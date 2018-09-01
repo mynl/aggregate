@@ -13,6 +13,7 @@ def hack_make_lines_from_csv(fn='../data/DIRECT_IEE.csv', do_save=False):
     placeholder
     make industry lines from IEE extract
     provenance: IND_IEE*....py in python
+
     :param do_save:
     :param fn:
     :return:
@@ -223,15 +224,16 @@ def hack_make_lines_from_csv(fn='../data/DIRECT_IEE.csv', do_save=False):
     def skew(x):
         return x.skew()
 
-    def EP(x):
+    def premium_net_of_expenses(x):
         """
         premium net of expenses
+
         """
         return x.iloc[-1]
 
     sf = [np.mean, np.std, cov, skew]
     tl = clean(D)
-    piv = tl.groupby('NAME').agg({'LR': sf, 'PLR': sf, 'ER': sf, 'CR': sf, 'DEP': EP})
+    piv = tl.groupby('NAME').agg({'LR': sf, 'PLR': sf, 'ER': sf, 'CR': sf, 'DEP': premium_net_of_expenses})
     display(piv)
     piv.plot(kind='bar', subplots=True, figsize=(9, 8), layout=(-1, 4), sharex=True)
     ans = piv['DEP']

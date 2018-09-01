@@ -12,17 +12,19 @@ import os
 from . utils import html_title, sensible_jump
 from . port import Portfolio
 
+
 class Example(object):
     """
     Example: class
     Manages examples for Portfolio object
     Building examples from built in lines
+
+
+    :param dirname: dirname load filename or YAMLFILE if not given
     """
 
     def __init__(self, dirname=""):
         """
-        load filename or YAMLFILE if not given
-        :param dirname:
         """
         if dirname == '':
             # TODO sort out...
@@ -41,6 +43,7 @@ class Example(object):
     def rescale_sev(spec, scale):
         """
         Apply scale to a built in line
+
         :param scale:
         :param spec:
         :return:
@@ -62,6 +65,7 @@ class Example(object):
     def shift_sev(spec, shift):
         """
         shift severity for a built in line, leaves limit unchanged
+
         :param shift:
         :param spec:
         :return:
@@ -77,6 +81,7 @@ class Example(object):
         """
         Adjust scale and shift freq for a built in line
         can make both adjustment, scale first then shift
+
         :param spec:
         :param scale:
         :param shift:
@@ -193,6 +198,7 @@ class Example(object):
     def line(self, name):
         """
         return dictionary line specification, for building portfolios
+
         :param name:
         :return:
         """
@@ -221,6 +227,7 @@ class Example(object):
         """
         make Example scriptable: try user portfolios, b/in portfolios, line, severity
         to access specifically use severity or line methods
+
         :param name:
         :return:
         """
@@ -274,17 +281,20 @@ class Example(object):
             temp['MeanErr'] = temp.EmpMean / temp.Mean - 1
             temp['CVErr'] = temp.EmpCV / temp.CV - 1
             temp = temp[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr']]
-            display(temp.style.applymap(Example.highlight))
+            display(temp.style.applymap(Example._highlight))
 
         if reporting_level >= 3:
             html_title('Graphics', 1)
 
     @staticmethod
-    def highlight(val):
+    def _highlight(val):
         """
         Takes a scalar and returns a string with
         the css property `'color: red'` for large
         values. As pct error
+
+        :param val:
+        :return:
         """
         color = 'red' if abs(val) > 0.01 and val < 1 else 'black'
         return f'color: {color}; font-weight: bold'

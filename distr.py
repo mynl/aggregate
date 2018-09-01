@@ -11,32 +11,32 @@ class Agg(object):
     """
     CAgg creates an aggregate distritbution from a frequency/severity specfication.
 
+    Spec = members:
+        name
+        attachment 0 (occ attachment) TODO why aren't these in the seveirty and have AGG L & A outside?
+        limit np.inf (occ limit)
+        severity =
+            version 1
+                dist name lognorm | gamma | histogram | portfolio
+                shape param(s)
+                scale = 1
+                loc = 0
+                portfolio = portfolio variable (hummmm, now do you want to deep copy??!)
+            version 2
+                dist name = scipy.stats distname  | histogram
+                mean (unlimited)
+                cv
+                if histogram supply array of xs and ps
+        frequency =
+            n = claim count
+            contagion, c
+            fixed = 1  # makes the distribution fixed type rather than Poisson
+
+    :param spec:
     """
 
     def __init__(self, spec):
-        """
-        Spec = members:
-            name
-            attachment 0 (occ attachment) TODO why aren't these in the seveirty and have AGG L & A outside?
-            limit np.inf (occ limit)
-            severity =
-                version 1
-                    dist name lognorm | gamma | histogram | portfolio
-                    shape param(s)
-                    scale = 1
-                    loc = 0
-                    portfolio = portfolio variable (hummmm, now do you want to deep copy??!)
-                version 2
-                    dist name = scipy.stats distname  | histogram
-                    mean (unlimited)
-                    cv
-                    if histogram supply array of xs and ps
-            frequency =
-                n = claim count
-                contagion, c
-                fixed = 1  # makes the distribution fixed type rather than Poisson
-        :param spec:
-        """
+
         self.spec = deepcopy(spec)
         self.name = spec['name']
 
@@ -180,6 +180,7 @@ class Agg(object):
     def __str__(self):
         """
         Goal: readability
+
         :return:
         """
         s = f"CAgg: {self.name}\n\tEN={self.n}, CV={self.report[('freq', 'cv')]:5.3f}\n\t" \
@@ -198,6 +199,7 @@ class Agg(object):
     def plot(self, N=100, p=1e-4, axiter=None):
         """
         make a quick plot of fz
+
         :param axiter:
         :param N:
         :param p:
@@ -223,6 +225,7 @@ class Agg(object):
     def recommend_bucket(self, N):
         """
         recommend a bucket size given N buckets
+
         :param N:
         :return:
         """
@@ -237,6 +240,7 @@ class Agg(object):
     def density(self, xs, padding, tilt_vector, approximation='exact', sev_calc='gradient', force_severity=False):
         """
         Compute the density
+
         :param xs:
         :param padding:
         :param tilt_vector:
@@ -308,7 +312,7 @@ class Agg(object):
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name):
         """
         Compare the base and Delbaen Haezendonck transformed aggregates
-        beta(x) = alpha + gamma(x)
+        $\beta(x) = \alpha + \gamma(x)$.
         alpha = log(freq' / freq): log of the increase in claim count
         gamma = log(RND of adjusted severity) = log(tilde f / f)
         Adjustment guarantees a positive loading iff beta is an increasing function
@@ -317,9 +321,11 @@ class Agg(object):
         Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
         form of beta function described in 2.23 via, 2.16-17 and 2.18
         From examples on last page of paper:
-            beta(x) = a ==> adjust frequency by factor of e^a
-            beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
-            beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
+
+        *    beta(x) = a ==> adjust frequency by factor of e^a
+        *    beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
+        *    beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
+
         :param xs:
         :param padding:
         :param tilt_vector:
@@ -350,6 +356,8 @@ class Agg(object):
     def emp_stats(self):
         """
         report on empirical stats
+
+
         :return:
         """
 
@@ -380,8 +388,9 @@ class Agg(object):
     def quick_visual(self, axiter=None, figsize=(9, 3)):
         """
         Plot severity and agg, density, distribution and Lee diagram
-        :param axiter:
-        :param figsize:
+
+        :param axiter: iterator for axes
+        :param figsize: figure size, only used if axiter is None
         :return:
         """
 

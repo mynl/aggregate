@@ -163,7 +163,8 @@ class Portfolio(object):
 
     def yaml(self, stream=None):
         """
-        write out as YAML
+        write object as YAML
+
         :param stream:
         :return:
         """
@@ -196,7 +197,9 @@ class Portfolio(object):
     def save(self, filename='', mode='a'):
         """
         persist to YAML in filename; if none save to user.yaml
+
         TODO: update user list in Examples?
+
         :param filename:
         :param mode: for file open
         :return:
@@ -212,7 +215,9 @@ class Portfolio(object):
     def __add__(self, other):
         """
         Add two portfolio objets INDEPENDENT sum (down road can look for the same severity...)
+
         TODO same severity!
+
         :param other:
         :return:
         """
@@ -259,6 +264,7 @@ class Portfolio(object):
     def __mul__(self, other):
         """
         new = self * other, other integer, sum of other independent copies
+
         :param other:
         :return:
         """
@@ -289,6 +295,7 @@ class Portfolio(object):
     def q(self, p):
         """
         return a quantile using nearest (i.e. will be in the index
+
         :param p:
         :return:
         """
@@ -299,7 +306,10 @@ class Portfolio(object):
     def quantile_function(self, kind='nearest'):
         """
         return an approximation to the quantile function
+
         TODO sort out...this isn't right
+
+        :param kind:
         :return:
         """
         q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind, bounds_error=False, fill_value=0)
@@ -309,6 +319,7 @@ class Portfolio(object):
         """
         returns a dictionary specification of the portfolio aggregate
         if updated uses empirical moments, otherwise uses theoretic moments
+
         :param kind: slognorm | sgamma
         :return:
         """
@@ -337,6 +348,7 @@ class Portfolio(object):
     def collapse(self, kind='slognorm'):
         """
         returns new CPortfolio with the fit
+
         :param kind: slognorm | sgamma
         :return:
         """
@@ -368,7 +380,8 @@ class Portfolio(object):
 
     def recommend_bucket(self):
         """
-        guess a good bucket size
+        data to help estimate a good bucket size
+
         :return:
         """
         N = 1 << 10
@@ -392,6 +405,7 @@ class Portfolio(object):
                **kwargs):
         """
         interp guesses exa etc. for small losses, but that doesn't work
+
         :param log2:
         :param bs: bucket size
         :param approx_freq_ge:
@@ -596,19 +610,16 @@ class Portfolio(object):
 
         kind = collateral
             plot to illustrate bivariate density of line vs not line with indicated asset a and capital c
-            :param figsize:
-            :param height:
-            :param aspect:
-            :param line:
-            :param c:
-            :param a:
         :param kind:
         :param line:
-        :param axiter:
         :param p:   for graphics audit controls loss scale
+        :param c:
+        :param a:
+        :param axiter:
+        :param figsize:
+        :param height:
+        :param aspect:
         :param kwargs:
-        :return:
-        :param line:
         :return:
         """
 
@@ -784,6 +795,7 @@ class Portfolio(object):
     def uat_interpolation_functions(self, a0, e0):
         """
         Perform quick audit of interpolation functions
+
         :param a0: base assets
         :param e0: base epd
         :return:

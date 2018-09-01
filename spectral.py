@@ -26,6 +26,7 @@ class Distortion(object):
     def available_distortions(cls, pricing=True):
         """
         list of the available distortions
+
         :param pricing: only return list suitable for pricing
         :return:
         """
@@ -39,6 +40,7 @@ class Distortion(object):
         """
         create new distortion
         create from  g_spec = {name, shape} ising **g_spec!
+
         :param name: ph wang lep ly clin
         :param shape: float or [float, float]
 
@@ -155,6 +157,7 @@ class Distortion(object):
     def __str__(self):
         """
         printable version of distortion
+
         :return:
         """
         s = f'{self._distortion_names_[self.name]} ({self.shape:.3f}'
@@ -175,7 +178,8 @@ class Distortion(object):
     # noinspection PyUnusedLocal
     def plot(self, xs=None, n=101, both=True, ax=None, **kwargs):
         """
-        quick plot of the distortionk
+        quick plot of the distortion
+
         :param ax:
         :param xs:
         :param n:  length of vector is no xs
@@ -203,6 +207,7 @@ class Distortion(object):
     def test(cls, r0=0.05):
         """
         tester: make some nice plots
+
         :return:
         """
 
@@ -225,11 +230,11 @@ class Distortion(object):
         """
         make set of dist funs and inverses from params, output of port.calibrate_distortions
         params must just have one row for each method and be in the output format of cal_dist
+
         :param plot:
         :param index:
-        :param r0:
+        :param r0: min rol parameters
         :param params: dataframe such that params[index, :] has a [lep, param] etc.
-        :ro: min rol parameters
         :return:
         """
         temp = params.loc[index, :]

@@ -1,0 +1,221 @@
+bodoff1:
+    args:
+        log2: 8
+        bs: 1
+        sev_calc: rescale
+    spec:
+        -   name: wind
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 99]
+                    ps: !!python/tuple [0.8, 0.2]
+            frequency:
+                    n: 1
+                    fixed: 1
+        -   name: quake
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 100]
+                    ps: !!python/tuple [0.95, 0.05]
+            frequency:
+                    n: 1
+                    fixed: 1
+bodoff2:
+    args:
+        log2: 8
+        bs: 1
+        sev_calc: rescale
+    spec:
+        -   name: wind
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 50]
+                    ps: !!python/tuple [0.8, 0.2]
+            frequency:
+                    n: 1
+                    fixed: 1
+        -   name: quake
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 100]
+                    ps: !!python/tuple [0.95, 0.05]
+            frequency:
+                    n: 1
+                    fixed: 1
+bodoff3:
+    args:
+        log2: 8
+        bs: 1
+        sev_calc: rescale
+    spec:
+        -   name: wind
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 5]
+                    ps: !!python/tuple [0.8, 0.2]
+            frequency:
+                    n: 1
+                    fixed: 1
+        -   name: quake
+            severity:
+                    name: histogram
+                    xs: !!python/tuple [0, 100]
+                    ps: !!python/tuple [0.95, 0.05]
+            frequency:
+                    n: 1
+                    fixed: 1
+bodoff4:
+    args:
+        log2: 16
+        bs: 0.0625
+        sev_calc: rescale
+    spec:
+        -   name: a
+            severity:
+                name: expon
+                scale: 4
+            frequency:
+                n: 0.25
+                fixed: -1
+        -   name: b
+            severity:
+                name: expon
+                scale: 20
+            frequency:
+                n: 0.05
+                fixed: -1
+        -   name: c
+            severity:
+                name: expon
+                scale: 100
+            frequency:
+                n: 0.01
+                fixed: -1
+small_medium_large:
+    args:
+        log2: 14
+        bs: 10000
+        sev_calc: rescale
+    spec:
+        -   name: small
+            severity:
+                name: lognorm
+                mean: 500000
+                cv: 1.5
+            limit: !!float 10e6
+            frequency:
+                n: 10
+                contagion: 0.01
+        -   name: medium
+            severity:
+                name: lognorm
+                mean: 50000
+                cv: 1.5
+            limit: !!float 1e6
+            frequency:
+                n: 100
+                contagion: 0.01
+        -   name: large
+            severity:
+                name: lognorm
+                mean: 50000
+                cv: 1.5
+            limit: !!float 1e6
+            frequency:
+                n: 1000
+                contagion: 0.01
+mass_test:
+    args:
+        log2: 6
+        bs: 1
+        sev_calc: rescale
+    spec:
+        -   name: a
+            severity:
+                name: uniform
+                scale: 10
+                loc: 5
+            frequency:
+                n: 2
+                fixed: 1
+        -   name: b
+            severity:
+                name: uniform
+                scale: 10
+                loc: 0
+            frequency:
+                n: 1
+                fixed: 1
+        -   name: c
+            severity:
+                name: uniform
+                scale: 15
+                loc: 5
+            frequency:
+                n: 1
+                fixed: 1
+interesting_cat:
+    args:
+        log2: 14
+        bs: 10
+        sev_calc: rescale
+    spec:
+        -   name: lognormalcat
+            severity:
+                name: lognorm
+                scale: 45.783336177161424
+                scalenote: 100 * np.exp(-1.25 * 1.25 / 2)
+                shape: 1.25
+            limit: 40000
+            frequency:
+                n: 3.5
+                contagion: 0
+        -   name: paretocat
+            severity:
+                name: pareto
+                shape: 1.25
+                scale: 50
+                loc: -50
+            frequency:
+                n: 2
+        -   name: attrit
+            severity:
+                name: lognorm
+                mean: 1
+                cv: 1.75
+            limit: 500
+            frequency:
+                n: 10000
+                contagion: 0.25
+kent:
+    args:
+        log2: 13
+        bs: 1
+        sev_calc: rescale
+    spec:
+        -   name: attrit
+            severity:
+                name: frozen
+                fz: !!python/object/apply:LCA_Aggregate.beta_factory
+                    args: [640, 5000, 0.25]
+            frequency:
+                n: 1
+                fixed: 1
+        -   name: wind
+            severity:
+                name: frozen
+                fz: !!python/object/apply:LCA_Aggregate.beta_factory
+                    args: [400, 5000, 1.00]
+            frequency:
+                n: 0.75
+                fixed: -1
+        -   name: quake
+            severity:
+                name: frozen
+                fz: !!python/object/apply:LCA_Aggregate.beta_factory
+                    args: [800, 5000, 0.05]
+            frequency:
+                n: 0.05
+                fixed: -1
+
+

@@ -1,0 +1,115 @@
+user_a:
+    args:
+        log2: 14
+        bs: 10000
+        sev_calc: rescale
+    spec:
+        -   name: small
+            severity:
+                name: lognorm
+                mean: 500000
+                cv: 0.5
+            limit: !!float 10e6
+            frequency:
+                n: 10
+                contagion: 0.01
+        -   name: medium
+            severity:
+                name: lognorm
+                mean: 50000
+                cv: 1.5
+            limit: !!float 1e6
+            frequency:
+                n: 200
+                contagion: 0.01
+        -   name: large
+            severity:
+                name: lognorm
+                mean: 50000
+                cv: 1.5
+            limit: !!float 1e6
+            frequency:
+                n: 1000
+                contagion: 0.01
+test:
+  args:
+    approx_freq_ge: 100
+    approx_type: slognorm
+    bs: 20000
+    hash_rep_at_last_update: '-5203523802985371838'
+    last_distortion: None
+    last_sev_calc: rescale
+    last_update: '2018-08-30T15:53:08'
+    log2: 11
+    padding: 1
+    remove_fuzz: true
+    tilt_amount: 0
+  spec:
+  - frequency:
+      cv: 0.18
+      n: 1
+    limit: 25000000
+    name: workcomp
+    severity:
+      cv: 2.1
+      mean: 10000
+      name: lognorm
+  - frequency:
+      cv: 0.24
+      n: 1
+    limit: 1000000
+    name: homeowners
+    severity:
+      cv: 1.0
+      mean: 50000
+      name: lognorm
+  - frequency:
+      cv: 0.09
+      n: 1
+    limit: 500000
+    name: personalauto
+    severity:
+      cv: 1.1
+      mean: 24000
+      name: lognorm
+new_example:
+    args:
+        approx_freq_ge: 100
+        approx_type: slognorm
+        bs: 100000
+        hash_rep_at_last_update: '-1307706648875916602'
+        last_distortion: None
+        last_sev_calc: rescale
+        last_update: '2018-08-30T16:31:13'
+        log2: 11
+        padding: 1
+        remove_fuzz: false
+        tilt_amount: 0
+    spec:
+    -   frequency:
+            cv: 0.24
+            n: 1000
+        limit: 1000000
+        name: homeowners
+        severity:
+            cv: 1.0
+            mean: 50000
+            name: lognorm
+    -   frequency:
+            cv: 0.09
+            n: 2000
+        limit: 500000
+        name: personalauto
+        severity:
+            cv: 1.1
+            mean: 24000
+            name: lognorm
+    -   frequency:
+            cv: 0.18
+            n: 1000
+        limit: 25000000
+        name: workcomp
+        severity:
+            cv: 2.1
+            mean: 10000
+            name: lognorm

@@ -9,55 +9,41 @@ from . utils import *
 
 class Agg(object):
     """
-    CAgg creates an aggregate distritbution from a frequency/severity specfication.
+    Agg creates an aggregate distritbution from a frequency/severity specfication.
 
-    Spec = members:
-        name
-        attachment 0 (occ attachment) TODO why aren't these in the seveirty and have AGG L & A outside?
-        limit np.inf (occ limit)
-        severity =
-            version 1
-                dist name lognorm | gamma | histogram | portfolio
-                shape param(s)
-                scale = 1
-                loc = 0
-                portfolio = portfolio variable (hummmm, now do you want to deep copy??!)
-            version 2
-                dist name = scipy.stats distname  | histogram
-                mean (unlimited)
-                cv
-                if histogram supply array of xs and ps
-        frequency =
-            n = claim count
-            contagion, c
-            fixed = 1  # makes the distribution fixed type rather than Poisson
+    Spec is a dictionary with members
 
-    :param spec:
+    :param name:
+    :param attachment:
+    :param limit: limit np.inf (occ limit)
+    :param severity: 0 (occ attachment) TODO why aren't these in the severity and have AGG L & A outside?;
+        dist name = scipy.stats distname  | histogram; mean (unlimited); cv; if histogram, supply array of xs and ps
+        and specify type
+    :param frequency: n = claim count, contagion c, fixed = 1|fixed, 0|Poisson, -1|Binomial/Bernoulli
     """
 
-    def __init__(self, spec):
+    def __init__(self, name, attachment=0, limit=np.inf, severity={}, frequency):
 
-        self.spec = deepcopy(spec)
-        self.name = spec['name']
+        self.spec = deepcopy(name)
+        self.name = name['name']
 
         # occurrence specs
-        self.attachment = spec.get('attachment', 0)
-        self.limit = spec.get('limit', np.inf)
+        self.attachment = attachment
+        self.limit = limit
 
         # set up severity
-        sev = spec['severity']
-        self.sev_name = sev['name']
-        if sev['name'] == 'histogram':
-            xs = np.array(sev['xs'])
-            ps = np.array(sev['ps'])
+        self.sev_name = severity['name']
+        if severity['name'] == 'histogram':
+            xs = np.array(severity['xs'])
+            ps = np.array(severity['ps'])
             xss = np.sort(np.hstack((xs, xs + 1e-5)))
             pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
             self.fz = ss.rv_histogram((pss, xss))
-        elif sev['name'] == 'frozen':
+        elif severity['name'] == 'frozen':
             # hand in a frozen sev directly
-            self.fz = sev['fz']
-        elif sev['name'] == 'portfolio':
-            port = sev['portfolio']
+            self.fz = severity['fz']
+        elif severity['name'] == 'portfolio':
+            port = severity['portfolio']
             # object must have been updated
             # TODO implement auto update...
             assert port.audit_df is not None
@@ -74,14 +60,14 @@ class Agg(object):
             else:
                 raise ValueError(f'Unknown type {hist_type} passed to portfolio approximation, ' 
                                  'valid=continuous or discrete')
-        elif 'mean' in sev:
-            mean = sev['mean']
-            cv = sev['cv']
-            self.fz, sh, sc = distribution_factory(sev['name'], mean, cv)
-            sev['shape'] = sh
-            sev['scale'] = sc
+        elif 'mean' in severity:
+            mean = severity['mean']
+            cv = severity['cv']
+            self.fz, sh, sc = distribution_factory(severity['name'], mean, cv)
+            severity['shape'] = sh
+            severity['scale'] = sc
         else:
-            gen = getattr(ss, sev['name'])
+            gen = getattr(ss, severity['name'])
             shape = sev.get('shape', None)
             loc = sev.get('loc', 0)
             scale = sev.get('scale', 1)
@@ -119,12 +105,11 @@ class Agg(object):
         sev3 = sev3[0]
 
         # frequency
-        freq = spec['frequency']
-        self.n = freq['n']
-        self.contagion = freq.get('contagion', 0)
-        if 'cv' in freq:
-            self.contagion = freq['cv'] ** 2
-        self.fixed = freq.get('fixed', 0)
+        self.n = frequency['n']
+        self.contagion = frequency.get('contagion', 0)
+        if 'cv' in frequency:
+            self.contagion = frequency['cv'] ** 2
+        self.fixed = frequency.get('fixed', 0)
         c = self.contagion
         freq1 = self.n
         if self.fixed == 1 or self.fixed == 'fixed':

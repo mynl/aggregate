@@ -1,8 +1,8 @@
 # aggregate
 
 
-aggregate - a powerful aggregate loss modeling library for Python
-==================================================================
+a powerful aggregate loss modeling library for Python
+=====================================================
 
 What is it?
 -----------

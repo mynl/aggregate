@@ -24,7 +24,7 @@ class Portfolio(object):
         self.agg_list = []
         self.line_names = []
         for spec in spec_list:
-            self.agg_list.append(Agg(spec))
+            self.agg_list.append(Agg(**spec))
             self.line_names.append(spec['name'])
         self.line_names_ex = self.line_names + ['total']
         sns.set_palette('Set1', 2 * len(self.line_names_ex))
@@ -597,7 +597,7 @@ class Portfolio(object):
         kind = density
         simple plotting of line density or not line density
         input single line or list of lines
-        p_ appended as appropriate
+        'p_'appended as appropriate
 
         kind = audit
             Miscellaneous audit graphs
@@ -610,6 +610,7 @@ class Portfolio(object):
 
         kind = collateral
             plot to illustrate bivariate density of line vs not line with indicated asset a and capital c
+
         :param kind:
         :param line:
         :param p:   for graphics audit controls loss scale
@@ -818,28 +819,29 @@ class Portfolio(object):
         Use fft to add exa_XXX = E(X_i | X=a) to each dist...obviously kludgy here
 
         also add exlea = E(X_i | X <= a) = sum_{x<=a} exa(x)*f(x) where f is for the total
-        ie. self.density_df['exlea_attrit'] = np.cumsum( self.density_df.exa_attrit * self.density_df.p_total) /
-                        self.density_df.F
+        ie. self.density_df['exlea_attrit'] = np.cumsum( self.density_df.exa_attrit *
+        self.density_df.p_total) / self.density_df.F
 
-        and add exgta = E(X_i | X>a)
-        since E(X) = E(X | X<= a)F(a) + E(X | X>a)S(a) we have
+        and add exgta = E(X_i | X>a) since E(X) = E(X | X<= a)F(a) + E(X | X>a)S(a) we have
         exgta = (ex - exlea F) / S
 
-        and add the actual expected losses (not theoretical )
-        the empirical amount: self.density_df['e_attrit'] =  np.sum( self.density_df.p_attrit * self.density_df.loss)
+        and add the actual expected losses (not theoretical) the empirical amount:
+        self.density_df['e_attrit'] =  np.sum( self.density_df.p_attrit * self.density_df.loss)
 
         Mid point adjustment is handled by the example creation routines
-           self.density_df.loss = self.density_df.loss - bs/2
+        self.density_df.loss = self.density_df.loss - bs/2
 
-        YOU CANNOT HAVE A LINE with a name starting t!!!
+        **YOU CANNOT HAVE A LINE with a name starting t!!!**
 
         See LCA_Examples for original code
 
         Alternative approach to exa: use UC=unconditional versions of exlea and exi_xgta:
-            exleaUC = np.cumsum(port.density_df['exeqa_' + col] * port.density_df.p_total)  # unconditional
-            exixgtaUC =np.cumsum(  self.density_df.loc[::-1, 'exeqa_' + col] / self.density_df.loc[::-1, 'loss'] *
-                    self.density_df.loc[::-1, 'p_total'] )
-            exa = exleaUC + exixgtaUC * self.density_df.loss
+
+        * exleaUC = np.cumsum(port.density_df['exeqa_' + col] * port.density_df.p_total)  # unconditional
+        * exixgtaUC =np.cumsum(  self.density_df.loc[::-1, 'exeqa_' + col] / self.density_df.loc[::-1, 'loss']
+          * self.density_df.loc[::-1, 'p_total'] )
+        * exa = exleaUC + exixgtaUC * self.density_df.loss
+
 
         """
 
@@ -1890,7 +1892,7 @@ class Portfolio(object):
 
     def uat_differential(self, line):
         """
-        Check the numerical and theoretical derivatives os exa_ agree for given line
+        Check the numerical and theoretical derivatives of exa agree for given line
 
         :param line:
         :return:

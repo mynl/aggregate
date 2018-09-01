@@ -3,7 +3,7 @@ Does this do anything?
 """
 
 from scipy.integrate import quad
-from copy import deepcopy
+# from copy import deepcopy
 from . utils import *
 
 
@@ -22,10 +22,11 @@ class Agg(object):
     :param frequency: n = claim count, contagion c, fixed = 1|fixed, 0|Poisson, -1|Binomial/Bernoulli
     """
 
-    def __init__(self, name, attachment=0, limit=np.inf, severity={}, frequency):
+    def __init__(self, name='', attachment=0, limit=np.inf, severity={}, frequency={}):
 
-        self.spec = deepcopy(name)
-        self.name = name['name']
+        self.spec = dict(name=name, attachment=attachment, limit=limit, severity=severity.copy(),
+                         frequency=frequency.copy())
+        self.name = name
 
         # occurrence specs
         self.attachment = attachment
@@ -49,7 +50,7 @@ class Agg(object):
             assert port.audit_df is not None
             xs = port.density_df.loss.values
             ps = port.density_df.p_total.values
-            hist_type = sev.get('type', 'continuous')
+            hist_type = severity.get('type', 'continuous')
             if hist_type == 'continuous':
                 xs = np.hstack((xs, xs[-1] + xs[1]))
                 self.fz = ss.rv_histogram((ps, xs))
@@ -68,9 +69,9 @@ class Agg(object):
             severity['scale'] = sc
         else:
             gen = getattr(ss, severity['name'])
-            shape = sev.get('shape', None)
-            loc = sev.get('loc', 0)
-            scale = sev.get('scale', 1)
+            shape = severity.get('shape', None)
+            loc = severity.get('loc', 0)
+            scale = severity.get('scale', 1)
             if shape is None:
                 self.fz = gen(loc=loc, scale=scale)
             else:
@@ -297,9 +298,9 @@ class Agg(object):
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name):
         """
         Compare the base and Delbaen Haezendonck transformed aggregates
-        $\beta(x) = \alpha + \gamma(x)$.
-        alpha = log(freq' / freq): log of the increase in claim count
-        gamma = log(RND of adjusted severity) = log(tilde f / f)
+        ``beta(x) = alpha + \gamma(x)``.
+        ``alpha = log(freq' / freq)``: log of the increase in claim count
+        ``gamma = log(RND of adjusted severity) = log(tilde f / f)``
         Adjustment guarantees a positive loading iff beta is an increasing function
         iff gamma is increasing iff tilde f / f is increasing.
         cf. eqn 3.7 and 3.8
@@ -307,9 +308,9 @@ class Agg(object):
         form of beta function described in 2.23 via, 2.16-17 and 2.18
         From examples on last page of paper:
 
-        *    beta(x) = a ==> adjust frequency by factor of e^a
-        *    beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
-        *    beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
+        *    ``beta(x) = a`` ==> adjust frequency by factor of e^a
+        *    ``beta(x) = log(1 + b(x - E(X)))``  ==> variance principle EN(EX + bVar(X))
+        *    ``beta(x) = ax- logE_P(exp(a x))``  ==> Esscher principle
 
         :param xs:
         :param padding:

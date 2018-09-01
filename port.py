@@ -597,7 +597,7 @@ class Portfolio(object):
         kind = density
         simple plotting of line density or not line density
         input single line or list of lines
-        'p_'appended as appropriate
+        p underscore appended as appropriate
 
         kind = audit
             Miscellaneous audit graphs

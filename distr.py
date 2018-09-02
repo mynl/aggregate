@@ -13,12 +13,18 @@ class Agg(object):
 
     Spec is a dictionary with members
 
+    TODO why aren't limit/attach in the severity and have AGG L & A outside?
+
     :param name:
     :param attachment:
     :param limit: limit np.inf (occ limit)
-    :param severity: 0 (occ attachment) TODO why aren't these in the severity and have AGG L & A outside?;
-        dist name = scipy.stats distname  | histogram; mean (unlimited); cv; if histogram, supply array of xs and ps
-        and specify type
+    :param severity:
+
+         - name = scipy.stats distribution name or  histogram
+         - mean (unlimited)
+         - cv
+         - if histogram, supply array of xs and ps and specify whether continuous or discrete
+
     :param frequency: n = claim count, contagion c, fixed = 1|fixed, 0|Poisson, -1|Binomial/Bernoulli
     """
 
@@ -298,13 +304,13 @@ class Agg(object):
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name):
         """
         Compare the base and Delbaen Haezendonck transformed aggregates
-        ``beta(x) = alpha + \gamma(x)``.
+        ``beta(x) = alpha + gamma(x)``.
         ``alpha = log(freq' / freq)``: log of the increase in claim count
         ``gamma = log(RND of adjusted severity) = log(tilde f / f)``
         Adjustment guarantees a positive loading iff beta is an increasing function
         iff gamma is increasing iff tilde f / f is increasing.
         cf. eqn 3.7 and 3.8
-        Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
+        Note conditions that `E(exp(beta(X))` and `E(X exp(beta(X))` must both be finite (3.4, 3.5)
         form of beta function described in 2.23 via, 2.16-17 and 2.18
         From examples on last page of paper:
 

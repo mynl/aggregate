@@ -113,3 +113,73 @@ new_example:
             cv: 2.1
             mean: 10000
             name: lognorm
+first test:
+    args:
+        approx_freq_ge: 100
+        approx_type: slognorm
+        bs: 1
+        hash_rep_at_last_update: '8700272782704736413'
+        last_distortion: None
+        last_sev_calc: discrete
+        last_update: '2018-09-03T00:34:37'
+        log2: 10
+        padding: 1
+        remove_fuzz: false
+        tilt_amount: 0
+    spec:
+    -   attachment: 0
+        el: 0
+        en: 10
+        freq_a: 0
+        freq_b: 0
+        freq_name: poisson
+        limit: 250
+        lr: 0
+        mix_wt: !!python/object/apply:numpy.core.multiarray._reconstruct
+            args:
+            - !!python/name:numpy.ndarray ''
+            - !!python/tuple
+                -   0
+            - !!binary |
+                Yg==
+            state: !!python/tuple
+            -   1
+            - !!python/tuple
+                -   10
+            - !!python/object/apply:numpy.dtype
+                args:
+                -   f8
+                -   0
+                -   1
+                state: !!python/tuple
+                -   3
+                -   <
+                -   null
+                -   null
+                -   null
+                -   -1
+                -   -1
+                -   0
+            -   false
+            - !!binary |
+                mpmZmZmZuT+amZmZmZm5P5qZmZmZmbk/mpmZmZmZuT+amZmZmZm5P5qZmZmZmbk/mpmZmZmZuT+a
+                mZmZmZm5P5qZmZmZmbk/mpmZmZmZuT8=
+        name: dist1 biz1
+        premium: 0
+        sev_a: 0
+        sev_b: 0
+        sev_cv:
+        -   0.05
+        -   0.26666667
+        -   0.48333333
+        -   0.7
+        -   0.91666667
+        -   1.13333333
+        -   1.35
+        -   1.56666667
+        -   1.78333333
+        -   2.0
+        sev_loc: 0
+        sev_mean: 100
+        sev_name: lognorm
+        sev_scale: 0

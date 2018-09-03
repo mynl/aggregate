@@ -5,7 +5,7 @@ Distortion functions to implement spectral risk measures
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
-from . utils import make_axes, suptitle_and_tight
+from . utils import axiter_factory, suptitle_and_tight
 
 
 class Distortion(object):
@@ -211,7 +211,7 @@ class Distortion(object):
         :return:
         """
 
-        axiter = make_axes(12, figsize=(10, 6))
+        axiter = axiter_factory(None, 12, figsize=(10, 6))
 
         xs = np.linspace(0, 1, 1001)
 

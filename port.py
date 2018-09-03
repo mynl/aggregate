@@ -4,7 +4,7 @@ from copy import deepcopy
 from ruamel import yaml
 
 from . utils import *
-from . distr import Agg
+from . distr import Aggregate
 from . spectral import Distortion
 
 
@@ -24,7 +24,7 @@ class Portfolio(object):
         self.agg_list = []
         self.line_names = []
         for spec in spec_list:
-            self.agg_list.append(Agg(**spec))
+            self.agg_list.append(Aggregate(**spec))
             self.line_names.append(spec['name'])
         self.line_names_ex = self.line_names + ['total']
         sns.set_palette('Set1', 2 * len(self.line_names_ex))
@@ -401,8 +401,8 @@ class Portfolio(object):
         return df
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
-               sev_calc='rescale', padding=1, tilt_amount=0, epds=None, trim_df=True,
-               **kwargs):
+               sev_calc='discrete', discretization_calc='survival', padding=1, tilt_amount=0, epds=None,
+               trim_df=True, verbose=False, **kwargs):
         """
         interp guesses exa etc. for small losses, but that doesn't work
 
@@ -459,7 +459,8 @@ class Portfolio(object):
         for agg in self.agg_list:
             nm = agg.name
             agg.density(xs, self.padding, tilt_vector,
-                        'exact' if agg.n < approx_freq_ge else approx_type, sev_calc)
+                        'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
+                        verbose=verbose)
             ft_line_density[nm] = agg.ftagg_density
             line_density[nm] = agg.agg_density
             if ftall is None:
@@ -625,8 +626,7 @@ class Portfolio(object):
         """
 
         if kind == 'quick':
-            if axiter is None:
-                axiter = make_axes(4, figsize, height, aspect, 'iterator')
+            axiter = axiter_factory(axiter, 4, figsize, height, aspect)
 
             self.statistics_df.loc[('agg', 'mean')]. \
                 sort_index(ascending=True, axis=0). \
@@ -655,25 +655,22 @@ class Portfolio(object):
             else:
                 raise ValueError
 
-            if 'subplots' in kwargs:
-                axiter = make_pandas_axes(axiter, len(line), figsize, height, aspect, **kwargs)
+            if 'subplots' in kwargs and len(line) > 1:
+                axiter = axiter_factory(axiter, len(line), figsize, height, aspect)
+                ax = axiter.grid(len(line))
             else:
-                axiter = make_pandas_axes(axiter, 1, figsize, height, aspect, **kwargs)
-
+                axiter = axiter_factory(axiter, 1, figsize, height, aspect)
+                ax = axiter.grid(1)
             self.density_df.loc[:, line].sort_index(axis=1). \
-                plot(title=f'{self.name} Line Density', sort_columns=True, ax=axiter, **kwargs)
-
+                plot(title=f'{self.name} Line Density', sort_columns=True, ax=ax, **kwargs)
             if 'subplots' in kwargs:
-                plt.tight_layout()
+                plt.tight_layout(rect=[0, 0, 1, 0.97])
 
         elif kind == 'audit':
             D = self.density_df
             # n_lines = len(self.line_names_ex)
             n_plots = 12  # * n_lines + 8  # assumes that not lines have been taken out!
-            axiter = make_axes(n_plots, figsize, height, aspect, returning='iterator')
-
-            # max color contrast
-            # sns.set_palette("husl", len(self.line_names_ex), .75)
+            axiter = axiter_factory(axiter, n_plots, figsize, height, aspect)
 
             # make appropriate scales
             density_scale = D.filter(regex='^p_').iloc[1:, :].max().max()
@@ -682,33 +679,33 @@ class Portfolio(object):
 
             # densities
             temp = D.filter(regex='^p_', axis=1)
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             print(ax)
             temp.plot(ax=ax, ylim=(0, density_scale), xlim=(0, large_loss_scale), title='Densities')
 
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             temp.plot(ax=ax, logx=True, ylim=(0, density_scale), title='Densities log/linear')
 
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             temp.plot(ax=ax, logy=True, xlim=(0, large_loss_scale), title='Densities linear/log')
 
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             temp.plot(ax=ax, logx=True, logy=True, title='Densities log/log')
 
             # graph of cumulative loss cost and rate of change of cumulative loss cost
             temp = D.filter(regex='^exa_[^n]')
 
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             temp.plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, expected_loss_scale),
                       title='Loss Cost by Line: $E(X_i(a))$')
 
-            ax = make_pandas_axes(axiter, 1)
+            ax = axiter.grid(1)
             temp.diff().plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, D.index[1]),
                              title='Change in Loss Cost by Line: $\\nabla E(X_i(a))$')
 
             # E(X_i / X | X > a); exi_x_lea_ dropped
             for prefix in ['exi_xgta_', 'exeqa_', 'exlea_', 'exgta_']:
-                ax = make_pandas_axes(axiter, 1)
+                ax = axiter.grid(1)
                 D.filter(regex='^' + prefix).plot(ax=ax, xlim=(0, large_loss_scale))
                 ax.set_title(prefix.replace('xi_x_', ' $X_i/X$ '))
                 if prefix == 'exgta_':
@@ -742,20 +739,20 @@ class Portfolio(object):
             n_lines = len(self.line_names_ex)
             n_plots = 3 + 2 * n_lines
             if axiter is None:
-                axiter = make_axes(n_plots, figsize, height, aspect, returning='iterator')
+                axiter = axiter_factory(axiter, n_plots, figsize, height, aspect)
 
             for prefix in ['lev_', 'exa_', 'e2pri_']:
-                ax = make_pandas_axes(axiter, 1)
+                ax = axiter.grid(1)
                 self.density_df.filter(regex=f'{prefix}').plot(ax=ax, xlim=(0, xmax),
                                                                title=prefix[:-1].title())
                 ax.set_xlabel('Capital assets')
 
             for line in self.line_names:
-                ax = make_pandas_axes(axiter, 1)
+                ax = axiter.grid(1)
                 self.density_df.filter(regex=f'(lev|exa|e2pri)_{line}$').plot(ax=ax, xlim=(0, xmax))
                 ax.set_xlabel('Capital assets')
             for col in self.line_names_ex:
-                ax = make_pandas_axes(axiter, 1)
+                ax = axiter.grid(1)
                 self.density_df.filter(regex=f'epd_[012]_{col}').plot(ax=ax, xlim=(0, xmax),
                                                                       title=f'{col.title()} EPDs', logy=True)
             plt.tight_layout()
@@ -763,7 +760,7 @@ class Portfolio(object):
         elif kind == 'collateral':
             assert line != '' and line != 'all'
             if axiter is None:
-                axiter = make_axes(2, figsize, height, aspect, returning='iterator')
+                axiter = axiter_factory(axiter, 2, figsize, height, aspect)
 
             cmap = cm.BuGn
             if a == 0:

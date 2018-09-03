@@ -314,70 +314,103 @@ def plot_frozen(fz, N=100, p=1e-4):
     plt.show()
 
 
-# general purpose axis stuff
-def make_axes(n, figsize=None, height=2, aspect=1, returning='iterator'):
+def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     """
-    set up axiter for plotting with n subplots
+    axiter = check_axiter(axiter, ...) to allow chaining
+    TODO can this be done in the class somehow?
 
-    :param height:
-    :param aspect:
-    :param returning:
-    :param figsize:
-    :param n:
-    :return:
-    """
-    # for rows of 5
-    r = (4 + n) // 5
-    c = min(n, 5)
-    if returning == 'dimensions':
-        return r, c
-    if figsize is None:
-        h = r * height
-        w = c * height * aspect
-        figsize = (w, h)
-    f, axs = plt.subplots(r, c, figsize=figsize)
-    if n == 1:
-        return axs
-    if returning == 'iterator':
-        return iter(axs.flatten())
-    elif returning == 'grid':
-        return axs
-    else:
-        raise ValueError
-
-
-def make_pandas_axes(axiter, n, figsize=None, height=0, aspect=0, **kwargs):
-    """
-    make something suitable for pandas from the input, which may be none
-    n plots
-    https://pandas.pydata.org/pandas-docs/stable/visualization.html#using-layout-and-targeting-multiple-axes
-
-    :param figsize:
-    :param height:
-    :param aspect:
     :param axiter:
     :param n:
-    :param kwargs:
+    :param figsize:
+    :param height:
+    :param aspect:
+    :param nr:
     :return:
     """
     if axiter is None:
-        if 'subplots' in kwargs:
-            axiter = make_axes(n, figsize, height, aspect, returning='grid')
-        else:
-            # all on one plot
-            axiter = make_axes(1, figsize, height, aspect, returning='grid')
+        return AxisManager(n, figsize, height, aspect, nr)
     else:
-        if isinstance(axiter, np.ndarray):
-            # up to user to pass in something appropriate
-            pass
+        return axiter
+
+class AxisManager(object):
+    """
+
+
+    """
+
+    def __init__(self, n, figsize=None, height=2, aspect=1, nr=5):
+        """
+
+        :param n:
+        :param figsize:
+        :param height:
+        :param aspect:
+        :param nr: number of plots per row
+        """
+
+        self.n = n
+        self.nr = nr
+        self.r, self.c = self.grid_size(n)
+
+        if figsize is None:
+            h = self.r * height
+            w = self.c * height * aspect
+            figsize = (w, h)
+
+        self.f, self.axs = plt.subplots(self.r, self.c, figsize=figsize)
+        if n == 1:
+            self.ax = self.axs
+            self.it = None
         else:
-            # make up a suitable sized grid (note the size matters??
-            r, c = make_axes(n, returning='dimensions')
-            if n == 1:
-                axiter = next(axiter)
-            else:
-                axiter = [next(axiter) for i in range(c) for j in range(r)]
-    return axiter
+            self.faxs = self.axs.flatten()
+            self.it = iter(self.faxs)
+            self.ax = None
+
+    def __next__(self):
+        if self.n > 1:
+            self.ax = next(self.it)
+        return self.ax
+
+    def grid_size(self, n, subgrid=False):
+        """
+        appropriate grid size given class parameters
+
+        :param n:
+        :param subgrid: call is for a subgrid, no special treatment for 6 and 8
+        :return:
+        """
+        r = (self.nr - 1 + n) // self.nr
+        c = min(n, self.nr)
+        if not subgrid:
+            if self.nr > 3 and n == 6:
+                r = 2
+                c = 3
+            elif self.nr > 4 and n == 8:
+                r = 2
+                c = 4
+        return r, c
+
+    def dimensions(self):
+        return self.r, self.c
+
+    def grid(self, size=0):
+        """
+        return a block of axes suitable for Pandas
+        if size=0 return all the axes
+
+        :param size:
+        :return:
+        """
+
+        if size == 0:
+            return self.faxs
+        elif size == 1:
+            return self.__next__()
+        else:
+            # need local sizing
+            assert self.n >= size
+            r, c = self.grid_size(size, subgrid=True)
+            return [self.__next__() for _ in range(c) for _ in range(r)]
 
 
 def cumintegral(v, bs):

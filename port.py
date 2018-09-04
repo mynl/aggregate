@@ -23,11 +23,14 @@ class Portfolio(object):
         self.name = name
         self.agg_list = []
         self.line_names = []
+        ma = MomentAggregator("", 0, 0)
         for spec in spec_list:
-            self.agg_list.append(Aggregate(**spec))
+            a = Aggregate(**spec)
+            self.agg_list.append(a)
             self.line_names.append(spec['name'])
+            ma.add_fs( a.report[('freq', 'ex1')], a.report[('sev', 'ex1')], a.report[('sev', 'ex2')],
+                       a.report[('sev', 'ex3')])
         self.line_names_ex = self.line_names + ['total']
-        sns.set_palette('Set1', 2 * len(self.line_names_ex))
         for n in self.line_names:
             # line names cannot start with n, it is reserved for "not"
             if n[0] == 'n':
@@ -73,7 +76,8 @@ class Portfolio(object):
                                           tot_agg_ex1, tot_agg_ex2, tot_agg_ex3,
                                           tot_freq_ex1, tot_freq_ex2, tot_freq_ex3,
                                           tot_sev_ex1, tot_sev_ex2, tot_sev_ex3, max_limit, p999], 'total'))
-        self.statistics_df = pd.concat([temp_report, temp], axis=1)
+        temp2 = pd.DataFrame(ma.stats_series('new_tot', max_limit, p999, total=True))
+        self.statistics_df = pd.concat([temp_report, temp, temp2], axis=1)
         # future storage
         # self.line_density = {}
         # self.ft_line_density = {}
@@ -160,6 +164,23 @@ class Portfolio(object):
         :return:
         """
         return hash(self.__repr__())
+
+    def __iter__(self):
+        """
+        make Portfolio iterable
+
+        :return:
+        """
+        return iter(self.agg_list)
+
+    def __getitem__(self, item):
+        """
+        alloow Portfolio[slice] to return bits of agg_list
+
+        :param item:
+        :return:
+        """
+        return self.agg_list[item]
 
     def yaml(self, stream=None):
         """

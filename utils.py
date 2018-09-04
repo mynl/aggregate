@@ -6,6 +6,7 @@ from scipy.optimize import newton
 import seaborn as sns
 from IPython.core.display import HTML, display
 import logging
+import itertools
 
 # logging
 # TODO better filename!
@@ -547,10 +548,287 @@ def read_log():
     df = df.set_index('datetime')
     return df
 
+
 class MomentAggregator(object):
     """
     Accumulate moments
     Used by Portfolio and Aggregate (when there are multiple severities)
     makes report df and statistics_df
 
+    Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
+
+
     """
+
+    def __init__(self, freq_name, freq_a, freq_b):
+
+        self.freq_name = freq_name
+        self.freq_a = freq_a
+        self.freq_b = freq_b
+
+        # accumulators
+        self.agg_1 = self.agg_2 = self.agg_3 = 0
+        self.tot_agg_1 = self.tot_agg_2 = self.tot_agg_3 = 0
+        self.freq_1 = self.freq_2 = self.freq_3 = 0
+        self.tot_freq_1 = self.tot_freq_2 = self.tot_freq_3 = 0
+        self.sev_1 = self.sev_2 = self.sev_3 = 0
+        self.tot_sev_1 = self.tot_sev_2 = self.tot_sev_3 = 0
+
+    def freq_moms(self, f1):
+        """
+        figure the moments for the given frequency distribution
+
+        :param f1:
+        :return:
+        """
+
+        freq_1 = f1
+
+        if self.freq_name == 'fixed':
+            # fixed distribution N=n certainly
+            freq_2 = freq_1 ** 2
+            freq_3 = freq_1 * freq_2
+        elif self.freq_name == 'bernoulli':
+            # code for bernoulli n, E(N^k) = E(N) = n
+            freq_2 = freq_1
+            freq_3 = freq_1
+        elif self.freq_name == 'poisson' and self.freq_a == 0:
+            # Poisson
+            freq_2 = freq_1 * (1 + freq_1)
+            freq_3 = freq_1 * (1 + freq_1 * (3 + freq_1))
+        else:
+            # for gamma alpha, k with density x^alpha e^-kx, EX^n = Gamma(alpha + n) / Gamma(n) k^-n
+            # EX = a/k = 1, so a=k
+            # EX2 = (a+1)a/k^2 = a^2/k^2 + a/k^2 = (EX)^2 + a/k^2 = 1 + 1/k, hence var = a/k^2
+            # if EX=1 and var = c then var = a/k/k = 1/k = c, so k = 1/c
+            # then a = 1/c
+            # Finally EX3 = (a+2)(a+1)a/k^3 = (c+1)(c+2)
+            # Iman Conover paper page 14
+            # for now...
+            c = self.freq_a * self.freq_a
+            freq_2 = freq_1 * (1 + freq_1 * (1 + c))  # note 1+c = E(G^2)
+            freq_3 = freq_1 * (1 + freq_1 * (3 * (1 + c) + freq_1 * (1 + c) * (1 + 2 * c)))
+
+        return freq_2, freq_3
+
+    def add_fs(self, f1, s1, s2, s3):
+        """
+        accumulate new moments defined by f and s
+        compute agg for the latest values
+
+
+        :param f1:
+        :param s1:
+        :param s2:
+        :param s3:
+        :return:
+        """
+
+        # fill in the frequency moments and store away
+        f2, f3 = self.freq_moms(f1)
+        self.freq_1 = f1
+        self.freq_2 = f2
+        self.freq_3 = f3
+
+        # load current sev stats
+        self.sev_1 = s1
+        self.sev_2 = s2
+        self.sev_3 = s3
+
+        # accumulatge frequency
+        self.tot_freq_1, self.tot_freq_2, self.tot_freq_3 = \
+            self.cumulate_moments(self.tot_freq_1, self.tot_freq_2, self.tot_freq_3, f1, f2, f3)
+
+        # severity
+        self.tot_sev_1 = self.tot_sev_1 + f1 * s1
+        self.tot_sev_2 = self.tot_sev_2 + f1 * s2
+        self.tot_sev_3 = self.tot_sev_3 + f1 * s3
+
+        # aggregate
+        self.agg_1, self.agg_2, self.agg_3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
+
+        # finally accumulate the aggregate
+        self.tot_agg_1, self.tot_agg_2, self.tot_agg_3 = \
+            self.cumulate_moments(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, self.agg_1, self.agg_2, self.agg_3)
+
+    @staticmethod
+    def agg_from_fs(f1, f2, f3, s1, s2, s3):
+        """
+        aggregate moments from freq and sev components
+
+
+        :param f1:
+        :param f2:
+        :param f3:
+        :param s1:
+        :param s2:
+        :param s3:
+        :return:
+        """
+        return f1 * s1, \
+               f1 * s2 + (f2 - f1) * s1 ** 2, \
+               f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
+
+    def get_fsa_stats(self, total, remix=False):
+        """
+        get the current f x s = agg stats and moments
+        total = true use total else, current
+        remix = true for total only, re-compute freq stats based on total freq 1
+
+        :param total: binary
+        :param remix: combine all sevs and recompute the freq moments from total freq
+        :return:
+        """
+
+        if total:
+            if remix:
+                # recompute the frequency moments; all local variables
+                f1 = self.tot_freq_1
+                f2, f3 = self.freq_moms(f1)
+                s1, s2, s3 = self.tot_sev_1 / f1, self.tot_sev_2 / f1, self.tot_sev_3 / f1
+                a1, a2, a3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
+                return [f1, f2, f3, *self._moments_to_mcvsk(f1, f2, f3),
+                        s1, s2, s3, *self._moments_to_mcvsk(s1, s2, s3),
+                        a1, a2, a3, *self._moments_to_mcvsk(a1, a2, a3)]
+            else:
+                # running total, not adjusting freq cv
+                return [self.tot_freq_1, self.tot_freq_2, self.tot_freq_3, *self.moments_to_mcvsk('freq', True),
+                        self.tot_sev_1 / self.tot_freq_1, self.tot_sev_2 / self.tot_freq_1,
+                        self.tot_sev_3 / self.tot_freq_1, *self.moments_to_mcvsk('sev', True),
+                        self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, *self.moments_to_mcvsk('agg', True)]
+        else:
+            # not total
+            return [self.freq_1, self.freq_2, self.freq_3, *self.moments_to_mcvsk('freq', False),
+                    self.sev_1, self.sev_2, self.sev_3, *self.moments_to_mcvsk('sev', False),
+                    self.agg_1, self.agg_2, self.agg_3, *self.moments_to_mcvsk('agg', False)]
+
+    def moments_to_mcvsk(self, mom_type, total=True):
+        """
+        convert noncentral moments into mean, cv and skewness
+        type = agg | freq | sev | mix
+        delegates work
+
+        :param mom_type:
+        :param total:
+        :return:
+        """
+
+        if mom_type == 'agg':
+            if total:
+                return MomentAggregator._moments_to_mcvsk(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3)
+            else:
+                return MomentAggregator._moments_to_mcvsk(self.agg_1, self.agg_2, self.agg_3)
+        elif mom_type == 'freq':
+            if total:
+                return MomentAggregator._moments_to_mcvsk(self.tot_freq_1, self.tot_freq_2, self.tot_freq_3)
+            else:
+                return MomentAggregator._moments_to_mcvsk(self.freq_1, self.freq_2, self.freq_3)
+        elif mom_type == 'sev':
+            if total:
+                return MomentAggregator._moments_to_mcvsk(self.tot_sev_1 / self.tot_freq_1,
+                                                          self.tot_sev_2 / self.tot_freq_1,
+                                                          self.tot_sev_3 / self.tot_freq_1)
+            else:
+                return MomentAggregator._moments_to_mcvsk(self.sev_1, self.sev_2, self.sev_3)
+
+    def moments(self, mom_type, total=True):
+        """
+        vector of the moments; convenience function
+
+        :param mom_type:
+        :param total:
+        :return:
+        """
+        if mom_type == 'agg':
+            if total:
+                return self.tot_agg_1, self.tot_agg_2, self.tot_agg_3
+            else:
+                return self.agg_1, self.agg_2, self.agg_3
+        elif mom_type == 'freq':
+            if total:
+                return self.tot_freq_1, self.tot_freq_2, self.tot_freq_3
+            else:
+                return self.freq_1, self.freq_2, self.freq_3
+        elif mom_type == 'sev':
+            if total:
+                return self.tot_sev_1 / self.tot_freq_1, self.tot_sev_2 / self.tot_freq_1, \
+                       self.tot_sev_3 / self.tot_freq_1
+            else:
+                return self.sev_1, self.sev_2, self.sev_3
+
+    @staticmethod
+    def cumulate_moments(m1, m2, m3, n1, n2, n3):
+        """
+        Moments of sum of indepdendent variables
+
+        :param m1: 1st moment, E(X)
+        :param m2: 2nd moment, E(X^2)
+        :param m3: 3rd moment, E(X^3)
+        :param n1:
+        :param n2:
+        :param n3:
+        :return:
+        """
+        # figure out moments of the sum
+        t1 = m1 + n1
+        t2 = m2 + 2 * m1 * n1 + n2
+        t3 = m3 + 3 * m2 * n1 + 3 * m1 * n2 + n3
+        return t1, t2, t3
+
+    @staticmethod
+    def column_names(agg_only):
+        """
+        list of the moment and stats names for f x s = a
+        list of the moment and stats names for just agg
+
+        :param agg_only: = True for total r
+        :return:
+        """
+
+        if agg_only:
+            return [i + j for i, j in itertools.product(['agg'], [f'_{i}' for i in range(1, 4)] +
+                                                        ['_m', '_cv', '_skew'])]
+        else:
+            return [i + j for i, j in itertools.product(['freq', 'sev', 'agg'], [f'_{i}' for i in range(1, 4)] +
+                                                        ['_m', '_cv', '_skew'])]
+
+    @staticmethod
+    def _moments_to_mcvsk(ex1, ex2, ex3):
+        """
+        returns mean, cv and skewness from non-central moments
+
+        :param ex1:
+        :param ex2:
+        :param ex3:
+        :return:
+        """
+        m = ex1
+        var = ex2 - ex1 ** 2
+        sd = np.sqrt(var)
+        cv = sd / m
+        skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+        return m, cv, skew
+
+    def stats_series(self, name, limit, p999e, total=False):
+        """
+        combine elements into a reporting series
+        handles order, index names etc. in one place
+
+        :param name: series name
+        :param limit:
+        :param p999e:
+        :param total:
+        :return:
+        """
+        idx = pd.MultiIndex.from_arrays(
+            [['agg', 'agg', 'agg', 'freq', 'freq', 'freq', 'sev', 'sev', 'sev'] * 2 + ['agg', 'agg'],
+             ['mean', 'cv', 'skew'] * 3 + ['ex1', 'ex2', 'ex3'] * 3 + ['limit', 'P99.9e']],
+            names=['component', 'measure'])
+
+        return pd.Series([*self.moments_to_mcvsk('agg', total),
+                          *self.moments_to_mcvsk('freq', total),
+                          *self.moments_to_mcvsk('sev', total),
+                          *self.moments('agg', total),
+                          *self.moments('freq', total),
+                          *self.moments('sev', total),
+                          limit, p999e], name=name, index=idx)

@@ -7,7 +7,7 @@ import collections
 import matplotlib.pyplot as plt
 import logging
 from .utils import cumulate_moments, moments_to_mcvsk, sln_fit, sgamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, stats_series
+    axiter_factory, estimate_agg_percentile, suptitle_and_tight, stats_series, MomentAggregator
 from .spectral import Distortion
 from scipy import interpolate
 # import matplotlib.cm as cm
@@ -115,8 +115,12 @@ class Aggregate(object):
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.stats = pd.DataFrame(columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr',
-                                           'en', 'freqcv', 'freqskew', 'sev1', 'sev2', 'sev3', 'sevcv', 'sevskew',
-                                           'agg1', 'agg2', 'agg3', 'aggcv', 'aggskew', 'contagion', 'mix_cv'])
+                                           'en', 'freq_cv', 'freq_skew', 'sev_1', 'sev_2', 'sev_3', 'sev_cv', 'sev_skew',
+                                           'agg_1', 'agg_2', 'agg_3', 'agg_cv', 'agg_skew', 'contagion', 'mix_cv'])
+        self.newstats = pd.DataFrame(
+            columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr' ] +
+                    MomentAggregator.column_names(agg_only=False))
+        ma = MomentAggregator(freq_name, freq_a, freq_b)
         self.stats_total = self.stats.copy()
 
         # broadcast arrays: first line forces them all to be arrays
@@ -151,8 +155,8 @@ class Aggregate(object):
 
             self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc, sev_xs, sev_ps, True)
             sev1, sev2, sev3 = self.sevs[r].moms()
-
             m, scv, ssk = moments_to_mcvsk(sev1, sev2, sev3)
+
             if _el > 0:
                 _en = _el / sev1
             elif _en > 0:
@@ -210,6 +214,11 @@ class Aggregate(object):
             sev_tot1 += freq1 * sev1
             sev_tot2 += freq1 * sev2
             sev_tot3 += freq1 * sev3
+
+            # new method
+            freq1 = _en
+            ma.add_fs(freq1, sev1, sev2, sev3)
+            self.newstats.loc[r + 100, :] = [_y, _at, scv, _el, _pr, _lr ] + ma.get_fsa_stats(total=False)
             r += 1
 
         # compute the grand total for approximations
@@ -248,6 +257,14 @@ class Aggregate(object):
                                                       freq_tot1, freq_cvi, freq_ski, sev_tot1, sev_tot2, sev_tot3,
                                                       _sev_cv, sev_sk,
                                                       agg_tot1, agg_tot2, agg_tot3, aggcvi, aggskewi, c, root_c]
+
+        self.newstats.loc[r + 1000, :] = [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
+                                       self.stats.el.sum() / self.stats.prem.sum()] + \
+                                      ma.get_fsa_stats(total=True, remix=False)
+        self.newstats.loc[r + 10000, :] = [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
+                                       self.stats.el.sum() / self.stats.prem.sum()] + \
+                                      ma.get_fsa_stats(total=True, remix=True)
+
         self.stats['wt'] = self.stats['en'] / self.stats['en'].sum()
         self.stats_total['wt'] = np.nan
         self.n = freq_tot1
@@ -260,6 +277,7 @@ class Aggregate(object):
                                     freq_tot1, freq_tot2, freq_tot3,
                                     sev_tot1, sev_tot2, sev_tot3, np.max(self.limit), np.nan], self.name)
         # TODO fill in missing p99                                                    ^ pctile
+        self.report2 = ma.stats_series('total a', np.max(self.limit), np.nan, total=True)
 
     def __str__(self):
         """
@@ -441,10 +459,10 @@ class Aggregate(object):
                                 self.agg_density.max(), np.nan, self.agg_density.min()]
             audit = pd.concat((df[['limit', 'attachment', 'emp ex1', 'emp cv']],
                                pd.concat((self.stats, self.stats_total))[[
-                                   'en', 'sev1', 'sevcv']]), axis=1)
-            audit.iloc[-1, -1] = self.stats_total.loc['Agg independent', 'aggcv']
-            audit.iloc[-1, -2] = self.stats_total.loc['Agg independent', 'agg1']
-            audit['abs sev err'] = audit.sev1 - audit['emp ex1']
+                                   'en', 'sev_1', 'sev_cv']]), axis=1)
+            audit.iloc[-1, -1] = self.stats_total.loc['Agg independent', 'agg_cv']
+            audit.iloc[-1, -2] = self.stats_total.loc['Agg independent', 'agg_1']
+            audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
             audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1'] - 1
 
         return df, audit
@@ -538,7 +556,6 @@ class Aggregate(object):
         :param aspect:
         :param axiter:
         :param figsize:
-        :param extraps: extra p values for return period plot
        :return:
         """
 
@@ -574,10 +591,10 @@ class Aggregate(object):
             axiter.ax.set(yscale='log', title='Aggregate, log scale')
 
             F = self.agg_density.cumsum()
-            next(axiter).plot(self.xs, 1-F)
+            next(axiter).plot(self.xs, 1 - F)
             axiter.ax.set(title='Survival Function')
 
-            next(axiter).plot(self.xs, 1-F)
+            next(axiter).plot(self.xs, 1 - F)
             axiter.ax.set(title='Survival Function, log scale', yscale='log')
 
             next(axiter).plot(1 - F, self.xs, label='aggregate')
@@ -592,13 +609,13 @@ class Aggregate(object):
             else:
                 _n = 5
             if maxp >= 1:
-                maxp = 1-1e-10
-            k = (maxp / 0.99) **(1/_n)
+                maxp = 1 - 1e-10
+            k = (maxp / 0.99) ** (1 / _n)
             extraps = 0.99 * k ** np.arange(_n)
             q = interpolate.interp1d(F, self.xs, kind='linear', fill_value=0, bounds_error=False)
             ps = np.hstack((np.linspace(0, 1, 100, endpoint=False), extraps))
             qs = q(ps)
-            next(axiter).plot(1/(1-ps), qs)
+            next(axiter).plot(1 / (1 - ps), qs)
             axiter.ax.set(title='Return Period', xscale='log')
 
             if set_tight:

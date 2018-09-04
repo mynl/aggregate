@@ -125,8 +125,65 @@ appropriately for a discrete variable as $\sum_i p_k x_k$, then the mean will be
 
 
 
-Issues
-======
+Plan, Progress and Issues
+=========================
+
+September 3
+-----------
+
+## Non programming Enhancements 
+* Better sample of realistic severity curves
+* Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing? 
+
+## Short term 
+* Round trip to YAML
+* Distortion that is the P/L convex envelope of a set of given points
+* Errors with mass! Finite vs infinite supported distributions, lep vs ly and clin?!
+* Understand output for collateral and priority!
+* Fixed severity type
+* Sev by name from examples in spec sev_a = name 
+* Different freq dists and freq dist in exact mode 
+* Integrate beta factory: Kent example should be built in: dist=beta, mean=, cv= (catch in shape from mean,cv) limit=?? 
+* Exponential takes no shape 
+
+## Medium Term
+* Estimate Bucket function! Auto update
+* Major paper examples?
+
+## Nice to have enhancements 
+* pf += to add a line? 
+    - x = CPort(name)
+    - x.add(line='home', premium=1200, lr=.5)?!  
+* different ways of specfiying? .add method? add with (freq=, sev=) style
+* More freq dists and shape scale specification
+* occ and agg limit and attachment
+* Label severity distributions to facilitate adding (user warrants labels are unique) 
+* Better + function combining severity distributions 
+* How to model two reinstatements?
+* $N\mid N \ge n$ distribution?
+* Split into subfiles and make a proper package
+* sort beta factory 
+
+## Educational Opportunities
+* Uniform, triangular to normal
+* Bernoulli to normal = life insurance
+* $P(A>x)\sim \lambda P(X>x) \sim P(M>x)$ if thick tails
+* Occ vs agg PMLs, body vs. tail. For non-cat lines it is all about correlation; for cat it is all about the tail
+* Effron's theorem
+* FFT exact for "making" Poisson, sum of normals is normal, expnentials is gamma etc.
+* Slow convergence of truncated stable to normal
+* Severity doesn't matter: difference between agg with sev and without for large claim count and stable severity
+* Small large claim split approach...attrit for small; handling without correlation??
+* Compound Poisson: CP(mixed sev) = sum CP(sev0 
+
+## Practical Modeling Examples
+* From limit profile
+* Mixed severity 
+* Modeling $N\mid N \ge n$
+* How to model 2 reinstatements 
+
+## Publication and Use 
+* Interest from RMIR 
 
 Open 
 ----

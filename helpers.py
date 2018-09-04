@@ -29,10 +29,10 @@ class Example(object):
         if dirname == '':
             # TODO sort out...
             dirname = 'c:/s/telos/python/aggregate'
-        with open(os.path.join(dirname, 'portfolios.yaml'), 'r') as f:
+        with open(os.path.join(dirname, 'portfolio.yaml'), 'r') as f:
             self.built_in_portfolios = yaml.load(f, Loader=yaml.Loader)
-        with open(os.path.join(dirname, 'lines.yaml'), 'r') as f:
-            self.built_in_lines = yaml.load(f, Loader=yaml.Loader)
+        with open(os.path.join(dirname, 'aggregate.yaml'), 'r') as f:
+            self.built_in_aggregates = yaml.load(f, Loader=yaml.Loader)
         with open(os.path.join(dirname, 'severity.yaml'), 'r') as f:
             self.built_in_severity = yaml.load(f, Loader=yaml.Loader)
         with open(os.path.join(dirname, 'user.yaml'), 'r') as f:
@@ -99,7 +99,7 @@ class Example(object):
         """
         print('\n\t- '.join(['Built in portfolios'] + list(self.built_in_portfolios.keys())))
         print()
-        print('\n\t- '.join(['Built in lines'] + list(self.built_in_lines.keys())))
+        print('\n\t- '.join(['Built in lines'] + list(self.built_in_aggregates.keys())))
         print()
         print('\n\t- '.join(['Built in severity'] + list(self.built_in_severity.keys())))
         print()
@@ -161,7 +161,7 @@ class Example(object):
         """
 
         try:
-            spec = deepcopy(self.built_in_lines[line_name])
+            spec = deepcopy(self.built_in_aggregates[line_name])
         except KeyError:
             logging.error(f'Example.addline | attempted to add unknown line {line_name}')
             raise KeyError(f'{line_name} is not a known built in line')
@@ -202,9 +202,9 @@ class Example(object):
         :param name:
         :return:
         """
-        if name in self.built_in_lines:
+        if name in self.built_in_aggregates:
             logging.info(f'Example.line | serving {name}')
-            return self.built_in_lines[name]
+            return self.built_in_aggregates[name]
         else:
             logging.warning(f'Example.line | failed to find {name}')
             print(f'{name} is not available as a line')
@@ -237,9 +237,9 @@ class Example(object):
         elif name in self.built_in_portfolios:
             logging.info(f'Example.__getitem__ | serving built in portfolio {name}')
             return self.portfolio(name, 1)
-        elif name in self.built_in_lines:
+        elif name in self.built_in_aggregates:
             logging.info(f'Example.__getitem__ | serving line {name}')
-            return self.built_in_lines[name]
+            return self.built_in_aggregates[name]
         elif name in self.built_in_severity:
             logging.info(f'Example.__getitem__ | serving severity {name}')
             return self.built_in_severity[name]
@@ -276,25 +276,26 @@ class Example(object):
             display(port.audit_df.filter(regex='^[^n]', axis=0))
 
         if reporting_level >= 1:
-            html_title('Summary Audit Data', 1)
-            temp = port.audit_df.filter(regex='^Mean|^EmpMean|^CV|^EmpCV')
-            temp['MeanErr'] = temp.EmpMean / temp.Mean - 1
-            temp['CVErr'] = temp.EmpCV / temp.CV - 1
-            temp = temp[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr']]
-            display(temp.style.applymap(Example._highlight))
+            port.report('quick')
+            # html_title('Summary Audit Data', 1)
+            # temp = port.audit_df.filter(regex='^Mean|^EmpMean|^CV|^EmpCV')
+            # temp['MeanErr'] = temp.EmpMean / temp.Mean - 1
+            # temp['CVErr'] = temp.EmpCV / temp.CV - 1
+            # temp = temp[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr']]
+            # display(temp.style.applymap(Example._highlight))
 
         if reporting_level >= 3:
             html_title('Graphics', 1)
 
-    @staticmethod
-    def _highlight(val):
-        """
-        Takes a scalar and returns a string with
-        the css property `'color: red'` for large
-        values. As pct error
-
-        :param val:
-        :return:
-        """
-        color = 'red' if abs(val) > 0.01 and val < 1 else 'black'
-        return f'color: {color}; font-weight: bold'
+    # @staticmethod
+    # def _highlight(val):
+    #     """
+    #     Takes a scalar and returns a string with
+    #     the css property `'color: red'` for large
+    #     values. As pct error
+    #
+    #     :param val:
+    #     :return:
+    #     """
+    #     color = 'red' if abs(val) > 0.01 and val < 1 else 'black'
+    #     return f'color: {color}; font-weight: bold'

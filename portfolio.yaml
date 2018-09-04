@@ -1,0 +1,184 @@
+bodoff1:
+    args:
+        bs: 1
+        last_sev_calc: discrete
+        log2: 8
+        remove_fuzz: true
+    spec:
+    -   name: wind
+        en: 1
+        freq_name: fixed
+        sev_name: dhistogram
+        sev_ps:
+        -   0.8
+        -   0.2
+        sev_xs:
+        -   0
+        -   99
+    -   name: quake
+        freq_name: fixed
+        sev_name: dhistogram
+        sev_ps:
+        -   0.95
+        -   0.05
+        sev_xs:
+        -   0
+        -   100
+bodoff2:
+    args:
+        log2: 8
+        bs: 1
+        sev_calc: discrete
+    spec:
+    -   name: wind
+        freq_name: fixed
+        en: 1
+        sev_name: dhistogram
+        sev_xs:
+        -   0
+        -   50
+        sev_ps:
+        -   0.8
+        -   0.2
+    -   name: quake
+        freq_name: fixed
+        en: 1
+        sev_name: dhistogram
+        sev_xs:
+        -   0
+        -   100
+        sev_ps:
+        -   0.95
+        -   0.05
+bodoff3:
+    args:
+        log2: 8
+        bs: 1
+        sev_calc: discrete
+    spec:
+    -   name: wind
+        freq_name: fixed
+        en: 1
+        sev_name: dhistogram
+        sev_xs:
+        -   0
+        -   5
+        sev_ps:
+        -   0.8
+        -   0.2
+    -   name: quake
+        freq_name: fixed
+        en: 1
+        sev_name: dhistogram
+        sev_xs:
+        -   0
+        -   100
+        sev_ps:
+        -   0.95
+        -   0.05
+bodoff4:
+    args:
+        log2: 16
+        bs: 0.0625
+        sev_calc: discrete
+    spec:
+    -   name: a
+        sev_name: expon
+        sev_scale: 4
+        en: 0.25
+        freq_name: bernoulli
+    -   name: b
+        sev_name: expon
+        sev_scale: 20
+        en: 0.05
+        freq_name: bernoulli
+    -   name: c
+        sev_name: expon
+        sev_scale: 100
+        en: 0.05
+        freq_name: bernoulli
+small_medium_large:
+    args:
+        log2: 14
+        bs: 10000
+        sev_calc: discrete
+    spec:
+    -   name: small
+        sev_name: lognorm
+        sev_mean: 500000
+        sev_cv: 1.5
+        limit: 10000000
+        en: 10
+        freq_name: poisson
+        freq_a: 0.1
+    -   name: medium
+        sev_name: lognorm
+        sev_mean: 50000
+        sev_cv: 1.5
+        limit: 1000000
+        en: 100
+        freq_name: poisson
+        freq_a: 0.1
+    -   name: large
+        sev_name: lognorm
+        sev_mean: 50000
+        sev_cv: 1.5
+        limit: 1000000
+        en: 1000
+        freq_name: poisson
+        freq_a: 0.1
+mass_test:
+    args:
+        log2: 6
+        bs: 1
+        sev_calc: discrete
+    spec:
+    -   name: a
+        sev_name: uniform
+        sev_scale: 10
+        sev_loc: 5
+        en: 2
+        freq_name: fixed
+    -   name: b
+        sev_name: uniform
+        sev_scale: 10
+        sev_loc: 0
+        en: 1
+        freq_name: fixed
+    -   name: c
+        sev_name: uniform
+        sev_scale: 15
+        sev_loc: 0
+        en: 1
+        freq_name: fixed
+interesting_cat:
+    args:
+        log2: 14
+        bs: 10
+        sev_calc: discrete
+    spec:
+    -   name: lognormalcat
+        sev_name: lognorm
+        sev_scale: 45.783336177161424
+        sev_a: 1.25
+        limit: 40000
+        freq_name: poisson
+        en: 3.5
+    -   name: paretocat
+        sev_name: pareto
+        sev_scale: 50
+        sev_loc: -50
+        sev_a: 1.25
+        freq_name: poisson
+        en: 2
+    -   name: attrit
+        limit: 500
+        sev_name: lognorm
+        sev_mean: 1
+        sev_cv: 1.75
+        sev_a: 1.25
+        freq_name: poisson
+        en: 10000
+
+
+

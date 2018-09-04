@@ -332,6 +332,7 @@ def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     else:
         return axiter
 
+
 class AxisManager(object):
     """
 
@@ -382,10 +383,10 @@ class AxisManager(object):
         r = (self.nr - 1 + n) // self.nr
         c = min(n, self.nr)
         if not subgrid:
-            if self.nr > 3 and n == 6:
+            if self.nr > 3 and n == 6 and self.nr != 6:
                 r = 2
                 c = 3
-            elif self.nr > 4 and n == 8:
+            elif self.nr > 4 and n == 8 and self.nr != 8:
                 r = 2
                 c = 4
         return r, c

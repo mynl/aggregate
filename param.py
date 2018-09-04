@@ -253,6 +253,6 @@ def hack_make_lines_from_csv(fn='../data/DIRECT_IEE.csv', do_save=False):
         d[f'ind {name}'] = e
     print(yaml.dump(d, default_flow_style=False, indent=4))
     if do_save:
-        with open('c:/s/telos/python/aggregate/lines.yaml', 'a') as f:
+        with open('c:/s/telos/python/aggregate/aggregate.yaml', 'a') as f:
             yaml.dump(d, stream=f, default_flow_style=False, indent=4)
     return tl

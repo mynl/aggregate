@@ -3,9 +3,9 @@ from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
 
-from . utils import *
-from . distr import Aggregate
-from . spectral import Distortion
+from .utils import *
+from .distr import Aggregate
+from .spectral import Distortion
 
 
 class Portfolio(object):
@@ -46,16 +46,16 @@ class Portfolio(object):
         tot_agg_ex1 = 0
         tot_agg_ex2 = 0
         tot_agg_ex3 = 0
-        max_limit = max([a.get('limit', np.inf) for a in spec_list])
+        max_limit = np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
         # must be a better way...
-        for c in temp_report.filter(regex='ex', axis=0).T.iterrows():
-            agg1, agg2, agg3 = c[1]['agg']
-            freq1, freq2, freq3 = c[1]['freq']
-            sev1, sev2, sev3 = c[1]['sev']
-            tot_agg_ex1, tot_agg_ex2, tot_agg_ex3 = cumulate_moments(tot_agg_ex1, tot_agg_ex2, tot_agg_ex3, agg1, agg2,
-                                                                     agg3)
-            tot_freq_ex1, tot_freq_ex2, tot_freq_ex3 = cumulate_moments(tot_freq_ex1, tot_freq_ex2, tot_freq_ex3, freq1,
-                                                                        freq2, freq3)
+        for rn, c in temp_report.filter(regex='ex', axis=0).T.iterrows():
+            agg1, agg2, agg3 = c['agg']
+            freq1, freq2, freq3 = c['freq']
+            sev1, sev2, sev3 = c['sev']
+            tot_agg_ex1, tot_agg_ex2, tot_agg_ex3 = \
+                cumulate_moments(tot_agg_ex1, tot_agg_ex2, tot_agg_ex3, agg1, agg2, agg3)
+            tot_freq_ex1, tot_freq_ex2, tot_freq_ex3 = \
+                cumulate_moments(tot_freq_ex1, tot_freq_ex2, tot_freq_ex3, freq1, freq2, freq3)
             tot_sev_ex1 += freq1 * sev1
             tot_sev_ex2 += freq1 * sev2
             tot_sev_ex3 += freq1 * sev3
@@ -406,6 +406,8 @@ class Portfolio(object):
         """
         interp guesses exa etc. for small losses, but that doesn't work
 
+        :param discretization_calc:
+        :param verbose:
         :param log2:
         :param bs: bucket size
         :param approx_freq_ge:
@@ -458,9 +460,12 @@ class Portfolio(object):
         ftall = None
         for agg in self.agg_list:
             nm = agg.name
-            agg.density(xs, self.padding, tilt_vector,
-                        'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
-                        verbose=verbose)
+            _a, _b = agg.density(xs, self.padding, tilt_vector,
+                                 'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
+                                 verbose=verbose)
+            if verbose:
+                display(_a)
+                display(_b)
             ft_line_density[nm] = agg.ftagg_density
             line_density[nm] = agg.agg_density
             if ftall is None:
@@ -565,13 +570,13 @@ class Portfolio(object):
             axis=1
         )
 
-    def reports(self, report_list='all'):
+    def report(self, report_list='quick'):
         """
 
         :param report_list:
         :return:
         """
-        full_report_list = ['statistics', 'audit', 'priority_capital', 'priority_analysis']
+        full_report_list = ['statistics', 'quick', 'audit', 'priority_capital', 'priority_analysis']
         if report_list == 'all':
             report_list = full_report_list
         for r in full_report_list:
@@ -582,6 +587,9 @@ class Portfolio(object):
                         display(self.priority_capital_df.loc[1e-3:1e-2, :].style)
                     else:
                         html_title('Report {:} not generated'.format(r), 2)
+                elif r == 'quick':
+                    df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
+                    display(df.style)
                 else:
                     df = getattr(self, r + '_df', None)
                     if df is not None:
@@ -592,7 +600,7 @@ class Portfolio(object):
                     else:
                         html_title('Report {:} not generated'.format(r), 2)
 
-    def plot(self, kind, line='all', p=0.99, c=0, a=0, axiter=None, figsize=(8, 6), height=2,
+    def plot(self, kind, line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
              aspect=1, **kwargs):
         """
         kind = density
@@ -662,9 +670,10 @@ class Portfolio(object):
                 axiter = axiter_factory(axiter, 1, figsize, height, aspect)
                 ax = axiter.grid(1)
             self.density_df.loc[:, line].sort_index(axis=1). \
-                plot(title=f'{self.name} Line Density', sort_columns=True, ax=ax, **kwargs)
-            if 'subplots' in kwargs:
-                plt.tight_layout(rect=[0, 0, 1, 0.97])
+                plot(sort_columns=True, ax=ax, **kwargs)
+            # plot(title=f'{self.name} Line Density', sort_columns=True, ax=ax, **kwargs)
+            # if 'subplots' in kwargs:
+            #     plt.tight_layout(rect=[0, 0, 1, 0.97])
 
         elif kind == 'audit':
             D = self.density_df
@@ -680,7 +689,6 @@ class Portfolio(object):
             # densities
             temp = D.filter(regex='^p_', axis=1)
             ax = axiter.grid(1)
-            print(ax)
             temp.plot(ax=ax, ylim=(0, density_scale), xlim=(0, large_loss_scale), title='Densities')
 
             ax = axiter.grid(1)
@@ -732,7 +740,6 @@ class Portfolio(object):
             ax.set_title('Lee diagrams by peril')
             ax.set_xlim(0, 1)
             ax.set_ylim(0, large_loss_scale)
-            plt.tight_layout()
 
         elif kind == 'priority':
             xmax = self.q(p)
@@ -755,7 +762,6 @@ class Portfolio(object):
                 ax = axiter.grid(1)
                 self.density_df.filter(regex=f'epd_[012]_{col}').plot(ax=ax, xlim=(0, xmax),
                                                                       title=f'{col.title()} EPDs', logy=True)
-            plt.tight_layout()
 
         elif kind == 'collateral':
             assert line != '' and line != 'all'

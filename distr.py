@@ -8,10 +8,8 @@ import matplotlib.pyplot as plt
 import logging
 from .utils import cumulate_moments, moments_to_mcvsk, sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, stats_series
-from . spectral import Distortion
-
-
-# from scipy import interpolate
+from .spectral import Distortion
+from scipy import interpolate
 # import matplotlib.cm as cm
 # from scipy import interpolate
 # from copy import deepcopy
@@ -33,7 +31,8 @@ class Aggregate(object):
     """
 
     def __init__(self, name, el=0, premium=0, lr=0, en=0, attachment=0, limit=np.inf, sev_name='', sev_a=0, sev_b=0,
-                 sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0, mix_wt=1, freq_name='', freq_a=0, freq_b=0):
+                 sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, mix_wt=1,
+                 freq_name='', freq_a=0, freq_b=0):
         """
 
         el -> en
@@ -53,6 +52,9 @@ class Aggregate(object):
         n is the CONDITIONAL claim count
         X is the GROUND UP severity, so X | X > attachment is used and generates n claims
 
+        For fixed or histogram have to separate the parameter so they are not broad cast; otherwise
+        you end up with multiple lines when you intend only one
+
         TODO: later do both, for now assume one or other is a scalar
         call with both that does the cross product... (note the sev array may not be equal sizes)
 
@@ -70,6 +72,8 @@ class Aggregate(object):
         :param sev_cv:
         :param sev_loc:
         :param sev_scale:
+        :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram or fixed
+        :param sev_ps:
         :param mix_wt: weight for mixed distribution
         :param freq_name: name of frequency distribution
         :param freq_a: freq dist shape1 OR CV = sq root contagion
@@ -83,7 +87,8 @@ class Aggregate(object):
                          attachment=attachment, limit=limit,
                          sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
                          sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                         mix_wt=mix_wt, freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
+                         sev_xs=sev_xs, sev_ps=sev_ps, mix_wt=mix_wt,
+                         freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
 
         # class variables (mostly)
         self.name = name
@@ -144,7 +149,7 @@ class Aggregate(object):
                 zip(el, premium, lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean,
                     sev_cv, sev_loc, sev_scale, mix_wt):
 
-            self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc)
+            self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc, sev_xs, sev_ps, True)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
             m, scv, ssk = moments_to_mcvsk(sev1, sev2, sev3)
@@ -246,14 +251,15 @@ class Aggregate(object):
         self.stats['wt'] = self.stats['en'] / self.stats['en'].sum()
         self.stats_total['wt'] = np.nan
         self.n = freq_tot1
+        self.statistics_df = pd.concat((self.stats, self.stats_total))
         # finally, need a report series for Portfolio to consolidate
         self.report = stats_series([self.aggm, self.aggcv, self.aggskew,
                                     freq_tot1, freq_cv, freq_sk,
                                     sev_tot1, _sev_cv, sev_sk,
                                     agg1, agg2, agg3,
                                     freq_tot1, freq_tot2, freq_tot3,
-                                    sev_tot1, sev_tot2, sev_tot3, self.limit, np.nan], self.name)
-        # TODO fill in missing p99                                            ^ pctile
+                                    sev_tot1, sev_tot2, sev_tot3, np.max(self.limit), np.nan], self.name)
+        # TODO fill in missing p99                                                    ^ pctile
 
     def __str__(self):
         """
@@ -364,7 +370,7 @@ class Aggregate(object):
                         axm.ax.set(title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
                     axm.ax.legend()
             if verbose:
-                next(axm).plot(xs, self.sev_density)
+                next(axm).plot(xs, self.sev_density, lw=0.5, drawstyle='steps-post')
                 axm.ax.set_title('occ')
                 aa = float(np.sum(df.attachment * df.wt))
                 al = float(np.sum(df.limit * df.wt))
@@ -438,7 +444,8 @@ class Aggregate(object):
                                    'en', 'sev1', 'sevcv']]), axis=1)
             audit.iloc[-1, -1] = self.stats_total.loc['Agg independent', 'aggcv']
             audit.iloc[-1, -2] = self.stats_total.loc['Agg independent', 'agg1']
-            audit['sev err'] = audit.sev1 - audit['emp ex1']
+            audit['abs sev err'] = audit.sev1 - audit['emp ex1']
+            audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1'] - 1
 
         return df, audit
 
@@ -523,129 +530,142 @@ class Aggregate(object):
             raise ValueError('Must use compound Poisson for DH density')
         self.beta_name = beta_name
 
-    def quick_visual(self, axiter=None, figsize=(9, 3)):
+    def plot(self, kind='long', axiter=None, aspect=1, figsize=None):
         """
-        Plot severity and agg, density, distribution and Lee diagram
+        make a quick plot of fz: computed density and aggregate
+
+        :param kind:
+        :param aspect:
         :param axiter:
         :param figsize:
-        :return:
+        :param extraps: extra p values for return period plot
+       :return:
         """
 
-        if self.dh_agg_density is not None:
-            n = 4
-        else:
-            n = 3
+        if self.agg_density is None:
+            print('Cannot plot before update')
+            return
 
-        set_tight = False
-        if axiter is None:
-            axiter = axiter_factory(axiter, n, figsize)
-            set_tight = True
+        if kind == 'long':
 
-        F = np.cumsum(self.agg_density)
-        mx = np.argmax(F > 1 - 1e-5)
-        if mx == 0:
-            mx = len(F) + 1
-        dh_F = None
-        if self.dh_agg_density is not None:
-            dh_F = np.cumsum(self.dh_agg_density)
-            mx = max(mx, np.argmax(dh_F > 1 - 1e-5))
-            dh_F = dh_F[:mx]
-        F = F[:mx]
+            set_tight = (axiter is None)
+            axiter = axiter_factory(axiter, 10, aspect=aspect, figsize=figsize)
 
-        if self.sev_density is None:
-            self.density(self.xs, 1, None, sev_calc='rescale', force_severity=True)
-        xs = self.xs[:mx]
-        d = self.agg_density[:mx]
-        sevF = np.cumsum(self.sev_density)
-        sevF = sevF[:mx]
-        f = self.sev_density[:mx]
+            max_lim = min(self.xs[-1], np.max(self.limit)) * 1.05
 
-        ax = next(axiter)
-        ax.plot(xs, d, label='agg')
-        ax.plot(xs, f, label='sev')
-        if self.dh_agg_density is not None:
-            ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
-            ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-        ax.set_ylim(0, min(2 * np.max(d), np.max(f[1:])))
-        ax.legend()
-        ax.set_title('Density')
-        ax = next(axiter)
-        ax.plot(xs, d, label='agg')
-        ax.plot(xs, f, label='sev')
-        if self.dh_agg_density is not None:
-            ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
-            ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-        ax.set_yscale('log')
-        ax.legend()
-        ax.set_title('Log Density')
+            next(axiter).plot(self.xs, self.sev_density, drawstyle='steps-post')
+            axiter.ax.set(title='Severity', xlim=(0, max_lim))
 
-        ax = next(axiter)
-        ax.plot(F, xs, label='Agg')
-        ax.plot(sevF, xs, label='Sev')
-        if self.dh_agg_density is not None:
-            dh_F = np.cumsum(self.dh_agg_density[:mx])
-            ax.plot(dh_F, xs, label='dh {:} agg'.format(self.beta_name))
-        ax.legend()
-        ax.set_title('Lee Diagram')
+            next(axiter).plot(self.xs, self.sev_density)
+            axiter.ax.set(title='Log Severity', yscale='log', xlim=(0, max_lim))
 
-        if self.dh_agg_density is not None:
-            # if dh computed graph comparision
+            next(axiter).plot(self.xs, self.sev_density.cumsum(), drawstyle='steps-post')
+            axiter.ax.set(title='Severity Distribution', xlim=(0, max_lim))
+
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            axiter.ax.plot(self.xs, self.sev_density, lw=0.5, drawstyle='steps-post', label='severity')
+            axiter.ax.set(title='Aggregate')
+            axiter.ax.legend()
+
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            axiter.ax.set(title='Aggregate')
+
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            axiter.ax.set(yscale='log', title='Aggregate, log scale')
+
+            F = self.agg_density.cumsum()
+            next(axiter).plot(self.xs, 1-F)
+            axiter.ax.set(title='Survival Function')
+
+            next(axiter).plot(self.xs, 1-F)
+            axiter.ax.set(title='Survival Function, log scale', yscale='log')
+
+            next(axiter).plot(1 - F, self.xs, label='aggregate')
+            axiter.ax.plot(1 - self.sev_density.cumsum(), self.xs, label='severity')
+            axiter.ax.set(title='Lee Diagram')
+            axiter.ax.legend()
+
+            # figure for extended plotting of return period:
+            maxp = F[-1]
+            if maxp > 0.9999:
+                _n = 10
+            else:
+                _n = 5
+            if maxp >= 1:
+                maxp = 1-1e-10
+            k = (maxp / 0.99) **(1/_n)
+            extraps = 0.99 * k ** np.arange(_n)
+            q = interpolate.interp1d(F, self.xs, kind='linear', fill_value=0, bounds_error=False)
+            ps = np.hstack((np.linspace(0, 1, 100, endpoint=False), extraps))
+            qs = q(ps)
+            next(axiter).plot(1/(1-ps), qs)
+            axiter.ax.set(title='Return Period', xscale='log')
+
+            if set_tight:
+                suptitle_and_tight(f'{self.name} Distributions')
+        else:  # kind == 'quick':
+            if self.dh_agg_density is not None:
+                n = 4
+            else:
+                n = 3
+
+            set_tight = (axiter is None)
+            axiter = axiter_factory(axiter, n, figsize, aspect=aspect)
+
+            F = np.cumsum(self.agg_density)
+            mx = np.argmax(F > 1 - 1e-5)
+            if mx == 0:
+                mx = len(F) + 1
+            dh_F = None
+            if self.dh_agg_density is not None:
+                dh_F = np.cumsum(self.dh_agg_density)
+                mx = max(mx, np.argmax(dh_F > 1 - 1e-5))
+                dh_F = dh_F[:mx]
+            F = F[:mx]
+
+            if self.sev_density is None:
+                self.density(self.xs, 1, None, sev_calc='rescale', force_severity=True)
+            xs = self.xs[:mx]
+            d = self.agg_density[:mx]
+            sevF = np.cumsum(self.sev_density)
+            sevF = sevF[:mx]
+            f = self.sev_density[:mx]
+
             ax = next(axiter)
-            ax.plot(1 - F, 1 - dh_F, label='g(S) vs S')
-            ax.plot(1 - F, 1 - F, 'k', linewidth=.5, label=None)
-        if set_tight:
-            plt.tight_layout()
+            ax.plot(xs, d, label='agg')
+            ax.plot(xs, f, label='sev')
+            if self.dh_agg_density is not None:
+                ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
+                ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
+            ax.set_ylim(0, min(2 * np.max(d), np.max(f[1:])))
+            ax.legend()
+            ax.set_title('Density')
+            ax = next(axiter)
+            ax.plot(xs, d, label='agg')
+            ax.plot(xs, f, label='sev')
+            if self.dh_agg_density is not None:
+                ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
+                ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
+            ax.set_yscale('log')
+            ax.legend()
+            ax.set_title('Log Density')
 
-    def plot(self, N=100, p=1e-4, axiter=None):
-        """
-        make a quick plot of fz
-        :param axiter:
-        :param N:
-        :param p:
-        :return:
-        """
-        print('plot is NYI')
+            ax = next(axiter)
+            ax.plot(F, xs, label='Agg')
+            ax.plot(sevF, xs, label='Sev')
+            if self.dh_agg_density is not None:
+                dh_F = np.cumsum(self.dh_agg_density[:mx])
+                ax.plot(dh_F, xs, label='dh {:} agg'.format(self.beta_name))
+            ax.legend()
+            ax.set_title('Lee Diagram')
 
-        # # for now just severity
-        # if axiter is None:
-        #     axiter = make_axes(2, (6, 3))
-        # # TODO use interpolation if complex severity, otherwise pass through to self.sevs[0]
-        # if len(self.sevs) ==  1:
-        #     fzisf = self.sevs[0].isf
-        #     fzpdf = self.sevs[0].pdf
-        # else:
-        #     fzisf = interpolate.interp1d( np.cumsum(self.sev_density), self.xs, kind='linear', assume_sorted=True )
-        #     fzpdf = interpolate.interp1d( np.cumsum(self.sev_density), self.xs, kind='linear', assume_sorted=True )
-        # x0 = fzisf(1 - p)
-        # if x0 < 0.1:
-        #     x0 = 0
-        # x1 = fzisf(p)
-        # xs = np.linspace(x0, x1, N)
-        # ps = np.linspace(1 / N, 1, N, endpoint=False)
-        # den = self.fz.pdf(xs)
-        # qs = self.fz.ppf(ps)
-        # # plt.figure()
-        # next(axiter).plot(xs, den)
-        # next(axiter).plot(ps, qs)
-        # plt.tight_layout()
-        # for now just severity
-
-        # original
-        # if axiter is None:
-        #     axiter = AxisManager(2, (6, 3))
-        #
-        # x0 = self.fz.isf(1 - p)
-        # if x0 < 0.1:
-        #     x0 = 0
-        # x1 = self.fz.isf(p)
-        # xs = np.linspace(x0, x1, N)
-        # ps = np.linspace(1 / N, 1, N, endpoint=False)
-        # den = self.fz.pdf(xs)
-        # qs = self.fz.ppf(ps)
-        # # plt.figure()
-        # next(axiter).plot(xs, den)
-        # next(axiter).plot(ps, qs)
-        # plt.tight_layout()
+            if self.dh_agg_density is not None:
+                # if dh computed graph comparision
+                ax = next(axiter)
+                ax.plot(1 - F, 1 - dh_F, label='g(S) vs S')
+                ax.plot(1 - F, 1 - F, 'k', linewidth=.5, label=None)
+            if set_tight:
+                plt.tight_layout()
 
     def recommend_bucket(self, N=10):
         """
@@ -655,7 +675,9 @@ class Aggregate(object):
         :return:
         """
         moment_est = estimate_agg_percentile(self.aggm, self.aggcv, self.aggskew) / N
-        limit_est = np.max(self.limit[self.limit < np.inf]) / N
+        limit_est = self.limit.max() / N
+        if limit_est == np.inf:
+            limit_est = 0
         logging.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
         return max(moment_est, limit_est)
 
@@ -680,10 +702,11 @@ class Severity(ss.rv_continuous):
 
     """
 
-    def __init__(self, name, attachment=0, limit=np.inf, mean=0, cv=0, a=0, b=0, loc=0, scale=0, conditional=True):
+    def __init__(self, name, attachment=0, limit=np.inf, mean=0, cv=0, a=0, b=0, loc=0, scale=0, hxs=None,
+                 hps=None, conditional=True):
         """
 
-        :param name:
+        :param name: scipy stats continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param attachment:
         :param limit:
         :param mean:
@@ -692,6 +715,8 @@ class Severity(ss.rv_continuous):
         :param b:
         :param loc:
         :param scale:
+        :param hxs: for fixed or histogram classes
+        :param hps:
         :param conditional: conditional or unconditional; for severities use conditional
         """
 
@@ -703,22 +728,60 @@ class Severity(ss.rv_continuous):
         self.pattach = 0
         self.pdetach = 0
         self.conditional = conditional
+        self.name = name
+        self.sev1 = self.sev2 = self.sev3 = None
 
-        gen = getattr(ss, name)
-        if name in ['norm']:
+        # there are two types: if hxs and hps provided then fixed/histogram, else scpiy dist
+        # allows you to define fixed with just xs=1 (no p)
+        if hxs is not None:
+            if name == 'fixed':
+                # fixed is a special case of dhistogram with just one point
+                name = 'dhistogram'
+                hps = np.array(1)
+            assert name[1:] == 'histogram'
+            # TODO: make histogram work with limit and attachment; currently they are ignored
+            xs, ps = np.broadcast_arrays(np.array(hxs), np.array(hps))
+            if not np.isclose(np.sum(ps), 1.0):
+                logging.error(f'Severity.init | {name} histogram/fixed severity with probs do not sum to 1, '
+                              f'{np.sum(ps)}')
+            # need to limit distribution
+            limit = min(np.min(limit), xs.max())
+            if name == 'chistogram':
+                # continuous histogram: uniform between xs's
+                xss = np.sort(np.hstack((xs, xs[-1] + xs[1])))
+                # midpoints
+                xsm = (xss[:-1] + xss[1:]) / 2
+                self.sev1 = np.sum(xsm * ps)
+                self.sev2 = np.sum(xsm ** 2 * ps)
+                self.sev3 = np.sum(xsm ** 3 * ps)
+                self.fz = ss.rv_histogram((ps, xss))
+            elif name == 'dhistogram':
+                # discrete histogram: point masses at xs's
+                self.sev1 = np.sum(xs * ps)
+                self.sev2 = np.sum(xs ** 2 * ps)
+                self.sev3 = np.sum(xs ** 3 * ps)
+                xss = np.sort(np.hstack((xs - 1e-5, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
+                pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
+                self.fz = ss.rv_histogram((pss, xss))
+            else:
+                raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
+                                 f', you passed {name}')
+
+        elif name in ['norm', 'expon']:
             # distributions with no shape parameters
             #     Normal (and possibly others) does not have a shape parameter
             if loc == 0 and mean > 0:
                 loc = mean
             if scale == 0 and cv > 0:
                 scale = cv * loc
-            self.fz = gen(loc=mean, scale=scale)
+            gen = getattr(ss, name)
+            self.fz = gen(loc=loc, scale=scale)
 
         elif name in ['beta']:
             # distributions with two shape parameters
             # require specific inputs
+            gen = getattr(ss, name)
             self.fz = gen(a, b, loc=loc, scale=scale)
-
         else:
             # distributions with one shape parameter
             if a == 0:  # TODO figuring 0 is invalid shape...
@@ -726,6 +789,7 @@ class Severity(ss.rv_continuous):
             if scale == 0 and mean > 0:
                 scale, self.fz = mean_to_scale(name, a, mean)
             else:
+                gen = getattr(ss, name)
                 self.fz = gen(a, scale=scale, loc=loc)
 
         if self.detachment == np.inf:
@@ -748,9 +812,14 @@ class Severity(ss.rv_continuous):
             if cv > 0:
                 assert (np.isclose(cv, acv))
             # print('ACHIEVED', mean, cv, m, acv, self.fz.stats(), self._stats())
+            logging.info(f'Severity.__init__ | parameters {a}, {scale}: target/actual {mean} vs {m};  {cv} vs {acv}')
 
         lim_name = f'{limit:,.0f}' if limit != np.inf else "Unlimited"
-        self.long_name = f'{name}({self.fz.args[0]:.2f})[{lim_name} xs {attachment:,.0f}]'
+        try:
+            self.long_name = f'{name}({self.fz.args[0]:.2f})[{lim_name} xs {attachment:,.0f}]'
+        except:
+            # 'rv_histogram' object has no attribute 'args'
+            self.long_name = f'{name}[{lim_name} xs {attachment:,.0f}]'
 
         assert self.fz is not None
 
@@ -782,12 +851,24 @@ class Severity(ss.rv_continuous):
     def _cdf(self, x, *args):
         if self.conditional:
             return np.where(x > self.limit, 1,
-                            (self.fz.cdf(x + self.attachment) - (1-self.pattach)) / self.pattach)
+                            np.where(x < 0, 0,
+                                     (self.fz.cdf(x + self.attachment) - (1 - self.pattach)) / self.pattach))
         else:
             return np.where(x < 0, 0,
                             np.where(x == 0, 1 - self.pattach,
-                                     np.where(x > self.detachment - self.attachment, 1,
+                                     np.where(x > self.limit, 1,
                                               self.fz.cdf(x + self.attachment, *args))))
+
+    def _sf(self, x, *args):
+        if self.conditional:
+            return np.where(x > self.limit, 0,
+                            np.where(x < 0, 1,
+                                     self.fz.sf(x + self.attachment, *args) / self.pattach))
+        else:
+            return np.where(x < 0, 1,
+                            np.where(x == 0, self.pattach,
+                                     np.where(x > self.limit, 0,
+                                              self.fz.sf(x + self.attachment, *args))))
 
     def _isf(self, q, *args):
         if self.conditional:
@@ -801,7 +882,7 @@ class Severity(ss.rv_continuous):
     def _ppf(self, q, *args):
         if self.conditional:
             return np.where(q > 1 - self.pdetach / self.pattach, self.limit,
-                            self.fz.ppf(1 - self.pattach(1 - q)) - self.attachment)
+                            self.fz.ppf(1 - self.pattach * (1 - q)) - self.attachment)
         else:
             return np.where(q <= 1 - self.pattach, 0,
                             np.where(q > 1 - self.pdetach, self.limit,
@@ -825,11 +906,16 @@ class Severity(ss.rv_continuous):
 
         :return:
         """
+
+        if self.sev1 is not None:
+            # precomputed (fixed and (c|d)histogram classes
+            # TODO ignores layer and attach...
+            return self.sev1, self.sev2, self.sev3
+
         ex1 = quad(lambda x: self.fz.sf(x), self.attachment, self.detachment)
         ex2 = quad(lambda x: 2 * (x - self.attachment) * self.fz.sf(x), self.attachment, self.detachment)
         ex3 = quad(lambda x: 3 * (x - self.attachment) ** 2 * self.fz.sf(x), self.attachment, self.detachment,
-                   limit=100,
-                   full_output=False)
+                   limit=100, full_output=False)
 
         # quad returns abs error
         eps = 1e-5
@@ -837,11 +923,14 @@ class Severity(ss.rv_continuous):
                 (ex2[1] / ex2[0] < eps or ex2[1] < 1e-4) and
                 (ex3[1] / ex3[0] < eps or ex3[1] < 1e-6)):
             logging.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
-                         f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t{ex3[1]/ex3[0]}')
-            raise ValueError(f' Severity.moms | doubtful convergence of integrals, abs errs '
-                             f'{ex1[1]}, {ex2[1]}, {ex3[1]} rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, {ex3[1]/ex3[0]}')
+                         f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t'
+                         f'{ex3[1]/ex3[0]}')
+            # raise ValueError(f' Severity.moms | doubtful convergence of integrals, abs errs '
+            #                  f'{ex1[1]}, {ex2[1]}, {ex3[1]} rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, '
+            #                  f'{ex3[1]/ex3[0]}')
         # logging.info(f'Severity.moms | GOOD convergence of integrals, abs errs '
-        #                      f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t{ex3[1]/ex3[0]}')
+        #                      f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \
+        #  t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t{ex3[1]/ex3[0]}')
 
         ex1 = ex1[0]
         ex2 = ex2[0]
@@ -865,7 +954,7 @@ class Severity(ss.rv_continuous):
         ps = np.linspace(0, 1, N, endpoint=False)
         xs = np.linspace(0, self._isf(1e-4), N)
 
-        it = axiter_factory(None, 4, figsize=(12, 2))
+        it = axiter_factory(None, 4)
 
         ax = next(it)
         ys = self._pdf(xs)

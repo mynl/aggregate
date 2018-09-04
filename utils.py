@@ -546,3 +546,11 @@ def read_log():
     df = df.dropna()
     df = df.set_index('datetime')
     return df
+
+class MomentAggregator(object):
+    """
+    Accumulate moments
+    Used by Portfolio and Aggregate (when there are multiple severities)
+    makes report df and statistics_df
+
+    """

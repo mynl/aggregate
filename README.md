@@ -45,6 +45,11 @@ Potential Applications
   - Pricing small insurance portfolios on a claim by claim basis 
   - Analysis of default probabilities
   - Allocation of capital and risk charges
+  - Detailed creation of marginal loss distributions that can then be 
+    sampled and used by other simulation software, e.g. to incorporate 
+    dependence structures, or in situations where it is necessary to 
+    track individual events, e.g. to compute gross, ceded and net bi- 
+    and trivariate distributions. 
 
 Missing Features
 ----------------
@@ -136,23 +141,21 @@ September 3
 * Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing? 
 
 ## Short term 
-* Round trip to YAML
 * Distortion that is the P/L convex envelope of a set of given points
 * Errors with mass! Finite vs infinite supported distributions, lep vs ly and clin?!
 * Understand output for collateral and priority!
-* Fixed severity type
 * Sev by name from examples in spec sev_a = name 
 * Different freq dists and freq dist in exact mode 
 * Integrate beta factory: Kent example should be built in: dist=beta, mean=, cv= (catch in shape from mean,cv) limit=?? 
-* Exponential takes no shape 
 
 ## Medium Term
 * Estimate Bucket function! Auto update
-* Major paper examples?
+* Major paper examples? Normal with correlation
+* IME review paper example? 
 
 ## Nice to have enhancements 
 * pf += to add a line? 
-    - x = CPort(name)
+    - x = Portfolio(name)
     - x.add(line='home', premium=1200, lr=.5)?!  
 * different ways of specfiying? .add method? add with (freq=, sev=) style
 * More freq dists and shape scale specification

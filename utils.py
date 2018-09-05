@@ -357,6 +357,11 @@ class AxisManager(object):
         return r, c
 
     def dimensions(self):
+        """
+        return dimensions (width and height) of current layout
+
+        :return:
+        """
         return self.r, self.c
 
     def grid(self, size=0):

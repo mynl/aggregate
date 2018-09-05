@@ -1,3 +1,24 @@
+"""
+Purpose
+-------
+
+A Portfolio represents a collection of Aggregate objects. Applications include
+
+* A book of insurance or reinsurance business
+
+
+Important Methods
+-----------------
+
+
+Example Calls
+-------------
+
+Other Notes
+-----------
+
+"""
+
 import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy

@@ -1,0 +1,303 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Development Outline &#8212; aggregate 0.9.40 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.9.40',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Severity Class" href="severity.html" />
+    <link rel="prev" title="Probability and Risk Theory" href="prob.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="development-outline">
+<h1>Development Outline<a class="headerlink" href="#development-outline" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="september-3">
+<h2>September 3<a class="headerlink" href="#september-3" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="non-programming-enhancements">
+<h2>Non programming Enhancements<a class="headerlink" href="#non-programming-enhancements" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Better sample of realistic severity curves</li>
+<li>Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing?</li>
+</ul>
+</div>
+<div class="section" id="short-term">
+<h2>Short term<a class="headerlink" href="#short-term" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Distortion that is the P/L convex envelope of a set of given points</li>
+<li>Errors with mass! Finite vs infinite supported distributions, lep vs ly and clin?!</li>
+<li>Understand output for collateral and priority!</li>
+<li>Sev by name from examples in spec sev_a = name</li>
+<li>Different freq dists and freq dist in exact mode</li>
+<li>Integrate beta factory: Kent example should be built in: dist=beta, mean=, cv= (catch in shape from mean,cv) limit=??</li>
+</ul>
+</div>
+<div class="section" id="medium-term">
+<h2>Medium Term<a class="headerlink" href="#medium-term" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Estimate Bucket function! Auto update</li>
+<li>Major paper examples? Normal with correlation</li>
+<li>IME review paper example?</li>
+</ul>
+</div>
+<div class="section" id="nice-to-have-enhancements">
+<h2>Nice to have enhancements<a class="headerlink" href="#nice-to-have-enhancements" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt>pf += to add a line?</dt>
+<dd><ul class="first last">
+<li>x = Portfolio(name)</li>
+<li>x.add(line=’home’, premium=1200, lr=.5)?!</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>different ways of specfiying? .add method? add with (freq=, sev=) style</li>
+<li>More freq dists and shape scale specification</li>
+<li>occ and agg limit and attachment</li>
+<li>Label severity distributions to facilitate adding (user warrants labels are unique)</li>
+<li>Better + function combining severity distributions</li>
+<li>How to model two reinstatements?</li>
+<li>$Nmid N ge n$ distribution?</li>
+<li>Split into subfiles and make a proper package</li>
+<li>sort beta factory</li>
+</ul>
+<p>Educational Opportunities</p>
+<ul class="simple">
+<li>Uniform, triangular to normal</li>
+<li>Bernoulli to normal = life insurance</li>
+<li>$P(A&gt;x)sim lambda P(X&gt;x) sim P(M&gt;x)$ if thick tails</li>
+<li>Occ vs agg PMLs, body vs. tail. For non-cat lines it is all about correlation; for cat it is all about the tail</li>
+<li>Effron’s theorem</li>
+<li>FFT exact for “making” Poisson, sum of normals is normal, expnentials is gamma etc.</li>
+<li>Slow convergence of truncated stable to normal</li>
+<li>Severity doesn’t matter: difference between agg with sev and without for large claim count and stable severity</li>
+<li>Small large claim split approach…attrit for small; handling without correlation??</li>
+<li>Compound Poisson: CP(mixed sev) = sum CP(sev0</li>
+</ul>
+<p>## Practical Modeling Examples
+* From limit profile
+* Mixed severity
+* Modeling $Nmid N ge n$
+* How to model 2 reinstatements</p>
+<p>## Publication and Use
+* Interest from RMIR</p>
+</div>
+<div class="section" id="open">
+<h2>Open<a class="headerlink" href="#open" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>issue with mass and bodoff1 portfolio</li>
+</ul>
+</div>
+<div class="section" id="aug-30">
+<h2>Aug 30<a class="headerlink" href="#aug-30" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Examples params split into portfolios, lines and severity</li>
+<li>Examples is scriptable to return line or severity</li>
+<li>Portfolio tracks all update parameters to determine recalc</li>
+<li>Portfolio.update trim_df option</li>
+<li>User portfolios</li>
+<li>estimate bucket looks at limit and moments</li>
+<li>ability to save to YAML, optionally to user set</li>
+<li>Hack function to make line aggs for industry from IEE extract…very ROUGH</li>
+</ul>
+</div>
+<div class="section" id="aug-29">
+<h2>Aug 29<a class="headerlink" href="#aug-29" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>removed great depenedence</li>
+<li>experimented with YAML persistence…tricky!</li>
+<li>DONE Hash of status for last run and timestamp (np.timeformat!) [not all inputs…]</li>
+<li><dl class="first docutils">
+<dt>DONE Histogram mode: cts or discrete: other adj needed for cts? (Half bucket off?)</dt>
+<dd><ul class="first last">
+<li>If you lower the bucket size then continuous will increase the mean by half the new (smaller) bucket size</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>DONE trim density_df to get rid of unwanted columns</li>
+<li>DONE apply_distortion works on density_df and applied dist is kept for reference</li>
+<li><dl class="first docutils">
+<dt>DONE fixed severity type: how to make easy</dt>
+<dd><ul class="first last">
+<li>‘severity’: {‘name’: ‘histogram’, ‘xs’ : (1), ‘ps’: (1)}</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>DONE Rationalize graphics</dt>
+<dd><ul class="first last">
+<li>See make_axis and make_pandas_axis…just needs to be propogated</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>DONE created example as a class, reads examples from YAML</li>
+<li>DONE Include apply_distortion into density_df (easy change, easy to change back)</li>
+<li><dl class="first docutils">
+<dt>removed adjust_axis_format - put in K, M, B into axis text</dt>
+<dd><ul class="first last">
+<li>figure best format</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="aug-28">
+<h2>Aug 28<a class="headerlink" href="#aug-28" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>added ability to recurse and use a portfolio as a severity</li>
+<li>deepcopy</li>
+<li>drawstyle=’steps-post’</li>
+<li>distribution_factory, deleted old verison, combined in _ex</li>
+<li>added logging, read_log function as dataframe</li>
+<li>overrode + *</li>
+<li><dl class="first docutils">
+<dt>removed junk from bottom:</dt>
+<dd><ul class="first last">
+<li>old list of examples</li>
+<li>qd = quick display</li>
+<li>qdso with sort order on split _ index</li>
+<li>qtab quick tabulate</li>
+<li>cumintegralnew</li>
+<li>cumintegraltest</li>
+<li>pno - pre-iterator axes</li>
+<li>defuzz - now in update</li>
+<li>KEPT fit_distortion - ?see CAS talks, calibrate to a given - - distribution (? fit one transf to another?)</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="aug-27">
+<h2>Aug 27:<a class="headerlink" href="#aug-27" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>repr and string</li>
+<li>uat function into CPortfolio</li>
+<li>insurability_triangle</li>
+<li>estimate function</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/logo.PNG" alt="Logo"/>
+    
+    <h1 class="logo logo-name">aggregate</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Development Outline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#september-3">September 3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#non-programming-enhancements">Non programming Enhancements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#short-term">Short term</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#medium-term">Medium Term</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#nice-to-have-enhancements">Nice to have enhancements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#open">Open</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aug-30">Aug 30</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aug-29">Aug 29</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aug-28">Aug 28</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aug-27">Aug 27:</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="helpers.html">Helpers and Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Stephen J. Mildenhall.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/devel.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/mynl/aggregate" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

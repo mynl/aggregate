@@ -1,0 +1,82 @@
+.. aggregate documentation master file, created by
+   sphinx-quickstart on Sat Sep  1 14:08:11 2018.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+   http://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
+   https://alabaster.readthedocs.io/en/latest/customization.html
+
+aggregate: Working with Probability Distributions
+=================================================
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Contents:
+
+   intro
+   tutorial
+   helpfile
+
+.. automodule:: aggregate
+	:members:
+
+Severity Class
+==============
+
+.. autoclass:: Severity
+	:members:
+	:private-members:
+
+Aggregate Distribution Class
+============================
+
+.. autoclass:: Aggregate
+	:members:
+	:private-members:
+
+Portfolio Class
+===============
+
+.. autoclass:: Portfolio
+	:members:
+
+Distortion Class
+================
+
+.. autoclass:: Distortion
+	:members:
+
+Example Class
+=============
+
+.. autoclass:: Example
+	:members:
+	:undoc-members:
+
+Helpers and Utilities
+=====================
+
+Axis Manager Class
+------------------
+
+.. autoclass:: AxisManager
+	:members:
+
+
+Utilities Module
+----------------
+
+.. automodule:: utils
+	:members:
+	:exclude-members: AxisManager
+	:undoc-members:
+	:private-members:
+
+Parameters Module
+-----------------
+
+.. automodule:: param
+	:members:
+	:private-members:
+
+
+

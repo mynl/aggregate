@@ -1,0 +1,912 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>utils &#8212; aggregate 0.9.40 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.9.40',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for utils</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">ss</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="k">import</span> <span class="n">newton</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="kn">from</span> <span class="nn">IPython.core.display</span> <span class="k">import</span> <span class="n">HTML</span><span class="p">,</span> <span class="n">display</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<span class="c1"># logging</span>
+<span class="c1"># TODO better filename!</span>
+<span class="n">LOGFILE</span> <span class="o">=</span> <span class="s1">&#39;c:/S/TELOS/python/aggregate/aggregate.log&#39;</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">LOGFILE</span><span class="p">,</span>
+                    <span class="n">filemode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span>
+                    <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> | </span><span class="si">%(name)s</span><span class="s1"> | </span><span class="si">%(levelname)s</span><span class="s1"> | </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span>
+                    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;aggregate.__init__ | New Aggregate Session started&#39;</span><span class="p">)</span>
+
+
+<span class="c1"># momnent utility functions</span>
+<div class="viewcode-block" id="ft"><a class="viewcode-back" href="../helpers.html#utils.ft">[docs]</a><span class="k">def</span> <span class="nf">ft</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    fft with padding and tilt</span>
+<span class="sd">    padding = n makes vector 2^n as long</span>
+<span class="sd">    n=1 doubles (default)</span>
+<span class="sd">    n=2 quadruples</span>
+<span class="sd">    tilt is passed in as the tilting vector or None: easier for the caller to have a single instance</span>
+
+<span class="sd">    :param z:</span>
+<span class="sd">    :param padding: = 1 doubles</span>
+<span class="sd">    :param tilt: vector of tilt values</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">locft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span>
+    <span class="k">if</span> <span class="n">z</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">z</span><span class="p">),):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;FUKYUPY error, wrong shape passed into ft: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="c1"># tilt</span>
+    <span class="k">if</span> <span class="n">tilt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">zt</span> <span class="o">=</span> <span class="n">z</span> <span class="o">*</span> <span class="n">tilt</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">zt</span> <span class="o">=</span> <span class="n">z</span>
+    <span class="c1"># pad</span>
+    <span class="k">if</span> <span class="n">padding</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># temp = np.hstack((z, np.zeros_like(z), np.zeros_like(z), np.zeros_like(z)))</span>
+        <span class="n">pad_len</span> <span class="o">=</span> <span class="n">zt</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">padding</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">zt</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">pad_len</span><span class="p">)))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">zt</span>
+    <span class="c1"># temp = np.hstack((z, np.zeros_like(z)))</span>
+    <span class="k">return</span> <span class="n">locft</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ift"><a class="viewcode-back" href="../helpers.html#utils.ift">[docs]</a><span class="k">def</span> <span class="nf">ift</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ift that strips out padding and adjusts for tilt</span>
+
+<span class="sd">    :param z:</span>
+<span class="sd">    :param padding:</span>
+<span class="sd">    :param tilt:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">locift</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft</span>
+    <span class="k">if</span> <span class="n">z</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">z</span><span class="p">),):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;FUKYUPY error, wrong shape passed into ft: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">locift</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+    <span class="c1"># unpad</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="mi">0</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="n">padding</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">temp</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">padding</span><span class="p">))]</span>
+    <span class="c1"># untilt</span>
+    <span class="k">if</span> <span class="n">tilt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">temp</span> <span class="o">/=</span> <span class="n">tilt</span>
+    <span class="k">return</span> <span class="n">temp</span></div>
+    <span class="c1"># return temp[0:int(len(temp) / 2)]</span>
+
+
+<div class="viewcode-block" id="stats_series"><a class="viewcode-back" href="../helpers.html#utils.stats_series">[docs]</a><span class="k">def</span> <span class="nf">stats_series</span><span class="p">(</span><span class="n">data_list</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    combine elements into a reporting series</span>
+<span class="sd">    handles order, index names etc. in one place</span>
+
+<span class="sd">    :param data_list:</span>
+<span class="sd">    :param name:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_arrays</span><span class="p">(</span>
+        <span class="p">[[</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">],</span>
+         <span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">,</span> <span class="s1">&#39;skew&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;ex1&#39;</span><span class="p">,</span> <span class="s1">&#39;ex2&#39;</span><span class="p">,</span> <span class="s1">&#39;ex3&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.9e&#39;</span><span class="p">]],</span>
+        <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;component&#39;</span><span class="p">,</span> <span class="s1">&#39;measure&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">data_list</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="cv_to_shape"><a class="viewcode-back" href="../helpers.html#utils.cv_to_shape">[docs]</a><span class="k">def</span> <span class="nf">cv_to_shape</span><span class="p">(</span><span class="n">dist_name</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create a frozen object of type dist_name with given cv</span>
+<span class="sd">    dist_name = &#39;lognorm&#39;</span>
+<span class="sd">    cv = 0.25</span>
+
+<span class="sd">    :param dist_name:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    :param hint:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">gen</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">dist_name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+        <span class="n">fz0</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">fz0</span><span class="o">.</span><span class="n">stats</span><span class="p">(</span><span class="s1">&#39;mv&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cv</span> <span class="o">-</span> <span class="n">temp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="o">.</span><span class="mi">5</span> <span class="o">/</span> <span class="n">temp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="n">newton</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;cv_to_shape | error for </span><span class="si">{dist_name}</span><span class="s1">, </span><span class="si">{cv}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+        <span class="k">return</span> <span class="n">ans</span><span class="p">,</span> <span class="kc">None</span>
+    <span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">ans</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ans</span><span class="p">,</span> <span class="n">fz</span></div>
+
+
+<div class="viewcode-block" id="mean_to_scale"><a class="viewcode-back" href="../helpers.html#utils.mean_to_scale">[docs]</a><span class="k">def</span> <span class="nf">mean_to_scale</span><span class="p">(</span><span class="n">dist_name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">mean</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    adjust scale of fz to have desired mean</span>
+<span class="sd">    return frozen instance</span>
+
+<span class="sd">    :param dist_name:</span>
+<span class="sd">    :param shape:</span>
+<span class="sd">    :param mean:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">gen</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">dist_name</span><span class="p">)</span>
+    <span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">stats</span><span class="p">(</span><span class="s1">&#39;m&#39;</span><span class="p">)</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">mean</span> <span class="o">/</span> <span class="n">m</span>
+    <span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">scale</span><span class="p">,</span> <span class="n">fz</span></div>
+
+
+<div class="viewcode-block" id="sln_fit"><a class="viewcode-back" href="../helpers.html#utils.sln_fit">[docs]</a><span class="k">def</span> <span class="nf">sln_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    method of moments shifted lognormal fit matching given mean, cv and skewness</span>
+
+<span class="sd">    :param m:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    :param skew:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">eta</span> <span class="o">=</span> <span class="p">(((</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">skew</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">4</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">skew</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span>
+            <span class="mi">1</span> <span class="o">/</span> <span class="p">(((</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">skew</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">4</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">skew</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">eta</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">shift</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">cv</span> <span class="o">*</span> <span class="n">m</span> <span class="o">/</span> <span class="n">eta</span>
+    <span class="n">mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">m</span> <span class="o">-</span> <span class="n">shift</span><span class="p">)</span> <span class="o">-</span> <span class="n">sigma</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="k">return</span> <span class="n">shift</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span></div>
+
+
+<div class="viewcode-block" id="sgamma_fit"><a class="viewcode-back" href="../helpers.html#utils.sgamma_fit">[docs]</a><span class="k">def</span> <span class="nf">sgamma_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    method of moments shifted gamma fit matching given mean, cv and skewness</span>
+
+<span class="sd">    :param m:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    :param skew:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">/</span> <span class="p">(</span><span class="n">skew</span> <span class="o">*</span> <span class="n">skew</span><span class="p">)</span>
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">cv</span> <span class="o">*</span> <span class="n">m</span> <span class="o">*</span> <span class="n">skew</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">shift</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">theta</span>
+    <span class="k">return</span> <span class="n">shift</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">theta</span></div>
+
+
+<span class="c1"># Distribution factory</span>
+
+<div class="viewcode-block" id="beta_factory"><a class="viewcode-back" href="../helpers.html#utils.beta_factory">[docs]</a><span class="k">def</span> <span class="nf">beta_factory</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">maxl</span><span class="p">,</span> <span class="n">cv</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    beta a and b params given expected loss, max loss exposure and cv</span>
+<span class="sd">    Kent E.&#39;s specification. Just used to create the CAgg classes for his examples (in agg.examples)</span>
+<span class="sd">    https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters</span>
+
+<span class="sd">    :param el:</span>
+<span class="sd">    :param maxl:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">el</span> <span class="o">/</span> <span class="n">maxl</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">m</span> <span class="o">*</span> <span class="n">m</span> <span class="o">*</span> <span class="n">cv</span> <span class="o">*</span> <span class="n">cv</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">m</span> <span class="o">*</span> <span class="p">(</span><span class="n">m</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">m</span><span class="p">)</span> <span class="o">/</span> <span class="n">v</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">m</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">m</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">m</span><span class="p">)</span> <span class="o">/</span> <span class="n">v</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ss</span><span class="o">.</span><span class="n">beta</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">maxl</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="distribution_factory"><a class="viewcode-back" href="../helpers.html#utils.distribution_factory">[docs]</a><span class="k">def</span> <span class="nf">distribution_factory</span><span class="p">(</span><span class="n">dist_name</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">cv</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a frozen distribution object by name</span>
+<span class="sd">    Normal (and possibly others) does not have a shape parameter</span>
+<span class="sd">    figure shape and scale from mean and cv</span>
+<span class="sd">    corresponds to unlimited severity for now</span>
+
+<span class="sd">    E.g.</span>
+<span class="sd">    fz = dist_factory_ex(&#39;lognorm&#39;, 1000, 0.25)</span>
+<span class="sd">    fz = dist_factory_ex(&#39;gamma&#39;, 1000, 1.25)</span>
+<span class="sd">    plot_frozen(fz)</span>
+
+<span class="sd">    :param dist_name:</span>
+<span class="sd">    :param mean:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    :return frozen distribution instance:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">dist_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;norm&#39;</span><span class="p">]:</span>
+        <span class="c1">#     Create a frozen distribution object by name</span>
+        <span class="c1">#     Normal (and possibly others) does not have a shape parameter</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="n">cv</span> <span class="o">*</span> <span class="n">mean</span>
+        <span class="c1"># ss is scipy.stats</span>
+        <span class="n">gen</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">dist_name</span><span class="p">)</span>
+        <span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">fz</span>
+
+    <span class="n">sh</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cv_to_shape</span><span class="p">(</span><span class="n">dist_name</span><span class="p">,</span> <span class="n">cv</span><span class="p">)</span>
+    <span class="n">sc</span><span class="p">,</span> <span class="n">fz</span> <span class="o">=</span> <span class="n">mean_to_scale</span><span class="p">(</span><span class="n">dist_name</span><span class="p">,</span> <span class="n">sh</span><span class="p">,</span> <span class="n">mean</span><span class="p">)</span>
+    <span class="n">st</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">stats</span><span class="p">(</span><span class="s1">&#39;mv&#39;</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">acv</span> <span class="o">=</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="o">.</span><span class="mi">5</span> <span class="o">/</span> <span class="n">m</span>  <span class="c1"># achieved cv</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">m</span><span class="p">))</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">cv</span><span class="p">,</span> <span class="n">acv</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">fz</span><span class="p">,</span> <span class="n">sh</span><span class="p">,</span> <span class="n">sc</span></div>
+
+
+<div class="viewcode-block" id="estimate_agg_percentile"><a class="viewcode-back" href="../helpers.html#utils.estimate_agg_percentile">[docs]</a><span class="k">def</span> <span class="nf">estimate_agg_percentile</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.999</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</span>
+<span class="sd">    if len(spec) &gt; 3 it is assumed to be a spec, otherwise input m, cv, sk</span>
+
+<span class="sd">    If spec passed in also take max with the limit</span>
+
+<span class="sd">    :param m:</span>
+<span class="sd">    :param cv:</span>
+<span class="sd">    :param skew:</span>
+<span class="sd">    :param p:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">shift</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span> <span class="o">=</span> <span class="n">sln_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">)</span>
+    <span class="n">fzl</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">lognorm</span><span class="p">(</span><span class="n">sigma</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mu</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="n">shift</span><span class="p">)</span>
+    <span class="n">shift</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">theta</span> <span class="o">=</span> <span class="n">sgamma_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">)</span>
+    <span class="n">fzg</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">gamma</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">theta</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">shift</span><span class="p">)</span>
+    <span class="n">pl</span> <span class="o">=</span> <span class="n">fzl</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">pg</span> <span class="o">=</span> <span class="n">fzg</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
+    <span class="c1"># throw in a mean + 3 sd approx too...</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">pl</span><span class="p">,</span> <span class="n">pg</span><span class="p">,</span> <span class="n">m</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">ss</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">cv</span><span class="p">))</span></div>
+
+
+<span class="c1"># misc</span>
+<div class="viewcode-block" id="plot_frozen"><a class="viewcode-back" href="../helpers.html#utils.plot_frozen">[docs]</a><span class="k">def</span> <span class="nf">plot_frozen</span><span class="p">(</span><span class="n">fz</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    make a quick plot of fz</span>
+
+<span class="sd">    :param fz:</span>
+<span class="sd">    :param N:</span>
+<span class="sd">    :param p:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">x0</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">:</span>
+        <span class="n">x0</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+    <span class="n">ps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">N</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">den</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+    <span class="n">qs</span> <span class="o">=</span> <span class="n">fz</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+    <span class="c1"># plt.figure()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">den</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ps</span><span class="p">,</span> <span class="n">qs</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="c1"># &#39;{:5.3f}\t{:5.3f}&#39;.format(*[float(i) for i in fz.stats()])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="axiter_factory"><a class="viewcode-back" href="../helpers.html#utils.axiter_factory">[docs]</a><span class="k">def</span> <span class="nf">axiter_factory</span><span class="p">(</span><span class="n">axiter</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nr</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    axiter = check_axiter(axiter, ...) to allow chaining</span>
+<span class="sd">    TODO can this be done in the class somehow?</span>
+
+<span class="sd">    :param axiter:</span>
+<span class="sd">    :param n:</span>
+<span class="sd">    :param figsize:</span>
+<span class="sd">    :param height:</span>
+<span class="sd">    :param aspect:</span>
+<span class="sd">    :param nr:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">axiter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">AxisManager</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">aspect</span><span class="p">,</span> <span class="n">nr</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">axiter</span></div>
+
+
+<div class="viewcode-block" id="AxisManager"><a class="viewcode-back" href="../helpers.html#utils.AxisManager">[docs]</a><span class="k">class</span> <span class="nc">AxisManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nr</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        :param n:</span>
+<span class="sd">        :param figsize:</span>
+<span class="sd">        :param height:</span>
+<span class="sd">        :param aspect:</span>
+<span class="sd">        :param nr: number of plots per row</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">=</span> <span class="n">nr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">figsize</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r</span> <span class="o">*</span> <span class="n">height</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">*</span> <span class="n">height</span> <span class="o">*</span> <span class="n">aspect</span>
+            <span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">axs</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">it</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">faxs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">axs</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">it</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">faxs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span>
+
+<div class="viewcode-block" id="AxisManager.grid_size"><a class="viewcode-back" href="../helpers.html#utils.AxisManager.grid_size">[docs]</a>    <span class="k">def</span> <span class="nf">grid_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">subgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        appropriate grid size given class parameters</span>
+
+<span class="sd">        :param n:</span>
+<span class="sd">        :param subgrid: call is for a subgrid, no special treatment for 6 and 8</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">n</span><span class="p">)</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">subgrid</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">&gt;</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">6</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">!=</span> <span class="mi">6</span><span class="p">:</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="mi">2</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="mi">3</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">&gt;</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">8</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">!=</span> <span class="mi">8</span><span class="p">:</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="mi">2</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="k">return</span> <span class="n">r</span><span class="p">,</span> <span class="n">c</span></div>
+
+    <span class="k">def</span> <span class="nf">dimensions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span>
+
+<div class="viewcode-block" id="AxisManager.grid"><a class="viewcode-back" href="../helpers.html#utils.AxisManager.grid">[docs]</a>    <span class="k">def</span> <span class="nf">grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        return a block of axes suitable for Pandas</span>
+<span class="sd">        if size=0 return all the axes</span>
+
+<span class="sd">        :param size:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">faxs</span>
+        <span class="k">elif</span> <span class="n">size</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__next__</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># need local sizing</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">&gt;=</span> <span class="n">size</span>
+            <span class="n">r</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">subgrid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="fm">__next__</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">r</span><span class="p">)]</span></div></div>
+
+
+<div class="viewcode-block" id="cumintegral"><a class="viewcode-back" href="../helpers.html#utils.cumintegral">[docs]</a><span class="k">def</span> <span class="nf">cumintegral</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">bs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    cumulative integral of v with buckets size bs</span>
+
+<span class="sd">    :param v:</span>
+<span class="sd">    :param bs:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">v</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span> <span class="o">*</span> <span class="n">bs</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">values</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span> <span class="o">*</span> <span class="n">bs</span></div>
+
+
+<div class="viewcode-block" id="lognorm_lev"><a class="viewcode-back" href="../helpers.html#utils.lognorm_lev">[docs]</a><span class="k">def</span> <span class="nf">lognorm_lev</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">limit</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    return E(min(X, limit)^n) for lognormal using exact calculation</span>
+<span class="sd">    currently only for n=1, 2</span>
+
+<span class="sd">    :param mu:</span>
+<span class="sd">    :param sigma:</span>
+<span class="sd">    :param n:</span>
+<span class="sd">    :param limit:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">limit</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">mu</span> <span class="o">+</span> <span class="n">n</span> <span class="o">*</span> <span class="n">n</span> <span class="o">*</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">sigma</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">cdf</span>
+        <span class="n">ll</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">limit</span><span class="p">)</span>
+        <span class="n">sigma2</span> <span class="o">=</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">sigma</span>
+        <span class="n">phi_l</span> <span class="o">=</span> <span class="n">phi</span><span class="p">((</span><span class="n">ll</span> <span class="o">-</span> <span class="n">mu</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigma</span><span class="p">)</span>
+        <span class="n">phi_l2</span> <span class="o">=</span> <span class="n">phi</span><span class="p">((</span><span class="n">ll</span> <span class="o">-</span> <span class="n">mu</span> <span class="o">-</span> <span class="n">n</span> <span class="o">*</span> <span class="n">sigma2</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigma</span><span class="p">)</span>
+        <span class="n">unlimited</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">mu</span> <span class="o">+</span> <span class="n">n</span> <span class="o">*</span> <span class="n">n</span> <span class="o">*</span> <span class="n">sigma2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">unlimited</span> <span class="o">*</span> <span class="n">phi_l2</span> <span class="o">+</span> <span class="n">limit</span> <span class="o">**</span> <span class="n">n</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">phi_l</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="html_title"><a class="viewcode-back" href="../helpers.html#utils.html_title">[docs]</a><span class="k">def</span> <span class="nf">html_title</span><span class="p">(</span><span class="n">txt</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    :param txt:</span>
+<span class="sd">    :param n:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">display</span><span class="p">(</span><span class="n">HTML</span><span class="p">(</span><span class="s1">&#39;&lt;h</span><span class="si">{:}</span><span class="s1">&gt; </span><span class="si">{:}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">txt</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">())))</span></div>
+
+
+<div class="viewcode-block" id="sensible_jump"><a class="viewcode-back" href="../helpers.html#utils.sensible_jump">[docs]</a><span class="k">def</span> <span class="nf">sensible_jump</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">desired_rows</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    return a sensible jump size to output desired_rows given input of n</span>
+
+<span class="sd">    :param n:</span>
+<span class="sd">    :param desired_rows:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">desired_rows</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="n">j</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span> <span class="o">/</span> <span class="n">desired_rows</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">round</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="suptitle_and_tight"><a class="viewcode-back" href="../helpers.html#utils.suptitle_and_tight">[docs]</a><span class="k">def</span> <span class="nf">suptitle_and_tight</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    deal with tight layout when there is a suptitle</span>
+
+<span class="sd">    :param title:</span>
+<span class="sd">    :param fontsize:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="n">fontsize</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">(</span><span class="n">rect</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.97</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="insurability_triangle"><a class="viewcode-back" href="../helpers.html#utils.insurability_triangle">[docs]</a><span class="k">def</span> <span class="nf">insurability_triangle</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Illustrate the insurability triangle...</span>
+
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">f</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+    <span class="n">it</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">axs</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+    <span class="n">λs</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">100</span><span class="p">]</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">set_palette</span><span class="p">(</span><span class="n">sns</span><span class="o">.</span><span class="n">cubehelix_palette</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">λs</span><span class="p">)))</span>
+
+    <span class="n">LR</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">101</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">λ</span> <span class="ow">in</span> <span class="n">λs</span><span class="p">:</span>
+        <span class="n">δ</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">LR</span><span class="p">)</span> <span class="o">/</span> <span class="n">LR</span> <span class="o">/</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">LR</span><span class="p">,</span> <span class="n">δ</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;λ=</span><span class="si">{λ}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Loss Ratio&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;δ Investor Discount Rate&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Profitability vs. Loss Ratio </span><span class="se">\n</span><span class="s1">By PML to EL Ratio&#39;</span><span class="p">)</span>
+
+    <span class="n">LR</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">101</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">λ</span> <span class="ow">in</span> <span class="n">λs</span><span class="p">:</span>
+        <span class="n">levg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">λ</span> <span class="o">*</span> <span class="n">LR</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">λ</span> <span class="o">*</span> <span class="n">LR</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># hide the discontinuity</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">LR</span><span class="p">,</span> <span class="n">levg</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;λ=</span><span class="si">{λ}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="c1"># plt.legend()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Loss Ratio&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Premium to Surplus Ratio&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Premium to Surplus Ratio vs. Loss Ratio </span><span class="se">\n</span><span class="s1">By PML to EL Ratio&#39;</span><span class="p">)</span>
+
+    <span class="n">δ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mi">301</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">λ</span> <span class="ow">in</span> <span class="n">λs</span><span class="p">:</span>
+        <span class="n">LR</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">δ</span> <span class="o">*</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">δ</span><span class="p">,</span> <span class="n">LR</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;λ=</span><span class="si">{λ}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="c1"># plt.legend()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Loss Ratio&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Investor Discount Rate&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Loss Ratio vs. Investor Discount Rate </span><span class="se">\n</span><span class="s1">By PML to EL Ratio&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="read_log"><a class="viewcode-back" href="../helpers.html#utils.read_log">[docs]</a><span class="k">def</span> <span class="nf">read_log</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    read and return the log file</span>
+
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">LOGFILE</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;|&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;context&#39;</span><span class="p">,</span> <span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;routine&#39;</span><span class="p">,</span> <span class="s1">&#39;log&#39;</span><span class="p">],</span>
+                     <span class="n">parse_dates</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="MomentAggregator"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator">[docs]</a><span class="k">class</span> <span class="nc">MomentAggregator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Accumulate moments</span>
+<span class="sd">    Used by Portfolio and Aggregate (when there are multiple severities)</span>
+<span class="sd">    makes report df and statistics_df</span>
+
+<span class="sd">    Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freq_name</span><span class="p">,</span> <span class="n">freq_a</span><span class="p">,</span> <span class="n">freq_b</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">=</span> <span class="n">freq_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_a</span> <span class="o">=</span> <span class="n">freq_a</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_b</span> <span class="o">=</span> <span class="n">freq_b</span>
+
+        <span class="c1"># accumulators</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="MomentAggregator.freq_moms"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.freq_moms">[docs]</a>    <span class="k">def</span> <span class="nf">freq_moms</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        figure the moments for the given frequency distribution</span>
+
+<span class="sd">        :param f1:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">freq_1</span> <span class="o">=</span> <span class="n">f1</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;fixed&#39;</span><span class="p">:</span>
+            <span class="c1"># fixed distribution N=n certainly</span>
+            <span class="n">freq_2</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="n">freq_3</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="n">freq_2</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;bernoulli&#39;</span><span class="p">:</span>
+            <span class="c1"># code for bernoulli n, E(N^k) = E(N) = n</span>
+            <span class="n">freq_2</span> <span class="o">=</span> <span class="n">freq_1</span>
+            <span class="n">freq_3</span> <span class="o">=</span> <span class="n">freq_1</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;poisson&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_a</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Poisson</span>
+            <span class="n">freq_2</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_1</span><span class="p">)</span>
+            <span class="n">freq_3</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">+</span> <span class="n">freq_1</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># for gamma alpha, k with density x^alpha e^-kx, EX^n = Gamma(alpha + n) / Gamma(n) k^-n</span>
+            <span class="c1"># EX = a/k = 1, so a=k</span>
+            <span class="c1"># EX2 = (a+1)a/k^2 = a^2/k^2 + a/k^2 = (EX)^2 + a/k^2 = 1 + 1/k, hence var = a/k^2</span>
+            <span class="c1"># if EX=1 and var = c then var = a/k/k = 1/k = c, so k = 1/c</span>
+            <span class="c1"># then a = 1/c</span>
+            <span class="c1"># Finally EX3 = (a+2)(a+1)a/k^3 = (c+1)(c+2)</span>
+            <span class="c1"># Iman Conover paper page 14</span>
+            <span class="c1"># for now...</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_a</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_a</span>
+            <span class="n">freq_2</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">))</span>  <span class="c1"># note 1+c = E(G^2)</span>
+            <span class="n">freq_3</span> <span class="o">=</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">+</span> <span class="n">freq_1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">c</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="n">freq_2</span><span class="p">,</span> <span class="n">freq_3</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.add_fs"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.add_fs">[docs]</a>    <span class="k">def</span> <span class="nf">add_fs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        accumulate new moments defined by f and s</span>
+<span class="sd">        compute agg for the latest values</span>
+
+
+<span class="sd">        :param f1:</span>
+<span class="sd">        :param s1:</span>
+<span class="sd">        :param s2:</span>
+<span class="sd">        :param s3:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># fill in the frequency moments and store away</span>
+        <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_moms</span><span class="p">(</span><span class="n">f1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_1</span> <span class="o">=</span> <span class="n">f1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_2</span> <span class="o">=</span> <span class="n">f2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_3</span> <span class="o">=</span> <span class="n">f3</span>
+
+        <span class="c1"># load current sev stats</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span> <span class="o">=</span> <span class="n">s1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span> <span class="o">=</span> <span class="n">s2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span> <span class="o">=</span> <span class="n">s3</span>
+
+        <span class="c1"># accumulatge frequency</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span> <span class="o">=</span> \
+            <span class="bp">self</span><span class="o">.</span><span class="n">cumulate_moments</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">)</span>
+
+        <span class="c1"># severity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">+</span> <span class="n">f1</span> <span class="o">*</span> <span class="n">s1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">+</span> <span class="n">f1</span> <span class="o">*</span> <span class="n">s2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">+</span> <span class="n">f1</span> <span class="o">*</span> <span class="n">s3</span>
+
+        <span class="c1"># aggregate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_from_fs</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">)</span>
+
+        <span class="c1"># finally accumulate the aggregate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span> <span class="o">=</span> \
+            <span class="bp">self</span><span class="o">.</span><span class="n">cumulate_moments</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.agg_from_fs"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.agg_from_fs">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">agg_from_fs</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        aggregate moments from freq and sev components</span>
+
+
+<span class="sd">        :param f1:</span>
+<span class="sd">        :param f2:</span>
+<span class="sd">        :param f3:</span>
+<span class="sd">        :param s1:</span>
+<span class="sd">        :param s2:</span>
+<span class="sd">        :param s3:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">f1</span> <span class="o">*</span> <span class="n">s1</span><span class="p">,</span> \
+               <span class="n">f1</span> <span class="o">*</span> <span class="n">s2</span> <span class="o">+</span> <span class="p">(</span><span class="n">f2</span> <span class="o">-</span> <span class="n">f1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> \
+               <span class="n">f1</span> <span class="o">*</span> <span class="n">s3</span> <span class="o">+</span> <span class="n">f3</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">f2</span> <span class="o">-</span> <span class="n">f1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">*</span> <span class="n">s2</span> <span class="o">+</span> <span class="p">(</span><span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">f2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">f1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">**</span> <span class="mi">3</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.get_fsa_stats"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.get_fsa_stats">[docs]</a>    <span class="k">def</span> <span class="nf">get_fsa_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">remix</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the current f x s = agg stats and moments</span>
+<span class="sd">        total = true use total else, current</span>
+<span class="sd">        remix = true for total only, re-compute freq stats based on total freq 1</span>
+
+<span class="sd">        :param total: binary</span>
+<span class="sd">        :param remix: combine all sevs and recompute the freq moments from total freq</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">remix</span><span class="p">:</span>
+                <span class="c1"># recompute the frequency moments; all local variables</span>
+                <span class="n">f1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span>
+                <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_moms</span><span class="p">(</span><span class="n">f1</span><span class="p">)</span>
+                <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">/</span> <span class="n">f1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">/</span> <span class="n">f1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">/</span> <span class="n">f1</span>
+                <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_from_fs</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">),</span>
+                        <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">),</span>
+                        <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># running total, not adjusting freq cv</span>
+                <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># not total</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.moments_to_mcvsk"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.moments_to_mcvsk">[docs]</a>    <span class="k">def</span> <span class="nf">moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        convert noncentral moments into mean, cv and skewness</span>
+<span class="sd">        type = agg | freq | sev | mix</span>
+<span class="sd">        delegates work</span>
+
+<span class="sd">        :param mom_type:</span>
+<span class="sd">        :param total:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;agg&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;freq&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_3</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;sev&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span>
+                                                          <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span>
+                                                          <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.moments"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.moments">[docs]</a>    <span class="k">def</span> <span class="nf">moments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        vector of the moments; convenience function</span>
+
+<span class="sd">        :param mom_type:</span>
+<span class="sd">        :param total:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;agg&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span>
+        <span class="k">elif</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;freq&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_3</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_3</span>
+        <span class="k">elif</span> <span class="n">mom_type</span> <span class="o">==</span> <span class="s1">&#39;sev&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_2</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span><span class="p">,</span> \
+                       <span class="bp">self</span><span class="o">.</span><span class="n">tot_sev_3</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_freq_1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.cumulate_moments"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.cumulate_moments">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">cumulate_moments</span><span class="p">(</span><span class="n">m1</span><span class="p">,</span> <span class="n">m2</span><span class="p">,</span> <span class="n">m3</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n3</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Moments of sum of indepdendent variables</span>
+
+<span class="sd">        :param m1: 1st moment, E(X)</span>
+<span class="sd">        :param m2: 2nd moment, E(X^2)</span>
+<span class="sd">        :param m3: 3rd moment, E(X^3)</span>
+<span class="sd">        :param n1:</span>
+<span class="sd">        :param n2:</span>
+<span class="sd">        :param n3:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># figure out moments of the sum</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="n">m1</span> <span class="o">+</span> <span class="n">n1</span>
+        <span class="n">t2</span> <span class="o">=</span> <span class="n">m2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">n1</span> <span class="o">+</span> <span class="n">n2</span>
+        <span class="n">t3</span> <span class="o">=</span> <span class="n">m3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">m2</span> <span class="o">*</span> <span class="n">n1</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">n2</span> <span class="o">+</span> <span class="n">n3</span>
+        <span class="k">return</span> <span class="n">t1</span><span class="p">,</span> <span class="n">t2</span><span class="p">,</span> <span class="n">t3</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.column_names"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.column_names">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">column_names</span><span class="p">(</span><span class="n">agg_only</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        list of the moment and stats names for f x s = a</span>
+<span class="sd">        list of the moment and stats names for just agg</span>
+
+<span class="sd">        :param agg_only: = True for total r</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">agg_only</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">([</span><span class="s1">&#39;agg&#39;</span><span class="p">],</span> <span class="p">[</span><span class="n">f</span><span class="s1">&#39;_</span><span class="si">{i}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)]</span> <span class="o">+</span>
+                                                        <span class="p">[</span><span class="s1">&#39;_m&#39;</span><span class="p">,</span> <span class="s1">&#39;_cv&#39;</span><span class="p">,</span> <span class="s1">&#39;_skew&#39;</span><span class="p">])]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">([</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">],</span> <span class="p">[</span><span class="n">f</span><span class="s1">&#39;_</span><span class="si">{i}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)]</span> <span class="o">+</span>
+                                                        <span class="p">[</span><span class="s1">&#39;_m&#39;</span><span class="p">,</span> <span class="s1">&#39;_cv&#39;</span><span class="p">,</span> <span class="s1">&#39;_skew&#39;</span><span class="p">])]</span></div>
+
+<div class="viewcode-block" id="MomentAggregator._moments_to_mcvsk"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator._moments_to_mcvsk">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_moments_to_mcvsk</span><span class="p">(</span><span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span><span class="p">,</span> <span class="n">ex3</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        returns mean, cv and skewness from non-central moments</span>
+
+<span class="sd">        :param ex1:</span>
+<span class="sd">        :param ex2:</span>
+<span class="sd">        :param ex3:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">ex1</span>
+        <span class="n">var</span> <span class="o">=</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
+        <span class="n">cv</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">/</span> <span class="n">m</span>
+        <span class="n">skew</span> <span class="o">=</span> <span class="p">(</span><span class="n">ex3</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">*</span> <span class="n">ex2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span> <span class="o">/</span> <span class="n">sd</span> <span class="o">**</span> <span class="mi">3</span>
+        <span class="k">return</span> <span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span></div>
+
+<div class="viewcode-block" id="MomentAggregator.stats_series"><a class="viewcode-back" href="../helpers.html#utils.MomentAggregator.stats_series">[docs]</a>    <span class="k">def</span> <span class="nf">stats_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">pvalue</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        combine elements into a reporting series</span>
+<span class="sd">        handles order, index names etc. in one place</span>
+
+<span class="sd">        :param name: series name</span>
+<span class="sd">        :param limit:</span>
+<span class="sd">        :param pvalue:</span>
+<span class="sd">        :param total:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_arrays</span><span class="p">(</span>
+            <span class="p">[[</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">],</span>
+             <span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">,</span> <span class="s1">&#39;skew&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;ex1&#39;</span><span class="p">,</span> <span class="s1">&#39;ex2&#39;</span><span class="p">,</span> <span class="s1">&#39;ex3&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.9e&#39;</span><span class="p">]],</span>
+            <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;component&#39;</span><span class="p">,</span> <span class="s1">&#39;measure&#39;</span><span class="p">])</span>
+        <span class="n">agg_stats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">)</span>
+        <span class="n">p999e</span> <span class="o">=</span> <span class="n">estimate_agg_percentile</span><span class="p">(</span><span class="o">*</span><span class="n">agg_stats</span><span class="p">,</span> <span class="n">pvalue</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="o">*</span><span class="n">agg_stats</span><span class="p">,</span>
+                          <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">),</span>
+                          <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">),</span>
+                          <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments</span><span class="p">(</span><span class="s1">&#39;agg&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">),</span>
+                          <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments</span><span class="p">(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">),</span>
+                          <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">moments</span><span class="p">(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="n">total</span><span class="p">),</span>
+                          <span class="n">limit</span><span class="p">,</span> <span class="n">p999e</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../index.html">
+    <img class="logo" src="../_static/logo.PNG" alt="Logo"/>
+    
+    <h1 class="logo logo-name">aggregate</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction to aggregate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../histapp.html">History and Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel.html">Development Outline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../severity.html">Severity Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../portfolio.html">Portfolio Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distortion.html">Distortion Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../helpers.html">Helpers and Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters.html">Parameters Module</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Stephen J. Mildenhall.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+    <a href="https://github.com/mynl/aggregate" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

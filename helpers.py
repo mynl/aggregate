@@ -11,13 +11,14 @@ from ruamel import yaml
 import os
 from . utils import html_title, sensible_jump
 from . port import Portfolio
-
+import os
 
 class Example(object):
     """
-    Example: class
-    Manages examples for Portfolio object
-    Building examples from built in lines
+    Example class
+    -------------
+
+    Manages examples for Portfolio and Book objects
 
 
     :param dirname: dirname load filename or YAMLFILE if not given
@@ -27,8 +28,7 @@ class Example(object):
         """
         """
         if dirname == '':
-            # TODO sort out...
-            dirname = 'c:/s/telos/python/aggregate'
+            dirname = os.path.split(__file__)[0]
         with open(os.path.join(dirname, 'portfolio.yaml'), 'r') as f:
             self.built_in_portfolios = yaml.load(f, Loader=yaml.Loader)
         with open(os.path.join(dirname, 'aggregate.yaml'), 'r') as f:

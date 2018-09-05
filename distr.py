@@ -31,8 +31,9 @@ class Aggregate(object):
 
     """
 
-    def __init__(self, name, el=0, premium=0, lr=0, en=0, attachment=0, limit=np.inf, sev_name='', sev_a=0, sev_b=0,
-                 sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, mix_wt=1,
+    def __init__(self, name, el=0, premium=0, lr=0, en=0, attachment=0, limit=np.inf,
+                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
+                 sev_xs=None, sev_ps=None, mix_wt=1,
                  freq_name='', freq_a=0, freq_b=0):
         """
 

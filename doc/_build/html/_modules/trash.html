@@ -1,0 +1,943 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>trash &#8212; aggregate 0.9.40 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.9.40',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for trash</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">ss</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">aggregate.utils</span> <span class="k">import</span> <span class="n">cv_to_shape</span><span class="p">,</span> <span class="n">mean_to_scale</span>
+<span class="kn">from</span> <span class="nn">scipy.integrate</span> <span class="k">import</span> <span class="n">quad</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">interpolate</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">aggregate</span> <span class="k">import</span> <span class="n">cumulate_moments</span><span class="p">,</span> <span class="n">moments_to_mcvsk</span><span class="p">,</span> <span class="n">sln_fit</span><span class="p">,</span> <span class="n">sgamma_fit</span><span class="p">,</span> <span class="n">ft</span><span class="p">,</span> <span class="n">ift</span><span class="p">,</span> \
+    <span class="n">AxisManager</span><span class="p">,</span> <span class="n">estimate_agg_percentile</span><span class="p">,</span> <span class="n">Distortion</span><span class="p">,</span> <span class="n">suptitle_and_tight</span>
+
+<span class="n">LOGFILE</span> <span class="o">=</span> <span class="s1">&#39;c:/S/TELOS/python/aggregate/aggregate.log&#39;</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">LOGFILE</span><span class="p">,</span>
+                    <span class="n">filemode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span>
+                    <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> | </span><span class="si">%(name)s</span><span class="s1"> | </span><span class="si">%(levelname)s</span><span class="s1"> | </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span>
+                    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;aggregate.__init__ | New trash Session started&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SuperAggregate"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate">[docs]</a><span class="k">class</span> <span class="nc">SuperAggregate</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    SuperAggregate help placeholder</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SuperAggregate.__init__"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">el</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">premium</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">en</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">sev_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">sev_a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sev_b</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                 <span class="n">sev_mean</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sev_cv</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sev_loc</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sev_scale</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">mix_wt</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">freq_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">freq_a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">freq_b</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        el -&gt; en</span>
+<span class="sd">        prem x lr -&gt; el</span>
+<span class="sd">        x . en -&gt; el</span>
+<span class="sd">        always have en x and el; may have prem and lr</span>
+<span class="sd">        if prem then lr computed; if lr then premium computed</span>
+
+<span class="sd">        el is determined using np.where(el==0, prem*lr, el)</span>
+<span class="sd">        if el==0 then el = freq * sev</span>
+<span class="sd">        assert np.all( el&gt;0 or en&gt;0 )</span>
+
+<span class="sd">        call with el (or prem x lr) (or n) expressing a mixture, with the same severity</span>
+<span class="sd">        call with el expressing lines of business with an array of severities</span>
+<span class="sd">        call with single el and array of sevs expressing a mixture; [] broken down by weights</span>
+
+<span class="sd">        n is the CONDITIONAL claim count</span>
+<span class="sd">        X is the GROUND UP severity, so X | X &gt; attachment is used and generates n claims</span>
+
+<span class="sd">        TODO: later do both, for now assume one or other is a scalar</span>
+<span class="sd">        call with both that does the cross product... (note the sev array may not be equal sizes)</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :param el:   expected loss or vector or matrix</span>
+<span class="sd">        :param premium:</span>
+<span class="sd">        :param lr:  loss ratio</span>
+<span class="sd">        :param en:  expected claim count</span>
+<span class="sd">        :param attachment: occ attachment</span>
+<span class="sd">        :param limit: occ limit</span>
+<span class="sd">        :param sev_name: Severity class object or similar or vector or matrix</span>
+<span class="sd">        :param sev_a:</span>
+<span class="sd">        :param sev_b:</span>
+<span class="sd">        :param sev_mean:</span>
+<span class="sd">        :param sev_cv:</span>
+<span class="sd">        :param sev_loc:</span>
+<span class="sd">        :param sev_scale:</span>
+<span class="sd">        :param mix_wt: weight for mixed distribution</span>
+<span class="sd">        :param freq_name: name of frequency distribution</span>
+<span class="sd">        :param freq_a: freq dist shape1 OR CV = sq root contagion</span>
+<span class="sd">        :param freq_b: freq dist shape2</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mix_wt</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+
+        <span class="c1"># class variables (mostly)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">=</span> <span class="n">freq_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_a</span> <span class="o">=</span> <span class="n">freq_a</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freq_b</span> <span class="o">=</span> <span class="n">freq_b</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fzapprox</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># total frequency</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aggm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+
+        <span class="c1"># get other variables defined in init</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fzapprox</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bs</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>  <span class="c1"># name of the beta function used to create dh distortion</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;attachment&#39;</span><span class="p">,</span> <span class="s1">&#39;sevcv&#39;</span><span class="p">,</span> <span class="s1">&#39;el&#39;</span><span class="p">,</span> <span class="s1">&#39;prem&#39;</span><span class="p">,</span> <span class="s1">&#39;lr&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;en&#39;</span><span class="p">,</span> <span class="s1">&#39;freqcv&#39;</span><span class="p">,</span> <span class="s1">&#39;freqskew&#39;</span><span class="p">,</span> <span class="s1">&#39;sev1&#39;</span><span class="p">,</span> <span class="s1">&#39;sev2&#39;</span><span class="p">,</span> <span class="s1">&#39;sev3&#39;</span><span class="p">,</span> <span class="s1">&#39;sevcv&#39;</span><span class="p">,</span> <span class="s1">&#39;sevskew&#39;</span><span class="p">,</span>
+                                           <span class="s1">&#39;agg1&#39;</span><span class="p">,</span> <span class="s1">&#39;agg2&#39;</span><span class="p">,</span> <span class="s1">&#39;agg3&#39;</span><span class="p">,</span> <span class="s1">&#39;aggcv&#39;</span><span class="p">,</span> <span class="s1">&#39;aggskew&#39;</span><span class="p">,</span> <span class="s1">&#39;contagion&#39;</span><span class="p">,</span> <span class="s1">&#39;mix_cv&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># broadcast arrays: first line forces them all to be arrays</span>
+        <span class="c1"># TODO this approach forces EITHER a mixture OR multi exposures</span>
+        <span class="c1"># TODO need to expand to product for general case, however, that should be easy</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">Iterable</span><span class="p">):</span>
+            <span class="n">el</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">el</span><span class="p">])</span>
+
+        <span class="c1"># pyCharm formatting</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">en</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">el</span><span class="p">,</span> <span class="n">premium</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">en</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="n">sev_name</span><span class="p">,</span> <span class="n">sev_a</span><span class="p">,</span> <span class="n">sev_b</span><span class="p">,</span> <span class="n">sev_mean</span><span class="p">,</span> <span class="n">sev_cv</span><span class="p">,</span> <span class="n">sev_loc</span><span class="p">,</span> \
+        <span class="n">sev_scale</span><span class="p">,</span> <span class="n">mix_wt</span> <span class="o">=</span> \
+            <span class="n">np</span><span class="o">.</span><span class="n">broadcast_arrays</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">premium</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="n">en</span><span class="p">,</span> <span class="n">attachment</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">sev_name</span><span class="p">,</span> <span class="n">sev_a</span><span class="p">,</span> <span class="n">sev_b</span><span class="p">,</span> <span class="n">sev_mean</span><span class="p">,</span> <span class="n">sev_cv</span><span class="p">,</span>
+                                <span class="n">sev_loc</span><span class="p">,</span> <span class="n">sev_scale</span><span class="p">,</span> <span class="n">mix_wt</span><span class="p">)</span>
+        <span class="c1"># just one overall line/class of business?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalar_business</span> <span class="o">=</span> \
+            <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="p">[</span><span class="n">el</span><span class="p">,</span> <span class="n">premium</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">en</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">])))</span>
+
+        <span class="c1"># holder for the severity distributions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">Severity</span><span class="p">))</span>
+        <span class="n">el</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">el</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">el</span><span class="p">,</span> <span class="n">premium</span> <span class="o">*</span> <span class="n">lr</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># accumulators for total moments</span>
+        <span class="n">agg_tot1</span> <span class="o">=</span> <span class="n">agg_tot2</span> <span class="o">=</span> <span class="n">agg_tot3</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">=</span> <span class="n">freq_tot2</span> <span class="o">=</span> <span class="n">freq_tot3</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">sev_tot1</span> <span class="o">=</span> <span class="n">sev_tot2</span> <span class="o">=</span> <span class="n">sev_tot3</span> <span class="o">=</span> <span class="n">c</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">_el</span><span class="p">,</span> <span class="n">_pr</span><span class="p">,</span> <span class="n">_lr</span><span class="p">,</span> <span class="n">_en</span><span class="p">,</span> <span class="n">_at</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">sn</span><span class="p">,</span> <span class="n">sa</span><span class="p">,</span> <span class="n">sb</span><span class="p">,</span> <span class="n">sm</span><span class="p">,</span> <span class="n">scv</span><span class="p">,</span> <span class="n">sloc</span><span class="p">,</span> <span class="n">ssc</span><span class="p">,</span> <span class="n">smix</span> <span class="ow">in</span> \
+                <span class="nb">zip</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">premium</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">en</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="n">sev_name</span><span class="p">,</span> <span class="n">sev_a</span><span class="p">,</span> <span class="n">sev_b</span><span class="p">,</span> <span class="n">sev_mean</span><span class="p">,</span>
+                    <span class="n">sev_cv</span><span class="p">,</span> <span class="n">sev_loc</span><span class="p">,</span> <span class="n">sev_scale</span><span class="p">,</span> <span class="n">mix_wt</span><span class="p">):</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="o">=</span> <span class="n">Severity</span><span class="p">(</span><span class="n">sn</span><span class="p">,</span> <span class="n">_at</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">sm</span><span class="p">,</span> <span class="n">scv</span><span class="p">,</span> <span class="n">sa</span><span class="p">,</span> <span class="n">sb</span><span class="p">,</span> <span class="n">sloc</span><span class="p">,</span> <span class="n">ssc</span><span class="p">)</span>
+            <span class="n">sev1</span><span class="p">,</span> <span class="n">sev2</span><span class="p">,</span> <span class="n">sev3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span><span class="p">[</span><span class="n">r</span><span class="p">]</span><span class="o">.</span><span class="n">moms</span><span class="p">()</span>
+
+            <span class="n">m</span><span class="p">,</span> <span class="n">scv</span><span class="p">,</span> <span class="n">ssk</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">sev1</span><span class="p">,</span> <span class="n">sev2</span><span class="p">,</span> <span class="n">sev3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">_el</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_en</span> <span class="o">=</span> <span class="n">_el</span> <span class="o">/</span> <span class="n">sev1</span>
+            <span class="k">elif</span> <span class="n">_en</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_el</span> <span class="o">=</span> <span class="n">_en</span> <span class="o">*</span> <span class="n">sev1</span>
+            <span class="k">if</span> <span class="n">_pr</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_lr</span> <span class="o">=</span> <span class="n">_el</span> <span class="o">/</span> <span class="n">_pr</span>
+            <span class="k">elif</span> <span class="n">_lr</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_pr</span> <span class="o">=</span> <span class="n">_el</span> <span class="o">/</span> <span class="n">_lr</span>
+
+            <span class="c1"># scale for the mix</span>
+            <span class="n">_pr</span> <span class="o">*=</span> <span class="n">smix</span>
+            <span class="n">_el</span> <span class="o">*=</span> <span class="n">smix</span>
+            <span class="n">_lr</span> <span class="o">*=</span> <span class="n">smix</span>
+            <span class="n">_en</span> <span class="o">*=</span> <span class="n">smix</span>
+
+            <span class="c1"># freq moments (old style for now) c = contagion</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">freq_a</span> <span class="o">*</span> <span class="n">freq_a</span>
+            <span class="n">freq1</span> <span class="o">=</span> <span class="n">_en</span>
+            <span class="k">if</span> <span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;fixed&#39;</span><span class="p">:</span>
+                <span class="c1"># fixed distribution N=self.n certainly</span>
+                <span class="n">freq2</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="n">freq3</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">freq2</span>
+            <span class="k">elif</span> <span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;bernoulli&#39;</span><span class="p">:</span>
+                <span class="c1"># code for bernoulli self.n, E(N^k) = E(N) = self.n</span>
+                <span class="n">freq2</span> <span class="o">=</span> <span class="n">_en</span>
+                <span class="n">freq3</span> <span class="o">=</span> <span class="n">_en</span>
+            <span class="k">elif</span> <span class="n">c</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># Poisson</span>
+                <span class="n">freq2</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq1</span><span class="p">)</span>
+                <span class="n">freq3</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">+</span> <span class="n">freq1</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># for gamma alpha, k with density x^alpha e^-kx, EX^n = Gamma(alpha + n) / Gamma(n) k^-n</span>
+                <span class="c1"># EX = a/k = 1, so a=k</span>
+                <span class="c1"># EX2 = (a+1)a/k^2 = a^2/k^2 + a/k^2 = (EX)^2 + a/k^2 = 1 + 1/k, hence var = a/k^2</span>
+                <span class="c1"># if EX=1 and var = c then var = a/k/k = 1/k = c, so k = 1/c</span>
+                <span class="c1"># then a = 1/c</span>
+                <span class="c1"># Finally EX3 = (a+2)(a+1)a/k^3 = (c+1)(c+2)</span>
+                <span class="c1"># Iman Conover paper page 14</span>
+                <span class="n">freq2</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">))</span>  <span class="c1"># note 1+c = E(G^2)</span>
+                <span class="n">freq3</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">+</span> <span class="n">freq1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">c</span><span class="p">)))</span>
+
+            <span class="c1"># raw moments of aggregate, not central moments</span>
+            <span class="n">agg1</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev1</span>
+            <span class="n">agg2</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev2</span> <span class="o">+</span> <span class="p">(</span><span class="n">freq2</span> <span class="o">-</span> <span class="n">freq1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev1</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="n">agg3</span> <span class="o">=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev3</span> <span class="o">+</span> <span class="n">freq3</span> <span class="o">*</span> <span class="n">sev1</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">freq2</span> <span class="o">-</span> <span class="n">freq1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev1</span> <span class="o">*</span> <span class="n">sev2</span> <span class="o">+</span> <span class="p">(</span>
+                    <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">freq2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">freq1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev1</span> <span class="o">**</span> <span class="mi">3</span>
+            <span class="n">am</span><span class="p">,</span> <span class="n">acv</span><span class="p">,</span> <span class="n">ask</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">agg1</span><span class="p">,</span> <span class="n">agg2</span><span class="p">,</span> <span class="n">agg3</span><span class="p">)</span>
+            <span class="n">fm</span><span class="p">,</span> <span class="n">fcv</span><span class="p">,</span> <span class="n">fsk</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">freq1</span><span class="p">,</span> <span class="n">freq2</span><span class="p">,</span> <span class="n">freq3</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">_y</span><span class="p">,</span> <span class="n">_at</span><span class="p">,</span> <span class="n">scv</span><span class="p">,</span> <span class="n">_el</span><span class="p">,</span> <span class="n">_pr</span><span class="p">,</span> <span class="n">_lr</span><span class="p">,</span> <span class="n">_en</span><span class="p">,</span> <span class="n">fcv</span><span class="p">,</span> <span class="n">fsk</span><span class="p">,</span> <span class="n">sev1</span><span class="p">,</span> <span class="n">sev2</span><span class="p">,</span> <span class="n">sev3</span><span class="p">,</span> <span class="n">scv</span><span class="p">,</span> <span class="n">ssk</span><span class="p">,</span> <span class="n">agg1</span><span class="p">,</span> <span class="n">agg2</span><span class="p">,</span>
+                                    <span class="n">agg3</span><span class="p">,</span>
+                                    <span class="n">acv</span><span class="p">,</span> <span class="n">ask</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">freq_a</span><span class="p">]</span>
+            <span class="n">agg_tot1</span><span class="p">,</span> <span class="n">agg_tot2</span><span class="p">,</span> <span class="n">agg_tot3</span> <span class="o">=</span> <span class="n">cumulate_moments</span><span class="p">(</span><span class="n">agg_tot1</span><span class="p">,</span> <span class="n">agg_tot2</span><span class="p">,</span> <span class="n">agg_tot3</span><span class="p">,</span> <span class="n">agg1</span><span class="p">,</span> <span class="n">agg2</span><span class="p">,</span> <span class="n">agg3</span><span class="p">)</span>
+            <span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_tot2</span><span class="p">,</span> <span class="n">freq_tot3</span> <span class="o">=</span> <span class="n">cumulate_moments</span><span class="p">(</span><span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_tot2</span><span class="p">,</span> <span class="n">freq_tot3</span><span class="p">,</span> <span class="n">freq1</span><span class="p">,</span> <span class="n">freq2</span><span class="p">,</span> <span class="n">freq3</span><span class="p">)</span>
+            <span class="n">sev_tot1</span> <span class="o">+=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev1</span>
+            <span class="n">sev_tot2</span> <span class="o">+=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev2</span>
+            <span class="n">sev_tot3</span> <span class="o">+=</span> <span class="n">freq1</span> <span class="o">*</span> <span class="n">sev3</span>
+            <span class="n">r</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># compute the grand total for approximations</span>
+        <span class="n">sev_tot1</span> <span class="o">/=</span> <span class="n">freq_tot1</span>
+        <span class="n">sev_tot2</span> <span class="o">/=</span> <span class="n">freq_tot1</span>
+        <span class="n">sev_tot3</span> <span class="o">/=</span> <span class="n">freq_tot1</span>
+        <span class="c1"># freq_tot2 and freq_tot3 need to reflect the same mixing; compute impact of mixing:</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">freq_cvi</span><span class="p">,</span> <span class="n">freq_ski</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_tot2</span><span class="p">,</span> <span class="n">freq_tot3</span><span class="p">)</span>
+        <span class="n">freq_tot2</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">))</span>  <span class="c1"># note 1+c = E(G^2)</span>
+        <span class="n">freq_tot3</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">+</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">c</span><span class="p">)))</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">freq_cv</span><span class="p">,</span> <span class="n">freq_sk</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_tot2</span><span class="p">,</span> <span class="n">freq_tot3</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">sev_cv</span><span class="p">,</span> <span class="n">sev_sk</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">sev_tot1</span><span class="p">,</span> <span class="n">sev_tot2</span><span class="p">,</span> <span class="n">sev_tot3</span><span class="p">)</span>
+        <span class="n">aggmi</span><span class="p">,</span> <span class="n">aggcvi</span><span class="p">,</span> <span class="n">aggskewi</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">agg_tot1</span><span class="p">,</span> <span class="n">agg_tot2</span><span class="p">,</span> <span class="n">agg_tot3</span><span class="p">)</span>
+
+        <span class="n">agg1</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="n">sev_tot1</span>
+        <span class="n">agg2</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="n">sev_tot2</span> <span class="o">+</span> <span class="p">(</span><span class="n">freq_tot2</span> <span class="o">-</span> <span class="n">freq_tot1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev_tot1</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">agg3</span> <span class="o">=</span> <span class="n">freq_tot1</span> <span class="o">*</span> <span class="n">sev_tot3</span> <span class="o">+</span> <span class="n">freq_tot3</span> <span class="o">*</span> <span class="n">sev_tot1</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="n">freq_tot2</span> <span class="o">-</span> <span class="n">freq_tot1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev_tot1</span> <span class="o">*</span> <span class="n">sev_tot2</span> <span class="o">+</span> <span class="p">(</span>
+                       <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">freq_tot2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">freq_tot1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sev_tot1</span> <span class="o">**</span> <span class="mi">3</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aggm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span> <span class="o">=</span> <span class="n">moments_to_mcvsk</span><span class="p">(</span><span class="n">agg1</span><span class="p">,</span> <span class="n">agg2</span><span class="p">,</span> <span class="n">agg3</span><span class="p">)</span>
+
+        <span class="c1"># overall CV</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="n">freq_tot2</span> <span class="o">-</span> <span class="n">freq_tot1</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">freq_tot1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">freq_tot1</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">root_c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+        <span class="c1"># average limit and attachment</span>
+        <span class="n">avg_limit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">limit</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">en</span><span class="p">)</span> <span class="o">/</span> <span class="n">freq_tot1</span>
+        <span class="c1"># assert np.allclose(freq_tot1, self.stats.en)</span>
+        <span class="n">avg_attach</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">attachment</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">en</span><span class="p">)</span> <span class="o">/</span> <span class="n">freq_tot1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">avg_limit</span><span class="p">,</span> <span class="n">avg_attach</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">el</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">prem</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                          <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">el</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">prem</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                          <span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_cv</span><span class="p">,</span> <span class="n">freq_sk</span><span class="p">,</span> <span class="n">sev_tot1</span><span class="p">,</span> <span class="n">sev_tot2</span><span class="p">,</span> <span class="n">sev_tot3</span><span class="p">,</span> <span class="n">sev_cv</span><span class="p">,</span> <span class="n">sev_sk</span><span class="p">,</span>
+                                          <span class="n">agg1</span><span class="p">,</span> <span class="n">agg2</span><span class="p">,</span> <span class="n">agg3</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">root_c</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg independent&#39;</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">avg_limit</span><span class="p">,</span> <span class="n">avg_attach</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">el</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                                      <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">prem</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                                      <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">el</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">prem</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                                      <span class="n">freq_tot1</span><span class="p">,</span> <span class="n">freq_cvi</span><span class="p">,</span> <span class="n">freq_ski</span><span class="p">,</span> <span class="n">sev_tot1</span><span class="p">,</span> <span class="n">sev_tot2</span><span class="p">,</span> <span class="n">sev_tot3</span><span class="p">,</span>
+                                                      <span class="n">sev_cv</span><span class="p">,</span> <span class="n">sev_sk</span><span class="p">,</span>
+                                                      <span class="n">agg_tot1</span><span class="p">,</span> <span class="n">agg_tot2</span><span class="p">,</span> <span class="n">agg_tot3</span><span class="p">,</span> <span class="n">aggcvi</span><span class="p">,</span> <span class="n">aggskewi</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">root_c</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;wt&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;en&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;en&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="p">[</span><span class="s1">&#39;wt&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">freq_tot1</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.discretize"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.discretize">[docs]</a>    <span class="k">def</span> <span class="nf">discretize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">approx_calc</span><span class="o">=</span><span class="s1">&#39;survival&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+
+<span class="sd">        :param method:  continuous or discrete or raw (for...)</span>
+<span class="sd">        :param approx_calc:  survival, distribution or both</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;continuous&#39;</span><span class="p">:</span>
+            <span class="n">adj_xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;discrete&#39;</span><span class="p">:</span>
+            <span class="n">adj_xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bs</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;raw&#39;</span><span class="p">:</span>
+            <span class="n">adj_xs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xs</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;Invalid parameter </span><span class="si">{method}</span><span class="s1"> passed to double_diff; options are raw, discrete or histogram&#39;</span><span class="p">)</span>
+
+        <span class="c1"># bed = bucketed empirical distribution</span>
+        <span class="n">beds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">fz</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">approx_calc</span> <span class="o">==</span> <span class="s1">&#39;both&#39;</span><span class="p">:</span>
+                <span class="n">beds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">fz</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">adj_xs</span><span class="p">)),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">adj_xs</span><span class="p">))))</span>
+            <span class="k">elif</span> <span class="n">approx_calc</span> <span class="o">==</span> <span class="s1">&#39;survival&#39;</span><span class="p">:</span>
+                <span class="n">beds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">adj_xs</span><span class="p">)))</span>
+            <span class="k">elif</span> <span class="n">approx_calc</span> <span class="o">==</span> <span class="s1">&#39;distribution&#39;</span><span class="p">:</span>
+                <span class="n">beds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">fz</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">adj_xs</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Invalid options </span><span class="si">{approx_calc}</span><span class="s1"> to double_diff; options are density, survival or both&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">beds</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.density"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.density">[docs]</a>    <span class="k">def</span> <span class="nf">density</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;exact&#39;</span><span class="p">,</span> <span class="n">sev_calc</span><span class="o">=</span><span class="s1">&#39;discrete&#39;</span><span class="p">,</span>
+                <span class="n">approx_calc</span><span class="o">=</span><span class="s1">&#39;survival&#39;</span><span class="p">,</span> <span class="n">force_severity</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the density</span>
+<span class="sd">        :param xs:</span>
+<span class="sd">        :param padding:</span>
+<span class="sd">        :param tilt_vector:</span>
+<span class="sd">        :param approximation:</span>
+<span class="sd">        :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version</span>
+<span class="sd">        :param approx_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc</span>
+<span class="sd">        :param force_severity: make severities even if using approximation, for plotting</span>
+<span class="sd">        :param verbose: make partial plots and return details of all moments</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="n">axm</span> <span class="o">=</span> <span class="n">AxisManager</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sevs</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mf">1.66</span><span class="p">)</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;n&#39;</span><span class="p">,</span> <span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;attachment&#39;</span><span class="p">,</span> <span class="s1">&#39;en&#39;</span><span class="p">,</span> <span class="s1">&#39;emp ex1&#39;</span><span class="p">,</span> <span class="s1">&#39;emp cv&#39;</span><span class="p">,</span> <span class="s1">&#39;sum p_i&#39;</span><span class="p">,</span> <span class="s1">&#39;wt&#39;</span><span class="p">,</span> <span class="s1">&#39;nans&#39;</span><span class="p">,</span> <span class="s1">&#39;max&#39;</span><span class="p">,</span> <span class="s1">&#39;wtmax&#39;</span><span class="p">,</span>
+                         <span class="s1">&#39;min&#39;</span><span class="p">])</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;n&#39;</span><span class="p">)</span>
+            <span class="n">dm</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">300000</span><span class="p">))</span>
+            <span class="n">audit</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">axm</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">dm</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">audit</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">aa</span> <span class="o">=</span> <span class="n">al</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">=</span> <span class="n">xs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bs</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># make the severity vector</span>
+        <span class="c1"># case 1 (all for now) it is the claim count weighted average of the severities</span>
+        <span class="k">if</span> <span class="n">approximation</span> <span class="o">==</span> <span class="s1">&#39;exact&#39;</span> <span class="ow">or</span> <span class="n">force_severity</span><span class="p">:</span>
+            <span class="n">wts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;en&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">en</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+            <span class="n">beds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">discretize</span><span class="p">(</span><span class="n">sev_calc</span><span class="p">,</span> <span class="n">approx_calc</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">temp</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">beds</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">en</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="o">+=</span> <span class="n">temp</span> <span class="o">*</span> <span class="n">w</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="n">_m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">*</span> <span class="n">temp</span><span class="p">)</span>
+                    <span class="n">_cv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">temp</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">_m</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="n">_m</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">dm</span><span class="p">),</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">_m</span><span class="p">,</span> <span class="n">_cv</span><span class="p">,</span>
+                                           <span class="n">temp</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                           <span class="n">w</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">temp</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+                                           <span class="n">temp</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">w</span> <span class="o">*</span> <span class="n">temp</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">temp</span><span class="o">.</span><span class="n">min</span><span class="p">()]</span>
+                    <span class="nb">next</span><span class="p">(</span><span class="n">axm</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">temp</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;compt&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s1">&#39;steps-post&#39;</span><span class="p">)</span>
+                    <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;run tot&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s1">&#39;steps-post&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">):</span>
+                        <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1.1</span><span class="p">),</span> <span class="n">title</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{l:,.0f}</span><span class="s1"> xs </span><span class="si">{a:,.0f}</span><span class="se">\t</span><span class="s1">wt=</span><span class="si">{w:.2f}</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{l:,.0f}</span><span class="s1"> xs </span><span class="si">{a:,.0f}</span><span class="se">\t</span><span class="s1">wt=</span><span class="si">{w:.2f}</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">next</span><span class="p">(</span><span class="n">axm</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">)</span>
+                <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;occ&#39;</span><span class="p">)</span>
+                <span class="n">aa</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">attachment</span> <span class="o">*</span> <span class="n">df</span><span class="o">.</span><span class="n">wt</span><span class="p">))</span>
+                <span class="n">al</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">limit</span> <span class="o">*</span> <span class="n">df</span><span class="o">.</span><span class="n">wt</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">):</span>
+                    <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">axm</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">_m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">))</span>
+                <span class="n">_cv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">))</span> <span class="o">-</span> <span class="n">_m</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">_m</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">&quot;Occ&quot;</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">al</span><span class="p">,</span> <span class="n">aa</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="n">_m</span><span class="p">,</span> <span class="n">_cv</span><span class="p">,</span>
+                                    <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                    <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">wts</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+                                    <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="o">.</span><span class="n">min</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="n">force_severity</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">approximation</span> <span class="o">==</span> <span class="s1">&#39;exact&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;poisson&#39;</span><span class="p">:</span>
+                <span class="c1"># TODO ignoring contagion! Where are other freq dists!!!</span>
+                <span class="c1"># convolve for compound Poisson</span>
+                <span class="c1"># TODO put back!</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39; | warning, </span><span class="si">{self.n}</span><span class="s1"> very high claim count &#39;</span><span class="p">)</span>
+                <span class="c1"># assert self.n &lt; 100</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">*</span> <span class="p">(</span><span class="n">ft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">ift</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;fixed&#39;</span><span class="p">:</span>
+                <span class="c1"># fixed count distribution...still need to do convolution</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="n">ft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">)</span> <span class="o">**</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">ift</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;bernoulli&#39;</span><span class="p">:</span>
+                <span class="c1"># binomial M_N(t) = p M_X(t) + (1-p) at zero point</span>
+                <span class="k">assert</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">*</span> <span class="n">ft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">+=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">ift</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Inadmissible value for fixed </span><span class="si">{self.freq_name}</span><span class="s1">&#39;</span>
+                                 <span class="s1">&#39; Allowable values are -1 (or bernoulli) 1 (or fixed), missing or 0 (Poisson)&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">approximation</span> <span class="o">==</span> <span class="s1">&#39;slognorm&#39;</span><span class="p">:</span>
+                <span class="n">shift</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span> <span class="o">=</span> <span class="n">sln_fit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aggm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fzapprox</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">lognorm</span><span class="p">(</span><span class="n">sigma</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mu</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="n">shift</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">approximation</span> <span class="o">==</span> <span class="s1">&#39;sgamma&#39;</span><span class="p">:</span>
+                <span class="n">shift</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">theta</span> <span class="o">=</span> <span class="n">sgamma_fit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aggm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fzapprox</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">gamma</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">theta</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">shift</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Invalid approximation </span><span class="si">{approximation}</span><span class="s1"> option passed to CAgg density. &#39;</span>
+                                 <span class="s1">&#39;Allowable options are: exact | slogorm | sgamma&#39;</span><span class="p">)</span>
+
+            <span class="n">ps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fzapprox</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="o">=</span> <span class="n">ps</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ftagg_density</span> <span class="o">=</span> <span class="n">ft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">axm</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggm</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">)),</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;aggregate&#39;</span><span class="p">)</span>
+            <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{self.name}</span><span class="s1"> severity audit&#39;</span><span class="p">)</span>
+            <span class="n">_m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">))</span>
+            <span class="n">_cv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">))</span> <span class="o">-</span> <span class="n">_m</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">_m</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">al</span><span class="p">,</span> <span class="n">aa</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="n">_m</span><span class="p">,</span> <span class="n">_cv</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+                                <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="o">.</span><span class="n">min</span><span class="p">()]</span>
+            <span class="n">audit</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="n">df</span><span class="p">[[</span><span class="s1">&#39;limit&#39;</span><span class="p">,</span> <span class="s1">&#39;attachment&#39;</span><span class="p">,</span> <span class="s1">&#39;emp ex1&#39;</span><span class="p">,</span> <span class="s1">&#39;emp cv&#39;</span><span class="p">]],</span>
+                               <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="p">))[[</span>
+                                   <span class="s1">&#39;en&#39;</span><span class="p">,</span> <span class="s1">&#39;sev1&#39;</span><span class="p">,</span> <span class="s1">&#39;sevcv&#39;</span><span class="p">]]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">audit</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg independent&#39;</span><span class="p">,</span> <span class="s1">&#39;aggcv&#39;</span><span class="p">]</span>
+            <span class="n">audit</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg independent&#39;</span><span class="p">,</span> <span class="s1">&#39;agg1&#39;</span><span class="p">]</span>
+            <span class="n">audit</span><span class="p">[</span><span class="s1">&#39;sev err&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">audit</span><span class="o">.</span><span class="n">sev1</span> <span class="o">-</span> <span class="n">audit</span><span class="p">[</span><span class="s1">&#39;emp ex1&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">audit</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.emp_stats"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.emp_stats">[docs]</a>    <span class="k">def</span> <span class="nf">emp_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        report on empirical stats</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">ex</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">)</span>
+        <span class="n">ex2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">)</span>
+        <span class="c1"># ex3 = np.sum(self.xs**3 * self.agg_density)</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex</span> <span class="o">*</span> <span class="n">ex</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+        <span class="n">cv</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">/</span> <span class="n">ex</span>
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="n">ex</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">cv</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;sd&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ex</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">)</span>
+            <span class="n">ex2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">)</span>
+            <span class="c1"># ex3 = np.sum(self.xs**3 * self.dh_agg_density)</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex</span> <span class="o">*</span> <span class="n">ex</span>
+            <span class="n">sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+            <span class="n">cv</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">/</span> <span class="n">ex</span>
+            <span class="n">s2</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="n">ex</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">cv</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;sd&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">])</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;numeric&#39;</span><span class="p">:</span> <span class="n">s1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">:</span> <span class="n">s2</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;numeric&#39;</span><span class="p">])</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;theory&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg1&#39;</span><span class="p">]</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;sd&#39;</span><span class="p">,</span> <span class="s1">&#39;theory&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg2&#39;</span><span class="p">]</span> <span class="o">-</span>
+                                         <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="s1">&#39;agg1&#39;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;cv&#39;</span><span class="p">,</span> <span class="s1">&#39;theory&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_total</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Agg&#39;</span><span class="p">,</span> <span class="s1">&#39;aggcv&#39;</span><span class="p">]</span>  <span class="c1"># report[(&#39;agg&#39;, &#39;cv&#39;)]</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;err&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;numeric&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;theory&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">df</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.delbaen_haezendonck_density"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.delbaen_haezendonck_density">[docs]</a>    <span class="k">def</span> <span class="nf">delbaen_haezendonck_density</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta_name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compare the base and Delbaen Haezendonck transformed aggregates</span>
+
+<span class="sd">        * beta(x) = alpha + gamma(x)</span>
+<span class="sd">        * alpha = log(freq&#39; / freq): log of the increase in claim count</span>
+<span class="sd">        * gamma = log(RND of adjusted severity) = log(tilde f / f)</span>
+
+<span class="sd">        Adjustment guarantees a positive loading iff beta is an increasing function</span>
+<span class="sd">        iff gamma is increasing iff tilde f / f is increasing.</span>
+<span class="sd">        cf. eqn 3.7 and 3.8</span>
+
+<span class="sd">        Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)</span>
+<span class="sd">        form of beta function described in 2.23 via, 2.16-17 and 2.18</span>
+
+<span class="sd">        From examples on last page of paper:</span>
+
+<span class="sd">            beta(x) = a ==&gt; adjust frequency by factor of e^a</span>
+<span class="sd">            beta(x) = log(1 + b(x - E(X)))  ==&gt; variance principle EN(EX + bVar(X))</span>
+<span class="sd">            beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</span>
+
+<span class="sd">        :param xs:</span>
+<span class="sd">        :param padding:</span>
+<span class="sd">        :param tilt_vector:</span>
+<span class="sd">        :param beta: function R+ to R with appropriate properties or name of prob distortion function</span>
+<span class="sd">        :param beta_name:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># update</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">density</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">,</span> <span class="s1">&#39;exact&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">Distortion</span><span class="p">):</span>
+            <span class="c1"># passed in a distortion function</span>
+            <span class="n">beta_name</span> <span class="o">=</span> <span class="n">beta</span><span class="o">.</span><span class="n">name</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">beta</span><span class="o">.</span><span class="n">g</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">)))))</span>
+            <span class="c1"># expect ex_beta = 1 but allow to pass multiples....</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">beta</span><span class="o">.</span><span class="n">g</span><span class="p">(</span><span class="n">xs</span><span class="p">))</span>
+        <span class="n">ex_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span> <span class="o">/</span> <span class="n">ex_beta</span>
+        <span class="n">adj_n</span> <span class="o">=</span> <span class="n">ex_beta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">==</span> <span class="s1">&#39;poisson&#39;</span><span class="p">:</span>
+            <span class="c1"># convolve for compound Poisson</span>
+            <span class="n">ftagg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">adj_n</span> <span class="o">*</span> <span class="p">(</span><span class="n">ft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">ift</span><span class="p">(</span><span class="n">ftagg_density</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Must use compound Poisson for DH density&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span> <span class="o">=</span> <span class="n">beta_name</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.quick_visual"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.quick_visual">[docs]</a>    <span class="k">def</span> <span class="nf">quick_visual</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">3</span><span class="p">)):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Plot severity and agg, density, distribution and Lee diagram</span>
+<span class="sd">        :param axiter:</span>
+<span class="sd">        :param figsize:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="mi">3</span>
+
+        <span class="n">set_tight</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">axiter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">axiter</span> <span class="o">=</span> <span class="n">AxisManager</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="p">)</span>
+            <span class="n">set_tight</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="n">F</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">)</span>
+        <span class="n">mx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">F</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">mx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">F</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">dh_F</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dh_F</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">)</span>
+            <span class="n">mx</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">mx</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">dh_F</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">))</span>
+            <span class="n">dh_F</span> <span class="o">=</span> <span class="n">dh_F</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+        <span class="n">F</span> <span class="o">=</span> <span class="n">F</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">density</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xs</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sev_calc</span><span class="o">=</span><span class="s1">&#39;rescale&#39;</span><span class="p">,</span> <span class="n">force_severity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">xs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xs</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+        <span class="n">sevF</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">)</span>
+        <span class="n">sevF</span> <span class="o">=</span> <span class="n">sevF</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">]</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;agg&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;sev&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;dh </span><span class="si">{:}</span><span class="s1"> agg&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">))</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;dh </span><span class="si">{:}</span><span class="s1"> sev&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">d</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="mi">1</span><span class="p">:])))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Density&#39;</span><span class="p">)</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;agg&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;sev&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;dh </span><span class="si">{:}</span><span class="s1"> agg&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">))</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_sev_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;dh </span><span class="si">{:}</span><span class="s1"> sev&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Log Density&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">F</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Agg&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">sevF</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Sev&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dh_F</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span><span class="p">[:</span><span class="n">mx</span><span class="p">])</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">dh_F</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;dh </span><span class="si">{:}</span><span class="s1"> agg&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">beta_name</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Lee Diagram&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dh_agg_density</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># if dh computed graph comparision</span>
+            <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">F</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">dh_F</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;g(S) vs S&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">F</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">F</span><span class="p">,</span> <span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=.</span><span class="mi">5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">set_tight</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="SuperAggregate.plot"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        make a quick plot of fz</span>
+<span class="sd">        :param axiter:</span>
+<span class="sd">        :param N:</span>
+<span class="sd">        :param p:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;plot is NYI&#39;</span><span class="p">)</span>
+        <span class="k">pass</span></div>
+        <span class="c1"># # for now just severity</span>
+        <span class="c1"># if axiter is None:</span>
+        <span class="c1">#     axiter = make_axes(2, (6, 3))</span>
+        <span class="c1"># # TODO use interpolation if complex severity, otherwise pass through to self.sevs[0]</span>
+        <span class="c1"># if len(self.sevs) ==  1:</span>
+        <span class="c1">#     fzisf = self.sevs[0].isf</span>
+        <span class="c1">#     fzpdf = self.sevs[0].pdf</span>
+        <span class="c1"># else:</span>
+        <span class="c1">#     fzisf = interpolate.interp1d( np.cumsum(self.sev_density), self.xs, kind=&#39;linear&#39;, assume_sorted=True )</span>
+        <span class="c1">#     fzpdf = interpolate.interp1d( np.cumsum(self.sev_density), self.xs, kind=&#39;linear&#39;, assume_sorted=True )</span>
+        <span class="c1"># x0 = fzisf(1 - p)</span>
+        <span class="c1"># if x0 &lt; 0.1:</span>
+        <span class="c1">#     x0 = 0</span>
+        <span class="c1"># x1 = fzisf(p)</span>
+        <span class="c1"># xs = np.linspace(x0, x1, N)</span>
+        <span class="c1"># ps = np.linspace(1 / N, 1, N, endpoint=False)</span>
+        <span class="c1"># den = self.fz.pdf(xs)</span>
+        <span class="c1"># qs = self.fz.ppf(ps)</span>
+        <span class="c1"># # plt.figure()</span>
+        <span class="c1"># next(axiter).plot(xs, den)</span>
+        <span class="c1"># next(axiter).plot(ps, qs)</span>
+        <span class="c1"># plt.tight_layout()</span>
+
+<div class="viewcode-block" id="SuperAggregate.recommend_bucket"><a class="viewcode-back" href="../documentation.html#trash.SuperAggregate.recommend_bucket">[docs]</a>    <span class="k">def</span> <span class="nf">recommend_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        recommend a bucket size given 2**N buckets</span>
+
+<span class="sd">        :param N:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">moment_est</span> <span class="o">=</span> <span class="n">estimate_agg_percentile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aggm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggcv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggskew</span><span class="p">)</span> <span class="o">/</span> <span class="n">N</span>
+        <span class="n">limit_est</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">])</span> <span class="o">/</span> <span class="n">N</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Agg.recommend_bucket | </span><span class="si">{self.name}</span><span class="s1"> moment: </span><span class="si">{moment_est}</span><span class="s1">, limit </span><span class="si">{limit_est}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">moment_est</span><span class="p">,</span> <span class="n">limit_est</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="Severity"><a class="viewcode-back" href="../documentation.html#trash.Severity">[docs]</a><span class="k">class</span> <span class="nc">Severity</span><span class="p">(</span><span class="n">ss</span><span class="o">.</span><span class="n">rv_continuous</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    A continuous random variable, subclasses ``scipy.stats.rv_continuous``.</span>
+
+<span class="sd">    adds layer and attachment to scipy stats continuous random variable class</span>
+<span class="sd">    overrides</span>
+
+<span class="sd">    * cdf</span>
+<span class="sd">    * pdf</span>
+<span class="sd">    * isf</span>
+<span class="sd">    * ppf</span>
+<span class="sd">    * moments</span>
+
+<span class="sd">    Should consider over-riding: sf, **stats** ?munp</span>
+
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Severity.__init__"><a class="viewcode-back" href="../documentation.html#trash.Severity.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">mean</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">conditional</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :param attachment:</span>
+<span class="sd">        :param limit:</span>
+<span class="sd">        :param mean:</span>
+<span class="sd">        :param cv:</span>
+<span class="sd">        :param a:</span>
+<span class="sd">        :param b:</span>
+<span class="sd">        :param loc:</span>
+<span class="sd">        :param scale:</span>
+<span class="sd">        :param conditional: conditional or unconditional; for severities use conditional</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">ss</span><span class="o">.</span><span class="n">rv_continuous</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{name}</span><span class="s1">[</span><span class="si">{limit}</span><span class="s1"> xs </span><span class="si">{attachment:,.0f}</span><span class="s1">]&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">limit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="n">attachment</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span> <span class="o">=</span> <span class="n">limit</span> <span class="o">+</span> <span class="n">attachment</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span> <span class="o">=</span> <span class="n">conditional</span>
+
+        <span class="n">gen</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;norm&#39;</span><span class="p">]:</span>
+            <span class="c1"># distributions with no shape parameters</span>
+            <span class="c1">#     Normal (and possibly others) does not have a shape parameter</span>
+            <span class="k">if</span> <span class="n">loc</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">loc</span> <span class="o">=</span> <span class="n">mean</span>
+            <span class="k">if</span> <span class="n">scale</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">cv</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="n">cv</span> <span class="o">*</span> <span class="n">loc</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;beta&#39;</span><span class="p">]:</span>
+            <span class="c1"># distributions with two shape parameters</span>
+            <span class="c1"># require specific inputs</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">loc</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># distributions with one shape parameter</span>
+            <span class="k">if</span> <span class="n">a</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># TODO figuring 0 is invalid shape...</span>
+                <span class="n">a</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cv_to_shape</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">cv</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">scale</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">scale</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="n">mean_to_scale</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">mean</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="n">gen</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">loc</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">cv</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># if you input a mean or cv check we are close to target</span>
+            <span class="n">st</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">stats</span><span class="p">(</span><span class="s1">&#39;mv&#39;</span><span class="p">)</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">acv</span> <span class="o">=</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="o">.</span><span class="mi">5</span> <span class="o">/</span> <span class="n">m</span>  <span class="c1"># achieved cv</span>
+            <span class="k">if</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">m</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">cv</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">cv</span><span class="p">,</span> <span class="n">acv</span><span class="p">))</span>
+            <span class="c1"># print(&#39;ACHIEVED&#39;, mean, cv, m, acv, self.fz.stats(), self._stats())</span>
+
+        <span class="n">lim_name</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{limit:,.0f}</span><span class="s1">&#39;</span> <span class="k">if</span> <span class="n">limit</span> <span class="o">!=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span> <span class="k">else</span> <span class="s2">&quot;Unlimited&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">long_name</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{name}</span><span class="s1">(</span><span class="si">{self.fz.args[0]:.2f}</span><span class="s1">)[</span><span class="si">{lim_name}</span><span class="s1"> xs </span><span class="si">{attachment:,.0f}</span><span class="s1">]&#39;</span>
+
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Severity.__enter__"><a class="viewcode-back" href="../documentation.html#trash.Severity.__enter__">[docs]</a>    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Support with Severity as f: &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+        <span class="k">del</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                                     <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+                                         <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+                                                  <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                                           <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)))))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+                                         <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                                  <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">))))</span>
+
+    <span class="k">def</span> <span class="nf">_cdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span>
+                            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">))</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">,</span>
+                                     <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span>
+                                              <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">))))</span>
+
+    <span class="k">def</span> <span class="nf">_isf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="n">q</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                                     <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">q</span><span class="p">))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">pdetach</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                                     <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
+        <span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span><span class="p">,</span> <span class="n">ex3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">moms</span><span class="p">()</span>
+        <span class="n">var</span> <span class="o">=</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">skew</span> <span class="o">=</span> <span class="p">(</span><span class="n">ex3</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">*</span> <span class="n">ex2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span> <span class="o">/</span> <span class="n">var</span> <span class="o">**</span> <span class="mf">1.5</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">ex1</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">skew</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">_munp</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;wow, called munp&#39;</span><span class="p">)</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="Severity.moms"><a class="viewcode-back" href="../documentation.html#trash.Severity.moms">[docs]</a>    <span class="k">def</span> <span class="nf">moms</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        moms method</span>
+<span class="sd">        remember have to use integral of survival function otherwise quad can fail to &quot;see&quot; the distribution</span>
+<span class="sd">        for unlimited integral of a low sd variable</span>
+
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ex1</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">)</span>
+        <span class="n">ex2</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">)</span>
+        <span class="n">ex3</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fz</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">detachment</span><span class="p">,</span>
+                   <span class="n">limit</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+                   <span class="n">full_output</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># quad returns abs error</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="mf">1e-5</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">((</span><span class="n">ex1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">ex1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">eps</span> <span class="ow">or</span> <span class="n">ex1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1e-4</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="p">(</span><span class="n">ex2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">ex2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">eps</span> <span class="ow">or</span> <span class="n">ex2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1e-4</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="p">(</span><span class="n">ex3</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">ex3</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">eps</span> <span class="ow">or</span> <span class="n">ex3</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Severity.moms | **DOUBTFUL** convergence of integrals, abs errs &#39;</span>
+                         <span class="n">f</span><span class="s1">&#39;</span><span class="se">\t</span><span class="si">{ex1[1]}</span><span class="se">\t</span><span class="si">{ex2[1]}</span><span class="se">\t</span><span class="si">{ex3[1]}</span><span class="s1"> </span><span class="se">\t</span><span class="s1">rel errors </span><span class="se">\t</span><span class="s1">{ex1[1]/ex1[0]}</span><span class="se">\t</span><span class="s1">{ex2[1]/ex2[0]}</span><span class="se">\t</span><span class="s1">{ex3[1]/ex3[0]}&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39; Severity.moms | doubtful convergence of integrals, abs errs &#39;</span>
+                             <span class="n">f</span><span class="s1">&#39;</span><span class="si">{ex1[1]}</span><span class="s1">, </span><span class="si">{ex2[1]}</span><span class="s1">, </span><span class="si">{ex3[1]}</span><span class="s1"> rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, {ex3[1]/ex3[0]}&#39;</span><span class="p">)</span>
+        <span class="c1"># logging.info(f&#39;Severity.moms | GOOD convergence of integrals, abs errs &#39;</span>
+        <span class="c1">#                      f&#39;\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t{ex3[1]/ex3[0]}&#39;)</span>
+
+        <span class="n">ex1</span> <span class="o">=</span> <span class="n">ex1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">ex2</span> <span class="o">=</span> <span class="n">ex2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">ex3</span> <span class="o">=</span> <span class="n">ex3</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conditional</span><span class="p">:</span>
+            <span class="n">ex1</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span>
+            <span class="n">ex2</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span>
+            <span class="n">ex3</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pattach</span>
+
+        <span class="k">return</span> <span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span><span class="p">,</span> <span class="n">ex3</span></div>
+
+<div class="viewcode-block" id="Severity.plot"><a class="viewcode-back" href="../documentation.html#trash.Severity.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        quick plot</span>
+
+<span class="sd">        :param N:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">ps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_isf</span><span class="p">(</span><span class="mf">1e-4</span><span class="p">),</span> <span class="n">N</span><span class="p">)</span>
+
+        <span class="n">it</span> <span class="o">=</span> <span class="n">AxisManager</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pdf</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">which</span><span class="o">=</span><span class="s1">&#39;major&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="s1">&#39;0.1&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;PDF&#39;</span><span class="p">)</span>
+
+        <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cdf</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s1">&#39;steps-post&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">which</span><span class="o">=</span><span class="s1">&#39;major&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="s1">&#39;0.1&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;CDF&#39;</span><span class="p">,</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_isf</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ps</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s1">&#39;steps-post&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">which</span><span class="o">=</span><span class="s1">&#39;major&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="s1">&#39;0.1&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;ISF&#39;</span><span class="p">,</span> <span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">ps</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s1">&#39;steps-post&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">which</span><span class="o">=</span><span class="s1">&#39;major&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="s1">&#39;0.1&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Lee diagram&#39;</span><span class="p">,</span> <span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">long_name</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../index.html">
+    <img class="logo" src="../_static/logo.PNG" alt="Logo"/>
+    
+    <h1 class="logo logo-name">aggregate</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction to aggregate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../histapp.html">History and Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel.html">Development Outline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../severity.html">Severity Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../portfolio.html">Portfolio Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distortion.html">Distortion Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../helpers.html">Helpers and Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters.html">Parameters Module</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Stephen J. Mildenhall.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+    <a href="https://github.com/mynl/aggregate" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

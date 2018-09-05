@@ -1,0 +1,414 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>aggregate.helpers &#8212; aggregate 0.9.40 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.9.40',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for aggregate.helpers</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">manage built in and user portfolios, severity lines and access to parameters</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">IPython.core.display</span> <span class="k">import</span> <span class="n">display</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">deepcopy</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">ruamel</span> <span class="k">import</span> <span class="n">yaml</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="n">utils</span> <span class="kn">import</span> <span class="nn">html_title</span><span class="o">,</span> <span class="nn">sensible_jump</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="n">port</span> <span class="kn">import</span> <span class="nn">Portfolio</span>
+
+
+<div class="viewcode-block" id="Example"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example">[docs]</a><span class="k">class</span> <span class="nc">Example</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Example: class</span>
+<span class="sd">    Manages examples for Portfolio object</span>
+<span class="sd">    Building examples from built in lines</span>
+
+
+<span class="sd">    :param dirname: dirname load filename or YAMLFILE if not given</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dirname</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">dirname</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+            <span class="c1"># TODO sort out...</span>
+            <span class="n">dirname</span> <span class="o">=</span> <span class="s1">&#39;c:/s/telos/python/aggregate&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="s1">&#39;portfolio.yaml&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">built_in_portfolios</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">Loader</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="s1">&#39;aggregate.yaml&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">Loader</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="s1">&#39;severity.yaml&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">Loader</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="s1">&#39;user.yaml&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">user_portfolios</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">Loader</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spec_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="Example.rescale_sev"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.rescale_sev">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">rescale_sev</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">scale</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply scale to a built in line</span>
+
+<span class="sd">        :param scale:</span>
+<span class="sd">        :param spec:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">scale</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;mean&#39;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]:</span>
+                <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">][</span><span class="s1">&#39;mean&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span>
+            <span class="k">elif</span> <span class="s1">&#39;scale&#39;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]:</span>
+                <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">][</span><span class="s1">&#39;scale&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;example | Cannot adjust </span><span class="si">{spec[&quot;name&quot;]}</span><span class="s1"> for scale shift </span><span class="si">{scale}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;loc&#39;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]:</span>
+                <span class="c1"># for Pareto</span>
+                <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">][</span><span class="s1">&#39;loc&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span>
+            <span class="k">if</span> <span class="s1">&#39;limit&#39;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">:</span>
+                <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;limit&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span></div>
+
+<div class="viewcode-block" id="Example.shift_sev"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.shift_sev">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">shift_sev</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">shift</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        shift severity for a built in line, leaves limit unchanged</span>
+
+<span class="sd">        :param shift:</span>
+<span class="sd">        :param spec:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">shift</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;loc&#39;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]:</span>
+                <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">][</span><span class="s1">&#39;loc&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">shift</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;example | Cannot adjust </span><span class="si">{spec[&quot;name&quot;]}</span><span class="s1"> for scale shift </span><span class="si">{shift}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Example.adjust_frequency"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.adjust_frequency">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">adjust_frequency</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">shift</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adjust scale and shift freq for a built in line</span>
+<span class="sd">        can make both adjustment, scale first then shift</span>
+
+<span class="sd">        :param spec:</span>
+<span class="sd">        :param scale:</span>
+<span class="sd">        :param shift:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">scale</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;frequency&#39;</span><span class="p">][</span><span class="s1">&#39;n&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span>
+        <span class="k">if</span> <span class="n">shift</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;frequency&#39;</span><span class="p">][</span><span class="s1">&#39;n&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">shift</span></div>
+
+<div class="viewcode-block" id="Example.list"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.list">[docs]</a>    <span class="k">def</span> <span class="nf">list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        list all available portfolios and lines</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">- &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;Built in portfolios&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">built_in_portfolios</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+        <span class="nb">print</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">- &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;Built in lines&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+        <span class="nb">print</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">- &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;Built in severity&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+        <span class="nb">print</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">- &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;User portfolios&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_portfolios</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span></div>
+
+<div class="viewcode-block" id="Example.portfolio"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.portfolio">[docs]</a>    <span class="k">def</span> <span class="nf">portfolio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">portfolio</span><span class="p">,</span> <span class="n">reporting_level</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        make an example by name, convenience function</span>
+<span class="sd">        includes Bodoff, Kent and sensible default examples</span>
+<span class="sd">        kwargs passed through to CPortfolio.update</span>
+
+<span class="sd">        :param portfolio: pre-defined portfolio name</span>
+<span class="sd">        :param reporting_level: what post-construction reports to print (mostly graphcs), 0 to 3, higher is more detail</span>
+<span class="sd">        :param kwargs:    additional args passed through to update; note: if  line_list this must</span>
+<span class="sd">                include log2 and bs</span>
+<span class="sd">        :return:  portfolio object, recomputed from spec</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">portfolio</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_portfolios</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_portfolios</span><span class="p">[</span><span class="n">portfolio</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_portfolios</span><span class="p">[</span><span class="n">portfolio</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.portfolio | unknown portfolio </span><span class="si">{portfolio}</span><span class="s1"> requested &#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span>
+
+        <span class="n">port</span> <span class="o">=</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">portfolio</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">])</span>
+        <span class="c1"># update if there is enough information</span>
+        <span class="k">if</span> <span class="s1">&#39;log2&#39;</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;args&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;bs&#39;</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;args&#39;</span><span class="p">]:</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="o">**</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;args&#39;</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">})</span>
+            <span class="n">log2</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;args&#39;</span><span class="p">][</span><span class="s1">&#39;log2&#39;</span><span class="p">]</span>
+            <span class="n">Example</span><span class="o">.</span><span class="n">reporting</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">reporting_level</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">port</span></div>
+
+<div class="viewcode-block" id="Example.new"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.new">[docs]</a>    <span class="k">def</span> <span class="nf">new</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create a new example; just clears out the old spec</span>
+<span class="sd">        then call addline...</span>
+<span class="sd">        :param self:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spec_list</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+<div class="viewcode-block" id="Example.addline"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.addline">[docs]</a>    <span class="k">def</span> <span class="nf">addline</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line_name</span><span class="p">,</span> <span class="n">freq_scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">freq_shift</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sev_scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">sev_shift</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sample using built in lines (minimal)</span>
+<span class="sd">        ex.addline(&#39;home&#39;, 1000)</span>
+<span class="sd">        ex.addline(&#39;auto&#39;, 3000)</span>
+<span class="sd">        ex.addline(&#39;olocc&#39;, 500)</span>
+<span class="sd">        ex.publish(13, 10000)</span>
+
+<span class="sd">        :param line_name:</span>
+<span class="sd">        :param freq_scale:</span>
+<span class="sd">        :param freq_shift:</span>
+<span class="sd">        :param sev_scale:</span>
+<span class="sd">        :param sev_shift:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">spec</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="p">[</span><span class="n">line_name</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.addline | attempted to add unknown line </span><span class="si">{line_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{line_name}</span><span class="s1"> is not a known built in line&#39;</span><span class="p">)</span>
+        <span class="n">Example</span><span class="o">.</span><span class="n">adjust_frequency</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">freq_scale</span><span class="p">,</span> <span class="n">freq_shift</span><span class="p">)</span>
+        <span class="n">Example</span><span class="o">.</span><span class="n">rescale_sev</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sev_scale</span><span class="p">)</span>
+        <span class="n">Example</span><span class="o">.</span><span class="n">shift_sev</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sev_shift</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spec_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.addline | added line </span><span class="si">{line_name}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Example.publish"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.publish">[docs]</a>    <span class="k">def</span> <span class="nf">publish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">log2</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">bs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">reporting_level</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        complete construction of example made from built in lines</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :param log2:</span>
+<span class="sd">        :param bs:</span>
+<span class="sd">        :param reporting_level:</span>
+<span class="sd">        :param kwargs:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spec_list</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">log2</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">bs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># used to estimate moments, no update</span>
+            <span class="n">html_title</span><span class="p">(</span><span class="s1">&#39;Theoretical Statistics&#39;</span><span class="p">)</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">port</span><span class="o">.</span><span class="n">statistics_df</span><span class="p">)</span>
+            <span class="n">html_title</span><span class="p">(</span><span class="s1">&#39;Bucket Recommendations&#39;</span><span class="p">)</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">port</span><span class="o">.</span><span class="n">recommend_bucket</span><span class="p">()</span><span class="o">.</span><span class="n">style</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">log2</span><span class="o">=</span><span class="n">log2</span><span class="p">,</span> <span class="n">bs</span><span class="o">=</span><span class="n">bs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">Example</span><span class="o">.</span><span class="n">reporting</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">reporting_level</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.publish | publishing object </span><span class="si">{port.name}</span><span class="s1"> with {len(port.agg_list)} lines&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">port</span></div>
+
+<div class="viewcode-block" id="Example.line"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.line">[docs]</a>    <span class="k">def</span> <span class="nf">line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        return dictionary line specification, for building portfolios</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.line | serving </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.line | failed to find </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{name}</span><span class="s1"> is not available as a line&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Example.severity"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.severity">[docs]</a>    <span class="k">def</span> <span class="nf">severity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        return dictionary severity specification, for building portfolios</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.severity | serving </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.severity | failed to find </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{name}</span><span class="s1"> is not available as a severity&#39;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        make Example scriptable: try user portfolios, b/in portfolios, line, severity</span>
+<span class="sd">        to access specifically use severity or line methods</span>
+
+<span class="sd">        :param name:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_portfolios</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.__getitem__ | serving user portfolio </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_portfolios</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.__getitem__ | serving built in portfolio </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.__getitem__ | serving line </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_aggregates</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Example.__getitem__ | serving severity </span><span class="si">{name}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">built_in_severity</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Example.__getitem__ | unknown object </span><span class="si">{name}</span><span class="s1"> requested&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span>
+
+<div class="viewcode-block" id="Example.reporting"><a class="viewcode-back" href="../../trash/documentation.html#aggregate.Example.reporting">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">reporting</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">reporting_level</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        handle various reporting options: most important to appear last</span>
+
+<span class="sd">        :param port:</span>
+<span class="sd">        :param log2:</span>
+<span class="sd">        :param reporting_level:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">reporting_level</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="c1"># just plot the densities</span>
+            <span class="n">f</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">))</span>
+            <span class="n">axiter</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">axs</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;quick&#39;</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="n">axiter</span><span class="p">)</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;density&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="n">port</span><span class="o">.</span><span class="n">line_names_ex</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="n">axiter</span><span class="p">)</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;density&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="n">port</span><span class="o">.</span><span class="n">line_names_ex</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="n">axiter</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">reporting_level</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">jump</span> <span class="o">=</span> <span class="n">sensible_jump</span><span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="n">log2</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+            <span class="n">html_title</span><span class="p">(</span><span class="s1">&#39;Line Densities&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">port</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;^p_[^n]|S|^exa_[^n]|^lev_[^n]&#39;</span><span class="p">)</span><span class="o">.</span>
+                    <span class="n">query</span><span class="p">(</span><span class="s1">&#39;p_total &gt; 0&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[::</span><span class="n">jump</span><span class="p">,</span> <span class="p">:])</span>
+            <span class="n">html_title</span><span class="p">(</span><span class="s1">&#39;Audit Data&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">port</span><span class="o">.</span><span class="n">audit_df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;^[^n]&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">reporting_level</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">port</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s1">&#39;quick&#39;</span><span class="p">)</span>
+            <span class="c1"># html_title(&#39;Summary Audit Data&#39;, 1)</span>
+            <span class="c1"># temp = port.audit_df.filter(regex=&#39;^Mean|^EmpMean|^CV|^EmpCV&#39;)</span>
+            <span class="c1"># temp[&#39;MeanErr&#39;] = temp.EmpMean / temp.Mean - 1</span>
+            <span class="c1"># temp[&#39;CVErr&#39;] = temp.EmpCV / temp.CV - 1</span>
+            <span class="c1"># temp = temp[[&#39;Mean&#39;, &#39;EmpMean&#39;, &#39;MeanErr&#39;, &#39;CV&#39;, &#39;EmpCV&#39;, &#39;CVErr&#39;]]</span>
+            <span class="c1"># display(temp.style.applymap(Example._highlight))</span>
+
+        <span class="k">if</span> <span class="n">reporting_level</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">html_title</span><span class="p">(</span><span class="s1">&#39;Graphics&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div></div>
+
+    <span class="c1"># @staticmethod</span>
+    <span class="c1"># def _highlight(val):</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     Takes a scalar and returns a string with</span>
+    <span class="c1">#     the css property `&#39;color: red&#39;` for large</span>
+    <span class="c1">#     values. As pct error</span>
+    <span class="c1">#</span>
+    <span class="c1">#     :param val:</span>
+    <span class="c1">#     :return:</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     color = &#39;red&#39; if abs(val) &gt; 0.01 and val &lt; 1 else &#39;black&#39;</span>
+    <span class="c1">#     return f&#39;color: {color}; font-weight: bold&#39;</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../../index.html">
+    <img class="logo" src="../../_static/logo.PNG" alt="Logo"/>
+    
+    <h1 class="logo logo-name">aggregate</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction to aggregate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../histapp.html">History and Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../devel.html">Development Outline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../severity.html">Severity Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../portfolio.html">Portfolio Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../distortion.html">Distortion Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../helpers.html">Helpers and Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters.html">Parameters Module</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Stephen J. Mildenhall.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+    <a href="https://github.com/mynl/aggregate" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

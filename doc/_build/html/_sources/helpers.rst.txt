@@ -1,0 +1,24 @@
+
+Helpers and Utilities
+=====================
+
+Axis Manager Class
+------------------
+
+.. autoclass:: utils.AxisManager
+	:members:
+
+
+Moment Aggregator Class
+-----------------------
+
+.. autoclass:: utils.MomentAggregator
+
+Utilities Module
+----------------
+
+.. automodule:: utils
+	:members:
+	:exclude-members: AxisManager
+	:undoc-members:
+	:private-members:

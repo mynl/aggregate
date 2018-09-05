@@ -1,0 +1,1398 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "AGGREGATE" "1" "Sep 03, 2018" "0.9" "aggregate"
+.SH NAME
+aggregate \- aggregate Documentation
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH AGGREGATE - A POWERFUL AGGREGATE LOSS MODELING LIBRARY FOR PYTHON
+.sp
+\fBaggregate\fP is a Python package providing fast, accurate, and expressive data
+structures designed to make working with probability distributions 
+easy and intuitive. Its primary aim is to be an educational tool, allowing 
+experimenation with complex, \fBreal world\fP distributions. It has applications in 
+insurance, risk management, actuarial science and related areas.
+.INDENT 0.0
+.TP
+.B class aggregate.Severity(name, attachment=0, limit=inf, mean=0, cv=0, a=0, b=0, loc=0, scale=0, conditional=True)
+A continuous random variable, subclasses \fBscipy.stats.rv_continuous\fP\&.
+.sp
+adds layer and attachment to scipy stats continuous random variable class
+overrides
+.INDENT 7.0
+.IP \(bu 2
+cdf
+.IP \(bu 2
+pdf
+.IP \(bu 2
+isf
+.IP \(bu 2
+ppf
+.IP \(bu 2
+moments
+.UNINDENT
+.sp
+Should consider over\-riding: sf, \fBstats\fP ?munp
+.INDENT 7.0
+.TP
+.B moms()
+moms method
+remember have to use integral of survival function otherwise quad can fail to “see” the distribution
+for unlimited integral of a low sd variable
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B plot(N=100)
+quick plot
+.INDENT 7.0
+.TP
+.B Parameters
+\fBN\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class aggregate.Aggregate(name, el=0, premium=0, lr=0, en=0, attachment=0, limit=inf, sev_name=\(aq\(aq, sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0, mix_wt=1, freq_name=\(aq\(aq, freq_a=0, freq_b=0)
+Aggregate help placeholder
+.INDENT 7.0
+.TP
+.B delbaen_haezendonck_density(xs, padding, tilt_vector, beta, beta_name=\(aq\(aq)
+Compare the base and Delbaen Haezendonck transformed aggregates
+.INDENT 7.0
+.IP \(bu 2
+beta(x) = alpha + gamma(x)
+.IP \(bu 2
+alpha = log(freq’ / freq): log of the increase in claim count
+.IP \(bu 2
+gamma = log(RND of adjusted severity) = log(tilde f / f)
+.UNINDENT
+.sp
+Adjustment guarantees a positive loading iff beta is an increasing function
+iff gamma is increasing iff tilde f / f is increasing.
+cf. eqn 3.7 and 3.8
+.sp
+Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
+form of beta function described in 2.23 via, 2.16\-17 and 2.18
+.sp
+From examples on last page of paper:
+.INDENT 7.0
+.INDENT 3.5
+beta(x) = a ==> adjust frequency by factor of e^a
+beta(x) = log(1 + b(x \- E(X)))  ==> variance principle EN(EX + bVar(X))
+beta(x) = ax\- logE_P(exp(a x))  ==> Esscher principle
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBxs\fP – 
+.IP \(bu 2
+\fBpadding\fP – 
+.IP \(bu 2
+\fBtilt_vector\fP – 
+.IP \(bu 2
+\fBbeta\fP – function R+ to R with appropriate properties or name of prob distortion function
+.IP \(bu 2
+\fBbeta_name\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B density(xs, padding=1, tilt_vector=None, approximation=\(aqexact\(aq, sev_calc=\(aqdiscrete\(aq, discretization_calc=\(aqsurvival\(aq, force_severity=False, verbose=False)
+Compute the density
+:param xs:
+:param padding:
+:param tilt_vector:
+:param approximation:
+:param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
+:param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
+:param force_severity: make severities even if using approximation, for plotting
+:param verbose: make partial plots and return details of all moments
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B discretize(method, approx_calc=\(aqsurvival\(aq)
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBmethod\fP – continuous or discrete or raw (for…)
+.IP \(bu 2
+\fBapprox_calc\fP – survival, distribution or both
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B emp_stats()
+report on empirical stats
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B plot(N=100, p=0.0001, axiter=None)
+make a quick plot of fz
+:param axiter:
+:param N:
+:param p:
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B quick_visual(axiter=None, figsize=(9, 3))
+Plot severity and agg, density, distribution and Lee diagram
+:param axiter:
+:param figsize:
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B recommend_bucket(N=10)
+recommend a bucket size given 2**N buckets
+.INDENT 7.0
+.TP
+.B Parameters
+\fBN\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class aggregate.Portfolio(name, spec_list)
+CPortfolio creates and manages a portfolio of CAgg risks.
+.INDENT 7.0
+.TP
+.B analysis_collateral(line, c, a, debug=False)
+E(C(a,c)) expected value of C_line against not C with collateral c and assets a, c <= a
+:param debug:
+:param line: line of business with collateral, analyzed against not line
+:param c: collateral, c <= a required; c=0 reproduces exa, c=a reproduces lev
+:param a: assets, assumed less than the max loss (i.e. within the square)
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B analysis_priority(asset_spec)
+Create priority analysis report
+This can be called multiple times so keep as method
+:param asset_spec: epd
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B apply_distortion(dist, axiter=None)
+Apply the distorion, make a copy of density_df and append various columns
+Handy graphic of results
+:param dist: CDistortion
+:param axiter: axis iterator, if None no plots are returned
+:return: density_df with extra columns appended
+.UNINDENT
+.INDENT 7.0
+.TP
+.B apply_distortions(dist_dict, As=None, Ps=None, num_plots=2)
+.INDENT 7.0
+.TP
+.B Apply a list of distortions, summarize pricing and produce graphical output
+show s_ub > S > s_lb by jump
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdist_dict\fP – dictionary of CDistortion objects
+.IP \(bu 2
+\fBAs\fP – input asset levels to consider OR
+.IP \(bu 2
+\fBPs\fP – input probs (near 1) converted to assets using self.q()
+.IP \(bu 2
+\fBnum_plots\fP – 0, 1 or 2
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B calibrate_distortion(name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0)
+Find transform to hit a premium target given assets of a
+this fills in the values in g_spec and returns params and diagnostics…so
+you can use it either way…more convenient
+:param name: name of distortion
+:param r0:   fixed parameter if applicable
+:param premium_target: target premium
+:param roe:             or ROE
+:param assets: asset level
+:param p:
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B calibrate_distortions(LRs=None, ROEs=None, As=None, Ps=None, r0=0.03)
+Calibrate assets a to loss ratios LRs and asset levels As (iterables)
+ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
+:param LRs:  LR or ROEs given
+:param ROEs: ROEs override LRs
+:param As:  Assets or probs given
+:param Ps: probability levels for quantiles
+:param r0: for distortions that have a min ROL
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B collapse(kind=\(aqslognorm\(aq)
+returns new CPortfolio with the fit
+.INDENT 7.0
+.TP
+.B Parameters
+\fBkind\fP – slognorm | sgamma
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B fit(kind=\(aqslognorm\(aq)
+returns a dictionary specification of the portfolio aggregate
+if updated uses empirical moments, otherwise uses theoretic moments
+.INDENT 7.0
+.TP
+.B Parameters
+\fBkind\fP – slognorm | sgamma
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B get_stat(line=\(aqtotal\(aq, stat=\(aqEmpMean\(aq)
+Other analysis suggests that iloc and iat are about same speed but slower than ix
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBline\fP – 
+.IP \(bu 2
+\fBstat\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B percentiles(pvalues=None)
+report on percentiles and large losses
+uses interpolation, audit_df uses nearest
+.INDENT 7.0
+.TP
+.B Pvalues
+optional vector of p values to use. If None sensible defaults provided
+.TP
+.B Returns
+DataFrame of percentiles indexed by line and p
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B plot(kind, line=\(aqall\(aq, p=0.99, c=0, a=0, axiter=None, figsize=(8, 6), height=2, aspect=1, **kwargs)
+kind = density
+simple plotting of line density or not line density
+input single line or list of lines
+p underscore appended as appropriate
+.INDENT 7.0
+.TP
+.B kind = audit
+Miscellaneous audit graphs
+.TP
+.B kind = priority
+LEV EXA, E2Pri and combined plots by line
+.TP
+.B kind = quick
+four bar charts of EL etc.
+.TP
+.B kind = collateral
+plot to illustrate bivariate density of line vs not line with indicated asset a and capital c
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBkind\fP – 
+.IP \(bu 2
+\fBline\fP – 
+.IP \(bu 2
+\fBp\fP – for graphics audit controls loss scale
+.IP \(bu 2
+\fBc\fP – 
+.IP \(bu 2
+\fBa\fP – 
+.IP \(bu 2
+\fBaxiter\fP – 
+.IP \(bu 2
+\fBfigsize\fP – 
+.IP \(bu 2
+\fBheight\fP – 
+.IP \(bu 2
+\fBaspect\fP – 
+.IP \(bu 2
+\fBkwargs\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B price(reg_g, pricing_g=None)
+Price using regulatory and pricing g functions
+i.e. compute E_price (X wedge E_reg(X) )
+regulatory capital distortion is applied on unlimited basis
+reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =p value in either case }
+pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
+overwritten
+.sp
+ly  must include ro in spec
+.sp
+if lr and roe then lr is used
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBreg_g\fP – a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
+.IP \(bu 2
+\fBpricing_g\fP – spec or CDistortion class or lr= or roe =; must have name= to define spec; if CDist that is
+used
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B q(p)
+return a quantile using nearest (i.e. will be in the index
+.INDENT 7.0
+.TP
+.B Parameters
+\fBp\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B quantile_function(kind=\(aqnearest\(aq)
+return an approximation to the quantile function
+.sp
+TODO sort out…this isn’t right
+.INDENT 7.0
+.TP
+.B Parameters
+\fBkind\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B recommend_bucket()
+data to help estimate a good bucket size
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B reports(report_list=\(aqall\(aq)
+.INDENT 7.0
+.TP
+.B Parameters
+\fBreport_list\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B save(filename=\(aq\(aq, mode=\(aqa\(aq)
+persist to YAML in filename; if none save to user.yaml
+.sp
+TODO: update user list in Examples?
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBfilename\fP – 
+.IP \(bu 2
+\fBmode\fP – for file open
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B top_down(distortions, A_or_p)
+DataFrama summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A
+If A=0 A=q(p) is used
+.sp
+Not integrated into graphcis format (plot)
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdistortions\fP – list or dictionary of CDistortion objects, or a single CDist object
+.IP \(bu 2
+\fBA_or_p\fP – if <1 interpreted as a quantile, otherwise assets
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B trim_df()
+trim out unwanted columns from density_df
+.sp
+epd used in graphics
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B uat(As=None, Ps=[0.98], LRs=[0.965], r0=0.03)
+Reconcile apply_distortion(s) with price and calibrate
+.UNINDENT
+.INDENT 7.0
+.TP
+.B uat_differential(line)
+Check the numerical and theoretical derivatives of exa agree for given line
+.INDENT 7.0
+.TP
+.B Parameters
+\fBline\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B uat_interpolation_functions(a0, e0)
+Perform quick audit of interpolation functions
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBa0\fP – base assets
+.IP \(bu 2
+\fBe0\fP – base epd
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B update(log2, bs, approx_freq_ge=100, approx_type=\(aqslognorm\(aq, remove_fuzz=False, sev_calc=\(aqdiscrete\(aq, discretization_calc=\(aqsurvival\(aq, padding=1, tilt_amount=0, epds=None, trim_df=True, verbose=False, **kwargs)
+interp guesses exa etc. for small losses, but that doesn’t work
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBlog2\fP – 
+.IP \(bu 2
+\fBbs\fP – bucket size
+.IP \(bu 2
+\fBapprox_freq_ge\fP – 
+.IP \(bu 2
+\fBapprox_type\fP – 
+.IP \(bu 2
+\fBremove_fuzz\fP – 
+.IP \(bu 2
+\fBsev_calc\fP – how to calculate the severity gradient | rescale
+.IP \(bu 2
+\fBpadding\fP – for fft 1 = double, 2 = quadruple
+.IP \(bu 2
+\fBtilt_amount\fP – for tiling methodology \- see notes on density for suggested parameters
+.IP \(bu 2
+\fBepds\fP – epd points for priority analysis; if None\-> sensible defaults
+.IP \(bu 2
+\fBtrim_df\fP – remove unnecessary columns from density_df before returning
+.IP \(bu 2
+\fBkwargs\fP – allows you to pass in other crap which is ignored, useful for YAML persistence
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B yaml(stream=None)
+write object as YAML
+.INDENT 7.0
+.TP
+.B Parameters
+\fBstream\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class aggregate.Distortion(name, shape, r0=0.0)
+handles everything to do with distortion functions
+.INDENT 7.0
+.TP
+.B classmethod available_distortions(pricing=True)
+list of the available distortions
+.INDENT 7.0
+.TP
+.B Parameters
+\fBpricing\fP – only return list suitable for pricing
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B static distortions_from_params(params, index, r0=0.025, plot=True)
+make set of dist funs and inverses from params, output of port.calibrate_distortions
+params must just have one row for each method and be in the output format of cal_dist
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBplot\fP – 
+.IP \(bu 2
+\fBindex\fP – 
+.IP \(bu 2
+\fBr0\fP – min rol parameters
+.IP \(bu 2
+\fBparams\fP – dataframe such that params[index, :] has a [lep, param] etc.
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B plot(xs=None, n=101, both=True, ax=None, **kwargs)
+quick plot of the distortion
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBax\fP – 
+.IP \(bu 2
+\fBxs\fP – 
+.IP \(bu 2
+\fBn\fP – length of vector is no xs
+.IP \(bu 2
+\fBboth\fP – ignored for now. just do both
+.IP \(bu 2
+\fBkwargs\fP – passed to plot
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B classmethod test(r0=0.05)
+tester: make some nice plots
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class aggregate.Example(dirname=\(aq\(aq)
+Example: class
+Manages examples for Portfolio object
+Building examples from built in lines
+.INDENT 7.0
+.TP
+.B Parameters
+\fBdirname\fP – dirname load filename or YAMLFILE if not given
+.UNINDENT
+.INDENT 7.0
+.TP
+.B addline(line_name, freq_scale=1, freq_shift=0, sev_scale=1, sev_shift=0)
+Sample using built in lines (minimal)
+ex.addline(‘home’, 1000)
+ex.addline(‘auto’, 3000)
+ex.addline(‘olocc’, 500)
+ex.publish(13, 10000)
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBline_name\fP – 
+.IP \(bu 2
+\fBfreq_scale\fP – 
+.IP \(bu 2
+\fBfreq_shift\fP – 
+.IP \(bu 2
+\fBsev_scale\fP – 
+.IP \(bu 2
+\fBsev_shift\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B static adjust_frequency(spec, scale=0, shift=0)
+Adjust scale and shift freq for a built in line
+can make both adjustment, scale first then shift
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBspec\fP – 
+.IP \(bu 2
+\fBscale\fP – 
+.IP \(bu 2
+\fBshift\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B line(name)
+return dictionary line specification, for building portfolios
+.INDENT 7.0
+.TP
+.B Parameters
+\fBname\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B list()
+list all available portfolios and lines
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B new()
+create a new example; just clears out the old spec
+then call addline…
+:param self:
+:return:
+.UNINDENT
+.INDENT 7.0
+.TP
+.B portfolio(portfolio, reporting_level=0, **kwargs)
+make an example by name, convenience function
+includes Bodoff, Kent and sensible default examples
+kwargs passed through to CPortfolio.update
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBportfolio\fP – pre\-defined portfolio name
+.IP \(bu 2
+\fBreporting_level\fP – what post\-construction reports to print (mostly graphcs), 0 to 3, higher is more detail
+.IP \(bu 2
+\fBkwargs\fP – additional args passed through to update; note: if  line_list this must
+include log2 and bs
+.UNINDENT
+.TP
+.B Returns
+portfolio object, recomputed from spec
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B publish(name, log2=0, bs=0, reporting_level=0, **kwargs)
+complete construction of example made from built in lines
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBname\fP – 
+.IP \(bu 2
+\fBlog2\fP – 
+.IP \(bu 2
+\fBbs\fP – 
+.IP \(bu 2
+\fBreporting_level\fP – 
+.IP \(bu 2
+\fBkwargs\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B static reporting(port, log2, reporting_level)
+handle various reporting options: most important to appear last
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBport\fP – 
+.IP \(bu 2
+\fBlog2\fP – 
+.IP \(bu 2
+\fBreporting_level\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B static rescale_sev(spec, scale)
+Apply scale to a built in line
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBscale\fP – 
+.IP \(bu 2
+\fBspec\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B severity(name)
+return dictionary severity specification, for building portfolios
+.INDENT 7.0
+.TP
+.B Parameters
+\fBname\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B static shift_sev(spec, shift)
+shift severity for a built in line, leaves limit unchanged
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBshift\fP – 
+.IP \(bu 2
+\fBspec\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SH AXIS MANAGER CLASS
+.INDENT 0.0
+.TP
+.B class aggregate.AxisManager(n, figsize=None, height=2, aspect=1, nr=5)
+.INDENT 7.0
+.TP
+.B grid(size=0)
+return a block of axes suitable for Pandas
+if size=0 return all the axes
+.INDENT 7.0
+.TP
+.B Parameters
+\fBsize\fP – 
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B grid_size(n, subgrid=False)
+appropriate grid size given class parameters
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBn\fP – 
+.IP \(bu 2
+\fBsubgrid\fP – call is for a subgrid, no special treatment for 6 and 8
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SH UTILITIES MODULE
+.INDENT 0.0
+.TP
+.B utils.axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5)
+axiter = check_axiter(axiter, …) to allow chaining
+TODO can this be done in the class somehow?
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBaxiter\fP – 
+.IP \(bu 2
+\fBn\fP – 
+.IP \(bu 2
+\fBfigsize\fP – 
+.IP \(bu 2
+\fBheight\fP – 
+.IP \(bu 2
+\fBaspect\fP – 
+.IP \(bu 2
+\fBnr\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.beta_factory(el, maxl, cv)
+beta a and b params given expected loss, max loss exposure and cv
+Kent E.’s specification. Just used to create the CAgg classes for his examples (in agg.examples)
+\fI\%https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters\fP
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBel\fP – 
+.IP \(bu 2
+\fBmaxl\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.cumintegral(v, bs)
+cumulative integral of v with buckets size bs
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBv\fP – 
+.IP \(bu 2
+\fBbs\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.cumulate_moments(m1, m2, m3, n1, n2, n3)
+Moments of sum of indepdendent variables
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBm1\fP – 1st moment, E(X)
+.IP \(bu 2
+\fBm2\fP – 2nd moment, E(X^2)
+.IP \(bu 2
+\fBm3\fP – 3rd moment, E(X^3)
+.IP \(bu 2
+\fBn1\fP – 
+.IP \(bu 2
+\fBn2\fP – 
+.IP \(bu 2
+\fBn3\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.cv_to_shape(dist_name, cv, hint=1)
+create a frozen object of type dist_name with given cv
+dist_name = ‘lognorm’
+cv = 0.25
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdist_name\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.IP \(bu 2
+\fBhint\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.distribution_factory(dist_name, mean, cv)
+Create a frozen distribution object by name
+Normal (and possibly others) does not have a shape parameter
+figure shape and scale from mean and cv
+corresponds to unlimited severity for now
+.sp
+E.g.
+fz = dist_factory_ex(‘lognorm’, 1000, 0.25)
+fz = dist_factory_ex(‘gamma’, 1000, 1.25)
+plot_frozen(fz)
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdist_name\fP – 
+.IP \(bu 2
+\fBmean\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.UNINDENT
+.TP
+.B Return frozen distribution instance
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.estimate_agg_percentile(m, cv, skew, p=0.999)
+Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
+if len(spec) > 3 it is assumed to be a spec, otherwise input m, cv, sk
+.sp
+If spec passed in also take max with the limit
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBm\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.IP \(bu 2
+\fBskew\fP – 
+.IP \(bu 2
+\fBp\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.ft(z, padding, tilt)
+fft with padding and tilt
+padding = n makes vector 2^n as long
+n=1 doubles (default)
+n=2 quadruples
+tilt is passed in as the tilting vector or None: easier for the caller to have a single instance
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBz\fP – 
+.IP \(bu 2
+\fBpadding\fP – = 1 doubles
+.IP \(bu 2
+\fBtilt\fP – vector of tilt values
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.html_title(txt, n=1)
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBtxt\fP – 
+.IP \(bu 2
+\fBn\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.ift(z, padding, tilt)
+ift that strips out padding and adjusts for tilt
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBz\fP – 
+.IP \(bu 2
+\fBpadding\fP – 
+.IP \(bu 2
+\fBtilt\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.insurability_triangle()
+Illustrate the insurability triangle…
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.lognorm_lev(mu, sigma, n, limit)
+return E(min(X, limit)^n) for lognormal using exact calculation
+currently only for n=1, 2
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBmu\fP – 
+.IP \(bu 2
+\fBsigma\fP – 
+.IP \(bu 2
+\fBn\fP – 
+.IP \(bu 2
+\fBlimit\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.mean_to_scale(dist_name, shape, mean)
+adjust scale of fz to have desired mean
+return frozen instance
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdist_name\fP – 
+.IP \(bu 2
+\fBshape\fP – 
+.IP \(bu 2
+\fBmean\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.moments_to_mcvsk(ex1, ex2, ex3)
+returns mean, cv and skewness from non\-central moments
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBex1\fP – 
+.IP \(bu 2
+\fBex2\fP – 
+.IP \(bu 2
+\fBex3\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.plot_frozen(fz, N=100, p=0.0001)
+make a quick plot of fz
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBfz\fP – 
+.IP \(bu 2
+\fBN\fP – 
+.IP \(bu 2
+\fBp\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.read_log()
+read and return the log file
+.INDENT 7.0
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.sensible_jump(n, desired_rows=20)
+return a sensible jump size to output desired_rows given input of n
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBn\fP – 
+.IP \(bu 2
+\fBdesired_rows\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.sgamma_fit(m, cv, skew)
+method of moments shifted gamma fit matching given mean, cv and skewness
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBm\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.IP \(bu 2
+\fBskew\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.sln_fit(m, cv, skew)
+method of moments shifted lognormal fit matching given mean, cv and skewness
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBm\fP – 
+.IP \(bu 2
+\fBcv\fP – 
+.IP \(bu 2
+\fBskew\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.stats_series(data_list, name)
+combine elements into a reporting series
+handles order, index names etc. in one place
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdata_list\fP – 
+.IP \(bu 2
+\fBname\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B utils.suptitle_and_tight(title, fontsize=14, **kwargs)
+deal with tight layout when there is a suptitle
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBtitle\fP – 
+.IP \(bu 2
+\fBfontsize\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.SH PARAMETERS MODULE
+.sp
+Functions to determine and setup parameters
+.INDENT 0.0
+.TP
+.B param.hack_make_lines_from_csv(fn=\(aq../data/DIRECT_IEE.csv\(aq, do_save=False)
+placeholder
+make industry lines from IEE extract
+provenance: IND_IEE*….py in python
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBdo_save\fP – 
+.IP \(bu 2
+\fBfn\fP – 
+.UNINDENT
+.TP
+.B Returns
+
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.IP \(bu 2
+genindex
+.IP \(bu 2
+modindex
+.IP \(bu 2
+search
+.UNINDENT
+.SH AUTHOR
+Stephen J. Mildenhall
+.SH COPYRIGHT
+2018, Stephen J. Mildenhall
+.\" Generated by docutils manpage writer.
+.

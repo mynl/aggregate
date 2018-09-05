@@ -29,13 +29,14 @@ class Example(object):
         """
         if dirname == '':
             dirname = os.path.split(__file__)[0]
+            dirname = os.path.join(dirname, 'yaml')
         with open(os.path.join(dirname, 'portfolio.yaml'), 'r') as f:
             self.built_in_portfolios = yaml.load(f, Loader=yaml.Loader)
-        with open(os.path.join(dirname, 'aggregate.yaml'), 'r') as f:
-            self.built_in_aggregates = yaml.load(f, Loader=yaml.Loader)
+        # with open(os.path.join(dirname, 'aggregate.yaml'), 'r') as f:
+        #     self.built_in_aggregates = yaml.load(f, Loader=yaml.Loader)
         with open(os.path.join(dirname, 'severity.yaml'), 'r') as f:
             self.built_in_severity = yaml.load(f, Loader=yaml.Loader)
-        with open(os.path.join(dirname, 'user.yaml'), 'r') as f:
+        with open(os.path.join(dirname, 'user_portfolios.yaml'), 'r') as f:
             self.user_portfolios = yaml.load(f, Loader=yaml.Loader)
         self.spec_list = []
 
@@ -99,8 +100,8 @@ class Example(object):
         """
         print('\n\t- '.join(['Built in portfolios'] + list(self.built_in_portfolios.keys())))
         print()
-        print('\n\t- '.join(['Built in lines'] + list(self.built_in_aggregates.keys())))
-        print()
+        # print('\n\t- '.join(['Built in lines'] + list(self.built_in_aggregates.keys())))
+        # print()
         print('\n\t- '.join(['Built in severity'] + list(self.built_in_severity.keys())))
         print()
         print('\n\t- '.join(['User portfolios'] + list(self.user_portfolios.keys())))

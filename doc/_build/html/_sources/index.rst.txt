@@ -28,5 +28,6 @@ Table of Contents
    portfolio
    distortion
    example
-   helpers
+   underwriter
+   utilities
    parameters

@@ -11,57 +11,56 @@ Three Line Example:
         tilt_amount: 0
     spec:
     -   name: single
-        attachment: 0
-        el: 0
-        en: 10
+        exp_attachment: 0
+        exp_el: 0
+        exp_en: 10
+        exp_limit: .inf
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit: .inf
-        lr: 0
-        mix_wt: 1
-        premium: 0
+        sev_wt: 1
         sev_cv: 0.75
         sev_mean: 100
         sev_name: lognorm
     -   name: mixed
-        attachment: 0
-        el: 0
-        en: 10
+        exp_attachment: 0
+        exp_el: 0
+        exp_en: 10
+        exp_limit: 250
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit: 250
-        lr: 0
-        mix_wt: !!python/tuple [0.2, 0.2, 0.2, 0.2, 0.2]
-        premium: 0
+        sev_wt: !!python/tuple [0.2, 0.2, 0.2, 0.2, 0.2]
         sev_cv: !!python/tuple [0.2, 0.4, 0.6, 0.8, 1.0]
         sev_mean: 100
         sev_name: lognorm
     -   name: sublines
-        attachment:
+        exp_attachment:
         -   0
         -   0
         -   100
         -   50
-        el: 0
-        en:
+        exp_el: 0
+        exp_en:
         -   10
         -   10
         -   10
         -   10
+        exp_limit:
+        -   .inf
+        -   100
+        -   .inf
+        -   100
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit:
-        -   .inf
-        -   100
-        -   .inf
-        -   100
-        lr: 0
-        mix_wt: 1
-        name: sublines
-        premium: 0
+        sev_wt: 1
         sev_a: 0.75
         sev_b: 0
         sev_cv: 0
@@ -81,16 +80,16 @@ Single:
         tilt_amount: 0
     spec:
     -   name: single
-        attachment: 0
-        el: 0
-        en: 10
+        exp_attachment: 0
+        exp_el: 0
+        exp_en: 10
+        exp_limit: .inf
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit: .inf
-        lr: 0
-        mix_wt: 1
-        premium: 0
+        sev_wt: 1
         sev_cv: 0.75
         sev_mean: 100
         sev_name: lognorm
@@ -107,21 +106,21 @@ Mixed:
         tilt_amount: 0
     spec:
     -   name: mixed
-        attachment: 0
-        el: 0
-        en: 10
+        exp_attachment: 0
+        exp_el: 0
+        exp_en: 10
+        exp_limit: 250
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit: 250
-        lr: 0
-        mix_wt:
+        sev_wt:
         -   0.2
         -   0.2
         -   0.2
         -   0.2
         -   0.2
-        premium: 0
         sev_cv:
         -   0.2
         -   0.4
@@ -143,29 +142,28 @@ Sublines:
         tilt_amount: 0
     spec:
     -   name: sublines
-        attachment:
+        exp_attachment:
         -   0
         -   0
         -   100
         -   50
-        el: 0
-        en:
+        exp_el: 0
+        exp_en:
         -   10
         -   10
         -   10
         -   10
+        exp_limit:
+        -   .inf
+        -   100
+        -   .inf
+        -   100
+        exp_lr: 0
+        exp_premium: 0
         freq_a: 0
         freq_b: 0
         freq_name: poisson
-        limit:
-        -   .inf
-        -   100
-        -   .inf
-        -   100
-        lr: 0
-        mix_wt: 1
-        name: sublines
-        premium: 0
+        sev_wt: 1
         sev_a: 0.75
         sev_b: 0
         sev_cv: 0

@@ -6,7 +6,7 @@ bodoff1:
         remove_fuzz: true
     spec:
     -   name: wind
-        en: 1
+        exp_en: 1
         freq_name: fixed
         sev_name: dhistogram
         sev_ps:
@@ -32,7 +32,7 @@ bodoff2:
     spec:
     -   name: wind
         freq_name: fixed
-        en: 1
+        exp_en: 1
         sev_name: dhistogram
         sev_xs:
         -   0
@@ -42,7 +42,7 @@ bodoff2:
         -   0.2
     -   name: quake
         freq_name: fixed
-        en: 1
+        exp_en: 1
         sev_name: dhistogram
         sev_xs:
         -   0
@@ -58,7 +58,7 @@ bodoff3:
     spec:
     -   name: wind
         freq_name: fixed
-        en: 1
+        exp_en: 1
         sev_name: dhistogram
         sev_xs:
         -   0
@@ -68,7 +68,7 @@ bodoff3:
         -   0.2
     -   name: quake
         freq_name: fixed
-        en: 1
+        exp_en: 1
         sev_name: dhistogram
         sev_xs:
         -   0
@@ -85,17 +85,17 @@ bodoff4:
     -   name: a
         sev_name: expon
         sev_scale: 4
-        en: 0.25
+        exp_en: 0.25
         freq_name: bernoulli
     -   name: b
         sev_name: expon
         sev_scale: 20
-        en: 0.05
+        exp_en: 0.05
         freq_name: bernoulli
     -   name: c
         sev_name: expon
         sev_scale: 100
-        en: 0.05
+        exp_en: 0.05
         freq_name: bernoulli
 small_medium_large:
     args:
@@ -107,24 +107,24 @@ small_medium_large:
         sev_name: lognorm
         sev_mean: 500000
         sev_cv: 1.5
-        limit: 10000000
-        en: 10
+        exp_limit: 10000000
+        exp_en: 10
         freq_name: poisson
         freq_a: 0.1
     -   name: medium
         sev_name: lognorm
         sev_mean: 50000
         sev_cv: 1.5
-        limit: 1000000
-        en: 100
+        exp_limit: 1000000
+        exp_en: 100
         freq_name: poisson
         freq_a: 0.1
     -   name: large
         sev_name: lognorm
         sev_mean: 50000
         sev_cv: 1.5
-        limit: 1000000
-        en: 1000
+        exp_limit: 1000000
+        exp_en: 1000
         freq_name: poisson
         freq_a: 0.1
 mass_test:
@@ -137,19 +137,19 @@ mass_test:
         sev_name: uniform
         sev_scale: 10
         sev_loc: 5
-        en: 2
+        exp_en: 2
         freq_name: fixed
     -   name: b
         sev_name: uniform
         sev_scale: 10
         sev_loc: 0
-        en: 1
+        exp_en: 1
         freq_name: fixed
     -   name: c
         sev_name: uniform
         sev_scale: 15
         sev_loc: 0
-        en: 1
+        exp_en: 1
         freq_name: fixed
 interesting_cat:
     args:
@@ -161,24 +161,24 @@ interesting_cat:
         sev_name: lognorm
         sev_scale: 45.783336177161424
         sev_a: 1.25
-        limit: 40000
+        exp_limit: 40000
         freq_name: poisson
-        en: 3.5
+        exp_en: 3.5
     -   name: paretocat
         sev_name: pareto
         sev_scale: 50
         sev_loc: -50
         sev_a: 1.25
         freq_name: poisson
-        en: 2
+        exp_en: 2
     -   name: attrit
-        limit: 500
+        exp_limit: 500
         sev_name: lognorm
         sev_mean: 1
         sev_cv: 1.75
         sev_a: 1.25
         freq_name: poisson
-        en: 10000
+        exp_en: 10000
 
 
 

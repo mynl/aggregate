@@ -31,23 +31,23 @@ class Aggregate(object):
 
     """
 
-    def __init__(self, name, el=0, premium=0, lr=0, en=0, attachment=0, limit=np.inf,
+    def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, mix_wt=1,
+                 sev_xs=None, sev_ps=None, sev_wt=1,
                  freq_name='', freq_a=0, freq_b=0):
         """
 
         el -> en
-        prem x lr -> el
+        prem x exp_lr -> el
         x . en -> el
-        always have en x and el; may have prem and lr
-        if prem then lr computed; if lr then premium computed
+        always have en x and el; may have prem and exp_lr
+        if prem then exp_lr computed; if exp_lr then premium computed
 
-        el is determined using np.where(el==0, prem*lr, el)
+        el is determined using np.where(el==0, prem*exp_lr, el)
         if el==0 then el = freq * sev
         assert np.all( el>0 or en>0 )
 
-        call with el (or prem x lr) (or n) expressing a mixture, with the same severity
+        call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity
         call with el expressing lines of business with an array of severities
         call with single el and array of sevs expressing a mixture; [] broken down by weights
 
@@ -61,12 +61,12 @@ class Aggregate(object):
         call with both that does the cross product... (note the sev array may not be equal sizes)
 
         :param name:
-        :param el:   expected loss or vector or matrix
-        :param premium:
-        :param lr:  loss ratio
-        :param en:  expected claim count per segment (self.n = total claim count)
-        :param attachment: occ attachment
-        :param limit: occ limit
+        :param exp_el:   expected loss or vector or matrix
+        :param exp_premium:
+        :param exp_lr:  loss ratio
+        :param exp_en:  expected claim count per segment (self.n = total claim count)
+        :param exp_attachment: occ attachment
+        :param exp_limit: occ limit
         :param sev_name: Severity class object or similar or vector or matrix
         :param sev_a:
         :param sev_b:
@@ -76,20 +76,20 @@ class Aggregate(object):
         :param sev_scale:
         :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram or fixed
         :param sev_ps:
-        :param mix_wt: weight for mixed distribution
+        :param sev_wt: weight for mixed distribution
         :param freq_name: name of frequency distribution
         :param freq_a: freq dist shape1 OR CV = sq root contagion
         :param freq_b: freq dist shape2
 
         """
 
-        assert np.sum(mix_wt) == 1
+        assert np.sum(sev_wt) == 1
 
-        self.spec = dict(name=name, el=el, premium=premium, lr=lr, en=en,
-                         attachment=attachment, limit=limit,
+        self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
+                         exp_attachment=exp_attachment, exp_limit=exp_limit,
                          sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
                          sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                         sev_xs=sev_xs, sev_ps=sev_ps, mix_wt=mix_wt,
+                         sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
                          freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
 
         # class variables (mostly)
@@ -126,24 +126,24 @@ class Aggregate(object):
         # TODO this approach forces EITHER a mixture OR multi exposures
         # TODO need to expand to product for general case, however, that should be easy
 
-        if not isinstance(el, collections.Iterable):
-            el = np.array([el])
+        if not isinstance(exp_el, collections.Iterable):
+            exp_el = np.array([exp_el])
 
         # pyCharm formatting
         self.en = None
         self.attachment = None
         self.limit = None
-        el, premium, lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, \
-        sev_scale, mix_wt = \
-            np.broadcast_arrays(el, premium, lr, en, attachment, limit, sev_name, sev_a, sev_b, sev_mean, sev_cv,
-                                sev_loc, sev_scale, mix_wt)
+        exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, \
+        sev_scale, sev_wt = \
+            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b, sev_mean, sev_cv,
+                                sev_loc, sev_scale, sev_wt)
         # just one overall line/class of business?
         self.scalar_business = \
-            np.all(list(map(lambda x: len(x) == 1, [el, premium, lr, self.en, self.attachment, self.limit])))
+            np.all(list(map(lambda x: len(x) == 1, [exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit])))
 
         # holder for the severity distributions
-        self.sevs = np.empty(el.shape, dtype=type(Severity))
-        el = np.where(el > 0, el, premium * lr)
+        self.sevs = np.empty(exp_el.shape, dtype=type(Severity))
+        exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
         # compute the grand total for approximations
         # overall freq CV with common mixing TODO this is dubious
         c = freq_a
@@ -151,8 +151,8 @@ class Aggregate(object):
         # counter
         r = 0
         for _el, _pr, _lr, _en, _at, _y, sn, sa, sb, sm, scv, sloc, ssc, smix in \
-                zip(el, premium, lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean,
-                    sev_cv, sev_loc, sev_scale, mix_wt):
+                zip(exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean,
+                    sev_cv, sev_loc, sev_scale, sev_wt):
 
             self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc, sev_xs, sev_ps, True)
             sev1, sev2, sev3 = self.sevs[r].moms()
@@ -180,10 +180,10 @@ class Aggregate(object):
             self.stats.loc[label, :] = [_y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [c, freq_a]
             r += 1
 
-        # average limit and attachment
+        # average exp_limit and exp_attachment
         avg_limit = np.sum(self.stats.limit * self.stats.freq_1) / ma.tot_freq_1
         avg_attach = np.sum(self.stats.attachment * self.stats.freq_1) / ma.tot_freq_1
-        # assert np.allclose(ma.freq_1, self.stats.en)
+        # assert np.allclose(ma.freq_1, self.stats.exp_en)
 
         # store answer for total
         self.stats_total.loc[self.name, :] = \

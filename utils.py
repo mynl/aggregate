@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
 import pandas as pd
-from scipy.optimize import newton
 import seaborn as sns
 from IPython.core.display import HTML, display
 import logging
@@ -75,69 +74,6 @@ def ift(z, padding, tilt):
     # return temp[0:int(len(temp) / 2)]
 
 
-def stats_series(data_list, name):
-    """
-    combine elements into a reporting series
-    handles order, index names etc. in one place
-
-    :param data_list:
-    :param name:
-    :return:
-    """
-    idx = pd.MultiIndex.from_arrays(
-        [['agg', 'agg', 'agg', 'freq', 'freq', 'freq', 'sev', 'sev', 'sev'] * 2 + ['agg', 'agg'],
-         ['mean', 'cv', 'skew'] * 3 + ['ex1', 'ex2', 'ex3'] * 3 + ['limit', 'P99.9e']],
-        names=['component', 'measure'])
-    return pd.Series(data_list, name=name, index=idx)
-
-
-def cv_to_shape(dist_name, cv, hint=1):
-    """
-    create a frozen object of type dist_name with given cv
-    dist_name = 'lognorm'
-    cv = 0.25
-
-    :param dist_name:
-    :param cv:
-    :param hint:
-    :return:
-    """
-
-    gen = getattr(ss, dist_name)
-
-    def f(shape):
-        fz0 = gen(shape)
-        temp = fz0.stats('mv')
-        return cv - temp[1] ** .5 / temp[0]
-
-    try:
-        ans = newton(f, hint)
-    except RuntimeError:
-        logging.error(f'cv_to_shape | error for {dist_name}, {cv}')
-        ans = np.inf
-        return ans, None
-    fz = gen(ans)
-    return ans, fz
-
-
-def mean_to_scale(dist_name, shape, mean):
-    """
-    adjust scale of fz to have desired mean
-    return frozen instance
-
-    :param dist_name:
-    :param shape:
-    :param mean:
-    :return:
-    """
-    gen = getattr(ss, dist_name)
-    fz = gen(shape)
-    m = fz.stats('m')
-    scale = mean / m
-    fz = gen(shape, scale=scale)
-    return scale, fz
-
-
 def sln_fit(m, cv, skew):
     """
     method of moments shifted lognormal fit matching given mean, cv and skewness
@@ -170,62 +106,6 @@ def sgamma_fit(m, cv, skew):
     return shift, alpha, theta
 
 
-# Distribution factory
-
-def beta_factory(el, maxl, cv):
-    """
-    beta a and b params given expected loss, max loss exposure and cv
-    Kent E.'s specification. Just used to create the CAgg classes for his examples (in agg.examples)
-    https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
-
-    :param el:
-    :param maxl:
-    :param cv:
-    """
-    m = el / maxl
-    v = m * m * cv * cv
-    a = m * (m * (1 - m) / v - 1)
-    b = (1 - m) * (m * (1 - m) / v - 1)
-    return ss.beta(a, b, loc=0, scale=maxl)
-
-
-def distribution_factory(dist_name, mean, cv):
-    """
-    Create a frozen distribution object by name
-    Normal (and possibly others) does not have a shape parameter
-    figure shape and scale from mean and cv
-    corresponds to unlimited severity for now
-
-    E.g.
-    fz = dist_factory_ex('lognorm', 1000, 0.25)
-    fz = dist_factory_ex('gamma', 1000, 1.25)
-    plot_frozen(fz)
-
-    :param dist_name:
-    :param mean:
-    :param cv:
-    :return frozen distribution instance:
-    """
-
-    if dist_name in ['norm']:
-        #     Create a frozen distribution object by name
-        #     Normal (and possibly others) does not have a shape parameter
-        scale = cv * mean
-        # ss is scipy.stats
-        gen = getattr(ss, dist_name)
-        fz = gen(loc=mean, scale=scale)
-        return fz
-
-    sh, _ = cv_to_shape(dist_name, cv)
-    sc, fz = mean_to_scale(dist_name, sh, mean)
-    st = fz.stats('mv')
-    m = st[0]
-    acv = st[1] ** .5 / m  # achieved cv
-    assert (np.isclose(mean, m))
-    assert (np.isclose(cv, acv))
-    return fz, sh, sc
-
-
 def estimate_agg_percentile(m, cv, skew, p=0.999):
     """
     Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
@@ -250,35 +130,7 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     return max(pl, pg, m * (1 + ss.norm.isf(1 - p) * cv))
 
 
-# misc
-def plot_frozen(fz, N=100, p=1e-4):
-    """
-    make a quick plot of fz
-
-    :param fz:
-    :param N:
-    :param p:
-    :return:
-    """
-
-    x0 = fz.isf(1 - p)
-    if x0 < 0.1:
-        x0 = 0
-    x1 = fz.isf(p)
-    xs = np.linspace(x0, x1, N)
-    ps = np.linspace(1 / N, 1, N, endpoint=False)
-    den = fz.pdf(xs)
-    qs = fz.ppf(ps)
-    # plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.plot(xs, den)
-    plt.subplot(1, 2, 2)
-    plt.plot(ps, qs)
-    plt.tight_layout()
-    # '{:5.3f}\t{:5.3f}'.format(*[float(i) for i in fz.stats()])
-    plt.show()
-
-
+# axis management
 def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     """
     axiter = check_axiter(axiter, ...) to allow chaining
@@ -384,20 +236,6 @@ class AxisManager(object):
             return [self.__next__() for _ in range(c) for _ in range(r)]
 
 
-def cumintegral(v, bs):
-    """
-    cumulative integral of v with buckets size bs
-
-    :param v:
-    :param bs:
-    :return:
-    """
-    if type(v) == np.ndarray:
-        return np.hstack((0, v[:-1])).cumsum() * bs
-    else:
-        return np.hstack((0, v.values[:-1])).cumsum() * bs
-
-
 def lognorm_lev(mu, sigma, n, limit):
     """
     return E(min(X, limit)^n) for lognormal using exact calculation
@@ -421,6 +259,7 @@ def lognorm_lev(mu, sigma, n, limit):
         return unlimited * phi_l2 + limit ** n * (1 - phi_l)
 
 
+# display related
 def html_title(txt, n=1):
     """
 
@@ -457,6 +296,7 @@ def suptitle_and_tight(title, fontsize=14, **kwargs):
     plt.tight_layout(rect=[0, 0, 1, 0.97])
 
 
+# general nonsense
 def insurability_triangle():
     """
     Illustrate the insurability triangle...

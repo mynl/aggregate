@@ -1,6 +1,5 @@
 import scipy.stats as ss
 import numpy as np
-from aggregate.utils import cv_to_shape, mean_to_scale
 from scipy.integrate import quad
 import pandas as pd
 import collections
@@ -10,6 +9,7 @@ from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, MomentAggregator
 from .spectral import Distortion
 from scipy import interpolate
+from scipy.optimize import newton
 
 # import matplotlib.cm as cm
 # from scipy import interpolate
@@ -719,14 +719,25 @@ class Severity(ss.rv_continuous):
         elif name in ['beta']:
             # distributions with two shape parameters
             # require specific inputs
-            gen = getattr(ss, name)
-            self.fz = gen(a, b, loc=loc, scale=scale)
+            # for Kent examples input scale=maxl, mean=el and cv as input
+            #     beta a and b params given expected loss, max loss exposure and cv
+            #     Kent E.'s specification. Just used to create the CAgg classes for his examples (in agg.examples)
+            #     https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
+            if name=='beta' and mean > 0 and cv > 0:
+                m = mean / scale
+                v = m * m * cv * cv
+                a = m * (m * (1 - m) / v - 1)
+                b = (1 - m) * (m * (1 - m) / v - 1)
+                self.fx = ss.beta(a, b, loc=0, scale=scale)
+            else:
+                gen = getattr(ss, name)
+                self.fz = gen(a, b, loc=loc, scale=scale)
         else:
             # distributions with one shape parameter
             if a == 0:  # TODO figuring 0 is invalid shape...
-                a, _ = cv_to_shape(name, cv)
+                a, _ = self.cv_to_shape(cv)
             if scale == 0 and mean > 0:
-                scale, self.fz = mean_to_scale(name, a, mean)
+                scale, self.fz = self.mean_to_scale(a, mean)
             else:
                 gen = getattr(ss, name)
                 self.fz = gen(a, scale=scale, loc=loc)
@@ -761,6 +772,49 @@ class Severity(ss.rv_continuous):
             self.long_name = f'{name}[{lim_name} xs {attachment:,.0f}]'
 
         assert self.fz is not None
+
+    def cv_to_shape(self, cv, hint=1):
+        """
+        create a frozen object of type dist_name with given cv
+        dist_name = 'lognorm'
+        cv = 0.25
+
+        :param cv:
+        :param hint:
+        :return:
+        """
+
+        gen = getattr(ss, self.name)
+
+        def f(shape):
+            fz0 = gen(shape)
+            temp = fz0.stats('mv')
+            return cv - temp[1] ** .5 / temp[0]
+
+        try:
+            ans = newton(f, hint)
+        except RuntimeError:
+            logging.error(f'cv_to_shape | error for {self.name}, {cv}')
+            ans = np.inf
+            return ans, None
+        fz = gen(ans)
+        return ans, fz
+
+    def mean_to_scale(self, shape, mean):
+        """
+        adjust scale of fz to have desired mean
+        return frozen instance
+
+        :param shape:
+        :param mean:
+        :return:
+        """
+        gen = getattr(ss, self.name)
+        fz = gen(shape)
+        m = fz.stats('m')
+        scale = mean / m
+        fz = gen(shape, scale=scale)
+        return scale, fz
 
     def __enter__(self):
         """ Support with Severity as f: """

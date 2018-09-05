@@ -12,24 +12,24 @@ wind:
     sev_a: 1.8
     sev_scale: !!float 2.5e8
     sev_loc: !!float -2.5e8
-    sev_limit: !!float 10e9
     freq_name: poisson
+    exp_limit: !!float 10e9
     exp_en: 1.7
 scs:
     name: scs
     sev_name: lognorm
     sev_mean: !!float 100e6
     sev_cv: 1.5
-    sev_limit: !!float 2e9
     freq_name: poisson
+    exp_limit: !!float 2e9
     exp_en: 0.5
 casxol:
     name: casualty xol
     sev_name: lognorm
     sev_mean: !!float 50e6
     sev_cv: 0.75
-    sev_limit: !!float 100e6
     freq_name: poisson
+    exp_limit: !!float 100e6
     exp_en: 0.5
 ind cal:
     freq_name: poisson

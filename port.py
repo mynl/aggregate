@@ -911,7 +911,7 @@ class Portfolio(object):
         # needs to be shifted down by one for the partial integrals....
         # temp = np.hstack((0, np.array(self.density_df.iloc[:-1, :].loc[:, 'S'].cumsum())))
         # self.density_df['exa_total'] = temp * bs
-        self.density_df['exa_total'] = cumintegral(self.density_df['S'], bs)
+        self.density_df['exa_total'] = self.cumintegral(self.density_df['S'])
         self.density_df.loc[:, 'lev_total'] = self.density_df['exa_total']
 
         # $E(X\wedge a)=\int_0^a tf(t)dt + aS(a)$ therefore exlea
@@ -989,14 +989,14 @@ class Portfolio(object):
             stemp = 1 - self.density_df.loc[:, 'p_' + col].cumsum()
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
             # self.density_df['lev_' + col] = temp * bs
-            self.density_df['lev_' + col] = cumintegral(stemp, bs)
+            self.density_df['lev_' + col] = self.cumintegral(stemp)
 
             self.density_df['e2pri_' + col] = \
                 np.real(loc_ift(loc_ft(self.density_df['lev_' + col]) * loc_ft(self.density_df['not_' + col])))
             stemp = 1 - self.density_df.loc[:, 'not_' + col].cumsum()
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
             # self.density_df['lev_not_' + col] = temp * bs
-            self.density_df['lev_not_' + col] = cumintegral(stemp, bs)
+            self.density_df['lev_not_' + col] = self.cumintegral(stemp)
 
             # EX_i | X<= a; temp is used in le and gt calcs
             temp = np.cumsum(self.density_df['exeqa_' + col] * self.density_df.p_total)
@@ -1397,7 +1397,7 @@ class Portfolio(object):
         mass = 0
         for line in self.line_names:
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
-            exleaUC = cumintegral(self.density_df[f'exeqa_{line}'] * df.gp_total, 1)  # unconditional
+            exleaUC = self.cumintegral(self.density_df[f'exeqa_{line}'] * df.gp_total, 1)  # unconditional
             exixgtaUC = np.cumsum(
                 self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
                 df.loc[::-1, 'gp_total'])
@@ -1416,7 +1416,7 @@ class Portfolio(object):
         # LEV under distortion g
         # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'gS'].cumsum())))
         # df['exag_total'] = temp * self.buck
-        df['exag_total'] = cumintegral(df['gS'], self.buck)
+        df['exag_total'] = self.cumintegral(df['gS'])
 
         # comparison of total and sum of parts
         # df.loc[:, ['exag_sumparts', 'exag_total', 'exa_total']].plot(ax=pno())
@@ -1997,3 +1997,21 @@ class Portfolio(object):
             logging.error(f'CPortfolio.uat | {s}')
 
         return a, p, test, params, dd, table, stacked
+
+    def cumintegral(self, v, bs_override=0):
+        """
+        cumulative integral of v with buckets size bs
+
+        :param v:
+        :return:
+        """
+
+        if bs_override != 0:
+            bs = bs_override
+        else:
+            bs = self.buck
+
+        if type(v) == np.ndarray:
+            return np.hstack((0, v[:-1])).cumsum() * bs
+        else:
+            return np.hstack((0, v.values[:-1])).cumsum() * bs

@@ -7,11 +7,14 @@ E.g. to run from Jupyter enter
 
 """
 
+import sys
+sys.path.append('c:/s/telos/python')
 
 import aggregate as agg
 import warnings
 import numpy as np
 warnings.filterwarnings("ignore")
+
 
 
 if __name__ == '__main__':

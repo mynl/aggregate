@@ -28,8 +28,8 @@ class Portfolio(object):
             a = Aggregate(**spec)
             self.agg_list.append(a)
             self.line_names.append(spec['name'])
-            ma.add_fs( a.report[('freq', 'ex1')], a.report[('sev', 'ex1')], a.report[('sev', 'ex2')],
-                       a.report[('sev', 'ex3')])
+            ma.add_fs(a.report[('freq', 'ex1')],
+                      a.report[('sev', 'ex1')], a.report[('sev', 'ex2')], a.report[('sev', 'ex3')])
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
             # line names cannot start with n, it is reserved for "not"
@@ -37,47 +37,10 @@ class Portfolio(object):
                 raise ValueError('Line names cannot start with n, it is reserved for not')
         # make a pandas data frame of all the stats
         temp_report = pd.concat([a.report for a in self.agg_list], axis=1)
-        # need to cumulate...
-        # figure out moments of the sum
-        # input dataframe has elements ex1, ex2, ex3
-        tot_freq_ex1 = 0
-        tot_freq_ex2 = 0
-        tot_freq_ex3 = 0
-        tot_sev_ex1 = 0
-        tot_sev_ex2 = 0
-        tot_sev_ex3 = 0
-        tot_agg_ex1 = 0
-        tot_agg_ex2 = 0
-        tot_agg_ex3 = 0
+
         max_limit = np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
-        # must be a better way...
-        for rn, c in temp_report.filter(regex='ex', axis=0).T.iterrows():
-            agg1, agg2, agg3 = c['agg']
-            freq1, freq2, freq3 = c['freq']
-            sev1, sev2, sev3 = c['sev']
-            tot_agg_ex1, tot_agg_ex2, tot_agg_ex3 = \
-                cumulate_moments(tot_agg_ex1, tot_agg_ex2, tot_agg_ex3, agg1, agg2, agg3)
-            tot_freq_ex1, tot_freq_ex2, tot_freq_ex3 = \
-                cumulate_moments(tot_freq_ex1, tot_freq_ex2, tot_freq_ex3, freq1, freq2, freq3)
-            tot_sev_ex1 += freq1 * sev1
-            tot_sev_ex2 += freq1 * sev2
-            tot_sev_ex3 += freq1 * sev3
-        tot_sev_ex1 /= tot_freq_ex1
-        tot_sev_ex2 /= tot_freq_ex1
-        tot_sev_ex3 /= tot_freq_ex1
-        # store these: used to make approximations
-        self.totm, self.totcv, self.totskew = moments_to_mcvsk(tot_agg_ex1, tot_agg_ex2, tot_agg_ex3)
-        sevm, sevcv, sevskew = moments_to_mcvsk(tot_sev_ex1, tot_sev_ex2, tot_sev_ex3)
-        freqm, freqcv, freqskew = moments_to_mcvsk(tot_freq_ex1, tot_freq_ex2, tot_freq_ex3)
-        p999 = estimate_agg_percentile(self.totm, self.totcv, self.totskew, 0.999)
-        temp = pd.DataFrame(stats_series([self.totm, self.totcv, self.totskew,
-                                          freqm, freqcv, freqskew,
-                                          sevm, sevcv, sevskew,
-                                          tot_agg_ex1, tot_agg_ex2, tot_agg_ex3,
-                                          tot_freq_ex1, tot_freq_ex2, tot_freq_ex3,
-                                          tot_sev_ex1, tot_sev_ex2, tot_sev_ex3, max_limit, p999], 'total'))
-        temp2 = pd.DataFrame(ma.stats_series('new_tot', max_limit, p999, total=True))
-        self.statistics_df = pd.concat([temp_report, temp, temp2], axis=1)
+        temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, total=True))
+        self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
         # self.line_density = {}
         # self.ft_line_density = {}
@@ -540,7 +503,7 @@ class Portfolio(object):
             ex2 = np.sum(t)
             t *= self.density_df['loss']
             ex3 = np.sum(t)
-            m, cv, s = moments_to_mcvsk(ex1, ex2, ex3)
+            m, cv, s = MomentAggregator._moments_to_mcvsk(ex1, ex2, ex3)
             ps = np.zeros((len(percentiles)))
             temp = self.density_df[f'p_{col}'].cumsum()
             for i, p in enumerate(percentiles):

@@ -6,10 +6,11 @@ import pandas as pd
 import collections
 import matplotlib.pyplot as plt
 import logging
-from .utils import cumulate_moments, moments_to_mcvsk, sln_fit, sgamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, stats_series, MomentAggregator
+from .utils import sln_fit, sgamma_fit, ft, ift, \
+    axiter_factory, estimate_agg_percentile, suptitle_and_tight, MomentAggregator
 from .spectral import Distortion
 from scipy import interpolate
+
 # import matplotlib.cm as cm
 # from scipy import interpolate
 # from copy import deepcopy
@@ -62,7 +63,7 @@ class Aggregate(object):
         :param el:   expected loss or vector or matrix
         :param premium:
         :param lr:  loss ratio
-        :param en:  expected claim count
+        :param en:  expected claim count per segment (self.n = total claim count)
         :param attachment: occ attachment
         :param limit: occ limit
         :param sev_name: Severity class object or similar or vector or matrix
@@ -114,14 +115,11 @@ class Aggregate(object):
         self.dh_sev_density = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
-        self.stats = pd.DataFrame(columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr',
-                                           'en', 'freq_cv', 'freq_skew', 'sev_1', 'sev_2', 'sev_3', 'sev_cv', 'sev_skew',
-                                           'agg_1', 'agg_2', 'agg_3', 'agg_cv', 'agg_skew', 'contagion', 'mix_cv'])
-        self.newstats = pd.DataFrame(
-            columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr' ] +
-                    MomentAggregator.column_names(agg_only=False))
-        ma = MomentAggregator(freq_name, freq_a, freq_b)
+        self.stats = pd.DataFrame(columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
+                                          MomentAggregator.column_names(agg_only=False) +
+                                          ['contagion', 'mix_cv'])
         self.stats_total = self.stats.copy()
+        ma = MomentAggregator(freq_name, freq_a, freq_b)
 
         # broadcast arrays: first line forces them all to be arrays
         # TODO this approach forces EITHER a mixture OR multi exposures
@@ -145,17 +143,18 @@ class Aggregate(object):
         # holder for the severity distributions
         self.sevs = np.empty(el.shape, dtype=type(Severity))
         el = np.where(el > 0, el, premium * lr)
+        # compute the grand total for approximations
+        # overall freq CV with common mixing TODO this is dubious
+        c = freq_a
+        root_c = np.sqrt(freq_a)
+        # counter
         r = 0
-        # accumulators for total moments
-        agg_tot1 = agg_tot2 = agg_tot3 = freq_tot1 = freq_tot2 = freq_tot3 = 0
-        sev_tot1 = sev_tot2 = sev_tot3 = c = 0
         for _el, _pr, _lr, _en, _at, _y, sn, sa, sb, sm, scv, sloc, ssc, smix in \
                 zip(el, premium, lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean,
                     sev_cv, sev_loc, sev_scale, mix_wt):
 
             self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc, sev_xs, sev_ps, True)
             sev1, sev2, sev3 = self.sevs[r].moms()
-            m, scv, ssk = moments_to_mcvsk(sev1, sev2, sev3)
 
             if _el > 0:
                 _en = _el / sev1
@@ -172,112 +171,34 @@ class Aggregate(object):
             _lr *= smix
             _en *= smix
 
-            # freq moments (old style for now) c = contagion
-            c = freq_a * freq_a
-            freq1 = _en
-            if freq_name == 'fixed':
-                # fixed distribution N=self.n certainly
-                freq2 = freq1 ** 2
-                freq3 = freq1 * freq2
-            elif freq_name == 'bernoulli':
-                # code for bernoulli self.n, E(N^k) = E(N) = self.n
-                freq2 = _en
-                freq3 = _en
-            elif c == 0:
-                # Poisson
-                freq2 = freq1 * (1 + freq1)
-                freq3 = freq1 * (1 + freq1 * (3 + freq1))
-            else:
-                # for gamma alpha, k with density x^alpha e^-kx, EX^n = Gamma(alpha + n) / Gamma(n) k^-n
-                # EX = a/k = 1, so a=k
-                # EX2 = (a+1)a/k^2 = a^2/k^2 + a/k^2 = (EX)^2 + a/k^2 = 1 + 1/k, hence var = a/k^2
-                # if EX=1 and var = c then var = a/k/k = 1/k = c, so k = 1/c
-                # then a = 1/c
-                # Finally EX3 = (a+2)(a+1)a/k^3 = (c+1)(c+2)
-                # Iman Conover paper page 14
-                freq2 = freq1 * (1 + freq1 * (1 + c))  # note 1+c = E(G^2)
-                freq3 = freq1 * (1 + freq1 * (3 * (1 + c) + freq1 * (1 + c) * (1 + 2 * c)))
+            # accumulate moments
+            ma.add_fs(_en, sev1, sev2, sev3)
 
-            # raw moments of aggregate, not central moments
-            agg1 = freq1 * sev1
-            agg2 = freq1 * sev2 + (freq2 - freq1) * sev1 ** 2
-            agg3 = freq1 * sev3 + freq3 * sev1 ** 3 + 3 * (freq2 - freq1) * sev1 * sev2 + (
-                    - 3 * freq2 + 2 * freq1) * sev1 ** 3
-            am, acv, ask = moments_to_mcvsk(agg1, agg2, agg3)
-            fm, fcv, fsk = moments_to_mcvsk(freq1, freq2, freq3)
-            # TODO make first scv the theoretic input value not the computed value
-            self.stats.loc[r, :] = [_y, _at, scv, _el, _pr, _lr, _en, fcv, fsk, sev1, sev2, sev3, scv, ssk, agg1, agg2,
-                                    agg3,
-                                    acv, ask, c, freq_a]
-            agg_tot1, agg_tot2, agg_tot3 = cumulate_moments(agg_tot1, agg_tot2, agg_tot3, agg1, agg2, agg3)
-            freq_tot1, freq_tot2, freq_tot3 = cumulate_moments(freq_tot1, freq_tot2, freq_tot3, freq1, freq2, freq3)
-            sev_tot1 += freq1 * sev1
-            sev_tot2 += freq1 * sev2
-            sev_tot3 += freq1 * sev3
-
-            # new method
-            freq1 = _en
-            ma.add_fs(freq1, sev1, sev2, sev3)
-            self.newstats.loc[r + 100, :] = [_y, _at, scv, _el, _pr, _lr ] + ma.get_fsa_stats(total=False)
+            # store
+            label = f'{r}: {_y} / {_at} n={_en}'
+            self.stats.loc[label, :] = [_y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [c, freq_a]
             r += 1
 
-        # compute the grand total for approximations
-        sev_tot1 /= freq_tot1
-        sev_tot2 /= freq_tot1
-        sev_tot3 /= freq_tot1
-        # freq_tot2 and freq_tot3 need to reflect the same mixing; compute impact of mixing:
-        _, freq_cvi, freq_ski = moments_to_mcvsk(freq_tot1, freq_tot2, freq_tot3)
-        freq_tot2 = freq_tot1 * (1 + freq_tot1 * (1 + c))  # note 1+c = E(G^2)
-        freq_tot3 = freq_tot1 * (1 + freq_tot1 * (3 * (1 + c) + freq_tot1 * (1 + c) * (1 + 2 * c)))
-        _, freq_cv, freq_sk = moments_to_mcvsk(freq_tot1, freq_tot2, freq_tot3)
-        _, _sev_cv, sev_sk = moments_to_mcvsk(sev_tot1, sev_tot2, sev_tot3)
-        aggmi, aggcvi, aggskewi = moments_to_mcvsk(agg_tot1, agg_tot2, agg_tot3)
-
-        agg1 = freq_tot1 * sev_tot1
-        agg2 = freq_tot1 * sev_tot2 + (freq_tot2 - freq_tot1) * sev_tot1 ** 2
-        agg3 = freq_tot1 * sev_tot3 + freq_tot3 * sev_tot1 ** 3 + 3 * (
-                freq_tot2 - freq_tot1) * sev_tot1 * sev_tot2 + (
-                       - 3 * freq_tot2 + 2 * freq_tot1) * sev_tot1 ** 3
-        self.aggm, self.aggcv, self.aggskew = moments_to_mcvsk(agg1, agg2, agg3)
-
-        # overall CV
-        c = (freq_tot2 - freq_tot1 ** 2 - freq_tot1) / (freq_tot1 ** 2)
-        root_c = np.sqrt(c)
         # average limit and attachment
-        avg_limit = np.sum(self.stats.limit * self.stats.en) / freq_tot1
-        # assert np.allclose(freq_tot1, self.stats.en)
-        avg_attach = np.sum(self.stats.attachment * self.stats.en) / freq_tot1
-        self.stats_total.loc['Agg', :] = [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
-                                          self.stats.el.sum() / self.stats.prem.sum(),
-                                          freq_tot1, freq_cv, freq_sk, sev_tot1, sev_tot2, sev_tot3, _sev_cv, sev_sk,
-                                          agg1, agg2, agg3, self.aggcv, self.aggskew, c, root_c]
-        self.stats_total.loc['Agg independent', :] = [avg_limit, avg_attach, 0, self.stats.el.sum(),
-                                                      self.stats.prem.sum(),
-                                                      self.stats.el.sum() / self.stats.prem.sum(),
-                                                      freq_tot1, freq_cvi, freq_ski, sev_tot1, sev_tot2, sev_tot3,
-                                                      _sev_cv, sev_sk,
-                                                      agg_tot1, agg_tot2, agg_tot3, aggcvi, aggskewi, c, root_c]
+        avg_limit = np.sum(self.stats.limit * self.stats.freq_1) / ma.tot_freq_1
+        avg_attach = np.sum(self.stats.attachment * self.stats.freq_1) / ma.tot_freq_1
+        # assert np.allclose(ma.freq_1, self.stats.en)
 
-        self.newstats.loc[r + 1000, :] = [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
-                                       self.stats.el.sum() / self.stats.prem.sum()] + \
-                                      ma.get_fsa_stats(total=True, remix=False)
-        self.newstats.loc[r + 10000, :] = [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
-                                       self.stats.el.sum() / self.stats.prem.sum()] + \
-                                      ma.get_fsa_stats(total=True, remix=True)
-
-        self.stats['wt'] = self.stats['en'] / self.stats['en'].sum()
-        self.stats_total['wt'] = np.nan
-        self.n = freq_tot1
+        # store answer for total
+        self.stats_total.loc[self.name, :] = \
+            [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
+             self.stats.el.sum() / self.stats.prem.sum()] + ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+        self.stats_total.loc[f'{self.name} independent freq', :] = \
+            [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
+             self.stats.el.sum() / self.stats.prem.sum()] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
+        self.stats['wt'] = self.stats.freq_1 / ma.tot_freq_1
+        self.stats_total['wt'] = self.stats.wt.sum()  # better equal 1.0!
+        self.n = ma.tot_freq_1
         self.statistics_df = pd.concat((self.stats, self.stats_total))
+
         # finally, need a report series for Portfolio to consolidate
-        self.report = stats_series([self.aggm, self.aggcv, self.aggskew,
-                                    freq_tot1, freq_cv, freq_sk,
-                                    sev_tot1, _sev_cv, sev_sk,
-                                    agg1, agg2, agg3,
-                                    freq_tot1, freq_tot2, freq_tot3,
-                                    sev_tot1, sev_tot2, sev_tot3, np.max(self.limit), np.nan], self.name)
-        # TODO fill in missing p99                                                    ^ pctile
-        self.report2 = ma.stats_series('total a', np.max(self.limit), np.nan, total=True)
+        self.report = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
+        # TODO fill in missing p99                                   ^ pctile
 
     def __str__(self):
         """
@@ -286,10 +207,10 @@ class Aggregate(object):
         :return:
         """
         # pull out agg stats
-        ags = self.stats_total.loc["Agg", :]
-        s = f"Aggregate: {self.name}\n\tEN={self.n}, CV(N)={ags['freqcv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severities, EX={ags['sev1']:,.1f}, CV(X)={ags['sevcv']:5.3f}\n\t" \
-            f"EA={ags['agg1']:,.1f}, CV={ags['aggcv']:5.3f}"
+        ags = self.stats_total.loc[self.name, :]
+        s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
+            f"{len(self.sevs)} severities, EX={ags['sev_1']:,.1f}, CV(X)={ags['sev_cv']:5.3f}\n\t" \
+            f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
     def __repr__(self):
@@ -368,7 +289,7 @@ class Aggregate(object):
         # make the severity vector
         # case 1 (all for now) it is the claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
-            wts = self.stats['en'] / self.stats.en.sum()
+            wts = self.stats.freq_1 / self.stats.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
             beds = self.discretize(sev_calc, discretization_calc)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):

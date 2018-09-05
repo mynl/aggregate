@@ -19,25 +19,6 @@ logging.info('aggregate.__init__ | New Aggregate Session started')
 
 
 # momnent utility functions
-def cumulate_moments(m1, m2, m3, n1, n2, n3):
-    """
-    Moments of sum of indepdendent variables
-
-    :param m1: 1st moment, E(X)
-    :param m2: 2nd moment, E(X^2)
-    :param m3: 3rd moment, E(X^3)
-    :param n1:
-    :param n2:
-    :param n3:
-    :return:
-    """
-    # figure out moments of the sum
-    t1 = m1 + n1
-    t2 = m2 + 2 * m1 * n1 + n2
-    t3 = m3 + 3 * m2 * n1 + 3 * m1 * n2 + n3
-    return t1, t2, t3
-
-
 def ft(z, padding, tilt):
     """
     fft with padding and tilt
@@ -92,23 +73,6 @@ def ift(z, padding, tilt):
         temp /= tilt
     return temp
     # return temp[0:int(len(temp) / 2)]
-
-
-def moments_to_mcvsk(ex1, ex2, ex3):
-    """
-    returns mean, cv and skewness from non-central moments
-
-    :param ex1:
-    :param ex2:
-    :param ex3:
-    :return:
-    """
-    m = ex1
-    var = ex2 - ex1 ** 2
-    sd = np.sqrt(var)
-    cv = sd / m
-    skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
-    return m, cv, skew
 
 
 def stats_series(data_list, name):
@@ -809,14 +773,14 @@ class MomentAggregator(object):
         skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
         return m, cv, skew
 
-    def stats_series(self, name, limit, p999e, total=False):
+    def stats_series(self, name, limit, pvalue, total=False):
         """
         combine elements into a reporting series
         handles order, index names etc. in one place
 
         :param name: series name
         :param limit:
-        :param p999e:
+        :param pvalue:
         :param total:
         :return:
         """
@@ -824,8 +788,9 @@ class MomentAggregator(object):
             [['agg', 'agg', 'agg', 'freq', 'freq', 'freq', 'sev', 'sev', 'sev'] * 2 + ['agg', 'agg'],
              ['mean', 'cv', 'skew'] * 3 + ['ex1', 'ex2', 'ex3'] * 3 + ['limit', 'P99.9e']],
             names=['component', 'measure'])
-
-        return pd.Series([*self.moments_to_mcvsk('agg', total),
+        agg_stats = self.moments_to_mcvsk('agg', total)
+        p999e = estimate_agg_percentile(*agg_stats, pvalue)
+        return pd.Series([*agg_stats,
                           *self.moments_to_mcvsk('freq', total),
                           *self.moments_to_mcvsk('sev', total),
                           *self.moments('agg', total),

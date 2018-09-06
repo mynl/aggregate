@@ -275,14 +275,12 @@ class Aggregate(object):
                 columns=['n', 'limit', 'attachment', 'en', 'emp ex1', 'emp cv', 'sum p_i', 'wt', 'nans', 'max', 'wtmax',
                          'min'])
             df = df.set_index('n')
-            dm = iter(range(300000))
             audit = None
         else:
             axm = None
             df = None
-            dm = 0
             audit = None
-
+        r = 0
         aa = al = 0
         self.xs = xs
         self.bs = xs[1]
@@ -298,7 +296,9 @@ class Aggregate(object):
                 if verbose:
                     _m = np.sum(self.xs * temp)
                     _cv = np.sqrt(np.sum((self.xs ** 2) * temp) - (_m ** 2)) / _m
-                    df.loc[next(dm), :] = [l, a, n, _m, _cv,
+                    label = f'{r}: {self.limit[r]} / {self.attachment[r]} n={self.en[r]}'
+                    r += 1
+                    df.loc[label, :] = [l, a, n, _m, _cv,
                                            temp.sum(),
                                            w, np.sum(np.where(np.isinf(temp), 1, 0)),
                                            temp.max(), w * temp.max(), temp.min()]
@@ -381,11 +381,11 @@ class Aggregate(object):
                                 self.agg_density.max(), np.nan, self.agg_density.min()]
             audit = pd.concat((df[['limit', 'attachment', 'emp ex1', 'emp cv']],
                                pd.concat((self.stats, self.stats_total))[[
-                                   'en', 'sev_1', 'sev_cv']]), axis=1)
-            audit.iloc[-1, -1] = self.stats_total.loc['Agg independent', 'agg_cv']
-            audit.iloc[-1, -2] = self.stats_total.loc['Agg independent', 'agg_1']
+                                   'freq_1', 'sev_1', 'sev_cv']]), axis=1)
+            audit.iloc[-1, -1] = self.stats_total.loc[f'{self.name} independent freq', 'agg_cv']
+            audit.iloc[-1, -2] = self.stats_total.loc[f'{self.name} independent freq', 'agg_1']
             audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
-            audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1'] - 1
+            audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1']
 
         return df, audit
 

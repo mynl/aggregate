@@ -100,8 +100,6 @@ class Example(object):
         """
         print('\n\t- '.join(['Built in portfolios'] + list(self.built_in_portfolios.keys())))
         print()
-        # print('\n\t- '.join(['Built in lines'] + list(self.built_in_aggregates.keys())))
-        # print()
         print('\n\t- '.join(['Built in severity'] + list(self.built_in_severity.keys())))
         print()
         print('\n\t- '.join(['User portfolios'] + list(self.user_portfolios.keys())))

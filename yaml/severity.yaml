@@ -1,31 +1,31 @@
 cata:
     severity:
     sev_name: pareto
-    sev_shape: 2.1
+    sev_a: 2.1
     sev_scale: 1
     sev_loc: -1
 catb:
     severity:
     sev_name: pareto
-    sev_shape: 1.7
+    sev_a: 1.7
     sev_scale: 1
     sev_loc: -1
 catc:
     severity:
     sev_name: pareto
-    sev_shape: 1.4
+    sev_a: 1.4
     sev_scale: 1
     sev_loc: -1
 catd:
     severity:
     sev_name: pareto
-    sev_shape: 1.1
+    sev_a: 1.1
     sev_scale: 1
     sev_loc: -1
 cate:
     severity:
     sev_name: pareto
-    sev_shape: 0.9
+    sev_a: 0.9
     sev_scale: 1
     sev_loc: -1
 noncata:

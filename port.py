@@ -151,7 +151,7 @@ class Portfolio(object):
 
     def __iter__(self):
         """
-        make Portfolio iterable
+        make Portfolio iterable: for each x in Portfolio
 
         :return:
         """

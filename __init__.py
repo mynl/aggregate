@@ -10,7 +10,7 @@ __status__ = "beta"
 
 # imports
 from . distr import *
-from . helpers import *
+from . underwriter import *
 from . param import *
 from . port import *
 from . spectral import *

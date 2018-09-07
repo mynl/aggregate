@@ -19,13 +19,20 @@ warnings.filterwarnings("ignore")
 
 
 if __name__ == '__main__':
-    ex = agg.Example()
-    port = ex['Three Line Example']
+
+    print('Creating from uw example....')
+    uw = agg.Underwriter()
+    book = uw['Three Line Example']
+    port = book.write(True)
     assert port.audit_df.MeanErr.abs().sum() < 1e-5
     assert port.audit_df.CVErr.abs().sum() < 5e-5
+    print('two assertions passed...\n\n...running portfolio uat....')
+
+
     a, p, test, params, dd, table, stacked = port.uat()
     assert a['lr err'].abs().sum() < 1e-8
     assert np.all(test.filter(regex='err[_s]', axis=1).abs().sum() < 1e-8)
+    print('two assertions passed...\n\n...creating aggregates....')
 
     sig = .75
     d1b1 = Aggregate('single', exp_en=10, sev_name='lognorm', sev_a=[sig, sig / 2, sig / 5],
@@ -45,6 +52,8 @@ if __name__ == '__main__':
                      sev_name='lognorm', sev_mean=100, sev_cv=np.linspace(0.05, 2, 5), sev_wt=0.2 * np.ones(5),
                      freq_name='poisson', freq_a=1.2)
     assert d2b1.stats_total.T.loc['el', :].sum() == 11464.315472434911
+    print('...three aggregates and three assertions passed\n\ncreating severities')
+
 
     fixed = Severity('dhistogram', hxs=[0, 1, 2, 3, 4], hps=[.2, .3, .4, .05, .05])
     assert fixed.moms() == (1.45, 3.1500000000000004, 8.0500000000000007)
@@ -54,10 +63,12 @@ if __name__ == '__main__':
 
     fixed = Severity('fixed', hxs=2)
     assert fixed.moms() == (2, 4, 8)
+    print('...three severities and three assertions passed\n\ncreating dhistorgram agg')
 
     fixed = Aggregate('chistogram', exp_en=1, sev_name='dhistogram', sev_xs=[0, 1, 2, 3, 4], sev_ps=.2,
                       freq_name='fixed')
     assert fixed.statistics_df['sev_cv'].sum() == 2.1213203435596428
+    print('...one aggregates and one assertions passed\n\ncreating bigger Aggregate example...')
 
     # bigger agg example
     sa = Aggregate('my test', exp_en=np.ones(50), exp_premium=0, exp_lr=.75,
@@ -70,5 +81,9 @@ if __name__ == '__main__':
     xs = np.linspace(0, MAXL, N, endpoint=False)
     df, audit = sa.density(xs, 1, None, 'exact', sev_calc='discrete', discretization_calc='survival', verbose=True)
     # average of square errors is small:
-    np.sum(np.abs(audit.iloc[0:-3,:][ 'rel sev err'])**2)**.5 / (len(audit) - 3)  < 1e-6
-    np.sum(np.abs(audit.iloc[0:-3,:][ 'abs sev err'])**2)**.5 / (len(audit) - 3) < 1e-4
+    assert np.sum(np.abs(audit.iloc[0:-3,:][ 'rel sev err'])**2)**.5 / (len(audit) - 3)  < 1e-6
+    assert np.sum(np.abs(audit.iloc[0:-3,:][ 'abs sev err'])**2)**.5 / (len(audit) - 3) < 1e-4
+    print('two audit df assertions passed...')
+
+    print('ALL AUDITS PASSED SUCCESSFULLY!')
+

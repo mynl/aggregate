@@ -1924,7 +1924,7 @@ class Portfolio(object):
         axs[2].plot(test.index, ddtest2, label='-EXi(a)/a')
         axs[2].legend()
 
-    def uat(self, As=None, Ps=[0.98], LRs=[0.965], r0=0.03):
+    def uat(self, As=None, Ps=[0.98], LRs=[0.965], r0=0.03, verbose=False):
         """
         Reconcile apply_distortion(s) with price and calibrate
         """
@@ -1982,8 +1982,9 @@ class Portfolio(object):
         lr_err = lr_err.rename(columns={'index': 'a'})
         test = pd.concat((test, lr_err), axis=1)
         overall_test = (test.filter(regex='err').abs()).sum().sum()
-        html_title(f'Combined, overall error {overall_test:.3e}')  # (exag=apply)')
-        display(test)
+        if verbose:
+            html_title(f'Combined, overall error {overall_test:.3e}')  # (exag=apply)')
+            display(test)
 
         if lr_err.errs.abs().max() > 1e-4:
             logging.error('CPortfolio.uat | {self.name} UAT Loss Ratio Error {lr_err.errs.abs().max()}')

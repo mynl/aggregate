@@ -83,12 +83,15 @@ def sln_fit(m, cv, skew):
     :param skew:
     :return:
     """
-    eta = (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3) - (
-            1 / (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3))
-    sigma = np.sqrt(np.log(1 + eta ** 2))
-    shift = m - cv * m / eta
-    mu = np.log(m - shift) - sigma ** 2 / 2
-    return shift, mu, sigma
+    if skew == 0:
+        return -np.inf, np.inf, 0
+    else:
+        eta = (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3) - (
+                1 / (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3))
+        sigma = np.sqrt(np.log(1 + eta ** 2))
+        shift = m - cv * m / eta
+        mu = np.log(m - shift) - sigma ** 2 / 2
+        return shift, mu, sigma
 
 
 def sgamma_fit(m, cv, skew):
@@ -100,10 +103,13 @@ def sgamma_fit(m, cv, skew):
     :param skew:
     :return:
     """
-    alpha = 4 / (skew * skew)
-    theta = cv * m * skew / 2
-    shift = m - alpha * theta
-    return shift, alpha, theta
+    if skew == 0:
+        return np.nan, np.inf, 0
+    else:
+        alpha = 4 / (skew * skew)
+        theta = cv * m * skew / 2
+        shift = m - alpha * theta
+        return shift, alpha, theta
 
 
 def estimate_agg_percentile(m, cv, skew, p=0.999):
@@ -120,14 +126,20 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     :return:
     """
 
-    shift, mu, sigma = sln_fit(m, cv, skew)
-    fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-    shift, alpha, theta = sgamma_fit(m, cv, skew)
-    fzg = ss.gamma(alpha, scale=theta, loc=shift)
-    pl = fzl.isf(1 - p)
-    pg = fzg.isf(1 - p)
+    pn = pl = pg = 0
+    if skew == 0:
+        # neither sln nor sgamma works, use a normal
+        fzn = ss.norm(scale=m*cv, loc=m)
+        pn = fzn.isf(1-p)
+    else:
+        shift, mu, sigma = sln_fit(m, cv, skew)
+        fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+        shift, alpha, theta = sgamma_fit(m, cv, skew)
+        fzg = ss.gamma(alpha, scale=theta, loc=shift)
+        pl = fzl.isf(1 - p)
+        pg = fzg.isf(1 - p)
     # throw in a mean + 3 sd approx too...
-    return max(pl, pg, m * (1 + ss.norm.isf(1 - p) * cv))
+    return max(pn, pl, pg, m * (1 + ss.norm.isf(1 - p) * cv))
 
 
 # axis management
@@ -615,7 +627,10 @@ class MomentAggregator(object):
         var = ex2 - ex1 ** 2
         sd = np.sqrt(var)
         cv = sd / m
-        skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+        if sd == 0:
+            skew = np.nan
+        else:
+            skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
         return m, cv, skew
 
     def stats_series(self, name, limit, pvalue, total=False):

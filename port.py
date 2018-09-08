@@ -593,8 +593,11 @@ class Portfolio(object):
                     else:
                         html_title('Report {:} not generated'.format(r), 2)
                 elif r == 'quick':
-                    df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
-                    display(df.style)
+                    if self.audit_df is not None:
+                        df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
+                        display(df.style)
+                    else:
+                        html_title('Report {:} not generated'.format(r), 2)
                 else:
                     df = getattr(self, r + '_df', None)
                     if df is not None:
@@ -1971,7 +1974,7 @@ class Portfolio(object):
         pp = pp.pivot(columns='dist').T.loc['exag']
         aa = a.filter(regex='exa|method').set_index('method')
 
-        test = pd.concat((aa, pp), axis=1)
+        test = pd.concat((aa, pp), axis=1, sort=True)
         for c in self.line_names_ex:
             test[f'err_{c}'] = test[c] / test[f'exag_{c}'] - 1
         test['err sum/total'] = test['exag_sumparts'] / test['exag_total'] - 1
@@ -1980,7 +1983,7 @@ class Portfolio(object):
         lr_err = pd.DataFrame({'applyLR': a.lr_total, 'method': a.method, 'target': LR, 'errs': a.lr_total - LR})
         lr_err = lr_err.reset_index(drop=False).set_index('method')
         lr_err = lr_err.rename(columns={'index': 'a'})
-        test = pd.concat((test, lr_err), axis=1)
+        test = pd.concat((test, lr_err), axis=1, sort=True)
         overall_test = (test.filter(regex='err').abs()).sum().sum()
         if verbose:
             html_title(f'Combined, overall error {overall_test:.3e}')  # (exag=apply)')

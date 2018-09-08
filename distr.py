@@ -135,11 +135,13 @@ class Aggregate(object):
         self.limit = None
         exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, \
         sev_scale, sev_wt = \
-            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b, sev_mean, sev_cv,
+            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b,
+                                sev_mean, sev_cv,
                                 sev_loc, sev_scale, sev_wt)
         # just one overall line/class of business?
         self.scalar_business = \
-            np.all(list(map(lambda x: len(x) == 1, [exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit])))
+            np.all(
+                list(map(lambda x: len(x) == 1, [exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit])))
 
         # holder for the severity distributions
         self.sevs = np.empty(exp_el.shape, dtype=type(Severity))
@@ -186,12 +188,16 @@ class Aggregate(object):
         # assert np.allclose(ma.freq_1, self.stats.exp_en)
 
         # store answer for total
-        self.stats_total.loc[self.name, :] = \
-            [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
-             self.stats.el.sum() / self.stats.prem.sum()] + ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+        tot_prem = self.stats.prem.sum()
+        tot_loss = self.stats.el.sum()
+        if tot_prem > 0:
+            lr = tot_loss / tot_prem
+        else:
+            lr = np.nan
+        self.stats_total.loc[self.name, :] = [avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
+                                             ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
         self.stats_total.loc[f'{self.name} independent freq', :] = \
-            [avg_limit, avg_attach, 0, self.stats.el.sum(), self.stats.prem.sum(),
-             self.stats.el.sum() / self.stats.prem.sum()] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
+            [avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
         self.stats['wt'] = self.stats.freq_1 / ma.tot_freq_1
         self.stats_total['wt'] = self.stats.wt.sum()  # better equal 1.0!
         self.n = ma.tot_freq_1
@@ -299,9 +305,9 @@ class Aggregate(object):
                     label = f'{r}: {self.limit[r]} / {self.attachment[r]} n={self.en[r]}'
                     r += 1
                     df.loc[label, :] = [l, a, n, _m, _cv,
-                                           temp.sum(),
-                                           w, np.sum(np.where(np.isinf(temp), 1, 0)),
-                                           temp.max(), w * temp.max(), temp.min()]
+                                        temp.sum(),
+                                        w, np.sum(np.where(np.isinf(temp), 1, 0)),
+                                        temp.max(), w * temp.max(), temp.min()]
                     next(axm).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
                     axm.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
                     if np.all(self.limit < np.inf):
@@ -353,10 +359,12 @@ class Aggregate(object):
                 raise ValueError(f'Inadmissible value for fixed {self.freq_name}'
                                  ' Allowable values are -1 (or bernoulli) 1 (or fixed), missing or 0 (Poisson)')
         else:
-            if approximation == 'slognorm':
+            # regardless of request if skew == 0 have to use normal
+            if self.aggskew == 0:
+                self.fzapprox = ss.norm(scale=self.aggm * self.aggcv, loc=self.aggm)
+            elif approximation == 'slognorm':
                 shift, mu, sigma = sln_fit(self.aggm, self.aggcv, self.aggskew)
                 self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-
             elif approximation == 'sgamma':
                 shift, alpha, theta = sgamma_fit(self.aggm, self.aggcv, self.aggskew)
                 self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
@@ -381,7 +389,7 @@ class Aggregate(object):
                                 self.agg_density.max(), np.nan, self.agg_density.min()]
             audit = pd.concat((df[['limit', 'attachment', 'emp ex1', 'emp cv']],
                                pd.concat((self.stats, self.stats_total))[[
-                                   'freq_1', 'sev_1', 'sev_cv']]), axis=1)
+                                   'freq_1', 'sev_1', 'sev_cv']]), sort=True, axis=1)
             audit.iloc[-1, -1] = self.stats_total.loc[f'{self.name} independent freq', 'agg_cv']
             audit.iloc[-1, -2] = self.stats_total.loc[f'{self.name} independent freq', 'agg_1']
             audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
@@ -723,7 +731,7 @@ class Severity(ss.rv_continuous):
             #     beta a and b params given expected loss, max loss exposure and cv
             #     Kent E.'s specification. Just used to create the CAgg classes for his examples (in agg.examples)
             #     https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
-            if name=='beta' and mean > 0 and cv > 0:
+            if name == 'beta' and mean > 0 and cv > 0:
                 m = mean / scale
                 v = m * m * cv * cv
                 a = m * (m * (1 - m) / v - 1)

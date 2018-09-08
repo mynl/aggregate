@@ -14,12 +14,13 @@ import numpy as np
 import collections
 from io import StringIO
 from textwrap import fill, indent
-from .distr import Aggregate, Severity
-from .port import Portfolio
-from .utils import sensible_jump, html_title
 from IPython.core.display import display
 import matplotlib.pyplot as plt
 import logging
+import pandas as pd
+from .distr import Aggregate, Severity
+from .port import Portfolio
+from .utils import sensible_jump, html_title
 
 class _DataManager(object):
     """
@@ -54,10 +55,28 @@ class _DataManager(object):
 
         :return:
         """
-
+        sers = dict()
         for k in self.databases.keys():
-            print('\n\t- '.join([k] + list(self.__getattribute__(k).keys())))
-            print()
+            d = list(self.__getattribute__(k).keys())
+            sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
+        df = pd.DataFrame(data=sers)
+        # df.index.name = 'No.'
+        df = df.fillna('')
+        return df
+
+    def notes(self, item):
+        """
+        Pull notes from YAML descriptions for type items
+
+        :param item:
+        :return:
+        """
+        item = item.lower()
+        items = list(self.__getattribute__(item).keys())
+        notes = [self.__getattribute__(item)[i].get('note', '') for i in items]
+        Item = item.title()
+        df = pd.DataFrame({Item: items, "Notes": notes})
+        return df
 
     def __getitem__(self, item):
         """
@@ -102,16 +121,32 @@ class Underwriter(_DataManager):
         _DataManager.__init__(self)
 
     def __getitem__(self, item):
+        """
+        handles self[item]
+        the result is cast into the right type of object
+
+        :param item:
+        :return: Book, Account or Line object
+        """
         item_type, obj = _DataManager.__getitem__(self, item)
         if item_type == 'book':
             return Book(item, obj['args'], obj['spec'])
         elif item_type == 'account':
             return Account(**obj)
         elif item_type == 'line':
-            return Line(**obj)
+            return Line(item, **obj)
         else:
             raise ValueError('Idiot, you are in charge, how did you end in this pickle?'
                              f'Invaid type {item_type} to Underwriter getitem')
+
+    def __getattr__(self, item):
+        """
+        handles self.item
+
+        :param item:
+        :return:
+        """
+        return self.__getitem__(item)
 
 
 class Line(object):
@@ -175,6 +210,20 @@ class Line(object):
 
     def __getitem__(self, item):
         return self.spec[item]
+
+    def __getattr__(self, item):
+        """
+        pass through so items in the spec are treated like they are attributes
+        :param item:
+        :return:
+        """
+        if item in self.spec:
+            print('pulling form object spec')
+            return self.spec[item]
+        else:
+            # this appears never to get called...
+            print('pulling form object get attr')
+            return self.__getattribute__(item)
 
     def __str__(self):
         return dict_2_string(type(self), self.spec)

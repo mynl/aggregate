@@ -148,7 +148,7 @@ class Distortion(object):
 
         else:
             raise ValueError(
-                "Incorrect spec passed to distortion_factory; implemented g types are ph, wang, tvar, "
+                "Incorrect contained_iterable passed to distortion_factory; implemented g types are ph, wang, tvar, "
                 "ly (linear yield), lep (layer equivalent pricing) and clin (clipped linear)")
 
         self.g = g

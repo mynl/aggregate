@@ -1,17 +1,15 @@
 my_earthquake:
-    name: earthquake
+    exp_en: 0.5
     sev_name: pareto
     sev_a: 1.35
     sev_scale: !!float 1e8
     sev_loc: !!float -1e8
     freq_name: poisson
-    exp_en: 0.5
 my_wind:
-    name: wind
+    exp_en: 1.7
     sev_name: pareto
     sev_a: 1.5
     sev_scale: !!float 2.5e8
     sev_loc: !!float -2.5e8
     limit: !!float 10e9
     freq_name: poisson
-    exp_en: 1.7

@@ -1,89 +1,14 @@
-earthquake:
-    name: earthquake
-    sev_name: pareto
-    sev_a: 1.1
-    sev_scale: !!float 1e8
-    sev_loc: !!float -1e8
-    freq_name: poisson
-    exp_en: 0.5
-wind:
-    name: wind
-    sev_name: pareto
-    sev_a: 1.8
-    sev_scale: !!float 2.5e8
-    sev_loc: !!float -2.5e8
-    freq_name: poisson
-    exp_limit: !!float 10e9
-    exp_en: 1.7
 scs:
-    name: scs
+    exp_en: 0.5
+    exp_limit: !!float 2e9
     sev_name: lognorm
     sev_mean: !!float 100e6
     sev_cv: 1.5
     freq_name: poisson
-    exp_limit: !!float 2e9
-    exp_en: 0.5
 casxol:
-    name: casualty xol
+    exp_en: 0.5
+    exp_limit: !!float 100e6
     sev_name: lognorm
     sev_mean: !!float 50e6
     sev_cv: 0.75
     freq_name: poisson
-    exp_limit: !!float 100e6
-    exp_en: 0.5
-ind cal:
-    freq_name: poisson
-    freq_a: 0.019514618069576366
-    exp_en: 462316.4185094556
-    name: cal
-    sev_cv: 0.5
-    sev_mean: 40000.0
-    sev_name: lognorm
-ind cmp:
-    name: cmp
-    freq_name: poisson
-    freq_a: 0.026423063353208383
-    exp_en: 268153.9035381244
-    sev_cv: 0.5
-    sev_mean: 100000.0
-    sev_name: lognorm
-ind commprop:
-    name: commprop
-    freq_name: poisson
-    freq_a: 0.23849756543842238
-    exp_en: 65087.40362778484
-    sev_cv: 0.5
-    sev_mean: 250000.0
-    sev_name: lognorm
-ind ho:
-    name: ho
-    freq_name: poisson
-    freq_a: 0.025479706791365048
-    exp_en: 4337346.319489225
-    sev_cv: 0.5
-    sev_mean: 15000.0
-    sev_name: lognorm
-ind im:
-    name: im
-    freq_name: poisson
-    freq_a: 0.051267889376807534
-    exp_en: 314117.39908251056
-    sev_cv: 0.5
-    sev_mean: 50000.0
-    sev_name: lognorm
-ind ppa:
-    name: ppa
-    frequency:
-    freq_a: 0.0034980315893991974
-    exp_en: 5676073.301971859
-    sev_cv: 0.5
-    sev_mean: 30000.0
-    sev_name: lognorm
-ind wc:
-    name: wc
-    freq_name: poisson
-    freq_a: 0.019416488668977414
-    exp_en: 2664340.5292379954
-    sev_cv: 0.5
-    sev_mean: 15000.0
-    sev_name: lognorm

@@ -216,7 +216,7 @@ class Aggregate(object):
         # pull out agg stats
         ags = self.stats_total.loc[self.name, :]
         s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severities, EX={ags['sev_1']:,.1f}, CV(X)={ags['sev_cv']:5.3f}\n\t" \
+            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, CV(X)={ags['sev_cv']:5.3f}\n\t" \
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
@@ -944,7 +944,7 @@ class Severity(ss.rv_continuous):
 
         return ex1, ex2, ex3
 
-    def plot(self, N=100):
+    def plot(self, N=100, axiter=None):
         """
         quick plot
 
@@ -955,29 +955,31 @@ class Severity(ss.rv_continuous):
         ps = np.linspace(0, 1, N, endpoint=False)
         xs = np.linspace(0, self._isf(1e-4), N)
 
-        it = axiter_factory(None, 4)
+        do_tight = axiter is None
+        axiter = axiter_factory(None, 4)
 
-        ax = next(it)
+        ax = next(axiter)
         ys = self._pdf(xs)
         ax.plot(xs, ys)
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set_title('PDF')
 
         ys = self._cdf(xs)
-        ax = next(it)
+        ax = next(axiter)
         ax.plot(xs, ys, drawstyle='steps-post', lw=1)
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set(title='CDF', ylim=(0, 1))
 
         ys = self._isf(ps)
-        ax = next(it)
+        ax = next(axiter)
         ax.plot(ps, ys, drawstyle='steps-post', lw=1)
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set(title='ISF', xlim=(0, 1))
 
-        ax = next(it)
+        ax = next(axiter)
         ax.plot(1 - ps, ys, drawstyle='steps-post', lw=1)
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set(title='Lee diagram', xlim=(0, 1))
 
-        suptitle_and_tight(self.long_name)
+        if do_tight:
+            suptitle_and_tight(self.long_name)

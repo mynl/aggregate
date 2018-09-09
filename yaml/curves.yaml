@@ -1,0 +1,19 @@
+fixed:
+  sev_name: dhistogram
+  sev_xs:
+  -  1
+  sev_ps:
+  -  1
+  note: a fixed loss of 1
+directors_a:
+  sev_name: lognorm
+  sev_mean: 10000000
+  sev_a: 1.25
+directors_b:
+  sev_name: lognorm
+  sev_mean: 10000000
+  sev_a: 1.75
+directors_c:
+  sev_name: lognorm
+  sev_mean: 10000000
+  sev_a: 2.0

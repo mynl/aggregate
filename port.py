@@ -45,12 +45,14 @@ class Portfolio(object):
         self.agg_list = []
         self.line_names = []
         ma = MomentAggregator("", 0, 0)
+        max_limit = 0
         for spec in spec_list:
             a = Aggregate(**spec)
             self.agg_list.append(a)
             self.line_names.append(spec['name'])
             ma.add_fs(a.report[('freq', 'ex1')],
                       a.report[('sev', 'ex1')], a.report[('sev', 'ex2')], a.report[('sev', 'ex3')])
+            max_limit = max(max_limit, np.max(np.array(a.exp_limit)))
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
             # line names cannot start with n, it is reserved for "not"
@@ -59,7 +61,7 @@ class Portfolio(object):
         # make a pandas data frame of all the stats
         temp_report = pd.concat([a.report for a in self.agg_list], axis=1)
 
-        max_limit = np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
+        # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
         temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, total=True))
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
@@ -72,7 +74,7 @@ class Portfolio(object):
         self.priority_capital_df = None
         self.priority_analysis_df = None
         self.audit_df = None
-        self.buck = 0
+        self.bs = 0
         self.padding = 0
         self.tilt_amount = 0
         self.nearest_quantile_function = None
@@ -111,7 +113,7 @@ class Portfolio(object):
             f'Actual expected loss     {empex:15,.1f}\n' \
             f'Error                    {empex/ex-1:15.6f}\n' \
             f'Discretization size      {self.log2:15d}\n' \
-            f'Bucket size              {self.buck:15.2f}\n' \
+            f'Bucket size              {self.bs:15.2f}\n' \
             f'{object.__repr__(self)}'
         if not isupdated:
             s += '\nNOT UPDATED!'
@@ -127,11 +129,11 @@ class Portfolio(object):
         s = [f'{{ "name": "{self.name}"']
         agg_list = []
         for a in self.agg_list:
-            # references through to the defining spec...as input...
+            # references through to the defining contained_iterable...as input...
             agg_list.append(str(a.spec))
-        s.append(f"'spec': [{', '.join(agg_list)}]")
-        if self.buck > 0:
-            s.append(f'"buck": {self.buck}')
+        s.append(f"'contained_iterable': [{', '.join(agg_list)}]")
+        if self.bs > 0:
+            s.append(f'"bs": {self.bs}')
             s.append(f'"log2": {self.log2}')
             s.append(f'"padding": {self.padding}')
             s.append(f'"tilt_amount": {self.tilt_amount}')
@@ -175,8 +177,8 @@ class Portfolio(object):
         """
 
         args = dict()
-        # TODO fix is it bs or buck!!
-        args["bs"] = self.buck
+        # TODO fix is it bs or bs!!
+        args["bs"] = self.bs
         args["log2"] = self.log2
         args["padding"] = self.padding
         args["tilt_amount"] = self.tilt_amount
@@ -255,7 +257,7 @@ class Portfolio(object):
             new_spec.append(deepcopy(a.spec))
 
         for d in new_spec:
-            # d is a dictionary agg spec, need to adjust the severity
+            # d is a dictionary agg contained_iterable, need to adjust the severity
             s = d['severity']
             if 'mean' in s:
                 s['mean'] *= other
@@ -281,7 +283,7 @@ class Portfolio(object):
             new_spec.append(deepcopy(a.spec))
 
         for d in new_spec:
-            # d is a dictionary agg spec, need to adjust the frequency
+            # d is a dictionary agg contained_iterable, need to adjust the frequency
             # TODO better freq dists; deal with Bernoulli where n=p<1
             d['frequency']['n'] *= other
 
@@ -358,7 +360,7 @@ class Portfolio(object):
         :return:
         """
         spec = self.fit(kind)
-        logging.debug(f'CPortfolio.collapse | Collapse created new CPortfolio with spec {spec}')
+        logging.debug(f'CPortfolio.collapse | Collapse created new CPortfolio with contained_iterable {contained_iterable}')
         return Portfolio(self.name, [spec])
 
     def percentiles(self, pvalues=None):
@@ -428,7 +430,7 @@ class Portfolio(object):
         """
 
         self.log2 = log2
-        self.buck = bs
+        self.bs = bs
         self.padding = padding
         self.tilt_amount = tilt_amount
         self.approx_type = approx_type
@@ -495,7 +497,7 @@ class Portfolio(object):
                     ftnot = ftall / ft_line_density[line]
             not_line_density[line] = np.real(ift(ftnot, self.padding, tilt_vector))
 
-        # make the dataframe spec
+        # make the dataframe contained_iterable
         d1 = {'loss': xs}
         d2 = {'p_' + i: line_density[i] for i in self.line_names_ex}
         d3 = {'not_' + i: not_line_density[i] for i in self.line_names}
@@ -1158,7 +1160,7 @@ class Portfolio(object):
                 'CPortfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
-            S = self.density_df.loc[0:assets - self.buck, 'S'].values
+            S = self.density_df.loc[0:assets - self.bs, 'S'].values
 
         # now all S values should be greater than zero  and it is decreasing
         assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
@@ -1169,8 +1171,8 @@ class Portfolio(object):
 
             def f(rho):
                 trho = S ** rho
-                ex = np.sum(trho) * self.buck
-                ex_prime = np.sum(trho * lS) * self.buck
+                ex = np.sum(trho) * self.bs
+                ex_prime = np.sum(trho * lS) * self.bs
                 return ex - premium_target, ex_prime
         elif name == 'wang':
             n = ss.norm()
@@ -1179,8 +1181,8 @@ class Portfolio(object):
             def f(lam):
                 temp = n.ppf(S) + lam
                 tlam = n.cdf(temp)
-                ex = np.sum(tlam) * self.buck
-                ex_prime = np.sum(n.pdf(temp)) * self.buck
+                ex = np.sum(tlam) * self.bs
+                ex_prime = np.sum(n.pdf(temp)) * self.bs
                 return ex - premium_target, ex_prime
         elif name == 'ly':
             # linear yield model; min rol is ro/(1+ro)
@@ -1191,8 +1193,8 @@ class Portfolio(object):
                 num = r0 + S * (1 + rk)
                 den = 1 + r0 + rk * S
                 tlam = num / den
-                ex = np.sum(tlam) * self.buck + mass
-                ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * self.buck
+                ex = np.sum(tlam) * self.bs + mass
+                ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * self.bs
                 return ex - premium_target, ex_prime
         elif name == 'clin':
             # capped linear, input rf as min rol
@@ -1201,8 +1203,8 @@ class Portfolio(object):
 
             def f(r):
                 r0_rS = r0 + r * S
-                ex = np.sum(np.minimum(1, r0_rS)) * self.buck + mass
-                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * self.buck
+                ex = np.sum(np.minimum(1, r0_rS)) * self.bs + mass
+                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * self.bs
                 return ex - premium_target, ex_prime
         elif name == 'lep':
             # layer equivalent pricing
@@ -1216,8 +1218,8 @@ class Portfolio(object):
             def f(r):
                 spread = r / (1 + r) - d
                 temp = d + (1 - d) * S + spread * rSF
-                ex = np.sum(np.minimum(1, temp)) * self.buck + mass
-                ex_prime = (1 + r) ** -2 * np.sum(np.where(temp < 1, rSF, 0)) * self.buck
+                ex = np.sum(np.minimum(1, temp)) * self.bs + mass
+                ex_prime = (1 + r) ** -2 * np.sum(np.where(temp < 1, rSF, 0)) * self.bs
                 return ex - premium_target, ex_prime
         else:
             raise ValueError('calibrate_distortions only works with ph and wang')
@@ -1407,8 +1409,8 @@ class Portfolio(object):
             # if S>0 but flat and there is a mass then need to include loss X g(S(loss)) term!
             # pick  up right hand places where S is very small (rounding issues...)
             # parts_0_loss = np.cumsum( np.where( (df.p_total==0) & (df.S < 1e-14),  dist.mass *
-            #                                     0.333333333 , 0)) * self.buck
-            #                                     # self.density_df[f'exi_xeqa_{line}'] , 0)) * self.buck
+            #                                     0.333333333 , 0)) * self.bs
+            #                                     # self.density_df[f'exi_xeqa_{line}'] , 0)) * self.bs
             # print(parts_0_loss[parts_0_loss > 0])
             # df[f'exag_{line}'] = exleaUC + (exixgtaUC + mass * lim_xi_x) * self.density_df.loss
             if dist.mass:
@@ -1418,7 +1420,7 @@ class Portfolio(object):
         df['exag_sumparts'] = df.filter(regex='^exag_[^n]').sum(axis=1)
         # LEV under distortion g
         # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'gS'].cumsum())))
-        # df['exag_total'] = temp * self.buck
+        # df['exag_total'] = temp * self.bs
         df['exag_total'] = self.cumintegral(df['gS'])
 
         # comparison of total and sum of parts
@@ -1520,16 +1522,16 @@ class Portfolio(object):
         Price using regulatory and pricing g functions
         i.e. compute E_price (X wedge E_reg(X) )
         regulatory capital distortion is applied on unlimited basis
-        reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =p value in either case }
+        reg_g is number; CDistortion; contained_iterable { name = var|tvar|  ,  shape =p value in either case }
         pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
         overwritten
 
-        ly  must include ro in spec
+        ly  must include ro in contained_iterable
 
         if lr and roe then lr is used
 
-        :param reg_g: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
-        :param pricing_g: spec or CDistortion class or lr= or roe =; must have name= to define spec; if CDist that is
+        :param reg_g: a distortion function contained_iterable or just a number; if >1 assets if <1 a prob converted to quantile
+        :param pricing_g: contained_iterable or CDistortion class or lr= or roe =; must have name= to define contained_iterable; if CDist that is
                           used
         :return:
         """
@@ -1562,7 +1564,7 @@ class Portfolio(object):
                     # not VaR, need to figure capital
                     assert (isinstance(reg_g, Distortion))
                     gS = reg_g.g(self.density_df.S)
-                    a_reg = self.buck * np.sum(gS)
+                    a_reg = self.bs * np.sum(gS)
                     ix = self.density_df.index.get_loc(a_reg, method='ffill')
                     a_reg_ix = self.density_df.index[ix]
 
@@ -1575,7 +1577,7 @@ class Portfolio(object):
             # just use it
             pass
         else:
-            # spec as dict
+            # contained_iterable as dict
             if 'lr' in pricing_g:
                 # given LR, figure premium
                 prem = row['exa_total'] / pricing_g['lr']
@@ -1620,8 +1622,8 @@ class Portfolio(object):
             # AND have issue of weight at zero applying a capacity charge ??
             # up to a_reg
             # remember loc on df includes RHS
-            exag1 = np.sum(self.density_df.loc[0:a_reg_ix - self.buck, f'exeqa_{line}'] *
-                           gp_total.loc[0:a_reg_ix - self.buck])
+            exag1 = np.sum(self.density_df.loc[0:a_reg_ix - self.bs, f'exeqa_{line}'] *
+                           gp_total.loc[0:a_reg_ix - self.bs])
             # note: exi_xeqa = exeqa / loss
             exag2 = np.sum(self.density_df.loc[a_reg_ix:, f'exeqa_{line}'] /
                            self.density_df.loss.loc[a_reg_ix:] * gp_total.loc[a_reg_ix:]) * a_reg_ix
@@ -1637,13 +1639,13 @@ class Portfolio(object):
         line = 'total'
         # if the g fun is degenerate you have the problem of capacity charge
         # so int density does not work. have to use int S
-        # apply_distortion uses df['exag_total'] = cumintegral(df['gS'], self.buck)
+        # apply_distortion uses df['exag_total'] = cumintegral(df['gS'], self.bs)
         # which is the same since it shifts forward
         # old
-        # exag = np.sum(g_pri(self.density_df.loc[self.buck:a_reg_ix, 'S'])) * self.buck
+        # exag = np.sum(g_pri(self.density_df.loc[self.bs:a_reg_ix, 'S'])) * self.bs
         # new
-        exag = np.sum(g_pri(self.density_df.loc[0:a_reg_ix - self.buck, 'S'])) * self.buck
-        assert (np.isclose(exag, np.sum(gS.loc[0:a_reg_ix - self.buck]) * self.buck))
+        exag = np.sum(g_pri(self.density_df.loc[0:a_reg_ix - self.bs, 'S'])) * self.bs
+        assert (np.isclose(exag, np.sum(gS.loc[0:a_reg_ix - self.bs]) * self.bs))
         df.loc[line, :] = [a_reg_ix, row[f'exa_{line}'], exag]
 
         # df.loc['sum', :] = df.filter(regex='^[^t]', axis=0).sum()
@@ -1707,14 +1709,14 @@ class Portfolio(object):
             S = self.density_df.S
             loss = self.density_df.loss
 
-            a = A - self.buck  # A-buck for pandas series (includes endpoint), a for numpy indexing; int(A / self.buck)
+            a = A - self.bs  # A-bs for pandas series (includes endpoint), a for numpy indexing; int(A / self.bs)
             lossa = loss[0:a]
 
             Sa = S[0:a]
             Fa = 1 - Sa
             gSa = g(Sa)
-            premium = np.cumsum(gSa[::-1])[::-1] * self.buck
-            el = np.cumsum(Sa[::-1])[::-1] * self.buck
+            premium = np.cumsum(gSa[::-1])[::-1] * self.bs
+            el = np.cumsum(Sa[::-1])[::-1] * self.bs
             capital = A - lossa - premium
             risk_margin = premium - el
             assets = capital + premium
@@ -1819,13 +1821,13 @@ class Portfolio(object):
         ans = []
         gt, incr, int1, int2, int3 = 0, 0, 0, 0, 0
         c1, c2, c3 = 0, 0, 0
-        n_c = int(c / self.buck)
+        n_c = int(c / self.bs)
         n_max = len(xs)  # this works as a rhs array[0:n_max] is the whole array, array[n_max] is an error
         err_count = 0
-        for loss in np.arange(a + self.buck, 2 * xs.max(), self.buck):
-            n_loss = int(loss / self.buck)  # 0...loss INCLUSIVE
+        for loss in np.arange(a + self.bs, 2 * xs.max(), self.bs):
+            n_loss = int(loss / self.bs)  # 0...loss INCLUSIVE
             c1 = c / a * loss
-            n_c1 = min(n_max, int(c1 / self.buck))
+            n_c1 = min(n_max, int(c1 / self.bs))
             # need to adjust for trimming when loss > max loss
             # loss indexes...see notes in blue book
             la = max(0, n_loss - (n_max - 1))
@@ -1854,7 +1856,7 @@ class Portfolio(object):
                 ptot = np.sum(pline[s3] * notline[s3r])
             except ValueError as e:
                 print(e)
-                print(f"Value error: loss={loss}, loss/b={loss/self.buck}, c1={c1}, c1/b={c1/self.buck}")
+                print(f"Value error: loss={loss}, loss/b={loss/self.bs}, c1={c1}, c1/b={c1/self.bs}")
                 print(f"n_loss {n_loss},  n_c {n_c}, n_c1 {n_c1}")
                 print(f'la={la}, lb={lb}, lc={lc}, ld={ld}')
                 print('ONE:', *map(len, [xs[s1], pline[s1], notline[s1r]]))
@@ -2013,7 +2015,7 @@ class Portfolio(object):
         if bs_override != 0:
             bs = bs_override
         else:
-            bs = self.buck
+            bs = self.bs
 
         if type(v) == np.ndarray:
             return np.hstack((0, v[:-1])).cumsum() * bs

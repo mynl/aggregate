@@ -29,7 +29,7 @@ def kword_expander(**kwargs):
 
 
 class TestUnderwriter(unittest.TestCase):
-    def test_line_objects(self):
+    def test_block_objects(self):
         uw = Underwriter()
         line = uw['cmp']
         line2 = uw.cmp
@@ -39,79 +39,20 @@ class TestUnderwriter(unittest.TestCase):
         self.assertTrue(line.exp_en == a.exp_en)
         self.assertTrue(line.sev_mean * 10 == a.sev_mean)
 
-        with self.assertRaises(ValueError):
-            b = line * 10
-            c = line + line
+        # with self.assertRaises(ValueError):
+        b = line * 10
+
+        c = line + line
 
         kword_expander(**line)
 
         line.sev_name = 'gamma'
         self.assertEqual(line.sev_name, 'gamma')
-        self.assertEqual(line['sev_name'], 'lognorm')
-        line['sev_name'] = 'gamma'
         self.assertEqual(line['sev_name'], 'gamma')
 
-        line.other_name = 'gamma'
-        self.assertFalse('other_name' in line.contained_iterable)
-        self.assertEqual(line.other_name, 'gamma')
-        with self.assertRaises(KeyError):
-            b = line['other_name']
-
-    def test_cat_objects(self):
+    def test_curve_object(self):
         uw = Underwriter()
-        cat = uw.cata
-        a = 10 * cat
-        self.assertTrue(cat.exp_en == a.exp_en)
-        self.assertTrue(cat.sev_mean * 10 == a.sev_mean)
-
-        with self.assertRaises(ValueError):
-            b = cat * 10
-            c = cat + cat
-
-        kword_expander(**cat)
-
-        cat.sev_name = 'gamma'
-        self.assertEqual(cat.sev_name, 'gamma')
-        self.assertEqual(cat['sev_name'], 'pareto')
-        cat['sev_name'] = 'gamma'
-        self.assertEqual(cat['sev_name'], 'gamma')
-
-        cat.other_name = 'gamma'
-        self.assertFalse('other_name' in cat.contained_iterable)
-        self.assertEqual(cat.other_name, 'gamma')
-        with self.assertRaises(KeyError):
-            b = cat['other_name']
-
-    def test_ac_objects(self):
-        # account object
-        uw = Underwriter()
-        ac = uw.casxol
-        a = 10 * ac
-        self.assertTrue(ac.exp_en == a.exp_en)
-        self.assertTrue(ac.sev_mean * 10 == a.sev_mean)
-
-        a = ac * 10
-        self.assertTrue(ac.exp_en * 10 == a.exp_en)
-        self.assertTrue(ac.sev_mean == a.sev_mean)
-
-        a = ac + ac
-        self.assertTrue(ac.exp_en * 2 == a.exp_en)
-        self.assertTrue(ac.sev_mean == a.sev_mean)
-
-        kword_expander(**ac)
-
-        ac.sev_name = 'gamma'
-        self.assertEqual(ac.sev_name, 'gamma')
-        self.assertEqual(ac['sev_name'], 'lognorm')
-        ac['sev_name'] = 'gamma'
-        self.assertEqual(ac['sev_name'], 'gamma')
-
-        ac.other_name = 'gamma'
-        self.assertFalse('other_name' in ac.contained_iterable)
-        self.assertEqual(ac.other_name, 'gamma')
-        with self.assertRaises(KeyError):
-            b = ac['other_name']
-
+        c1 = uw.
 
 # class TestAggregateModule(unittest.TestCase):
 #     def test_portfolio_creation_update_uat_from_book(self):

@@ -1,19 +1,52 @@
 fixed:
-  sev_name: dhistogram
-  sev_xs:
-  -  1
-  sev_ps:
-  -  1
-  note: a fixed loss of 1
+    sev_name: dhistogram
+    sev_xs:
+    -  1
+    sev_ps:
+    -  1
+    note: a fixed loss of 1
 directors_a:
-  sev_name: lognorm
-  sev_mean: 10000000
-  sev_a: 1.25
+    sev_name: lognorm
+    sev_mean: 10000000
+    sev_a: 1.25
 directors_b:
-  sev_name: lognorm
-  sev_mean: 10000000
-  sev_a: 1.75
+    sev_name: lognorm
+    sev_mean: 10000000
+    sev_a: 1.75
 directors_c:
-  sev_name: lognorm
-  sev_mean: 10000000
-  sev_a: 2.0
+    sev_name: lognorm
+    sev_mean: 10000000
+    sev_a: 2.0
+cata:
+    sev_name: pareto
+    sev_a: 2.1
+    sev_scale: 1
+    sev_loc: -1
+catb:
+    sev_name: pareto
+    sev_a: 1.7
+    sev_scale: 1
+    sev_loc: -1
+catc:
+    sev_name: pareto
+    sev_a: 1.4
+    sev_scale: 1
+    sev_loc: -1
+catd:
+    sev_name: pareto
+    sev_a: 1.1
+    sev_scale: 1
+    sev_loc: -1
+cate:
+    sev_name: pareto
+    sev_a: 0.9
+    sev_scale: 1
+    sev_loc: -1
+noncata:
+    sev_name: lognorm
+    sev_mean: 50000
+    sev_cv: 1.0
+noncatb:
+    sev_name: lognorm
+    sev_mean: 24000
+    sev_cv: 1.1

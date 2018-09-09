@@ -116,9 +116,7 @@ class Underwriter(_DataManager):
         """
 
         self.databases = dict(curves=['curves.yaml'],
-                              accounts=['accounts.yaml', 'user_accounts.yaml'],
-                              lines=['lines.yaml'],
-                              catlines=['catlines.yaml'],
+                              blocks=['blocks.yaml', 'user_blocks.yaml'],
                               books=['books.yaml', 'user_books.yaml'])
         self.dir_name = dir_name
         _DataManager.__init__(self)
@@ -134,12 +132,8 @@ class Underwriter(_DataManager):
         item_type, obj = _DataManager.__getitem__(self, item)
         if item_type == 'book':
             return Book(item, obj['args'], obj['spec'])
-        elif item_type == 'account':
-            return Account(item, **obj)
-        elif item_type == 'catline':
-            return CatLine(item, **obj)
-        elif item_type == 'line':
-            return Line(item, **obj)
+        elif item_type == 'block':
+            return Block(item, **obj)
         elif item_type == 'curve':
             return Curve(item, **obj)
         else:
@@ -162,27 +156,6 @@ class _ScriptableObject(object):
     used by Lines etc.
     """
 
-    def __init__(self, spec_dict):
-        self.contained_iterable = spec_dict
-
-    def __getattr__(self, item):
-        """
-        return member using x.member syntax
-
-        :param item:
-        :return:
-        """
-        if item in self.__dict__:
-            # print(f'getattr __dict__[{item}] ')
-            # print(self.__dict__)
-            return self.__dict__[item]
-        elif item in self.contained_iterable:
-            # print(f'getattr from contained object[{item}]')
-            return self.contained_iterable[item]
-        else:
-            # print(f'item {item} not found in getattr, just returning...')
-            return
-
     def __getitem__(self, item):
         """
         return member using x[item] syntax
@@ -191,21 +164,11 @@ class _ScriptableObject(object):
         :return:
         """
         # print(f'getitem {item} requested')
-        return self.contained_iterable[item]
+        return self.__getattribute__(item)
 
-    def __setitem__(self, key, value):
-        self.contained_iterable.__setitem__(key, value)
-
-    # def __setattr__(self, key, value):
-    #     #    do not allow to add items to the spec?
-    #     if key in self.contained_iterable:
-    #         self.contained_iterable.__setitem__(key, value)
-    #     else:
-    #         object.__setattr__(key, value )
-
-    def __deepcopy__(self, memodict={}):
-        # https://www.peterbe.com/plog/must__deepcopy__
-        return deepcopy(self.contained_iterable)
+    # def __deepcopy__(self, memodict={}):
+    #     # https://www.peterbe.com/plog/must__deepcopy__
+    #     return deepcopy(self.contained_iterable)
 
     def keys(self):
         """
@@ -215,13 +178,13 @@ class _ScriptableObject(object):
 
         :return:
         """
-        return self.contained_iterable.keys()
+        return self.__dict__.keys()
 
     def values(self):
-        return self.contained_iterable.values()
+        return self.__dict__.values()
 
     def items(self):
-        return self.contained_iterable.items()
+        return self.__dict__.items()
 
     def __iter__(self):
         """
@@ -229,8 +192,13 @@ class _ScriptableObject(object):
 
         :return:
         """
-        return iter(self.contained_iterable)
+        return iter(self.__dict__)
 
+    def __repr__(self):
+        return repr(self.__dict__)
+
+    def __str__(self):
+        return str(self.__dict__)
 
 class Curve(_ScriptableObject):
     """
@@ -246,8 +214,8 @@ class Curve(_ScriptableObject):
 
     """
 
-    def __init__(self, name="", sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0,
-                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, note=''):
+    def __init__(self, name="", sev_name='', sev_a=0., sev_b=0., sev_mean=0., sev_cv=0.,
+                 sev_loc=0., sev_scale=0., sev_xs=None, sev_ps=None, sev_wt=1, note=''):
         """
 
 
@@ -266,10 +234,17 @@ class Curve(_ScriptableObject):
         """
 
         self.note = note
-        _ScriptableObject.__init__(self, dict(name=name,
-                                              sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                                              sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                                              sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt))
+        self.name = name
+        self.sev_name = sev_name
+        self.sev_a = sev_a
+        self.sev_b = sev_b
+        self.sev_mean = sev_mean
+        self.sev_cv = sev_cv
+        self.sev_loc = sev_loc
+        self.sev_scale = sev_scale
+        self.sev_xs = sev_xs
+        self.sev_ps = sev_ps
+        self.sev_wt = sev_wt
 
     def __rmul__(self, other):
         """
@@ -291,40 +266,38 @@ class Curve(_ScriptableObject):
         assert other > 0
         assert isinstance(other, float) or isinstance(other, int)
         other = float(other)
-
-        spec = self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc'))
-        spec['name'] = f'{other}.{self.name}'
-        return Curve(**spec)
+        return Curve(name=self.name,
+                     sev_name=self.sev_name,
+                     sev_a=self.sev_a,
+                     sev_b=self.sev_b,
+                     sev_mean=self.sev_mean * other,
+                     sev_cv=self.sev_cv,
+                     sev_loc=self.sev_loc * other,
+                     sev_scale=self.sev_scale * other,
+                     sev_xs=None if self.sev_xs is None else np.array(self.sev_xs) * other,
+                     sev_ps=self.sev_ps,
+                     sev_wt=self.sev_wt,
+                     note=f'{other} x {self.name}')
 
     def write(self):
-        return Severity(**self)
-
-    # def __add__(self, other):
-    #     """
-    #     shift
-    #
-    #     """
-    #     assert isinstance(other, float) or isinstance(other, int)
-    #     other = float(other)
-    #
-    #     """
-    #     d = deepcopy(self.contained_iterable)
-    #     for a in adjust_list:
-    #         d[a] *= other
-    #
-    #     return d
-    #     """
-    #     spec = deepcopy(self.contained_iterable)
-    #     spec['sev_loc'] += other
-    #     return Curve(**self)
+        return Severity(name=self.sev_name,
+                        a=self.sev_a,
+                        b=self.sev_b,
+                        mean=self.sev_mean,
+                        cv=self.sev_cv,
+                        loc=self.sev_loc,
+                        scale=self.sev_scale,
+                        hxs=self.sev_xs,
+                        hps=self.sev_ps,
+                        conditional=True)
 
 
-class _Aggregate(_ScriptableObject):
+class Block(_ScriptableObject):
     """
-    _Aggregate class
+    Block class
     ----------------
 
-    _Aggregate is a helper class, containing all the information
+    Block is a helper class, containing all the information
     needed to create an Aggregate object but no work is done until the account is "written".
 
     Information is lightweight and stored in a dictionary.
@@ -352,137 +325,6 @@ class _Aggregate(_ScriptableObject):
     * There is no self * other for inhomogeneous volume change
     * There is no sum of lines: create a Book to add. :
 
-    """
-
-    def __init__(self, name='', exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0, freq_b=0, note=''):
-
-        self.note = note
-        _ScriptableObject.__init__(self, dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                                        exp_attachment=exp_attachment, exp_limit=exp_limit,
-                                        sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                                        sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                                        sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                                        freq_name=freq_name, freq_a=freq_a, freq_b=freq_b))
-
-    def __str__(self):
-        return dict_2_string(type(self), self.contained_iterable)
-
-    def __repr__(self):
-        return str(self.contained_iterable)
-
-    def __add__(self, other):
-        """
-        Add two _Aggregate objects: must have matching frequency specs (not enforced?)
-        I.e. sev = wtd avg of sevs and freq = sum of freqss
-
-        TODO same severity!
-
-        :param other:
-        :return:
-        """
-        assert isinstance(other, type(self))
-
-        # check fully compatible objects
-        compatible_requires = ['freq_name', 'freq_a', 'freq_b']
-        compatible_objects = True
-        for a in compatible_requires:
-            compatible_objects = compatible_objects and self.contained_iterable[a] == other.contained_iterable[a]
-            if not compatible_objects:
-                print('Incompatible Accounts: must have same ' + ', '.join(compatible_requires))
-                print(f'For attribute {a}: {self.contained_iterable[a]} does not equal {other.contained_iterable[a]}')
-
-        # now create mixture if severity, limit and attach are different? or just bludegon on?
-        easy_add_requires = ['exp_attachment', 'exp_limit',
-                             'sev_name', 'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale',
-                             'sev_xs', 'sev_ps', 'sev_wt']
-        easy_add = True
-        for a in easy_add_requires:
-            easy_add = easy_add and self.contained_iterable[a] == other.contained_iterable[a]
-
-        if easy_add:
-            new_spec = deepcopy(self.contained_iterable)
-            for a in ['exp_en', 'exp_el', 'exp_premium']:
-                new_spec[a] += other.contained_iterable[a]
-            new_spec['name'] = f'{self.name} + {other.name}'
-        else:
-            # doh, create mixture
-            raise ValueError('Needs mixture, NYI')
-
-        # the caller has to create the right type of object
-        return new_spec
-
-    def __rmul__(self, other):
-        """
-        new = other * self; treat as homogeneous scale change
-
-        :param other:
-        :return:
-        """
-
-        assert other > 0
-        assert isinstance(other, float) or isinstance(other, int)
-        other = float(other)
-        new_spec = self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc', 'sev_attachment', 'sev_limit',
-                                                 'exp_limit', 'exp_attachment', 'exp_premium', 'exp_el'))
-        new_spec['name'] = f'{other}.{self.name}'
-        return new_spec
-
-    def __mul__(self, other):
-        """
-        new = self * other, other integer, sum of other independent copies in Levy process sense
-        other > 0
-
-        adjusts en and exposure (premium and el)
-
-        :param other:
-        :return:
-        """
-
-        assert isinstance(other, int) or isinstance(other, float)
-        assert other >= 0
-
-        new_spec = self._copy_and_adjust(other, ('exp_premium', 'exp_el', 'exp_en'))
-        new_spec['name'] = f'{self.name} to time {other}'
-        return new_spec
-
-    def _copy_and_adjust(self, other, adjust_list):
-        """
-        performs adjustments for homogeneous and independent scale changes
-
-        :param other:
-        :param adjust_list:
-        :return:
-        """
-        d = deepcopy(self.contained_iterable)
-        for a in set(adjust_list).intersection(d.keys()):
-            d[a] *= other
-
-        return d
-
-    def write(self):
-        """
-        materialize contained_iterable in a full Aggregate class object
-        TODO: do we need , attachment=0, limit=np.inf):??
-
-        :return:
-        """
-        # swap ??
-        # a0 = self.contained_iterable['attachment']
-        # l0 = self.contained_iterable['limit']
-        # self.contained_iterable['attachment'] = attachment
-        # self.contained_iterable['limit'] = limit
-        # agg = Aggregate(**self)
-        # self.contained_iterable['attachment'] = a0
-        # self.contained_iterable['limit'] = l0
-
-        return Aggregate(**self)
-
-
-class Line(_Aggregate):
-    """
     Line class
     ----------
 
@@ -503,192 +345,218 @@ class Line(_Aggregate):
 
     Information is lightweight and stored in a dictionary.
 
-
-
     """
 
-    def __init__(self, name='',
-                 exp_el=0, exp_premium=0, exp_lr=0, exp_en=0,
-                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
+    def __init__(self, name='', exp_el=0., exp_premium=0., exp_lr=0., exp_en=0., exp_attachment=0., exp_limit=np.inf,
+                 sev_name='', sev_a=0., sev_b=0., sev_mean=0., sev_cv=0., sev_loc=0., sev_scale=0.,
                  sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0, freq_b=0, note=''):
-        """
+                 freq_name='', freq_a=0., freq_b=0., note=''):
 
-        :param name:
-        :param sev_name:
-        :param sev_a:
-        :param sev_b:
-        :param sev_mean:
-        :param sev_cv:
-        :param sev_loc:
-        :param sev_scale:
-        :param sev_xs:
-        :param sev_ps:
-        :param sev_wt:
-        :param freq_name:
-        :param freq_a:
-        :param freq_b:
-        :param note:
-        """
-        # TODO: print('Line class checking information provided...')
+        self.name = name
+        self.exp_el = exp_el
+        self.exp_premium = exp_premium
+        self.exp_lr = exp_lr
+        self.exp_en = exp_en
+        self.exp_attachment = exp_attachment
+        self.exp_limit = exp_limit
+        self.sev_name = sev_name
+        self.sev_a = sev_a
+        self.sev_b = sev_b
+        self.sev_mean = sev_mean
+        self.sev_cv = sev_cv
+        self.sev_loc = sev_loc
+        self.sev_scale = sev_scale
+        self.sev_xs = sev_xs
+        self.sev_ps = sev_ps
+        self.sev_wt = sev_wt
+        self.freq_name = freq_name
+        self.freq_a = freq_a
+        self.freq_b = freq_b
+        # convenient to sort this out for adding etc.
+        if self.exp_premium > 0 and self.exp_el > 0:
+            self.exp_lr = self.exp_el / self.exp_premium
+        elif self.exp_el > 0 and self.exp_lr > 0:
+            self.exp_premium = self.exp_el / self.exp_lr
+        elif self.exp_lr > 0 and self.exp_premium > 0:
+            self.exp_el = self.exp_lr * self.exp_premium
         self.note = note
-        _ScriptableObject.__init__(self, dict(name=name,
-                                              exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                                              sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                                              sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                                              sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                                              freq_name=freq_name, freq_a=freq_a, freq_b=freq_b))
 
-    def __rmul__(self, other):
+    # def __str__(self):
+    #     return dict_2_string(type(self), dict(  ))
+    #
+    # def __repr__(self):
+    #     return str(self.contained_iterable)
+    #
+    def __add__(self, other):
         """
-        new = other * self; treat as scale change
+        Add two Block objects: must have matching frequency specs (not enforced?)
+        I.e. sev = wtd avg of sevs and freq = sum of freqss
 
-        scale is a homogeneous change, it adjusts
-
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
+        TODO same severity!
 
         :param other:
         :return:
         """
-        return Line(**_Aggregate.__rmul__(self, other))
-        # assert other > 0
-        # assert isinstance(other, float) or isinstance(other, int)
-        # other = float(other)
-        #
-        # spec = self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc'))
-        # spec['name'] = f'{other}.{self.name}'
-        # return Line(**spec)
+        assert isinstance(other, type(self))
 
-    def __add__(self, other):
-        # somehow demonstrate this is not acceptable
-        raise ValueError('Cannot add lines...')
+        # check fully compatible objects
+        compatible_requires = ['freq_name', 'freq_a', 'freq_b']
+        compatible_objects = True
+        for a in compatible_requires:
+            compatible_objects = compatible_objects and self.__getattribute__(a) == other.__getattribute__(a)
+            if not compatible_objects:
+                print('Incompatible Accounts: must have same ' + ', '.join(compatible_requires))
+                print(f'For attribute {a}: {self.__getattribute__(a)} does not equal {other.__getattribute__(a)}')
 
-    def __mul__(self, other):
-        # somehow demonstrate this is not acceptable
-        raise ValueError('Cannot perform inhomogeneous exposure change on Line objects...')
+        # now create mixture if severity, limit and attach are different? or just bludegon on?
+        easy_add_requires = ['exp_attachment', 'exp_limit',
+                             'sev_name', 'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale',
+                             'sev_xs', 'sev_ps', 'sev_wt', 'freq_name', 'freq_a', 'freq_b']
+        easy_add = True
+        for a in easy_add_requires:
+            easy_add = easy_add and self.__getattribute__(a) == other.__getattribute__(a)
 
-    # def write(self):
-    #     return _Aggregate.write(self)
-
-
-class Account(_Aggregate):
-    """
-    Account class
-    -------------
-
-    Manages construction of a single account. Contains all the information
-    needed to create an Aggregate object but no work is done until the account is "written". Information
-    is lightweight and stored in a dictionary. Can read/write from YAML. Generally created by an underwriter.
-
-    An Account is also a Line but is guaranteed to contain detailed severity information.
-
-    There is only adding of accounts in very restrictive conditions: freq must match, then severities
-    are weighted
-
-    rmul, add and mul are all valid...all passed through to _Aggregate
-
-        new = other * self; treat as scale change
-
-        scale is a homogeneous change, it adjusts
-
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
-    """
-
-    def __init__(self, name='', exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0, freq_b=0, note=''):
-        # check you are given enough information
-        # TODO: print('Account class checking information provided...')
-        self.note = note
-        _Aggregate.__init__(self,
-                            **dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                                   exp_attachment=exp_attachment, exp_limit=exp_limit,
-                                   sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                                   sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                                   sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                                   freq_name=freq_name, freq_a=freq_a, freq_b=freq_b))
-
-    def __add__(self, other):
-        return Account(**_Aggregate.__add__(self, other))
+        if easy_add:
+            prem = self.exp_premium + other.exp_premium
+            loss = self.exp_el + other.exp_el
+            if prem > 0:
+                lr = loss / prem
+            else:
+                lr = 0
+            return Block(name=f'{self.name} + {other.name}',
+                         exp_el=loss,
+                         exp_premium=prem,
+                         exp_lr=lr,
+                         exp_en=self.exp_en + other.exp_en,
+                         exp_attachment=self.exp_attachment,
+                         exp_limit=self.exp_limit,
+                         sev_name=self.sev_name,
+                         sev_a=self.sev_a,
+                         sev_b=self.sev_b,
+                         sev_mean=self.sev_mean,
+                         sev_cv=self.sev_cv,
+                         sev_loc=self.sev_loc,
+                         sev_scale=self.sev_scale,
+                         sev_xs=self.sev_xs,
+                         sev_ps=self.sev_ps,
+                         sev_wt=self.sev_wt,
+                         freq_name=self.freq_name,
+                         freq_a=self.freq_a,
+                         freq_b=self.freq_b,
+                         note='')
+        else:
+            # doh, create mixture
+            raise ValueError('Needs mixture, NYI')
 
     def __rmul__(self, other):
-        return Account(**_Aggregate.__rmul__(self, other))
+        """
+        new = other * self; treat as homogeneous scale change
+
+        :param other:
+        :return:
+        """
+
+        assert other > 0
+        assert isinstance(other, float) or isinstance(other, int)
+        other = float(other)
+        if self.sev_xs is not None:
+            xs = other * np.array(self.sev_xs)
+        else:
+            xs = None
+        return Block(name=f'{other:.0f} {self.name}',
+                     exp_el=other * self.exp_el,
+                     exp_premium=other * self.exp_premium,
+                     exp_lr=self.exp_lr,
+                     exp_en=self.exp_en,
+                     exp_attachment=other * self.exp_attachment,
+                     exp_limit=other * self.exp_limit,
+                     sev_name=self.sev_name,
+                     sev_a=self.sev_a,
+                     sev_b=self.sev_b,
+                     sev_mean=other * self.sev_mean,
+                     sev_cv=self.sev_cv,
+                     sev_loc=other * self.sev_loc,
+                     sev_scale=other * self.sev_scale,
+                     sev_xs=xs,
+                     sev_ps=self.sev_ps,
+                     sev_wt=self.sev_wt,
+                     freq_name=self.freq_name,
+                     freq_a=self.freq_a,
+                     freq_b=self.freq_b,
+                     note='')
 
     def __mul__(self, other):
-        return Account(**_Aggregate.__mul__(self, other))
+        """
+        new = self * other, other integer, sum of other independent copies in Levy process sense
+        other > 0
 
+        adjusts en and exposure (premium and el)
 
-class CatLine(_Aggregate):
-    """
-    CatLine class
-    -------------
+        :param other:
+        :return:
+        """
 
-    Manages construction of an industry catastrophe line, e.g. US Wind, US Quake.
-    Contains all the information blah...
-    needed to create an Aggregate object but no work is done until the account is "written". Information
-    is lightweight and stored in a dictionary. Can read/write from YAML. Generally created by an underwriter.
+        assert isinstance(other, int) or isinstance(other, float)
+        assert other >= 0
 
-    An Account is also a Line but is guaranteed to contain detailed severity information.
+        return Block(name=f'{other:.0f} {self.name}',
+                     exp_el=other * self.exp_el,
+                     exp_premium=other * self.exp_premium,
+                     exp_lr=self.exp_lr,
+                     exp_en=other * self.exp_en,
+                     exp_attachment=self.exp_attachment,
+                     exp_limit=self.exp_limit,
+                     sev_name=self.sev_name,
+                     sev_a=self.sev_a,
+                     sev_b=self.sev_b,
+                     sev_mean=other * self.sev_mean,
+                     sev_cv=self.sev_cv,
+                     sev_loc=other * self.sev_loc,
+                     sev_scale=other * self.sev_scale,
+                     sev_xs=self.sev_xs,
+                     sev_ps=self.sev_ps,
+                     sev_wt=self.sev_wt,
+                     freq_name=self.freq_name,
+                     freq_a=self.freq_a,
+                     freq_b=self.freq_b,
+                     note='')
 
-    There is only adding of accounts in very restrictive conditions: freq must match, then severities
-    are weighted
+    def write(self):
+        """
+        materialize contained_iterable in a full Aggregate class object
+        TODO: do we need , attachment=0., limit=np.inf):??
 
-        new = other * self; treat as scale change
+        :return:
+        """
+        # swap ??
+        # a0 = self.contained_iterable['attachment']
+        # l0 = self.contained_iterable['limit']
+        # self.contained_iterable['attachment'] = attachment
+        # self.contained_iterable['limit'] = limit
+        # agg = Aggregate(**self)
+        # self.contained_iterable['attachment'] = a0
+        # self.contained_iterable['limit'] = l0
 
-        scale is a homogeneous change, it adjusts
-
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
-
-
-    """
-
-    def __init__(self, name='', exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0, freq_b=0, note=''):
-        # check you are given enough information
-        # TODO: print('CatLine class checking information provided...')
-        assert sev_name != ''
-        assert np.sum(np.abs(np.array([sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale]))) > 0
-        if sev_ps is not None:
-            assert np.sum(np.array(sev_ps)) > 0
-        assert freq_name != ''
-        assert exp_en > 0
-        self.note = note
-        _Aggregate.__init__(self,
-                            **dict(name=name,  exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                                   exp_attachment=exp_attachment, exp_limit=exp_limit,
-                                   sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                                   sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                                   sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                                   freq_name=freq_name, freq_a=freq_a, freq_b=freq_b))
-
-    def __add__(self, other):
-        # somehow demonstrate this is not acceptable
-        raise ValueError('Cannot add CatLines...')
-
-    def __mul__(self, other):
-        # somehow demonstrate this is not acceptable
-        raise ValueError('Cannot perform inhomogeneous exposure change on CatLine objects...')
-
-    def __rmul__(self, other):
-        return CatLine(**_Aggregate.__rmul__(self, other))
+        return Aggregate(name=self.name,
+                         exp_el=self.exp_el,
+                         exp_premium=self.exp_premium,
+                         exp_lr=self.exp_lr,
+                         exp_en=self.exp_en,
+                         exp_attachment=self.exp_attachment,
+                         exp_limit=self.exp_limit,
+                         sev_name=self.sev_name,
+                         sev_a=self.sev_a,
+                         sev_b=self.sev_b,
+                         sev_mean=self.sev_mean,
+                         sev_cv=self.sev_cv,
+                         sev_loc=self.sev_loc,
+                         sev_scale=self.sev_scale,
+                         sev_xs=self.sev_xs,
+                         sev_ps=self.sev_ps,
+                         sev_wt=self.sev_wt,
+                         freq_name=self.freq_name,
+                         freq_a=self.freq_a,
+                         freq_b=self.freq_b)
 
 
 class Book(_ScriptableObject):
@@ -700,6 +568,8 @@ class Book(_ScriptableObject):
     needed to create a Portfolio object but no work is done until the book is "written". Information
     is lightweight and stored in a dictionary. Can read/write from YAML.
 
+    Adding assumes all components are independent...down road may want to revise and look through
+    to severity and add groups?
 
     """
 
@@ -707,22 +577,24 @@ class Book(_ScriptableObject):
 
         self.name = name
         self.arg_dict = arg_dict
-        # self.spec_list = spec_list
-        account_list = []
-        self.line_names = []
-        # actually materialize the specs into Accounts  TODO: WHY are you doing this rather than leaving as dict?
-        for spec in spec_list:
-            if isinstance(spec, Account):
-                account_list.append(spec)
-            else:
-                account_list.append(Account(**spec))
-            self.line_names.append(spec['name'])
-        _ScriptableObject.__init__(self, account_list)
+        self.spec_list = deepcopy(spec_list)
+
+        # # self.spec_list = spec_list
+        # account_list = []
+        # self.line_names = []
+        # # do not actually materialize the specs into Accounts - can't see why you would
+        # for spec in spec_list:
+        #     if isinstance(spec, Account):
+        #         account_list.append(spec)
+        #     else:
+        #         account_list.append(Account(**spec))
+        #     self.line_names.append(spec['name'])
+        # _ScriptableObject.__init__(self, account_list)
 
     def __str__(self):
         d = dict(name=self.name)
-        for a in self.contained_iterable:
-            d[a.name] = str(a) # .spec_dict
+        for a in self.spec_list:
+            d[a.name] = str(a)
         return dict_2_string(type(self), d)
 
     def __repr__(self):
@@ -737,9 +609,8 @@ class Book(_ScriptableObject):
         s.append(f'{{ "name": "{self.name}"')
         s.append(f'"args": {str(self.arg_dict)}')
         account_list = []
-        for a in self.contained_iterable:
-            # references through to the defining contained_iterable...as input...
-            account_list.append(repr(a)) # .__repr__())
+        for a in self.spec_list:
+            account_list.append(repr(a))
         s.append(f"'spec': [{', '.join(account_list)}]")
         return ', '.join(s) + '}'
 
@@ -753,66 +624,51 @@ class Book(_ScriptableObject):
         :return:
         """
         assert isinstance(other, Book)
-        return Book(f'{self.name} + {other.name}', dict(), self.contained_iterable + other.contained_iterable)
+        return Book(f'{self.name} + {other.name}',
+                    dict(),
+                    self.spec_list + other.spec_list)
 
-    def __rmul__(self, other):
-        """
-        new = other * self; treat as homogeneous scale change
-
-        scale is a homogeneous change, it adjusts
-
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
-
-        :param other:
-        :return:
-        """
-
-        assert other > 0
-        assert isinstance(other, float) or isinstance(other, int)
-        other = float(other)
-
-        # TODO here and elsewhere need to scale xs for histogram distributions...
-        return Book(f'{other:.0f} {self.name}', self.arg_dict,
-                    self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc', # 'sev_xs',
-                                                  'exp_limit', 'exp_attachment', 'exp_premium', 'exp_el')))
-
-    def __mul__(self, other):
-        """
-        new = self * other, other integer, sum of other independent copies in Levy process sense,
-        so other can be fractional, other > 0 required
-
-        adjusts en and exposure (premium and el)
-
-        :param other:
-        :return:
-        """
-
-        assert isinstance(other, int) or isinstance(other, float)
-        assert other >= 0
-        return Book(f'{self.name} to time {other}', dict(),
-                    self._copy_and_adjust(other, ('exp_premium', 'exp_el', 'exp_en')))
-
-    def _copy_and_adjust(self, other, adjust_list):
-        """
-        performs adjustments for homogeneous and independent scale changes
-
-        :param other:
-        :param adjust_list:
-        :return:
-        """
-
-        new_spec = deepcopy(self.contained_iterable)
-
-        for d in new_spec:
-            for a in adjust_list:
-                d[a] *= other
-
-        return new_spec
+    # def __rmul__(self, other):
+    #     """
+    #     new = other * self; treat as homogeneous scale change
+    #
+    #     scale is a homogeneous change, it adjusts
+    #
+    #         - exposure: el, premium
+    #         - sev_mean
+    #         - sev_scale
+    #         - sev_loc
+    #         - limit
+    #         - attachment
+    #
+    #     :param other:
+    #     :return:
+    #     """
+    #
+    #     assert other > 0
+    #     assert isinstance(other, float) or isinstance(other, int)
+    #     other = float(other)
+    #
+    #     # TODO here and elsewhere need to scale xs for histogram distributions...
+    #     return Book(f'{other:.0f} {self.name}', self.arg_dict,
+    #                 self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc',  # 'sev_xs',
+    #                                               'exp_limit', 'exp_attachment', 'exp_premium', 'exp_el')))
+    #
+    # def __mul__(self, other):
+    #     """
+    #     new = self * other, other integer, sum of other independent copies in Levy process sense,
+    #     so other can be fractional, other > 0 required
+    #
+    #     adjusts en and exposure (premium and el)
+    #
+    #     :param other:
+    #     :return:
+    #     """
+    #
+    #     assert isinstance(other, int) or isinstance(other, float)
+    #     assert other >= 0
+    #     return Book(f'{self.name} to time {other}', dict(),
+    #                 self._copy_and_adjust(other, ('exp_premium', 'exp_el', 'exp_en')))
 
     def write(self, update=False):
         """
@@ -821,8 +677,8 @@ class Book(_ScriptableObject):
 
         :return:
         """
-        # need to pass the raw (dictionary) spec_list through, not the account_list = [Account]
-        port = Portfolio(self.name, self.contained_iterable)
+        # need to pass the raw (dictionary) spec_list
+        port = Portfolio(self.name, self.spec_list)
         logging.info(f'Book.write | created Portfolio {self.name} from Book')
         if update:
             log2 = self.arg_dict.get('log2', 0)

@@ -85,12 +85,12 @@ class Aggregate(object):
 
         assert np.sum(sev_wt) == 1
 
-        self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                         exp_attachment=exp_attachment, exp_limit=exp_limit,
-                         sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-                         sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-                         sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                         freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
+        # self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
+        #                  exp_attachment=exp_attachment, exp_limit=exp_limit,
+        #                  sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
+        #                  sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
+        #                  sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
+        #                  freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
 
         # class variables (mostly)
         self.name = name
@@ -120,6 +120,7 @@ class Aggregate(object):
                                           MomentAggregator.column_names(agg_only=False) +
                                           ['contagion', 'mix_cv'])
         self.stats_total = self.stats.copy()
+
         ma = MomentAggregator(freq_name, freq_a, freq_b)
 
         # broadcast arrays: first line forces them all to be arrays
@@ -220,12 +221,12 @@ class Aggregate(object):
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
-    def __repr__(self):
-        """
-        Goal unmbiguous
-        :return: MUST return a string
-        """
-        return str(self.spec)
+    # def __repr__(self):
+    #     """
+    #     Goal unmbiguous
+    #     :return: MUST return a string
+    #     """
+    #     return str(self.spec)
 
     def discretize(self, method, approx_calc='survival'):
         """

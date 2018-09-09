@@ -451,7 +451,7 @@ class MomentAggregator(object):
         self.freq_2 = f2
         self.freq_3 = f3
 
-        # load current sev stats
+        # load current sev statistics_df
         self.sev_1 = s1
         self.sev_2 = s2
         self.sev_3 = s3
@@ -492,9 +492,9 @@ class MomentAggregator(object):
 
     def get_fsa_stats(self, total, remix=False):
         """
-        get the current f x s = agg stats and moments
+        get the current f x s = agg statistics_df and moments
         total = true use total else, current
-        remix = true for total only, re-compute freq stats based on total freq 1
+        remix = true for total only, re-compute freq statistics_df based on total freq 1
 
         :param total: binary
         :param remix: combine all sevs and recompute the freq moments from total freq
@@ -599,8 +599,8 @@ class MomentAggregator(object):
     @staticmethod
     def column_names(agg_only):
         """
-        list of the moment and stats names for f x s = a
-        list of the moment and stats names for just agg
+        list of the moment and statistics_df names for f x s = a
+        list of the moment and statistics_df names for just agg
 
         :param agg_only: = True for total r
         :return:

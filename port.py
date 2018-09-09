@@ -23,7 +23,7 @@ import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
-
+import pandas as pd
 from .utils import *
 from .distr import Aggregate
 from .spectral import Distortion
@@ -49,16 +49,16 @@ class Portfolio(object):
         for spec in spec_list:
             a = Aggregate(**spec)
             self.agg_list.append(a)
-            self.line_names.append(spec['name'])
+            self.line_names.append(spec['name'][0] if isinstance(spec['name'], list) else spec['name'])
             ma.add_fs(a.report[('freq', 'ex1')],
                       a.report[('sev', 'ex1')], a.report[('sev', 'ex2')], a.report[('sev', 'ex3')])
-            max_limit = max(max_limit, np.max(np.array(a.exp_limit)))
+            max_limit = max(max_limit, np.max(np.array(a.limit)))
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
             # line names cannot start with n, it is reserved for "not"
             if n[0] == 'n':
                 raise ValueError('Line names cannot start with n, it is reserved for not')
-        # make a pandas data frame of all the stats
+        # make a pandas data frame of all the statistics_df
         temp_report = pd.concat([a.report for a in self.agg_list], axis=1)
 
         # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
@@ -149,7 +149,9 @@ class Portfolio(object):
         hashging behavior
         :return:
         """
-        return hash(self.__repr__())
+        # TODO fix
+        # return hash(self.__repr__())
+        return hash(repr(self.__dict__))
 
     def __iter__(self):
         """
@@ -336,7 +338,7 @@ class Portfolio(object):
             cv = self.statistics_df.loc[('agg', 'cv'), 'total']
             skew = self.statistics_df.loc[('agg', 'skew'), 'total']
         else:
-            # use stats matched to computed aggregate
+            # use statistics_df matched to computed aggregate
             m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
 
         if kind == 'slognorm':
@@ -360,7 +362,7 @@ class Portfolio(object):
         :return:
         """
         spec = self.fit(kind)
-        logging.debug(f'CPortfolio.collapse | Collapse created new CPortfolio with contained_iterable {contained_iterable}')
+        logging.debug(f'CPortfolio.collapse | Collapse created new CPortfolio with spec {spec}')
         return Portfolio(self.name, [spec])
 
     def percentiles(self, pvalues=None):
@@ -510,7 +512,7 @@ class Portfolio(object):
             self.density_df.loc[:, self.density_df.select_dtypes(include=['float64']).columns] = \
                 self.density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
 
-        # make audit stats df
+        # make audit statistics_df df
         theoretical_stats = self.statistics_df.T.filter(regex='agg')
         theoretical_stats.columns = ['Mean', 'CV', 'Skew', 'EX1', 'EX2', 'EX3', 'Limit', 'P99.9Est']
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
@@ -530,7 +532,7 @@ class Portfolio(object):
             ps = np.zeros((len(percentiles)))
             temp = self.density_df[f'p_{col}'].cumsum()
             for i, p in enumerate(percentiles):
-                ps[i] = np.argmax(temp > p)
+                ps[i] = (temp > p).idxmax()
             newrow = [sump, m, cv, s, ex1, ex2, ex3] + list(ps)
             self.audit_df.loc[col, :] = newrow
         self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
@@ -694,7 +696,7 @@ class Portfolio(object):
             # make appropriate scales
             density_scale = D.filter(regex='^p_').iloc[1:, :].max().max()
             expected_loss_scale = np.sum(D.loss * D.p_total) * 1.05
-            large_loss_scale = np.argmax(D.p_total.cumsum() > p)
+            large_loss_scale = (D.p_total.cumsum() > p).idxmax()
 
             # densities
             temp = D.filter(regex='^p_', axis=1)
@@ -1454,7 +1456,7 @@ class Portfolio(object):
             # truncate for graphics
             # 1e-4 arb selected min prob for plot truncation... not significant
             max_threshold = 1e-4
-            max_x = np.argmax(self.density_df.S < max_threshold)
+            max_x = (self.density_df.S < max_threshold).idxmax()
             if max_x == 0:
                 max_x = self.density_df.loss.max()
             df_plot = df.loc[0:max_x, :]
@@ -1568,7 +1570,7 @@ class Portfolio(object):
                     ix = self.density_df.index.get_loc(a_reg, method='ffill')
                     a_reg_ix = self.density_df.index[ix]
 
-        # relevant row for all stats
+        # relevant row for all statistics_df
         row = self.density_df.loc[a_reg_ix, :]
 
         # figure pricing distortion
@@ -2021,3 +2023,34 @@ class Portfolio(object):
             return np.hstack((0, v[:-1])).cumsum() * bs
         else:
             return np.hstack((0, v.values[:-1])).cumsum() * bs
+
+    @staticmethod
+    def from_DataFrame(name, df):
+        """
+        create portfolio from pandas dataframe
+        uses columns with appropriate names
+
+        :param df:
+        :return:
+        """
+        # ...and this is why we love pandas so much
+        spec_list = [g.dropna(axis=1).to_dict(orient='list') for n, g in df.groupby('name')]
+        return Portfolio(name, spec_list)
+
+    @staticmethod
+    def from_Excel(name, ffn, sheet_name, **kwargs):
+        """
+        read in from Excel
+
+        works via a Pandas dataframe; kwargs passed through to pd.read_excel
+        drops all blank columns (mostly for auditing purposes)
+
+
+        :param ffn: full file name, including path
+        :param sheet_name:
+        :param kwargs:
+        :return:
+        """
+        df = pd.read_excel(ffn, sheet_name=sheet_name, **kwargs)
+        df = df.dropna(axis=1, how='all')
+        return Portfolio.from_DataFrame(name, df)

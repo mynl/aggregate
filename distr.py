@@ -92,20 +92,33 @@ class Aggregate(object):
         #                  sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
         #                  freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
 
+        # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
+        def get_value(v):
+            if isinstance(v, list):
+                return v[0]
+            else:
+                return v
+
         # class variables (mostly)
-        self.name = name
-        self.freq_name = freq_name
-        self.freq_a = freq_a
-        self.freq_b = freq_b
+        self.name = get_value(name)
+        self.freq_name = get_value(freq_name)
+        self.freq_a = get_value(freq_a)
+        self.freq_b = get_value(freq_b)
         self.sev_density = None
         self.ftagg_density = None
         self.agg_density = None
         self.xs = None
         self.fzapprox = None
         self.n = 0  # total frequency
-        self.aggm, self.aggcv, self.aggskew = 0, 0, 0
+        self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
+        self._nearest_quantile_function = None
 
         # get other variables defined in init
+        self.en = None # this is for a sublayer e.g. for limit profile
+        self.n = 0  # this is total frequency
+        self.attachment = None
+        self.limit = None
+        self.scalar_business = None
         self.sev_density = None
         self.fzapprox = None
         self.agg_density = None
@@ -116,12 +129,12 @@ class Aggregate(object):
         self.dh_sev_density = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
-        self.stats = pd.DataFrame(columns=['limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
-                                          MomentAggregator.column_names(agg_only=False) +
-                                          ['contagion', 'mix_cv'])
-        self.stats_total = self.stats.copy()
+        self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
+                                                  MomentAggregator.column_names(agg_only=False) +
+                                                  ['contagion', 'mix_cv'])
+        self.statistics_total_df = self.statistics_df.copy()
 
-        ma = MomentAggregator(freq_name, freq_a, freq_b)
+        ma = MomentAggregator(self.freq_name, self.freq_a, self.freq_b)
 
         # broadcast arrays: first line forces them all to be arrays
         # TODO this approach forces EITHER a mixture OR multi exposures
@@ -131,9 +144,6 @@ class Aggregate(object):
             exp_el = np.array([exp_el])
 
         # pyCharm formatting
-        self.en = None
-        self.attachment = None
-        self.limit = None
         exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, \
         sev_scale, sev_wt = \
             np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b,
@@ -149,8 +159,8 @@ class Aggregate(object):
         exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
         # compute the grand total for approximations
         # overall freq CV with common mixing TODO this is dubious
-        c = freq_a
-        root_c = np.sqrt(freq_a)
+        c = self.freq_a
+        root_c = np.sqrt(self.freq_a)
         # counter
         r = 0
         for _el, _pr, _lr, _en, _at, _y, sn, sa, sb, sm, scv, sloc, ssc, smix in \
@@ -179,31 +189,31 @@ class Aggregate(object):
             ma.add_fs(_en, sev1, sev2, sev3)
 
             # store
-            label = f'{r}: {_y} / {_at} n={_en}'
-            self.stats.loc[label, :] = [_y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [c, freq_a]
+            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [c, self.freq_a]
             r += 1
 
         # average exp_limit and exp_attachment
-        avg_limit = np.sum(self.stats.limit * self.stats.freq_1) / ma.tot_freq_1
-        avg_attach = np.sum(self.stats.attachment * self.stats.freq_1) / ma.tot_freq_1
-        # assert np.allclose(ma.freq_1, self.stats.exp_en)
+        avg_limit = np.sum(self.statistics_df.limit * self.statistics_df.freq_1) / ma.tot_freq_1
+        avg_attach = np.sum(self.statistics_df.attachment * self.statistics_df.freq_1) / ma.tot_freq_1
+        # assert np.allclose(ma.freq_1, self.statistics_df.exp_en)
 
         # store answer for total
-        tot_prem = self.stats.prem.sum()
-        tot_loss = self.stats.el.sum()
+        tot_prem = self.statistics_df.prem.sum()
+        tot_loss = self.statistics_df.el.sum()
         if tot_prem > 0:
             lr = tot_loss / tot_prem
         else:
             lr = np.nan
-        self.stats_total.loc[self.name, :] = [avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-                                             ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
-        self.stats_total.loc[f'{self.name} independent freq', :] = \
-            [avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
-        self.stats['wt'] = self.stats.freq_1 / ma.tot_freq_1
-        self.stats_total['wt'] = self.stats.wt.sum()  # better equal 1.0!
+        self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
+                                                    ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+        self.statistics_total_df.loc[f'independent', :] = \
+            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
+        self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
+        self.statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
         self.n = ma.tot_freq_1
-        self.statistics_df = pd.concat((self.stats, self.stats_total))
-
+        self.agg_m = self.statistics_total_df.loc['mixed', 'agg_m']
+        self.agg_cv = self.statistics_total_df.loc['mixed', 'agg_cv']
+        self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
         # finally, need a report series for Portfolio to consolidate
         self.report = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
         # TODO fill in missing p99                                   ^ pctile
@@ -214,8 +224,8 @@ class Aggregate(object):
 
         :return:
         """
-        # pull out agg stats
-        ags = self.stats_total.loc[self.name, :]
+        # pull out agg statistics_df
+        ags = self.statistics_total_df.loc['mixed', :]
         s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
             f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, CV(X)={ags['sev_cv']:5.3f}\n\t" \
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
@@ -295,7 +305,7 @@ class Aggregate(object):
         # make the severity vector
         # case 1 (all for now) it is the claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
-            wts = self.stats.freq_1 / self.stats.freq_1.sum()
+            wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
             beds = self.discretize(sev_calc, discretization_calc)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
@@ -303,12 +313,11 @@ class Aggregate(object):
                 if verbose:
                     _m = np.sum(self.xs * temp)
                     _cv = np.sqrt(np.sum((self.xs ** 2) * temp) - (_m ** 2)) / _m
-                    label = f'{r}: {self.limit[r]} / {self.attachment[r]} n={self.en[r]}'
-                    r += 1
-                    df.loc[label, :] = [l, a, n, _m, _cv,
+                    df.loc[r, :] = [l, a, n, _m, _cv,
                                         temp.sum(),
                                         w, np.sum(np.where(np.isinf(temp), 1, 0)),
                                         temp.max(), w * temp.max(), temp.min()]
+                    r += 1
                     next(axm).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
                     axm.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
                     if np.all(self.limit < np.inf):
@@ -361,13 +370,13 @@ class Aggregate(object):
                                  ' Allowable values are -1 (or bernoulli) 1 (or fixed), missing or 0 (Poisson)')
         else:
             # regardless of request if skew == 0 have to use normal
-            if self.aggskew == 0:
-                self.fzapprox = ss.norm(scale=self.aggm * self.aggcv, loc=self.aggm)
+            if self.agg_skew == 0:
+                self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)
             elif approximation == 'slognorm':
-                shift, mu, sigma = sln_fit(self.aggm, self.aggcv, self.aggskew)
+                shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
                 self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
             elif approximation == 'sgamma':
-                shift, alpha, theta = sgamma_fit(self.aggm, self.aggcv, self.aggskew)
+                shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
                 self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
             else:
                 raise ValueError(f'Invalid approximation {approximation} option passed to CAgg density. '
@@ -380,7 +389,7 @@ class Aggregate(object):
         if verbose:
             ax = next(axm)
             ax.plot(xs, self.agg_density, 'b')
-            ax.set(xlim=(0, self.aggm * (1 + 5 * self.aggcv)), title='aggregate')
+            ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='aggregate')
             suptitle_and_tight(f'{self.name} severity audit')
             _m = np.sum(self.xs * np.nan_to_num(self.agg_density))
             _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.agg_density)) - _m ** 2) / _m
@@ -389,10 +398,11 @@ class Aggregate(object):
                                 np.nan, np.sum(np.where(np.isinf(self.agg_density), 1, 0)),
                                 self.agg_density.max(), np.nan, self.agg_density.min()]
             audit = pd.concat((df[['limit', 'attachment', 'emp ex1', 'emp cv']],
-                               pd.concat((self.stats, self.stats_total))[[
+                               pd.concat((self.statistics_df, self.statistics_total_df))[[
                                    'freq_1', 'sev_1', 'sev_cv']]), sort=True, axis=1)
-            audit.iloc[-1, -1] = self.stats_total.loc[f'{self.name} independent freq', 'agg_cv']
-            audit.iloc[-1, -2] = self.stats_total.loc[f'{self.name} independent freq', 'agg_1']
+            # TODO should one be mixed?
+            audit.iloc[-1, -1] = self.statistics_total_df.loc['independent', 'agg_cv']
+            audit.iloc[-1, -2] = self.statistics_total_df.loc['independent', 'agg_1']
             audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
             audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1']
 
@@ -400,7 +410,7 @@ class Aggregate(object):
 
     def emp_stats(self):
         """
-        report on empirical stats
+        report on empirical statistics_df
 
         :return:
         """
@@ -423,10 +433,10 @@ class Aggregate(object):
             df = pd.DataFrame({'numeric': s1, self.beta_name: s2})
         else:
             df = pd.DataFrame(s1, columns=['numeric'])
-        df.loc['mean', 'theory'] = self.stats_total.loc['Agg', 'agg1']
-        df.loc['sd', 'theory'] = np.sqrt(self.stats_total.loc['Agg', 'agg2'] -
-                                         self.stats_total.loc['Agg', 'agg1'] ** 2)
-        df.loc['cv', 'theory'] = self.stats_total.loc['Agg', 'aggcv']  # report[('agg', 'cv')]
+        df.loc['mean', 'theory'] = self.statistics_total_df.loc['Agg', 'agg1']
+        df.loc['sd', 'theory'] = np.sqrt(self.statistics_total_df.loc['Agg', 'agg2'] -
+                                         self.statistics_total_df.loc['Agg', 'agg1'] ** 2)
+        df.loc['cv', 'theory'] = self.statistics_total_df.loc['Agg', 'agg_cv']  # report[('agg', 'cv')]
         df['err'] = df['numeric'] / df['theory'] - 1
         return df
 
@@ -622,20 +632,42 @@ class Aggregate(object):
         :param N:
         :return:
         """
-        moment_est = estimate_agg_percentile(self.aggm, self.aggcv, self.aggskew) / N
+        moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew) / N
         limit_est = self.limit.max() / N
         if limit_est == np.inf:
             limit_est = 0
         logging.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
         return max(moment_est, limit_est)
 
+    def q(self, p):
+        """
+        return a quantile using nearest (i.e. will be in the index
+
+        :param p:
+        :return:
+        """
+        if self._nearest_quantile_function is None:
+            self._nearest_quantile_function = self.quantile_function("nearest")
+        return float(self._nearest_quantile_function(p))
+
+    def quantile_function(self, kind='nearest'):
+        """
+        return an approximation to the quantile function
+
+        TODO sort out...this isn't right
+
+        :param kind:
+        :return:
+        """
+        q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind, bounds_error=False, fill_value=0)
+        return q
 
 class Severity(ss.rv_continuous):
     """
 
-    A continuous random variable, subclasses ``scipy.stats.rv_continuous``.
+    A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``.
 
-    adds layer and attachment to scipy stats continuous random variable class
+    adds layer and attachment to scipy statistics_df continuous random variable class
     overrides
 
     * cdf
@@ -644,7 +676,7 @@ class Severity(ss.rv_continuous):
     * ppf
     * moments
 
-    Should consider over-riding: sf, **stats** ?munp
+    Should consider over-riding: sf, **statistics_df** ?munp
 
 
 
@@ -654,7 +686,7 @@ class Severity(ss.rv_continuous):
                  hps=None, conditional=True):
         """
 
-        :param name: scipy stats continuous distribution | (c|d)histogram  cts or discerte | fixed
+        :param name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param attachment:
         :param limit:
         :param mean:
@@ -770,7 +802,7 @@ class Severity(ss.rv_continuous):
                 assert (np.isclose(mean, m))
             if cv > 0:
                 assert (np.isclose(cv, acv))
-            # print('ACHIEVED', mean, cv, m, acv, self.fz.stats(), self._stats())
+            # print('ACHIEVED', mean, cv, m, acv, self.fz.statistics_df(), self._stats())
             logging.info(f'Severity.__init__ | parameters {a}, {scale}: target/actual {mean} vs {m};  {cv} vs {acv}')
 
         lim_name = f'{limit:,.0f}' if limit != np.inf else "Unlimited"

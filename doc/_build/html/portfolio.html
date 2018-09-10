@@ -163,6 +163,22 @@ ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
 </dd></dl>
 
 <dl class="method">
+<dt id="aggregate.port.Portfolio.cumintegral">
+<code class="descname">cumintegral</code><span class="sig-paren">(</span><em>v</em>, <em>bs_override=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.cumintegral"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.cumintegral" title="Permalink to this definition">¶</a></dt>
+<dd><p>cumulative integral of v with buckets size bs</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>v</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="aggregate.port.Portfolio.fit">
 <code class="descname">fit</code><span class="sig-paren">(</span><em>kind='slognorm'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>returns a dictionary specification of the portfolio aggregate
@@ -174,6 +190,47 @@ if updated uses empirical moments, otherwise uses theoretic moments</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kind</strong> – slognorm | sgamma</td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="aggregate.port.Portfolio.from_DataFrame">
+<em class="property">static </em><code class="descname">from_DataFrame</code><span class="sig-paren">(</span><em>name</em>, <em>df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.from_DataFrame"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.from_DataFrame" title="Permalink to this definition">¶</a></dt>
+<dd><p>create portfolio from pandas dataframe
+uses columns with appropriate names</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>df</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="aggregate.port.Portfolio.from_Excel">
+<em class="property">static </em><code class="descname">from_Excel</code><span class="sig-paren">(</span><em>name</em>, <em>ffn</em>, <em>sheet_name</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.from_Excel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.from_Excel" title="Permalink to this definition">¶</a></dt>
+<dd><p>read in from Excel</p>
+<p>works via a Pandas dataframe; kwargs passed through to pd.read_excel
+drops all blank columns (mostly for auditing purposes)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>ffn</strong> – full file name, including path</li>
+<li><strong>sheet_name</strong> – </li>
+<li><strong>kwargs</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -412,7 +469,7 @@ If A=0 A=q(p) is used</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.uat">
-<code class="descname">uat</code><span class="sig-paren">(</span><em>As=None, Ps=[0.98], LRs=[0.965], r0=0.03</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.uat"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.uat" title="Permalink to this definition">¶</a></dt>
+<code class="descname">uat</code><span class="sig-paren">(</span><em>As=None, Ps=[0.98], LRs=[0.965], r0=0.03, verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.uat"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.uat" title="Permalink to this definition">¶</a></dt>
 <dd><p>Reconcile apply_distortion(s) with price and calibrate</p>
 </dd></dl>
 
@@ -548,7 +605,7 @@ If A=0 A=q(p) is used</p>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

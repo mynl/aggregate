@@ -16,8 +16,8 @@ cata:
     exp_en: 1.7
     sev_name: pareto
     sev_a: 2.1
-    sev_scale: 1
-    sev_loc: -1
+    sev_scale: 1.
+    sev_loc: -1.
     freq_name: poisson
     note: can put notes here to describe provenance of curve
 catb:
@@ -85,11 +85,13 @@ comm_prop:
     sev_mean: 250000.0
 homeowners:
     exp_en: 4337346.319489225
+    exp_limit: 2500
     freq_name: poisson
-    freq_a: 0.025479706791365048
+    freq_a: 0.24
     sev_name: lognorm
     sev_cv: 0.5
-    sev_mean: 15000.0
+    sev_mean: 15.0
+    note: severity in 000s
 inland_marine:
     exp_en: 314117.39908251056
     freq_name: poisson
@@ -99,7 +101,6 @@ inland_marine:
     sev_mean: 50000.0
 ppa:
     exp_en: 5676073.301971859
-    frequency:
     freq_a: 0.0034980315893991974
     sev_name: lognorm
     sev_cv: 0.5

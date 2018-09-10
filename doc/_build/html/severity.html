@@ -46,8 +46,8 @@
 <dl class="class">
 <dt id="aggregate.distr.Severity">
 <em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Severity</code><span class="sig-paren">(</span><em>name</em>, <em>attachment=0</em>, <em>limit=inf</em>, <em>mean=0</em>, <em>cv=0</em>, <em>a=0</em>, <em>b=0</em>, <em>loc=0</em>, <em>scale=0</em>, <em>hxs=None</em>, <em>hps=None</em>, <em>conditional=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity" title="Permalink to this definition">¶</a></dt>
-<dd><p>A continuous random variable, subclasses <code class="docutils literal"><span class="pre">scipy.stats.rv_continuous</span></code>.</p>
-<p>adds layer and attachment to scipy stats continuous random variable class
+<dd><p>A continuous random variable, subclasses <code class="docutils literal"><span class="pre">scipy.statistics_df.rv_continuous</span></code>.</p>
+<p>adds layer and attachment to scipy statistics_df continuous random variable class
 overrides</p>
 <ul class="simple">
 <li>cdf</li>
@@ -56,7 +56,7 @@ overrides</p>
 <li>ppf</li>
 <li>moments</li>
 </ul>
-<p>Should consider over-riding: sf, <strong>stats</strong> ?munp</p>
+<p>Should consider over-riding: sf, <strong>statistics_df</strong> ?munp</p>
 <dl class="method">
 <dt id="aggregate.distr.Severity._cdf">
 <code class="descname">_cdf</code><span class="sig-paren">(</span><em>x</em>, <em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity._cdf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity._cdf" title="Permalink to this definition">¶</a></dt>
@@ -93,6 +93,51 @@ overrides</p>
 <dd></dd></dl>
 
 <dl class="method">
+<dt id="aggregate.distr.Severity.cv_to_shape">
+<code class="descname">cv_to_shape</code><span class="sig-paren">(</span><em>cv</em>, <em>hint=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.cv_to_shape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.cv_to_shape" title="Permalink to this definition">¶</a></dt>
+<dd><p>create a frozen object of type dist_name with given cv
+dist_name = ‘lognorm’
+cv = 0.25</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>cv</strong> – </li>
+<li><strong>hint</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.distr.Severity.mean_to_scale">
+<code class="descname">mean_to_scale</code><span class="sig-paren">(</span><em>shape</em>, <em>mean</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.mean_to_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.mean_to_scale" title="Permalink to this definition">¶</a></dt>
+<dd><p>adjust scale of fz to have desired mean
+return frozen instance</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>shape</strong> – </li>
+<li><strong>mean</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="aggregate.distr.Severity.moms">
 <code class="descname">moms</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.moms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.moms" title="Permalink to this definition">¶</a></dt>
 <dd><p>moms method
@@ -110,7 +155,7 @@ for unlimited integral of a low sd variable</p>
 
 <dl class="method">
 <dt id="aggregate.distr.Severity.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>N=100</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.plot" title="Permalink to this definition">¶</a></dt>
+<code class="descname">plot</code><span class="sig-paren">(</span><em>N=100</em>, <em>axiter=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.plot" title="Permalink to this definition">¶</a></dt>
 <dd><p>quick plot</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -170,7 +215,7 @@ for unlimited integral of a low sd variable</p>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

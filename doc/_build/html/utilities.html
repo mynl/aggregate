@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Parameters Module" href="parameters.html" />
-    <link rel="prev" title="&lt;no title&gt;" href="underwriter.html" />
+    <link rel="prev" title="Underwriter Module" href="underwriter.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -164,8 +164,8 @@ compute agg for the latest values</p>
 <dl class="staticmethod">
 <dt id="utils.MomentAggregator.column_names">
 <em class="property">static </em><code class="descname">column_names</code><span class="sig-paren">(</span><em>agg_only</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
-<dd><p>list of the moment and stats names for f x s = a
-list of the moment and stats names for just agg</p>
+<dd><p>list of the moment and statistics_df names for f x s = a
+list of the moment and statistics_df names for just agg</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -222,9 +222,9 @@ list of the moment and stats names for just agg</p>
 <dl class="method">
 <dt id="utils.MomentAggregator.get_fsa_stats">
 <code class="descname">get_fsa_stats</code><span class="sig-paren">(</span><em>total</em>, <em>remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
-<dd><p>get the current f x s = agg stats and moments
+<dd><p>get the current f x s = agg statistics_df and moments
 total = true use total else, current
-remix = true for total only, re-compute freq stats based on total freq 1</p>
+remix = true for total only, re-compute freq statistics_df based on total freq 1</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -342,106 +342,9 @@ TODO can this be done in the class somehow?</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.beta_factory">
-<code class="descclassname">utils.</code><code class="descname">beta_factory</code><span class="sig-paren">(</span><em>el</em>, <em>maxl</em>, <em>cv</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#beta_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.beta_factory" title="Permalink to this definition">¶</a></dt>
-<dd><p>beta a and b params given expected loss, max loss exposure and cv
-Kent E.’s specification. Just used to create the CAgg classes for his examples (in agg.examples)
-<a class="reference external" href="https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters">https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters</a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>el</strong> – </li>
-<li><strong>maxl</strong> – </li>
-<li><strong>cv</strong> – </li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="utils.cumintegral">
-<code class="descclassname">utils.</code><code class="descname">cumintegral</code><span class="sig-paren">(</span><em>v</em>, <em>bs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#cumintegral"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.cumintegral" title="Permalink to this definition">¶</a></dt>
-<dd><p>cumulative integral of v with buckets size bs</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>v</strong> – </li>
-<li><strong>bs</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="utils.cv_to_shape">
-<code class="descclassname">utils.</code><code class="descname">cv_to_shape</code><span class="sig-paren">(</span><em>dist_name</em>, <em>cv</em>, <em>hint=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#cv_to_shape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.cv_to_shape" title="Permalink to this definition">¶</a></dt>
-<dd><p>create a frozen object of type dist_name with given cv
-dist_name = ‘lognorm’
-cv = 0.25</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>dist_name</strong> – </li>
-<li><strong>cv</strong> – </li>
-<li><strong>hint</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="utils.distribution_factory">
-<code class="descclassname">utils.</code><code class="descname">distribution_factory</code><span class="sig-paren">(</span><em>dist_name</em>, <em>mean</em>, <em>cv</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#distribution_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.distribution_factory" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create a frozen distribution object by name
-Normal (and possibly others) does not have a shape parameter
-figure shape and scale from mean and cv
-corresponds to unlimited severity for now</p>
-<p>E.g.
-fz = dist_factory_ex(‘lognorm’, 1000, 0.25)
-fz = dist_factory_ex(‘gamma’, 1000, 1.25)
-plot_frozen(fz)</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>dist_name</strong> – </li>
-<li><strong>mean</strong> – </li>
-<li><strong>cv</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Return frozen distribution instance:</th></tr>
-<tr class="field-even field"><td>&#160;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="utils.estimate_agg_percentile">
 <code class="descclassname">utils.</code><code class="descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em>, <em>p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
-if len(spec) &gt; 3 it is assumed to be a spec, otherwise input m, cv, sk</p>
-<p>If spec passed in also take max with the limit</p>
+<dd><p>Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -568,51 +471,6 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.mean_to_scale">
-<code class="descclassname">utils.</code><code class="descname">mean_to_scale</code><span class="sig-paren">(</span><em>dist_name</em>, <em>shape</em>, <em>mean</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#mean_to_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.mean_to_scale" title="Permalink to this definition">¶</a></dt>
-<dd><p>adjust scale of fz to have desired mean
-return frozen instance</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>dist_name</strong> – </li>
-<li><strong>shape</strong> – </li>
-<li><strong>mean</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="utils.plot_frozen">
-<code class="descclassname">utils.</code><code class="descname">plot_frozen</code><span class="sig-paren">(</span><em>fz</em>, <em>N=100</em>, <em>p=0.0001</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#plot_frozen"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.plot_frozen" title="Permalink to this definition">¶</a></dt>
-<dd><p>make a quick plot of fz</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>fz</strong> – </li>
-<li><strong>N</strong> – </li>
-<li><strong>p</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="utils.read_log">
 <code class="descclassname">utils.</code><code class="descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.read_log" title="Permalink to this definition">¶</a></dt>
 <dd><p>read and return the log file</p>
@@ -692,28 +550,6 @@ return frozen instance</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.stats_series">
-<code class="descclassname">utils.</code><code class="descname">stats_series</code><span class="sig-paren">(</span><em>data_list</em>, <em>name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.stats_series" title="Permalink to this definition">¶</a></dt>
-<dd><p>combine elements into a reporting series
-handles order, index names etc. in one place</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>data_list</strong> – </li>
-<li><strong>name</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="utils.suptitle_and_tight">
 <code class="descclassname">utils.</code><code class="descname">suptitle_and_tight</code><span class="sig-paren">(</span><em>title</em>, <em>fontsize=14</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
 <dd><p>deal with tight layout when there is a suptitle</p>
@@ -779,7 +615,7 @@ handles order, index names etc. in one place</p>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

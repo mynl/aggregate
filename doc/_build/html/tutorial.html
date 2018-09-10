@@ -43,14 +43,254 @@
             
   <div class="section" id="tutorial">
 <h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="examples">
-<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li>Single line</li>
-<li>Multiple line</li>
-<li><span class="math">\(\beta \times \gamma = \tau\)</span></li>
-</ul>
+<div class="section" id="aggregate-simple-examples">
+<h2><code class="docutils literal"><span class="pre">aggregate</span></code>: Simple Examples<a class="headerlink" href="#aggregate-simple-examples" title="Permalink to this headline">¶</a></h2>
+<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="kn">from</span> <span class="nn">IPython.core.display</span> <span class="k">import</span> <span class="n">HTML</span><span class="p">,</span> <span class="n">display</span>
+
+<span class="c1"># pandas options</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s1">&#39;max_rows&#39;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s1">&#39;max_columns&#39;</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s1">&#39;display.max_colwidth&#39;</span><span class="p">,</span> <span class="mi">150</span><span class="p">)</span>
+
+<span class="c1"># matplotlib and plotting options</span>
+<span class="o">%</span><span class="n">matplotlib</span> <span class="n">inline</span>
+<span class="o">%</span><span class="n">config</span> <span class="n">InlineBackend</span><span class="o">.</span><span class="n">figure_format</span> <span class="o">=</span> <span class="s1">&#39;svg&#39;</span>
+
+<span class="c1"># seaborn options</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="s1">&#39;paper&#39;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set_palette</span><span class="p">(</span><span class="s2">&quot;husl&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="o">.</span><span class="mi">75</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set_style</span><span class="p">(</span><span class="s2">&quot;ticks&quot;</span><span class="p">)</span>
+</pre></div>
 </div>
+<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">aggregate</span> <span class="k">as</span> <span class="nn">agg</span>
+</pre></div>
+</div>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">WARNING</span><span class="p">:</span> <span class="mi">2</span> <span class="n">shift</span><span class="o">/</span><span class="n">reduce</span> <span class="n">conflicts</span>
+</pre></div>
+</div>
+<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">uw</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">Underwriter</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">uw</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+</pre></div>
+</div>
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Curves</th>
+      <th>Blocks</th>
+      <th>Books</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>fixed</td>
+      <td>scs</td>
+      <td>bodoff1</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>directors_a</td>
+      <td>casxol</td>
+      <td>bodoff2</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>directors_b</td>
+      <td>cata</td>
+      <td>bodoff3</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>directors_c</td>
+      <td>catb</td>
+      <td>bodoff4</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>cata</td>
+      <td>catc</td>
+      <td>Three Line Example</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>catb</td>
+      <td>catd</td>
+      <td>Single</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>catc</td>
+      <td>cate</td>
+      <td>Mixed</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>catd</td>
+      <td>noncata</td>
+      <td>Sublines</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>cate</td>
+      <td>noncatb</td>
+      <td>small_medium_large</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>noncata</td>
+      <td>comm_auto</td>
+      <td>mass_test</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>noncatb</td>
+      <td>cmp</td>
+      <td>interesting_cat</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td></td>
+      <td>comm_prop</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td></td>
+      <td>homeowners</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td></td>
+      <td>inland_marine</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td></td>
+      <td>ppa</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td></td>
+      <td>work_comp</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td></td>
+      <td>my_earthquake</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>17</th>
+      <td></td>
+      <td>my_wind</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+</div><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span> <span class="o">=</span> <span class="n">uw</span><span class="o">.</span><span class="n">homeowners</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+<span class="n">biz</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">250e6</span><span class="p">,</span> <span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">13</span><span class="p">),</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;quick&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<img alt="_images/output_6_1.svg" src="_images/output_6_1.svg" /><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<pre class="literal-block">
+C:UserssteveAnaconda3libsite-packagesmatplotlibaxes_base.py:3443: UserWarning: Attempting to set identical bottom==top results
+in singular transformations; automatically expanding.
+bottom=1.0, top=1.0
+  'bottom=%s, top=%s') % (bottom, top))
+</pre>
+<img alt="_images/output_7_1.svg" src="_images/output_7_1.svg" /><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">audit_df</span>
+</pre></div>
+</div>
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>name</th>
+      <th>limit</th>
+      <th>attachment</th>
+      <th>el</th>
+      <th>freq_1</th>
+      <th>sev_1</th>
+      <th>agg_1</th>
+      <th>agg_m</th>
+      <th>agg_cv</th>
+      <th>agg_skew</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>homeowners</td>
+      <td>2500</td>
+      <td>0</td>
+      <td>6.50602e+07</td>
+      <td>4.33735e+06</td>
+      <td>15</td>
+      <td>6.50602e+07</td>
+      <td>6.50602e+07</td>
+      <td>0.240001</td>
+      <td>0.48</td>
+    </tr>
+    <tr>
+      <th>mixed</th>
+      <td>homeowners</td>
+      <td>2500</td>
+      <td>0</td>
+      <td>6.50602e+07</td>
+      <td>4.33735e+06</td>
+      <td>15</td>
+      <td>6.50602e+07</td>
+      <td>6.50602e+07</td>
+      <td>0.240001</td>
+      <td>0.48</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
 </div>
 
 
@@ -95,7 +335,7 @@
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

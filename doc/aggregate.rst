@@ -1,7 +1,7 @@
 
 
-Aggregate Class
-==============
+Aggregate and Severity Classes
+==============================
 
 
 .. automodule:: aggregate.distr

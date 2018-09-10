@@ -29,10 +29,12 @@ def kword_expander(**kwargs):
 
 
 class TestUnderwriter(unittest.TestCase):
+    def setUp(self):
+        self.uw = Underwriter()
+
     def test_block_objects(self):
-        uw = Underwriter()
-        line = uw['cmp']
-        line2 = uw.cmp
+        line = self.uw['cmp']
+        line2 = self.uw.cmp
         self.assertTrue(line.name == 'cmp')
         self.assertTrue(line['sev_name'] == 'lognorm')
         a = 10 * line
@@ -51,24 +53,19 @@ class TestUnderwriter(unittest.TestCase):
         self.assertEqual(line['sev_name'], 'gamma')
 
     def test_curve_object(self):
-        uw = Underwriter()
-        c1 = uw.noncata
+        c1 = self.uw.noncata
         c1.sev_mean = 100
         cc = c1.write()
         self.assertTrue(np.allclose(cc.stats(), (100, 10000)))
 
     def test_book_object(self):
-        uw = Underwriter()
-        c = uw['Three Line Example']
+        c = self.uw['Three Line Example']
         cc = c.write(True)
         self.assertTrue(np.allclose(cc.audit_df.Mean, [ 969.456474, 1000.000000, 3076.451887, 5045.908361 ]))
         self.assertTrue(((cc.audit_df.EmpMean - cc.audit_df.Mean)**2).sum() < 1e-3)
 
-
-class TestAggregateModule(unittest.TestCase):
     def test_portfolio_creation_update_uat_from_book(self):
-        uw = agg.Underwriter()
-        book = uw['Three Line Example']
+        book = self.uw['Three Line Example']
         port = book.write(True)
         self.assertTrue(port.audit_df.MeanErr.abs().sum() < 1e-5)
         self.assertTrue(port.audit_df.CVErr.abs().sum() < 5e-5)
@@ -77,12 +74,15 @@ class TestAggregateModule(unittest.TestCase):
         self.assertTrue(a['lr err'].abs().sum() < 1e-8)
         self.assertTrue(np.all(test.filter(regex='err[_s]', axis=1).abs().sum() < 1e-8))
 
+
+class TestAggregateModule(unittest.TestCase):
+
     def test_Aggregate(self):
         sig = .75
         d1b1 = Aggregate('single', exp_en=10, sev_name='lognorm', sev_a=[sig, sig / 2, sig / 5],
                          sev_scale=100 * np.exp(-sig ** 2 / 2), sev_wt=1, freq_name='poisson', freq_a=0.81)
         xs = np.linspace(0, 1023, 1024)
-        df, audit = d1b1.density(xs, verbose=False)
+        d1b1.update(xs, verbose=False)
         self.assertTrue(d1b1.statistics_total_df.T.loc['el', :].sum() == 5146.408347357843)
 
         sig = 0.75
@@ -124,7 +124,7 @@ class TestAggregateModule(unittest.TestCase):
         N = 1 << log2
         MAXL = N * bs
         xs = np.linspace(0, MAXL, N, endpoint=False)
-        df, audit = sa.density(xs, 1, None, 'exact', sev_calc='discrete', discretization_calc='survival', verbose=True)
+        df, audit = sa.update(xs, 1, None, 'exact', sev_calc='discrete', discretization_calc='survival', verbose=True)
         # average of square errors is small:
         self.assertTrue(
             np.sum(np.abs(audit.iloc[0:-3, :]['rel sev err']) ** 2) ** .5 / (len(audit) - 3) < 1e-6)

@@ -127,11 +127,9 @@ class Portfolio(object):
         # return str(self.to_dict())
 
         s = [f'{{ "name": "{self.name}"']
-        agg_list = []
-        for a in self.agg_list:
-            # references through to the defining contained_iterable...as input...
-            agg_list.append(str(a.spec))
-        s.append(f"'contained_iterable': [{', '.join(agg_list)}]")
+        agg_list = [str({k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys})
+                    for a in self.agg_list]
+        s.append(f"'spec': [{', '.join(agg_list)}]")
         if self.bs > 0:
             s.append(f'"bs": {self.bs}')
             s.append(f'"log2": {self.log2}')
@@ -259,7 +257,7 @@ class Portfolio(object):
             new_spec.append(deepcopy(a.spec))
 
         for d in new_spec:
-            # d is a dictionary agg contained_iterable, need to adjust the severity
+            # d is a dictionary agg spec, need to adjust the severity
             s = d['severity']
             if 'mean' in s:
                 s['mean'] *= other
@@ -285,7 +283,7 @@ class Portfolio(object):
             new_spec.append(deepcopy(a.spec))
 
         for d in new_spec:
-            # d is a dictionary agg contained_iterable, need to adjust the frequency
+            # d is a dictionary agg spec, need to adjust the frequency
             # TODO better freq dists; deal with Bernoulli where n=p<1
             d['frequency']['n'] *= other
 
@@ -469,9 +467,9 @@ class Portfolio(object):
         ftall = None
         for agg in self.agg_list:
             nm = agg.name
-            _a, _b = agg.density(xs, self.padding, tilt_vector,
-                                 'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
-                                 verbose=verbose)
+            _a, _b = agg.update(xs, self.padding, tilt_vector,
+                                'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
+                                verbose=verbose)
             if verbose:
                 display(_a)
                 display(_b)
@@ -499,7 +497,7 @@ class Portfolio(object):
                     ftnot = ftall / ft_line_density[line]
             not_line_density[line] = np.real(ift(ftnot, self.padding, tilt_vector))
 
-        # make the dataframe contained_iterable
+        # make the density_df dataframe
         d1 = {'loss': xs}
         d2 = {'p_' + i: line_density[i] for i in self.line_names_ex}
         d3 = {'not_' + i: not_line_density[i] for i in self.line_names}
@@ -1524,16 +1522,16 @@ class Portfolio(object):
         Price using regulatory and pricing g functions
         i.e. compute E_price (X wedge E_reg(X) )
         regulatory capital distortion is applied on unlimited basis
-        reg_g is number; CDistortion; contained_iterable { name = var|tvar|  ,  shape =p value in either case }
+        reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =p value in either case }
         pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
         overwritten
 
-        ly  must include ro in contained_iterable
+        ly  must include ro in spec
 
         if lr and roe then lr is used
 
-        :param reg_g: a distortion function contained_iterable or just a number; if >1 assets if <1 a prob converted to quantile
-        :param pricing_g: contained_iterable or CDistortion class or lr= or roe =; must have name= to define contained_iterable; if CDist that is
+        :param reg_g: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
+        :param pricing_g: spec or CDistortion class or lr= or roe =; must have name= to define spec; if CDist that is
                           used
         :return:
         """
@@ -1579,7 +1577,7 @@ class Portfolio(object):
             # just use it
             pass
         else:
-            # contained_iterable as dict
+            # spec as dict
             if 'lr' in pricing_g:
                 # given LR, figure premium
                 prem = row['exa_total'] / pricing_g['lr']

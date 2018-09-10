@@ -23,11 +23,9 @@ Table of Contents
    tutorial
    prob
    devel
-   severity
    aggregate
    portfolio
    distortion
-   example
    underwriter
    utilities
    parameters

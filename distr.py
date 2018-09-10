@@ -17,24 +17,27 @@ from scipy.optimize import newton
 # from ruamel import yaml
 # from . utils import *
 
-LOGFILE = 'c:/S/TELOS/python/aggregate/aggregate.log'
-logging.basicConfig(filename=LOGFILE,
-                    filemode='w',
-                    format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-                    level=logging.DEBUG)
-logging.info('aggregate.__init__ | New trash Session started')
-
-
+# LOGFILE = 'c:/S/TELOS/python/aggregate/aggregate.log'
+# logging.basicConfig(filename=LOGFILE,
+#                     filemode='w',
+#                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+#                     level=logging.DEBUG)
+# logging.info('aggregate.__init__ | New trash Session started')
+#
+#
 class Aggregate(object):
     """
     Aggregate help placeholder
 
     """
+    aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
+                      'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
+                      'sev_wt', 'freq_name', 'freq_a', 'freq_b', 'note']
 
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0, freq_b=0):
+                 freq_name='', freq_a=0, freq_b=0, note=''):
         """
 
         el -> en
@@ -104,6 +107,7 @@ class Aggregate(object):
         self.freq_name = get_value(freq_name)
         self.freq_a = get_value(freq_a)
         self.freq_b = get_value(freq_b)
+        self.note = note
         self.sev_density = None
         self.ftagg_density = None
         self.agg_density = None
@@ -129,6 +133,7 @@ class Aggregate(object):
         self.dh_sev_density = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
+        self.audit_df = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names(agg_only=False) +
                                                   ['contagion', 'mix_cv'])
@@ -238,41 +243,42 @@ class Aggregate(object):
     #     """
     #     return str(self.spec)
 
-    def discretize(self, method, approx_calc='survival'):
+    def discretize(self, sev_calc, discretization_calc='survival'):
         """
 
 
-        :param method:  continuous or discrete or raw (for...)
-        :param approx_calc:  survival, distribution or both
+        :param sev_calc:  continuous or discrete or raw (for...)
+        :param discretization_calc:  survival, distribution or both
         :return:
         """
 
-        if method == 'continuous':
+        if sev_calc == 'continuous':
             adj_xs = np.hstack((self.xs, np.inf))
-        elif method == 'discrete':
+        elif sev_calc == 'discrete':
             adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
-        elif method == 'raw':
+        elif sev_calc == 'raw':
             adj_xs = self.xs
         else:
             raise ValueError(
-                f'Invalid parameter {method} passed to double_diff; options are raw, discrete or histogram')
+                f'Invalid parameter {sev_calc} passed to double_diff; options are raw, discrete or histogram')
 
         # bed = bucketed empirical distribution
         beds = []
         for fz in self.sevs:
-            if approx_calc == 'both':
+            if discretization_calc == 'both':
                 beds.append(np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs))))
-            elif approx_calc == 'survival':
+            elif discretization_calc == 'survival':
                 beds.append(-np.diff(fz.sf(adj_xs)))
-            elif approx_calc == 'distribution':
+            elif discretization_calc == 'distribution':
                 beds.append(np.diff(fz.cdf(adj_xs)))
             else:
-                raise ValueError(f'Invalid options {approx_calc} to double_diff; options are density, survival or both')
+                raise ValueError(
+                    f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
 
         return beds
 
-    def density(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
-                discretization_calc='survival', force_severity=False, verbose=False):
+    def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
+               discretization_calc='survival', force_severity=False, verbose=False):
         """
         Compute the density
         :param xs:
@@ -292,11 +298,10 @@ class Aggregate(object):
                 columns=['n', 'limit', 'attachment', 'en', 'emp ex1', 'emp cv', 'sum p_i', 'wt', 'nans', 'max', 'wtmax',
                          'min'])
             df = df.set_index('n')
-            audit = None
         else:
             axm = None
             df = None
-            audit = None
+        audit = None
         r = 0
         aa = al = 0
         self.xs = xs
@@ -386,6 +391,12 @@ class Aggregate(object):
             self.agg_density = ps / np.sum(ps)
             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
 
+        # make a suitable audit_df
+        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_1', 'agg_m', 'agg_cv', 'agg_skew']
+        self.audit_df = pd.concat((self.statistics_df[cols],
+                                   self.statistics_total_df.loc[['mixed'], cols]),
+                                  axis=0)
+
         if verbose:
             ax = next(axm)
             ax.plot(xs, self.agg_density, 'b')
@@ -405,7 +416,6 @@ class Aggregate(object):
             audit.iloc[-1, -2] = self.statistics_total_df.loc['independent', 'agg_1']
             audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
             audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1']
-
         return df, audit
 
     def emp_stats(self):
@@ -470,7 +480,7 @@ class Aggregate(object):
         """
         if self.agg_density is None:
             # update
-            self.density(xs, padding, tilt_vector, 'exact')
+            self.update(xs, padding, tilt_vector, 'exact')
         if isinstance(beta, Distortion):
             # passed in a distortion function
             beta_name = beta.name
@@ -582,7 +592,7 @@ class Aggregate(object):
             F = F[:mx]
 
             if self.sev_density is None:
-                self.density(self.xs, 1, None, sev_calc='rescale', force_severity=True)
+                self.update(self.xs, 1, None, sev_calc='discrete', force_severity=True)
             xs = self.xs[:mx]
             d = self.agg_density[:mx]
             sevF = np.cumsum(self.sev_density)

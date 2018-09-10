@@ -5,7 +5,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>&lt;no title&gt; &#8212; aggregate 0.9.40 documentation</title>
+    <title>Underwriter Module &#8212; aggregate 0.9.40 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Utilities" href="utilities.html" />
-    <link rel="prev" title="Example Class" href="example.html" />
+    <link rel="prev" title="Distortion Class" href="distortion.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -41,7 +41,213 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  
+  <div class="section" id="underwriter-module">
+<h1>Underwriter Module<a class="headerlink" href="#underwriter-module" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="aggregate.Underwriter">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">Underwriter</code><span class="sig-paren">(</span><em>dir_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Underwriter" title="Permalink to this definition">¶</a></dt>
+<dd><p>The underwriter class constructs real world examples from stored and user input Lines and Accounts.
+Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.</p>
+<p>Persisitence to and from YAML managed</p>
+<dl class="method">
+<dt id="aggregate.Underwriter.write">
+<code class="descname">write</code><span class="sig-paren">(</span><em>name</em>, <em>portfolio_program</em>, <em>update=False</em>, <em>verbose=False</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Underwriter.write" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> – </li>
+<li><strong>portfolio_program</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.Book">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">Book</code><span class="sig-paren">(</span><em>name</em>, <em>arg_dict</em>, <em>spec_list</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Book"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Book" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages construction of a “book” of business on a notional basis. Contains all the information
+needed to create a Portfolio object but no work is done until the book is “written”. Information
+is lightweight and stored in a dictionary. Can read/write from YAML.</p>
+<p>Adding assumes all components are independent…down road may want to revise and look through
+to severity and add groups?</p>
+<dl class="method">
+<dt id="aggregate.Book.write">
+<code class="descname">write</code><span class="sig-paren">(</span><em>update=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Book.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Book.write" title="Permalink to this definition">¶</a></dt>
+<dd><p>materialize Book in a full Portfolio class object</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.Block">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">Block</code><span class="sig-paren">(</span><em>name=''</em>, <em>exp_el=0.0</em>, <em>exp_premium=0.0</em>, <em>exp_lr=0.0</em>, <em>exp_en=0.0</em>, <em>exp_attachment=0.0</em>, <em>exp_limit=inf</em>, <em>sev_name=''</em>, <em>sev_a=0.0</em>, <em>sev_b=0.0</em>, <em>sev_mean=0.0</em>, <em>sev_cv=0.0</em>, <em>sev_loc=0.0</em>, <em>sev_scale=0.0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>sev_wt=1</em>, <em>freq_name=''</em>, <em>freq_a=0.0</em>, <em>freq_b=0.0</em>, <em>note=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Block"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Block" title="Permalink to this definition">¶</a></dt>
+<dd><p>Block is a helper class, containing all the information
+needed to create an Aggregate object but no work is done until the account is “written”.</p>
+<p>Information is lightweight and stored in a dictionary.</p>
+<p>Not created directly but subclasssed by Line, CatLine and Account which check appropriate information
+has been included in their specifications.</p>
+<p>Generally created by an underwriter.</p>
+<p>Can read/write from YAML.</p>
+<p>An Account is also a Line but is guaranteed to contain detailed severity information.</p>
+<p>Methods:</p>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt>new = other * self; treat as homogeneous scale change adjusting</dt>
+<dd><ul class="first last">
+<li>exposure: el, premium</li>
+<li>sev_mean</li>
+<li>sev_scale</li>
+<li>sev_loc</li>
+<li>limit</li>
+<li>attachment</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>An Account and a CatLine are both Lines but Lines are do not contain enough information to be Accounts or CatLines</li>
+<li>There is no self * other for inhomogeneous volume change</li>
+<li>There is no sum of lines: create a Book to add. :</li>
+</ul>
+<p>A line corresponds to the underwriting and actuarial notion of a line of business. It is designed for
+non-cat lines of business and is not guaranteed to contain meaningful severity information. It should
+not be used with limit and attachment. Often the severity is fixed at a constant. Asmptotically a
+corresponding Account will tend to its Line.</p>
+<p>If detailed severity information is needed use either an Account object or a CatLine object, both
+of which have meaningful severity information.</p>
+<p>Contains information on [ground-up] frequency, in particular contagion = freq_a,
+freq_b) and the frequency information appropriate for the total industry writings in the line.</p>
+<p>May, but not required to also contain premium and/or loss ratio information for the line.</p>
+<p>No work is done until the line used in an Aggregate or Portfolio.</p>
+<p>Information is lightweight and stored in a dictionary.</p>
+<dl class="method">
+<dt id="aggregate.Block.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Block.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Block.write" title="Permalink to this definition">¶</a></dt>
+<dd><p>materialize Block in a full Aggregate class object
+TODO: do we need , attachment=0., limit=np.inf):??</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.Curve">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">Curve</code><span class="sig-paren">(</span><em>name=''</em>, <em>sev_name=''</em>, <em>sev_a=0.0</em>, <em>sev_b=0.0</em>, <em>sev_mean=0.0</em>, <em>sev_cv=0.0</em>, <em>sev_loc=0.0</em>, <em>sev_scale=0.0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>sev_wt=1</em>, <em>note=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Curve"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>A curve corresponds to the underwriting and actuarial notion of a GROUND UP severity curve.</p>
+<p>It contains all the severity information needed to create a Severity object.</p>
+<p>Curves can be scaled and shifted: new = k * old, new = old + k</p>
+<dl class="method">
+<dt id="aggregate.Curve.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Curve.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Curve.write" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.CalcParser">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">CalcParser</code><span class="sig-paren">(</span><em>uw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="aggregate.CalcParser.empty">
+<code class="descname">empty</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.empty"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.empty" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcParser.error">
+<code class="descname">error</code><span class="sig-paren">(</span><em>token</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.error"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcParser.expr">
+<code class="descname">expr</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.expr"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.expr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcParser.number">
+<code class="descname">number</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.number"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.number" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.CalcParser.precedence">
+<code class="descname">precedence</code><em class="property"> = (('left', '+'), ('left', '*'))</em><a class="headerlink" href="#aggregate.CalcParser.precedence" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcParser.term">
+<code class="descname">term</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.term"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.term" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.CalcParser.tokens">
+<code class="descname">tokens</code><em class="property"> = {'NUMBER', 'LINE'}</em><a class="headerlink" href="#aggregate.CalcParser.tokens" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.CalcLexer">
+<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">CalcLexer</code><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="aggregate.CalcLexer.LINE">
+<code class="descname">LINE</code><em class="property"> = '[a-zA-Z_][a-zA-Z0-9_]*'</em><a class="headerlink" href="#aggregate.CalcLexer.LINE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcLexer.NUMBER">
+<code class="descname">NUMBER</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.NUMBER"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.NUMBER" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcLexer.error">
+<code class="descname">error</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.error"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.CalcLexer.ignore">
+<code class="descname">ignore</code><em class="property"> = ' \t'</em><a class="headerlink" href="#aggregate.CalcLexer.ignore" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.CalcLexer.literals">
+<code class="descname">literals</code><em class="property"> = {';', '*', '&amp;', '+'}</em><a class="headerlink" href="#aggregate.CalcLexer.literals" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.CalcLexer.newline">
+<code class="descname">newline</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.newline"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.newline" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.CalcLexer.tokens">
+<code class="descname">tokens</code><em class="property"> = {'NUMBER', 'LINE'}</em><a class="headerlink" href="#aggregate.CalcLexer.tokens" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+
 
           </div>
         </div>
@@ -74,17 +280,16 @@
 
 
 <h3>Navigation</h3>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate and Severity Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Underwriter Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

@@ -2,11 +2,292 @@
 Tutorial
 ========
 
-Examples
---------
+
+``aggregate``: Simple Examples
+------------------------------
+
+.. code:: ipython3
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import seaborn as sns
+    from IPython.core.display import HTML, display
+
+    # pandas options
+    pd.set_option('max_rows', 50)
+    pd.set_option('max_columns', 30)
+    pd.set_option('display.max_colwidth', 150)
+
+    # matplotlib and plotting options
+    %matplotlib inline
+    %config InlineBackend.figure_format = 'svg'
+
+    # seaborn options
+    sns.set(context='paper', style='white')
+    sns.set_palette("husl", 4, .75)
+    sns.set_style("ticks")
 
 
-* Single line
-* Multiple line
-* :math:`\beta \times \gamma = \tau`
+.. code:: ipython3
+
+    import aggregate as agg
+
+
+.. parsed-literal::
+
+    WARNING: 2 shift/reduce conflicts
+
+
+.. code:: ipython3
+
+    uw = agg.Underwriter()
+
+.. code:: ipython3
+
+    uw.list()
+
+
+
+
+.. raw:: html
+
+    <div>
+    <style scoped>
+        .dataframe tbody tr th:only-of-type {
+            vertical-align: middle;
+        }
+
+        .dataframe tbody tr th {
+            vertical-align: top;
+        }
+
+        .dataframe thead th {
+            text-align: right;
+        }
+    </style>
+    <table border="1" class="dataframe">
+      <thead>
+        <tr style="text-align: right;">
+          <th></th>
+          <th>Curves</th>
+          <th>Blocks</th>
+          <th>Books</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>0</th>
+          <td>fixed</td>
+          <td>scs</td>
+          <td>bodoff1</td>
+        </tr>
+        <tr>
+          <th>1</th>
+          <td>directors_a</td>
+          <td>casxol</td>
+          <td>bodoff2</td>
+        </tr>
+        <tr>
+          <th>2</th>
+          <td>directors_b</td>
+          <td>cata</td>
+          <td>bodoff3</td>
+        </tr>
+        <tr>
+          <th>3</th>
+          <td>directors_c</td>
+          <td>catb</td>
+          <td>bodoff4</td>
+        </tr>
+        <tr>
+          <th>4</th>
+          <td>cata</td>
+          <td>catc</td>
+          <td>Three Line Example</td>
+        </tr>
+        <tr>
+          <th>5</th>
+          <td>catb</td>
+          <td>catd</td>
+          <td>Single</td>
+        </tr>
+        <tr>
+          <th>6</th>
+          <td>catc</td>
+          <td>cate</td>
+          <td>Mixed</td>
+        </tr>
+        <tr>
+          <th>7</th>
+          <td>catd</td>
+          <td>noncata</td>
+          <td>Sublines</td>
+        </tr>
+        <tr>
+          <th>8</th>
+          <td>cate</td>
+          <td>noncatb</td>
+          <td>small_medium_large</td>
+        </tr>
+        <tr>
+          <th>9</th>
+          <td>noncata</td>
+          <td>comm_auto</td>
+          <td>mass_test</td>
+        </tr>
+        <tr>
+          <th>10</th>
+          <td>noncatb</td>
+          <td>cmp</td>
+          <td>interesting_cat</td>
+        </tr>
+        <tr>
+          <th>11</th>
+          <td></td>
+          <td>comm_prop</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>12</th>
+          <td></td>
+          <td>homeowners</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>13</th>
+          <td></td>
+          <td>inland_marine</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>14</th>
+          <td></td>
+          <td>ppa</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>15</th>
+          <td></td>
+          <td>work_comp</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>16</th>
+          <td></td>
+          <td>my_earthquake</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>17</th>
+          <td></td>
+          <td>my_wind</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+
+
+.. code:: ipython3
+
+    biz = uw.homeowners.write()
+    biz.update(np.linspace(0, 250e6, 1<<13), approximation='slognorm');
+
+.. code:: ipython3
+
+    biz.plot('quick')
+
+
+.. image:: output_6_1.svg
+
+
+.. code:: ipython3
+
+    biz.plot('long')
+
+
+.. parsed-literal::
+
+    C:\Users\steve\Anaconda3\lib\site-packages\matplotlib\axes\_base.py:3443: UserWarning: Attempting to set identical bottom==top results
+    in singular transformations; automatically expanding.
+    bottom=1.0, top=1.0
+      'bottom=%s, top=%s') % (bottom, top))
+
+
+
+.. image:: output_7_1.svg
+
+
+.. code:: ipython3
+
+    biz.audit_df
+
+
+
+
+.. raw:: html
+
+    <div>
+    <style scoped>
+        .dataframe tbody tr th:only-of-type {
+            vertical-align: middle;
+        }
+
+        .dataframe tbody tr th {
+            vertical-align: top;
+        }
+
+        .dataframe thead th {
+            text-align: right;
+        }
+    </style>
+    <table border="1" class="dataframe">
+      <thead>
+        <tr style="text-align: right;">
+          <th></th>
+          <th>name</th>
+          <th>limit</th>
+          <th>attachment</th>
+          <th>el</th>
+          <th>freq_1</th>
+          <th>sev_1</th>
+          <th>agg_1</th>
+          <th>agg_m</th>
+          <th>agg_cv</th>
+          <th>agg_skew</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>0</th>
+          <td>homeowners</td>
+          <td>2500</td>
+          <td>0</td>
+          <td>6.50602e+07</td>
+          <td>4.33735e+06</td>
+          <td>15</td>
+          <td>6.50602e+07</td>
+          <td>6.50602e+07</td>
+          <td>0.240001</td>
+          <td>0.48</td>
+        </tr>
+        <tr>
+          <th>mixed</th>
+          <td>homeowners</td>
+          <td>2500</td>
+          <td>0</td>
+          <td>6.50602e+07</td>
+          <td>4.33735e+06</td>
+          <td>15</td>
+          <td>6.50602e+07</td>
+          <td>6.50602e+07</td>
+          <td>0.240001</td>
+          <td>0.48</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
 

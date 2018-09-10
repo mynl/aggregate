@@ -21,6 +21,7 @@ import pandas as pd
 from .distr import Aggregate, Severity
 from .port import Portfolio
 from .utils import sensible_jump, html_title
+from sly import Lexer, Parser
 
 
 class _DataManager(object):
@@ -94,6 +95,7 @@ class _DataManager(object):
             if item in self.__getattribute__(k).keys():
                 # stip the s off the name: Books to Book etc.
                 return k[:-1], self.__getattribute__(k)[item]
+        raise LookupError
 
 
 class Underwriter(_DataManager):
@@ -149,11 +151,40 @@ class Underwriter(_DataManager):
         """
         return self.__getitem__(item)
 
+    def __call__(self, portfolio_program):
+        self.write('script_folio', portfolio_program)
+
+    def write(self, name, portfolio_program, update=False, verbose=False, **kwargs):
+        """
+
+
+        :param name:
+        :param portfolio_program:
+        :return:
+        """
+
+        lexer = CalcLexer()
+        parser = CalcParser(self)
+        parser.parse(lexer.tokenize(portfolio_program))
+        # ans is a list of Blocks
+        block_list = parser.spec
+        # make into a Book / Portfolio
+        spec_dict = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
+                     for a in block_list]
+        port = Portfolio(name, spec_dict)
+        logging.info(f'Underwriter.write | creating Portfolio {name} from {portfolio_program}')
+
+        if update:
+            bs = port.recommend_bucket().iloc[-1, 0]
+            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+            port.update(log2=10, bs=bs, **kwargs, verbose=verbose)
+        return port
+
 
 class _ScriptableObject(object):
     """
-    object wrapper that implements getitem and getattr on a member collection (the contained_iterable)
-    used by Lines etc.
+    object wrapper that implements getitem  to convert attributes to items
+
     """
 
     def __getitem__(self, item):
@@ -163,18 +194,12 @@ class _ScriptableObject(object):
         :param item:
         :return:
         """
-        # print(f'getitem {item} requested')
         return self.__getattribute__(item)
-
-    # def __deepcopy__(self, memodict={}):
-    #     # https://www.peterbe.com/plog/must__deepcopy__
-    #     return deepcopy(self.contained_iterable)
 
     def keys(self):
         """
         in conjunction with getitem allows the object to be passed using **obj
         and for it to expand to a list of kwargs
-
 
         :return:
         """
@@ -199,6 +224,7 @@ class _ScriptableObject(object):
 
     def __str__(self):
         return str(self.__dict__)
+
 
 class Curve(_ScriptableObject):
     """
@@ -385,7 +411,7 @@ class Block(_ScriptableObject):
     #     return dict_2_string(type(self), dict(  ))
     #
     # def __repr__(self):
-    #     return str(self.contained_iterable)
+    #     return str(self.SOMETHING)
     #
     def __add__(self, other):
         """
@@ -463,7 +489,7 @@ class Block(_ScriptableObject):
             xs = other * np.array(self.sev_xs)
         else:
             xs = None
-        return Block(name=f'{other:.0f} {self.name}',
+        return Block(name=f'{other} {self.name}',
                      exp_el=other * self.exp_el,
                      exp_premium=other * self.exp_premium,
                      exp_lr=self.exp_lr,
@@ -487,7 +513,7 @@ class Block(_ScriptableObject):
 
     def __mul__(self, other):
         """
-        new = self * other, other integer, sum of other independent copies in Levy process sense
+        new = self * other, sum of other independent copies in Levy process sense
         other > 0
 
         adjusts en and exposure (premium and el)
@@ -499,7 +525,7 @@ class Block(_ScriptableObject):
         assert isinstance(other, int) or isinstance(other, float)
         assert other >= 0
 
-        return Block(name=f'{other:.0f} {self.name}',
+        return Block(name=f'{self.name}⊕{other}',
                      exp_el=other * self.exp_el,
                      exp_premium=other * self.exp_premium,
                      exp_lr=self.exp_lr,
@@ -523,20 +549,11 @@ class Block(_ScriptableObject):
 
     def write(self):
         """
-        materialize contained_iterable in a full Aggregate class object
+        materialize Block in a full Aggregate class object
         TODO: do we need , attachment=0., limit=np.inf):??
 
         :return:
         """
-        # swap ??
-        # a0 = self.contained_iterable['attachment']
-        # l0 = self.contained_iterable['limit']
-        # self.contained_iterable['attachment'] = attachment
-        # self.contained_iterable['limit'] = limit
-        # agg = Aggregate(**self)
-        # self.contained_iterable['attachment'] = a0
-        # self.contained_iterable['limit'] = l0
-
         return Aggregate(name=self.name,
                          exp_el=self.exp_el,
                          exp_premium=self.exp_premium,
@@ -579,18 +596,6 @@ class Book(_ScriptableObject):
         self.arg_dict = arg_dict
         self.spec_list = deepcopy(spec_list)
 
-        # # self.spec_list = spec_list
-        # account_list = []
-        # self.line_names = []
-        # # do not actually materialize the specs into Accounts - can't see why you would
-        # for spec in spec_list:
-        #     if isinstance(spec, Account):
-        #         account_list.append(spec)
-        #     else:
-        #         account_list.append(Account(**spec))
-        #     self.line_names.append(spec['name'])
-        # _ScriptableObject.__init__(self, account_list)
-
     def __str__(self):
         d = dict(name=self.name)
         for a in self.spec_list:
@@ -628,51 +633,9 @@ class Book(_ScriptableObject):
                     dict(),
                     self.spec_list + other.spec_list)
 
-    # def __rmul__(self, other):
-    #     """
-    #     new = other * self; treat as homogeneous scale change
-    #
-    #     scale is a homogeneous change, it adjusts
-    #
-    #         - exposure: el, premium
-    #         - sev_mean
-    #         - sev_scale
-    #         - sev_loc
-    #         - limit
-    #         - attachment
-    #
-    #     :param other:
-    #     :return:
-    #     """
-    #
-    #     assert other > 0
-    #     assert isinstance(other, float) or isinstance(other, int)
-    #     other = float(other)
-    #
-    #     # TODO here and elsewhere need to scale xs for histogram distributions...
-    #     return Book(f'{other:.0f} {self.name}', self.arg_dict,
-    #                 self._copy_and_adjust(other, ('sev_mean', 'sev_scale', 'sev_loc',  # 'sev_xs',
-    #                                               'exp_limit', 'exp_attachment', 'exp_premium', 'exp_el')))
-    #
-    # def __mul__(self, other):
-    #     """
-    #     new = self * other, other integer, sum of other independent copies in Levy process sense,
-    #     so other can be fractional, other > 0 required
-    #
-    #     adjusts en and exposure (premium and el)
-    #
-    #     :param other:
-    #     :return:
-    #     """
-    #
-    #     assert isinstance(other, int) or isinstance(other, float)
-    #     assert other >= 0
-    #     return Book(f'{self.name} to time {other}', dict(),
-    #                 self._copy_and_adjust(other, ('exp_premium', 'exp_el', 'exp_en')))
-
     def write(self, update=False):
         """
-        materialize contained_iterable in a full Portfolio class object
+        materialize Book in a full Portfolio class object
 
 
         :return:
@@ -720,12 +683,6 @@ def reporting(port, log2, reporting_level):
 
     if reporting_level >= 1:
         port.report('quick')
-        # html_title('Summary Audit Data', 1)
-        # temp = port.audit_df.filter(regex='^Mean|^EmpMean|^CV|^EmpCV')
-        # temp['MeanErr'] = temp.EmpMean / temp.Mean - 1
-        # temp['CVErr'] = temp.EmpCV / temp.CV - 1
-        # temp = temp[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr']]
-        # display(temp.style.applymap(Example._highlight))
 
     if reporting_level >= 3:
         html_title('Graphics', 1)
@@ -781,3 +738,97 @@ def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
             # logging.info(f'Uknown type {type(v)} to dict_2_string')
             sio.write('\t' * tab_level + ks + '\t' + str(v) + '\n')
     return sio.getvalue()
+
+
+class CalcLexer(Lexer):
+    tokens = {LINE, NUMBER}
+    ignore = ' \t'
+    literals = {'+', '*', r'&', ';'}
+
+    # Tokens
+    LINE = r'[a-zA-Z_][a-zA-Z0-9_]*'
+
+    @_(r'\d+\.?\d*([eE](\+|\-)?\d+)?')
+    def NUMBER(self, t):
+        t.value = float(t.value)
+        return t
+
+    @_(r'\n+')
+    def newline(self, t):
+        self.lineno += t.value.count('\n')
+
+    def error(self, t):
+        print(f"Illegal character '{t.value[0]:s}'")
+        self.index += 1
+
+
+class CalcParser(Parser):
+    tokens = CalcLexer.tokens
+
+    precedence = (
+        ('left', '+'),
+        ('left', '*'),
+    )
+
+    def __init__(self, uw):
+        self.uw = uw
+        self.names = uw.blocks
+        self.spec = []
+
+    @_('expr ";"')
+    def empty(self, p):
+        # print(f'appending last expression...{p.expr}')
+        self.spec.append(p.expr)
+        return self.spec
+
+    @_('expr "&" expr')
+    def expr(self, p):
+        # print('appending')
+        self.spec.append(p.expr0)
+        return p.expr1
+
+    @_('term')
+    def expr(self, p):
+        # print('expr to term')
+        return p.term
+
+    @_('expr "+" expr')
+    def expr(self, p):
+        # print('adding t')
+        return p.expr0 + p.expr1
+
+    @_('term "*" number')
+    def expr(self, p):
+        # print('t x n')
+        return p.term * p.number
+
+    @_('number "*" term')
+    def expr(self, p):
+        # print('n x t')
+        return p.number * p.term
+
+    @_('NUMBER')
+    def number(self, p):
+        # print('num')
+        return p.NUMBER
+
+    @_('LINE')
+    def term(self, p):
+        # print(f'Extracting {p.LINE}, {p}')
+        try:
+            ans = getattr(self.uw, p.LINE)
+            return ans
+        except LookupError:
+            print(f"Undefined name {p.LINE}")
+            return 0
+
+    @_('')
+    def empty(self, p):
+        pass
+
+    def error(self, token):
+        if token is None:
+            # EOF
+            print('You forgot ending ";"')
+        else:
+            print(f'In error routine with {token}')

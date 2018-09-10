@@ -115,9 +115,6 @@ def sgamma_fit(m, cv, skew):
 def estimate_agg_percentile(m, cv, skew, p=0.999):
     """
     Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
-    if len(contained_iterable) > 3 it is assumed to be a contained_iterable, otherwise input m, cv, sk
-
-    If contained_iterable passed in also take max with the limit
 
     :param m:
     :param cv:

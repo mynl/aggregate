@@ -5,7 +5,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Aggregate Class &#8212; aggregate 0.9.40 documentation</title>
+    <title>Aggregate and Severity Classes &#8212; aggregate 0.9.40 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Portfolio Class" href="portfolio.html" />
-    <link rel="prev" title="Severity Class" href="severity.html" />
+    <link rel="prev" title="Development Outline" href="devel.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -41,11 +41,11 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="aggregate-class">
-<h1>Aggregate Class<a class="headerlink" href="#aggregate-class" title="Permalink to this headline">¶</a></h1>
-<span class="target" id="module-aggregate.distr"></span><dl class="class">
+  <div class="section" id="module-aggregate.distr">
+<span id="aggregate-and-severity-classes"></span><h1>Aggregate and Severity Classes<a class="headerlink" href="#module-aggregate.distr" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
 <dt id="aggregate.distr.Aggregate">
-<em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Aggregate</code><span class="sig-paren">(</span><em>name</em>, <em>el=0</em>, <em>premium=0</em>, <em>lr=0</em>, <em>en=0</em>, <em>attachment=0</em>, <em>limit=inf</em>, <em>sev_name=''</em>, <em>sev_a=0</em>, <em>sev_b=0</em>, <em>sev_mean=0</em>, <em>sev_cv=0</em>, <em>sev_loc=0</em>, <em>sev_scale=0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>mix_wt=1</em>, <em>freq_name=''</em>, <em>freq_a=0</em>, <em>freq_b=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Aggregate</code><span class="sig-paren">(</span><em>name</em>, <em>exp_el=0</em>, <em>exp_premium=0</em>, <em>exp_lr=0</em>, <em>exp_en=0</em>, <em>exp_attachment=0</em>, <em>exp_limit=inf</em>, <em>sev_name=''</em>, <em>sev_a=0</em>, <em>sev_b=0</em>, <em>sev_mean=0</em>, <em>sev_cv=0</em>, <em>sev_loc=0</em>, <em>sev_scale=0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>sev_wt=1</em>, <em>freq_name=''</em>, <em>freq_a=0</em>, <em>freq_b=0</em>, <em>note=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Aggregate help placeholder</p>
 <dl class="method">
 <dt id="aggregate.distr.Aggregate.delbaen_haezendonck_density">
@@ -87,30 +87,15 @@ beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</div></blockquote>
 </dd></dl>
 
 <dl class="method">
-<dt id="aggregate.distr.Aggregate.density">
-<code class="descname">density</code><span class="sig-paren">(</span><em>xs</em>, <em>padding=1</em>, <em>tilt_vector=None</em>, <em>approximation='exact'</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>force_severity=False</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.density"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.density" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compute the density
-:param xs:
-:param padding:
-:param tilt_vector:
-:param approximation:
-:param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
-:param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
-:param force_severity: make severities even if using approximation, for plotting
-:param verbose: make partial plots and return details of all moments
-:return:</p>
-</dd></dl>
-
-<dl class="method">
 <dt id="aggregate.distr.Aggregate.discretize">
-<code class="descname">discretize</code><span class="sig-paren">(</span><em>method</em>, <em>approx_calc='survival'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.discretize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.discretize" title="Permalink to this definition">¶</a></dt>
+<code class="descname">discretize</code><span class="sig-paren">(</span><em>sev_calc</em>, <em>discretization_calc='survival'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.discretize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.discretize" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>method</strong> – continuous or discrete or raw (for…)</li>
-<li><strong>approx_calc</strong> – survival, distribution or both</li>
+<li><strong>sev_calc</strong> – continuous or discrete or raw (for…)</li>
+<li><strong>discretization_calc</strong> – survival, distribution or both</li>
 </ul>
 </td>
 </tr>
@@ -124,7 +109,7 @@ beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</div></blockquote>
 <dl class="method">
 <dt id="aggregate.distr.Aggregate.emp_stats">
 <code class="descname">emp_stats</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.emp_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.emp_stats" title="Permalink to this definition">¶</a></dt>
-<dd><p>report on empirical stats</p>
+<dd><p>report on empirical statistics_df</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -166,6 +151,39 @@ beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</div></blockquote>
 </dd></dl>
 
 <dl class="method">
+<dt id="aggregate.distr.Aggregate.q">
+<code class="descname">q</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.q"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.q" title="Permalink to this definition">¶</a></dt>
+<dd><p>return a quantile using nearest (i.e. will be in the index</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>p</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.distr.Aggregate.quantile_function">
+<code class="descname">quantile_function</code><span class="sig-paren">(</span><em>kind='nearest'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.quantile_function"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.quantile_function" title="Permalink to this definition">¶</a></dt>
+<dd><p>return an approximation to the quantile function</p>
+<p>TODO sort out…this isn’t right</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kind</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="aggregate.distr.Aggregate.recommend_bucket">
 <code class="descname">recommend_bucket</code><span class="sig-paren">(</span><em>N=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.recommend_bucket"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.recommend_bucket" title="Permalink to this definition">¶</a></dt>
 <dd><p>recommend a bucket size given 2**N buckets</p>
@@ -181,13 +199,28 @@ beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</div></blockquote>
 </table>
 </dd></dl>
 
+<dl class="method">
+<dt id="aggregate.distr.Aggregate.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>xs</em>, <em>padding=1</em>, <em>tilt_vector=None</em>, <em>approximation='exact'</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>force_severity=False</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the density
+:param xs:
+:param padding:
+:param tilt_vector:
+:param approximation:
+:param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
+:param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
+:param force_severity: make severities even if using approximation, for plotting
+:param verbose: make partial plots and return details of all moments
+:return:</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="class">
 <dt id="aggregate.distr.Severity">
 <em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Severity</code><span class="sig-paren">(</span><em>name</em>, <em>attachment=0</em>, <em>limit=inf</em>, <em>mean=0</em>, <em>cv=0</em>, <em>a=0</em>, <em>b=0</em>, <em>loc=0</em>, <em>scale=0</em>, <em>hxs=None</em>, <em>hps=None</em>, <em>conditional=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity" title="Permalink to this definition">¶</a></dt>
-<dd><p>A continuous random variable, subclasses <code class="docutils literal"><span class="pre">scipy.stats.rv_continuous</span></code>.</p>
-<p>adds layer and attachment to scipy stats continuous random variable class
+<dd><p>A continuous random variable, subclasses <code class="docutils literal"><span class="pre">scipy.statistics_df.rv_continuous</span></code>.</p>
+<p>adds layer and attachment to scipy statistics_df continuous random variable class
 overrides</p>
 <ul class="simple">
 <li>cdf</li>
@@ -196,7 +229,52 @@ overrides</p>
 <li>ppf</li>
 <li>moments</li>
 </ul>
-<p>Should consider over-riding: sf, <strong>stats</strong> ?munp</p>
+<p>Should consider over-riding: sf, <strong>statistics_df</strong> ?munp</p>
+<dl class="method">
+<dt id="aggregate.distr.Severity.cv_to_shape">
+<code class="descname">cv_to_shape</code><span class="sig-paren">(</span><em>cv</em>, <em>hint=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.cv_to_shape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.cv_to_shape" title="Permalink to this definition">¶</a></dt>
+<dd><p>create a frozen object of type dist_name with given cv
+dist_name = ‘lognorm’
+cv = 0.25</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>cv</strong> – </li>
+<li><strong>hint</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.distr.Severity.mean_to_scale">
+<code class="descname">mean_to_scale</code><span class="sig-paren">(</span><em>shape</em>, <em>mean</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.mean_to_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.mean_to_scale" title="Permalink to this definition">¶</a></dt>
+<dd><p>adjust scale of fz to have desired mean
+return frozen instance</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>shape</strong> – </li>
+<li><strong>mean</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="method">
 <dt id="aggregate.distr.Severity.moms">
 <code class="descname">moms</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.moms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.moms" title="Permalink to this definition">¶</a></dt>
@@ -215,7 +293,7 @@ for unlimited integral of a low sd variable</p>
 
 <dl class="method">
 <dt id="aggregate.distr.Severity.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>N=100</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.plot" title="Permalink to this definition">¶</a></dt>
+<code class="descname">plot</code><span class="sig-paren">(</span><em>N=100</em>, <em>axiter=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.plot" title="Permalink to this definition">¶</a></dt>
 <dd><p>quick plot</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -271,11 +349,10 @@ for unlimited integral of a low sd variable</p>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Aggregate Class</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Aggregate and Severity Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>

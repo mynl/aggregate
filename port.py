@@ -23,7 +23,6 @@ import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
-import pandas as pd
 from .utils import *
 from .distr import Aggregate
 from .spectral import Distortion
@@ -50,8 +49,8 @@ class Portfolio(object):
             a = Aggregate(**spec)
             self.agg_list.append(a)
             self.line_names.append(spec['name'][0] if isinstance(spec['name'], list) else spec['name'])
-            ma.add_fs(a.report[('freq', 'ex1')],
-                      a.report[('sev', 'ex1')], a.report[('sev', 'ex2')], a.report[('sev', 'ex3')])
+            ma.add_fs(a.report_ser[('freq', 'ex1')],
+                      a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
             max_limit = max(max_limit, np.max(np.array(a.limit)))
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
@@ -59,14 +58,14 @@ class Portfolio(object):
             if n[0] == 'n':
                 raise ValueError('Line names cannot start with n, it is reserved for not')
         # make a pandas data frame of all the statistics_df
-        temp_report = pd.concat([a.report for a in self.agg_list], axis=1)
+        temp_report = pd.concat([a.report_ser for a in self.agg_list], axis=1)
 
         # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
         temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, total=True))
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
         # self.line_density = {}
-        # self.ft_line_density = {}
+        # self.ft_line_density = {}`
         # self.not_line_density = {}
         self.density_df = None
         self.epd_2_assets = {}
@@ -365,7 +364,7 @@ class Portfolio(object):
 
     def percentiles(self, pvalues=None):
         """
-        report on percentiles and large losses
+        report_ser on percentiles and large losses
         uses interpolation, audit_df uses nearest
 
         :pvalues: optional vector of p values to use. If None sensible defaults provided
@@ -1741,7 +1740,7 @@ class Portfolio(object):
 
     def analysis_priority(self, asset_spec):
         """
-        Create priority analysis report
+        Create priority analysis report_ser
         This can be called multiple times so keep as method
         :param asset_spec: epd
         :return:
@@ -2008,6 +2007,7 @@ class Portfolio(object):
         """
         cumulative integral of v with buckets size bs
 
+        :param bs_override:
         :param v:
         :return:
         """
@@ -2028,6 +2028,7 @@ class Portfolio(object):
         create portfolio from pandas dataframe
         uses columns with appropriate names
 
+        :param name:
         :param df:
         :return:
         """
@@ -2044,6 +2045,7 @@ class Portfolio(object):
         drops all blank columns (mostly for auditing purposes)
 
 
+        :param name:
         :param ffn: full file name, including path
         :param sheet_name:
         :param kwargs:

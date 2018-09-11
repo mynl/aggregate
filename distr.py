@@ -6,10 +6,11 @@ import collections
 import matplotlib.pyplot as plt
 import logging
 from .utils import sln_fit, sgamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, MomentAggregator
+    axiter_factory, estimate_agg_percentile, suptitle_and_tight, MomentAggregator, html_title
 from .spectral import Distortion
 from scipy import interpolate
 from scipy.optimize import newton
+from IPython.core.display import display
 
 # import matplotlib.cm as cm
 # from scipy import interpolate
@@ -219,8 +220,8 @@ class Aggregate(object):
         self.agg_m = self.statistics_total_df.loc['mixed', 'agg_m']
         self.agg_cv = self.statistics_total_df.loc['mixed', 'agg_cv']
         self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
-        # finally, need a report series for Portfolio to consolidate
-        self.report = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
+        # finally, need a report_ser series for Portfolio to consolidate
+        self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
         # TODO fill in missing p99                                   ^ pctile
 
     def __str__(self):
@@ -420,7 +421,7 @@ class Aggregate(object):
 
     def emp_stats(self):
         """
-        report on empirical statistics_df
+        report_ser on empirical statistics_df
 
         :return:
         """
@@ -446,7 +447,7 @@ class Aggregate(object):
         df.loc['mean', 'theory'] = self.statistics_total_df.loc['Agg', 'agg1']
         df.loc['sd', 'theory'] = np.sqrt(self.statistics_total_df.loc['Agg', 'agg2'] -
                                          self.statistics_total_df.loc['Agg', 'agg1'] ** 2)
-        df.loc['cv', 'theory'] = self.statistics_total_df.loc['Agg', 'agg_cv']  # report[('agg', 'cv')]
+        df.loc['cv', 'theory'] = self.statistics_total_df.loc['Agg', 'agg_cv']  # report_ser[('agg', 'cv')]
         df['err'] = df['numeric'] / df['theory'] - 1
         return df
 
@@ -525,10 +526,21 @@ class Aggregate(object):
             axiter.ax.set(title='Severity', xlim=(0, max_lim))
 
             next(axiter).plot(self.xs, self.sev_density)
-            axiter.ax.set(title='Log Severity', yscale='log', xlim=(0, max_lim))
+            axiter.ax.set(title='Log Severity')
+            if np.sum(self.sev_density==1) >= 1:
+                # sev density is degenerate, 1,0,0,... log scales won't work
+                axiter.ax.set(title='Severity Degenerate')
+                axiter.ax.set(xlim=(0, max_lim*2))
+            else:
+                axiter.ax.set(title='Log Severity')
+                axiter.ax.set(title='Log Severity', yscale='log')
+            if max_lim > 0:
+                axiter.ax.set(xlim=max_lim)
 
             next(axiter).plot(self.xs, self.sev_density.cumsum(), drawstyle='steps-post')
-            axiter.ax.set(title='Severity Distribution', xlim=(0, max_lim))
+            axiter.ax.set(title='Severity Distribution')
+            if max_lim > 0:
+                axiter.ax.set(xlim=(0, max_lim))
 
             next(axiter).plot(self.xs, self.agg_density, label='aggregate')
             axiter.ax.plot(self.xs, self.sev_density, lw=0.5, drawstyle='steps-post', label='severity')
@@ -554,14 +566,14 @@ class Aggregate(object):
             axiter.ax.legend()
 
             # figure for extended plotting of return period:
-            maxp = F[-1]
-            if maxp > 0.9999:
+            max_p = F[-1]
+            if max_p > 0.9999:
                 _n = 10
             else:
                 _n = 5
-            if maxp >= 1:
-                maxp = 1 - 1e-10
-            k = (maxp / 0.99) ** (1 / _n)
+            if max_p >= 1:
+                max_p = 1 - 1e-10
+            k = (max_p / 0.99) ** (1 / _n)
             extraps = 0.99 * k ** np.arange(_n)
             q = interpolate.interp1d(F, self.xs, kind='linear', fill_value=0, bounds_error=False)
             ps = np.hstack((np.linspace(0, 1, 100, endpoint=False), extraps))
@@ -570,7 +582,7 @@ class Aggregate(object):
             axiter.ax.set(title='Return Period', xscale='log')
 
             if set_tight:
-                suptitle_and_tight(f'{self.name} Distributions')
+                suptitle_and_tight(f'Aggregate {self.name}')
         else:  # kind == 'quick':
             if self.dh_agg_density is not None:
                 n = 4
@@ -605,7 +617,9 @@ class Aggregate(object):
             if self.dh_agg_density is not None:
                 ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
                 ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-            ax.set_ylim(0, min(2 * np.max(d), np.max(f[1:])))
+            max_y = min(2 * np.max(d), np.max(f[1:]))
+            if max_y > 0:
+                ax.set_ylim(0, max_y)
             ax.legend()
             ax.set_title('Density')
             ax = next(axiter)
@@ -633,7 +647,34 @@ class Aggregate(object):
                 ax.plot(1 - F, 1 - dh_F, label='g(S) vs S')
                 ax.plot(1 - F, 1 - F, 'k', linewidth=.5, label=None)
             if set_tight:
-                plt.tight_layout()
+                suptitle_and_tight(f'Aggregate {self.name}')
+
+    def report(self, report_list='quick'):
+        """
+
+        :param report_list:
+        :return:
+        """
+        full_report_list = ['statistics', 'quick', 'audit']
+        if report_list == 'all':
+            report_list = full_report_list
+
+        if 'quick' in report_list:
+            html_title(f'{self.name} Quick Report (Theoretic)', 1)
+            display(pd.DataFrame(self.report_ser).unstack())
+
+        if 'audit' in report_list:
+            if self.audit_df is not None:
+                html_title(f'{self.name} Audit Report', 1)
+                display(self.audit_df)
+
+        if 'statistics' in report_list:
+            if len(self.statistics_df) > 1:
+                df = pd.concat((self.statistics_df, self.statistics_total_df), axis=1)
+            else:
+                df = self.statistics_df
+            html_title(f'{self.name} Statistics Report', 1)
+            display(df)
 
     def recommend_bucket(self, N=10):
         """
@@ -817,9 +858,9 @@ class Severity(ss.rv_continuous):
 
         lim_name = f'{limit:,.0f}' if limit != np.inf else "Unlimited"
         try:
-            self.long_name = f'{name}({self.fz.args[0]:.2f})[{lim_name} xs {attachment:,.0f}]'
+            self.long_name = f'{name}({self.fz.arg_dict[0]:.2f})[{lim_name} xs {attachment:,.0f}]'
         except:
-            # 'rv_histogram' object has no attribute 'args'
+            # 'rv_histogram' object has no attribute 'arg_dict'
             self.long_name = f'{name}[{lim_name} xs {attachment:,.0f}]'
 
         assert self.fz is not None
@@ -991,6 +1032,7 @@ class Severity(ss.rv_continuous):
         """
         quick plot
 
+        :param axiter:
         :param N:
         :return:
         """
@@ -1025,4 +1067,4 @@ class Severity(ss.rv_continuous):
         ax.set(title='Lee diagram', xlim=(0, 1))
 
         if do_tight:
-            suptitle_and_tight(self.long_name)
+            suptitle_and_tight(f'Severity {self.long_name}')

@@ -1,5 +1,5 @@
 Three Line Example:
-    args:
+    arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
         bs: 1
@@ -68,7 +68,7 @@ Three Line Example:
         sev_mean: 100
         sev_name: lognorm
 Single:
-    args:
+    arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
         bs: 1
@@ -94,7 +94,7 @@ Single:
         sev_mean: 100
         sev_name: lognorm
 Mixed:
-    args:
+    arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
         bs: 1
@@ -130,7 +130,7 @@ Mixed:
         sev_mean: 100
         sev_name: lognorm
 Sublines:
-    args:
+    arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
         bs: 1
@@ -171,7 +171,7 @@ Sublines:
         sev_mean: 100
         sev_name: lognorm
 small_medium_large:
-    args:
+    arg_dict:
         log2: 14
         bs: 10000
         sev_calc: discrete
@@ -201,7 +201,7 @@ small_medium_large:
         freq_name: poisson
         freq_a: 0.1
 mass_test:
-    args:
+    arg_dict:
         log2: 6
         bs: 1
         sev_calc: discrete
@@ -225,7 +225,7 @@ mass_test:
         exp_en: 1
         freq_name: fixed
 interesting_cat:
-    args:
+    arg_dict:
         log2: 14
         bs: 10
         sev_calc: discrete

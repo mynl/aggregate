@@ -126,8 +126,8 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     pn = pl = pg = 0
     if skew == 0:
         # neither sln nor sgamma works, use a normal
-        fzn = ss.norm(scale=m*cv, loc=m)
-        pn = fzn.isf(1-p)
+        fzn = ss.norm(scale=m * cv, loc=m)
+        pn = fzn.isf(1 - p)
     else:
         shift, mu, sigma = sln_fit(m, cv, skew)
         fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
@@ -371,7 +371,7 @@ class MomentAggregator(object):
     """
     Accumulate moments
     Used by Portfolio and Aggregate (when there are multiple severities)
-    makes report df and statistics_df
+    makes report_ser df and statistics_df
 
     Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
 
@@ -623,7 +623,12 @@ class MomentAggregator(object):
         m = ex1
         var = ex2 - ex1 ** 2
         sd = np.sqrt(var)
-        cv = sd / m
+        if m == 0:
+            cv = np.nan
+            logging.error('MomentAggregator._moments_to_mcvsk | encountered zero mean, called with '
+                          f'{ex1}, {ex2}, {ex3}')
+        else:
+            cv = sd / m
         if sd == 0:
             skew = np.nan
         else:

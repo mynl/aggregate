@@ -66,18 +66,25 @@ class _DataManager(object):
         df = df.fillna('')
         return df
 
-    def notes(self, item):
+    def describe(self, item_type=''):
         """
+        more informative version of list
         Pull notes from YAML descriptions for type items
 
-        :param item:
         :return:
         """
-        item = item.lower()
-        items = list(self.__getattribute__(item).keys())
-        notes = [self.__getattribute__(item)[i].get('note', '') for i in items]
-        Item = item.title()
-        df = pd.DataFrame({Item: items, "Notes": notes})
+        df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'EN', 'ESev', 'ELoss', 'Notes'])
+        df = df.set_index('Name')
+        if item_type == '':
+            item_type = self.databases.keys()
+        else:
+            item_type = [item_type.lower()]
+        for k in item_type:  # self.databases.keys():
+            for kk, vv in self.__getattribute__(k).items():
+                df.loc[kk, :] = (k, vv.get('sev_name', ''), vv.get('exp_en', 0), vv.get('sev_mean', 0),
+                                 vv.get('exp_el', 0), vv.get('note', ''))
+        df = df.fillna('')
+
         return df
 
     def __getitem__(self, item):
@@ -133,7 +140,7 @@ class Underwriter(_DataManager):
         """
         item_type, obj = _DataManager.__getitem__(self, item)
         if item_type == 'book':
-            return Book(item, obj['args'], obj['spec'])
+            return Book(item, obj['arg_dict'], obj['spec'])
         elif item_type == 'block':
             return Block(item, **obj)
         elif item_type == 'curve':
@@ -152,32 +159,136 @@ class Underwriter(_DataManager):
         return self.__getitem__(item)
 
     def __call__(self, portfolio_program):
-        self.write('script_folio', portfolio_program)
+        self.write(portfolio_program)
 
-    def write(self, name, portfolio_program, update=False, verbose=False, **kwargs):
+    def nlp(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
+        write a pseudo natural language programming spec for a book or (if only one line) an aggregate
 
+        e.g. Input
+        20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
+        10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
+        100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1
 
+        See parser for full language spec!
+
+        :param program:
         :param name:
-        :param portfolio_program:
+        :param update:
+        :param verbose:
+        :param kwargs:
         :return:
         """
 
-        lexer = CalcLexer()
-        parser = CalcParser(self)
-        parser.parse(lexer.tokenize(portfolio_program))
-        # ans is a list of Blocks
-        block_list = parser.spec
-        # make into a Book / Portfolio
-        spec_dict = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
-                     for a in block_list]
-        port = Portfolio(name, spec_dict)
-        logging.info(f'Underwriter.write | creating Portfolio {name} from {portfolio_program}')
+        logging.info(f'Underwriter.nlp | creating Portfolio {name} from {program}')
+        lexer = NLPBizLexer()
+        parser = NLPBizParser()
+        program = [i.strip() for i in program.split('\n') if len(i.strip()) > 0]
+        spec_list = []
+
+        for txt in program:
+            parser.reset()
+            try:
+                parser.parse(lexer.tokenize(txt))
+            except ValueError as e:
+                if isinstance(e.args[0], str):
+                    print(e)
+                    raise e
+                else:
+                    t = e.args[0].type
+                    v = e.args[0].value
+                    # l = e.arg_dict[0].lineno
+                    i = e.args[0].index
+                    txt2 = txt[0:i] + f'>>>' + txt[i:]
+                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    raise e
+            spec_list.append(parser.arg_dict)
+        # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
+        if name == '':
+            name = f'script {len(spec_list)}'
+        port = Portfolio(name, spec_list)
+        if update:
+            if bs == 0:
+                # for log2 = 10
+                bs = port.recommend_bucket().iloc[-1, 0]
+                if log2 == 0:
+                    log2 = 10
+                else:
+                    if log2 > 10:
+                        bs = bs >> (log2 - 10)
+                    else:
+                        bs = bs * (1 << (10 - log2))
+            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
 
         if update:
-            bs = port.recommend_bucket().iloc[-1, 0]
+            if 'bs' not in kwargs:
+                bs = port.recommend_bucket().iloc[-1, 0]
+                log2 = 10
+            else:
+                bs = kwargs['bs']
+                log2 = kwargs['log2']
+                del kwargs['bs']
+                del kwargs['log2']
             logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-            port.update(log2=10, bs=bs, **kwargs, verbose=verbose)
+            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+        return port
+
+    def write(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+        """
+        built a book and materialize as a portfolio from built in blocks
+        e.g. 0.01 * cmp; 5.5*scs; comm_auto * 9; cmp+cmp;
+
+        :param update:
+        :param verbose:
+        :param name:
+        :param program:
+        :return:
+        """
+        logging.info(f'Underwriter.write | creating Portfolio {name} from {program}')
+        lexer = BuiltInBlockLexer()
+        parser = BuiltInBlockParser(self)
+        program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
+        ans = []
+
+        for txt in program:
+            parser.reset()
+            try:
+                parser.parse(lexer.tokenize(txt))
+            except ValueError as e:
+                if isinstance(e.args[0], str):
+                    print(e)
+                    raise e
+                else:
+                    t = e.args[0].type
+                    v = e.args[0].value
+                    # l = e.arg_dict[0].lineno
+                    i = e.args[0].index
+                    txt2 = txt[0:i] + f'>>>' + txt[i:]
+                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    raise e
+            ans.append(parser.spec)
+
+        # ans is a list of Blocks (because it pulls from uw and because
+        # it uses the + * ops defined by blocks
+        # Need to make into a Book / Portfolio
+        spec_dict = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
+                     for a in ans]
+        if name == '':
+            name = f'built ins {len(spec_dict)}'
+        port = Portfolio(name, spec_dict)
+        if update:
+            if bs == 0:
+                # for log2 = 10
+                bs = port.recommend_bucket().iloc[-1, 0]
+                if log2 == 0:
+                    log2 = 10
+                else:
+                    if log2 > 10:
+                        bs = bs >> (log2 - 10)
+                    else:
+                        bs = bs * (1 << (10 - log2))
+            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
         return port
 
 
@@ -612,7 +723,7 @@ class Book(_ScriptableObject):
         # return _ScriptableObject.__repr__(self)
         s = list()
         s.append(f'{{ "name": "{self.name}"')
-        s.append(f'"args": {str(self.arg_dict)}')
+        s.append(f'"arg_dict": {str(self.arg_dict)}')
         account_list = []
         for a in self.spec_list:
             account_list.append(repr(a))
@@ -740,10 +851,10 @@ def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
     return sio.getvalue()
 
 
-class CalcLexer(Lexer):
+class BuiltInBlockLexer(Lexer):
     tokens = {LINE, NUMBER}
     ignore = ' \t'
-    literals = {'+', '*', r'&', ';'}
+    literals = {'+', '*'}
 
     # Tokens
     LINE = r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -762,50 +873,38 @@ class CalcLexer(Lexer):
         self.index += 1
 
 
-class CalcParser(Parser):
-    tokens = CalcLexer.tokens
-
-    precedence = (
-        ('left', '+'),
-        ('left', '*'),
-    )
+class BuiltInBlockParser(Parser):
+    tokens = BuiltInBlockLexer.tokens
+    precedence = (('left', '+'), ('left', '*'))
 
     def __init__(self, uw):
-        self.uw = uw
         self.names = uw.blocks
-        self.spec = []
+        self.uw = uw
+        self.spec = None
+        self.reset()
 
-    @_('expr ";"')
-    def empty(self, p):
-        # print(f'appending last expression...{p.expr}')
-        self.spec.append(p.expr)
-        return self.spec
-
-    @_('expr "&" expr')
-    def expr(self, p):
-        # print('appending')
-        self.spec.append(p.expr0)
-        return p.expr1
+    def reset(self):
+        self.spec = None
 
     @_('term')
-    def expr(self, p):
-        # print('expr to term')
-        return p.term
+    def empty(self, p):
+        # print('appending')
+        self.spec = p.term
 
-    @_('expr "+" expr')
-    def expr(self, p):
+    @_('term "+" term')
+    def term(self, p):
         # print('adding t')
-        return p.expr0 + p.expr1
-
-    @_('term "*" number')
-    def expr(self, p):
-        # print('t x n')
-        return p.term * p.number
+        return p.term0 + p.term1
 
     @_('number "*" term')
-    def expr(self, p):
+    def term(self, p):
         # print('n x t')
         return p.number * p.term
+
+    @_('term "*" number')
+    def term(self, p):
+        # print('t x n')
+        return p.term * p.number
 
     @_('NUMBER')
     def number(self, p):
@@ -814,21 +913,170 @@ class CalcParser(Parser):
 
     @_('LINE')
     def term(self, p):
-        # print(f'Extracting {p.LINE}, {p}')
         try:
-            ans = getattr(self.uw, p.LINE)
-            return ans
+            return getattr(self.uw, p.LINE)
         except LookupError:
             print(f"Undefined name {p.LINE}")
             return 0
 
-    @_('')
-    def empty(self, p):
+    def error(self, p):
+        if p:
+            raise ValueError(p)
+        else:
+            raise ValueError('Unexpcted end of file')
+
+
+class NLPBizLexer(Lexer):
+    tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
+              FIXED, POISSON}
+    ignore = ' \t,;\\:\\(\\)'
+
+    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    # PERCENT = r'%'
+    PLUS = r'\+'
+    MINUS = r'\-'
+    TIMES = r'\*'
+    ID['loss'] = LOSS
+    ID['LOSS'] = LOSS
+    ID['at'] = AT
+    ID['AT'] = AT
+    ID['@'] = AT
+    ID['cv'] = CV
+    ID['CV'] = CV
+    ID['premium'] = PREMIUM
+    ID['prem'] = PREMIUM
+    ID['PREMIUM'] = PREMIUM
+    ID['PREM'] = PREMIUM
+    ID['WP'] = PREMIUM
+    ID['EP'] = PREMIUM
+    ID['lr'] = LR
+    ID['LR'] = LR
+    ID['claims'] = CLAIMS
+    ID['claim'] = CLAIMS
+    ID['CLAIMS'] = CLAIMS
+    ID['CLAIM'] = CLAIMS
+    ID['xs'] = XS
+    ID['XS'] = XS
+    ID['x'] = XS
+    ID['X'] = XS
+    ID['mixed'] = MIXED
+    ID['poisson'] = POISSON
+    ID['fixed'] = FIXED
+
+    @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
+    def NUMBER(self, t):
+        t.value = float(t.value)
+        return t
+
+    @_(r'\n+')
+    def newline(self, t):
+        self.lineno += t.value.count('\n')
+
+    def error(self, t):
+        print(f"Illegal character '{t.value[0]:s}'")
+        self.index += 1
+
+
+class NLPBizParser(Parser):
+    tokens = NLPBizLexer.tokens
+    precedence = (('left', PLUS, MINUS), ('left', TIMES))
+
+    def __init__(self):
+        self.arg_dict = None
+        self.reset()
+
+    def reset(self):
+        # TODO pull from Aggregate automatically ...
+        self.arg_dict = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
+                             sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0,
+                             freq_name='', freq_a=0, freq_b=0)
+
+    @_('name expos limit sev freq')
+    def ans(self, p):
         pass
 
-    def error(self, token):
-        if token is None:
-            # EOF
-            print('You forgot ending ";"')
+    @_('MIXED ID NUMBER NUMBER')
+    def freq(self, p):
+        self.arg_dict['freq_name'] = 'poisson'  # p.ID  TODO once freq dists implemented this needs to change
+        self.arg_dict['freq_a'] = p[2]
+        self.arg_dict['freq_b'] = p[3]
+
+    @_('MIXED ID NUMBER')
+    def freq(self, p):
+        self.arg_dict['freq_name'] = 'poisson'  # p.ID  TODO, as above
+        self.arg_dict['freq_a'] = p.NUMBER
+
+    @_('FIXED')
+    def freq(self, p):
+        self.arg_dict['freq_name'] = 'fixed'
+
+    @_('POISSON')
+    def freq(self, p):
+        self.arg_dict['freq_name'] = 'poisson'
+
+    @_('sev PLUS NUMBER')
+    def sev(self, p):
+        self.arg_dict['sev_loc'] += p.NUMBER
+
+    @_('sev MINUS NUMBER')
+    def sev(self, p):
+        self.arg_dict['sev_loc'] -= p.NUMBER
+
+    @_('NUMBER TIMES sev')
+    def sev(self, p):
+        self.arg_dict['sev_mean'] *= p.NUMBER
+        self.arg_dict['sev_scale'] = p.NUMBER
+
+    @_('ID NUMBER CV NUMBER')
+    def sev(self, p):
+        self.arg_dict['sev_name'] = p.ID
+        self.arg_dict['sev_mean'] = p[1]
+        self.arg_dict['sev_cv'] = p[3]
+        return True
+
+    @_('ID NUMBER NUMBER')
+    def sev(self, p):
+        self.arg_dict['sev_name'] = p.ID
+        self.arg_dict['sev_a'] = p[1]
+        self.arg_dict['sev_b'] = p[2]
+        return True
+
+    @_('NUMBER XS NUMBER')
+    def limit(self, p):
+        self.arg_dict['exp_attachment'] = p[2]
+        self.arg_dict['exp_limit'] = p[0]
+        return True
+
+    @_('NUMBER CLAIMS')
+    def expos(self, p):
+        self.arg_dict['exp_en'] = p.NUMBER
+        return True
+
+    @_('NUMBER LOSS')
+    def expos(self, p):
+        self.arg_dict['exp_el'] = p.NUMBER
+        return True
+
+    @_('NUMBER PREMIUM AT NUMBER LR')
+    def expos(self, p):
+        self.arg_dict['exp_premium'] = p[0]
+        self.arg_dict['exp_lr'] = p[3]
+        self.arg_dict['exp_loss'] = p[0] * p[3]
+        return True
+
+    @_('NUMBER PREMIUM AT NUMBER')
+    def expos(self, p):
+        self.arg_dict['exp_premium'] = p[0]
+        self.arg_dict['exp_lr'] = p[3]
+        self.arg_dict['exp_el'] = p[0] * p[3]
+        return True
+
+    @_('ID')
+    def name(self, p):
+        self.arg_dict['name'] = p[0]
+
+    def error(self, p):
+        if p:
+            raise ValueError(p)
         else:
-            print(f'In error routine with {token}')
+            raise ValueError('Unexpected end of file')

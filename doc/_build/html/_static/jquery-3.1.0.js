@@ -4001,12 +4001,12 @@ Data.prototype = {
 		var prop,
 			cache = this.cache( owner );
 
-		// Handle: [ owner, key, value ] args
+		// Handle: [ owner, key, value ] arg_dict
 		// Always use camelCase key (gh-2257)
 		if ( typeof data === "string" ) {
 			cache[ jQuery.camelCase( data ) ] = value;
 
-		// Handle: [ owner, { properties } ] args
+		// Handle: [ owner, { properties } ] arg_dict
 		} else {
 
 			// Copy the properties one-by-one to the cache object

@@ -65,7 +65,6 @@
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">interpolate</span>
 <span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">deepcopy</span>
 <span class="kn">from</span> <span class="nn">ruamel</span> <span class="k">import</span> <span class="n">yaml</span>
-<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">from</span> <span class="nn">.utils</span> <span class="k">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">.distr</span> <span class="k">import</span> <span class="n">Aggregate</span>
 <span class="kn">from</span> <span class="nn">.spectral</span> <span class="k">import</span> <span class="n">Distortion</span>
@@ -92,8 +91,8 @@
             <span class="n">a</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="o">**</span><span class="n">spec</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">line_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
-            <span class="n">ma</span><span class="o">.</span><span class="n">add_fs</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">report</span><span class="p">[(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;ex1&#39;</span><span class="p">)],</span>
-                      <span class="n">a</span><span class="o">.</span><span class="n">report</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex1&#39;</span><span class="p">)],</span> <span class="n">a</span><span class="o">.</span><span class="n">report</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex2&#39;</span><span class="p">)],</span> <span class="n">a</span><span class="o">.</span><span class="n">report</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex3&#39;</span><span class="p">)])</span>
+            <span class="n">ma</span><span class="o">.</span><span class="n">add_fs</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">report_ser</span><span class="p">[(</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;ex1&#39;</span><span class="p">)],</span>
+                      <span class="n">a</span><span class="o">.</span><span class="n">report_ser</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex1&#39;</span><span class="p">)],</span> <span class="n">a</span><span class="o">.</span><span class="n">report_ser</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex2&#39;</span><span class="p">)],</span> <span class="n">a</span><span class="o">.</span><span class="n">report_ser</span><span class="p">[(</span><span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;ex3&#39;</span><span class="p">)])</span>
             <span class="n">max_limit</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">max_limit</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">limit</span><span class="p">)))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">line_names_ex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_names</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span>
         <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_names</span><span class="p">:</span>
@@ -101,14 +100,14 @@
             <span class="k">if</span> <span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;n&#39;</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Line names cannot start with n, it is reserved for not&#39;</span><span class="p">)</span>
         <span class="c1"># make a pandas data frame of all the statistics_df</span>
-        <span class="n">temp_report</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">a</span><span class="o">.</span><span class="n">report</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">temp_report</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">a</span><span class="o">.</span><span class="n">report_ser</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># max_limit = np.inf # np.max([np.max(a.get(&#39;limit&#39;, np.inf)) for a in spec_list])</span>
         <span class="n">temp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">ma</span><span class="o">.</span><span class="n">stats_series</span><span class="p">(</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="n">max_limit</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">statistics_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">temp_report</span><span class="p">,</span> <span class="n">temp</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="c1"># future storage</span>
         <span class="c1"># self.line_density = {}</span>
-        <span class="c1"># self.ft_line_density = {}</span>
+        <span class="c1"># self.ft_line_density = {}`</span>
         <span class="c1"># self.not_line_density = {}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">epd_2_assets</span> <span class="o">=</span> <span class="p">{}</span>
@@ -407,7 +406,7 @@
 
 <div class="viewcode-block" id="Portfolio.percentiles"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.percentiles">[docs]</a>    <span class="k">def</span> <span class="nf">percentiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pvalues</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        report on percentiles and large losses</span>
+<span class="sd">        report_ser on percentiles and large losses</span>
 <span class="sd">        uses interpolation, audit_df uses nearest</span>
 
 <span class="sd">        :pvalues: optional vector of p values to use. If None sensible defaults provided</span>
@@ -1783,7 +1782,7 @@
 
 <div class="viewcode-block" id="Portfolio.analysis_priority"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.analysis_priority">[docs]</a>    <span class="k">def</span> <span class="nf">analysis_priority</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asset_spec</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Create priority analysis report</span>
+<span class="sd">        Create priority analysis report_ser</span>
 <span class="sd">        This can be called multiple times so keep as method</span>
 <span class="sd">        :param asset_spec: epd</span>
 <span class="sd">        :return:</span>
@@ -2050,6 +2049,7 @@
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        cumulative integral of v with buckets size bs</span>
 
+<span class="sd">        :param bs_override:</span>
 <span class="sd">        :param v:</span>
 <span class="sd">        :return:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -2070,6 +2070,7 @@
 <span class="sd">        create portfolio from pandas dataframe</span>
 <span class="sd">        uses columns with appropriate names</span>
 
+<span class="sd">        :param name:</span>
 <span class="sd">        :param df:</span>
 <span class="sd">        :return:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -2086,6 +2087,7 @@
 <span class="sd">        drops all blank columns (mostly for auditing purposes)</span>
 
 
+<span class="sd">        :param name:</span>
 <span class="sd">        :param ffn: full file name, including path</span>
 <span class="sd">        :param sheet_name:</span>
 <span class="sd">        :param kwargs:</span>

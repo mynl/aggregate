@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Distortion Class" href="distortion.html" />
-    <link rel="prev" title="Aggregate Class" href="aggregate.html" />
+    <link rel="prev" title="Aggregate and Severity Classes" href="aggregate.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -76,7 +76,7 @@
 <dl class="method">
 <dt id="aggregate.port.Portfolio.analysis_priority">
 <code class="descname">analysis_priority</code><span class="sig-paren">(</span><em>asset_spec</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.analysis_priority"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.analysis_priority" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create priority analysis report
+<dd><p>Create priority analysis report_ser
 This can be called multiple times so keep as method
 :param asset_spec: epd
 :return:</p>
@@ -170,9 +170,14 @@ ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>v</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bs_override</strong> – </li>
+<li><strong>v</strong> – </li>
+</ul>
+</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -204,9 +209,14 @@ uses columns with appropriate names</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>df</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> – </li>
+<li><strong>df</strong> – </li>
+</ul>
+</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -223,6 +233,7 @@ drops all blank columns (mostly for auditing purposes)</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> – </li>
 <li><strong>ffn</strong> – full file name, including path</li>
 <li><strong>sheet_name</strong> – </li>
 <li><strong>kwargs</strong> – </li>
@@ -260,7 +271,7 @@ drops all blank columns (mostly for auditing purposes)</p>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.percentiles">
 <code class="descname">percentiles</code><span class="sig-paren">(</span><em>pvalues=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.percentiles"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.percentiles" title="Permalink to this definition">¶</a></dt>
-<dd><p>report on percentiles and large losses
+<dd><p>report_ser on percentiles and large losses
 uses interpolation, audit_df uses nearest</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -601,8 +612,7 @@ If A=0 A=q(p) is used</p>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate and Severity Classes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>

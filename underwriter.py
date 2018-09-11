@@ -161,78 +161,6 @@ class Underwriter(_DataManager):
     def __call__(self, portfolio_program):
         self.write(portfolio_program)
 
-    def nlp(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
-        """
-        write a pseudo natural language programming spec for a book or (if only one line) an aggregate
-
-        e.g. Input
-        20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
-        10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
-        100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1
-
-        See parser for full language spec!
-
-        :param program:
-        :param name:
-        :param update:
-        :param verbose:
-        :param kwargs:
-        :return:
-        """
-
-        logging.info(f'Underwriter.nlp | creating Portfolio {name} from {program}')
-        lexer = NLPBizLexer()
-        parser = NLPBizParser()
-        program = [i.strip() for i in program.split('\n') if len(i.strip()) > 0]
-        spec_list = []
-
-        for txt in program:
-            parser.reset()
-            try:
-                parser.parse(lexer.tokenize(txt))
-            except ValueError as e:
-                if isinstance(e.args[0], str):
-                    print(e)
-                    raise e
-                else:
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    # l = e.arg_dict[0].lineno
-                    i = e.args[0].index
-                    txt2 = txt[0:i] + f'>>>' + txt[i:]
-                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
-                    raise e
-            spec_list.append(parser.arg_dict)
-        # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
-        if name == '':
-            name = f'script {len(spec_list)}'
-        port = Portfolio(name, spec_list)
-        if update:
-            if bs == 0:
-                # for log2 = 10
-                bs = port.recommend_bucket().iloc[-1, 0]
-                if log2 == 0:
-                    log2 = 10
-                else:
-                    if log2 > 10:
-                        bs = bs >> (log2 - 10)
-                    else:
-                        bs = bs * (1 << (10 - log2))
-            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-
-        if update:
-            if 'bs' not in kwargs:
-                bs = port.recommend_bucket().iloc[-1, 0]
-                log2 = 10
-            else:
-                bs = kwargs['bs']
-                log2 = kwargs['log2']
-                del kwargs['bs']
-                del kwargs['log2']
-            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
-        return port
-
     def write(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         built a book and materialize as a portfolio from built in blocks
@@ -287,6 +215,79 @@ class Underwriter(_DataManager):
                         bs = bs >> (log2 - 10)
                     else:
                         bs = bs * (1 << (10 - log2))
+            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+        return port
+
+    @staticmethod
+    def script(program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+        """
+        write a pseudo natural language programming spec for a book or (if only one line) an aggregate
+
+        e.g. Input
+        20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
+        10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
+        100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1
+
+        See parser for full language spec!
+
+        :param program:
+        :param name:
+        :param update:
+        :param verbose:
+        :param kwargs:
+        :return:
+        """
+
+        logging.info(f'Underwriter.nlp | creating Portfolio {name} from {program}')
+        lexer = NLPBizLexer()
+        parser = NLPBizParser()
+        program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
+        spec_list = []
+
+        for txt in program:
+            parser.reset()
+            try:
+                parser.parse(lexer.tokenize(txt))
+            except ValueError as e:
+                if isinstance(e.args[0], str):
+                    print(e)
+                    raise e
+                else:
+                    t = e.args[0].type
+                    v = e.args[0].value
+                    # l = e.arg_dict[0].lineno
+                    i = e.args[0].index
+                    txt2 = txt[0:i] + f'>>>' + txt[i:]
+                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    raise e
+            spec_list.append(parser.arg_dict)
+        # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
+        if name == '':
+            name = f'script {len(spec_list)}'
+        port = Portfolio(name, spec_list)
+        if update:
+            if bs == 0:
+                # for log2 = 10
+                bs = port.recommend_bucket().iloc[-1, 0]
+                if log2 == 0:
+                    log2 = 10
+                else:
+                    if log2 > 10:
+                        bs = bs >> (log2 - 10)
+                    else:
+                        bs = bs * (1 << (10 - log2))
+            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+
+        if update:
+            if 'bs' not in kwargs:
+                bs = port.recommend_bucket().iloc[-1, 0]
+                log2 = 10
+            else:
+                bs = kwargs['bs']
+                log2 = kwargs['log2']
+                del kwargs['bs']
+                del kwargs['log2']
             logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
             port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
         return port
@@ -929,7 +930,7 @@ class BuiltInBlockParser(Parser):
 class NLPBizLexer(Lexer):
     tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
               FIXED, POISSON}
-    ignore = ' \t,;\\:\\(\\)'
+    ignore = ' \t,\\:\\(\\)'
 
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
     # PERCENT = r'%'

@@ -189,6 +189,7 @@ class AxisManager(object):
             self.ax = self.axs
             self.it = None
         else:
+            # faxs = flattened axes
             self.faxs = self.axs.flatten()
             self.it = iter(self.faxs)
             self.ax = None
@@ -242,7 +243,7 @@ class AxisManager(object):
             # need local sizing
             assert self.n >= size
             r, c = self.grid_size(size, subgrid=True)
-            return [self.__next__() for _ in range(c) for _ in range(r)]
+            return [self.__next__() for _ in range(size)]  # range(c) for _ in range(r)]
 
 
 def lognorm_lev(mu, sigma, n, limit):

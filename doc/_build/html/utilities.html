@@ -110,7 +110,7 @@ if size=0 return all the axes</p>
 <em class="property">class </em><code class="descclassname">utils.</code><code class="descname">MomentAggregator</code><span class="sig-paren">(</span><em>freq_name</em>, <em>freq_a</em>, <em>freq_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
 <dd><p>Accumulate moments
 Used by Portfolio and Aggregate (when there are multiple severities)
-makes report df and statistics_df</p>
+makes report_ser df and statistics_df</p>
 <p>Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</p>
 <dl class="method">
 <dt id="utils.MomentAggregator.add_fs">
@@ -611,8 +611,7 @@ currently only for n=1, 2</p>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate and Severity Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>

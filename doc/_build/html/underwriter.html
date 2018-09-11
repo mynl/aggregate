@@ -50,15 +50,48 @@
 Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.</p>
 <p>Persisitence to and from YAML managed</p>
 <dl class="method">
-<dt id="aggregate.Underwriter.write">
-<code class="descname">write</code><span class="sig-paren">(</span><em>name</em>, <em>portfolio_program</em>, <em>update=False</em>, <em>verbose=False</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Underwriter.write" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dt id="aggregate.Underwriter.nlp">
+<code class="descname">nlp</code><span class="sig-paren">(</span><em>program</em>, <em>name=''</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.nlp"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Underwriter.nlp" title="Permalink to this definition">¶</a></dt>
+<dd><p>write a pseudo natural language programming spec for a book or (if only one line) an aggregate</p>
+<p>e.g. Input
+20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
+10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
+100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1</p>
+<p>See parser for full language spec!</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>program</strong> – </li>
 <li><strong>name</strong> – </li>
-<li><strong>portfolio_program</strong> – </li>
+<li><strong>update</strong> – </li>
+<li><strong>verbose</strong> – </li>
+<li><strong>kwargs</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.Underwriter.write">
+<code class="descname">write</code><span class="sig-paren">(</span><em>program</em>, <em>name=''</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Underwriter.write" title="Permalink to this definition">¶</a></dt>
+<dd><p>built a book and materialize as a portfolio from built in blocks
+e.g. 0.01 * cmp; 5.5*scs; comm_auto * 9; cmp+cmp;</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>update</strong> – </li>
+<li><strong>verbose</strong> – </li>
+<li><strong>name</strong> – </li>
+<li><strong>program</strong> – </li>
 </ul>
 </td>
 </tr>
@@ -162,86 +195,6 @@ TODO: do we need , attachment=0., limit=np.inf):??</p>
 <dl class="method">
 <dt id="aggregate.Curve.write">
 <code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Curve.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.Curve.write" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="aggregate.CalcParser">
-<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">CalcParser</code><span class="sig-paren">(</span><em>uw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="method">
-<dt id="aggregate.CalcParser.empty">
-<code class="descname">empty</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.empty"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.empty" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcParser.error">
-<code class="descname">error</code><span class="sig-paren">(</span><em>token</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.error"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.error" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcParser.expr">
-<code class="descname">expr</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.expr"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.expr" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcParser.number">
-<code class="descname">number</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.number"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.number" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="aggregate.CalcParser.precedence">
-<code class="descname">precedence</code><em class="property"> = (('left', '+'), ('left', '*'))</em><a class="headerlink" href="#aggregate.CalcParser.precedence" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcParser.term">
-<code class="descname">term</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcParser.term"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcParser.term" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="aggregate.CalcParser.tokens">
-<code class="descname">tokens</code><em class="property"> = {'NUMBER', 'LINE'}</em><a class="headerlink" href="#aggregate.CalcParser.tokens" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="aggregate.CalcLexer">
-<em class="property">class </em><code class="descclassname">aggregate.</code><code class="descname">CalcLexer</code><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="attribute">
-<dt id="aggregate.CalcLexer.LINE">
-<code class="descname">LINE</code><em class="property"> = '[a-zA-Z_][a-zA-Z0-9_]*'</em><a class="headerlink" href="#aggregate.CalcLexer.LINE" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcLexer.NUMBER">
-<code class="descname">NUMBER</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.NUMBER"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.NUMBER" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcLexer.error">
-<code class="descname">error</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.error"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.error" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="aggregate.CalcLexer.ignore">
-<code class="descname">ignore</code><em class="property"> = ' \t'</em><a class="headerlink" href="#aggregate.CalcLexer.ignore" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="aggregate.CalcLexer.literals">
-<code class="descname">literals</code><em class="property"> = {';', '*', '&amp;', '+'}</em><a class="headerlink" href="#aggregate.CalcLexer.literals" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.CalcLexer.newline">
-<code class="descname">newline</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#CalcLexer.newline"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.CalcLexer.newline" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="aggregate.CalcLexer.tokens">
-<code class="descname">tokens</code><em class="property"> = {'NUMBER', 'LINE'}</em><a class="headerlink" href="#aggregate.CalcLexer.tokens" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>

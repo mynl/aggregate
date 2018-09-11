@@ -168,8 +168,8 @@
     <span class="n">pn</span> <span class="o">=</span> <span class="n">pl</span> <span class="o">=</span> <span class="n">pg</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">if</span> <span class="n">skew</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="c1"># neither sln nor sgamma works, use a normal</span>
-        <span class="n">fzn</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">m</span><span class="o">*</span><span class="n">cv</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
-        <span class="n">pn</span> <span class="o">=</span> <span class="n">fzn</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">p</span><span class="p">)</span>
+        <span class="n">fzn</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">m</span> <span class="o">*</span> <span class="n">cv</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
+        <span class="n">pn</span> <span class="o">=</span> <span class="n">fzn</span><span class="o">.</span><span class="n">isf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">shift</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span> <span class="o">=</span> <span class="n">sln_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">)</span>
         <span class="n">fzl</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">lognorm</span><span class="p">(</span><span class="n">sigma</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mu</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="n">shift</span><span class="p">)</span>
@@ -413,7 +413,7 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Accumulate moments</span>
 <span class="sd">    Used by Portfolio and Aggregate (when there are multiple severities)</span>
-<span class="sd">    makes report df and statistics_df</span>
+<span class="sd">    makes report_ser df and statistics_df</span>
 
 <span class="sd">    Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</span>
 
@@ -665,7 +665,12 @@
         <span class="n">m</span> <span class="o">=</span> <span class="n">ex1</span>
         <span class="n">var</span> <span class="o">=</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">2</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
-        <span class="n">cv</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">/</span> <span class="n">m</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">cv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;MomentAggregator._moments_to_mcvsk | encountered zero mean, called with &#39;</span>
+                          <span class="n">f</span><span class="s1">&#39;</span><span class="si">{ex1}</span><span class="s1">, </span><span class="si">{ex2}</span><span class="s1">, </span><span class="si">{ex3}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cv</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">/</span> <span class="n">m</span>
         <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">skew</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
         <span class="k">else</span><span class="p">:</span>

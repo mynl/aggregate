@@ -65,21 +65,21 @@ noncatb:
 comm_auto:
     exp_en: 462316.4185094556
     freq_name: poisson
-    freq_a: 0.019514618069576366
+    freq_a: 0.24
     sev_name: lognorm
     sev_cv: 0.5
     sev_mean: 40000.0
 cmp:
     exp_en: 268153.9035381244
     freq_name: poisson
-    freq_a: 0.026423063353208383
+    freq_a: 0.28
     sev_name: lognorm
     sev_cv: 0.5
     sev_mean: 100000.0
 comm_prop:
     exp_en: 65087.40362778484
     freq_name: poisson
-    freq_a: 0.23849756543842238
+    freq_a: 0.30
     sev_name: lognorm
     sev_cv: 0.25
     sev_mean: 250000.0
@@ -95,20 +95,20 @@ homeowners:
 inland_marine:
     exp_en: 314117.39908251056
     freq_name: poisson
-    freq_a: 0.051267889376807534
+    freq_a: 0.35
     sev_name: lognorm
     sev_cv: 0.5
     sev_mean: 50000.0
 ppa:
     exp_en: 5676073.301971859
-    freq_a: 0.0034980315893991974
+    freq_a: 0.089
     sev_name: lognorm
     sev_cv: 0.5
     sev_mean: 30000.0
 work_comp:
     exp_en: 2664340.5292379954
     freq_name: poisson
-    freq_a: 0.019416488668977414
-    sev_cv: 0.5
+    freq_a: 0.19
+    sev_cv: 7
     sev_mean: 15000.0
     sev_name: lognorm

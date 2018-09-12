@@ -42,11 +42,11 @@ cate:
     sev_a: 0.9
     sev_scale: 1
     sev_loc: -1
-noncata:
+liaba:
     sev_name: lognorm
-    sev_mean: 50000
+    sev_mean: 50
     sev_cv: 1.0
-noncatb:
+liabb:
     sev_name: lognorm
-    sev_mean: 24000
+    sev_mean: 24
     sev_cv: 1.1

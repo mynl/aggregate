@@ -177,7 +177,7 @@ class Underwriter(_DataManager):
         parser = BuiltInBlockParser(self)
         program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
         ans = []
-
+        read_builtins = []
         for txt in program:
             parser.reset()
             try:
@@ -195,6 +195,7 @@ class Underwriter(_DataManager):
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
             ans.append(parser.spec)
+            read_builtins += parser.objs
 
         # ans is a list of Blocks (because it pulls from uw and because
         # it uses the + * ops defined by blocks
@@ -217,10 +218,11 @@ class Underwriter(_DataManager):
                         bs = bs * (1 << (10 - log2))
             logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
             port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+        if verbose:
+            print(f'Loaded objects {read_builtins}')
         return port
 
-    @staticmethod
-    def script(program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def script(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate
 
@@ -241,7 +243,7 @@ class Underwriter(_DataManager):
 
         logging.info(f'Underwriter.nlp | creating Portfolio {name} from {program}')
         lexer = NLPBizLexer()
-        parser = NLPBizParser()
+        parser = NLPBizParser(self)
         program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
         spec_list = []
 
@@ -882,10 +884,12 @@ class BuiltInBlockParser(Parser):
         self.names = uw.blocks
         self.uw = uw
         self.spec = None
+        self.objs = None
         self.reset()
 
     def reset(self):
         self.spec = None
+        self.objs = []
 
     @_('term')
     def empty(self, p):
@@ -915,7 +919,10 @@ class BuiltInBlockParser(Parser):
     @_('LINE')
     def term(self, p):
         try:
-            return getattr(self.uw, p.LINE)
+            obj = getattr(self.uw, p.LINE)
+            self.objs.append((type(obj), p.LINE))
+            logging.info(f'Underwriter.write | Loading object {p.LINE} of type {type(obj)} from uw library')
+            return obj
         except LookupError:
             print(f"Undefined name {p.LINE}")
             return 0
@@ -929,7 +936,7 @@ class BuiltInBlockParser(Parser):
 
 class NLPBizLexer(Lexer):
     tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON}
+              FIXED, POISSON, BUILTIN}
     ignore = ' \t,\\:\\(\\)'
 
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -963,6 +970,10 @@ class NLPBizLexer(Lexer):
     ID['mixed'] = MIXED
     ID['poisson'] = POISSON
     ID['fixed'] = FIXED
+    ID['builtin'] = BUILTIN
+    ID['BUILTIN'] = BUILTIN
+    ID['bin'] = BUILTIN
+    ID['BIN'] = BUILTIN
 
     @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
     def NUMBER(self, t):
@@ -982,15 +993,21 @@ class NLPBizParser(Parser):
     tokens = NLPBizLexer.tokens
     precedence = (('left', PLUS, MINUS), ('left', TIMES))
 
-    def __init__(self):
+    def __init__(self, uw):
         self.arg_dict = None
         self.reset()
+        # instance of uw class to look up severities
+        self.uw = uw
 
     def reset(self):
         # TODO pull from Aggregate automatically ...
         self.arg_dict = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                              sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0,
                              freq_name='', freq_a=0, freq_b=0)
+
+    @_('name expos sev freq')
+    def ans(self, p):
+        pass
 
     @_('name expos limit sev freq')
     def ans(self, p):
@@ -1041,6 +1058,24 @@ class NLPBizParser(Parser):
         self.arg_dict['sev_a'] = p[1]
         self.arg_dict['sev_b'] = p[2]
         return True
+
+    @_('BUILTIN ID')
+    def sev(self, p):
+        # look up ID in uw
+        sev_dist = self.uw[p.ID]
+        print(f'retrieved {p.ID} type {type(sev_dist)}')
+        assert isinstance(sev_dist, Curve)
+        self.arg_dict['sev_name'] = sev_dist.sev_name
+        self.arg_dict['sev_a'] = sev_dist.sev_a
+        self.arg_dict['sev_b'] = sev_dist.sev_b
+        self.arg_dict['sev_mean'] = sev_dist.sev_mean
+        self.arg_dict['sev_cv'] = sev_dist.sev_cv
+        self.arg_dict['sev_loc'] = sev_dist.sev_loc
+        self.arg_dict['sev_scale'] = sev_dist.sev_scale
+        self.arg_dict['sev_xs'] = sev_dist.sev_xs
+        self.arg_dict['sev_ps'] = sev_dist.sev_ps
+        self.arg_dict['sev_wt'] = sev_dist.sev_wt
+        print(self.arg_dict)
 
     @_('NUMBER XS NUMBER')
     def limit(self, p):

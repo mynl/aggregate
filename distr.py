@@ -12,20 +12,7 @@ from scipy import interpolate
 from scipy.optimize import newton
 from IPython.core.display import display
 
-# import matplotlib.cm as cm
-# from scipy import interpolate
-# from copy import deepcopy
-# from ruamel import yaml
-# from . utils import *
 
-# LOGFILE = 'c:/S/TELOS/python/aggregate/aggregate.log'
-# logging.basicConfig(filename=LOGFILE,
-#                     filemode='w',
-#                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-#                     level=logging.DEBUG)
-# logging.info('aggregate.__init__ | New trash Session started')
-#
-#
 class Aggregate(object):
     """
     Aggregate help placeholder
@@ -119,7 +106,7 @@ class Aggregate(object):
         self._nearest_quantile_function = None
 
         # get other variables defined in init
-        self.en = None # this is for a sublayer e.g. for limit profile
+        self.en = None  # this is for a sublayer e.g. for limit profile
         self.n = 0  # this is total frequency
         self.attachment = None
         self.limit = None
@@ -195,7 +182,8 @@ class Aggregate(object):
             ma.add_fs(_en, sev1, sev2, sev3)
 
             # store
-            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [c, self.freq_a]
+            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [
+                c, self.freq_a]
             r += 1
 
         # average exp_limit and exp_attachment
@@ -213,7 +201,8 @@ class Aggregate(object):
         self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
                                                     ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
         self.statistics_total_df.loc[f'independent', :] = \
-            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
+            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True,
+                                                                                             remix=False) + [c, root_c]
         self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
         self.statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
         self.n = ma.tot_freq_1
@@ -278,6 +267,31 @@ class Aggregate(object):
 
         return beds
 
+    def easy_update(self, log2=13, bs=0, reporting_level=0, **kwargs):
+        """
+        Convenience function
+
+
+        :param log2:
+        :param bs:
+        :param reporting_level:
+        :param kwargs:  passed through to update
+        :return:
+        """
+        # guess bucket and update
+        if bs == 0:
+            bs = self.recommend_bucket(log2)
+        xs = np.arange(0, 1 << log2, dtype=float) * bs
+        if 'approximation' not in kwargs:
+            kwargs['approximation'] = 'slognorm'
+        df, a = self.update(xs, **kwargs)
+
+        # misc reporting TODO enhance
+        if reporting_level > 0:
+            self.plot('quick')
+            self.report('audit')
+        return df, a
+
     def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', force_severity=False, verbose=False):
         """
@@ -320,9 +334,9 @@ class Aggregate(object):
                     _m = np.sum(self.xs * temp)
                     _cv = np.sqrt(np.sum((self.xs ** 2) * temp) - (_m ** 2)) / _m
                     df.loc[r, :] = [l, a, n, _m, _cv,
-                                        temp.sum(),
-                                        w, np.sum(np.where(np.isinf(temp), 1, 0)),
-                                        temp.max(), w * temp.max(), temp.min()]
+                                    temp.sum(),
+                                    w, np.sum(np.where(np.isinf(temp), 1, 0)),
+                                    temp.max(), w * temp.max(), temp.min()]
                     r += 1
                     next(axm).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
                     axm.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
@@ -527,10 +541,10 @@ class Aggregate(object):
 
             next(axiter).plot(self.xs, self.sev_density)
             axiter.ax.set(title='Log Severity')
-            if np.sum(self.sev_density==1) >= 1:
+            if np.sum(self.sev_density == 1) >= 1:
                 # sev density is degenerate, 1,0,0,... log scales won't work
                 axiter.ax.set(title='Severity Degenerate')
-                axiter.ax.set(xlim=(0, max_lim*2))
+                axiter.ax.set(xlim=(0, max_lim * 2))
             else:
                 axiter.ax.set(title='Log Severity')
                 axiter.ax.set(title='Log Severity', yscale='log')
@@ -676,19 +690,30 @@ class Aggregate(object):
             html_title(f'{self.name} Statistics Report', 1)
             display(df)
 
-    def recommend_bucket(self, N=10):
+    def recommend_bucket(self, log2=10, verbose=False):
         """
         recommend a bucket size given 2**N buckets
 
         :param N:
         :return:
         """
-        moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew) / N
-        limit_est = self.limit.max() / N
-        if limit_est == np.inf:
-            limit_est = 0
-        logging.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
-        return max(moment_est, limit_est)
+        N = 1 << log2
+        if not verbose:
+            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew) / N
+            limit_est = self.limit.max() / N
+            if limit_est == np.inf:
+                limit_est = 0
+            logging.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
+            return max(moment_est, limit_est)
+        else:
+            for n in sorted({log2, 16, 13, 10}):
+                rb = self.recommend_bucket(n)
+                if n == log2:
+                    rbr = rb
+                print(f'Recommended bucket size with {2**n} buckets: {rb:,.0f}')
+            if self.bs != 0:
+                print(f'Bucket size set with {2**self.log2} buckets at {self.bs:,.0f}')
+            return rbr
 
     def q(self, p):
         """
@@ -712,6 +737,7 @@ class Aggregate(object):
         """
         q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind, bounds_error=False, fill_value=0)
         return q
+
 
 class Severity(ss.rv_continuous):
     """

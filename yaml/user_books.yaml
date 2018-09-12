@@ -1,4 +1,5 @@
 Three Line Example:
+    note: User example, single line, mixed sev, and sublines
     arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
@@ -68,6 +69,7 @@ Three Line Example:
         sev_mean: 100
         sev_name: lognorm
 Single:
+    note: single line example
     arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
@@ -94,6 +96,7 @@ Single:
         sev_mean: 100
         sev_name: lognorm
 Mixed:
+    note: mixed severity example with different CVs
     arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
@@ -130,6 +133,7 @@ Mixed:
         sev_mean: 100
         sev_name: lognorm
 Sublines:
+    note: sublines defining a limit profile
     arg_dict:
         approx_freq_ge: 100
         approx_type: slognorm
@@ -171,6 +175,7 @@ Sublines:
         sev_mean: 100
         sev_name: lognorm
 small_medium_large:
+    note: three line example with small, medium and large claims
     arg_dict:
         log2: 14
         bs: 10000
@@ -201,6 +206,7 @@ small_medium_large:
         freq_name: poisson
         freq_a: 0.1
 mass_test:
+    note: test of fixed severity
     arg_dict:
         log2: 6
         bs: 1
@@ -225,6 +231,7 @@ mass_test:
         exp_en: 1
         freq_name: fixed
 interesting_cat:
+    note: pareto and lognormal cat with different tail characteristics
     arg_dict:
         log2: 14
         bs: 10

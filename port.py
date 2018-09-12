@@ -54,9 +54,9 @@ class Portfolio(object):
             max_limit = max(max_limit, np.max(np.array(a.limit)))
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
-            # line names cannot start with n, it is reserved for "not"
-            if n[0] == 'n':
-                raise ValueError('Line names cannot start with n, it is reserved for not')
+            # line names cannot equal total
+            if n == 'total':
+                raise ValueError('Line names cannot equal total, it is reserved for...total')
         # make a pandas data frame of all the statistics_df
         temp_report = pd.concat([a.report_ser for a in self.agg_list], axis=1)
 
@@ -64,9 +64,6 @@ class Portfolio(object):
         temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, total=True))
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
-        # self.line_density = {}
-        # self.ft_line_density = {}`
-        # self.not_line_density = {}
         self.density_df = None
         self.epd_2_assets = {}
         self.assets_2_epd = {}
@@ -499,7 +496,7 @@ class Portfolio(object):
         # make the density_df dataframe
         d1 = {'loss': xs}
         d2 = {'p_' + i: line_density[i] for i in self.line_names_ex}
-        d3 = {'not_' + i: not_line_density[i] for i in self.line_names}
+        d3 = {'ημ_' + i: not_line_density[i] for i in self.line_names}
         d = {**d1, **d2, **d3}
         self.density_df = pd.DataFrame(d, columns=d.keys(), index=xs)
 
@@ -572,7 +569,7 @@ class Portfolio(object):
         :return:
         """
         self.density_df = self.density_df.drop(
-            self.density_df.filter(regex='^e_|^exi_xlea|^[a-z_]+not').columns,
+            self.density_df.filter(regex='^e_|^exi_xlea|^[a-z_]+ημ').columns,
             axis=1
         )
 
@@ -668,7 +665,7 @@ class Portfolio(object):
                 else:
                     line = ['p_' + line]
             elif isinstance(line, list):
-                line = ['p_' + i if i[0:3] != 'not' else i for i in line]
+                line = ['p_' + i if i[0:2] != 'ημ' else i for i in line]
             else:
                 raise ValueError
 
@@ -710,7 +707,7 @@ class Portfolio(object):
             temp.plot(ax=ax, logx=True, logy=True, title='Densities log/log')
 
             # graph of cumulative loss cost and rate of change of cumulative loss cost
-            temp = D.filter(regex='^exa_[^n]')
+            temp = D.filter(regex='^exa_[^η]')
 
             ax = axiter.grid(1)
             temp.plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, expected_loss_scale),
@@ -781,7 +778,7 @@ class Portfolio(object):
             if a == 0:
                 a = self.q(p)
             pline = self.density_df.loc[0:a, f'p_{line}'].values
-            notline = self.density_df.loc[0:a, f'not_{line}'].values
+            notline = self.density_df.loc[0:a, f'ημ_{line}'].values
             xs = self.density_df.loc[0:a, 'loss'].values
             N = pline.shape[0]
             biv = np.matmul(notline.reshape((N, 1)), pline.reshape((1, N)))
@@ -978,14 +975,14 @@ class Portfolio(object):
             # EX_i | X=a, E(xi eq a)
             self.density_df['exeqa_' + col] = \
                 np.real(loc_ift(loc_ft(self.density_df.loss * self.density_df['p_' + col]) *
-                                loc_ft(self.density_df['not_' + col]))) / self.density_df.p_total
+                                loc_ft(self.density_df['ημ_' + col]))) / self.density_df.p_total
             # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
             self.density_df.loc[self.density_df.p_total < cut_eps, 'exeqa_' + col] = 0
-            self.density_df['exeqa_not_' + col] = \
-                np.real(loc_ift(loc_ft(self.density_df.loss * self.density_df['not_' + col]) *
+            self.density_df['exeqa_ημ_' + col] = \
+                np.real(loc_ift(loc_ft(self.density_df.loss * self.density_df['ημ_' + col]) *
                                 loc_ft(self.density_df['p_' + col]))) / self.density_df.p_total
             # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
-            self.density_df.loc[self.density_df.p_total < cut_eps, 'exeqa_not_' + col] = 0
+            self.density_df.loc[self.density_df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
             # E(X_{i, 2nd priority}(a))
             # need the stand alone LEV calc
             # E(min(Xi, a)
@@ -996,25 +993,25 @@ class Portfolio(object):
             self.density_df['lev_' + col] = self.cumintegral(stemp)
 
             self.density_df['e2pri_' + col] = \
-                np.real(loc_ift(loc_ft(self.density_df['lev_' + col]) * loc_ft(self.density_df['not_' + col])))
-            stemp = 1 - self.density_df.loc[:, 'not_' + col].cumsum()
+                np.real(loc_ift(loc_ft(self.density_df['lev_' + col]) * loc_ft(self.density_df['ημ_' + col])))
+            stemp = 1 - self.density_df.loc[:, 'ημ_' + col].cumsum()
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
-            # self.density_df['lev_not_' + col] = temp * bs
-            self.density_df['lev_not_' + col] = self.cumintegral(stemp)
+            # self.density_df['lev_ημ_' + col] = temp * bs
+            self.density_df['lev_ημ_' + col] = self.cumintegral(stemp)
 
             # EX_i | X<= a; temp is used in le and gt calcs
             temp = np.cumsum(self.density_df['exeqa_' + col] * self.density_df.p_total)
             self.density_df['exlea_' + col] = temp / self.density_df.F
             # revised version for small losses: do not know this value
             self.density_df.loc[0:loss_max, 'exlea_' + col] = 0  # self.density_df.loc[0:loss_max, 'loss']
-            temp_not = np.cumsum(self.density_df['exeqa_not_' + col] * self.density_df.p_total)
-            self.density_df['exlea_not_' + col] = temp_not / self.density_df.F
+            temp_not = np.cumsum(self.density_df['exeqa_ημ_' + col] * self.density_df.p_total)
+            self.density_df['exlea_ημ_' + col] = temp_not / self.density_df.F
             # revised version for small losses: do not know this value
-            self.density_df.loc[0:loss_max, 'exlea_not_' + col] = 0  # self.density_df.loc[0:loss_max, 'loss']
+            self.density_df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # self.density_df.loc[0:loss_max, 'loss']
 
             # constant value, helpful in calculations
             self.density_df['e_' + col] = np.sum(self.density_df['p_' + col] * self.density_df.loss)
-            self.density_df['e_not_' + col] = np.sum(self.density_df['not_' + col] * self.density_df.loss)
+            self.density_df['e_ημ_' + col] = np.sum(self.density_df['ημ_' + col] * self.density_df.loss)
 
             # EX_i | X>a
             self.density_df['exgta_' + col] = (self.density_df['e_' + col] - temp) / self.density_df.S
@@ -1031,23 +1028,23 @@ class Portfolio(object):
             # more generally F=0 error:
             self.density_df.loc[self.density_df.exlea_total == 0, 'exi_xlea_' + col] = 0
             # not version
-            self.density_df['exi_x_not_' + col] = np.sum(
-                self.density_df['exeqa_not_' + col] * self.density_df.p_total / self.density_df.loss)
+            self.density_df['exi_x_ημ_' + col] = np.sum(
+                self.density_df['exeqa_ημ_' + col] * self.density_df.p_total / self.density_df.loss)
             temp_xi_x_not = np.cumsum(
-                self.density_df['exeqa_not_' + col] * self.density_df.p_total / self.density_df.loss)
-            self.density_df['exi_xlea_not_' + col] = temp_xi_x_not / self.density_df.F
-            self.density_df.loc[0, 'exi_xlea_not_' + col] = 0  # self.density_df.F=0 at zero
+                self.density_df['exeqa_ημ_' + col] * self.density_df.p_total / self.density_df.loss)
+            self.density_df['exi_xlea_ημ_' + col] = temp_xi_x_not / self.density_df.F
+            self.density_df.loc[0, 'exi_xlea_ημ_' + col] = 0  # self.density_df.F=0 at zero
             # more generally F=0 error:
-            self.density_df.loc[self.density_df.exlea_total == 0, 'exi_xlea_not_' + col] = 0
+            self.density_df.loc[self.density_df.exlea_total == 0, 'exi_xlea_ημ_' + col] = 0
             # put value back
             self.density_df.loss.iloc[0] = temp
             self.density_df['exi_xgta_' + col] = (self.density_df['exi_x_' + col] - temp_xi_x) / self.density_df.S
-            self.density_df['exi_xgta_not_' + col] = \
-                (self.density_df['exi_x_not_' + col] - temp_xi_x_not) / self.density_df.S
+            self.density_df['exi_xgta_ημ_' + col] = \
+                (self.density_df['exi_x_ημ_' + col] - temp_xi_x_not) / self.density_df.S
             self.density_df['exi_xeqa_' + col] = self.density_df['exeqa_' + col] / self.density_df['loss']
             self.density_df.loc[0, 'exi_xeqa_' + col] = 0
-            self.density_df['exi_xeqa_not_' + col] = self.density_df['exeqa_not_' + col] / self.density_df['loss']
-            self.density_df.loc[0, 'exi_xeqa_not_' + col] = 0
+            self.density_df['exi_xeqa_ημ_' + col] = self.density_df['exeqa_ημ_' + col] / self.density_df['loss']
+            self.density_df.loc[0, 'exi_xeqa_ημ_' + col] = 0
             # need the loss cost with equal priority rule
             # exa_ = E(X_i(a)) = E(X_i | X<= a)F(a) + E(X_i / X| X>a) a S(a)
             #   = exlea F(a) + exixgta * a * S(a)
@@ -1055,24 +1052,24 @@ class Portfolio(object):
             self.density_df['exa_' + col] = \
                 self.density_df['exlea_' + col] * self.density_df.F + self.density_df.loss * \
                 self.density_df.S * self.density_df['exi_xgta_' + col]
-            self.density_df['exa_not_' + col] = \
-                self.density_df['exlea_not_' + col] * self.density_df.F + self.density_df.loss * \
-                self.density_df.S * self.density_df['exi_xgta_not_' + col]
+            self.density_df['exa_ημ_' + col] = \
+                self.density_df['exlea_ημ_' + col] * self.density_df.F + self.density_df.loss * \
+                self.density_df.S * self.density_df['exi_xgta_ημ_' + col]
 
             # epds
             self.density_df.loc[:, 'epd_0_' + col] = \
                 np.maximum(0, (self.density_df.loc[:, 'e_' + col] - self.density_df.loc[:, 'lev_' + col])) / \
                 self.density_df.loc[:, 'e_' + col]
-            self.density_df.loc[:, 'epd_0_not_' + col] = \
-                np.maximum(0, (self.density_df.loc[:, 'e_not_' + col] - self.density_df.loc[:, 'lev_not_' + col])) / \
-                self.density_df.loc[:, 'e_not_' + col]
+            self.density_df.loc[:, 'epd_0_ημ_' + col] = \
+                np.maximum(0, (self.density_df.loc[:, 'e_ημ_' + col] - self.density_df.loc[:, 'lev_ημ_' + col])) / \
+                self.density_df.loc[:, 'e_ημ_' + col]
             self.density_df.loc[:, 'epd_1_' + col] = \
                 np.maximum(0, (self.density_df.loc[:, 'e_' + col] - self.density_df.loc[:, 'exa_' + col])) / \
                 self.density_df.loc[:, 'e_' + col]
-            self.density_df.loc[:, 'epd_1_not_' + col] = \
-                np.maximum(0, (self.density_df.loc[:, 'e_not_' + col] -
-                               self.density_df.loc[:, 'exa_not_' + col])) / \
-                self.density_df.loc[:, 'e_not_' + col]
+            self.density_df.loc[:, 'epd_1_ημ_' + col] = \
+                np.maximum(0, (self.density_df.loc[:, 'e_ημ_' + col] -
+                               self.density_df.loc[:, 'exa_ημ_' + col])) / \
+                self.density_df.loc[:, 'e_ημ_' + col]
             self.density_df.loc[:, 'epd_2_' + col] = \
                 np.maximum(0, (self.density_df.loc[:, 'e_' + col] - self.density_df.loc[:, 'e2pri_' + col])) / \
                 self.density_df.loc[:, 'e_' + col]
@@ -1092,7 +1089,7 @@ class Portfolio(object):
                 self.assets_2_epd[(col, i)] = minus_ans_wrapper(
                     interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True))
             for i in [0, 1]:
-                epd_values = -self.density_df.loc[:, 'epd_{:}_not_{:}'.format(i, col)].values
+                epd_values = -self.density_df.loc[:, 'epd_{:}_ημ_{:}'.format(i, col)].values
                 self.epd_2_assets[('not ' + col, i)] = minus_arg_wrapper(
                     interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True))
                 self.assets_2_epd[('not ' + col, i)] = minus_ans_wrapper(
@@ -1100,7 +1097,7 @@ class Portfolio(object):
 
         # put in totals for the ratios... this is very handy in later use
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
-            self.density_df[metric + 'sum'] = self.density_df.filter(regex=metric + '[^n]').sum(axis=1)
+            self.density_df[metric + 'sum'] = self.density_df.filter(regex=metric + '[^η]').sum(axis=1)
 
         epd_values = -self.density_df.loc[:, 'epd_0_total'].values
         # if np.any(epd_values[1:] <= epd_values[:-1]):
@@ -1304,7 +1301,7 @@ class Portfolio(object):
         for g in dist_dict.values():
             df, au = self.apply_distortion(g, None)  # no plots at this point...
             # extract range of S values
-            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^n][a-z]*$|exag_sumparts|lr_').copy()
+            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-z]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name
@@ -1416,7 +1413,7 @@ class Portfolio(object):
                 mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}']
             df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
         # sum of parts: careful not to include the total twice!
-        df['exag_sumparts'] = df.filter(regex='^exag_[^n]').sum(axis=1)
+        df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
         # LEV under distortion g
         # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'gS'].cumsum())))
         # df['exag_total'] = temp * self.bs
@@ -1437,7 +1434,7 @@ class Portfolio(object):
             df[f'lr_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
 
         # make a convenient audit extract for viewing
-        audit = df.filter(regex='^loss|^p_[^n]|^S|^prem|^exag_[^n]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
+        audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^n]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
         # audit.columns = audit.columns.str.split('_', expand=True)
         # audit = audit.sort_index(axis=1)
 
@@ -1460,7 +1457,7 @@ class Portfolio(object):
 
             ax = next(axiter)
             df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
-            ax.set_ylim(0, df_plot.filter(regex='p_[^n]').iloc[1:, :].max().max())
+            ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
             ax.set_title("Densities")
 
             ax = next(axiter)
@@ -1474,8 +1471,8 @@ class Portfolio(object):
             # exi_xlea removed
             for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
                 # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
-                ax = next(axiter)
-                df_plot.filter(regex=f'^{prefix}_(?![n])[a-z]+$').sort_index(axis=1).plot(ax=ax)
+                ax = next(axiter)  # XXXX??? was (?![n])
+                df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-z]+$').sort_index(axis=1).plot(ax=ax)
                 ax.set_title(f'{prefix.title()} by line')
                 if prefix.find('xi_x') > 0:
                     # fix scale for proportions
@@ -1816,7 +1813,7 @@ class Portfolio(object):
         assert (c <= a)
         xs = self.density_df.loc[:, 'loss'].values
         pline = self.density_df.loc[:, 'p_' + line].values
-        notline = self.density_df.loc[:, 'not_' + line].values
+        notline = self.density_df.loc[:, 'ημ_' + line].values
         ans = []
         gt, incr, int1, int2, int3 = 0, 0, 0, 0, 0
         c1, c2, c3 = 0, 0, 0

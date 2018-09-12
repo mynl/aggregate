@@ -25,6 +25,7 @@ bodoff1:
         sev_xs:
         -   0
         -   100
+    note: Bodoff Thought Experiment No. 1
 bodoff2:
     arg_dict:
         log2: 8
@@ -51,6 +52,7 @@ bodoff2:
         sev_ps:
         -   0.95
         -   0.05
+    note: Bodoff Thought Experiment No. 2
 bodoff3:
     arg_dict:
         log2: 8
@@ -77,6 +79,7 @@ bodoff3:
         sev_ps:
         -   0.95
         -   0.05
+    note: Bodoff Thought Experiment No. 3
 bodoff4:
     arg_dict:
         log2: 16
@@ -98,4 +101,4 @@ bodoff4:
         sev_scale: 100
         exp_en: 0.05
         freq_name: bernoulli
-
+    note: Bodoff Thought Experiment No. 4

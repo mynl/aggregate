@@ -66,7 +66,7 @@ class _DataManager(object):
         df = df.fillna('')
         return df
 
-    def describe(self, item_type=''):
+    def describe(self, item_type='', pretty_print=False):
         """
         more informative version of list
         Pull notes from YAML descriptions for type items
@@ -84,7 +84,10 @@ class _DataManager(object):
                 df.loc[kk, :] = (k, vv.get('sev_name', ''), vv.get('exp_en', 0), vv.get('sev_mean', 0),
                                  vv.get('exp_el', 0), vv.get('note', ''))
         df = df.fillna('')
-
+        if pretty_print:
+            for t, egs in df.groupby('Type'):
+                html_title(t, 2)
+                display(egs)
         return df
 
     def __getitem__(self, item):
@@ -768,38 +771,38 @@ class Book(_ScriptableObject):
         return port
 
 
-def reporting(port, log2, reporting_level):
-    """
-    handle various reporting options: most important to appear last
-
-    :param port:
-    :param log2:
-    :param reporting_level:
-    :return:
-    """
-
-    if reporting_level >= 3:
-        # just plot the densities
-        f, axs = plt.subplots(1, 6, figsize=(15, 2.5))
-        axiter = iter(axs.flatten())
-        port.plot(kind='quick', axiter=axiter)
-        port.plot(kind='density', line=port.line_names_ex, axiter=axiter)
-        port.plot(kind='density', line=port.line_names_ex, axiter=axiter, legend=False, logy=True)
-        plt.tight_layout()
-
-    if reporting_level >= 2:
-        jump = sensible_jump(2 ** log2, 10)
-        html_title('Line Densities', 1)
-        display(port.density_df.filter(regex='^p_[^n]|S|^exa_[^n]|^lev_[^n]').
-                query('p_total > 0').iloc[::jump, :])
-        html_title('Audit Data', 1)
-        display(port.audit_df.filter(regex='^[^n]', axis=0))
-
-    if reporting_level >= 1:
-        port.report('quick')
-
-    if reporting_level >= 3:
-        html_title('Graphics', 1)
+# def reporting(port, log2, reporting_level):
+#     """
+#     handle various reporting options: most important to appear last
+#
+#     :param port:
+#     :param log2:
+#     :param reporting_level:
+#     :return:
+#     """
+#
+#     if reporting_level >= 3:
+#         # just plot the densities
+#         f, axs = plt.subplots(1, 6, figsize=(15, 2.5))
+#         axiter = iter(axs.flatten())
+#         port.plot(kind='quick', axiter=axiter)
+#         port.plot(kind='density', line=port.line_names_ex, axiter=axiter)
+#         port.plot(kind='density', line=port.line_names_ex, axiter=axiter, legend=False, logy=True)
+#         plt.tight_layout()
+#
+#     if reporting_level >= 2:
+#         jump = sensible_jump(2 ** log2, 10)
+#         html_title('Line Densities', 1)
+#         display(port.density_df.filter(regex='^p_[^n]|S|^exa_[^n]|^lev_[^n]').
+#                 query('p_total > 0').iloc[::jump, :])
+#         html_title('Audit Data', 1)
+#         display(port.audit_df.filter(regex='^[^n]', axis=0))
+#
+#     if reporting_level >= 1:
+#         port.report('quick')
+#
+#     if reporting_level >= 3:
+#         html_title('Graphics', 1)
 
 
 def dict_2_string(type_name, dict_in, tab_level=0, sio=None):

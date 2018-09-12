@@ -11,18 +11,13 @@ import sys
 
 sys.path.append('c:/s/telos/python')
 
-import aggregate as agg
-from aggregate import Aggregate, Severity, Portfolio
-from aggregate.underwriter import *
-import warnings
-
-warnings.filterwarnings("ignore")
-
+from aggregate import Aggregate, Severity, Portfolio, Underwriter
+# from aggregate.underwriter import *
 import numpy as np
-
-warnings.filterwarnings("ignore")
 import unittest
 
+# import warnings
+# warnings.filterwarnings("ignore")
 
 def kword_expander(**kwargs):
     pass
@@ -53,7 +48,7 @@ class TestUnderwriter(unittest.TestCase):
         self.assertEqual(line['sev_name'], 'gamma')
 
     def test_curve_object(self):
-        c1 = self.uw.noncata
+        c1 = self.uw.liaba
         c1.sev_mean = 100
         cc = c1.write()
         self.assertTrue(np.allclose(cc.stats(), (100, 10000)))
@@ -132,7 +127,7 @@ class TestAggregateModule(unittest.TestCase):
             np.sum(np.abs(audit.iloc[0:-3, :]['abs sev err']) ** 2) ** .5 / (len(audit) - 3) < 1e-4)
 
     def test_excel_read(self):
-        port = Portfolio.from_Excel('example', 'aggregate/yaml/Examples.xlsx', 'Generic')
+        port = Portfolio.from_Excel('example', '../yaml/Examples.xlsx', 'Generic')
         port.update(10, 50)
         # overall mean error is less than 0.001
         self.assertTrue( port.audit_df['MeanErr'].abs().sum() < 0.001)

@@ -5,6 +5,7 @@ my_earthquake:
     sev_scale: !!float 1e8
     sev_loc: !!float -1e8
     freq_name: poisson
+    note: small earthquake portfolio
 my_wind:
     exp_en: 1.7
     sev_name: pareto
@@ -13,3 +14,4 @@ my_wind:
     sev_loc: !!float -2.5e8
     limit: !!float 10e9
     freq_name: poisson
+    note: small wind portfolio

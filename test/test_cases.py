@@ -1,5 +1,5 @@
 """
-Test cases for aggregate
+Test cases for aggregate_project
 
 E.g. to run from Jupyter enter
 
@@ -9,10 +9,10 @@ E.g. to run from Jupyter enter
 
 import sys
 
-sys.path.append('c:/s/telos/python')
+sys.path.append('..')
 
 from aggregate import Aggregate, Severity, Portfolio, Underwriter
-# from aggregate.underwriter import *
+# from aggregate_project.underwriter import *
 import numpy as np
 import unittest
 
@@ -127,7 +127,7 @@ class TestAggregateModule(unittest.TestCase):
             np.sum(np.abs(audit.iloc[0:-3, :]['abs sev err']) ** 2) ** .5 / (len(audit) - 3) < 1e-4)
 
     def test_excel_read(self):
-        port = Portfolio.from_Excel('example', '../yaml/Examples.xlsx', 'Generic')
+        port = Portfolio.from_Excel('example', 'Examples.xlsx', 'Generic')
         port.update(10, 50)
         # overall mean error is less than 0.001
         self.assertTrue( port.audit_df['MeanErr'].abs().sum() < 0.001)

@@ -15,12 +15,11 @@ import collections
 from io import StringIO
 from textwrap import fill, indent
 from IPython.core.display import display
-import matplotlib.pyplot as plt
 import logging
 import pandas as pd
 from .distr import Aggregate, Severity
 from .port import Portfolio
-from .utils import sensible_jump, html_title
+from .utils import html_title
 from sly import Lexer, Parser
 
 
@@ -227,7 +226,7 @@ class Underwriter(_DataManager):
 
     def script(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
-        write a pseudo natural language programming spec for a book or (if only one line) an aggregate
+        write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
         e.g. Input
         20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4

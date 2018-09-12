@@ -209,7 +209,7 @@ class Portfolio(object):
         """
         if filename == "":
             # TODO: directory naming
-            filename = 'c:/S/TELOS/Python/aggregate/user.yaml'
+            filename = 'c:/S/TELOS/Python/aggregate_project/user.yaml'
 
         with open(filename, mode=mode) as f:
             self.yaml(stream=f)
@@ -320,7 +320,7 @@ class Portfolio(object):
 
     def fit(self, kind='slognorm'):
         """
-        returns a dictionary specification of the portfolio aggregate
+        returns a dictionary specification of the portfolio aggregate_project
         if updated uses empirical moments, otherwise uses theoretic moments
 
         :param kind: slognorm | sgamma
@@ -332,7 +332,7 @@ class Portfolio(object):
             cv = self.statistics_df.loc[('agg', 'cv'), 'total']
             skew = self.statistics_df.loc[('agg', 'skew'), 'total']
         else:
-            # use statistics_df matched to computed aggregate
+            # use statistics_df matched to computed aggregate_project
             m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
 
         if kind == 'slognorm':
@@ -1426,7 +1426,7 @@ class Portfolio(object):
             df[f'exa_{line}_pcttotal'] = df.loc[:, 'exa_' + line] / df.exa_total
             # exag is the premium
             df[f'exag_{line}_pcttotal'] = df.loc[:, 'exag_' + line] / df.exag_total
-            # premium like Total loss - this is in the aggregate and is an exa allocation (obvioulsy)
+            # premium like Total loss - this is in the aggregate_project and is an exa allocation (obvioulsy)
             df[f'prem_lTl_{line}'] = df.loc[:, f'exa_{line}_pcttotal'] * df.exag_total
             df[f'lrlTl_{line}'] = df[f'exa_{line}'] / df[f'prem_lTl_{line}']
             df.loc[0, f'prem_lTl_{line}'] = 0

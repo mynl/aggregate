@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# aggregate documentation build configuration file, created by
+# aggregate_project documentation build configuration file, created by
 # sphinx-quickstart on Sat Sep  1 14:08:11 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -19,7 +19,7 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('c:/s/telos/python/aggregate'))
+sys.path.insert(0, os.path.abspath('c:/s/telos/python/aggregate_project'))
 sys.path.insert(0, os.path.abspath('c:/s/telos/python/'))
 
 
@@ -51,7 +51,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'aggregate'
+project = 'aggregate_project'
 copyright = '2018, Stephen J. Mildenhall'
 author = 'Stephen J. Mildenhall'
 
@@ -95,9 +95,9 @@ html_theme = 'alabaster'
 # documentation.
 # See https://alabaster.readthedocs.io/en/latest/customization.html
 html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
-'description': 'aggregate is a Python package providing fast, accurate, and expressive data'
+'description': 'aggregate_project is a Python package providing fast, accurate, and expressive data'
 'structures designed to make working with probability distributions easy and intuitive.',
- 'github_user' :'mynl', 'github_repo': 'aggregate', 'github_button': True, 'github_banner': True}
+ 'github_user' :'mynl', 'github_repo': 'aggregate_project', 'github_button': True, 'github_banner': True}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -150,7 +150,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'aggregate.tex', 'aggregate Documentation',
+    (master_doc, 'aggregate_project.tex', 'aggregate_project Documentation',
      'Stephen J. Mildenhall', 'manual'),
 ]
 
@@ -160,7 +160,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'aggregate', 'aggregate Documentation',
+    (master_doc, 'aggregate_project', 'aggregate_project Documentation',
      [author], 1)
 ]
 
@@ -171,8 +171,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'aggregate', 'aggregate Documentation',
-     author, 'aggregate', 'One line description of project.',
+    (master_doc, 'aggregate_project', 'aggregate_project Documentation',
+     author, 'aggregate_project', 'One line description of project.',
      'Miscellaneous'),
 ]
 

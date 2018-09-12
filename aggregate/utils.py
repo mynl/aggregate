@@ -9,12 +9,12 @@ import itertools
 
 # logging
 # TODO better filename!
-LOGFILE = 'c:/S/TELOS/python/aggregate/aggregate.log'
+LOGFILE = 'c:/S/TELOS/python/aggregate_project/aggregate_project.log'
 logging.basicConfig(filename=LOGFILE,
                     filemode='w',
                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
                     level=logging.DEBUG)
-logging.info('aggregate.__init__ | New Aggregate Session started')
+logging.info('aggregate_project.__init__ | New Aggregate Session started')
 
 
 # momnent utility functions
@@ -463,17 +463,17 @@ class MomentAggregator(object):
         self.tot_sev_2 = self.tot_sev_2 + f1 * s2
         self.tot_sev_3 = self.tot_sev_3 + f1 * s3
 
-        # aggregate
+        # aggregate_project
         self.agg_1, self.agg_2, self.agg_3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
 
-        # finally accumulate the aggregate
+        # finally accumulate the aggregate_project
         self.tot_agg_1, self.tot_agg_2, self.tot_agg_3 = \
             self.cumulate_moments(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, self.agg_1, self.agg_2, self.agg_3)
 
     @staticmethod
     def agg_from_fs(f1, f2, f3, s1, s2, s3):
         """
-        aggregate moments from freq and sev components
+        aggregate_project moments from freq and sev components
 
 
         :param f1:

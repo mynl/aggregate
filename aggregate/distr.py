@@ -199,7 +199,7 @@ class Aggregate(object):
         else:
             lr = np.nan
         self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-                                                    ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+                                                   ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
         self.statistics_total_df.loc[f'independent', :] = \
             [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True,
                                                                                              remix=False) + [c, root_c]
@@ -415,7 +415,7 @@ class Aggregate(object):
         if verbose:
             ax = next(axm)
             ax.plot(xs, self.agg_density, 'b')
-            ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='aggregate')
+            ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='aggregate_project')
             suptitle_and_tight(f'{self.name} severity audit')
             _m = np.sum(self.xs * np.nan_to_num(self.agg_density))
             _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.agg_density)) - _m ** 2) / _m
@@ -516,7 +516,7 @@ class Aggregate(object):
 
     def plot(self, kind='long', axiter=None, aspect=1, figsize=None):
         """
-        make a quick plot of fz: computed density and aggregate
+        make a quick plot of fz: computed density and aggregate_project
 
         :param kind:
         :param aspect:
@@ -556,15 +556,15 @@ class Aggregate(object):
             if max_lim > 0:
                 axiter.ax.set(xlim=(0, max_lim))
 
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
             axiter.ax.plot(self.xs, self.sev_density, lw=0.5, drawstyle='steps-post', label='severity')
             axiter.ax.set(title='Aggregate')
             axiter.ax.legend()
 
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
             axiter.ax.set(title='Aggregate')
 
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate')
+            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
             axiter.ax.set(yscale='log', title='Aggregate, log scale')
 
             F = self.agg_density.cumsum()
@@ -574,7 +574,7 @@ class Aggregate(object):
             next(axiter).plot(self.xs, 1 - F)
             axiter.ax.set(title='Survival Function, log scale', yscale='log')
 
-            next(axiter).plot(1 - F, self.xs, label='aggregate')
+            next(axiter).plot(1 - F, self.xs, label='aggregate_project')
             axiter.ax.plot(1 - self.sev_density.cumsum(), self.xs, label='severity')
             axiter.ax.set(title='Lee Diagram')
             axiter.ax.legend()

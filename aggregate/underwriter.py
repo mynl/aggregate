@@ -58,7 +58,7 @@ class _DataManager(object):
         """
         sers = dict()
         for k in self.databases.keys():
-            d = list(self.__getattribute__(k).keys())
+            d = sorted(list(self.__getattribute__(k).keys()))
             sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
         df = pd.DataFrame(data=sers)
         # df.index.name = 'No.'
@@ -72,21 +72,30 @@ class _DataManager(object):
 
         :return:
         """
-        df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'EN', 'ESev', 'ELoss', 'Notes'])
+        df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b',
+                                   'EN', 'Freq_a',
+                                   'ELoss', 'Notes'])
         df = df.set_index('Name')
+        df['ELoss'] = np.maximum(df.ELoss, df.ESev * df.EN)
         if item_type == '':
             item_type = self.databases.keys()
         else:
             item_type = [item_type.lower()]
         for k in item_type:  # self.databases.keys():
             for kk, vv in self.__getattribute__(k).items():
-                df.loc[kk, :] = (k, vv.get('sev_name', ''), vv.get('exp_en', 0), vv.get('sev_mean', 0),
-                                 vv.get('exp_el', 0), vv.get('note', ''))
+                df.loc[kk, :] = (k, vv.get('sev_name', ''),
+                                 vv.get('sev_mean', 0),
+                                 vv.get('sev_a', 0),
+                                 vv.get('sev_b', 0),
+                                 vv.get('exp_en', 0),
+                                 vv.get('freq_a', 0),
+                                 vv.get('exp_el', 0),
+                                 vv.get('note', ''))
         df = df.fillna('')
         if pretty_print:
             for t, egs in df.groupby('Type'):
                 html_title(t, 2)
-                display(egs)
+                display(egs.style)
         return df
 
     def __getitem__(self, item):
@@ -163,15 +172,18 @@ class Underwriter(_DataManager):
     def __call__(self, portfolio_program):
         self.write(portfolio_program)
 
-    def write(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write(self, program, name='', return_type='portfolio', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         built a book and materialize as a portfolio from built in blocks
         e.g. 0.01 * cmp; 5.5*scs; comm_auto * 9; cmp+cmp;
 
+        :param program:
+        :param name:
+        :param return_type:
         :param update:
         :param verbose:
-        :param name:
-        :param program:
+        :param log2:
+        :param bs:
         :return:
         """
         logging.info(f'Underwriter.write | creating Portfolio {name} from {program}')
@@ -198,33 +210,26 @@ class Underwriter(_DataManager):
                     raise e
             ans.append(parser.spec)
             read_builtins += parser.objs
-
-        # ans is a list of Blocks (because it pulls from uw and because
-        # it uses the + * ops defined by blocks
-        # Need to make into a Book / Portfolio
-        spec_dict = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
-                     for a in ans]
-        if name == '':
-            name = f'built ins {len(spec_dict)}'
-        port = Portfolio(name, spec_dict)
-        if update:
-            if bs == 0:
-                # for log2 = 10
-                bs = port.recommend_bucket().iloc[-1, 0]
-                if log2 == 0:
-                    log2 = 10
-                else:
-                    if log2 > 10:
-                        bs = bs >> (log2 - 10)
-                    else:
-                        bs = bs * (1 << (10 - log2))
-            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
         if verbose:
             print(f'Loaded objects {read_builtins}')
-        return port
+        # ans is a list of Blocks (because it pulls from uw and because
+        # it uses the + * ops defined by blocks
+        # need to make it into a Book / Portfolio, which needs a spec_list
+        spec_list = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
+                     for a in ans]
+        return Underwriter._book_or_portfolio(spec_list, name, return_type, update, verbose, log2, bs, **kwargs)
 
-    def script(self, program, name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def easy_script(self, program):
+        """
+        minimal argument scripts
+
+        :param program:
+        :return:
+        """
+        return self.script(program, 'easy script', 'portfolio', update=True,
+                           verbose=False, log2=13, bs=0, remove_fuzz=True, trim_df=True)
+
+    def script(self, program, name='', return_type='portfolio', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
@@ -237,8 +242,11 @@ class Underwriter(_DataManager):
 
         :param program:
         :param name:
+        :param return_type:
         :param update:
         :param verbose:
+        :param log2:
+        :param bs:
         :param kwargs:
         :return:
         """
@@ -267,39 +275,49 @@ class Underwriter(_DataManager):
                     raise e
             spec_list.append(parser.arg_dict)
         # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
-        if name == '':
-            name = f'script {len(spec_list)}'
-        port = Portfolio(name, spec_list)
-        if update:
-            if bs == 0:
-                # for log2 = 10
-                bs = port.recommend_bucket().iloc[-1, 0]
-                if log2 == 0:
-                    log2 = 10
-                else:
-                    if log2 > 10:
-                        bs = bs >> (log2 - 10)
-                    else:
-                        bs = bs * (1 << (10 - log2))
-            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+        return Underwriter._book_or_portfolio(spec_list, name, return_type, update, verbose, log2, bs, **kwargs)
 
-        if update:
-            if 'bs' not in kwargs:
-                bs = port.recommend_bucket().iloc[-1, 0]
-                log2 = 10
-            else:
-                bs = kwargs['bs']
-                log2 = kwargs['log2']
-                del kwargs['bs']
-                del kwargs['log2']
-            logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+    @staticmethod
+    def _book_or_portfolio(spec_list, name, return_type, update=False,
+                           verbose=False, log2=0, bs=0, **kwargs):
+        """
+        Finish script or write. make book or portfolio as requested. update as requested
+
+        :param spec_list:
+        :param name:
+        :param return_type:
+        :param update:
+        :param verbose:
+        :param log2:
+        :param bs:
+        :param kwargs: arguments passed to Portfolio.update
+        :return:
+        """
+        if name == '':
+            name = f'built ins {len(spec_list)}'
+        return_type = return_type.lower()
+        if return_type == 'book':
+            port = Book(name, dict(log2=log2, bs=bs), spec_list)
+        elif return_type == 'portfolio':
+            port = Portfolio(name, spec_list)
+            if update:
+                if bs == 0:
+                    # for log2 = 10
+                    bs = port.recommend_bucket().iloc[-1, 0]
+                    if log2 == 0:
+                        log2 = 10
+                    else:
+                        bs = bs * 2**(10 - log2)
+                logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
+                port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+        else:
+            raise ValueError(f'Inadmissible argument {return_type} passed to write. Expected book or portfolio.')
         return port
 
 
 class _ScriptableObject(object):
     """
-    object wrapper that implements getitem  to convert attributes to items
+    object wrapper that implements getitem  to convert attributes to items and so is (sub)scriptable
 
     """
 

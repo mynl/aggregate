@@ -199,7 +199,7 @@ class Aggregate(object):
         else:
             lr = np.nan
         self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-                                                   ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+                                                    ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
         self.statistics_total_df.loc[f'independent', :] = \
             [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True,
                                                                                              remix=False) + [c, root_c]
@@ -407,10 +407,23 @@ class Aggregate(object):
             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
 
         # make a suitable audit_df
-        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_1', 'agg_m', 'agg_cv', 'agg_skew']
+        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_m', 'agg_cv', 'agg_skew']
         self.audit_df = pd.concat((self.statistics_df[cols],
                                    self.statistics_total_df.loc[['mixed'], cols]),
                                   axis=0)
+        # add empirical stats
+        if self.sev_density is not None:
+            _m = np.sum(self.xs * np.nan_to_num(self.sev_density))
+            _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.sev_density)) - _m ** 2) / _m
+        else:
+            _m = np.nan
+            _cv = np.nan
+        self.audit_df.loc['mixed', 'emp_sev_1'] = _m
+        self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
+        _m = np.sum(self.xs * np.nan_to_num(self.agg_density))
+        _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.agg_density)) - _m ** 2) / _m
+        self.audit_df.loc['mixed', 'emp_agg_1'] = _m
+        self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
 
         if verbose:
             ax = next(axm)

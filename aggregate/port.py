@@ -387,11 +387,10 @@ class Portfolio(object):
 
         :return:
         """
-        N = 1 << 10
         df = pd.DataFrame(columns=['line', 'bs10'])
         df = df.set_index('line')
         for a in self.agg_list:
-            df.loc[a.name, :] = [a.recommend_bucket(N)]
+            df.loc[a.name, :] = [a.recommend_bucket(10)]
         df['bs11'] = df['bs10'] / 2
         df['bs12'] = df['bs10'] / 4
         df['bs13'] = df['bs10'] / 8

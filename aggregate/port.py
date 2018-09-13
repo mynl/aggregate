@@ -637,6 +637,7 @@ class Portfolio(object):
         :param kwargs:
         :return:
         """
+        do_tight = (axiter is None)
 
         if kind == 'quick':
             axiter = axiter_factory(axiter, 4, figsize, height, aspect)
@@ -718,6 +719,7 @@ class Portfolio(object):
 
             # E(X_i / X | X > a); exi_x_lea_ dropped
             for prefix in ['exi_xgta_', 'exeqa_', 'exlea_', 'exgta_']:
+                prefix = prefix + '[a-zA-Z]'
                 ax = axiter.grid(1)
                 D.filter(regex='^' + prefix).plot(ax=ax, xlim=(0, large_loss_scale))
                 ax.set_title(prefix.replace('xi_x_', ' $X_i/X$ '))
@@ -800,6 +802,10 @@ class Portfolio(object):
         else:
             logging.error(f'Portfolio.plot | Unknown plot type {kind}')
             raise ValueError(f'Portfolio.plot unknown plot type {kind}')
+
+        if do_tight:
+            suptitle_and_tight(f'{kind.title()} Plots for {self.name}')
+
 
     def uat_interpolation_functions(self, a0, e0):
         """

@@ -3,7 +3,6 @@ import numpy as np
 from scipy.integrate import quad
 import pandas as pd
 import collections
-import matplotlib.pyplot as plt
 import logging
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, MomentAggregator, html_title
@@ -772,51 +771,51 @@ class Severity(ss.rv_continuous):
 
     """
 
-    def __init__(self, name, attachment=0, limit=np.inf, mean=0, cv=0, a=0, b=0, loc=0, scale=0, hxs=None,
-                 hps=None, conditional=True):
+    def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=0, sev_b=0,
+                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, conditional=True, note=''):
         """
 
-        :param name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
-        :param attachment:
-        :param limit:
-        :param mean:
-        :param cv:
-        :param a:
-        :param b:
-        :param loc:
-        :param scale:
-        :param hxs: for fixed or histogram classes
-        :param hps:
+        :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
+        :param exp_attachment:
+        :param exp_limit:
+        :param sev_mean:
+        :param sev_cv:
+        :param sev_a:
+        :param sev_b:
+        :param sev_loc:
+        :param sev_scale:
+        :param sev_xs: for fixed or histogram classes
+        :param sev_ps:
         :param conditional: conditional or unconditional; for severities use conditional
         """
 
-        ss.rv_continuous.__init__(self, name=f'{name}[{limit} xs {attachment:,.0f}]')
-        self.limit = limit
-        self.attachment = attachment
-        self.detachment = limit + attachment
+        ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        self.limit = exp_limit
+        self.attachment = exp_attachment
+        self.detachment = exp_limit + exp_attachment
         self.fz = None
         self.pattach = 0
         self.pdetach = 0
         self.conditional = conditional
-        self.name = name
+        self.name = sev_name
         self.sev1 = self.sev2 = self.sev3 = None
 
-        # there are two types: if hxs and hps provided then fixed/histogram, else scpiy dist
+        # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
         # allows you to define fixed with just xs=1 (no p)
-        if hxs is not None:
-            if name == 'fixed':
+        if sev_xs is not None:
+            if sev_name == 'fixed':
                 # fixed is a special case of dhistogram with just one point
-                name = 'dhistogram'
-                hps = np.array(1)
-            assert name[1:] == 'histogram'
-            # TODO: make histogram work with limit and attachment; currently they are ignored
-            xs, ps = np.broadcast_arrays(np.array(hxs), np.array(hps))
+                sev_name = 'dhistogram'
+                sev_ps = np.array(1)
+            assert sev_name[1:] == 'histogram'
+            # TODO: make histogram work with exp_limit and exp_attachment; currently they are ignored
+            xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
             if not np.isclose(np.sum(ps), 1.0):
-                logging.error(f'Severity.init | {name} histogram/fixed severity with probs do not sum to 1, '
+                logging.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
                               f'{np.sum(ps)}')
-            # need to limit distribution
-            limit = min(np.min(limit), xs.max())
-            if name == 'chistogram':
+            # need to exp_limit distribution
+            exp_limit = min(np.min(exp_limit), xs.max())
+            if sev_name == 'chistogram':
                 # continuous histogram: uniform between xs's
                 xss = np.sort(np.hstack((xs, xs[-1] + xs[1])))
                 # midpoints
@@ -825,7 +824,7 @@ class Severity(ss.rv_continuous):
                 self.sev2 = np.sum(xsm ** 2 * ps)
                 self.sev3 = np.sum(xsm ** 3 * ps)
                 self.fz = ss.rv_histogram((ps, xss))
-            elif name == 'dhistogram':
+            elif sev_name == 'dhistogram':
                 # discrete histogram: point masses at xs's
                 self.sev1 = np.sum(xs * ps)
                 self.sev2 = np.sum(xs ** 2 * ps)
@@ -835,43 +834,43 @@ class Severity(ss.rv_continuous):
                 self.fz = ss.rv_histogram((pss, xss))
             else:
                 raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
-                                 f', you passed {name}')
+                                 f', you passed {sev_name}')
 
-        elif name in ['norm', 'expon']:
+        elif sev_name in ['norm', 'expon']:
             # distributions with no shape parameters
             #     Normal (and possibly others) does not have a shape parameter
-            if loc == 0 and mean > 0:
-                loc = mean
-            if scale == 0 and cv > 0:
-                scale = cv * loc
-            gen = getattr(ss, name)
-            self.fz = gen(loc=loc, scale=scale)
+            if sev_loc == 0 and sev_mean > 0:
+                sev_loc = sev_mean
+            if sev_scale == 0 and sev_cv > 0:
+                sev_scale = sev_cv * sev_loc
+            gen = getattr(ss, sev_name)
+            self.fz = gen(loc=sev_loc, scale=sev_scale)
 
-        elif name in ['beta']:
+        elif sev_name in ['beta']:
             # distributions with two shape parameters
             # require specific inputs
-            # for Kent examples input scale=maxl, mean=el and cv as input
-            #     beta a and b params given expected loss, max loss exposure and cv
+            # for Kent examples input sev_scale=maxl, sev_mean=el and sev_cv as input
+            #     beta sev_a and sev_b params given expected loss, max loss exposure and sev_cv
             #     Kent E.'s specification. Just used to create the CAgg classes for his examples (in agg.examples)
             #     https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
-            if name == 'beta' and mean > 0 and cv > 0:
-                m = mean / scale
-                v = m * m * cv * cv
-                a = m * (m * (1 - m) / v - 1)
-                b = (1 - m) * (m * (1 - m) / v - 1)
-                self.fx = ss.beta(a, b, loc=0, scale=scale)
+            if sev_name == 'beta' and sev_mean > 0 and sev_cv > 0:
+                m = sev_mean / sev_scale
+                v = m * m * sev_cv * sev_cv
+                sev_a = m * (m * (1 - m) / v - 1)
+                sev_b = (1 - m) * (m * (1 - m) / v - 1)
+                self.fx = ss.beta(sev_a, sev_b, loc=0, scale=sev_scale)
             else:
-                gen = getattr(ss, name)
-                self.fz = gen(a, b, loc=loc, scale=scale)
+                gen = getattr(ss, sev_name)
+                self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
         else:
             # distributions with one shape parameter
-            if a == 0:  # TODO figuring 0 is invalid shape...
-                a, _ = self.cv_to_shape(cv)
-            if scale == 0 and mean > 0:
-                scale, self.fz = self.mean_to_scale(a, mean)
+            if sev_a == 0:  # TODO figuring 0 is invalid shape...
+                sev_a, _ = self.cv_to_shape(sev_cv)
+            if sev_scale == 0 and sev_mean > 0:
+                sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean)
             else:
-                gen = getattr(ss, name)
-                self.fz = gen(a, scale=scale, loc=loc)
+                gen = getattr(ss, sev_name)
+                self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
 
         if self.detachment == np.inf:
             self.pdetach = 0
@@ -883,24 +882,26 @@ class Severity(ss.rv_continuous):
         else:
             self.pattach = self.fz.sf(self.attachment)
 
-        if mean > 0 or cv > 0:
-            # if you input a mean or cv check we are close to target
+        if sev_mean > 0 or sev_cv > 0:
+            # if you input a sev_mean or sev_cv check we are close to target
             st = self.fz.stats('mv')
             m = st[0]
-            acv = st[1] ** .5 / m  # achieved cv
-            if mean > 0:
-                assert (np.isclose(mean, m))
-            if cv > 0:
-                assert (np.isclose(cv, acv))
-            # print('ACHIEVED', mean, cv, m, acv, self.fz.statistics_df(), self._stats())
-            logging.info(f'Severity.__init__ | parameters {a}, {scale}: target/actual {mean} vs {m};  {cv} vs {acv}')
+            acv = st[1] ** .5 / m  # achieved sev_cv
+            if sev_mean > 0:
+                assert (np.isclose(sev_mean, m))
+            if sev_cv > 0:
+                assert (np.isclose(sev_cv, acv))
+            # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
+            logging.info(
+                f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
+                f'{sev_cv} vs {acv}')
 
-        lim_name = f'{limit:,.0f}' if limit != np.inf else "Unlimited"
+        lim_name = f'{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
         try:
-            self.long_name = f'{name}({self.fz.arg_dict[0]:.2f})[{lim_name} xs {attachment:,.0f}]'
+            self.long_name = f'{sev_name}({self.fz.arg_dict[0]:.2f})[{lim_name} xs {exp_attachment:,.0f}]'
         except:
             # 'rv_histogram' object has no attribute 'arg_dict'
-            self.long_name = f'{name}[{lim_name} xs {attachment:,.0f}]'
+            self.long_name = f'{sev_name}[{lim_name} xs {exp_attachment:,.0f}]'
 
         assert self.fz is not None
 
@@ -1036,10 +1037,25 @@ class Severity(ss.rv_continuous):
             # TODO ignores layer and attach...
             return self.sev1, self.sev2, self.sev3
 
-        ex1 = quad(lambda x: self.fz.sf(x), self.attachment, self.detachment)
-        ex2 = quad(lambda x: 2 * (x - self.attachment) * self.fz.sf(x), self.attachment, self.detachment)
-        ex3 = quad(lambda x: 3 * (x - self.attachment) ** 2 * self.fz.sf(x), self.attachment, self.detachment,
-                   limit=100, full_output=False)
+        median = self.fz.isf(0.5)
+
+        def safe_integrate(f, level):
+            ex = quad(f, self.attachment, self.detachment, limit=100, full_output=1)
+            if len(ex) == 4:  # 'The integral is probably divergent, or slowly convergent.':
+                # TODO just wing it for now
+                logging.warning(f'Severity.moms | splitting {self.name} EX^{level} integral for convergence reasons')
+                exa = quad(f, self.attachment, median, limit=100, full_output=1)
+                exb = quad(f, median, self.detachment, limit=100, full_output=1)
+                if len(exa) == 4:
+                    logging.warning(f'Severity.moms | left hand split EX^{level} integral returned {exa[-1]}')
+                if len(exb) == 4:
+                    logging.warning(f'Severity.moms | right hand split EX^{level} integral returned {exb[-1]}')
+                ex = (exa[0] + exb[0], exa[1] + exb[1])
+            return ex
+
+        ex1 = safe_integrate(lambda x: self.fz.sf(x), 1)
+        ex2 = safe_integrate(lambda x: 2 * (x - self.attachment) * self.fz.sf(x), 2)
+        ex3 = safe_integrate(lambda x: 3 * (x - self.attachment) ** 2 * self.fz.sf(x), 3)
 
         # quad returns abs error
         eps = 1e-5

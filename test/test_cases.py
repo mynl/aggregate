@@ -27,29 +27,9 @@ class TestUnderwriter(unittest.TestCase):
     def setUp(self):
         self.uw = Underwriter()
 
-    def test_block_objects(self):
-        line = self.uw['cmp']
-        line2 = self.uw.cmp
-        self.assertTrue(line.name == 'cmp')
-        self.assertTrue(line['sev_name'] == 'lognorm')
-        a = 10 * line
-        self.assertTrue(line.exp_en == a.exp_en)
-        self.assertTrue(line.sev_mean * 10 == a.sev_mean)
-
-        # with self.assertRaises(ValueError):
-        b = line * 10
-
-        c = line + line
-
-        kword_expander(**line)
-
-        line.sev_name = 'gamma'
-        self.assertEqual(line.sev_name, 'gamma')
-        self.assertEqual(line['sev_name'], 'gamma')
-
     def test_curve_object(self):
         c1 = self.uw.liaba
-        c1.sev_mean = 100
+        c1['sev_mean'] = 100
         cc = c1.write()
         self.assertTrue(np.allclose(cc.stats(), (100, 10000)))
 

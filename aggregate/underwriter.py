@@ -9,7 +9,6 @@ Does lots of cool things
 
 import os
 from ruamel import yaml
-from copy import deepcopy
 import numpy as np
 import collections
 from io import StringIO
@@ -28,8 +27,8 @@ class _DataManager(object):
     _DataManager class
     --------------
 
-    Private class handling reading and writing to YAML files for Underwriter and Example classes, which both
-    subclass _YAML_reader
+    Private class handling reading and writing to YAML files for Underwriter class, which
+    subclasses _YAML_reader
 
 
     """
@@ -112,7 +111,7 @@ class _DataManager(object):
         for k in self.databases.keys():
             if item in self.__getattribute__(k).keys():
                 # stip the s off the name: Books to Book etc.
-                return k[:-1], self.__getattribute__(k)[item]
+                return k, self.__getattribute__(k)[item]
         raise LookupError
 
 
@@ -134,10 +133,10 @@ class Underwriter(_DataManager):
 
         :param dir_name:
         """
-
-        self.databases = dict(curves=['curves.yaml'],
-                              blocks=['blocks.yaml', 'user_blocks.yaml'],
-                              books=['books.yaml', 'user_books.yaml'])
+        self.last_spec = None
+        self.databases = dict(severity=['severities.yaml'],
+                              aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
+                              portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
         self.dir_name = dir_name
         _DataManager.__init__(self)
 
@@ -149,16 +148,7 @@ class Underwriter(_DataManager):
         :param item:
         :return: Book, Account or Line object
         """
-        item_type, obj = _DataManager.__getitem__(self, item)
-        if item_type == 'book':
-            return Book(item, obj['arg_dict'], obj['spec'])
-        elif item_type == 'block':
-            return Block(item, **obj)
-        elif item_type == 'curve':
-            return Curve(item, **obj)
-        else:
-            raise ValueError('Idiot, you are in charge, how did you end in this pickle?'
-                             f'Invaid type {item_type} to Underwriter getitem')
+        return _DataManager.__getitem__(self, item)
 
     def __getattr__(self, item):
         """
@@ -167,69 +157,34 @@ class Underwriter(_DataManager):
         :param item:
         :return:
         """
-        return self.__getitem__(item)
+        return _DataManager.__getitem__(self, item)
+
+    def get_dict(self, item):
+        """
+        get an item as dictionary, WITHOUT the type
+
+        :param item:
+        :return:
+        """
+        _type, obj = _DataManager.__getitem__(self, item)
+        return obj
+
+    def get_object(self, item):
+        """
+        get an item as an object of the right type
+
+        :param item:
+        :return:
+        """
+        # _type, obj = _DataManager.__getitem__(self, item)
+        # if _type == ''
+        # return obj
+        pass
 
     def __call__(self, portfolio_program):
-        self.write(portfolio_program)
+        return self.write(portfolio_program)
 
-    def write(self, program, name='', return_type='portfolio', update=False, verbose=False, log2=0, bs=0, **kwargs):
-        """
-        built a book and materialize as a portfolio from built in blocks
-        e.g. 0.01 * cmp; 5.5*scs; comm_auto * 9; cmp+cmp;
-
-        :param program:
-        :param name:
-        :param return_type:
-        :param update:
-        :param verbose:
-        :param log2:
-        :param bs:
-        :return:
-        """
-        logging.info(f'Underwriter.write | creating Portfolio {name} from {program}')
-        lexer = BuiltInBlockLexer()
-        parser = BuiltInBlockParser(self)
-        program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
-        ans = []
-        read_builtins = []
-        for txt in program:
-            parser.reset()
-            try:
-                parser.parse(lexer.tokenize(txt))
-            except ValueError as e:
-                if isinstance(e.args[0], str):
-                    print(e)
-                    raise e
-                else:
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    # l = e.arg_dict[0].lineno
-                    i = e.args[0].index
-                    txt2 = txt[0:i] + f'>>>' + txt[i:]
-                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
-                    raise e
-            ans.append(parser.spec)
-            read_builtins += parser.objs
-        if verbose:
-            print(f'Loaded objects {read_builtins}')
-        # ans is a list of Blocks (because it pulls from uw and because
-        # it uses the + * ops defined by blocks
-        # need to make it into a Book / Portfolio, which needs a spec_list
-        spec_list = [{k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys}
-                     for a in ans]
-        return Underwriter._book_or_portfolio(spec_list, name, return_type, update, verbose, log2, bs, **kwargs)
-
-    def easy_script(self, program):
-        """
-        minimal argument scripts
-
-        :param program:
-        :return:
-        """
-        return self.script(program, 'easy script', 'portfolio', update=True,
-                           verbose=False, log2=13, bs=0, remove_fuzz=True, trim_df=True)
-
-    def script(self, program, name='', return_type='portfolio', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write(self, portfolio_program, portfolio_name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
@@ -240,9 +195,8 @@ class Underwriter(_DataManager):
 
         See parser for full language spec!
 
-        :param program:
-        :param name:
-        :param return_type:
+        :param portfolio_program:
+        :param portfolio_name:
         :param update:
         :param verbose:
         :param log2:
@@ -250,14 +204,13 @@ class Underwriter(_DataManager):
         :param kwargs:
         :return:
         """
-
-        logging.info(f'Underwriter.nlp | creating Portfolio {name} from {program}')
-        lexer = NLPBizLexer()
-        parser = NLPBizParser(self)
-        program = [i.strip() for i in program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
+        logging.info(f'Underwriter.write | Executing program\n{portfolio_program[:500]}\n\n')
+        lexer = UnderwritingLexer()
+        parser = UnderwritingParser(self)
+        portfolio_program = [i.strip() for i in portfolio_program.replace(';', '\n').split('\n') if len(i.strip()) > 0]
         spec_list = []
 
-        for txt in program:
+        for txt in portfolio_program:
             parser.reset()
             try:
                 parser.parse(lexer.tokenize(txt))
@@ -274,552 +227,23 @@ class Underwriter(_DataManager):
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
             spec_list.append(parser.arg_dict)
+        if portfolio_name == '':
+            portfolio_name = f'built ins {len(spec_list)}'
+        logging.info(f'Underwriter.write | creating Portfolio {portfolio_name} from {portfolio_program}')
         # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
-        return Underwriter._book_or_portfolio(spec_list, name, return_type, update, verbose, log2, bs, **kwargs)
-
-    @staticmethod
-    def _book_or_portfolio(spec_list, name, return_type, update=False,
-                           verbose=False, log2=0, bs=0, **kwargs):
-        """
-        Finish script or write. make book or portfolio as requested. update as requested
-
-        :param spec_list:
-        :param name:
-        :param return_type:
-        :param update:
-        :param verbose:
-        :param log2:
-        :param bs:
-        :param kwargs: arguments passed to Portfolio.update
-        :return:
-        """
-        if name == '':
-            name = f'built ins {len(spec_list)}'
-        return_type = return_type.lower()
-        if return_type == 'book':
-            port = Book(name, dict(log2=log2, bs=bs), spec_list)
-        elif return_type == 'portfolio':
-            port = Portfolio(name, spec_list)
-            if update:
-                if bs == 0:
-                    # for log2 = 10
-                    bs = port.recommend_bucket().iloc[-1, 0]
-                    if log2 == 0:
-                        log2 = 10
-                    else:
-                        bs = bs * 2**(10 - log2)
-                logging.info(f'Underwriter.write | updating Portfolio {name}, log2={10}, bs={bs}')
-                port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
-        else:
-            raise ValueError(f'Inadmissible argument {return_type} passed to write. Expected book or portfolio.')
-        return port
-
-
-class _ScriptableObject(object):
-    """
-    object wrapper that implements getitem  to convert attributes to items and so is (sub)scriptable
-
-    """
-
-    def __getitem__(self, item):
-        """
-        return member using x[item] syntax
-
-        :param item:
-        :return:
-        """
-        return self.__getattribute__(item)
-
-    def keys(self):
-        """
-        in conjunction with getitem allows the object to be passed using **obj
-        and for it to expand to a list of kwargs
-
-        :return:
-        """
-        return self.__dict__.keys()
-
-    def values(self):
-        return self.__dict__.values()
-
-    def items(self):
-        return self.__dict__.items()
-
-    def __iter__(self):
-        """
-        make iterable
-
-        :return:
-        """
-        return iter(self.__dict__)
-
-    def __repr__(self):
-        return repr(self.__dict__)
-
-    def __str__(self):
-        return str(self.__dict__)
-
-
-class Curve(_ScriptableObject):
-    """
-    Curve class
-    -----------
-
-    A curve corresponds to the underwriting and actuarial notion of a GROUND UP severity curve.
-
-    It contains all the severity information needed to create a Severity object.
-
-    Curves can be scaled and shifted: new = k * old, new = old + k
-
-
-    """
-
-    def __init__(self, name="", sev_name='', sev_a=0., sev_b=0., sev_mean=0., sev_cv=0.,
-                 sev_loc=0., sev_scale=0., sev_xs=None, sev_ps=None, sev_wt=1, note=''):
-        """
-
-
-        :param name:
-        :param sev_name:
-        :param sev_a:
-        :param sev_b:
-        :param sev_mean:
-        :param sev_cv:
-        :param sev_loc:
-        :param sev_scale:
-        :param sev_xs:
-        :param sev_ps:
-        :param sev_wt:
-        :param note:
-        """
-
-        self.note = note
-        self.name = name
-        self.sev_name = sev_name
-        self.sev_a = sev_a
-        self.sev_b = sev_b
-        self.sev_mean = sev_mean
-        self.sev_cv = sev_cv
-        self.sev_loc = sev_loc
-        self.sev_scale = sev_scale
-        self.sev_xs = sev_xs
-        self.sev_ps = sev_ps
-        self.sev_wt = sev_wt
-
-    def __rmul__(self, other):
-        """
-        new = other * self; treat as scale change
-
-        scale is a homogeneous change, it adjusts
-
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
-
-        :param other:
-        :return:
-        """
-
-        assert other > 0
-        assert isinstance(other, float) or isinstance(other, int)
-        other = float(other)
-        return Curve(name=self.name,
-                     sev_name=self.sev_name,
-                     sev_a=self.sev_a,
-                     sev_b=self.sev_b,
-                     sev_mean=self.sev_mean * other,
-                     sev_cv=self.sev_cv,
-                     sev_loc=self.sev_loc * other,
-                     sev_scale=self.sev_scale * other,
-                     sev_xs=None if self.sev_xs is None else np.array(self.sev_xs) * other,
-                     sev_ps=self.sev_ps,
-                     sev_wt=self.sev_wt,
-                     note=f'{other} x {self.name}')
-
-    def write(self):
-        return Severity(name=self.sev_name,
-                        a=self.sev_a,
-                        b=self.sev_b,
-                        mean=self.sev_mean,
-                        cv=self.sev_cv,
-                        loc=self.sev_loc,
-                        scale=self.sev_scale,
-                        hxs=self.sev_xs,
-                        hps=self.sev_ps,
-                        conditional=True)
-
-
-class Block(_ScriptableObject):
-    """
-    Block class
-    ----------------
-
-    Block is a helper class, containing all the information
-    needed to create an Aggregate object but no work is done until the account is "written".
-
-    Information is lightweight and stored in a dictionary.
-
-    Not created directly but subclasssed by Line, CatLine and Account which check appropriate information
-    has been included in their specifications.
-
-    Generally created by an underwriter.
-
-    Can read/write from YAML.
-
-    An Account is also a Line but is guaranteed to contain detailed severity information.
-
-    Methods:
-
-    * new = other * self; treat as homogeneous scale change adjusting
-            - exposure: el, premium
-            - sev_mean
-            - sev_scale
-            - sev_loc
-            - limit
-            - attachment
-
-    * An Account and a CatLine are both Lines but Lines are do not contain enough information to be Accounts or CatLines
-    * There is no self * other for inhomogeneous volume change
-    * There is no sum of lines: create a Book to add. :
-
-    Line class
-    ----------
-
-    A line corresponds to the underwriting and actuarial notion of a line of business. It is designed for
-    non-cat lines of business and is not guaranteed to contain meaningful severity information. It should
-    not be used with limit and attachment. Often the severity is fixed at a constant. Asmptotically a
-    corresponding Account will tend to its Line.
-
-    If detailed severity information is needed use either an Account object or a CatLine object, both
-    of which have meaningful severity information.
-
-    Contains information on [ground-up] frequency, in particular contagion = freq_a,
-    freq_b) and the frequency information appropriate for the total industry writings in the line.
-
-    May, but not required to also contain premium and/or loss ratio information for the line.
-
-    No work is done until the line used in an Aggregate or Portfolio.
-
-    Information is lightweight and stored in a dictionary.
-
-    """
-
-    def __init__(self, name='', exp_el=0., exp_premium=0., exp_lr=0., exp_en=0., exp_attachment=0., exp_limit=np.inf,
-                 sev_name='', sev_a=0., sev_b=0., sev_mean=0., sev_cv=0., sev_loc=0., sev_scale=0.,
-                 sev_xs=None, sev_ps=None, sev_wt=1,
-                 freq_name='', freq_a=0., freq_b=0., note=''):
-
-        self.name = name
-        self.exp_el = exp_el
-        self.exp_premium = exp_premium
-        self.exp_lr = exp_lr
-        self.exp_en = exp_en
-        self.exp_attachment = exp_attachment
-        self.exp_limit = exp_limit
-        self.sev_name = sev_name
-        self.sev_a = sev_a
-        self.sev_b = sev_b
-        self.sev_mean = sev_mean
-        self.sev_cv = sev_cv
-        self.sev_loc = sev_loc
-        self.sev_scale = sev_scale
-        self.sev_xs = sev_xs
-        self.sev_ps = sev_ps
-        self.sev_wt = sev_wt
-        self.freq_name = freq_name
-        self.freq_a = freq_a
-        self.freq_b = freq_b
-        # convenient to sort this out for adding etc.
-        if self.exp_premium > 0 and self.exp_el > 0:
-            self.exp_lr = self.exp_el / self.exp_premium
-        elif self.exp_el > 0 and self.exp_lr > 0:
-            self.exp_premium = self.exp_el / self.exp_lr
-        elif self.exp_lr > 0 and self.exp_premium > 0:
-            self.exp_el = self.exp_lr * self.exp_premium
-        self.note = note
-
-    # def __str__(self):
-    #     return dict_2_string(type(self), dict(  ))
-    #
-    # def __repr__(self):
-    #     return str(self.SOMETHING)
-    #
-    def __add__(self, other):
-        """
-        Add two Block objects: must have matching frequency specs (not enforced?)
-        I.e. sev = wtd avg of sevs and freq = sum of freqss
-
-        TODO same severity!
-
-        :param other:
-        :return:
-        """
-        assert isinstance(other, type(self))
-
-        # check fully compatible objects
-        compatible_requires = ['freq_name', 'freq_a', 'freq_b']
-        compatible_objects = True
-        for a in compatible_requires:
-            compatible_objects = compatible_objects and self.__getattribute__(a) == other.__getattribute__(a)
-            if not compatible_objects:
-                print('Incompatible Accounts: must have same ' + ', '.join(compatible_requires))
-                print(f'For attribute {a}: {self.__getattribute__(a)} does not equal {other.__getattribute__(a)}')
-
-        # now create mixture if severity, limit and attach are different? or just bludegon on?
-        easy_add_requires = ['exp_attachment', 'exp_limit',
-                             'sev_name', 'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale',
-                             'sev_xs', 'sev_ps', 'sev_wt', 'freq_name', 'freq_a', 'freq_b']
-        easy_add = True
-        for a in easy_add_requires:
-            easy_add = easy_add and self.__getattribute__(a) == other.__getattribute__(a)
-
-        if easy_add:
-            prem = self.exp_premium + other.exp_premium
-            loss = self.exp_el + other.exp_el
-            if prem > 0:
-                lr = loss / prem
-            else:
-                lr = 0
-            return Block(name=f'{self.name} + {other.name}',
-                         exp_el=loss,
-                         exp_premium=prem,
-                         exp_lr=lr,
-                         exp_en=self.exp_en + other.exp_en,
-                         exp_attachment=self.exp_attachment,
-                         exp_limit=self.exp_limit,
-                         sev_name=self.sev_name,
-                         sev_a=self.sev_a,
-                         sev_b=self.sev_b,
-                         sev_mean=self.sev_mean,
-                         sev_cv=self.sev_cv,
-                         sev_loc=self.sev_loc,
-                         sev_scale=self.sev_scale,
-                         sev_xs=self.sev_xs,
-                         sev_ps=self.sev_ps,
-                         sev_wt=self.sev_wt,
-                         freq_name=self.freq_name,
-                         freq_a=self.freq_a,
-                         freq_b=self.freq_b,
-                         note='')
-        else:
-            # doh, create mixture
-            raise ValueError('Needs mixture, NYI')
-
-    def __rmul__(self, other):
-        """
-        new = other * self; treat as homogeneous scale change
-
-        :param other:
-        :return:
-        """
-
-        assert other > 0
-        assert isinstance(other, float) or isinstance(other, int)
-        other = float(other)
-        if self.sev_xs is not None:
-            xs = other * np.array(self.sev_xs)
-        else:
-            xs = None
-        return Block(name=f'{other} {self.name}',
-                     exp_el=other * self.exp_el,
-                     exp_premium=other * self.exp_premium,
-                     exp_lr=self.exp_lr,
-                     exp_en=self.exp_en,
-                     exp_attachment=other * self.exp_attachment,
-                     exp_limit=other * self.exp_limit,
-                     sev_name=self.sev_name,
-                     sev_a=self.sev_a,
-                     sev_b=self.sev_b,
-                     sev_mean=other * self.sev_mean,
-                     sev_cv=self.sev_cv,
-                     sev_loc=other * self.sev_loc,
-                     sev_scale=other * self.sev_scale,
-                     sev_xs=xs,
-                     sev_ps=self.sev_ps,
-                     sev_wt=self.sev_wt,
-                     freq_name=self.freq_name,
-                     freq_a=self.freq_a,
-                     freq_b=self.freq_b,
-                     note='')
-
-    def __mul__(self, other):
-        """
-        new = self * other, sum of other independent copies in Levy process sense
-        other > 0
-
-        adjusts en and exposure (premium and el)
-
-        :param other:
-        :return:
-        """
-
-        assert isinstance(other, int) or isinstance(other, float)
-        assert other >= 0
-
-        return Block(name=f'{self.name}⊕{other}',
-                     exp_el=other * self.exp_el,
-                     exp_premium=other * self.exp_premium,
-                     exp_lr=self.exp_lr,
-                     exp_en=other * self.exp_en,
-                     exp_attachment=self.exp_attachment,
-                     exp_limit=self.exp_limit,
-                     sev_name=self.sev_name,
-                     sev_a=self.sev_a,
-                     sev_b=self.sev_b,
-                     sev_mean=other * self.sev_mean,
-                     sev_cv=self.sev_cv,
-                     sev_loc=other * self.sev_loc,
-                     sev_scale=other * self.sev_scale,
-                     sev_xs=self.sev_xs,
-                     sev_ps=self.sev_ps,
-                     sev_wt=self.sev_wt,
-                     freq_name=self.freq_name,
-                     freq_a=self.freq_a,
-                     freq_b=self.freq_b,
-                     note='')
-
-    def write(self):
-        """
-        materialize Block in a full Aggregate class object
-        TODO: do we need , attachment=0., limit=np.inf):??
-
-        :return:
-        """
-        return Aggregate(name=self.name,
-                         exp_el=self.exp_el,
-                         exp_premium=self.exp_premium,
-                         exp_lr=self.exp_lr,
-                         exp_en=self.exp_en,
-                         exp_attachment=self.exp_attachment,
-                         exp_limit=self.exp_limit,
-                         sev_name=self.sev_name,
-                         sev_a=self.sev_a,
-                         sev_b=self.sev_b,
-                         sev_mean=self.sev_mean,
-                         sev_cv=self.sev_cv,
-                         sev_loc=self.sev_loc,
-                         sev_scale=self.sev_scale,
-                         sev_xs=self.sev_xs,
-                         sev_ps=self.sev_ps,
-                         sev_wt=self.sev_wt,
-                         freq_name=self.freq_name,
-                         freq_a=self.freq_a,
-                         freq_b=self.freq_b)
-
-
-class Book(_ScriptableObject):
-    """
-    Book class
-    ----------
-
-    Manages construction of a "book" of business on a notional basis. Contains all the information
-    needed to create a Portfolio object but no work is done until the book is "written". Information
-    is lightweight and stored in a dictionary. Can read/write from YAML.
-
-    Adding assumes all components are independent...down road may want to revise and look through
-    to severity and add groups?
-
-    """
-
-    def __init__(self, name, arg_dict, spec_list):
-
-        self.name = name
-        self.arg_dict = arg_dict
-        self.spec_list = deepcopy(spec_list)
-
-    def __str__(self):
-        d = dict(name=self.name)
-        for a in self.spec_list:
-            d[a.name] = str(a)
-        return dict_2_string(type(self), d)
-
-    def __repr__(self):
-        """
-        See portfolio repr
-
-        :return:
-        """
-        # delegate
-        # return _ScriptableObject.__repr__(self)
-        s = list()
-        s.append(f'{{ "name": "{self.name}"')
-        s.append(f'"arg_dict": {str(self.arg_dict)}')
-        account_list = []
-        for a in self.spec_list:
-            account_list.append(repr(a))
-        s.append(f"'spec': [{', '.join(account_list)}]")
-        return ', '.join(s) + '}'
-
-    def __add__(self, other):
-        """
-        Add two book objets INDEPENDENT sum
-
-        TODO same severity!
-
-        :param other:
-        :return:
-        """
-        assert isinstance(other, Book)
-        return Book(f'{self.name} + {other.name}',
-                    dict(),
-                    self.spec_list + other.spec_list)
-
-    def write(self, update=False):
-        """
-        materialize Book in a full Portfolio class object
-
-
-        :return:
-        """
-        # need to pass the raw (dictionary) spec_list
-        port = Portfolio(self.name, self.spec_list)
-        logging.info(f'Book.write | created Portfolio {self.name} from Book')
+        port = Portfolio(portfolio_name, spec_list)
         if update:
-            log2 = self.arg_dict.get('log2', 0)
-            bs = self.arg_dict.get('bs', 0)
-            if bs and log2:
-                logging.info(f'Book.write | updating {self.name}')
-                port.update(**self.arg_dict, verbose=False)
-            else:
-                logging.info(f'Book.write | not missing bs and log2 cannot perform requested update of {self.name}')
+            if bs == 0:
+                # for log2 = 10
+                bs = port.recommend_bucket().iloc[-1, 0]
+                if log2 == 0:
+                    log2 = 10
+                else:
+                    bs = bs * 2 ** (10 - log2)
+            logging.info(f'Underwriter.write | updating Portfolio {portfolio_name}, log2={10}, bs={bs}')
+            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+        self.last_spec = spec_list
         return port
-
-
-# def reporting(port, log2, reporting_level):
-#     """
-#     handle various reporting options: most important to appear last
-#
-#     :param port:
-#     :param log2:
-#     :param reporting_level:
-#     :return:
-#     """
-#
-#     if reporting_level >= 3:
-#         # just plot the densities
-#         f, axs = plt.subplots(1, 6, figsize=(15, 2.5))
-#         axiter = iter(axs.flatten())
-#         port.plot(kind='quick', axiter=axiter)
-#         port.plot(kind='density', line=port.line_names_ex, axiter=axiter)
-#         port.plot(kind='density', line=port.line_names_ex, axiter=axiter, legend=False, logy=True)
-#         plt.tight_layout()
-#
-#     if reporting_level >= 2:
-#         jump = sensible_jump(2 ** log2, 10)
-#         html_title('Line Densities', 1)
-#         display(port.density_df.filter(regex='^p_[^n]|S|^exa_[^n]|^lev_[^n]').
-#                 query('p_total > 0').iloc[::jump, :])
-#         html_title('Audit Data', 1)
-#         display(port.audit_df.filter(regex='^[^n]', axis=0))
-#
-#     if reporting_level >= 1:
-#         port.report('quick')
-#
-#     if reporting_level >= 3:
-#         html_title('Graphics', 1)
 
 
 def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
@@ -874,91 +298,12 @@ def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
     return sio.getvalue()
 
 
-class BuiltInBlockLexer(Lexer):
-    tokens = {LINE, NUMBER}
-    ignore = ' \t'
-    literals = {'+', '*'}
-
-    # Tokens
-    LINE = r'[a-zA-Z_][a-zA-Z0-9_]*'
-
-    @_(r'\d+\.?\d*([eE](\+|\-)?\d+)?')
-    def NUMBER(self, t):
-        t.value = float(t.value)
-        return t
-
-    @_(r'\n+')
-    def newline(self, t):
-        self.lineno += t.value.count('\n')
-
-    def error(self, t):
-        print(f"Illegal character '{t.value[0]:s}'")
-        self.index += 1
-
-
-class BuiltInBlockParser(Parser):
-    tokens = BuiltInBlockLexer.tokens
-    precedence = (('left', '+'), ('left', '*'))
-
-    def __init__(self, uw):
-        self.names = uw.blocks
-        self.uw = uw
-        self.spec = None
-        self.objs = None
-        self.reset()
-
-    def reset(self):
-        self.spec = None
-        self.objs = []
-
-    @_('term')
-    def empty(self, p):
-        # print('appending')
-        self.spec = p.term
-
-    @_('term "+" term')
-    def term(self, p):
-        # print('adding t')
-        return p.term0 + p.term1
-
-    @_('number "*" term')
-    def term(self, p):
-        # print('n x t')
-        return p.number * p.term
-
-    @_('term "*" number')
-    def term(self, p):
-        # print('t x n')
-        return p.term * p.number
-
-    @_('NUMBER')
-    def number(self, p):
-        # print('num')
-        return p.NUMBER
-
-    @_('LINE')
-    def term(self, p):
-        try:
-            obj = getattr(self.uw, p.LINE)
-            self.objs.append((type(obj), p.LINE))
-            logging.info(f'Underwriter.write | Loading object {p.LINE} of type {type(obj)} from uw library')
-            return obj
-        except LookupError:
-            print(f"Undefined name {p.LINE}")
-            return 0
-
-    def error(self, p):
-        if p:
-            raise ValueError(p)
-        else:
-            raise ValueError('Unexpcted end of file')
-
-
-class NLPBizLexer(Lexer):
+class UnderwritingLexer(Lexer):
     tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON, BUILTIN}
+              FIXED, POISSON, BUILTINID}
     ignore = ' \t,\\:\\(\\)'
 
+    BUILTINID = r'uw\.[a-zA-Z_][a-zA-Z0-9_]*'
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
     # PERCENT = r'%'
     PLUS = r'\+'
@@ -990,14 +335,15 @@ class NLPBizLexer(Lexer):
     ID['mixed'] = MIXED
     ID['poisson'] = POISSON
     ID['fixed'] = FIXED
-    ID['builtin'] = BUILTIN
-    ID['BUILTIN'] = BUILTIN
-    ID['bin'] = BUILTIN
-    ID['BIN'] = BUILTIN
+    ID['inf'] = NUMBER
+    ID['INF'] = NUMBER
 
     @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
     def NUMBER(self, t):
-        t.value = float(t.value)
+        if t.value == 'INF' or t.value == 'inf':
+            t.value = np.inf
+        else:
+            t.value = float(t.value)
         return t
 
     @_(r'\n+')
@@ -1009,8 +355,8 @@ class NLPBizLexer(Lexer):
         self.index += 1
 
 
-class NLPBizParser(Parser):
-    tokens = NLPBizLexer.tokens
+class UnderwritingParser(Parser):
+    tokens = UnderwritingLexer.tokens
     precedence = (('left', PLUS, MINUS), ('left', TIMES))
 
     def __init__(self, uw):
@@ -1021,16 +367,39 @@ class NLPBizParser(Parser):
 
     def reset(self):
         # TODO pull from Aggregate automatically ...
+        # in order to allow for missing terms this must reflect sensible defaults
         self.arg_dict = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                              sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0,
-                             freq_name='', freq_a=0, freq_b=0)
+                             freq_name='poisson', freq_a=0, freq_b=0)
 
-    @_('name expos sev freq')
+    # built from a built in book
+    @_('builtin_aggregate')
     def ans(self, p):
+        logging.info('UnderwritingParser | Exiting through built in aggregate')
         pass
 
+    # make freq and limit optional
+    @_('name expos sev')
+    def ans(self, p):
+        logging.info('UnderwritingParser | Exiting through name expos sev')
+        pass
+
+    # make freq optional
+    @_('name expos limit sev')
+    def ans(self, p):
+        logging.info('UnderwritingParser | Exiting through name expos limit sev')
+        pass
+
+    # make limit optional
+    @_('name expos sev freq')
+    def ans(self, p):
+        logging.info('UnderwritingParser | Exiting through name expos sev freq')
+        pass
+
+    # base: expos + limit + sev + freq
     @_('name expos limit sev freq')
     def ans(self, p):
+        logging.info('UnderwritingParser | Exiting through name expos limit sev freq')
         pass
 
     @_('MIXED ID NUMBER NUMBER')
@@ -1063,6 +432,7 @@ class NLPBizParser(Parser):
     @_('NUMBER TIMES sev')
     def sev(self, p):
         self.arg_dict['sev_mean'] *= p.NUMBER
+        # set the scale, don't "scale" the scale
         self.arg_dict['sev_scale'] = p.NUMBER
 
     @_('ID NUMBER CV NUMBER')
@@ -1072,6 +442,12 @@ class NLPBizParser(Parser):
         self.arg_dict['sev_cv'] = p[3]
         return True
 
+    @_('ID NUMBER')
+    def sev(self, p):
+        self.arg_dict['sev_name'] = p.ID
+        self.arg_dict['sev_a'] = p[1]
+        return True
+
     @_('ID NUMBER NUMBER')
     def sev(self, p):
         self.arg_dict['sev_name'] = p.ID
@@ -1079,23 +455,10 @@ class NLPBizParser(Parser):
         self.arg_dict['sev_b'] = p[2]
         return True
 
-    @_('BUILTIN ID')
+    @_('BUILTINID')
     def sev(self, p):
         # look up ID in uw
-        sev_dist = self.uw[p.ID]
-        print(f'retrieved {p.ID} type {type(sev_dist)}')
-        assert isinstance(sev_dist, Curve)
-        self.arg_dict['sev_name'] = sev_dist.sev_name
-        self.arg_dict['sev_a'] = sev_dist.sev_a
-        self.arg_dict['sev_b'] = sev_dist.sev_b
-        self.arg_dict['sev_mean'] = sev_dist.sev_mean
-        self.arg_dict['sev_cv'] = sev_dist.sev_cv
-        self.arg_dict['sev_loc'] = sev_dist.sev_loc
-        self.arg_dict['sev_scale'] = sev_dist.sev_scale
-        self.arg_dict['sev_xs'] = sev_dist.sev_xs
-        self.arg_dict['sev_ps'] = sev_dist.sev_ps
-        self.arg_dict['sev_wt'] = sev_dist.sev_wt
-        print(self.arg_dict)
+        self._safe_lookup(p.BUILTINID[3:], 'severity')
 
     @_('NUMBER XS NUMBER')
     def limit(self, p):
@@ -1117,7 +480,7 @@ class NLPBizParser(Parser):
     def expos(self, p):
         self.arg_dict['exp_premium'] = p[0]
         self.arg_dict['exp_lr'] = p[3]
-        self.arg_dict['exp_loss'] = p[0] * p[3]
+        self.arg_dict['exp_el'] = p[0] * p[3]
         return True
 
     @_('NUMBER PREMIUM AT NUMBER')
@@ -1126,6 +489,41 @@ class NLPBizParser(Parser):
         self.arg_dict['exp_lr'] = p[3]
         self.arg_dict['exp_el'] = p[0] * p[3]
         return True
+
+    @_('name BUILTINID TIMES NUMBER')
+    def builtin_aggregate(self, p):
+        """
+        inhomogeneous change of scale
+
+        :param p:
+        :return:
+        """
+        self._safe_lookup(p.BUILTINID[3:], 'aggregate')
+        self.arg_dict['exp_en'] *= p.NUMBER
+        self.arg_dict['exp_el'] *= p.NUMBER
+        self.arg_dict['exp_premium'] *= p.NUMBER
+
+    @_('name NUMBER TIMES BUILTINID')
+    def builtin_aggregate(self, p):
+        """
+        homogeneous change of scale
+
+        :param p:
+        :return:
+        """
+        self._safe_lookup(p.BUILTINID[3:], 'aggregate')
+        self.arg_dict['sev_mean'] *= p.NUMBER
+        self.arg_dict['sev_scale'] *= p.NUMBER
+        self.arg_dict['sev_loc'] *= p.NUMBER
+        self.arg_dict['exp_attachment'] *= p.NUMBER
+        self.arg_dict['exp_limit'] *= p.NUMBER
+        self.arg_dict['exp_el'] *= p.NUMBER
+        self.arg_dict['exp_premium'] *= p.NUMBER
+
+    @_('name BUILTINID')
+    def builtin_aggregate(self, p):
+        # look up ID in uw
+        self._safe_lookup(p.BUILTINID[3:], 'aggregate')
 
     @_('ID')
     def name(self, p):
@@ -1136,3 +534,23 @@ class NLPBizParser(Parser):
             raise ValueError(p)
         else:
             raise ValueError('Unexpected end of file')
+
+    def _safe_lookup(self, uw_id, expected_type):
+        """
+        lookup uw_id in uw of expected type and merge safely into self.arg_dict
+        delete anme and note if appropriate
+
+        :param uw_id:
+        :param expected_type:
+        :return:
+        """
+        _type, builtin_dict = self.uw[uw_id]
+        assert _type != 'portfolio'  # this is a problem
+        logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} type {type(builtin_dict)}')
+        if _type != expected_type:
+            print(f'WARNING: type of {uw_id} is  {type(builtin_dict)}, not expected {expected_type}')
+        assert _type == expected_type
+        # may need to delete various items
+        if 'note' in builtin_dict:
+            del builtin_dict['note']
+        self.arg_dict.update(builtin_dict)

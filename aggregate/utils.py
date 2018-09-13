@@ -6,10 +6,12 @@ import seaborn as sns
 from IPython.core.display import HTML, display
 import logging
 import itertools
+import os
+
 
 # logging
 # TODO better filename!
-LOGFILE = 'c:/S/TELOS/python/aggregate_project/aggregate_project.log'
+LOGFILE = os.path.join(os.path.split(__file__)[0], 'log/aggregate.log')
 logging.basicConfig(filename=LOGFILE,
                     filemode='w',
                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',

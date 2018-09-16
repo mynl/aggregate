@@ -151,7 +151,8 @@ class Underwriter(_DataManager):
     def __getitem__(self, item):
         """
         handles self[item]
-        the result is cast into the right type of object
+        the result is just a dictionary
+        this method is used by the Parser etc.
 
         :param item:
         :return: Book, Account or Line object
@@ -160,34 +161,22 @@ class Underwriter(_DataManager):
 
     def __getattr__(self, item):
         """
-        handles self.item
+        handles self.item and returns an appropriate object
 
         :param item:
         :return:
         """
-        return _DataManager.__getitem__(self, item)
+        return self.write(item)  # _DataManager.__getitem__(self, item)
 
-    def get_dict(self, item):
-        """
-        get an item as dictionary, WITHOUT the type
-
-        :param item:
-        :return:
-        """
-        _type, obj = _DataManager.__getitem__(self, item)
-        return obj
-
-    def get_object(self, item):
-        """
-        get an item as an object of the right type
-
-        :param item:
-        :return:
-        """
-        # _type, obj = _DataManager.__getitem__(self, item)
-        # if _type == ''
-        # return obj
-        pass
+    # def get_dict(self, item):
+    #     """
+    #     get an item as dictionary, WITHOUT the type
+    #
+    #     :param item:
+    #     :return:
+    #     """
+    #     _type, obj = _DataManager.__getitem__(self, item)
+    #     return obj
 
     def __call__(self, portfolio_program):
         return self.write(portfolio_program)
@@ -212,6 +201,25 @@ class Underwriter(_DataManager):
         :param kwargs:
         :return:
         """
+
+        # first see if it is a built in object
+        lookup_success = True
+        try:
+            _type, obj = _DataManager.__getitem__(self, portfolio_program)
+        except LookupError:
+            lookup_success = False
+            print(f'Warning: object {portfolio_program} not found...assuming program...')
+        if lookup_success:
+            if _type == 'aggregate':
+                return Aggregate(portfolio_program, **obj)
+            elif _type == 'portfolio':
+                return Portfolio(portfolio_program, obj['spec'])
+            elif _type == 'severity':
+                return Severity(**obj)
+            else:
+                ValueError(f'Cannot build {_type} objects')
+            return obj
+
         spec_list = self.runner.production_run(portfolio_program)
         # add newly created item to the built in list
         if self.store_mode:

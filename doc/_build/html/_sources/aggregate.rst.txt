@@ -1,8 +1,10 @@
 
 
-Aggregate and Severity Classes
-==============================
+distr Module
+============
 
+Aggregate and Severity Classes
+------------------------------
 
 .. automodule:: aggregate.distr
 	:members:

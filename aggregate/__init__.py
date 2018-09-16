@@ -20,10 +20,10 @@ from .parser import *
 
 # module level doc-string
 __doc__ = """
-aggregate_project - a powerful aggregate_project loss modeling library for Python
+aggregate - a powerful aggregate loss modeling library for Python
 ==================================================================
 
-**aggregate_project** is a Python package providing fast, accurate, and expressive data
+**aggregate** is a Python package providing fast, accurate, and expressive data
 structures designed to make working with probability distributions 
 easy and intuitive. Its primary aim is to be an educational tool, allowing 
 experimenation with complex, **real world** distributions. It has applications in 

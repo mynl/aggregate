@@ -5,13 +5,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Introduction to aggregate &#8212; aggregate 0.9.40 documentation</title>
+    <title>Introduction to aggregate &#8212; aggregate 0.6.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.9.40',
+        VERSION:     '0.6.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true,
@@ -87,6 +87,16 @@ tools based on simulation</li>
 <li>Mixed distributiuons</li>
 <li>Tail behavior based on frequency or severity tail</li>
 <li>Log concavity properties</li>
+<li>Uniform, triangular to normal</li>
+<li>Bernoulli to normal = life insurance</li>
+<li>$P(A&gt;x)sim lambda P(X&gt;x) sim P(M&gt;x)$ if thick tails</li>
+<li>Occ vs agg PMLs, body vs. tail. For non-cat lines it is all about correlation; for cat it is all about the tail</li>
+<li>Effron’s theorem</li>
+<li>FFT exact for “making” Poisson, sum of normals is normal, expnentials is gamma etc.</li>
+<li>Slow convergence of truncated stable to normal</li>
+<li>Severity doesn’t matter: difference between agg with sev and without for large claim count and stable severity</li>
+<li>Small large claim split approach…attrit for small; handling without correlation??</li>
+<li>Compound Poisson: CP(mixed sev) = sum CP(sev0</li>
 </ul>
 </dd>
 </dl>
@@ -101,6 +111,15 @@ track individual events, e.g. to compute gross, ceded and net bi-
 and trivariate distributions.</li>
 </ul>
 </div></blockquote>
+</div>
+<div class="section" id="practical-modeling-examples">
+<h2>Practical Modeling Examples<a class="headerlink" href="#practical-modeling-examples" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>From limit profile</li>
+<li>Mixed severity</li>
+<li>Modeling $Nmid N ge n$</li>
+<li>How to model 2 reinstatements</li>
+</ul>
 </div>
 <div class="section" id="missing-features">
 <h2>Missing Features<a class="headerlink" href="#missing-features" title="Permalink to this headline">¶</a></h2>
@@ -177,11 +196,11 @@ strength insurance company model.</li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="severity.html">Severity Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">distr Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="example.html">Example Class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parser.html">Parser Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>
@@ -203,10 +222,6 @@ strength insurance company model.</li>
           rel="nofollow">Page source</a>
     </div>
 
-    
-    <a href="https://github.com/mynl/aggregate" class="github">
-        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
-    </a>
     
 
     

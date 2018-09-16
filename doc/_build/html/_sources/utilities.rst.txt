@@ -5,21 +5,21 @@ Utilities
 Axis Manager Class
 ------------------
 
-.. autoclass:: utils.AxisManager
+.. autoclass:: aggregate.utils.AxisManager
 	:members:
 
 
 Moment Aggregator Class
 -----------------------
 
-.. autoclass:: utils.MomentAggregator
+.. autoclass:: aggregate.utils.MomentAggregator
 	:members:
 
 
 Utilities Module
 ----------------
 
-.. automodule:: utils
+.. automodule:: aggregate.utils
 	:members:
 	:exclude-members: AxisManager, MomentAggregator
 	:undoc-members:

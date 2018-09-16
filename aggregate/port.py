@@ -605,7 +605,7 @@ class Portfolio(object):
                     else:
                         html_title(f'Report {r} not generated', 2)
 
-    def plot(self, kind, line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
+    def plot(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
              aspect=1, **kwargs):
         """
         kind = density

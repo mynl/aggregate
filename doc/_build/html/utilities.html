@@ -5,13 +5,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Utilities &#8212; aggregate 0.9.40 documentation</title>
+    <title>Utilities &#8212; aggregate 0.6.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.9.40',
+        VERSION:     '0.6.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true,
@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Parameters Module" href="parameters.html" />
-    <link rel="prev" title="Underwriter Module" href="underwriter.html" />
+    <link rel="prev" title="Parser Module" href="parser.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -46,11 +46,11 @@
 <div class="section" id="axis-manager-class">
 <h2>Axis Manager Class<a class="headerlink" href="#axis-manager-class" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
-<dt id="utils.AxisManager">
-<em class="property">class </em><code class="descclassname">utils.</code><code class="descname">AxisManager</code><span class="sig-paren">(</span><em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.AxisManager" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.AxisManager">
+<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">AxisManager</code><span class="sig-paren">(</span><em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
-<dt id="utils.AxisManager.dimensions">
-<code class="descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.AxisManager.dimensions">
+<code class="descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
 <dd><p>return dimensions (width and height) of current layout</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -63,8 +63,8 @@
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.AxisManager.grid">
-<code class="descname">grid</code><span class="sig-paren">(</span><em>size=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#AxisManager.grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.AxisManager.grid" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.AxisManager.grid">
+<code class="descname">grid</code><span class="sig-paren">(</span><em>size=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid" title="Permalink to this definition">¶</a></dt>
 <dd><p>return a block of axes suitable for Pandas
 if size=0 return all the axes</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -80,8 +80,8 @@ if size=0 return all the axes</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.AxisManager.grid_size">
-<code class="descname">grid_size</code><span class="sig-paren">(</span><em>n</em>, <em>subgrid=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#AxisManager.grid_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.AxisManager.grid_size" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.AxisManager.grid_size">
+<code class="descname">grid_size</code><span class="sig-paren">(</span><em>n</em>, <em>subgrid=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid_size" title="Permalink to this definition">¶</a></dt>
 <dd><p>appropriate grid size given class parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -106,15 +106,15 @@ if size=0 return all the axes</p>
 <div class="section" id="moment-aggregator-class">
 <h2>Moment Aggregator Class<a class="headerlink" href="#moment-aggregator-class" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
-<dt id="utils.MomentAggregator">
-<em class="property">class </em><code class="descclassname">utils.</code><code class="descname">MomentAggregator</code><span class="sig-paren">(</span><em>freq_name</em>, <em>freq_a</em>, <em>freq_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator">
+<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">MomentAggregator</code><span class="sig-paren">(</span><em>freq_name</em>, <em>freq_a</em>, <em>freq_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
 <dd><p>Accumulate moments
 Used by Portfolio and Aggregate (when there are multiple severities)
 makes report_ser df and statistics_df</p>
 <p>Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</p>
 <dl class="method">
-<dt id="utils.MomentAggregator.add_fs">
-<code class="descname">add_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.add_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.add_fs" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.add_fs">
+<code class="descname">add_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_fs" title="Permalink to this definition">¶</a></dt>
 <dd><p>accumulate new moments defined by f and s
 compute agg for the latest values</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -137,9 +137,9 @@ compute agg for the latest values</p>
 </dd></dl>
 
 <dl class="staticmethod">
-<dt id="utils.MomentAggregator.agg_from_fs">
-<em class="property">static </em><code class="descname">agg_from_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>f2</em>, <em>f3</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.agg_from_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.agg_from_fs" title="Permalink to this definition">¶</a></dt>
-<dd><p>aggregate moments from freq and sev components</p>
+<dt id="aggregate.utils.MomentAggregator.agg_from_fs">
+<em class="property">static </em><code class="descname">agg_from_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>f2</em>, <em>f3</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.agg_from_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.agg_from_fs" title="Permalink to this definition">¶</a></dt>
+<dd><p>aggregate_project moments from freq and sev components</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -162,8 +162,8 @@ compute agg for the latest values</p>
 </dd></dl>
 
 <dl class="staticmethod">
-<dt id="utils.MomentAggregator.column_names">
-<em class="property">static </em><code class="descname">column_names</code><span class="sig-paren">(</span><em>agg_only</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.column_names">
+<em class="property">static </em><code class="descname">column_names</code><span class="sig-paren">(</span><em>agg_only</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
 <dd><p>list of the moment and statistics_df names for f x s = a
 list of the moment and statistics_df names for just agg</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -179,8 +179,8 @@ list of the moment and statistics_df names for just agg</p>
 </dd></dl>
 
 <dl class="staticmethod">
-<dt id="utils.MomentAggregator.cumulate_moments">
-<em class="property">static </em><code class="descname">cumulate_moments</code><span class="sig-paren">(</span><em>m1</em>, <em>m2</em>, <em>m3</em>, <em>n1</em>, <em>n2</em>, <em>n3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.cumulate_moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.cumulate_moments" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.cumulate_moments">
+<em class="property">static </em><code class="descname">cumulate_moments</code><span class="sig-paren">(</span><em>m1</em>, <em>m2</em>, <em>m3</em>, <em>n1</em>, <em>n2</em>, <em>n3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.cumulate_moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.cumulate_moments" title="Permalink to this definition">¶</a></dt>
 <dd><p>Moments of sum of indepdendent variables</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -204,8 +204,8 @@ list of the moment and statistics_df names for just agg</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.MomentAggregator.freq_moms">
-<code class="descname">freq_moms</code><span class="sig-paren">(</span><em>f1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.freq_moms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.freq_moms" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.freq_moms">
+<code class="descname">freq_moms</code><span class="sig-paren">(</span><em>f1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.freq_moms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.freq_moms" title="Permalink to this definition">¶</a></dt>
 <dd><p>figure the moments for the given frequency distribution</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -220,8 +220,8 @@ list of the moment and statistics_df names for just agg</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.MomentAggregator.get_fsa_stats">
-<code class="descname">get_fsa_stats</code><span class="sig-paren">(</span><em>total</em>, <em>remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.get_fsa_stats">
+<code class="descname">get_fsa_stats</code><span class="sig-paren">(</span><em>total</em>, <em>remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
 <dd><p>get the current f x s = agg statistics_df and moments
 total = true use total else, current
 remix = true for total only, re-compute freq statistics_df based on total freq 1</p>
@@ -243,8 +243,8 @@ remix = true for total only, re-compute freq statistics_df based on total freq 1
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.MomentAggregator.moments">
-<code class="descname">moments</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.moments" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.moments">
+<code class="descname">moments</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments" title="Permalink to this definition">¶</a></dt>
 <dd><p>vector of the moments; convenience function</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -264,8 +264,8 @@ remix = true for total only, re-compute freq statistics_df based on total freq 1
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.MomentAggregator.moments_to_mcvsk">
-<code class="descname">moments_to_mcvsk</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.moments_to_mcvsk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.moments_to_mcvsk" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.moments_to_mcvsk">
+<code class="descname">moments_to_mcvsk</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments_to_mcvsk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments_to_mcvsk" title="Permalink to this definition">¶</a></dt>
 <dd><p>convert noncentral moments into mean, cv and skewness
 type = agg | freq | sev | mix
 delegates work</p>
@@ -287,8 +287,8 @@ delegates work</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="utils.MomentAggregator.stats_series">
-<code class="descname">stats_series</code><span class="sig-paren">(</span><em>name</em>, <em>limit</em>, <em>pvalue</em>, <em>total=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#MomentAggregator.stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.MomentAggregator.stats_series" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.MomentAggregator.stats_series">
+<code class="descname">stats_series</code><span class="sig-paren">(</span><em>name</em>, <em>limit</em>, <em>pvalue</em>, <em>total=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.stats_series" title="Permalink to this definition">¶</a></dt>
 <dd><p>combine elements into a reporting series
 handles order, index names etc. in one place</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -313,11 +313,11 @@ handles order, index names etc. in one place</p>
 </dd></dl>
 
 </div>
-<div class="section" id="module-utils">
-<span id="utilities-module"></span><h2>Utilities Module<a class="headerlink" href="#module-utils" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-aggregate.utils">
+<span id="utilities-module"></span><h2>Utilities Module<a class="headerlink" href="#module-aggregate.utils" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
-<dt id="utils.axiter_factory">
-<code class="descclassname">utils.</code><code class="descname">axiter_factory</code><span class="sig-paren">(</span><em>axiter</em>, <em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#axiter_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.axiter_factory" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.axiter_factory">
+<code class="descclassname">aggregate.utils.</code><code class="descname">axiter_factory</code><span class="sig-paren">(</span><em>axiter</em>, <em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#axiter_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.axiter_factory" title="Permalink to this definition">¶</a></dt>
 <dd><p>axiter = check_axiter(axiter, …) to allow chaining
 TODO can this be done in the class somehow?</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -342,8 +342,8 @@ TODO can this be done in the class somehow?</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.estimate_agg_percentile">
-<code class="descclassname">utils.</code><code class="descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em>, <em>p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.estimate_agg_percentile">
+<code class="descclassname">aggregate.utils.</code><code class="descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em>, <em>p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -365,8 +365,8 @@ TODO can this be done in the class somehow?</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.ft">
-<code class="descclassname">utils.</code><code class="descname">ft</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#ft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.ft" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.ft">
+<code class="descclassname">aggregate.utils.</code><code class="descname">ft</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ft" title="Permalink to this definition">¶</a></dt>
 <dd><p>fft with padding and tilt
 padding = n makes vector 2^n as long
 n=1 doubles (default)
@@ -391,8 +391,24 @@ tilt is passed in as the tilting vector or None: easier for the caller to have a
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.html_title">
-<code class="descclassname">utils.</code><code class="descname">html_title</code><span class="sig-paren">(</span><em>txt</em>, <em>n=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#html_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.html_title" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.get_fmts">
+<code class="descclassname">aggregate.utils.</code><code class="descname">get_fmts</code><span class="sig-paren">(</span><em>df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#get_fmts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.get_fmts" title="Permalink to this definition">¶</a></dt>
+<dd><p>reasonable formats for a styler</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>df</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.html_title">
+<code class="descclassname">aggregate.utils.</code><code class="descname">html_title</code><span class="sig-paren">(</span><em>txt</em>, <em>n=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#html_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.html_title" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -411,8 +427,8 @@ tilt is passed in as the tilting vector or None: easier for the caller to have a
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.ift">
-<code class="descclassname">utils.</code><code class="descname">ift</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#ift"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.ift" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.ift">
+<code class="descclassname">aggregate.utils.</code><code class="descname">ift</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ift"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ift" title="Permalink to this definition">¶</a></dt>
 <dd><p>ift that strips out padding and adjusts for tilt</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -433,8 +449,8 @@ tilt is passed in as the tilting vector or None: easier for the caller to have a
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.insurability_triangle">
-<code class="descclassname">utils.</code><code class="descname">insurability_triangle</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.insurability_triangle">
+<code class="descclassname">aggregate.utils.</code><code class="descname">insurability_triangle</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
 <dd><p>Illustrate the insurability triangle…</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -447,8 +463,8 @@ tilt is passed in as the tilting vector or None: easier for the caller to have a
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.lognorm_lev">
-<code class="descclassname">utils.</code><code class="descname">lognorm_lev</code><span class="sig-paren">(</span><em>mu</em>, <em>sigma</em>, <em>n</em>, <em>limit</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#lognorm_lev"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.lognorm_lev" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.lognorm_lev">
+<code class="descclassname">aggregate.utils.</code><code class="descname">lognorm_lev</code><span class="sig-paren">(</span><em>mu</em>, <em>sigma</em>, <em>n</em>, <em>limit</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#lognorm_lev"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.lognorm_lev" title="Permalink to this definition">¶</a></dt>
 <dd><p>return E(min(X, limit)^n) for lognormal using exact calculation
 currently only for n=1, 2</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -471,8 +487,16 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.read_log">
-<code class="descclassname">utils.</code><code class="descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.read_log" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.qd">
+<code class="descclassname">aggregate.utils.</code><code class="descname">qd</code><span class="sig-paren">(</span><em>df</em>, <em>max_rows=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd" title="Permalink to this definition">¶</a></dt>
+<dd><p>generic quick display of data frame df
+aware of likely column names with appropriate format
+for each</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.read_log">
+<code class="descclassname">aggregate.utils.</code><code class="descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.read_log" title="Permalink to this definition">¶</a></dt>
 <dd><p>read and return the log file</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -485,8 +509,8 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.sensible_jump">
-<code class="descclassname">utils.</code><code class="descname">sensible_jump</code><span class="sig-paren">(</span><em>n</em>, <em>desired_rows=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#sensible_jump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sensible_jump" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.sensible_jump">
+<code class="descclassname">aggregate.utils.</code><code class="descname">sensible_jump</code><span class="sig-paren">(</span><em>n</em>, <em>desired_rows=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sensible_jump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sensible_jump" title="Permalink to this definition">¶</a></dt>
 <dd><p>return a sensible jump size to output desired_rows given input of n</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -506,8 +530,8 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.sgamma_fit">
-<code class="descclassname">utils.</code><code class="descname">sgamma_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#sgamma_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sgamma_fit" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.sgamma_fit">
+<code class="descclassname">aggregate.utils.</code><code class="descname">sgamma_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sgamma_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sgamma_fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>method of moments shifted gamma fit matching given mean, cv and skewness</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -528,8 +552,8 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.sln_fit">
-<code class="descclassname">utils.</code><code class="descname">sln_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#sln_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sln_fit" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.sln_fit">
+<code class="descclassname">aggregate.utils.</code><code class="descname">sln_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sln_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sln_fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>method of moments shifted lognormal fit matching given mean, cv and skewness</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -550,8 +574,8 @@ currently only for n=1, 2</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="utils.suptitle_and_tight">
-<code class="descclassname">utils.</code><code class="descname">suptitle_and_tight</code><span class="sig-paren">(</span><em>title</em>, <em>fontsize=14</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
+<dt id="aggregate.utils.suptitle_and_tight">
+<code class="descclassname">aggregate.utils.</code><code class="descname">suptitle_and_tight</code><span class="sig-paren">(</span><em>title</em>, <em>fontsize=14</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
 <dd><p>deal with tight layout when there is a suptitle</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -611,10 +635,11 @@ currently only for n=1, 2</p>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Aggregate and Severity Classes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">distr Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parser.html">Parser Module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Utilities</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
 </ul>
@@ -636,10 +661,6 @@ currently only for n=1, 2</p>
           rel="nofollow">Page source</a>
     </div>
 
-    
-    <a href="https://github.com/mynl/aggregate" class="github">
-        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
-    </a>
     
 
     

@@ -8,7 +8,6 @@
 aggregate: Working with Probability Distributions
 =================================================
 
-
 .. automodule:: aggregate
 
 
@@ -27,5 +26,6 @@ Table of Contents
    portfolio
    distortion
    underwriter
+   parser
    utilities
    parameters

@@ -47,6 +47,16 @@ Potential Applications
        * Mixed distributiuons
        * Tail behavior based on frequency or severity tail
        * Log concavity properties
+       * Uniform, triangular to normal
+       * Bernoulli to normal = life insurance
+       * $P(A>x)\sim \lambda P(X>x) \sim P(M>x)$ if thick tails
+       * Occ vs agg PMLs, body vs. tail. For non-cat lines it is all about correlation; for cat it is all about the tail
+       * Effron's theorem
+       * FFT exact for "making" Poisson, sum of normals is normal, expnentials is gamma etc.
+       * Slow convergence of truncated stable to normal
+       * Severity doesn't matter: difference between agg with sev and without for large claim count and stable severity
+       * Small large claim split approach...attrit for small; handling without correlation??
+       * Compound Poisson: CP(mixed sev) = sum CP(sev0
   - Pricing small insurance portfolios on a claim by claim basis
   - Analysis of default probabilities
   - Allocation of capital and risk charges
@@ -55,6 +65,17 @@ Potential Applications
     dependence structures, or in situations where it is necessary to
     track individual events, e.g. to compute gross, ceded and net bi-
     and trivariate distributions.
+
+
+Practical Modeling Examples
+---------------------------
+
+* From limit profile
+* Mixed severity
+* Modeling $N\mid N \ge n$
+* How to model 2 reinstatements
+
+
 
 Missing Features
 ----------------

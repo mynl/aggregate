@@ -42,7 +42,7 @@ def get_fmts(df):
     fmts = {}
 
     def guess_fmt(nm, sz):
-        named_cols = {'Err': {:6.3e}, 'CV': '{:6.3f}', 'Skew': '{:6.3f}'}
+        named_cols = {'Err': '{:6.3e}', 'CV': '{:6.3f}', 'Skew': '{:6.3f}'}
         for n, f in named_cols.items():
             if nm.find(n) >= 0:  # note -1 means not found
                 return f

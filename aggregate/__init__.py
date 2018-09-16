@@ -9,12 +9,14 @@ __email__ = "mildenhs@stjohns.edu"
 __status__ = "alpha"
 
 # imports
-from aggregate.distr import *
-from aggregate.underwriter import *
-from aggregate.param import *
-from aggregate.port import *
-from aggregate.spectral import *
-from aggregate.utils import *
+from .distr import *
+from .underwriter import *
+from .param import *
+from .port import *
+from .spectral import *
+from .utils import *
+from .parser import *
+
 
 # module level doc-string
 __doc__ = """

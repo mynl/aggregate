@@ -8,7 +8,6 @@ import logging
 import itertools
 import os
 
-
 # logging
 # TODO better filename!
 LOGFILE = os.path.join(os.path.split(__file__)[0], 'log/aggregate.log')
@@ -19,7 +18,51 @@ logging.basicConfig(filename=LOGFILE,
 logging.info('aggregate_project.__init__ | New Aggregate Session started')
 
 
-# momnent utility functions
+# display
+def qd(df, max_rows=10):
+    """
+    generic quick display of data frame df
+    aware of likely column names with appropriate format
+    for each
+    """
+    if max_rows == -1:
+        max_rows = df.shape[0]
+        if max_rows > 1000:
+            max_rows = 1000
+    display(df.head(max_rows).style.format(get_fmts(df)))
+
+
+def get_fmts(df):
+    """
+    reasonable formats for a styler
+
+    :param df:
+    :return:
+    """
+    fmts = {}
+
+    def guess_fmt(nm, sz):
+        named_cols = {'Err': {:6.3e}, 'CV': '{:6.3f}', 'Skew': '{:6.3f}'}
+        for n, f in named_cols.items():
+            if nm.find(n) >= 0:  # note -1 means not found
+                return f
+        if abs(sz) < 1:
+            return '{:6.3e}'
+        elif abs(sz) < 10:
+            return '{:6.3f}'
+        elif abs(sz) < 1000:
+            return '{:6.0f}'
+        elif abs(sz) < 1e10:
+            return '{:,.0f}'
+        else:
+            return '{:5.3e}'
+
+    for k, v in df.mean().items():
+        fmts[k] = guess_fmt(k, v)
+    return fmts
+
+
+# moment utility functions
 def ft(z, padding, tilt):
     """
     fft with padding and tilt
@@ -244,7 +287,7 @@ class AxisManager(object):
         else:
             # need local sizing
             assert self.n >= size
-            r, c = self.grid_size(size, subgrid=True)
+            # r, c = self.grid_size(size, subgrid=True)
             return [self.__next__() for _ in range(size)]  # range(c) for _ in range(r)]
 
 

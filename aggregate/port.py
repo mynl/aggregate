@@ -583,18 +583,18 @@ class Portfolio(object):
             report_list = full_report_list
         for r in full_report_list:
             if r in report_list:
-                html_title(r, 1)
+                html_title(f'{r} Report', 1)
                 if r == 'priority_capital':
                     if self.priority_capital_df is not None:
                         display(self.priority_capital_df.loc[1e-3:1e-2, :].style)
                     else:
-                        html_title('Report {:} not generated'.format(r), 2)
+                        html_title(f'Report {r} not generated', 2)
                 elif r == 'quick':
                     if self.audit_df is not None:
                         df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
                         display(df.style)
                     else:
-                        html_title('Report {:} not generated'.format(r), 2)
+                        html_title(f'Report {r} not generated', 2)
                 else:
                     df = getattr(self, r + '_df', None)
                     if df is not None:
@@ -603,7 +603,7 @@ class Portfolio(object):
                         except ValueError:
                             display(df)
                     else:
-                        html_title('Report {:} not generated'.format(r), 2)
+                        html_title(f'Report {r} not generated', 2)
 
     def plot(self, kind, line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
              aspect=1, **kwargs):
@@ -804,8 +804,7 @@ class Portfolio(object):
             raise ValueError(f'Portfolio.plot unknown plot type {kind}')
 
         if do_tight:
-            suptitle_and_tight(f'{kind.title()} Plots for {self.name}')
-
+            suptitle_and_tight(f'{kind.title()} Plots for {self.name.title()}')
 
     def uat_interpolation_functions(self, a0, e0):
         """

@@ -8,7 +8,7 @@ from IPython.core.display import display
 from ruamel import yaml
 
 
-def hack_make_lines_from_csv(fn='../data/DIRECT_IEE.csv', do_save=False):
+def hack_make_lines_from_csv(fn='../../../data/DIRECT_IEE.csv', do_save=False):
     """
     placeholder
     make industry lines from IEE extract
@@ -253,6 +253,6 @@ def hack_make_lines_from_csv(fn='../data/DIRECT_IEE.csv', do_save=False):
         d[f'ind {name}'] = e
     print(yaml.dump(d, default_flow_style=False, indent=4))
     if do_save:
-        with open('c:/s/telos/python/aggregate_project/aggregate_project.yaml', 'a') as f:
+        with open('c:/s/telos/python/aggregate_project/aggregate.yaml', 'a') as f:
             yaml.dump(d, stream=f, default_flow_style=False, indent=4)
     return tl

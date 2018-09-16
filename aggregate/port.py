@@ -19,7 +19,9 @@ Other Notes
 
 """
 
+import collections
 import matplotlib.cm as cm
+import seaborn as sns
 from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
@@ -640,7 +642,10 @@ class Portfolio(object):
         do_tight = (axiter is None)
 
         if kind == 'quick':
-            axiter = axiter_factory(axiter, 4, figsize, height, aspect)
+            if self.audit_df is not None:
+                axiter = axiter_factory(axiter, 4, figsize, height, aspect)
+            else:
+                axiter = axiter_factory(axiter, 3, figsize, height, aspect)
 
             self.statistics_df.loc[('agg', 'mean')]. \
                 sort_index(ascending=True, axis=0). \
@@ -654,9 +659,10 @@ class Portfolio(object):
                 sort_index(ascending=True, axis=0). \
                 plot(kind='bar', rot=-45, title='Skewness', ax=next(axiter))
 
-            self.audit_df.loc[:, 'P99.9']. \
-                sort_index(ascending=True, axis=0). \
-                plot(kind='bar', rot=-45, title='99.9th Percentile', ax=next(axiter))
+            if self.audit_df is not None:
+                self.audit_df.loc[:, 'P99.9']. \
+                    sort_index(ascending=True, axis=0). \
+                    plot(kind='bar', rot=-45, title='99.9th Percentile', ax=next(axiter))
 
         elif kind == 'density':
             if isinstance(line, str):
@@ -677,9 +683,19 @@ class Portfolio(object):
                 ax = axiter.grid(1)
             self.density_df.loc[:, line].sort_index(axis=1). \
                 plot(sort_columns=True, ax=ax, **kwargs)
-            # plot(title=f'{self.name} Line Density', sort_columns=True, ax=ax, **kwargs)
-            # if 'subplots' in kwargs:
-            #     plt.tight_layout(rect=[0, 0, 1, 0.97])
+            if 'logy' in kwargs:
+                _t = 'log Density'
+            else:
+                _t = 'Density'
+            if 'subplots' in kwargs and isinstance(ax, collections.Iterable):
+                for a, l in zip(ax, line):
+                    a.set(title=f'{l} {_t}')
+                    a.legend().set_visible(False)
+            elif isinstance(ax, collections.Iterable):
+                for a in ax:
+                    a.set(title=f'{_t}')
+            else:
+                ax.set(title=_t)
 
         elif kind == 'audit':
             D = self.density_df
@@ -718,16 +734,19 @@ class Portfolio(object):
                              title='Change in Loss Cost by Line: $\\nabla E(X_i(a))$')
 
             # E(X_i / X | X > a); exi_x_lea_ dropped
-            for prefix in ['exi_xgta_', 'exeqa_', 'exlea_', 'exgta_']:
-                prefix = prefix + '[a-zA-Z]'
+            prefix_and_titles = dict(exi_xgta_='$E(X_i/X \mid X>a)$',
+                                     exeqa_='$E(X_i \mid X=a)$',
+                                     exlea_=r'$E(X_i \mid X \leq a)$',
+                                     exgta_='$E(X_i \mid X>a)$')
+            for prefix in prefix_and_titles.keys():
+                regex = f'^{prefix}[a-zA-Z]'
                 ax = axiter.grid(1)
-                D.filter(regex='^' + prefix).plot(ax=ax, xlim=(0, large_loss_scale))
-                ax.set_title(prefix.replace('xi_x_', ' $X_i/X$ '))
+                D.filter(regex=regex).plot(ax=ax, xlim=(0, large_loss_scale))
                 if prefix == 'exgta_':
-                    ax.set_title('$E(X_i \\mid X > a)$ by line and total')
+                    ax.set_title(r'$E(X_i \mid X > a)$ by line and total')
                 if prefix.find('xi_x') > 0:
                     # these are fractions between zero and 1; plot sum on same axis and adjust limit
-                    D.filter(regex='^' + prefix).sum(axis=1).plot(ax=ax, label='calced total')
+                    D.filter(regex=regex).sum(axis=1).plot(ax=ax, label='calced total')
                     ax.set_ylim(-.05, 1.05)  # so you can see if anything weird is going on
                 elif prefix == 'exgta_' or prefix == 'exeqa_':
                     # scale same as x axis - so you can see E(X | X=a) is the diagonal ds
@@ -735,6 +754,7 @@ class Portfolio(object):
                 else:
                     # scale like mean
                     ax.set_ylim(0, expected_loss_scale)
+                ax.set_title(prefix_and_titles[prefix])
                 ax.legend()
 
             # Lee diagrams by peril - will fit in the sixth small plot
@@ -744,7 +764,7 @@ class Portfolio(object):
             for c in D.filter(regex='^p_[^t]').columns:
                 ax.plot(D.loc[:, c].cumsum(), D.loss, label=c[2:])
             ax.legend()
-            ax.set_title('Lee diagrams by peril')
+            ax.set_title('Lee Diagram')
             ax.set_xlim(0, 1)
             ax.set_ylim(0, large_loss_scale)
 
@@ -755,15 +775,16 @@ class Portfolio(object):
             if axiter is None:
                 axiter = axiter_factory(axiter, n_plots, figsize, height, aspect)
 
-            for prefix in ['lev_', 'exa_', 'e2pri_']:
+            for prefix, fmt in dict(lev_='LEV', exa_=r'$E(X_i\mid X=a)$', e2pri_=r'$E_2(X_i \mid X=a)$').items():
                 ax = axiter.grid(1)
                 self.density_df.filter(regex=f'{prefix}').plot(ax=ax, xlim=(0, xmax),
-                                                               title=prefix[:-1].title())
+                                                               title=fmt)
                 ax.set_xlabel('Capital assets')
 
             for line in self.line_names:
                 ax = axiter.grid(1)
-                self.density_df.filter(regex=f'(lev|exa|e2pri)_{line}$').plot(ax=ax, xlim=(0, xmax))
+                self.density_df.filter(regex=f'(lev|exa|e2pri)_{line}$').plot(ax=ax, xlim=(0, xmax),
+                                                                              title=f'{line.title()} by Priority')
                 ax.set_xlabel('Capital assets')
             for col in self.line_names_ex:
                 ax = axiter.grid(1)
@@ -804,6 +825,7 @@ class Portfolio(object):
             raise ValueError(f'Portfolio.plot unknown plot type {kind}')
 
         if do_tight:
+            axiter.tidy()
             suptitle_and_tight(f'{kind.title()} Plots for {self.name.title()}')
 
     def uat_interpolation_functions(self, a0, e0):
@@ -1248,6 +1270,7 @@ class Portfolio(object):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
+
         :param LRs:  LR or ROEs given
         :param ROEs: ROEs override LRs
         :param As:  Assets or probs given
@@ -1321,9 +1344,9 @@ class Portfolio(object):
         ans_stacked.columns = ['assets', 'method', 'return', 'S', 'line', 'stat', 'value']
 
         # figure reasonable max and mins for LR plots
-        mn = ans_stacked.filter(regex='^lr').min().min()
+        mn = ans_table.filter(regex='^lr').min().min()
         mn1 = mn
-        mx = ans_stacked.filter(regex='^lr').max().max()
+        mx = ans_table.filter(regex='^lr').max().max()
         mn = np.round(mn * 20, 0) / 20
         mx = np.round(mx * 20, 0) / 20
         if mx >= 0.9:
@@ -1336,10 +1359,13 @@ class Portfolio(object):
         # by line columns=method x capital
         if num_plots >= 1:
             display(ans_table)
+            html_title('LOSS RATIO row=return period, column=method, by line within plot', 3)
             sns.factorplot(x='line', y='value', row='return', col='method', size=2.5, kind='bar',
                            data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
+            html_title('LOSS RATIO row=return period, column=line, by method within plot', 3)
             sns.factorplot(x='method', y='value', row='return', col='line', size=2.5, kind='bar',
                            data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
+            html_title('LOSS RATIO row=line, column=method, by assets within plot', 3)
             sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
                            data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
 
@@ -1353,8 +1379,8 @@ class Portfolio(object):
         :param axiter: axis iterator, if None no plots are returned
         :return: density_df with extra columns appended
         """
-        # make sure we have enough colors
-        sns.set_palette('Set1', 2 * len(self.line_names_ex))
+        # make sure we have enough colors - no, up to user to manage palette
+        # sns.set_palette('Set1', 2 * len(self.line_names_ex))
 
         # store for reference
         self.last_distortion = dist
@@ -1734,7 +1760,7 @@ class Portfolio(object):
                                'Marginal ROE': marg_roe, 'P:S levg': leverage})
             df = df.set_index('$F(x)$', drop=True)
             df.plot(subplots=True, rot=0, figsize=(14, 4), layout=(-1, 7))
-            suptitle_and_tight(f'{str(dist)}: Statistics for Layer $x$ to $a$ vs. $F(x)$', fontsize=14)
+            suptitle_and_tight(f'{str(dist)}: Statistics for Layer $x$ to $a$ vs. $F(x)$')
             df['distortion'] = dist.name
             dfs.append(df)
         return pd.concat(dfs)

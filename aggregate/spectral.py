@@ -244,10 +244,12 @@ class Distortion(object):
             dists[dn] = Distortion(name=dn, shape=param, r0=r0)
 
         if plot:
-            f, axs = plt.subplots(2, 3, figsize=(8, 6))
-            it = iter(axs.flatten())
+            axiter = axiter_factory(None, 5, height=3, aspect=1)
+            # f, axs = plt.subplots(2, 3, figsize=(8, 6))
+            # it = iter(axs.flatten())
             for dn in Distortion.available_distortions():
-                dists[dn].plot(ax=next(it))
+                dists[dn].plot(ax=next(axiter))
+            axiter.tidy()
             plt.tight_layout()
 
         return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]

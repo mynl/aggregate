@@ -1,13 +1,23 @@
 # https://pythonhosted.org/an_example_pypi_project/setuptools.html
 # set HOME=c:\s\telos\python
 # python setup.py sdist bdist_wininst upload.bat
-
+# pip freeze > file to list installed packages
+# pip install -r requirements.txt to install
 
 from setuptools import setup
 import os
 
 tests_require = ['unittest', 'pandas', 'matplotlib', 'sly']
-
+install_requires = [
+    'ipython>=6.1',
+    'matplotlib>=2.2',
+    'numpy>=1.13',
+    'pandas>=0.23',
+    'ruamel.yaml>=0.15',
+    'scipy>=0.19',
+    'seaborn>=0.8',
+    'sly>=0.3'
+]
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
@@ -28,6 +38,7 @@ setup(name="aggregate_project",
       package_data={'': ['*.txt', '*.rst', 'yaml/*.yaml', 'examples/*.py', 'examples/*.ipynb',
                          'test/*.py']},
       tests_require=tests_require,
+      install_requires=install_requires,
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Programming Language :: Python :: 3',

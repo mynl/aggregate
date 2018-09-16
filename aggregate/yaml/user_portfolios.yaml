@@ -1,4 +1,4 @@
-Three Line Example:
+Three_Line_Example:
     note: User example, single line, mixed sev, and sublines
     arg_dict:
         approx_freq_ge: 100

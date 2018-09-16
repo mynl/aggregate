@@ -33,11 +33,14 @@ class _DataManager(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, databases, dir_name):
         """
-        info
 
+        :param databases: dictionary of databases to load
+        :param dir_name:  directory to search for database files
         """
+        self.databases = databases
+        self.dir_name = dir_name
 
         if self.dir_name == '':
             self.dir_name = os.path.split(__file__)[0]
@@ -132,7 +135,7 @@ class Underwriter(_DataManager):
 
     """
 
-    def __init__(self, dir_name="", store_mode=True, debug=False):
+    def __init__(self, dir_name="", databases=None, store_mode=True, debug=False):
         """
 
         :param dir_name:
@@ -140,13 +143,13 @@ class Underwriter(_DataManager):
         :param debug: run parser in debug mode?
         """
         self.last_spec = None
-        self.databases = dict(severity=['severities.yaml'],
-                              aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
-                              portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
-        self.dir_name = dir_name
         self.store_mode = store_mode
         self.runner = Runner(self, debug=debug)
-        _DataManager.__init__(self)
+
+        if databases is None:
+            databases = dict(severity=['severities.yaml'], aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
+                             portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
+        _DataManager.__init__(self, databases, dir_name)
 
     def __getitem__(self, item):
         """
@@ -208,7 +211,7 @@ class Underwriter(_DataManager):
             _type, obj = _DataManager.__getitem__(self, portfolio_program)
         except LookupError:
             lookup_success = False
-            print(f'Warning: object {portfolio_program} not found...assuming program...')
+            logging.info(f'underwriter.write | object {portfolio_program} not found, will process as program')
         if lookup_success:
             if _type == 'aggregate':
                 return Aggregate(portfolio_program, **obj)
@@ -220,29 +223,49 @@ class Underwriter(_DataManager):
                 ValueError(f'Cannot build {_type} objects')
             return obj
 
-        spec_list = self.runner.production_run(portfolio_program)
+        agg_spec_list, sev_spec_list = self.runner.production_run(portfolio_program)
+        # make up a name if none given
+        if portfolio_name == '':
+            portfolio_name = f'user_{len(agg_spec_list)}'
         # add newly created item to the built in list
         if self.store_mode:
-            for a in spec_list:
-                self.aggregate[a['name']] = a
-
-        if portfolio_name == '':
-            portfolio_name = f'built ins {len(spec_list)}'
-        logging.info(f'Underwriter.write | creating Portfolio {portfolio_name} from {portfolio_program[0:20]}')
-        # spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
-        port = Portfolio(portfolio_name, spec_list)
-        if update:
-            if bs == 0:
-                # for log2 = 10
-                bs = port.recommend_bucket().iloc[-1, 0]
-                if log2 == 0:
-                    log2 = 10
-                else:
-                    bs = bs * 2 ** (10 - log2)
-            logging.info(f'Underwriter.write | updating Portfolio {portfolio_name}, log2={10}, bs={bs}')
-            port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
-        self.last_spec = spec_list
-        return port
+            if len(agg_spec_list) > 0:
+                for a in agg_spec_list:
+                    self.aggregate[a['name']] = a
+                self.portfolio[portfolio_name] = dict(arg_dict=dict(), note=portfolio_program, spec=agg_spec_list)
+            if len(sev_spec_list) > 0:
+                for s in sev_spec_list:
+                    self.severity[s['name']] = {k: v for k, v in s.items() if k != 'name'}
+        # allow to create EITHER portfolio OR severities
+        if len(agg_spec_list) > 0:
+            logging.info(f'Underwriter.write | creating Portfolio {portfolio_name} from {portfolio_program[0:20]}')
+            # agg_spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
+            port = Portfolio(portfolio_name, agg_spec_list)
+            if update:
+                if bs == 0:
+                    # for log2 = 10
+                    bs = port.recommend_bucket().iloc[-1, 0]
+                    if log2 == 0:
+                        log2 = 10
+                    else:
+                        bs = bs * 2 ** (10 - log2)
+                logging.info(f'Underwriter.write | updating Portfolio {portfolio_name}, log2={10}, bs={bs}')
+                port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+            self.last_spec = agg_spec_list
+            return port
+        elif len(sev_spec_list) > 0:
+            sevs = []
+            logging.info(f'Underwriter.write | creating severities from {portfolio_program[0:20]}')
+            for s in sev_spec_list:
+                del s['sev_wt']
+                sev = Severity(**s)
+                sevs.append(sev)
+            self.last_spec = sev_spec_list
+            return sevs
+        else:
+            print('WARNING: Program did not contain any output...')
+            logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output...')
+            return None
 
     def test_write(self, portfolio_program):
         """

@@ -242,7 +242,7 @@ import numpy as np
 
 class UnderwritingLexer(Lexer):
     tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, ON}
+              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, ON, SEV}
     ignore = ' \t,\\:\\(\\)|'
     literals = {'[', ']'}
 
@@ -267,6 +267,7 @@ class UnderwritingLexer(Lexer):
     ID['poisson'] = POISSON
     ID['fixed'] = FIXED
     ID['inf'] = NUMBER
+    ID['sev'] = SEV
 
     @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
     def NUMBER(self, t):
@@ -293,6 +294,7 @@ class UnderwritingParser(Parser):
     def __init__(self, uw, debug=False):
         self.arg_dict = None
         self.reset()
+        self.type = ''
         # instance of uw class to look up severities
         self.uw = uw
         if debug:
@@ -318,6 +320,7 @@ class UnderwritingParser(Parser):
     @_('name builtin_aggregate')
     def ans(self, p):
         self.p(f'exiting through builtin_aggregate {p.builtin_aggregate}')
+        self.type = 'aggregate'
         logging.info('UnderwritingParser | Exiting through built in aggregate')
         pass
 
@@ -325,7 +328,16 @@ class UnderwritingParser(Parser):
     @_('name exposures layers sev_term freq')
     def ans(self, p):
         self.p(f'exiting through nelsf...')
-        logging.info('UnderwritingParser | Exiting through name exposures limit sev')
+        self.type = 'aggregate'
+        logging.info('UnderwritingParser | Exiting through name exposures limit sev_term')
+        pass
+
+    # allow just to load a severity...
+    @_('SEV name sev')
+    def ans(self, p):
+        self.p('Exiting through sev')
+        self.type = 'severity'
+        logging.info('UnderwritingParser | Exiting through sev')
         pass
 
     # frequency term ==========================================
@@ -378,7 +390,8 @@ class UnderwritingParser(Parser):
     def sev(self, p):
         self.p(f'resolving numbers TIMES sev to sev {p.numbers}')
         self.arg_dict['sev_mean'] *= p.numbers
-        # set the scale, don't "scale" the scale
+        # only scale scale if there is a scale (otherwise you double count)
+        # if self.arg_dict['sev_scale']:
         self.arg_dict['sev_scale'] = p.numbers
 
     @_('ids numbers CV numbers weights')
@@ -600,12 +613,14 @@ class UnderwritingParser(Parser):
     def _safe_lookup(self, uw_id, expected_type):
         """
         lookup uw_id in uw of expected type and merge safely into self.arg_dict
-        delete anme and note if appropriate
+        delete name and note if appropriate
 
         :param uw_id:
         :param expected_type:
         :return:
         """
+        _type = 'not found'
+        builtin_dict = None
         try:
             # strip the uw. off here
             _type, builtin_dict = self.uw[uw_id[3:]]
@@ -616,7 +631,7 @@ class UnderwritingParser(Parser):
         assert _type != 'portfolio'  # this is a problem
         logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} type {type(builtin_dict)}')
         if _type != expected_type:
-            print(f'WARNING: type of {uw_id} is  {type(builtin_dict)}, not expected {expected_type}')
+            print(f'WARNING: type of {uw_id} is  {_type}, not expected {expected_type}')
         assert _type == expected_type
         # may need to delete various items
         if 'note' in builtin_dict:
@@ -637,11 +652,16 @@ class Runner(object):
 
     def test_run(self, portfolio_program):
         logging.info(f'Runner.test_run| Executing program\n{portfolio_program[:500]}\n\n')
-        spec_list = self._runner(portfolio_program)
-        nm = [a['name'] for a in spec_list]
-        ans = pd.DataFrame(spec_list, index=nm).T
-        ans = ans.iloc[[1, 2, 5, 4, 3, 0, 15, 10, 11, 14, 12, 13, 16, 17, 8, 6, 7], :]
-        return ans
+        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
+        ans = ans2 = None
+        if len(agg_spec_list) > 0:
+            nm = [a['name'] for a in agg_spec_list]
+            ans = pd.DataFrame(agg_spec_list, index=nm).T
+            ans = ans.iloc[[1, 2, 5, 4, 3, 0, 15, 10, 11, 14, 12, 13, 16, 17, 8, 6, 7], :]
+        if len(sev_spec_list) > 0:
+            nm2 = [a['name'] for a in sev_spec_list]
+            ans2 = pd.DataFrame(sev_spec_list, index=nm2).T
+        return ans, ans2
 
     def production_run(self, portfolio_program):
         logging.info(f'Runner.production_run | Executing program\n{portfolio_program[:500]}\n\n')
@@ -666,7 +686,8 @@ class Runner(object):
         if len(portfolio_program) >= 2 and portfolio_program[1][0:2] in ('|:', '|-'):
             # looks like a pipe table
             portfolio_program = portfolio_program[2:]
-        spec_list = []
+        agg_spec_list = []
+        sev_spec_list = []
         for txt in portfolio_program:
             self.parser.reset()
             try:
@@ -682,5 +703,20 @@ class Runner(object):
                     txt2 = txt[0:i] + f'>>>' + txt[i:]
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
-            spec_list.append(self.parser.arg_dict)
-        return spec_list
+            self.parser.arg_dict['note'] = txt
+            # store creation text in note for future reference
+            if self.parser.type == 'aggregate':
+                agg_spec_list.append(self.parser.arg_dict)
+            elif self.parser.type == 'severity':
+                d = {k: v for k, v in self.parser.arg_dict.items() if k[0:3] == 'sev' or
+                     k[0:4] == 'note' or k[0:4] == 'name'}
+                sev_spec_list.append(d)
+        return agg_spec_list, sev_spec_list
+
+    @staticmethod
+    def dict_to_agg(d):
+        """
+        convert a spec dictionary d into an agg language specification
+        :param d:
+        :return:
+        """

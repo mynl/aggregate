@@ -280,6 +280,7 @@ class Aggregate(object):
         # guess bucket and update
         if bs == 0:
             bs = self.recommend_bucket(log2)
+        self.log2 = log2
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
             kwargs['approximation'] = 'slognorm'
@@ -541,9 +542,9 @@ class Aggregate(object):
             print('Cannot plot before update')
             return
 
-        if kind == 'long':
+        set_tight = (axiter is None)
 
-            set_tight = (axiter is None)
+        if kind == 'long':
             axiter = axiter_factory(axiter, 10, aspect=aspect, figsize=figsize)
 
             max_lim = min(self.xs[-1], np.max(self.limit)) * 1.05
@@ -607,15 +608,12 @@ class Aggregate(object):
             next(axiter).plot(1 / (1 - ps), qs)
             axiter.ax.set(title='Return Period', xscale='log')
 
-            if set_tight:
-                suptitle_and_tight(f'Aggregate {self.name}')
         else:  # kind == 'quick':
             if self.dh_agg_density is not None:
                 n = 4
             else:
                 n = 3
 
-            set_tight = (axiter is None)
             axiter = axiter_factory(axiter, n, figsize, aspect=aspect)
 
             F = np.cumsum(self.agg_density)
@@ -672,8 +670,10 @@ class Aggregate(object):
                 ax = next(axiter)
                 ax.plot(1 - F, 1 - dh_F, label='g(S) vs S')
                 ax.plot(1 - F, 1 - F, 'k', linewidth=.5, label=None)
-            if set_tight:
-                suptitle_and_tight(f'Aggregate {self.name}')
+
+        if set_tight:
+            axiter.tidy()
+            suptitle_and_tight(f'Aggregate {self.name}')
 
     def report(self, report_list='quick'):
         """
@@ -772,7 +772,7 @@ class Severity(ss.rv_continuous):
     """
 
     def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=0, sev_b=0,
-                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, conditional=True, note=''):
+                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, conditional=True, name='', note=''):
         """
 
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
@@ -797,7 +797,9 @@ class Severity(ss.rv_continuous):
         self.pattach = 0
         self.pdetach = 0
         self.conditional = conditional
-        self.name = sev_name
+        self.sev_name = sev_name
+        self.name = name
+        self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
 
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
@@ -896,12 +898,16 @@ class Severity(ss.rv_continuous):
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
                 f'{sev_cv} vs {acv}')
 
-        lim_name = f'{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
+        if exp_limit < np.inf or exp_attachment > 0:
+            layer_text = f'[{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
+            layer_text += f' xs {exp_attachment:,.0f}]'
+        else:
+            layer_text = ''
         try:
-            self.long_name = f'{sev_name}({self.fz.arg_dict[0]:.2f})[{lim_name} xs {exp_attachment:,.0f}]'
+            self.long_name = f'{name}: {sev_name}({self.fz.arg_dict[0]:.2f}){layer_text}'
         except:
             # 'rv_histogram' object has no attribute 'arg_dict'
-            self.long_name = f'{sev_name}[{lim_name} xs {exp_attachment:,.0f}]'
+            self.long_name = f'{name}: {sev_name}{layer_text}'
 
         assert self.fz is not None
 
@@ -916,7 +922,7 @@ class Severity(ss.rv_continuous):
         :return:
         """
 
-        gen = getattr(ss, self.name)
+        gen = getattr(ss, self.sev_name)
 
         def f(shape):
             fz0 = gen(shape)
@@ -926,7 +932,7 @@ class Severity(ss.rv_continuous):
         try:
             ans = newton(f, hint)
         except RuntimeError:
-            logging.error(f'cv_to_shape | error for {self.name}, {cv}')
+            logging.error(f'cv_to_shape | error for {self.sev_name}, {cv}')
             ans = np.inf
             return ans, None
         fz = gen(ans)
@@ -941,7 +947,7 @@ class Severity(ss.rv_continuous):
         :param mean:
         :return:
         """
-        gen = getattr(ss, self.name)
+        gen = getattr(ss, self.sev_name)
         fz = gen(shape)
         m = fz.stats('m')
         scale = mean / m
@@ -1043,7 +1049,7 @@ class Severity(ss.rv_continuous):
             ex = quad(f, self.attachment, self.detachment, limit=100, full_output=1)
             if len(ex) == 4:  # 'The integral is probably divergent, or slowly convergent.':
                 # TODO just wing it for now
-                logging.warning(f'Severity.moms | splitting {self.name} EX^{level} integral for convergence reasons')
+                logging.warning(f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                 exa = quad(f, self.attachment, median, limit=100, full_output=1)
                 exb = quad(f, median, self.detachment, limit=100, full_output=1)
                 if len(exa) == 4:
@@ -1122,4 +1128,5 @@ class Severity(ss.rv_continuous):
         ax.set(title='Lee diagram', xlim=(0, 1))
 
         if do_tight:
-            suptitle_and_tight(f'Severity {self.long_name}')
+            axiter.tidy()
+            suptitle_and_tight(self.long_name)

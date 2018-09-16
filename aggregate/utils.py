@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
 import pandas as pd
-import seaborn as sns
 from IPython.core.display import HTML, display
 import logging
 import itertools
@@ -227,7 +226,8 @@ class AxisManager(object):
         if figsize is None:
             h = self.r * height
             w = self.c * height * aspect
-            figsize = (w, h)
+            # almost all the time will sup_title which scales down by 0.96
+            figsize = (w, h / 0.96)
 
         self.f, self.axs = plt.subplots(self.r, self.c, figsize=figsize)
         if n == 1:
@@ -290,6 +290,16 @@ class AxisManager(object):
             # r, c = self.grid_size(size, subgrid=True)
             return [self.__next__() for _ in range(size)]  # range(c) for _ in range(r)]
 
+    def tidy(self):
+        """
+        delete unused axes to tidy up a plot
+
+        :return:
+        """
+        if self.it is not None:
+            for ax in self.it:
+                self.f.delaxes(ax)
+
 
 def lognorm_lev(mu, sigma, n, limit):
     """
@@ -339,16 +349,15 @@ def sensible_jump(n, desired_rows=20):
     return round(j, -len(str(j)) + 1)
 
 
-def suptitle_and_tight(title, fontsize=14, **kwargs):
+def suptitle_and_tight(title, **kwargs):
     """
     deal with tight layout when there is a suptitle
 
     :param title:
-    :param fontsize:
     :return:
     """
-    plt.suptitle(title, fontsize=fontsize, **kwargs)
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.suptitle(title, **kwargs)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
 
 
 # general nonsense
@@ -361,7 +370,8 @@ def insurability_triangle():
     f, axs = plt.subplots(1, 3, figsize=(12, 4))
     it = iter(axs.flatten())
     λs = [1.5, 2, 3, 5, 10, 25, 50, 100]
-    sns.set_palette(sns.cubehelix_palette(len(λs)))
+    # up to user to manage colors
+    # sns.set_palette(sns.cubehelix_palette(len(λs)))
 
     LR = np.linspace(0, 1, 101)
     plt.sca(next(it))

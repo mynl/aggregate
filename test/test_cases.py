@@ -9,10 +9,9 @@ E.g. to run from Jupyter enter
 
 import sys
 
-sys.path.append('..')
+sys.path.insert(0,'/s/telos/python/aggregate_project/')
 
 from aggregate import Aggregate, Severity, Portfolio, Underwriter
-# from aggregate_project.underwriter import *
 import numpy as np
 import unittest
 
@@ -27,27 +26,35 @@ class TestUnderwriter(unittest.TestCase):
     def setUp(self):
         self.uw = Underwriter()
 
-    def test_curve_object(self):
-        c1 = self.uw.liaba
-        c1['sev_mean'] = 100
-        cc = c1.write()
-        self.assertTrue(np.allclose(cc.stats(), (100, 10000)))
+    def test_severity(self):
+        cc = self.uw.liaba
+        self.assertTrue(np.allclose(cc.stats(), (50, 2500)))
 
-    def test_book_object(self):
-        c = self.uw['Three Line Example']
-        cc = c.write(True)
-        self.assertTrue(np.allclose(cc.audit_df.Mean, [ 969.456474, 1000.000000, 3076.451887, 5045.908361 ]))
-        self.assertTrue(((cc.audit_df.EmpMean - cc.audit_df.Mean)**2).sum() < 1e-3)
+    def test_portfolio(self):
+        p = self.uw.Three_Line_Example
+        p.update(13, 1.25)
+        self.assertTrue(np.all(p.audit_df.loc['total', ['MeanErr', 'CVErr']].abs() < 1e-5))
 
-    def test_portfolio_creation_update_uat_from_book(self):
-        book = self.uw['Three Line Example']
-        port = book.write(True)
-        self.assertTrue(port.audit_df.MeanErr.abs().sum() < 1e-5)
-        self.assertTrue(port.audit_df.CVErr.abs().sum() < 5e-5)
-
-        a, p, test, params, dd, table, stacked = port.uat()
+        self.assertTrue(p.audit_df.MeanErr.abs().sum() < 1.5e-5)
+        self.assertTrue(p.audit_df.CVErr.abs().sum() < 5e-5)
+        a, p, test, params, dd, table, stacked = p.uat()
         self.assertTrue(a['lr err'].abs().sum() < 1e-8)
         self.assertTrue(np.all(test.filter(regex='err[_s]', axis=1).abs().sum() < 1e-8))
+
+    def test_parser(self):
+        portfolio_program = """
+        | name        | expos                 | limit                    | sev                                               | freq              |
+        |:------------|:----------------------|:-------------------------|:--------------------------------------------------|:------------------|
+        | big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | on lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
+        | A1a         | 500 premium at 0.5    |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A1b         | 500 premium at 0.5 lr |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A2          | 50  claims            | 30 xs 10                 | on gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A3          | 50  claims            |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
+        | hcmp        | 1e-8 * uw.cmp         |                          |                                                   |                   |
+        """
+        p = self.uw.write(portfolio_program, 'test_portfolio', update=True, verbose=False, log2=12, remove_fuzz=True)
+        self.assertTrue(np.all(p.audit_df.iloc[:-1, :].CVErr.abs() < 0.005))
+        self.assertTrue(np.all(p.audit_df.iloc[:-1, :].MeanErr.abs() < 0.002))
 
 
 class TestAggregateModule(unittest.TestCase):
@@ -79,13 +86,13 @@ class TestAggregateModule(unittest.TestCase):
                         fixed.statistics_total_df['sev_cv'].sum()== 2.1213203435596428)
 
     def test_Severity(self):
-        fixed = Severity('dhistogram', hxs=[0, 1, 2, 3, 4], hps=[.2, .3, .4, .05, .05])
+        fixed = Severity('dhistogram', sev_xs=[0, 1, 2, 3, 4], sev_ps=[.2, .3, .4, .05, .05])
         self.assertTrue(fixed.moms() == (1.45, 3.1500000000000004, 8.0500000000000007))
 
-        fixed = Severity('chistogram', hxs=[0, 1, 2, 3, 4], hps=[.1, .2, .3, 0, .4])
+        fixed = Severity('chistogram', sev_xs=[0, 1, 2, 3, 4], sev_ps=[.1, .2, .3, 0, .4])
         self.assertTrue(fixed.moms() == (2.9000000000000004, 10.449999999999999, 41.825000000000003))
 
-        fixed = Severity('fixed', hxs=2)
+        fixed = Severity('fixed', sev_xs=2)
         self.assertTrue(fixed.moms() == (2, 4, 8))
 
     def test_big_example(self):
@@ -111,6 +118,7 @@ class TestAggregateModule(unittest.TestCase):
         port.update(10, 50)
         # overall mean error is less than 0.001
         self.assertTrue( port.audit_df['MeanErr'].abs().sum() < 0.001)
+
 
 if __name__ == '__main__':
     unittest.main()

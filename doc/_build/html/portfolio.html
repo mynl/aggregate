@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Distortion Class" href="distortion.html" />
-    <link rel="prev" title="distr Module" href="aggregate.html" />
+    <link rel="prev" title="Distribution Classes" href="aggregate.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -137,13 +137,25 @@ you can use it either way…more convenient
 <dt id="aggregate.port.Portfolio.calibrate_distortions">
 <code class="descname">calibrate_distortions</code><span class="sig-paren">(</span><em>LRs=None</em>, <em>ROEs=None</em>, <em>As=None</em>, <em>Ps=None</em>, <em>r0=0.03</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.calibrate_distortions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.calibrate_distortions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calibrate assets a to loss ratios LRs and asset levels As (iterables)
-ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
-:param LRs:  LR or ROEs given
-:param ROEs: ROEs override LRs
-:param As:  Assets or probs given
-:param Ps: probability levels for quantiles
-:param r0: for distortions that have a min ROL
-:return:</p>
+ro for LY, it ro/(1+ro) corresponds to a minimum rate on line</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>LRs</strong> – LR or ROEs given</li>
+<li><strong>ROEs</strong> – ROEs override LRs</li>
+<li><strong>As</strong> – Assets or probs given</li>
+<li><strong>Ps</strong> – probability levels for quantiles</li>
+<li><strong>r0</strong> – for distortions that have a min ROL</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
@@ -287,7 +299,7 @@ uses interpolation, audit_df uses nearest</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>kind</em>, <em>line='all'</em>, <em>p=0.99</em>, <em>c=0</em>, <em>a=0</em>, <em>axiter=None</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.plot" title="Permalink to this definition">¶</a></dt>
+<code class="descname">plot</code><span class="sig-paren">(</span><em>kind='density'</em>, <em>line='all'</em>, <em>p=0.99</em>, <em>c=0</em>, <em>a=0</em>, <em>axiter=None</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.plot" title="Permalink to this definition">¶</a></dt>
 <dd><p>kind = density
 simple plotting of line density or not line density
 input single line or list of lines
@@ -611,8 +623,9 @@ If A=0 A=q(p) is used</p>
 <li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">distr Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Distribution Classes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Portfolio Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>

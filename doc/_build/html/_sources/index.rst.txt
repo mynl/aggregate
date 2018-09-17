@@ -20,7 +20,8 @@ Table of Contents
    intro
    histapp
    tutorial
-   prob
+   probrst
+   prob.md
    devel
    aggregate
    portfolio

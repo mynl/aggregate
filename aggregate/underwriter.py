@@ -19,29 +19,44 @@ import pandas as pd
 from .port import Portfolio
 from .utils import html_title
 from .distr import Aggregate, Severity
-from .parser import Runner  # UnderwritingLexer, UnderwritingParser
+from .parser import UnderwritingLexer, UnderwritingParser
 
 
-class _DataManager(object):
+class Underwriter(object):
     """
-    _DataManager class
-    --------------
+    Underwriter class
+    -----------------
 
-    Private class handling reading and writing to YAML files for Underwriter class, which
-    subclasses _YAML_reader
+    The underwriter class constructs real world examples from stored and user input Lines and Accounts.
+    Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.
 
+    Handles persistence
+    Is interface into program parser
+    Handles safe lookup from database for parser
+
+    Persisitence to and from YAML managed
 
     """
 
-    def __init__(self, databases, dir_name):
+    def __init__(self, dir_name="", databases=None, store_mode=True, debug=False):
         """
 
-        :param databases: dictionary of databases to load
-        :param dir_name:  directory to search for database files
+        :param dir_name:
+        :param store_mode: add newly created aggregates to the database?
+        :param debug: run parser in debug mode?
         """
+
+        self.last_spec = None
+        self.store_mode = store_mode
+        self.debug = debug
+        self.lexer = UnderwritingLexer()
+        self.parser = UnderwritingParser(self._safe_lookup, debug)
+
+        if databases is None:
+            databases = dict(severity=['severities.yaml'], aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
+                             portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
         self.databases = databases
         self.dir_name = dir_name
-
         if self.dir_name == '':
             self.dir_name = os.path.split(__file__)[0]
             self.dir_name = os.path.join(self.dir_name, 'yaml')
@@ -49,13 +64,41 @@ class _DataManager(object):
             d = dict()
             for fn in v:
                 with open(os.path.join(self.dir_name, fn), 'r') as f:
-                    # ?
-                    # d = dict(**d, **yaml.load(f, Loader=yaml.Loader))
-                    # better ?!
                     temp = yaml.load(f, Loader=yaml.Loader)
                     for kt, vt in temp.items():
                         d[kt] = vt
             self.__setattr__(k, d)
+
+    def __getitem__(self, item):
+        """
+        handles self[item]
+        subscriptable: try user portfolios, b/in portfolios, line, severity
+        to access specifically use severity or line methods
+
+        ORDERING PROBLEM!
+
+        :param item:
+        :return:
+        """
+
+        for k in self.databases.keys():
+            if item in self.__getattribute__(k).keys():
+                # stip the s off the name: Books to Book etc.
+                return k, self.__getattribute__(k)[item]
+        raise LookupError
+
+    def __getattr__(self, item):
+        """
+        handles self.item and returns an appropriate object
+
+        :param item:
+        :return:
+        """
+        print(f'Underwriter.__getattr__({item}) called')
+        return self.write(item)
+
+    def __call__(self, portfolio_program):
+        return self.write(portfolio_program)
 
     def list(self):
         """
@@ -105,85 +148,6 @@ class _DataManager(object):
                 display(egs.style)
         return df
 
-    def __getitem__(self, item):
-        """
-        scriptable: try user portfolios, b/in portfolios, line, severity
-        to access specifically use severity or line methods
-
-        ORDERING PROBLEM!
-
-        :param item:
-        :return:
-        """
-
-        for k in self.databases.keys():
-            if item in self.__getattribute__(k).keys():
-                # stip the s off the name: Books to Book etc.
-                return k, self.__getattribute__(k)[item]
-        raise LookupError
-
-
-class Underwriter(_DataManager):
-    """
-    Underwriter class
-    -----------------
-
-    The underwriter class constructs real world examples from stored and user input Lines and Accounts.
-    Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.
-
-    Persisitence to and from YAML managed
-
-    """
-
-    def __init__(self, dir_name="", databases=None, store_mode=True, debug=False):
-        """
-
-        :param dir_name:
-        :param store_mode: add newly created aggregates to the database?
-        :param debug: run parser in debug mode?
-        """
-        self.last_spec = None
-        self.store_mode = store_mode
-        self.runner = Runner(self, debug=debug)
-
-        if databases is None:
-            databases = dict(severity=['severities.yaml'], aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
-                             portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
-        _DataManager.__init__(self, databases, dir_name)
-
-    def __getitem__(self, item):
-        """
-        handles self[item]
-        the result is just a dictionary
-        this method is used by the Parser etc.
-
-        :param item:
-        :return: Book, Account or Line object
-        """
-        return _DataManager.__getitem__(self, item)
-
-    def __getattr__(self, item):
-        """
-        handles self.item and returns an appropriate object
-
-        :param item:
-        :return:
-        """
-        return self.write(item)  # _DataManager.__getitem__(self, item)
-
-    # def get_dict(self, item):
-    #     """
-    #     get an item as dictionary, WITHOUT the type
-    #
-    #     :param item:
-    #     :return:
-    #     """
-    #     _type, obj = _DataManager.__getitem__(self, item)
-    #     return obj
-
-    def __call__(self, portfolio_program):
-        return self.write(portfolio_program)
-
     def write(self, portfolio_program, portfolio_name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
@@ -207,8 +171,10 @@ class Underwriter(_DataManager):
 
         # first see if it is a built in object
         lookup_success = True
+        _type = ''
+        obj = None
         try:
-            _type, obj = _DataManager.__getitem__(self, portfolio_program)
+            _type, obj = self.__getitem__(portfolio_program)
         except LookupError:
             lookup_success = False
             logging.info(f'underwriter.write | object {portfolio_program} not found, will process as program')
@@ -223,7 +189,8 @@ class Underwriter(_DataManager):
                 ValueError(f'Cannot build {_type} objects')
             return obj
 
-        agg_spec_list, sev_spec_list = self.runner.production_run(portfolio_program)
+        logging.info(f'Underwriter._runner | Executing program\n{portfolio_program[:500]}\n\n')
+        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
         # make up a name if none given
         if portfolio_name == '':
             portfolio_name = f'user_{len(agg_spec_list)}'
@@ -267,15 +234,6 @@ class Underwriter(_DataManager):
             logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output...')
             return None
 
-    def test_write(self, portfolio_program):
-        """
-        parse program in debug mode
-
-        :param portfolio_program:
-        :return:
-        """
-        return self.runner.test_run(portfolio_program)
-
     def write_from_file(self, file_name, portfolio_name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         read program from file. delegates to write
@@ -292,6 +250,110 @@ class Underwriter(_DataManager):
         with open(file_name, 'r', encoding='utf-8') as f:
             portfolio_program = f.read()
         return self.write(portfolio_program, portfolio_name, update, verbose, log2, bs, **kwargs)
+
+    def write_test(self, portfolio_program):
+        """
+        replaced     def test_write(self, portfolio_program):
+        fka test_run
+
+        :param portfolio_program:
+        :return:
+        """
+        logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
+        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
+        ans = ans2 = None
+        if len(agg_spec_list) > 0:
+            nm = [a['name'] for a in agg_spec_list]
+            ans = pd.DataFrame(agg_spec_list, index=nm).T
+            ans = ans.iloc[[1, 2, 5, 4, 3, 0, 15, 10, 11, 14, 12, 13, 16, 17, 8, 6, 7], :]
+        if len(sev_spec_list) > 0:
+            nm2 = [a['name'] for a in sev_spec_list]
+            ans2 = pd.DataFrame(sev_spec_list, index=nm2).T
+        return ans, ans2
+
+    def _runner(self, portfolio_program):
+        """
+        preprocessing:
+            ; mapped to newline
+            \ (line continuation) mapped to space
+            split on newlines
+            parse one line at a time
+            if the second line started |-, |:- both it and the first line are ignored
+            ==> a pipe table can be used as input
+        :param portfolio_program:
+        :return:
+        """
+        # preprocess
+        portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
+                             replace(';', '\n').split('\n') if len(i.strip()) > 0]
+        # check if program in pipe table format
+        if len(portfolio_program) >= 2 and portfolio_program[1][0:2] in ('|:', '|-'):
+            # looks like a pipe table
+            portfolio_program = portfolio_program[2:]
+        agg_spec_list = []
+        sev_spec_list = []
+        for txt in portfolio_program:
+            self.parser.reset()
+            try:
+                # parse the block
+                self.parser.parse(self.lexer.tokenize(txt))
+            except ValueError as e:
+                if isinstance(e.args[0], str):
+                    print(e)
+                    raise e
+                else:
+                    t = e.args[0].type
+                    v = e.args[0].value
+                    i = e.args[0].index
+                    txt2 = txt[0:i] + f'>>>' + txt[i:]
+                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    raise e
+            self.parser.arg_dict['note'] = txt
+            # store creation text in note for future reference
+            if self.parser.type == 'aggregate':
+                agg_spec_list.append(self.parser.arg_dict)
+            elif self.parser.type == 'severity':
+                d = {k: v for k, v in self.parser.arg_dict.items() if k[0:3] == 'sev' or
+                     k[0:4] == 'note' or k[0:4] == 'name'}
+                sev_spec_list.append(d)
+        return agg_spec_list, sev_spec_list
+
+    def _safe_lookup(self, uw_id, expected_type):
+        """
+        lookup uw_id in uw of expected type and merge safely into self.arg_dict
+        delete name and note if appropriate
+
+        :param uw_id:
+        :param expected_type:
+        :return:
+        """
+        _type = 'not found'
+        builtin_dict = None
+        try:
+            # strip the uw. off here
+            _type, builtin_dict = self[uw_id[3:]]
+        except LookupError as e:
+            print(f'ERROR Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
+            raise e
+        logging.info(f'Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
+        assert _type != 'portfolio'  # this is a problem
+        logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} type {type(builtin_dict)}')
+        if _type != expected_type:
+            print(f'WARNING: type of {uw_id} is  {_type}, not expected {expected_type}')
+        assert _type == expected_type
+        # may need to delete various items
+        # if 'note' in builtin_dict:
+        #     del builtin_dict['note']
+        return builtin_dict
+
+    @staticmethod
+    def dict_to_agg(d):
+        """
+        convert a spec dictionary d into an agg language specification
+        :param d:
+        :return:
+        """
+        pass
 
 
 def dict_2_string(type_name, dict_in, tab_level=0, sio=None):

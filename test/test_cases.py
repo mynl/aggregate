@@ -45,11 +45,11 @@ class TestUnderwriter(unittest.TestCase):
         portfolio_program = """
         | name        | expos                 | limit                    | sev                                               | freq              |
         |:------------|:----------------------|:-------------------------|:--------------------------------------------------|:------------------|
-        | big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | on lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
-        | A1a         | 500 premium at 0.5    |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A1b         | 500 premium at 0.5 lr |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A2          | 50  claims            | 30 xs 10                 | on gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A3          | 50  claims            |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
+        | big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | sev lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
+        | A1a         | 500 premium at 0.5    |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A1b         | 500 premium at 0.5 lr |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A2          | 50  claims            | 30 xs 10                 | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+        | A3          | 50  claims            |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
         | hcmp        | 1e-8 * uw.cmp         |                          |                                                   |                   |
         """
         p = self.uw.write(portfolio_program, 'test_portfolio', update=True, verbose=False, log2=12, remove_fuzz=True)

@@ -242,7 +242,7 @@ import numpy as np
 
 class UnderwritingLexer(Lexer):
     tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, ON, SEV}
+              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, SEV}
     ignore = ' \t,\\:\\(\\)|'
     literals = {'[', ']'}
 
@@ -257,10 +257,11 @@ class UnderwritingLexer(Lexer):
     ID['premium'] = PREMIUM
     ID['prem'] = PREMIUM
     ID['lr'] = LR
-    ID['on'] = ON
+    # ID['on'] = ON
     ID['claims'] = CLAIMS
     ID['claim'] = CLAIMS
     ID['xs'] = XS
+    ID['x'] = XS
     ID['wts'] = WEIGHTS
     ID['xps'] = XPS
     ID['mixed'] = MIXED
@@ -291,12 +292,12 @@ class UnderwritingParser(Parser):
     tokens = UnderwritingLexer.tokens
     precedence = (('left', PLUS, MINUS), ('left', TIMES))
 
-    def __init__(self, uw, debug=False):
+    def __init__(self, safe_lookup_function, debug=False):
         self.arg_dict = None
         self.reset()
         self.type = ''
         # instance of uw class to look up severities
-        self.uw = uw
+        self._safe_lookup = safe_lookup_function
         if debug:
             def _print(s):
                 print(s)
@@ -325,17 +326,17 @@ class UnderwritingParser(Parser):
         pass
 
     # standard spec expos [layers] sevs [freq]
-    @_('name exposures layers sev_term freq')
+    @_('name exposures layers SEV sev freq')
     def ans(self, p):
-        self.p(f'exiting through nelsf...')
+        self.p(f'exiting through name exposures layers SEV sev freq')
         self.type = 'aggregate'
-        logging.info('UnderwritingParser | Exiting through name exposures limit sev_term')
+        logging.info('UnderwritingParser | Exiting through name exposures limit SEV sev freq')
         pass
 
     # allow just to load a severity...
     @_('SEV name sev')
     def ans(self, p):
-        self.p('Exiting through sev')
+        self.p('Exiting through SEV name sev')
         self.type = 'severity'
         logging.info('UnderwritingParser | Exiting through sev')
         pass
@@ -370,10 +371,10 @@ class UnderwritingParser(Parser):
         return True
 
     # severity term ============================================
-    @_("ON sev")
-    def sev_term(self, p):
-        self.p(f'resolving ON sev to sev_term')
-        return True
+    # @_("ON sev")
+    # def sev_term(self, p):
+    #     self.p(f'resolving ON sev to sev_term')
+    #     return True
 
     @_('sev PLUS numbers')
     def sev(self, p):
@@ -443,7 +444,8 @@ class UnderwritingParser(Parser):
         self.p(f'builtinds to sevs {p.builtinids}')
         # look up ID in uw
         for n in p.builtinids:
-            self._safe_lookup(n, 'severity')
+            built_in_dict = self._safe_lookup(n, 'severity')
+            self.arg_dict.update(built_in_dict)
 
     # layer terms, optoinal ===================================
     @_('numbers XS numbers')
@@ -565,7 +567,8 @@ class UnderwritingParser(Parser):
     def builtin_aggregate(self, p):
         """  inhomogeneous change of scale """
         self.p(f'Lookup BUILTINID {p.BUILTINID} TIMES NUMBER {p.NUMBER}')
-        self._safe_lookup(p.BUILTINID, 'aggregate')
+        built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
+        self.arg_dict.update(built_in_dict)
         self.arg_dict['exp_en'] *= p.NUMBER
         self.arg_dict['exp_el'] *= p.NUMBER
         self.arg_dict['exp_premium'] *= p.NUMBER
@@ -579,7 +582,8 @@ class UnderwritingParser(Parser):
         :return:
         """
         self.p(f'NUMBER {p.NUMBER} TIMES Lookup BUILTINID {p.BUILTINID}')
-        self._safe_lookup(p.BUILTINID, 'aggregate')
+        built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
+        self.arg_dict.update(built_in_dict)
         self.arg_dict['sev_mean'] *= p.NUMBER
         self.arg_dict['sev_scale'] *= p.NUMBER
         self.arg_dict['sev_loc'] *= p.NUMBER
@@ -591,18 +595,13 @@ class UnderwritingParser(Parser):
     @_('BUILTINID')
     def builtin_aggregate(self, p):
         self.p(f'Lookup BUILTINID {p.BUILTINID}')
-        self._safe_lookup(p.BUILTINID, 'aggregate')
+        built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
+        self.arg_dict.update(built_in_dict)
 
     @_('ID')
     def name(self, p):
         self.p(f'ID resolves to name {p.ID}')
         self.arg_dict['name'] = p.ID
-
-    # utilities ===============================================
-    # @_('')
-    # def empty(self, p):
-    #     # self.p('empty resolving to empty')
-    #     pass
 
     def error(self, p):
         if p:
@@ -610,113 +609,4 @@ class UnderwritingParser(Parser):
         else:
             raise ValueError('Unexpected end of file')
 
-    def _safe_lookup(self, uw_id, expected_type):
-        """
-        lookup uw_id in uw of expected type and merge safely into self.arg_dict
-        delete name and note if appropriate
 
-        :param uw_id:
-        :param expected_type:
-        :return:
-        """
-        _type = 'not found'
-        builtin_dict = None
-        try:
-            # strip the uw. off here
-            _type, builtin_dict = self.uw[uw_id[3:]]
-        except LookupError as e:
-            print(f'ERROR Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
-            raise e
-        logging.info(f'Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
-        assert _type != 'portfolio'  # this is a problem
-        logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} type {type(builtin_dict)}')
-        if _type != expected_type:
-            print(f'WARNING: type of {uw_id} is  {_type}, not expected {expected_type}')
-        assert _type == expected_type
-        # may need to delete various items
-        if 'note' in builtin_dict:
-            del builtin_dict['note']
-        self.arg_dict.update(builtin_dict)
-
-
-class Runner(object):
-
-    def __init__(self, uw, debug=False):
-        self.uw = uw
-        self.debug = debug
-        self.lexer = UnderwritingLexer()
-        self.parser = UnderwritingParser(uw, self.debug)
-
-    def parse_lex(self, txt):
-        return self.parser.parse(self.lexer.tokenize(txt))
-
-    def test_run(self, portfolio_program):
-        logging.info(f'Runner.test_run| Executing program\n{portfolio_program[:500]}\n\n')
-        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
-        ans = ans2 = None
-        if len(agg_spec_list) > 0:
-            nm = [a['name'] for a in agg_spec_list]
-            ans = pd.DataFrame(agg_spec_list, index=nm).T
-            ans = ans.iloc[[1, 2, 5, 4, 3, 0, 15, 10, 11, 14, 12, 13, 16, 17, 8, 6, 7], :]
-        if len(sev_spec_list) > 0:
-            nm2 = [a['name'] for a in sev_spec_list]
-            ans2 = pd.DataFrame(sev_spec_list, index=nm2).T
-        return ans, ans2
-
-    def production_run(self, portfolio_program):
-        logging.info(f'Runner.production_run | Executing program\n{portfolio_program[:500]}\n\n')
-        return self._runner(portfolio_program)
-
-    def _runner(self, portfolio_program):
-        """
-        preprocessing:
-            ; mapped to newline
-            \ (line continuation) mapped to space
-            split on newlines
-            parse one line at a time
-            if the second line started |-, |:- both it and the first line are ignored
-            ==> a pipe table can be used as input
-        :param portfolio_program:
-        :return:
-        """
-        # preprocess
-        portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
-            replace(';', '\n').split('\n') if len(i.strip()) > 0]
-        # check if program in pipe table format
-        if len(portfolio_program) >= 2 and portfolio_program[1][0:2] in ('|:', '|-'):
-            # looks like a pipe table
-            portfolio_program = portfolio_program[2:]
-        agg_spec_list = []
-        sev_spec_list = []
-        for txt in portfolio_program:
-            self.parser.reset()
-            try:
-                self.parse_lex(txt)
-            except ValueError as e:
-                if isinstance(e.args[0], str):
-                    print(e)
-                    raise e
-                else:
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    i = e.args[0].index
-                    txt2 = txt[0:i] + f'>>>' + txt[i:]
-                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
-                    raise e
-            self.parser.arg_dict['note'] = txt
-            # store creation text in note for future reference
-            if self.parser.type == 'aggregate':
-                agg_spec_list.append(self.parser.arg_dict)
-            elif self.parser.type == 'severity':
-                d = {k: v for k, v in self.parser.arg_dict.items() if k[0:3] == 'sev' or
-                     k[0:4] == 'note' or k[0:4] == 'name'}
-                sev_spec_list.append(d)
-        return agg_spec_list, sev_spec_list
-
-    @staticmethod
-    def dict_to_agg(d):
-        """
-        convert a spec dictionary d into an agg language specification
-        :param d:
-        :return:
-        """

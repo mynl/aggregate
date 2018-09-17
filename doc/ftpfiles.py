@@ -7,7 +7,7 @@ host = 'www.mynl.com'
 ftp.connect(host)
 ftp.getwelcome()
 
-ftp.login(user='mynl0com',passwd ='gaT,691')
+ftp.login(user='mynl0com',passwd =)
 
 ftp.retrlines('LIST')
 # https://www.atlantic.net/cloud-hosting/how-to-ftp-uploads-python/

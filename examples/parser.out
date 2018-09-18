@@ -1,892 +1,1134 @@
 Grammar:
 
-Rule 0     S' -> ans
-Rule 1     ans -> SEV name sev
-Rule 2     ans -> name exposures layers SEV sev freq
-Rule 3     ans -> name builtin_aggregate
-Rule 4     freq -> <empty>
-Rule 5     freq -> POISSON
-Rule 6     freq -> FIXED
-Rule 7     freq -> MIXED ids numbers
-Rule 8     freq -> MIXED ids numbers numbers
-Rule 9     sev -> builtinids
-Rule 10    sev -> ids numbers numbers weights xps
-Rule 11    sev -> ids numbers weights
-Rule 12    sev -> ids numbers CV numbers weights
-Rule 13    sev -> numbers TIMES sev  [precedence=left, level=2]
-Rule 14    sev -> sev MINUS numbers  [precedence=left, level=1]
-Rule 15    sev -> sev PLUS numbers  [precedence=left, level=1]
-Rule 16    xps -> <empty>
-Rule 17    xps -> XPS numbers numbers
-Rule 18    weights -> <empty>
-Rule 19    weights -> WEIGHTS numbers
-Rule 20    layers -> <empty>
-Rule 21    layers -> numbers XS numbers
-Rule 22    exposures -> numbers PREMIUM AT numbers
-Rule 23    exposures -> numbers PREMIUM AT numbers LR
-Rule 24    exposures -> numbers LOSS
-Rule 25    exposures -> numbers CLAIMS
-Rule 26    builtinids -> BUILTINID
-Rule 27    builtinids -> [ builtinidl ]
-Rule 28    builtinidl -> BUILTINID
-Rule 29    builtinidl -> builtinidl BUILTINID
-Rule 30    ids -> ID
-Rule 31    ids -> [ idl ]
-Rule 32    idl -> ID
-Rule 33    idl -> idl ID
-Rule 34    numbers -> NUMBER
-Rule 35    numbers -> [ numberl ]
-Rule 36    numberl -> NUMBER
-Rule 37    numberl -> numberl NUMBER
-Rule 38    builtin_aggregate -> BUILTINID
-Rule 39    builtin_aggregate -> NUMBER TIMES BUILTINID
-Rule 40    builtin_aggregate -> BUILTINID TIMES NUMBER
-Rule 41    name -> ID
+Rule 0     S' -> answer
+Rule 1     answer -> port_out
+Rule 2     answer -> agg_out
+Rule 3     answer -> sev_out
+Rule 4     port_out -> port_name agg_list
+Rule 5     agg_list -> agg_out
+Rule 6     agg_list -> agg_list agg_out
+Rule 7     agg_out -> agg_name exposures layers SEV sev freq
+Rule 8     agg_out -> agg_name builtin_aggregate
+Rule 9     sev_out -> sev_name sev
+Rule 10    sev_out -> sev_out sev_name sev
+Rule 11    freq -> <empty>
+Rule 12    freq -> POISSON
+Rule 13    freq -> FIXED
+Rule 14    freq -> MIXED ids numbers
+Rule 15    freq -> MIXED ids numbers numbers
+Rule 16    sev -> builtinids
+Rule 17    sev -> ids numbers numbers weights xps
+Rule 18    sev -> ids numbers weights
+Rule 19    sev -> ids numbers CV numbers weights
+Rule 20    sev -> numbers TIMES sev  [precedence=left, level=2]
+Rule 21    sev -> sev MINUS numbers  [precedence=left, level=1]
+Rule 22    sev -> sev PLUS numbers  [precedence=left, level=1]
+Rule 23    xps -> <empty>
+Rule 24    xps -> XPS numbers numbers
+Rule 25    weights -> <empty>
+Rule 26    weights -> WEIGHTS numbers
+Rule 27    layers -> <empty>
+Rule 28    layers -> numbers XS numbers
+Rule 29    exposures -> numbers PREMIUM AT numbers
+Rule 30    exposures -> numbers PREMIUM AT numbers LR
+Rule 31    exposures -> numbers LOSS
+Rule 32    exposures -> numbers CLAIMS
+Rule 33    builtinids -> BUILTINID
+Rule 34    builtinids -> [ builtinidl ]
+Rule 35    builtinidl -> BUILTINID
+Rule 36    builtinidl -> builtinidl BUILTINID
+Rule 37    ids -> ID
+Rule 38    ids -> [ idl ]
+Rule 39    idl -> ID
+Rule 40    idl -> idl ID
+Rule 41    numbers -> NUMBER
+Rule 42    numbers -> [ numberl ]
+Rule 43    numberl -> NUMBER
+Rule 44    numberl -> numberl NUMBER
+Rule 45    builtin_aggregate -> BUILTINID
+Rule 46    builtin_aggregate -> NUMBER TIMES BUILTINID
+Rule 47    builtin_aggregate -> BUILTINID TIMES NUMBER
+Rule 48    sev_name -> SEV ID
+Rule 49    agg_name -> ID
+Rule 50    agg_name -> AGG ID
+Rule 51    port_name -> PORT ID
 
 Terminals, with rules where they appear:
 
-AT                   : 22 23
-BUILTINID            : 26 28 29 38 39 40
-CLAIMS               : 25
-CV                   : 12
-FIXED                : 6
-ID                   : 30 32 33 41
-LOSS                 : 24
-LR                   : 23
-MINUS                : 14
-MIXED                : 7 8
-NUMBER               : 34 36 37 39 40
-PLUS                 : 15
-POISSON              : 5
-PREMIUM              : 22 23
-SEV                  : 1 2
-TIMES                : 13 39 40
-WEIGHTS              : 19
-XPS                  : 17
-XS                   : 21
-[                    : 27 31 35
-]                    : 27 31 35
+AGG                  : 50
+AT                   : 29 30
+BUILTINID            : 33 35 36 45 46 47
+CLAIMS               : 32
+CV                   : 19
+FIXED                : 13
+ID                   : 37 39 40 48 49 50 51
+LOSS                 : 31
+LR                   : 30
+MINUS                : 21
+MIXED                : 14 15
+NUMBER               : 41 43 44 46 47
+PLUS                 : 22
+POISSON              : 12
+PORT                 : 51
+PREMIUM              : 29 30
+SEV                  : 7 48
+TIMES                : 20 46 47
+WEIGHTS              : 26
+XPS                  : 24
+XS                   : 28
+[                    : 34 38 42
+]                    : 34 38 42
 error                : 
 
 Nonterminals, with rules where they appear:
 
-ans                  : 0
-builtin_aggregate    : 3
-builtinidl           : 27 29
-builtinids           : 9
-exposures            : 2
-freq                 : 2
-idl                  : 31 33
-ids                  : 7 8 10 11 12
-layers               : 2
-name                 : 1 2 3
-numberl              : 35 37
-numbers              : 7 8 8 10 10 11 12 12 13 14 15 17 17 19 21 21 22 22 23 23 24 25
-sev                  : 1 2 13 14 15
-weights              : 10 11 12
-xps                  : 10
+agg_list             : 4 6
+agg_name             : 7 8
+agg_out              : 2 5 6
+answer               : 0
+builtin_aggregate    : 8
+builtinidl           : 34 36
+builtinids           : 16
+exposures            : 7
+freq                 : 7
+idl                  : 38 40
+ids                  : 14 15 17 18 19
+layers               : 7
+numberl              : 42 44
+numbers              : 14 15 15 17 17 18 19 19 20 21 22 24 24 26 28 28 29 29 30 30 31 32
+port_name            : 4
+port_out             : 1
+sev                  : 7 9 10 20 21 22
+sev_name             : 9 10
+sev_out              : 3 10
+weights              : 17 18 19
+xps                  : 17
 
 
 state 0
 
-    (0) S' -> . ans
-    (1) ans -> . SEV name sev
-    (2) ans -> . name exposures layers SEV sev freq
-    (3) ans -> . name builtin_aggregate
-    (41) name -> . ID
-    SEV             shift and go to state 2
-    ID              shift and go to state 4
+    (0) S' -> . answer
+    (1) answer -> . port_out
+    (2) answer -> . agg_out
+    (3) answer -> . sev_out
+    (4) port_out -> . port_name agg_list
+    (7) agg_out -> . agg_name exposures layers SEV sev freq
+    (8) agg_out -> . agg_name builtin_aggregate
+    (9) sev_out -> . sev_name sev
+    (10) sev_out -> . sev_out sev_name sev
+    (51) port_name -> . PORT ID
+    (49) agg_name -> . ID
+    (50) agg_name -> . AGG ID
+    (48) sev_name -> . SEV ID
+    PORT            shift and go to state 9
+    ID              shift and go to state 10
+    AGG             shift and go to state 11
+    SEV             shift and go to state 7
 
-    ans                            shift and go to state 1
-    name                           shift and go to state 3
+    answer                         shift and go to state 1
+    port_out                       shift and go to state 2
+    agg_out                        shift and go to state 3
+    sev_out                        shift and go to state 4
+    port_name                      shift and go to state 5
+    agg_name                       shift and go to state 6
+    sev_name                       shift and go to state 8
 
 state 1
 
-    (0) S' -> ans .
+    (0) S' -> answer .
 
 
 state 2
 
-    (1) ans -> SEV . name sev
-    (41) name -> . ID
-    ID              shift and go to state 4
+    (1) answer -> port_out .
+    $end            reduce using rule 1 (answer -> port_out .)
 
-    name                           shift and go to state 5
 
 state 3
 
-    (2) ans -> name . exposures layers SEV sev freq
-    (3) ans -> name . builtin_aggregate
-    (22) exposures -> . numbers PREMIUM AT numbers
-    (23) exposures -> . numbers PREMIUM AT numbers LR
-    (24) exposures -> . numbers LOSS
-    (25) exposures -> . numbers CLAIMS
-    (38) builtin_aggregate -> . BUILTINID
-    (39) builtin_aggregate -> . NUMBER TIMES BUILTINID
-    (40) builtin_aggregate -> . BUILTINID TIMES NUMBER
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    BUILTINID       shift and go to state 9
-    NUMBER          shift and go to state 10
-    [               shift and go to state 11
+    (2) answer -> agg_out .
+    $end            reduce using rule 2 (answer -> agg_out .)
 
-    exposures                      shift and go to state 6
-    builtin_aggregate              shift and go to state 7
-    numbers                        shift and go to state 8
 
 state 4
 
-    (41) name -> ID .
-    BUILTINID       reduce using rule 41 (name -> ID .)
-    NUMBER          reduce using rule 41 (name -> ID .)
-    [               reduce using rule 41 (name -> ID .)
-    ID              reduce using rule 41 (name -> ID .)
+    (3) answer -> sev_out .
+    (10) sev_out -> sev_out . sev_name sev
+    (48) sev_name -> . SEV ID
+    $end            reduce using rule 3 (answer -> sev_out .)
+    SEV             shift and go to state 7
 
+    sev_name                       shift and go to state 12
 
 state 5
 
-    (1) ans -> SEV name . sev
-    (9) sev -> . builtinids
-    (10) sev -> . ids numbers numbers weights xps
-    (11) sev -> . ids numbers weights
-    (12) sev -> . ids numbers CV numbers weights
-    (13) sev -> . numbers TIMES sev
-    (14) sev -> . sev MINUS numbers
-    (15) sev -> . sev PLUS numbers
-    (26) builtinids -> . BUILTINID
-    (27) builtinids -> . [ builtinidl ]
-    (30) ids -> . ID
-    (31) ids -> . [ idl ]
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    BUILTINID       shift and go to state 16
-    [               shift and go to state 17
-    ID              shift and go to state 18
-    NUMBER          shift and go to state 19
+    (4) port_out -> port_name . agg_list
+    (5) agg_list -> . agg_out
+    (6) agg_list -> . agg_list agg_out
+    (7) agg_out -> . agg_name exposures layers SEV sev freq
+    (8) agg_out -> . agg_name builtin_aggregate
+    (49) agg_name -> . ID
+    (50) agg_name -> . AGG ID
+    ID              shift and go to state 10
+    AGG             shift and go to state 11
 
-    sev                            shift and go to state 12
-    builtinids                     shift and go to state 13
-    ids                            shift and go to state 14
-    numbers                        shift and go to state 15
+    agg_list                       shift and go to state 13
+    agg_out                        shift and go to state 14
+    agg_name                       shift and go to state 6
 
 state 6
 
-    (2) ans -> name exposures . layers SEV sev freq
-    (20) layers -> .
-    (21) layers -> . numbers XS numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    SEV             reduce using rule 20 (layers -> .)
+    (7) agg_out -> agg_name . exposures layers SEV sev freq
+    (8) agg_out -> agg_name . builtin_aggregate
+    (29) exposures -> . numbers PREMIUM AT numbers
+    (30) exposures -> . numbers PREMIUM AT numbers LR
+    (31) exposures -> . numbers LOSS
+    (32) exposures -> . numbers CLAIMS
+    (45) builtin_aggregate -> . BUILTINID
+    (46) builtin_aggregate -> . NUMBER TIMES BUILTINID
+    (47) builtin_aggregate -> . BUILTINID TIMES NUMBER
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    BUILTINID       shift and go to state 18
     NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    [               shift and go to state 20
 
-    layers                         shift and go to state 20
-    numbers                        shift and go to state 21
+    exposures                      shift and go to state 15
+    builtin_aggregate              shift and go to state 16
+    numbers                        shift and go to state 17
 
 state 7
 
-    (3) ans -> name builtin_aggregate .
-    $end            reduce using rule 3 (ans -> name builtin_aggregate .)
+    (48) sev_name -> SEV . ID
+    ID              shift and go to state 21
 
 
 state 8
 
-    (22) exposures -> numbers . PREMIUM AT numbers
-    (23) exposures -> numbers . PREMIUM AT numbers LR
-    (24) exposures -> numbers . LOSS
-    (25) exposures -> numbers . CLAIMS
-    PREMIUM         shift and go to state 22
-    LOSS            shift and go to state 23
-    CLAIMS          shift and go to state 24
+    (9) sev_out -> sev_name . sev
+    (16) sev -> . builtinids
+    (17) sev -> . ids numbers numbers weights xps
+    (18) sev -> . ids numbers weights
+    (19) sev -> . ids numbers CV numbers weights
+    (20) sev -> . numbers TIMES sev
+    (21) sev -> . sev MINUS numbers
+    (22) sev -> . sev PLUS numbers
+    (33) builtinids -> . BUILTINID
+    (34) builtinids -> . [ builtinidl ]
+    (37) ids -> . ID
+    (38) ids -> . [ idl ]
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    BUILTINID       shift and go to state 26
+    [               shift and go to state 27
+    ID              shift and go to state 28
+    NUMBER          shift and go to state 29
 
+    sev                            shift and go to state 22
+    builtinids                     shift and go to state 23
+    ids                            shift and go to state 24
+    numbers                        shift and go to state 25
 
 state 9
 
-    (38) builtin_aggregate -> BUILTINID .
-    (40) builtin_aggregate -> BUILTINID . TIMES NUMBER
-    $end            reduce using rule 38 (builtin_aggregate -> BUILTINID .)
-    TIMES           shift and go to state 25
+    (51) port_name -> PORT . ID
+    ID              shift and go to state 30
 
 
 state 10
 
-    (39) builtin_aggregate -> NUMBER . TIMES BUILTINID
-    (34) numbers -> NUMBER .
-    TIMES           shift and go to state 26
-    PREMIUM         reduce using rule 34 (numbers -> NUMBER .)
-    LOSS            reduce using rule 34 (numbers -> NUMBER .)
-    CLAIMS          reduce using rule 34 (numbers -> NUMBER .)
+    (49) agg_name -> ID .
+    BUILTINID       reduce using rule 49 (agg_name -> ID .)
+    NUMBER          reduce using rule 49 (agg_name -> ID .)
+    [               reduce using rule 49 (agg_name -> ID .)
 
 
 state 11
 
-    (35) numbers -> [ . numberl ]
-    (36) numberl -> . NUMBER
-    (37) numberl -> . numberl NUMBER
-    NUMBER          shift and go to state 28
+    (50) agg_name -> AGG . ID
+    ID              shift and go to state 31
 
-    numberl                        shift and go to state 27
 
 state 12
 
-    (1) ans -> SEV name sev .
-    (14) sev -> sev . MINUS numbers
-    (15) sev -> sev . PLUS numbers
-    $end            reduce using rule 1 (ans -> SEV name sev .)
-    MINUS           shift and go to state 29
-    PLUS            shift and go to state 30
+    (10) sev_out -> sev_out sev_name . sev
+    (16) sev -> . builtinids
+    (17) sev -> . ids numbers numbers weights xps
+    (18) sev -> . ids numbers weights
+    (19) sev -> . ids numbers CV numbers weights
+    (20) sev -> . numbers TIMES sev
+    (21) sev -> . sev MINUS numbers
+    (22) sev -> . sev PLUS numbers
+    (33) builtinids -> . BUILTINID
+    (34) builtinids -> . [ builtinidl ]
+    (37) ids -> . ID
+    (38) ids -> . [ idl ]
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    BUILTINID       shift and go to state 26
+    [               shift and go to state 27
+    ID              shift and go to state 28
+    NUMBER          shift and go to state 29
 
+    sev                            shift and go to state 32
+    builtinids                     shift and go to state 23
+    ids                            shift and go to state 24
+    numbers                        shift and go to state 25
 
 state 13
 
-    (9) sev -> builtinids .
-    MINUS           reduce using rule 9 (sev -> builtinids .)
-    PLUS            reduce using rule 9 (sev -> builtinids .)
-    $end            reduce using rule 9 (sev -> builtinids .)
-    POISSON         reduce using rule 9 (sev -> builtinids .)
-    FIXED           reduce using rule 9 (sev -> builtinids .)
-    MIXED           reduce using rule 9 (sev -> builtinids .)
+    (4) port_out -> port_name agg_list .
+    (6) agg_list -> agg_list . agg_out
+    (7) agg_out -> . agg_name exposures layers SEV sev freq
+    (8) agg_out -> . agg_name builtin_aggregate
+    (49) agg_name -> . ID
+    (50) agg_name -> . AGG ID
+    $end            reduce using rule 4 (port_out -> port_name agg_list .)
+    ID              shift and go to state 10
+    AGG             shift and go to state 11
 
+    agg_out                        shift and go to state 33
+    agg_name                       shift and go to state 6
 
 state 14
 
-    (10) sev -> ids . numbers numbers weights xps
-    (11) sev -> ids . numbers weights
-    (12) sev -> ids . numbers CV numbers weights
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (5) agg_list -> agg_out .
+    ID              reduce using rule 5 (agg_list -> agg_out .)
+    AGG             reduce using rule 5 (agg_list -> agg_out .)
+    $end            reduce using rule 5 (agg_list -> agg_out .)
 
-    numbers                        shift and go to state 31
 
 state 15
 
-    (13) sev -> numbers . TIMES sev
-    TIMES           shift and go to state 32
+    (7) agg_out -> agg_name exposures . layers SEV sev freq
+    (27) layers -> .
+    (28) layers -> . numbers XS numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    SEV             reduce using rule 27 (layers -> .)
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    layers                         shift and go to state 34
+    numbers                        shift and go to state 35
 
 state 16
 
-    (26) builtinids -> BUILTINID .
-    MINUS           reduce using rule 26 (builtinids -> BUILTINID .)
-    PLUS            reduce using rule 26 (builtinids -> BUILTINID .)
-    $end            reduce using rule 26 (builtinids -> BUILTINID .)
-    POISSON         reduce using rule 26 (builtinids -> BUILTINID .)
-    FIXED           reduce using rule 26 (builtinids -> BUILTINID .)
-    MIXED           reduce using rule 26 (builtinids -> BUILTINID .)
+    (8) agg_out -> agg_name builtin_aggregate .
+    $end            reduce using rule 8 (agg_out -> agg_name builtin_aggregate .)
+    ID              reduce using rule 8 (agg_out -> agg_name builtin_aggregate .)
+    AGG             reduce using rule 8 (agg_out -> agg_name builtin_aggregate .)
 
 
 state 17
 
-    (27) builtinids -> [ . builtinidl ]
-    (31) ids -> [ . idl ]
-    (35) numbers -> [ . numberl ]
-    (28) builtinidl -> . BUILTINID
-    (29) builtinidl -> . builtinidl BUILTINID
-    (32) idl -> . ID
-    (33) idl -> . idl ID
-    (36) numberl -> . NUMBER
-    (37) numberl -> . numberl NUMBER
-    BUILTINID       shift and go to state 35
-    ID              shift and go to state 36
-    NUMBER          shift and go to state 28
+    (29) exposures -> numbers . PREMIUM AT numbers
+    (30) exposures -> numbers . PREMIUM AT numbers LR
+    (31) exposures -> numbers . LOSS
+    (32) exposures -> numbers . CLAIMS
+    PREMIUM         shift and go to state 36
+    LOSS            shift and go to state 37
+    CLAIMS          shift and go to state 38
 
-    builtinidl                     shift and go to state 33
-    idl                            shift and go to state 34
-    numberl                        shift and go to state 27
 
 state 18
 
-    (30) ids -> ID .
-    NUMBER          reduce using rule 30 (ids -> ID .)
-    [               reduce using rule 30 (ids -> ID .)
+    (45) builtin_aggregate -> BUILTINID .
+    (47) builtin_aggregate -> BUILTINID . TIMES NUMBER
+    $end            reduce using rule 45 (builtin_aggregate -> BUILTINID .)
+    ID              reduce using rule 45 (builtin_aggregate -> BUILTINID .)
+    AGG             reduce using rule 45 (builtin_aggregate -> BUILTINID .)
+    TIMES           shift and go to state 39
 
 
 state 19
 
-    (34) numbers -> NUMBER .
-    TIMES           reduce using rule 34 (numbers -> NUMBER .)
-    XS              reduce using rule 34 (numbers -> NUMBER .)
-    CV              reduce using rule 34 (numbers -> NUMBER .)
-    NUMBER          reduce using rule 34 (numbers -> NUMBER .)
-    [               reduce using rule 34 (numbers -> NUMBER .)
-    WEIGHTS         reduce using rule 34 (numbers -> NUMBER .)
-    MINUS           reduce using rule 34 (numbers -> NUMBER .)
-    PLUS            reduce using rule 34 (numbers -> NUMBER .)
-    $end            reduce using rule 34 (numbers -> NUMBER .)
-    POISSON         reduce using rule 34 (numbers -> NUMBER .)
-    FIXED           reduce using rule 34 (numbers -> NUMBER .)
-    MIXED           reduce using rule 34 (numbers -> NUMBER .)
-    XPS             reduce using rule 34 (numbers -> NUMBER .)
-    SEV             reduce using rule 34 (numbers -> NUMBER .)
-    LR              reduce using rule 34 (numbers -> NUMBER .)
+    (46) builtin_aggregate -> NUMBER . TIMES BUILTINID
+    (41) numbers -> NUMBER .
+    TIMES           shift and go to state 40
+    PREMIUM         reduce using rule 41 (numbers -> NUMBER .)
+    LOSS            reduce using rule 41 (numbers -> NUMBER .)
+    CLAIMS          reduce using rule 41 (numbers -> NUMBER .)
 
 
 state 20
 
-    (2) ans -> name exposures layers . SEV sev freq
-    SEV             shift and go to state 37
+    (42) numbers -> [ . numberl ]
+    (43) numberl -> . NUMBER
+    (44) numberl -> . numberl NUMBER
+    NUMBER          shift and go to state 42
 
+    numberl                        shift and go to state 41
 
 state 21
 
-    (21) layers -> numbers . XS numbers
-    XS              shift and go to state 38
+    (48) sev_name -> SEV ID .
+    BUILTINID       reduce using rule 48 (sev_name -> SEV ID .)
+    [               reduce using rule 48 (sev_name -> SEV ID .)
+    ID              reduce using rule 48 (sev_name -> SEV ID .)
+    NUMBER          reduce using rule 48 (sev_name -> SEV ID .)
 
 
 state 22
 
-    (22) exposures -> numbers PREMIUM . AT numbers
-    (23) exposures -> numbers PREMIUM . AT numbers LR
-    AT              shift and go to state 39
+    (9) sev_out -> sev_name sev .
+    (21) sev -> sev . MINUS numbers
+    (22) sev -> sev . PLUS numbers
+    SEV             reduce using rule 9 (sev_out -> sev_name sev .)
+    $end            reduce using rule 9 (sev_out -> sev_name sev .)
+    MINUS           shift and go to state 43
+    PLUS            shift and go to state 44
 
 
 state 23
 
-    (24) exposures -> numbers LOSS .
-    NUMBER          reduce using rule 24 (exposures -> numbers LOSS .)
-    [               reduce using rule 24 (exposures -> numbers LOSS .)
-    SEV             reduce using rule 24 (exposures -> numbers LOSS .)
+    (16) sev -> builtinids .
+    MINUS           reduce using rule 16 (sev -> builtinids .)
+    PLUS            reduce using rule 16 (sev -> builtinids .)
+    SEV             reduce using rule 16 (sev -> builtinids .)
+    $end            reduce using rule 16 (sev -> builtinids .)
+    POISSON         reduce using rule 16 (sev -> builtinids .)
+    FIXED           reduce using rule 16 (sev -> builtinids .)
+    MIXED           reduce using rule 16 (sev -> builtinids .)
+    ID              reduce using rule 16 (sev -> builtinids .)
+    AGG             reduce using rule 16 (sev -> builtinids .)
 
 
 state 24
 
-    (25) exposures -> numbers CLAIMS .
-    NUMBER          reduce using rule 25 (exposures -> numbers CLAIMS .)
-    [               reduce using rule 25 (exposures -> numbers CLAIMS .)
-    SEV             reduce using rule 25 (exposures -> numbers CLAIMS .)
+    (17) sev -> ids . numbers numbers weights xps
+    (18) sev -> ids . numbers weights
+    (19) sev -> ids . numbers CV numbers weights
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 45
 
 state 25
 
-    (40) builtin_aggregate -> BUILTINID TIMES . NUMBER
-    NUMBER          shift and go to state 40
+    (20) sev -> numbers . TIMES sev
+    TIMES           shift and go to state 46
 
 
 state 26
 
-    (39) builtin_aggregate -> NUMBER TIMES . BUILTINID
-    BUILTINID       shift and go to state 41
+    (33) builtinids -> BUILTINID .
+    MINUS           reduce using rule 33 (builtinids -> BUILTINID .)
+    PLUS            reduce using rule 33 (builtinids -> BUILTINID .)
+    SEV             reduce using rule 33 (builtinids -> BUILTINID .)
+    $end            reduce using rule 33 (builtinids -> BUILTINID .)
+    POISSON         reduce using rule 33 (builtinids -> BUILTINID .)
+    FIXED           reduce using rule 33 (builtinids -> BUILTINID .)
+    MIXED           reduce using rule 33 (builtinids -> BUILTINID .)
+    ID              reduce using rule 33 (builtinids -> BUILTINID .)
+    AGG             reduce using rule 33 (builtinids -> BUILTINID .)
 
 
 state 27
 
-    (35) numbers -> [ numberl . ]
-    (37) numberl -> numberl . NUMBER
-    ]               shift and go to state 42
-    NUMBER          shift and go to state 43
+    (34) builtinids -> [ . builtinidl ]
+    (38) ids -> [ . idl ]
+    (42) numbers -> [ . numberl ]
+    (35) builtinidl -> . BUILTINID
+    (36) builtinidl -> . builtinidl BUILTINID
+    (39) idl -> . ID
+    (40) idl -> . idl ID
+    (43) numberl -> . NUMBER
+    (44) numberl -> . numberl NUMBER
+    BUILTINID       shift and go to state 49
+    ID              shift and go to state 50
+    NUMBER          shift and go to state 42
 
+    builtinidl                     shift and go to state 47
+    idl                            shift and go to state 48
+    numberl                        shift and go to state 41
 
 state 28
 
-    (36) numberl -> NUMBER .
-    ]               reduce using rule 36 (numberl -> NUMBER .)
-    NUMBER          reduce using rule 36 (numberl -> NUMBER .)
+    (37) ids -> ID .
+    NUMBER          reduce using rule 37 (ids -> ID .)
+    [               reduce using rule 37 (ids -> ID .)
 
 
 state 29
 
-    (14) sev -> sev MINUS . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (41) numbers -> NUMBER .
+    TIMES           reduce using rule 41 (numbers -> NUMBER .)
+    XS              reduce using rule 41 (numbers -> NUMBER .)
+    CV              reduce using rule 41 (numbers -> NUMBER .)
+    NUMBER          reduce using rule 41 (numbers -> NUMBER .)
+    [               reduce using rule 41 (numbers -> NUMBER .)
+    WEIGHTS         reduce using rule 41 (numbers -> NUMBER .)
+    MINUS           reduce using rule 41 (numbers -> NUMBER .)
+    PLUS            reduce using rule 41 (numbers -> NUMBER .)
+    SEV             reduce using rule 41 (numbers -> NUMBER .)
+    $end            reduce using rule 41 (numbers -> NUMBER .)
+    POISSON         reduce using rule 41 (numbers -> NUMBER .)
+    FIXED           reduce using rule 41 (numbers -> NUMBER .)
+    MIXED           reduce using rule 41 (numbers -> NUMBER .)
+    ID              reduce using rule 41 (numbers -> NUMBER .)
+    AGG             reduce using rule 41 (numbers -> NUMBER .)
+    XPS             reduce using rule 41 (numbers -> NUMBER .)
+    LR              reduce using rule 41 (numbers -> NUMBER .)
 
-    numbers                        shift and go to state 44
 
 state 30
 
-    (15) sev -> sev PLUS . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (51) port_name -> PORT ID .
+    ID              reduce using rule 51 (port_name -> PORT ID .)
+    AGG             reduce using rule 51 (port_name -> PORT ID .)
 
-    numbers                        shift and go to state 45
 
 state 31
 
-    (10) sev -> ids numbers . numbers weights xps
-    (11) sev -> ids numbers . weights
-    (12) sev -> ids numbers . CV numbers weights
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    (18) weights -> .
-    (19) weights -> . WEIGHTS numbers
-    CV              shift and go to state 48
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
-    MINUS           reduce using rule 18 (weights -> .)
-    PLUS            reduce using rule 18 (weights -> .)
-    $end            reduce using rule 18 (weights -> .)
-    POISSON         reduce using rule 18 (weights -> .)
-    FIXED           reduce using rule 18 (weights -> .)
-    MIXED           reduce using rule 18 (weights -> .)
-    WEIGHTS         shift and go to state 49
+    (50) agg_name -> AGG ID .
+    BUILTINID       reduce using rule 50 (agg_name -> AGG ID .)
+    NUMBER          reduce using rule 50 (agg_name -> AGG ID .)
+    [               reduce using rule 50 (agg_name -> AGG ID .)
 
-    numbers                        shift and go to state 46
-    weights                        shift and go to state 47
 
 state 32
 
-    (13) sev -> numbers TIMES . sev
-    (9) sev -> . builtinids
-    (10) sev -> . ids numbers numbers weights xps
-    (11) sev -> . ids numbers weights
-    (12) sev -> . ids numbers CV numbers weights
-    (13) sev -> . numbers TIMES sev
-    (14) sev -> . sev MINUS numbers
-    (15) sev -> . sev PLUS numbers
-    (26) builtinids -> . BUILTINID
-    (27) builtinids -> . [ builtinidl ]
-    (30) ids -> . ID
-    (31) ids -> . [ idl ]
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    BUILTINID       shift and go to state 16
-    [               shift and go to state 17
-    ID              shift and go to state 18
-    NUMBER          shift and go to state 19
+    (10) sev_out -> sev_out sev_name sev .
+    (21) sev -> sev . MINUS numbers
+    (22) sev -> sev . PLUS numbers
+    SEV             reduce using rule 10 (sev_out -> sev_out sev_name sev .)
+    $end            reduce using rule 10 (sev_out -> sev_out sev_name sev .)
+    MINUS           shift and go to state 43
+    PLUS            shift and go to state 44
 
-    numbers                        shift and go to state 15
-    sev                            shift and go to state 50
-    builtinids                     shift and go to state 13
-    ids                            shift and go to state 14
 
 state 33
 
-    (27) builtinids -> [ builtinidl . ]
-    (29) builtinidl -> builtinidl . BUILTINID
-    ]               shift and go to state 51
-    BUILTINID       shift and go to state 52
+    (6) agg_list -> agg_list agg_out .
+    ID              reduce using rule 6 (agg_list -> agg_list agg_out .)
+    AGG             reduce using rule 6 (agg_list -> agg_list agg_out .)
+    $end            reduce using rule 6 (agg_list -> agg_list agg_out .)
 
 
 state 34
 
-    (31) ids -> [ idl . ]
-    (33) idl -> idl . ID
-    ]               shift and go to state 53
-    ID              shift and go to state 54
+    (7) agg_out -> agg_name exposures layers . SEV sev freq
+    SEV             shift and go to state 51
 
 
 state 35
 
-    (28) builtinidl -> BUILTINID .
-    ]               reduce using rule 28 (builtinidl -> BUILTINID .)
-    BUILTINID       reduce using rule 28 (builtinidl -> BUILTINID .)
+    (28) layers -> numbers . XS numbers
+    XS              shift and go to state 52
 
 
 state 36
 
-    (32) idl -> ID .
-    ]               reduce using rule 32 (idl -> ID .)
-    ID              reduce using rule 32 (idl -> ID .)
+    (29) exposures -> numbers PREMIUM . AT numbers
+    (30) exposures -> numbers PREMIUM . AT numbers LR
+    AT              shift and go to state 53
 
 
 state 37
 
-    (2) ans -> name exposures layers SEV . sev freq
-    (9) sev -> . builtinids
-    (10) sev -> . ids numbers numbers weights xps
-    (11) sev -> . ids numbers weights
-    (12) sev -> . ids numbers CV numbers weights
-    (13) sev -> . numbers TIMES sev
-    (14) sev -> . sev MINUS numbers
-    (15) sev -> . sev PLUS numbers
-    (26) builtinids -> . BUILTINID
-    (27) builtinids -> . [ builtinidl ]
-    (30) ids -> . ID
-    (31) ids -> . [ idl ]
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    BUILTINID       shift and go to state 16
-    [               shift and go to state 17
-    ID              shift and go to state 18
-    NUMBER          shift and go to state 19
+    (31) exposures -> numbers LOSS .
+    NUMBER          reduce using rule 31 (exposures -> numbers LOSS .)
+    [               reduce using rule 31 (exposures -> numbers LOSS .)
+    SEV             reduce using rule 31 (exposures -> numbers LOSS .)
 
-    sev                            shift and go to state 55
-    builtinids                     shift and go to state 13
-    ids                            shift and go to state 14
-    numbers                        shift and go to state 15
 
 state 38
 
-    (21) layers -> numbers XS . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (32) exposures -> numbers CLAIMS .
+    NUMBER          reduce using rule 32 (exposures -> numbers CLAIMS .)
+    [               reduce using rule 32 (exposures -> numbers CLAIMS .)
+    SEV             reduce using rule 32 (exposures -> numbers CLAIMS .)
 
-    numbers                        shift and go to state 56
 
 state 39
 
-    (22) exposures -> numbers PREMIUM AT . numbers
-    (23) exposures -> numbers PREMIUM AT . numbers LR
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (47) builtin_aggregate -> BUILTINID TIMES . NUMBER
+    NUMBER          shift and go to state 54
 
-    numbers                        shift and go to state 57
 
 state 40
 
-    (40) builtin_aggregate -> BUILTINID TIMES NUMBER .
-    $end            reduce using rule 40 (builtin_aggregate -> BUILTINID TIMES NUMBER .)
+    (46) builtin_aggregate -> NUMBER TIMES . BUILTINID
+    BUILTINID       shift and go to state 55
 
 
 state 41
 
-    (39) builtin_aggregate -> NUMBER TIMES BUILTINID .
-    $end            reduce using rule 39 (builtin_aggregate -> NUMBER TIMES BUILTINID .)
+    (42) numbers -> [ numberl . ]
+    (44) numberl -> numberl . NUMBER
+    ]               shift and go to state 56
+    NUMBER          shift and go to state 57
 
 
 state 42
 
-    (35) numbers -> [ numberl ] .
-    PREMIUM         reduce using rule 35 (numbers -> [ numberl ] .)
-    LOSS            reduce using rule 35 (numbers -> [ numberl ] .)
-    CLAIMS          reduce using rule 35 (numbers -> [ numberl ] .)
-    TIMES           reduce using rule 35 (numbers -> [ numberl ] .)
-    XS              reduce using rule 35 (numbers -> [ numberl ] .)
-    CV              reduce using rule 35 (numbers -> [ numberl ] .)
-    NUMBER          reduce using rule 35 (numbers -> [ numberl ] .)
-    [               reduce using rule 35 (numbers -> [ numberl ] .)
-    WEIGHTS         reduce using rule 35 (numbers -> [ numberl ] .)
-    MINUS           reduce using rule 35 (numbers -> [ numberl ] .)
-    PLUS            reduce using rule 35 (numbers -> [ numberl ] .)
-    $end            reduce using rule 35 (numbers -> [ numberl ] .)
-    POISSON         reduce using rule 35 (numbers -> [ numberl ] .)
-    FIXED           reduce using rule 35 (numbers -> [ numberl ] .)
-    MIXED           reduce using rule 35 (numbers -> [ numberl ] .)
-    XPS             reduce using rule 35 (numbers -> [ numberl ] .)
-    SEV             reduce using rule 35 (numbers -> [ numberl ] .)
-    LR              reduce using rule 35 (numbers -> [ numberl ] .)
+    (43) numberl -> NUMBER .
+    ]               reduce using rule 43 (numberl -> NUMBER .)
+    NUMBER          reduce using rule 43 (numberl -> NUMBER .)
 
 
 state 43
 
-    (37) numberl -> numberl NUMBER .
-    ]               reduce using rule 37 (numberl -> numberl NUMBER .)
-    NUMBER          reduce using rule 37 (numberl -> numberl NUMBER .)
+    (21) sev -> sev MINUS . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 58
 
 state 44
 
-    (14) sev -> sev MINUS numbers .
-    MINUS           reduce using rule 14 (sev -> sev MINUS numbers .)
-    PLUS            reduce using rule 14 (sev -> sev MINUS numbers .)
-    $end            reduce using rule 14 (sev -> sev MINUS numbers .)
-    POISSON         reduce using rule 14 (sev -> sev MINUS numbers .)
-    FIXED           reduce using rule 14 (sev -> sev MINUS numbers .)
-    MIXED           reduce using rule 14 (sev -> sev MINUS numbers .)
+    (22) sev -> sev PLUS . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 59
 
 state 45
 
-    (15) sev -> sev PLUS numbers .
-    MINUS           reduce using rule 15 (sev -> sev PLUS numbers .)
-    PLUS            reduce using rule 15 (sev -> sev PLUS numbers .)
-    $end            reduce using rule 15 (sev -> sev PLUS numbers .)
-    POISSON         reduce using rule 15 (sev -> sev PLUS numbers .)
-    FIXED           reduce using rule 15 (sev -> sev PLUS numbers .)
-    MIXED           reduce using rule 15 (sev -> sev PLUS numbers .)
+    (17) sev -> ids numbers . numbers weights xps
+    (18) sev -> ids numbers . weights
+    (19) sev -> ids numbers . CV numbers weights
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    (25) weights -> .
+    (26) weights -> . WEIGHTS numbers
+    CV              shift and go to state 62
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
+    MINUS           reduce using rule 25 (weights -> .)
+    PLUS            reduce using rule 25 (weights -> .)
+    SEV             reduce using rule 25 (weights -> .)
+    $end            reduce using rule 25 (weights -> .)
+    POISSON         reduce using rule 25 (weights -> .)
+    FIXED           reduce using rule 25 (weights -> .)
+    MIXED           reduce using rule 25 (weights -> .)
+    ID              reduce using rule 25 (weights -> .)
+    AGG             reduce using rule 25 (weights -> .)
+    WEIGHTS         shift and go to state 63
 
+    numbers                        shift and go to state 60
+    weights                        shift and go to state 61
 
 state 46
 
-    (10) sev -> ids numbers numbers . weights xps
-    (18) weights -> .
-    (19) weights -> . WEIGHTS numbers
-    XPS             reduce using rule 18 (weights -> .)
-    MINUS           reduce using rule 18 (weights -> .)
-    PLUS            reduce using rule 18 (weights -> .)
-    $end            reduce using rule 18 (weights -> .)
-    POISSON         reduce using rule 18 (weights -> .)
-    FIXED           reduce using rule 18 (weights -> .)
-    MIXED           reduce using rule 18 (weights -> .)
-    WEIGHTS         shift and go to state 49
+    (20) sev -> numbers TIMES . sev
+    (16) sev -> . builtinids
+    (17) sev -> . ids numbers numbers weights xps
+    (18) sev -> . ids numbers weights
+    (19) sev -> . ids numbers CV numbers weights
+    (20) sev -> . numbers TIMES sev
+    (21) sev -> . sev MINUS numbers
+    (22) sev -> . sev PLUS numbers
+    (33) builtinids -> . BUILTINID
+    (34) builtinids -> . [ builtinidl ]
+    (37) ids -> . ID
+    (38) ids -> . [ idl ]
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    BUILTINID       shift and go to state 26
+    [               shift and go to state 27
+    ID              shift and go to state 28
+    NUMBER          shift and go to state 29
 
-    weights                        shift and go to state 58
+    numbers                        shift and go to state 25
+    sev                            shift and go to state 64
+    builtinids                     shift and go to state 23
+    ids                            shift and go to state 24
 
 state 47
 
-    (11) sev -> ids numbers weights .
-    MINUS           reduce using rule 11 (sev -> ids numbers weights .)
-    PLUS            reduce using rule 11 (sev -> ids numbers weights .)
-    $end            reduce using rule 11 (sev -> ids numbers weights .)
-    POISSON         reduce using rule 11 (sev -> ids numbers weights .)
-    FIXED           reduce using rule 11 (sev -> ids numbers weights .)
-    MIXED           reduce using rule 11 (sev -> ids numbers weights .)
+    (34) builtinids -> [ builtinidl . ]
+    (36) builtinidl -> builtinidl . BUILTINID
+    ]               shift and go to state 65
+    BUILTINID       shift and go to state 66
 
 
 state 48
 
-    (12) sev -> ids numbers CV . numbers weights
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (38) ids -> [ idl . ]
+    (40) idl -> idl . ID
+    ]               shift and go to state 67
+    ID              shift and go to state 68
 
-    numbers                        shift and go to state 59
 
 state 49
 
-    (19) weights -> WEIGHTS . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (35) builtinidl -> BUILTINID .
+    ]               reduce using rule 35 (builtinidl -> BUILTINID .)
+    BUILTINID       reduce using rule 35 (builtinidl -> BUILTINID .)
 
-    numbers                        shift and go to state 60
 
 state 50
 
-    (13) sev -> numbers TIMES sev .
-    (14) sev -> sev . MINUS numbers
-    (15) sev -> sev . PLUS numbers
-    MINUS           reduce using rule 13 (sev -> numbers TIMES sev .)
-    PLUS            reduce using rule 13 (sev -> numbers TIMES sev .)
-    $end            reduce using rule 13 (sev -> numbers TIMES sev .)
-    POISSON         reduce using rule 13 (sev -> numbers TIMES sev .)
-    FIXED           reduce using rule 13 (sev -> numbers TIMES sev .)
-    MIXED           reduce using rule 13 (sev -> numbers TIMES sev .)
+    (39) idl -> ID .
+    ]               reduce using rule 39 (idl -> ID .)
+    ID              reduce using rule 39 (idl -> ID .)
 
 
 state 51
 
-    (27) builtinids -> [ builtinidl ] .
-    MINUS           reduce using rule 27 (builtinids -> [ builtinidl ] .)
-    PLUS            reduce using rule 27 (builtinids -> [ builtinidl ] .)
-    $end            reduce using rule 27 (builtinids -> [ builtinidl ] .)
-    POISSON         reduce using rule 27 (builtinids -> [ builtinidl ] .)
-    FIXED           reduce using rule 27 (builtinids -> [ builtinidl ] .)
-    MIXED           reduce using rule 27 (builtinids -> [ builtinidl ] .)
+    (7) agg_out -> agg_name exposures layers SEV . sev freq
+    (16) sev -> . builtinids
+    (17) sev -> . ids numbers numbers weights xps
+    (18) sev -> . ids numbers weights
+    (19) sev -> . ids numbers CV numbers weights
+    (20) sev -> . numbers TIMES sev
+    (21) sev -> . sev MINUS numbers
+    (22) sev -> . sev PLUS numbers
+    (33) builtinids -> . BUILTINID
+    (34) builtinids -> . [ builtinidl ]
+    (37) ids -> . ID
+    (38) ids -> . [ idl ]
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    BUILTINID       shift and go to state 26
+    [               shift and go to state 27
+    ID              shift and go to state 28
+    NUMBER          shift and go to state 29
 
+    sev                            shift and go to state 69
+    builtinids                     shift and go to state 23
+    ids                            shift and go to state 24
+    numbers                        shift and go to state 25
 
 state 52
 
-    (29) builtinidl -> builtinidl BUILTINID .
-    ]               reduce using rule 29 (builtinidl -> builtinidl BUILTINID .)
-    BUILTINID       reduce using rule 29 (builtinidl -> builtinidl BUILTINID .)
+    (28) layers -> numbers XS . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 70
 
 state 53
 
-    (31) ids -> [ idl ] .
-    NUMBER          reduce using rule 31 (ids -> [ idl ] .)
-    [               reduce using rule 31 (ids -> [ idl ] .)
+    (29) exposures -> numbers PREMIUM AT . numbers
+    (30) exposures -> numbers PREMIUM AT . numbers LR
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 71
 
 state 54
 
-    (33) idl -> idl ID .
-    ]               reduce using rule 33 (idl -> idl ID .)
-    ID              reduce using rule 33 (idl -> idl ID .)
+    (47) builtin_aggregate -> BUILTINID TIMES NUMBER .
+    $end            reduce using rule 47 (builtin_aggregate -> BUILTINID TIMES NUMBER .)
+    ID              reduce using rule 47 (builtin_aggregate -> BUILTINID TIMES NUMBER .)
+    AGG             reduce using rule 47 (builtin_aggregate -> BUILTINID TIMES NUMBER .)
 
 
 state 55
 
-    (2) ans -> name exposures layers SEV sev . freq
-    (14) sev -> sev . MINUS numbers
-    (15) sev -> sev . PLUS numbers
-    (4) freq -> .
-    (5) freq -> . POISSON
-    (6) freq -> . FIXED
-    (7) freq -> . MIXED ids numbers
-    (8) freq -> . MIXED ids numbers numbers
-    MINUS           shift and go to state 29
-    PLUS            shift and go to state 30
-    $end            reduce using rule 4 (freq -> .)
-    POISSON         shift and go to state 62
-    FIXED           shift and go to state 63
-    MIXED           shift and go to state 64
+    (46) builtin_aggregate -> NUMBER TIMES BUILTINID .
+    $end            reduce using rule 46 (builtin_aggregate -> NUMBER TIMES BUILTINID .)
+    ID              reduce using rule 46 (builtin_aggregate -> NUMBER TIMES BUILTINID .)
+    AGG             reduce using rule 46 (builtin_aggregate -> NUMBER TIMES BUILTINID .)
 
-    freq                           shift and go to state 61
 
 state 56
 
-    (21) layers -> numbers XS numbers .
-    SEV             reduce using rule 21 (layers -> numbers XS numbers .)
+    (42) numbers -> [ numberl ] .
+    PREMIUM         reduce using rule 42 (numbers -> [ numberl ] .)
+    LOSS            reduce using rule 42 (numbers -> [ numberl ] .)
+    CLAIMS          reduce using rule 42 (numbers -> [ numberl ] .)
+    TIMES           reduce using rule 42 (numbers -> [ numberl ] .)
+    XS              reduce using rule 42 (numbers -> [ numberl ] .)
+    CV              reduce using rule 42 (numbers -> [ numberl ] .)
+    NUMBER          reduce using rule 42 (numbers -> [ numberl ] .)
+    [               reduce using rule 42 (numbers -> [ numberl ] .)
+    WEIGHTS         reduce using rule 42 (numbers -> [ numberl ] .)
+    MINUS           reduce using rule 42 (numbers -> [ numberl ] .)
+    PLUS            reduce using rule 42 (numbers -> [ numberl ] .)
+    SEV             reduce using rule 42 (numbers -> [ numberl ] .)
+    $end            reduce using rule 42 (numbers -> [ numberl ] .)
+    POISSON         reduce using rule 42 (numbers -> [ numberl ] .)
+    FIXED           reduce using rule 42 (numbers -> [ numberl ] .)
+    MIXED           reduce using rule 42 (numbers -> [ numberl ] .)
+    ID              reduce using rule 42 (numbers -> [ numberl ] .)
+    AGG             reduce using rule 42 (numbers -> [ numberl ] .)
+    XPS             reduce using rule 42 (numbers -> [ numberl ] .)
+    LR              reduce using rule 42 (numbers -> [ numberl ] .)
 
 
 state 57
 
-    (22) exposures -> numbers PREMIUM AT numbers .
-    (23) exposures -> numbers PREMIUM AT numbers . LR
-    NUMBER          reduce using rule 22 (exposures -> numbers PREMIUM AT numbers .)
-    [               reduce using rule 22 (exposures -> numbers PREMIUM AT numbers .)
-    SEV             reduce using rule 22 (exposures -> numbers PREMIUM AT numbers .)
-    LR              shift and go to state 65
+    (44) numberl -> numberl NUMBER .
+    ]               reduce using rule 44 (numberl -> numberl NUMBER .)
+    NUMBER          reduce using rule 44 (numberl -> numberl NUMBER .)
 
 
 state 58
 
-    (10) sev -> ids numbers numbers weights . xps
-    (16) xps -> .
-    (17) xps -> . XPS numbers numbers
-    MINUS           reduce using rule 16 (xps -> .)
-    PLUS            reduce using rule 16 (xps -> .)
-    $end            reduce using rule 16 (xps -> .)
-    POISSON         reduce using rule 16 (xps -> .)
-    FIXED           reduce using rule 16 (xps -> .)
-    MIXED           reduce using rule 16 (xps -> .)
-    XPS             shift and go to state 67
+    (21) sev -> sev MINUS numbers .
+    MINUS           reduce using rule 21 (sev -> sev MINUS numbers .)
+    PLUS            reduce using rule 21 (sev -> sev MINUS numbers .)
+    SEV             reduce using rule 21 (sev -> sev MINUS numbers .)
+    $end            reduce using rule 21 (sev -> sev MINUS numbers .)
+    POISSON         reduce using rule 21 (sev -> sev MINUS numbers .)
+    FIXED           reduce using rule 21 (sev -> sev MINUS numbers .)
+    MIXED           reduce using rule 21 (sev -> sev MINUS numbers .)
+    ID              reduce using rule 21 (sev -> sev MINUS numbers .)
+    AGG             reduce using rule 21 (sev -> sev MINUS numbers .)
 
-    xps                            shift and go to state 66
 
 state 59
 
-    (12) sev -> ids numbers CV numbers . weights
-    (18) weights -> .
-    (19) weights -> . WEIGHTS numbers
-    MINUS           reduce using rule 18 (weights -> .)
-    PLUS            reduce using rule 18 (weights -> .)
-    $end            reduce using rule 18 (weights -> .)
-    POISSON         reduce using rule 18 (weights -> .)
-    FIXED           reduce using rule 18 (weights -> .)
-    MIXED           reduce using rule 18 (weights -> .)
-    WEIGHTS         shift and go to state 49
+    (22) sev -> sev PLUS numbers .
+    MINUS           reduce using rule 22 (sev -> sev PLUS numbers .)
+    PLUS            reduce using rule 22 (sev -> sev PLUS numbers .)
+    SEV             reduce using rule 22 (sev -> sev PLUS numbers .)
+    $end            reduce using rule 22 (sev -> sev PLUS numbers .)
+    POISSON         reduce using rule 22 (sev -> sev PLUS numbers .)
+    FIXED           reduce using rule 22 (sev -> sev PLUS numbers .)
+    MIXED           reduce using rule 22 (sev -> sev PLUS numbers .)
+    ID              reduce using rule 22 (sev -> sev PLUS numbers .)
+    AGG             reduce using rule 22 (sev -> sev PLUS numbers .)
 
-    weights                        shift and go to state 68
 
 state 60
 
-    (19) weights -> WEIGHTS numbers .
-    MINUS           reduce using rule 19 (weights -> WEIGHTS numbers .)
-    PLUS            reduce using rule 19 (weights -> WEIGHTS numbers .)
-    $end            reduce using rule 19 (weights -> WEIGHTS numbers .)
-    POISSON         reduce using rule 19 (weights -> WEIGHTS numbers .)
-    FIXED           reduce using rule 19 (weights -> WEIGHTS numbers .)
-    MIXED           reduce using rule 19 (weights -> WEIGHTS numbers .)
-    XPS             reduce using rule 19 (weights -> WEIGHTS numbers .)
+    (17) sev -> ids numbers numbers . weights xps
+    (25) weights -> .
+    (26) weights -> . WEIGHTS numbers
+    XPS             reduce using rule 25 (weights -> .)
+    MINUS           reduce using rule 25 (weights -> .)
+    PLUS            reduce using rule 25 (weights -> .)
+    SEV             reduce using rule 25 (weights -> .)
+    $end            reduce using rule 25 (weights -> .)
+    POISSON         reduce using rule 25 (weights -> .)
+    FIXED           reduce using rule 25 (weights -> .)
+    MIXED           reduce using rule 25 (weights -> .)
+    ID              reduce using rule 25 (weights -> .)
+    AGG             reduce using rule 25 (weights -> .)
+    WEIGHTS         shift and go to state 63
 
+    weights                        shift and go to state 72
 
 state 61
 
-    (2) ans -> name exposures layers SEV sev freq .
-    $end            reduce using rule 2 (ans -> name exposures layers SEV sev freq .)
+    (18) sev -> ids numbers weights .
+    MINUS           reduce using rule 18 (sev -> ids numbers weights .)
+    PLUS            reduce using rule 18 (sev -> ids numbers weights .)
+    SEV             reduce using rule 18 (sev -> ids numbers weights .)
+    $end            reduce using rule 18 (sev -> ids numbers weights .)
+    POISSON         reduce using rule 18 (sev -> ids numbers weights .)
+    FIXED           reduce using rule 18 (sev -> ids numbers weights .)
+    MIXED           reduce using rule 18 (sev -> ids numbers weights .)
+    ID              reduce using rule 18 (sev -> ids numbers weights .)
+    AGG             reduce using rule 18 (sev -> ids numbers weights .)
 
 
 state 62
 
-    (5) freq -> POISSON .
-    $end            reduce using rule 5 (freq -> POISSON .)
+    (19) sev -> ids numbers CV . numbers weights
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 73
 
 state 63
 
-    (6) freq -> FIXED .
-    $end            reduce using rule 6 (freq -> FIXED .)
+    (26) weights -> WEIGHTS . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
 
+    numbers                        shift and go to state 74
 
 state 64
 
-    (7) freq -> MIXED . ids numbers
-    (8) freq -> MIXED . ids numbers numbers
-    (30) ids -> . ID
-    (31) ids -> . [ idl ]
-    ID              shift and go to state 18
-    [               shift and go to state 70
+    (20) sev -> numbers TIMES sev .
+    (21) sev -> sev . MINUS numbers
+    (22) sev -> sev . PLUS numbers
+    MINUS           reduce using rule 20 (sev -> numbers TIMES sev .)
+    PLUS            reduce using rule 20 (sev -> numbers TIMES sev .)
+    SEV             reduce using rule 20 (sev -> numbers TIMES sev .)
+    $end            reduce using rule 20 (sev -> numbers TIMES sev .)
+    POISSON         reduce using rule 20 (sev -> numbers TIMES sev .)
+    FIXED           reduce using rule 20 (sev -> numbers TIMES sev .)
+    MIXED           reduce using rule 20 (sev -> numbers TIMES sev .)
+    ID              reduce using rule 20 (sev -> numbers TIMES sev .)
+    AGG             reduce using rule 20 (sev -> numbers TIMES sev .)
 
-    ids                            shift and go to state 69
 
 state 65
 
-    (23) exposures -> numbers PREMIUM AT numbers LR .
-    NUMBER          reduce using rule 23 (exposures -> numbers PREMIUM AT numbers LR .)
-    [               reduce using rule 23 (exposures -> numbers PREMIUM AT numbers LR .)
-    SEV             reduce using rule 23 (exposures -> numbers PREMIUM AT numbers LR .)
+    (34) builtinids -> [ builtinidl ] .
+    MINUS           reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    PLUS            reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    SEV             reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    $end            reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    POISSON         reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    FIXED           reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    MIXED           reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    ID              reduce using rule 34 (builtinids -> [ builtinidl ] .)
+    AGG             reduce using rule 34 (builtinids -> [ builtinidl ] .)
 
 
 state 66
 
-    (10) sev -> ids numbers numbers weights xps .
-    MINUS           reduce using rule 10 (sev -> ids numbers numbers weights xps .)
-    PLUS            reduce using rule 10 (sev -> ids numbers numbers weights xps .)
-    $end            reduce using rule 10 (sev -> ids numbers numbers weights xps .)
-    POISSON         reduce using rule 10 (sev -> ids numbers numbers weights xps .)
-    FIXED           reduce using rule 10 (sev -> ids numbers numbers weights xps .)
-    MIXED           reduce using rule 10 (sev -> ids numbers numbers weights xps .)
+    (36) builtinidl -> builtinidl BUILTINID .
+    ]               reduce using rule 36 (builtinidl -> builtinidl BUILTINID .)
+    BUILTINID       reduce using rule 36 (builtinidl -> builtinidl BUILTINID .)
 
 
 state 67
 
-    (17) xps -> XPS . numbers numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (38) ids -> [ idl ] .
+    NUMBER          reduce using rule 38 (ids -> [ idl ] .)
+    [               reduce using rule 38 (ids -> [ idl ] .)
 
-    numbers                        shift and go to state 71
 
 state 68
 
-    (12) sev -> ids numbers CV numbers weights .
-    MINUS           reduce using rule 12 (sev -> ids numbers CV numbers weights .)
-    PLUS            reduce using rule 12 (sev -> ids numbers CV numbers weights .)
-    $end            reduce using rule 12 (sev -> ids numbers CV numbers weights .)
-    POISSON         reduce using rule 12 (sev -> ids numbers CV numbers weights .)
-    FIXED           reduce using rule 12 (sev -> ids numbers CV numbers weights .)
-    MIXED           reduce using rule 12 (sev -> ids numbers CV numbers weights .)
+    (40) idl -> idl ID .
+    ]               reduce using rule 40 (idl -> idl ID .)
+    ID              reduce using rule 40 (idl -> idl ID .)
 
 
 state 69
 
-    (7) freq -> MIXED ids . numbers
-    (8) freq -> MIXED ids . numbers numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (7) agg_out -> agg_name exposures layers SEV sev . freq
+    (21) sev -> sev . MINUS numbers
+    (22) sev -> sev . PLUS numbers
+    (11) freq -> .
+    (12) freq -> . POISSON
+    (13) freq -> . FIXED
+    (14) freq -> . MIXED ids numbers
+    (15) freq -> . MIXED ids numbers numbers
+    MINUS           shift and go to state 43
+    PLUS            shift and go to state 44
+    $end            reduce using rule 11 (freq -> .)
+    ID              reduce using rule 11 (freq -> .)
+    AGG             reduce using rule 11 (freq -> .)
+    POISSON         shift and go to state 76
+    FIXED           shift and go to state 77
+    MIXED           shift and go to state 78
 
-    numbers                        shift and go to state 72
+    freq                           shift and go to state 75
 
 state 70
 
-    (31) ids -> [ . idl ]
-    (32) idl -> . ID
-    (33) idl -> . idl ID
-    ID              shift and go to state 36
+    (28) layers -> numbers XS numbers .
+    SEV             reduce using rule 28 (layers -> numbers XS numbers .)
 
-    idl                            shift and go to state 34
 
 state 71
 
-    (17) xps -> XPS numbers . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (29) exposures -> numbers PREMIUM AT numbers .
+    (30) exposures -> numbers PREMIUM AT numbers . LR
+    NUMBER          reduce using rule 29 (exposures -> numbers PREMIUM AT numbers .)
+    [               reduce using rule 29 (exposures -> numbers PREMIUM AT numbers .)
+    SEV             reduce using rule 29 (exposures -> numbers PREMIUM AT numbers .)
+    LR              shift and go to state 79
 
-    numbers                        shift and go to state 73
 
 state 72
 
-    (7) freq -> MIXED ids numbers .
-    (8) freq -> MIXED ids numbers . numbers
-    (34) numbers -> . NUMBER
-    (35) numbers -> . [ numberl ]
-    $end            reduce using rule 7 (freq -> MIXED ids numbers .)
-    NUMBER          shift and go to state 19
-    [               shift and go to state 11
+    (17) sev -> ids numbers numbers weights . xps
+    (23) xps -> .
+    (24) xps -> . XPS numbers numbers
+    MINUS           reduce using rule 23 (xps -> .)
+    PLUS            reduce using rule 23 (xps -> .)
+    SEV             reduce using rule 23 (xps -> .)
+    $end            reduce using rule 23 (xps -> .)
+    POISSON         reduce using rule 23 (xps -> .)
+    FIXED           reduce using rule 23 (xps -> .)
+    MIXED           reduce using rule 23 (xps -> .)
+    ID              reduce using rule 23 (xps -> .)
+    AGG             reduce using rule 23 (xps -> .)
+    XPS             shift and go to state 81
 
-    numbers                        shift and go to state 74
+    xps                            shift and go to state 80
 
 state 73
 
-    (17) xps -> XPS numbers numbers .
-    MINUS           reduce using rule 17 (xps -> XPS numbers numbers .)
-    PLUS            reduce using rule 17 (xps -> XPS numbers numbers .)
-    $end            reduce using rule 17 (xps -> XPS numbers numbers .)
-    POISSON         reduce using rule 17 (xps -> XPS numbers numbers .)
-    FIXED           reduce using rule 17 (xps -> XPS numbers numbers .)
-    MIXED           reduce using rule 17 (xps -> XPS numbers numbers .)
+    (19) sev -> ids numbers CV numbers . weights
+    (25) weights -> .
+    (26) weights -> . WEIGHTS numbers
+    MINUS           reduce using rule 25 (weights -> .)
+    PLUS            reduce using rule 25 (weights -> .)
+    SEV             reduce using rule 25 (weights -> .)
+    $end            reduce using rule 25 (weights -> .)
+    POISSON         reduce using rule 25 (weights -> .)
+    FIXED           reduce using rule 25 (weights -> .)
+    MIXED           reduce using rule 25 (weights -> .)
+    ID              reduce using rule 25 (weights -> .)
+    AGG             reduce using rule 25 (weights -> .)
+    WEIGHTS         shift and go to state 63
 
+    weights                        shift and go to state 82
 
 state 74
 
-    (8) freq -> MIXED ids numbers numbers .
-    $end            reduce using rule 8 (freq -> MIXED ids numbers numbers .)
+    (26) weights -> WEIGHTS numbers .
+    MINUS           reduce using rule 26 (weights -> WEIGHTS numbers .)
+    PLUS            reduce using rule 26 (weights -> WEIGHTS numbers .)
+    SEV             reduce using rule 26 (weights -> WEIGHTS numbers .)
+    $end            reduce using rule 26 (weights -> WEIGHTS numbers .)
+    POISSON         reduce using rule 26 (weights -> WEIGHTS numbers .)
+    FIXED           reduce using rule 26 (weights -> WEIGHTS numbers .)
+    MIXED           reduce using rule 26 (weights -> WEIGHTS numbers .)
+    ID              reduce using rule 26 (weights -> WEIGHTS numbers .)
+    AGG             reduce using rule 26 (weights -> WEIGHTS numbers .)
+    XPS             reduce using rule 26 (weights -> WEIGHTS numbers .)
+
+
+state 75
+
+    (7) agg_out -> agg_name exposures layers SEV sev freq .
+    $end            reduce using rule 7 (agg_out -> agg_name exposures layers SEV sev freq .)
+    ID              reduce using rule 7 (agg_out -> agg_name exposures layers SEV sev freq .)
+    AGG             reduce using rule 7 (agg_out -> agg_name exposures layers SEV sev freq .)
+
+
+state 76
+
+    (12) freq -> POISSON .
+    $end            reduce using rule 12 (freq -> POISSON .)
+    ID              reduce using rule 12 (freq -> POISSON .)
+    AGG             reduce using rule 12 (freq -> POISSON .)
+
+
+state 77
+
+    (13) freq -> FIXED .
+    $end            reduce using rule 13 (freq -> FIXED .)
+    ID              reduce using rule 13 (freq -> FIXED .)
+    AGG             reduce using rule 13 (freq -> FIXED .)
+
+
+state 78
+
+    (14) freq -> MIXED . ids numbers
+    (15) freq -> MIXED . ids numbers numbers
+    (37) ids -> . ID
+    (38) ids -> . [ idl ]
+    ID              shift and go to state 28
+    [               shift and go to state 84
+
+    ids                            shift and go to state 83
+
+state 79
+
+    (30) exposures -> numbers PREMIUM AT numbers LR .
+    NUMBER          reduce using rule 30 (exposures -> numbers PREMIUM AT numbers LR .)
+    [               reduce using rule 30 (exposures -> numbers PREMIUM AT numbers LR .)
+    SEV             reduce using rule 30 (exposures -> numbers PREMIUM AT numbers LR .)
+
+
+state 80
+
+    (17) sev -> ids numbers numbers weights xps .
+    MINUS           reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    PLUS            reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    SEV             reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    $end            reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    POISSON         reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    FIXED           reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    MIXED           reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    ID              reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+    AGG             reduce using rule 17 (sev -> ids numbers numbers weights xps .)
+
+
+state 81
+
+    (24) xps -> XPS . numbers numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
+
+    numbers                        shift and go to state 85
+
+state 82
+
+    (19) sev -> ids numbers CV numbers weights .
+    MINUS           reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    PLUS            reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    SEV             reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    $end            reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    POISSON         reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    FIXED           reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    MIXED           reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    ID              reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+    AGG             reduce using rule 19 (sev -> ids numbers CV numbers weights .)
+
+
+state 83
+
+    (14) freq -> MIXED ids . numbers
+    (15) freq -> MIXED ids . numbers numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
+
+    numbers                        shift and go to state 86
+
+state 84
+
+    (38) ids -> [ . idl ]
+    (39) idl -> . ID
+    (40) idl -> . idl ID
+    ID              shift and go to state 50
+
+    idl                            shift and go to state 48
+
+state 85
+
+    (24) xps -> XPS numbers . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
+
+    numbers                        shift and go to state 87
+
+state 86
+
+    (14) freq -> MIXED ids numbers .
+    (15) freq -> MIXED ids numbers . numbers
+    (41) numbers -> . NUMBER
+    (42) numbers -> . [ numberl ]
+    $end            reduce using rule 14 (freq -> MIXED ids numbers .)
+    ID              reduce using rule 14 (freq -> MIXED ids numbers .)
+    AGG             reduce using rule 14 (freq -> MIXED ids numbers .)
+    NUMBER          shift and go to state 29
+    [               shift and go to state 20
+
+    numbers                        shift and go to state 88
+
+state 87
+
+    (24) xps -> XPS numbers numbers .
+    MINUS           reduce using rule 24 (xps -> XPS numbers numbers .)
+    PLUS            reduce using rule 24 (xps -> XPS numbers numbers .)
+    SEV             reduce using rule 24 (xps -> XPS numbers numbers .)
+    $end            reduce using rule 24 (xps -> XPS numbers numbers .)
+    POISSON         reduce using rule 24 (xps -> XPS numbers numbers .)
+    FIXED           reduce using rule 24 (xps -> XPS numbers numbers .)
+    MIXED           reduce using rule 24 (xps -> XPS numbers numbers .)
+    ID              reduce using rule 24 (xps -> XPS numbers numbers .)
+    AGG             reduce using rule 24 (xps -> XPS numbers numbers .)
+
+
+state 88
+
+    (15) freq -> MIXED ids numbers numbers .
+    $end            reduce using rule 15 (freq -> MIXED ids numbers numbers .)
+    ID              reduce using rule 15 (freq -> MIXED ids numbers numbers .)
+    AGG             reduce using rule 15 (freq -> MIXED ids numbers numbers .)

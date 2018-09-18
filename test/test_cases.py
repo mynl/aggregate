@@ -27,11 +27,11 @@ class TestUnderwriter(unittest.TestCase):
         self.uw = Underwriter()
 
     def test_severity(self):
-        cc = self.uw.liaba
+        cc = self.uw('liaba')
         self.assertTrue(np.allclose(cc.stats(), (50, 2500)))
 
     def test_portfolio(self):
-        p = self.uw.Three_Line_Example
+        p = self.uw('Three_Line_Example')
         p.update(13, 1.25)
         self.assertTrue(np.all(p.audit_df.loc['total', ['MeanErr', 'CVErr']].abs() < 1e-5))
 
@@ -42,17 +42,23 @@ class TestUnderwriter(unittest.TestCase):
         self.assertTrue(np.all(test.filter(regex='err[_s]', axis=1).abs().sum() < 1e-8))
 
     def test_parser(self):
-        portfolio_program = """
-        | name        | expos                 | limit                    | sev                                               | freq              |
-        |:------------|:----------------------|:-------------------------|:--------------------------------------------------|:------------------|
-        | big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | sev lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
-        | A1a         | 500 premium at 0.5    |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A1b         | 500 premium at 0.5 lr |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A2          | 50  claims            | 30 xs 10                 | sev gamma 12 cv .30                                | mixed gamma 0.014 |
-        | A3          | 50  claims            |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
-        | hcmp        | 1e-8 * uw.cmp         |                          |                                                   |                   |
+        portfolio_program = """port test_portfolio
+    big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | sev lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
+    | A1a         | 500 premium at 0.5    |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+    | A1b         | 500 premium at 0.5 lr |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+    | A2          | 50  claims            | 30 xs 10                 | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+    | A3          | 50  claims            |                          | sev gamma 12 cv .30                                | mixed gamma 0.014 |
+    | hcmp        | 1e-8 * uw.cmp         |                          |                                                   |                   |
         """
-        p = self.uw.write(portfolio_program, 'test_portfolio', update=True, verbose=False, log2=12, remove_fuzz=True)
+        portfolio_program = """port test_portfolio
+    big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | sev lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
+    | A1a         | 500 premium at 0.5    |                          | sev gamma 12 cv .30                           
+    | A1b         | 500 premium at 0.5 lr |                          | sev gamma 12 cv .30                             
+    | A2          | 50  claims            | 30 xs 10                 | sev gamma 12 cv .30                      
+    | A3          | 50  claims            |                          | sev gamma 12 cv .30                       
+    | hcmp        | 1e-8 * uw.cmp                                       
+            """
+        p = self.uw.write(portfolio_program, update=True, verbose=False, log2=12, remove_fuzz=True)
         self.assertTrue(np.all(p.audit_df.iloc[:-1, :].CVErr.abs() < 0.005))
         self.assertTrue(np.all(p.audit_df.iloc[:-1, :].MeanErr.abs() < 0.002))
 

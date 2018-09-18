@@ -106,6 +106,7 @@ inland_marine:
 ppal:
     exp_en: 5676073.301971859
     freq_a: 0.089
+    freq_name: poisson
     sev_name: lognorm
     sev_cv: 0.5
     sev_mean: 30000.0
@@ -127,6 +128,7 @@ pers_auto:
     note: US statutory personal auto liability and physical damage, SNL 2017
 comm_auto:
     exp_en: 5676073.301971859
+    freq_name: poisson
     freq_a: 0.089
     sev_name: lognorm
     sev_cv: 0.5

@@ -73,7 +73,7 @@ class Aggregate(object):
 
         """
 
-        assert np.sum(sev_wt) == 1
+        assert np.allclose(np.sum(sev_wt), 1)
 
         # self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
         #                  exp_attachment=exp_attachment, exp_limit=exp_limit,
@@ -541,6 +541,8 @@ class Aggregate(object):
         if self.agg_density is None:
             print('Cannot plot before update')
             return
+        if self.sev_density is None:
+            self.update(self.xs, 1, None, sev_calc='discrete', force_severity=True)
 
         set_tight = (axiter is None)
 
@@ -548,8 +550,9 @@ class Aggregate(object):
             axiter = axiter_factory(axiter, 10, aspect=aspect, figsize=figsize)
 
             max_lim = min(self.xs[-1], np.max(self.limit)) * 1.05
+            if max_lim < 1: max_lim = 1
 
-            next(axiter).plot(self.xs, self.sev_density, drawstyle='steps-post')
+            next(axiter).plot(self.xs, self.sev_density)  # , drawstyle='steps-post')
             axiter.ax.set(title='Severity', xlim=(0, max_lim))
 
             next(axiter).plot(self.xs, self.sev_density)
@@ -561,13 +564,11 @@ class Aggregate(object):
             else:
                 axiter.ax.set(title='Log Severity')
                 axiter.ax.set(title='Log Severity', yscale='log')
-            if max_lim > 0:
-                axiter.ax.set(xlim=max_lim)
+                axiter.ax.set(xlim=(0, max_lim))
 
             next(axiter).plot(self.xs, self.sev_density.cumsum(), drawstyle='steps-post')
             axiter.ax.set(title='Severity Distribution')
-            if max_lim > 0:
-                axiter.ax.set(xlim=(0, max_lim))
+            axiter.ax.set(xlim=(0, max_lim))
 
             next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
             axiter.ax.plot(self.xs, self.sev_density, lw=0.5, drawstyle='steps-post', label='severity')
@@ -627,8 +628,6 @@ class Aggregate(object):
                 dh_F = dh_F[:mx]
             F = F[:mx]
 
-            if self.sev_density is None:
-                self.update(self.xs, 1, None, sev_calc='discrete', force_severity=True)
             xs = self.xs[:mx]
             d = self.agg_density[:mx]
             sevF = np.cumsum(self.sev_density)
@@ -889,10 +888,12 @@ class Severity(ss.rv_continuous):
             st = self.fz.stats('mv')
             m = st[0]
             acv = st[1] ** .5 / m  # achieved sev_cv
-            if sev_mean > 0:
-                assert (np.isclose(sev_mean, m))
-            if sev_cv > 0:
-                assert (np.isclose(sev_cv, acv))
+            if sev_mean > 0 and not np.isclose(sev_mean, m):
+                print(f'WARNING target mean {sev_mean} and achieved mean {m} not close')
+                # assert (np.isclose(sev_mean, m))
+            if sev_cv > 0 and not np.isclose(sev_cv, acv):
+                print(f'WARNING target cv {sev_cv} and achieved cv {acv} not close')
+                # assert (np.isclose(sev_cv, acv))
             # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
             logging.info(
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '

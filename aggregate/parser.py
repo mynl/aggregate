@@ -234,41 +234,51 @@ References
 https://sly.readthedocs.io/en/latest/sly.html
 
 """
-import pandas as pd
 from sly import Lexer, Parser
 import logging
 import numpy as np
+from collections import Iterable
 
 
 class UnderwritingLexer(Lexer):
-    tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, SEV}
+    tokens = {ID, BUILTINID,
+              SEV, AGG, PORT,
+              PLUS, MINUS, TIMES, NUMBER,
+              LOSS, PREMIUM, AT, LR, CLAIMS,
+              XS,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
+              MIXED, FIXED, POISSON
+              }
     ignore = ' \t,\\:\\(\\)|'
     literals = {'[', ']'}
 
-    BUILTINID = r'uw\.[a-zA-Z_][a-zA-Z0-9_]*'
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    BUILTINID = r'uw\.[a-zA-Z][a-zA-Z0-9_]*'
+    ID = r'[a-zA-Z][a-zA-Z0-9_]*'
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
+    EQUAL_WEIGHT = r'='
     ID['loss'] = LOSS
     ID['at'] = AT
     ID['cv'] = CV
-    ID['premium'] = PREMIUM
     ID['prem'] = PREMIUM
+    ID['premium'] = PREMIUM
     ID['lr'] = LR
-    # ID['on'] = ON
-    ID['claims'] = CLAIMS
     ID['claim'] = CLAIMS
-    ID['xs'] = XS
+    ID['claims'] = CLAIMS
     ID['x'] = XS
+    ID['xs'] = XS
     ID['wts'] = WEIGHTS
+    ID['wt'] = WEIGHTS
     ID['xps'] = XPS
     ID['mixed'] = MIXED
     ID['poisson'] = POISSON
     ID['fixed'] = FIXED
     ID['inf'] = NUMBER
     ID['sev'] = SEV
+    ID['on'] = SEV
+    ID['agg'] = AGG
+    ID['port'] = PORT
 
     @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
     def NUMBER(self, t):
@@ -294,8 +304,10 @@ class UnderwritingParser(Parser):
 
     def __init__(self, safe_lookup_function, debug=False):
         self.arg_dict = None
+        self.sev_out_dict = None
+        self.agg_out_dict = None
+        self.port_out_dict = None
         self.reset()
-        self.type = ''
         # instance of uw class to look up severities
         self._safe_lookup = safe_lookup_function
         if debug:
@@ -305,189 +317,231 @@ class UnderwritingParser(Parser):
             self.p = _print
         else:
             def _print(s):
-                pass
+                logging.info('UnderwritingParser | ' + s)
 
             self.p = _print
 
     def reset(self):
-        # TODO pull from Aggregate automatically ...
         # TODO Add sev_xs and sev_ps !!
-        # in order to allow for missing terms this must reflect sensible defaults
-        self.arg_dict = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                             sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
-                             freq_name='poisson', freq_a=0, freq_b=0)
+        self.sev_out_dict = {}
+        self.agg_out_dict = {}
+        self.port_out_dict = {}
 
-    # built from a built in book
-    @_('name builtin_aggregate')
-    def ans(self, p):
-        self.p(f'exiting through builtin_aggregate {p.builtin_aggregate}')
-        self.type = 'aggregate'
-        logging.info('UnderwritingParser | Exiting through built in aggregate')
-        pass
+    @staticmethod
+    def _check_vectorizable(value):
+        """
+        check the if value can be vectorized
+
+        """
+        if isinstance(value, float) or isinstance(value, int) or isinstance(value, np.ndarray):
+            return value
+        else:
+            return np.array(value)
+
+            # @staticmethod
+    # def new_arg_dict():
+    #     # to
+    #     # in order to allow for missing terms this must reflect sensible defaults
+    #     return dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
+    #                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
+    #                 freq_name='poisson', freq_a=0, freq_b=0)
+
+    # final answer exit points ===================================
+    @_('sev_out')
+    def answer(self, p):
+        self.p(f'\t\tExiting through sev_out, created severity {p.sev_out}')
+
+    @_('agg_out')
+    def answer(self, p):
+        self.p(f'\t\tExiting through agg_out, created aggregate {p.agg_out}')
+
+    @_('port_out')
+    def answer(self, p):
+        self.p(f'\t\tExiting through port_out, portfolio has {len(self.port_out_dict)} aggregates')
+
+    # building portfolios =======================================
+    @_('port_name agg_list')
+    def port_out(self, p):
+        self.p(f'\tport_name and agg_list to port_out {p.port_name}')
+        self.port_out_dict[p.port_name] = p.agg_list
+
+    @_('agg_list agg_out')
+    def agg_list(self, p):
+        self.p(f'\tadding agg_out {p.agg_out} to agg_list {p.agg_list}')
+        if p.agg_list is None:
+            raise ValueError('ODD agg list is empty')
+        p.agg_list.append(p.agg_out)
+        return p.agg_list
+
+    @_('agg_out')
+    def agg_list(self, p):
+        self.p(f'\tadding agg_out {p.agg_out} to new agg_list')
+        return [p.agg_out]
+
+    # building aggregates ========================================
+    @_('agg_name builtin_aggregate')
+    def agg_out(self, p):
+        self.p(f'agg_name builtin_aggregate {p.builtin_aggregate} to agg_out')
+        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.builtin_aggregate}
+        return p.agg_name
 
     # standard spec expos [layers] sevs [freq]
-    @_('name exposures layers SEV sev freq')
-    def ans(self, p):
-        self.p(f'exiting through name exposures layers SEV sev freq')
-        self.type = 'aggregate'
-        logging.info('UnderwritingParser | Exiting through name exposures limit SEV sev freq')
-        pass
+    @_('agg_name exposures layers SEV sev freq')
+    def agg_out(self, p):
+        self.p(f'agg_name exposures layers SEV sev freq to agg_out {p.agg_name}')
+        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.exposures, **p.layers, **p.sev, **p.freq}
+        return p.agg_name
 
-    # allow just to load a severity...
-    @_('SEV name sev')
-    def ans(self, p):
-        self.p('Exiting through SEV name sev')
-        self.type = 'severity'
-        logging.info('UnderwritingParser | Exiting through sev')
-        pass
+    # building severities ======================================
+    @_('sev_out sev_name sev')
+    def sev_out(self, p):
+        self.p(f'sev_out sev_name {p.sev_name} sev to sev_out, appending to sev_out_dict')
+        self.sev_out_dict[p.sev_name] = p.sev
+
+    @_('sev_name sev')
+    def sev_out(self, p):
+        self.p(f'sev_name sev resolving to sev_part {p.sev_name}, adding to sev_out_dict')
+        self.sev_out_dict[p.sev_name] = p.sev
 
     # frequency term ==========================================
-    @_('MIXED ids numbers numbers')
+    @_('MIXED ID numbers numbers')
     def freq(self, p):
-        self.p(f'MIXED ids numbers numbers {p.ids}, {p.numbers}, {p.numbers} two param freq, numbers.1=CVs')
-        self.arg_dict['freq_name'] = 'poisson'  # p.ids  TODO once freq dists implemented this needs to change
-        self.arg_dict['freq_a'] = p[2]
-        self.arg_dict['freq_b'] = p[3]
+        self.p(f'MIXED ids numbers numbers {p.ID}, {p.numbers}, {p.numbers} two param freq, numbers.1=CVs')
+        return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}  # TODO IDS--> poisson for now
 
-    @_('MIXED ids numbers')
+    @_('MIXED ID numbers')
     def freq(self, p):
-        self.p(f'MIXED ids numbers {p.ids}, {p.numbers} single param freq, numbers=CVs')
-        self.arg_dict['freq_name'] = 'poisson'  # p.ids  TODO, as above
-        self.arg_dict['freq_a'] = p.numbers
+        self.p(f'MIXED ids numbers {p.ID}, {p.numbers} single param freq, numbers=CVs')
+        # return {'freq_name': p.ids, 'freq_a': p.numbers}  # TODO IDS--> poisson for now
+        return {'freq_name': p.ID, 'freq_a': p.numbers}  # TODO IDS--> poisson for now
 
     @_('FIXED')
     def freq(self, p):
         self.p('FIXED')
-        self.arg_dict['freq_name'] = 'fixed'
+        return {'freq_name': 'fixed'}
 
     @_('POISSON')
     def freq(self, p):
         self.p('POISSON')
-        self.arg_dict['freq_name'] = 'poisson'
+        return {'freq_name': 'poisson'}
 
     @_('')
     def freq(self, p):
         self.p('missing frequency term')
-        return True
+        return { 'freq_name': 'poisson'}
 
     # severity term ============================================
-    # @_("ON sev")
-    # def sev_term(self, p):
-    #     self.p(f'resolving ON sev to sev_term')
-    #     return True
-
     @_('sev PLUS numbers')
     def sev(self, p):
         self.p(f'resolving sev PLUS numbers to sev {p.numbers}')
-        # this won't work...
-        self.arg_dict['sev_loc'] += p.numbers
+        p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_loc', 0))
+        p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
+        p.sev['sev_loc'] += p.numbers
+        return p.sev
 
     @_('sev MINUS numbers')
     def sev(self, p):
         self.p(f'resolving sev MINUS numbers to sev {p.numbers}')
-        self.arg_dict['sev_loc'] -= p.numbers
+        p.sev['sev_loc'] = p.sev.get('sev_loc', 0) - p.numbers
+        return p.sev
 
     @_('numbers TIMES sev')
     def sev(self, p):
         self.p(f'resolving numbers TIMES sev to sev {p.numbers}')
-        self.arg_dict['sev_mean'] *= p.numbers
+        p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
+        if 'sev_mean' in p.sev:
+            p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_mean', 0))
+            p.sev['sev_mean'] *= p.numbers
         # only scale scale if there is a scale (otherwise you double count)
-        # if self.arg_dict['sev_scale']:
-        self.arg_dict['sev_scale'] = p.numbers
+        # TODO OK? sev_scale...
+        if 'sev_scale' in p.sev:
+            p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_scale', 0))
+            p.sev['sev_scale'] *= p.numbers
+        else:
+            p.sev['sev_scale'] = p.numbers
+        return p.sev
+
 
     @_('ids numbers CV numbers weights')
     def sev(self, p):
-        self.p(f'resolving ids numbers CV numbers sev{p[1]}, {p[3]}')
-        self.arg_dict['sev_name'] = p.ids
-        self.arg_dict['sev_mean'] = p[1]
-        self.arg_dict['sev_cv'] = p[3]
-        return True
+        self.p(f'resolving ids {p.ids} numbers CV numbers sev {p[1]}, {p[3]}')
+        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_wt': p.weights}
 
     @_('ids numbers weights')
     def sev(self, p):
-        self.p(f'resolving ids numbers to sev {p[1]} (one param dist)')
-        self.arg_dict['sev_name'] = p.ids
-        self.arg_dict['sev_a'] = p[1]
-        return True
+        self.p(f'resolving ids {p.ids} numbers {p[1]} to sev (one param dist)')
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
 
     @_('ids numbers numbers weights xps')
     def sev(self, p):
-        self.p(f'resolving ids numbers numbers to sev {p[1]}, {p[2]} (two param dist)')
-        self.arg_dict['sev_name'] = p.ids
-        self.arg_dict['sev_a'] = p[1]
-        self.arg_dict['sev_b'] = p[2]
-        return True
+        self.p(f'resolving ids {p.ids} numbers numbers {p[1]}, {p[2]} to sev (two param sev dist)')
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
 
     @_('XPS numbers numbers')
     def xps(self, p):
         self.p(f'XPS numbers numbers resolving to xs and ps {p[1]}, {p[2]}')
-        self.arg_dict['sev_xs'] = p[1]
-        self.arg_dict['sev_ps'] = p[2]
-        return True
+        return {'sev_xs':  p[1], 'sev_ps':  p[2]}
 
     @_('')
     def xps(self, p):
         self.p('missing xps term')
+        return {}
+
+    @_('WEIGHTS EQUAL_WEIGHT NUMBER')
+    def weights(self, p):
+        self.p(f'WEIGHTS EQUAL_WEIGHTS {p.NUMBER} resolving to equal weights')
+        return np.ones(int(p.NUMBER)) / p.NUMBER
 
     @_('WEIGHTS numbers')
     def weights(self, p):
         self.p(f'WEIGHTS numbers resolving to weights {p.numbers}')
-        self.arg_dict['sev_wt'] = p.numbers
-        return True
+        return p.numbers
 
     @_('')
     def weights(self, p):
         self.p('missing weights term')
+        return 1
 
     @_('builtinids')
     def sev(self, p):
-        self.p(f'builtinds to sevs {p.builtinids}')
+        self.p(f'builtinds to sev {p.builtinids} IS THIS RIGHT? HAS IT BEEN CHECKED?')
         # look up ID in uw
-        for n in p.builtinids:
-            built_in_dict = self._safe_lookup(n, 'severity')
-            self.arg_dict.update(built_in_dict)
+        return [self._safe_lookup(n, 'severity') for n in p.builtinids]
+        # for n in p.builtinids:
+        #     built_in_dict = self._safe_lookup(n, 'severity')
+        #     self.arg_dict.update(built_in_dict)
 
     # layer terms, optoinal ===================================
     @_('numbers XS numbers')
     def layers(self, p):
         self.p(f'numbers XS numbers to layers {p[0]} xs {p[2]}')
-        self.arg_dict['exp_attachment'] = p[2]
-        self.arg_dict['exp_limit'] = p[0]
-        return True
+        return {'exp_attachment': p[2], 'exp_limit': p[0]}
 
     @_('')
     def layers(self, p):
         self.p('missing layer term')
-        return True
+        return {}
 
     # exposures term ==========================================
     @_('numbers CLAIMS')
     def exposures(self, p):
         self.p(f'resolving numbers CLAIMS to exposures {p.numbers}')
-        self.arg_dict['exp_en'] = p.numbers
-        return True
+        return {'exp_en': p.numbers}
 
     @_('numbers LOSS')
     def exposures(self, p):
         self.p(f'resolving numbers LOSS to exposures {p.numbers}')
-        self.arg_dict['exp_el'] = p.numbers
-        return True
+        return {'exp_el': p.numbers}
 
     @_('numbers PREMIUM AT numbers LR')
     def exposures(self, p):
         self.p(f'resolving numbers PREMIUM AT numbers LR to exposures {p[0]} at {p[3]}')
-        self.arg_dict['exp_premium'] = p[0]
-        self.arg_dict['exp_lr'] = p[3]
-        self.arg_dict['exp_el'] = p[0] * p[3]
-        return True
+        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
 
     @_('numbers PREMIUM AT numbers')
     def exposures(self, p):
         self.p(f'resolving numbers PREMIUM AT numbers to exposures {p[0]} at {p[3]}')
-        self.arg_dict['exp_premium'] = p[0]
-        self.arg_dict['exp_lr'] = p[3]
-        self.arg_dict['exp_el'] = p[0] * p[3]
-        return True
+        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
 
     # lists for ids and numbers and builtinids ================================
     @_('"[" builtinidl "]"')
@@ -567,11 +621,11 @@ class UnderwritingParser(Parser):
     def builtin_aggregate(self, p):
         """  inhomogeneous change of scale """
         self.p(f'Lookup BUILTINID {p.BUILTINID} TIMES NUMBER {p.NUMBER}')
-        built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
-        self.arg_dict.update(built_in_dict)
-        self.arg_dict['exp_en'] *= p.NUMBER
-        self.arg_dict['exp_el'] *= p.NUMBER
-        self.arg_dict['exp_premium'] *= p.NUMBER
+        bid = self._safe_lookup(p.BUILTINID, 'aggregate')
+        bid['exp_en'] = bid.get('exp_en', 0) * p.NUMBER
+        bid['exp_el'] = bid.get('exp_el', 0) * p.NUMBER
+        bid['exp_premium'] = bid.get('exp_premium', 0) * p.NUMBER
+        return bid
 
     @_('NUMBER TIMES BUILTINID')
     def builtin_aggregate(self, p):
@@ -582,31 +636,49 @@ class UnderwritingParser(Parser):
         :return:
         """
         self.p(f'NUMBER {p.NUMBER} TIMES Lookup BUILTINID {p.BUILTINID}')
-        built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
-        self.arg_dict.update(built_in_dict)
-        self.arg_dict['sev_mean'] *= p.NUMBER
-        self.arg_dict['sev_scale'] *= p.NUMBER
-        self.arg_dict['sev_loc'] *= p.NUMBER
-        self.arg_dict['exp_attachment'] *= p.NUMBER
-        self.arg_dict['exp_limit'] *= p.NUMBER
-        self.arg_dict['exp_el'] *= p.NUMBER
-        self.arg_dict['exp_premium'] *= p.NUMBER
+        # bid = built_in_dict
+        bid = self._safe_lookup(p.BUILTINID, 'aggregate')  # ? does this need copying. if so do in safelookup!
+        bid['sev_mean'] = bid.get('sev_mean', 0) * p.NUMBER
+        bid['sev_scale'] = bid.get('sev_scale', 1) * p.NUMBER
+        bid['sev_loc'] = bid.get('sev_loc', 0) * p.NUMBER
+        bid['exp_attachment'] = bid.get('exp_attachment', 0) * p.NUMBER
+        bid['exp_limit'] = bid.get('exp_limit', np.inf) *p.NUMBER
+        bid['exp_el'] = bid.get('exp_el', 0) * p.NUMBER
+        bid['exp_premium'] = bid.get('exp_premium', 0) * p.NUMBER
+        return bid
 
     @_('BUILTINID')
     def builtin_aggregate(self, p):
         self.p(f'Lookup BUILTINID {p.BUILTINID}')
         built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
-        self.arg_dict.update(built_in_dict)
+        return built_in_dict
+
+    # ids =========================================================
+    @_('SEV ID')
+    def sev_name(self, p):
+        self.p(f'SEV ID resolves to sev_name {p.ID}')
+        return p.ID
+
+    @_('AGG ID')
+    def agg_name(self, p):
+        self.p(f'AGG ID resolves to agg_name {p.ID}')
+        # return {'name': p.ID}
+        return p.ID
 
     @_('ID')
-    def name(self, p):
-        self.p(f'ID resolves to name {p.ID}')
-        self.arg_dict['name'] = p.ID
+    def agg_name(self, p):
+        self.p(f'ID resolves to agg_name {p.ID}')
+        # return {'name': p.ID}
+        return p.ID
+
+    @_('PORT ID')
+    def port_name(self, p):
+        self.p(f'PORT ID resolves to port_name {p.ID}')
+        # return {'name': p.ID}
+        return p.ID
 
     def error(self, p):
         if p:
             raise ValueError(p)
         else:
             raise ValueError('Unexpected end of file')
-
-

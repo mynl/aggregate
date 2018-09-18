@@ -51,7 +51,10 @@ class Underwriter(object):
         self.debug = debug
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
-
+        # otherwise these are hidden from pyCharm....
+        self.severity = None
+        self.aggregate = None
+        self.portfolio = None
         if databases is None:
             databases = dict(severity=['severities.yaml'], aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
                              portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
@@ -67,6 +70,7 @@ class Underwriter(object):
                     temp = yaml.load(f, Loader=yaml.Loader)
                     for kt, vt in temp.items():
                         d[kt] = vt
+            # port, agg and sev actually set here...
             self.__setattr__(k, d)
 
     def __getitem__(self, item):
@@ -87,17 +91,24 @@ class Underwriter(object):
                 return k, self.__getattribute__(k)[item]
         raise LookupError
 
-    def __getattr__(self, item):
-        """
-        handles self.item and returns an appropriate object
-
-        :param item:
-        :return:
-        """
-        print(f'Underwriter.__getattr__({item}) called')
-        return self.write(item)
+    # this is evil: it passes unknown things through to write...
+    # def __getattr__(self, item):
+    #     """
+    #     handles self.item and returns an appropriate object
+    #
+    #     :param item:
+    #     :return:
+    #     """
+    #     # print(f'Underwriter.__getattr__({item}) called')
+    #     if item[0] == '_':
+    #         # deal with the _ipython_canary_method_should_not_exist_
+    #         # print('bailing')
+    #         return
+    #     else:
+    #         return self.write(item)
 
     def __call__(self, portfolio_program):
+        # print(f'Call on underwriter with {portfolio_program[:100]}')
         return self.write(portfolio_program)
 
     def list(self):
@@ -148,19 +159,21 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
-    def write(self, portfolio_program, portfolio_name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write(self, portfolio_program, update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
         e.g. Input
-        20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
-        10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
-        100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1
+        port my_portfolio
+            20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
+            10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
+            100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
+
+        The indents are required...
 
         See parser for full language spec!
 
         :param portfolio_program:
-        :param portfolio_name:
         :param update:
         :param verbose:
         :param log2:
@@ -177,8 +190,9 @@ class Underwriter(object):
             _type, obj = self.__getitem__(portfolio_program)
         except LookupError:
             lookup_success = False
-            logging.info(f'underwriter.write | object {portfolio_program} not found, will process as program')
+            logging.warning(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
         if lookup_success:
+            logging.info(f'underwriter.write | object {portfolio_program[:500]} found, returning object...')
             if _type == 'aggregate':
                 return Aggregate(portfolio_program, **obj)
             elif _type == 'portfolio':
@@ -189,57 +203,56 @@ class Underwriter(object):
                 ValueError(f'Cannot build {_type} objects')
             return obj
 
-        logging.info(f'Underwriter._runner | Executing program\n{portfolio_program[:500]}\n\n')
-        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
-        # make up a name if none given
-        if portfolio_name == '':
-            portfolio_name = f'user_{len(agg_spec_list)}'
-        # add newly created item to the built in list
-        if self.store_mode:
-            if len(agg_spec_list) > 0:
-                for a in agg_spec_list:
-                    self.aggregate[a['name']] = a
-                self.portfolio[portfolio_name] = dict(arg_dict=dict(), note=portfolio_program, spec=agg_spec_list)
-            if len(sev_spec_list) > 0:
-                for s in sev_spec_list:
-                    self.severity[s['name']] = {k: v for k, v in s.items() if k != 'name'}
-        # allow to create EITHER portfolio OR severities
-        if len(agg_spec_list) > 0:
-            logging.info(f'Underwriter.write | creating Portfolio {portfolio_name} from {portfolio_program[0:20]}')
-            # agg_spec_list is a list of dictionaries that can be passed straight through to creaet a portfolio
-            port = Portfolio(portfolio_name, agg_spec_list)
-            if update:
-                if bs == 0:
-                    # for log2 = 10
-                    bs = port.recommend_bucket().iloc[-1, 0]
-                    if log2 == 0:
-                        log2 = 10
-                    else:
-                        bs = bs * 2 ** (10 - log2)
-                logging.info(f'Underwriter.write | updating Portfolio {portfolio_name}, log2={10}, bs={bs}')
-                port.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
-            self.last_spec = agg_spec_list
-            return port
-        elif len(sev_spec_list) > 0:
-            sevs = []
-            logging.info(f'Underwriter.write | creating severities from {portfolio_program[0:20]}')
-            for s in sev_spec_list:
-                del s['sev_wt']
-                sev = Severity(**s)
-                sevs.append(sev)
-            self.last_spec = sev_spec_list
-            return sevs
+        # run
+        self._runner(portfolio_program)
+
+        # what shall we create? only create if there is one item  port then agg then sev, create in rv
+        rv = None
+        if len(self.parser.port_out_dict) > 0:
+            # create ports
+            rv = []
+            for k in self.parser.port_out_dict.keys():
+                s = Portfolio(k, self.portfolio[k]['spec'])
+                if update:
+                    if bs == 0:
+                        # for log2 = 10
+                        bs = s.recommend_bucket().iloc[-1, 0]
+                        if log2 == 0:
+                            log2 = 10
+                        else:
+                            bs = bs * 2 ** (10 - log2)
+                    logging.info(f'Underwriter.write | updating Portfolio {k}, log2={10}, bs={bs}')
+                    s.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+                rv.append(s)
+
+        elif len(self.parser.agg_out_dict) > 0 and rv is None:
+            # new aggs, create them
+            rv = []
+            for k, v in self.parser.sev_out_dict.items():
+                s = Aggregate(k, **v)
+                rv.append(s)
+
+        elif len(self.parser.sev_out_dict) > 0 and rv is None:
+            # sev all sevs
+            rv = []
+            for v in self.parser.sev_out_dict.values():
+                if 'sev_wt' in v:
+                    del v['sev_wt']
+                s = Severity(**v)
+                rv.append(s)
+
         else:
             print('WARNING: Program did not contain any output...')
             logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output...')
-            return None
+        if len(rv) == 1:
+            rv = rv[0]
+        return rv
 
-    def write_from_file(self, file_name, portfolio_name='', update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write_from_file(self, file_name, update=False, verbose=False, log2=0, bs=0, **kwargs):
         """
         read program from file. delegates to write
 
         :param file_name:
-        :param portfolio_name:
         :param update:
         :param verbose:
         :param log2:
@@ -249,7 +262,7 @@ class Underwriter(object):
         """
         with open(file_name, 'r', encoding='utf-8') as f:
             portfolio_program = f.read()
-        return self.write(portfolio_program, portfolio_name, update, verbose, log2, bs, **kwargs)
+        return self.write(portfolio_program, update, verbose, log2, bs, **kwargs)
 
     def write_test(self, portfolio_program):
         """
@@ -260,16 +273,27 @@ class Underwriter(object):
         :return:
         """
         logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
-        agg_spec_list, sev_spec_list = self._runner(portfolio_program)
-        ans = ans2 = None
-        if len(agg_spec_list) > 0:
-            nm = [a['name'] for a in agg_spec_list]
-            ans = pd.DataFrame(agg_spec_list, index=nm).T
-            ans = ans.iloc[[1, 2, 5, 4, 3, 0, 15, 10, 11, 14, 12, 13, 16, 17, 8, 6, 7], :]
-        if len(sev_spec_list) > 0:
-            nm2 = [a['name'] for a in sev_spec_list]
-            ans2 = pd.DataFrame(sev_spec_list, index=nm2).T
-        return ans, ans2
+        self._runner(portfolio_program)
+        # for a in ['sev_out_dict', 'agg_out_dict', 'port_out_dict']:
+        #     ans = getattr(self.parser, a)
+        #     if len(ans) > 0:
+        #         _s = f'{len(ans)} {a[0:4]} objects created'
+        #         print('\n'+_s)
+        #         print('='*len(_s))
+        #         for k, v in ans.items():
+        #             print(f'{k:<10s}\t{v}')
+        ans1 = ans2 = ans3 = None
+        if len(self.parser.sev_out_dict) > 0:
+            for v in self.parser.sev_out_dict.values():
+                Underwriter._add_defaults(v, 'sev')
+            ans1 = pd.DataFrame(list(self.parser.sev_out_dict.values()), index=self.parser.sev_out_dict.keys())
+        if len(self.parser.agg_out_dict) > 0:
+            for v in self.parser.agg_out_dict.values():
+                Underwriter._add_defaults(v)
+            ans2 = pd.DataFrame(list(self.parser.agg_out_dict.values()), index=self.parser.agg_out_dict.keys())
+        if len(self.parser.port_out_dict) > 0:
+            ans3 = pd.DataFrame(list(self.parser.port_out_dict.values()), index=self.parser.port_out_dict.keys())
+        return ans1, ans2, ans3
 
     def _runner(self, portfolio_program):
         """
@@ -278,45 +302,71 @@ class Underwriter(object):
             \ (line continuation) mapped to space
             split on newlines
             parse one line at a time
-            if the second line started |-, |:- both it and the first line are ignored
-            ==> a pipe table can be used as input
+            PIPE format no longer supported
+        error handling and piping through parser
+
         :param portfolio_program:
         :return:
         """
-        # preprocess
+        # preprocess line continuation and replace ; with new line
         portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
-                             replace(';', '\n').split('\n') if len(i.strip()) > 0]
-        # check if program in pipe table format
-        if len(portfolio_program) >= 2 and portfolio_program[1][0:2] in ('|:', '|-'):
-            # looks like a pipe table
-            portfolio_program = portfolio_program[2:]
-        agg_spec_list = []
-        sev_spec_list = []
-        for txt in portfolio_program:
-            self.parser.reset()
+                             replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
+                             split('\n') if len(i.strip()) > 0]
+        # portfolio_program = portfolio_program.replace('\\\n', ' ') # .replace(';', '\n')
+        self.parser.reset()
+        for program_line in portfolio_program:
+            # print(program_line)
             try:
-                # parse the block
-                self.parser.parse(self.lexer.tokenize(txt))
+                if len(program_line) > 0:
+                    self.parser.parse(self.lexer.tokenize(program_line))
             except ValueError as e:
                 if isinstance(e.args[0], str):
                     print(e)
                     raise e
                 else:
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    i = e.args[0].index
-                    txt2 = txt[0:i] + f'>>>' + txt[i:]
+                    t = e.args[0].type; v = e.args[0].value; i = e.args[0].index
+                    txt2 = program_line[0:i] + f'>>>' + program_line[i:]
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
-            self.parser.arg_dict['note'] = txt
-            # store creation text in note for future reference
-            if self.parser.type == 'aggregate':
-                agg_spec_list.append(self.parser.arg_dict)
-            elif self.parser.type == 'severity':
-                d = {k: v for k, v in self.parser.arg_dict.items() if k[0:3] == 'sev' or
-                     k[0:4] == 'note' or k[0:4] == 'name'}
-                sev_spec_list.append(d)
-        return agg_spec_list, sev_spec_list
+        if self.store_mode:
+            # could do this with a loop and getattr but it is too hard to read, so go easy route
+            if len(self.parser.sev_out_dict) > 0:
+                # for k, v in self.parser.sev_out_dict.items():
+                self.severity.update(self.parser.sev_out_dict) # [k] = v
+                logging.info(f'Underwriter._runner | saving {self.parser.sev_out_dict.keys()} severity/ies')
+            if len(self.parser.agg_out_dict) > 0:
+                # for k, v in self.parser.agg_out_dict.items():
+                #     self.aggregate[k] = v
+                self.aggregate.update(self.parser.agg_out_dict)
+                logging.info(f'Underwriter._runner | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
+            if len(self.parser.port_out_dict) > 0:
+                for k, v in self.parser.port_out_dict.items():
+                    # v is a list of aggregate names, these have all been added to the database...
+                    logging.info(f'Underwriter._runner | saving {k} portfolio')
+                    self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
+        # can we still do something like this?
+        #     self.parser.arg_dict['note'] = txt
+        return
+
+    @staticmethod
+    def _add_defaults(dict_, kind='agg'):
+        """
+        add default values to dict_ Leave existing values unchanged
+
+        :param dict_:
+        :return:
+        """
+        defaults = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
+                    sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
+                    freq_name='poisson', freq_a=0, freq_b=0)
+        if kind == 'agg':
+            for k, v in defaults.items():
+                if k not in dict_:
+                    dict_[k] = v
+        elif kind == 'sev':
+            for k, v in defaults.items():
+                if k[0:3] == 'sev' and k not in dict_ and k != 'sev_wt':
+                    dict_[k] = v
 
     def _safe_lookup(self, uw_id, expected_type):
         """
@@ -344,7 +394,7 @@ class Underwriter(object):
         # may need to delete various items
         # if 'note' in builtin_dict:
         #     del builtin_dict['note']
-        return builtin_dict
+        return builtin_dict.copy()
 
     @staticmethod
     def dict_to_agg(d):

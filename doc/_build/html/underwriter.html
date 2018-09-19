@@ -48,18 +48,42 @@
 <em class="property">class </em><code class="descclassname">aggregate.underwriter.</code><code class="descname">Underwriter</code><span class="sig-paren">(</span><em>dir_name=''</em>, <em>databases=None</em>, <em>store_mode=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter" title="Permalink to this definition">¶</a></dt>
 <dd><p>The underwriter class constructs real world examples from stored and user input Lines and Accounts.
 Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.</p>
+<p>Handles persistence
+Is interface into program parser
+Handles safe lookup from database for parser</p>
 <p>Persisitence to and from YAML managed</p>
 <dl class="method">
-<dt id="aggregate.underwriter.Underwriter.test_write">
-<code class="descname">test_write</code><span class="sig-paren">(</span><em>portfolio_program</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.test_write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.test_write" title="Permalink to this definition">¶</a></dt>
-<dd><p>parse program in debug mode</p>
+<dt id="aggregate.underwriter.Underwriter.describe">
+<code class="descname">describe</code><span class="sig-paren">(</span><em>item_type=''</em>, <em>pretty_print=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.describe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.describe" title="Permalink to this definition">¶</a></dt>
+<dd><p>more informative version of list
+Pull notes from YAML descriptions for type items</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>portfolio_program</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="aggregate.underwriter.Underwriter.dict_to_agg">
+<em class="property">static </em><code class="descname">dict_to_agg</code><span class="sig-paren">(</span><em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.dict_to_agg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.dict_to_agg" title="Permalink to this definition">¶</a></dt>
+<dd><p>convert a spec dictionary d into an agg language specification
+:param d:
+:return:</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.underwriter.Underwriter.list">
+<code class="descname">list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.list"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.list" title="Permalink to this definition">¶</a></dt>
+<dd><p>list all available databases</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
 </tr>
 </tbody>
 </table>
@@ -67,12 +91,15 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.write">
-<code class="descname">write</code><span class="sig-paren">(</span><em>portfolio_program</em>, <em>portfolio_name=''</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
+<code class="descname">write</code><span class="sig-paren">(</span><em>portfolio_program</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
 <dd><p>write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project</p>
 <p>e.g. Input
-20  loss 3 x 2 gamma 5 cv 0.30 mixed gamma 0.4
-10  claims 3 x 2 gamma 12 cv 0.30 mixed gamma 1.2
-100  premium at 0.4 3 x 2 4 * lognormal 3 cv 0.8 fixed 1</p>
+port my_portfolio</p>
+<blockquote>
+<div>20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
+10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
+100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1</div></blockquote>
+<p>The indents are required…</p>
 <p>See parser for full language spec!</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -80,7 +107,6 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>portfolio_program</strong> – </li>
-<li><strong>portfolio_name</strong> – </li>
 <li><strong>update</strong> – </li>
 <li><strong>verbose</strong> – </li>
 <li><strong>log2</strong> – </li>
@@ -98,7 +124,7 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.write_from_file">
-<code class="descname">write_from_file</code><span class="sig-paren">(</span><em>file_name</em>, <em>portfolio_name=''</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_from_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_from_file" title="Permalink to this definition">¶</a></dt>
+<code class="descname">write_from_file</code><span class="sig-paren">(</span><em>file_name</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_from_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_from_file" title="Permalink to this definition">¶</a></dt>
 <dd><p>read program from file. delegates to write</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -106,7 +132,6 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>file_name</strong> – </li>
-<li><strong>portfolio_name</strong> – </li>
 <li><strong>update</strong> – </li>
 <li><strong>verbose</strong> – </li>
 <li><strong>log2</strong> – </li>
@@ -117,6 +142,23 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.underwriter.Underwriter.write_test">
+<code class="descname">write_test</code><span class="sig-paren">(</span><em>portfolio_program</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>replaced     def test_write(self, portfolio_program):
+fka test_run</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>portfolio_program</strong> – </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
 </tr>
 </tbody>
 </table>
@@ -189,7 +231,8 @@ Whereas Examples only produces simple Portfolios and Books, the Underwriter clas
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probrst.html">Probability and Risk Theory (rst)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory (Markdown)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Distribution Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>

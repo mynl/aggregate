@@ -38,17 +38,24 @@ class Underwriter(object):
 
     """
 
-    def __init__(self, dir_name="", databases=None, store_mode=True, debug=False):
+    def __init__(self, dir_name="", databases=None, store_mode=True, auto_update=False,
+                 verbose=False, log2=10, debug=False):
         """
 
         :param dir_name:
+        :param databases:
         :param store_mode: add newly created aggregates to the database?
+        :param auto_update:
+        :param log2:
         :param debug: run parser in debug mode?
         """
 
         self.last_spec = None
         self.store_mode = store_mode
+        self.auto_update = auto_update
+        self.log2 = log2
         self.debug = debug
+        self.verbose = False  # for update
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
         # otherwise these are hidden from pyCharm....
@@ -159,7 +166,7 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
-    def write(self, portfolio_program, update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write(self, portfolio_program, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
@@ -173,11 +180,14 @@ class Underwriter(object):
 
         See parser for full language spec!
 
+        Reasonable kwargs:
+
+            bs
+            log2
+            verbose
+            update
+
         :param portfolio_program:
-        :param update:
-        :param verbose:
-        :param log2:
-        :param bs:
         :param kwargs:
         :return:
         """
@@ -206,6 +216,26 @@ class Underwriter(object):
         # run
         self._runner(portfolio_program)
 
+        # what / how to do; little awkward: to make easier for user have to strip named update args
+        # out of kwargs
+        update = kwargs.get('update', self.auto_update)
+        if update:
+            if 'log2' in kwargs:
+                log2 = kwargs.get('log2')
+                del kwargs['log2']
+            else:
+                log2 = self.log2
+            if 'bs' in kwargs:
+                bs = kwargs.get('bs')
+                del kwargs['bs']
+            else:
+                bs = 0
+            if 'verbose' in kwargs:
+                verbose = kwargs.get('verbose')
+                del kwargs['verbose']
+            else:
+                verbose = self.verbose
+
         # what shall we create? only create if there is one item  port then agg then sev, create in rv
         rv = None
         if len(self.parser.port_out_dict) > 0:
@@ -216,13 +246,15 @@ class Underwriter(object):
                 if update:
                     if bs == 0:
                         # for log2 = 10
-                        bs = s.recommend_bucket().iloc[-1, 0]
+                        _bs = s.recommend_bucket().iloc[-1, 0]
                         if log2 == 0:
-                            log2 = 10
+                            _log2 = 10
                         else:
-                            bs = bs * 2 ** (10 - log2)
-                    logging.info(f'Underwriter.write | updating Portfolio {k}, log2={10}, bs={bs}')
-                    s.update(log2=log2, bs=bs, verbose=verbose, **kwargs)
+                            _log2 = log2
+                            # adjust bucket size for new log2
+                            _bs *= 2 ** (10 - _log2)
+                    logging.info(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
+                    s.update(log2=_log2, bs=_bs, verbose=verbose, **kwargs)
                 rv.append(s)
 
         elif len(self.parser.agg_out_dict) > 0 and rv is None:
@@ -243,12 +275,12 @@ class Underwriter(object):
 
         else:
             print('WARNING: Program did not contain any output...')
-            logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output...')
-        if len(rv) == 1:
+            logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output')
+        if rv is not None and len(rv) == 1:
             rv = rv[0]
         return rv
 
-    def write_from_file(self, file_name, update=False, verbose=False, log2=0, bs=0, **kwargs):
+    def write_from_file(self, file_name, **kwargs):
         """
         read program from file. delegates to write
 
@@ -262,7 +294,7 @@ class Underwriter(object):
         """
         with open(file_name, 'r', encoding='utf-8') as f:
             portfolio_program = f.read()
-        return self.write(portfolio_program, update, verbose, log2, bs, **kwargs)
+        return self.write(portfolio_program, **kwargs)
 
     def write_test(self, portfolio_program):
         """
@@ -397,62 +429,62 @@ class Underwriter(object):
         return builtin_dict.copy()
 
     @staticmethod
-    def dict_to_agg(d):
+    def obj_to_agg(obj):
         """
-        convert a spec dictionary d into an agg language specification
-        :param d:
+        convert an object into an agg language specification, used for saving
+        :param obj: a dictionary, Aggregate, Severity or Portfolio object
         :return:
         """
         pass
 
 
-def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
-    """
-    nice formating for str function
-
-    :param type_name:
-    :param dict_in:
-    :param tab_level:
-    :param sio:
-    :return:
-    """
-
-    if sio is None:
-        sio = StringIO()
-
-    keys = sorted(dict_in.keys())
-    if 'name' in keys:
-        # which it should always be
-        nm = dict_in['name']
-        sio.write(nm + '\n' + '=' * len(nm) + '\n')
-        keys.pop(keys.index('name'))
-
-    sio.write(f'{"type":<20s}{type_name}\n')
-
-    for k in keys:
-        v = dict_in[k]
-        ks = '\t' * max(0, tab_level - 1) + f'{str(k):<20s}'
-        if type(v) == dict:
-            # sio.write('\t' * tab_level + ks + '\n')
-            dict_2_string(type(v), v, tab_level + 1, sio)
-        elif isinstance(v, str):
-            if len(v) > 30:
-                sio.write('\t' * tab_level + ks + '\n' + indent(fill(v, 30), ' ' * (4 * tab_level + 20)))
-            elif len(v) > 0:
-                sio.write('\t' * tab_level + ks + v)
-            sio.write('\n')
-        elif isinstance(v, collections.Iterable):
-            sio.write('\t' * tab_level + ks + '\n')
-            for vv in v:
-                sio.write('\t' * (tab_level + 1) + str(vv) + '\n')
-        elif type(v) == int:
-            sio.write('\t' * tab_level + f'{ks}\t{v:20d}\n')
-        elif type(v) == float:
-            if abs(v) < 100:
-                sio.write('\t' * tab_level + f'{ks}\t{v:20.5f}\n')
-            else:
-                sio.write('\t' * tab_level + f'{ks}\t{v:20,.1f}\n')
-        else:
-            # logging.info(f'Uknown type {type(v)} to dict_2_string')
-            sio.write('\t' * tab_level + ks + '\t' + str(v) + '\n')
-    return sio.getvalue()
+# def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
+#     """
+#     nice formating for str function
+#
+#     :param type_name:
+#     :param dict_in:
+#     :param tab_level:
+#     :param sio:
+#     :return:
+#     """
+#
+#     if sio is None:
+#         sio = StringIO()
+#
+#     keys = sorted(dict_in.keys())
+#     if 'name' in keys:
+#         # which it should always be
+#         nm = dict_in['name']
+#         sio.write(nm + '\n' + '=' * len(nm) + '\n')
+#         keys.pop(keys.index('name'))
+#
+#     sio.write(f'{"type":<20s}{type_name}\n')
+#
+#     for k in keys:
+#         v = dict_in[k]
+#         ks = '\t' * max(0, tab_level - 1) + f'{str(k):<20s}'
+#         if type(v) == dict:
+#             # sio.write('\t' * tab_level + ks + '\n')
+#             dict_2_string(type(v), v, tab_level + 1, sio)
+#         elif isinstance(v, str):
+#             if len(v) > 30:
+#                 sio.write('\t' * tab_level + ks + '\n' + indent(fill(v, 30), ' ' * (4 * tab_level + 20)))
+#             elif len(v) > 0:
+#                 sio.write('\t' * tab_level + ks + v)
+#             sio.write('\n')
+#         elif isinstance(v, collections.Iterable):
+#             sio.write('\t' * tab_level + ks + '\n')
+#             for vv in v:
+#                 sio.write('\t' * (tab_level + 1) + str(vv) + '\n')
+#         elif type(v) == int:
+#             sio.write('\t' * tab_level + f'{ks}\t{v:20d}\n')
+#         elif type(v) == float:
+#             if abs(v) < 100:
+#                 sio.write('\t' * tab_level + f'{ks}\t{v:20.5f}\n')
+#             else:
+#                 sio.write('\t' * tab_level + f'{ks}\t{v:20,.1f}\n')
+#         else:
+#             # logging.info(f'Uknown type {type(v)} to dict_2_string')
+#             sio.write('\t' * tab_level + ks + '\t' + str(v) + '\n')
+#     return sio.getvalue()

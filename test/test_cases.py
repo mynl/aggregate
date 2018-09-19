@@ -58,7 +58,7 @@ class TestUnderwriter(unittest.TestCase):
     | A3          | 50  claims            |                          | sev gamma 12 cv .30                       
     | hcmp        | 1e-8 * uw.cmp                                       
             """
-        p = self.uw.write(portfolio_program, update=True, verbose=False, log2=12, remove_fuzz=True)
+        p = self.uw.write(portfolio_program, update=True, log2=12, remove_fuzz=True)
         self.assertTrue(np.all(p.audit_df.iloc[:-1, :].CVErr.abs() < 0.005))
         self.assertTrue(np.all(p.audit_df.iloc[:-1, :].MeanErr.abs() < 0.002))
 

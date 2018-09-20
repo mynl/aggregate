@@ -225,6 +225,39 @@ class Aggregate(object):
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
+    def _repr_html_(self):
+        s = [f'<h3>Aggregate object: {self.name}</h3>']
+        s.append(f'Claim count {self.n:0,.2f}, {self.freq_name} distribution<br>')
+        _n = len(self.statistics_df)
+        if _n == 1:
+            sv = self.sevs[0]
+            s.append(f'Severity{sv.long_name} distribution, {sv.limit} xs {sv.attachment}<br>')
+        else:
+            s.append(f'Severity with {_n} components<br>')
+        st = self.statistics_total_df.loc['mixed', :]
+        sev_m = st.sev_m
+        sev_cv = st.sev_cv
+        n_m = st.freq_m
+        n_cv = st.freq_cv
+        a_m = st.agg_m
+        a_cv = st.agg_cv
+        _df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
+                            'Skew(X)': [None, None, st.agg_skew]}, index=['Sev', 'Freq', 'Agg'])
+        _df.index.name = 'X'
+        if self.audit_df is not None:
+            esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
+            esev_cv = self.audit_df.loc['mixed', 'emp_sev_cv']
+            ea_m = self.audit_df.loc['mixed', 'emp_agg_1']
+            ea_cv = self.audit_df.loc['mixed', 'emp_agg_cv']
+            _df.loc['Sev', 'Est E(X)'] = esev_m
+            _df.loc['Agg', 'Est E(X)'] = ea_m
+            _df.loc[:, 'Err E(X)'] = _df['Est E(X)'] / _df['E(X)'] - 1
+            _df.loc['Sev', 'Est CV(X)'] = esev_cv
+            _df.loc['Agg', 'Est CV(X)'] = ea_cv
+            _df.loc[:, 'Err CV(X)'] = _df['Est CV(X)'] / _df['CV(X)'] - 1
+        _df.fillna('')
+        return '\n'.join(s) + _df._repr_html_()
+
     # def __repr__(self):
     #     """
     #     Goal unmbiguous
@@ -266,7 +299,7 @@ class Aggregate(object):
 
         return beds
 
-    def easy_update(self, log2=13, bs=0, reporting_level=0, **kwargs):
+    def easy_update(self, log2=13, bs=0, **kwargs):
         """
         Convenience function
 
@@ -284,13 +317,7 @@ class Aggregate(object):
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
             kwargs['approximation'] = 'slognorm'
-        df, a = self.update(xs, **kwargs)
-
-        # misc reporting TODO enhance
-        if reporting_level > 0:
-            self.plot('quick')
-            self.report('audit')
-        return df, a
+        self.update(xs, **kwargs)
 
     def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', force_severity=False, verbose=False):
@@ -603,7 +630,7 @@ class Aggregate(object):
                 max_p = 1 - 1e-10
             k = (max_p / 0.99) ** (1 / _n)
             extraps = 0.99 * k ** np.arange(_n)
-            q = interpolate.interp1d(F, self.xs, kind='linear', fill_value=0, bounds_error=False)
+            q = interpolate.interp1d(F, self.xs, kind='linear', fill_value='extrapolate', bounds_error=False)
             ps = np.hstack((np.linspace(0, 1, 100, endpoint=False), extraps))
             qs = q(ps)
             next(axiter).plot(1 / (1 - ps), qs)
@@ -746,7 +773,8 @@ class Aggregate(object):
         :param kind:
         :return:
         """
-        q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind, bounds_error=False, fill_value=0)
+        q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind,
+                                 bounds_error=False, fill_value='extrapolate')
         return q
 
 
@@ -798,6 +826,7 @@ class Severity(ss.rv_continuous):
         self.conditional = conditional
         self.sev_name = sev_name
         self.name = name
+        self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
 
@@ -922,6 +951,16 @@ class Severity(ss.rv_continuous):
         :param hint:
         :return:
         """
+        # some special cases we can handle:
+        if self.sev_name == 'lognorm':
+            shape = np.sqrt(np.log(cv*cv + 1))
+            fz = ss.lognorm(shape)
+            return shape, fz
+
+        if self.sev_name == 'gamma':
+            shape = 1 / (cv * cv)
+            fz = ss.gamma(shape)
+            return shape, fz
 
         gen = getattr(ss, self.sev_name)
 
@@ -1050,7 +1089,8 @@ class Severity(ss.rv_continuous):
             ex = quad(f, self.attachment, self.detachment, limit=100, full_output=1)
             if len(ex) == 4:  # 'The integral is probably divergent, or slowly convergent.':
                 # TODO just wing it for now
-                logging.warning(f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
+                logging.warning(
+                    f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                 exa = quad(f, self.attachment, median, limit=100, full_output=1)
                 exb = quad(f, median, self.detachment, limit=100, full_output=1)
                 if len(exa) == 4:

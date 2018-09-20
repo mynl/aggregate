@@ -140,6 +140,18 @@ class Portfolio(object):
             s.append(f'"approx_freq_ge": {self.approx_freq_ge}')
         return ', '.join(s) + '}'
 
+    def _repr_html_(self):
+        s = [f'<h2>Portfolio object: {self.name}</h2>']
+        _n = len(self.agg_list)
+        _s = "" if _n <= 1 else "s"
+        s.append(f'Portfolio contains {_n} aggregate component{_s}')
+        if self.audit_df is not None:
+            _df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
+            s.append(_df._repr_html_())
+        else:
+            s.append('Not updated, no estimated statistics available')
+        return '\n'.join(s)
+
     def __hash__(self):
         """
         hashging behavior
@@ -317,7 +329,8 @@ class Portfolio(object):
         :param kind:
         :return:
         """
-        q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind, bounds_error=False, fill_value=0)
+        q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind,
+                                 bounds_error=False, fill_value='extrapolate')
         return q
 
     def fit(self, kind='slognorm'):
@@ -376,7 +389,7 @@ class Portfolio(object):
             pvalues = [0.5, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99, 0.994, 0.995, 0.999, 0.9999]
         for line in self.line_names_ex:
             q_agg = interpolate.interp1d(self.density_df.loc[:, f'p_{line}'].cumsum(), self.density_df.loss,
-                                         kind='linear', bounds_error=False, fill_value=0)
+                                         kind='linear', bounds_error=False, fill_value='extrapolate')
             for p in pvalues:
                 qq = q_agg(p)
                 df.loc[(line, p), :] = [float(qq)]
@@ -406,7 +419,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', padding=1, tilt_amount=0, epds=None,
-               trim_df=True, verbose=False, **kwargs):
+               trim_df=True, verbose=False, add_exa=True, **kwargs):
         """
         interp guesses exa etc. for small losses, but that doesn't work
 
@@ -536,26 +549,27 @@ class Portfolio(object):
         self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
 
         # add exa detasil
-        self._add_exa()
+        if add_exa:
+            self._add_exa()
+            # default priority analysis
+            if epds is None:
+                epds = np.hstack(
+                    [np.linspace(0.5, 0.1, 4, endpoint=False)] +
+                    [np.linspace(10 ** -n, 10 ** -(n + 1), 9, endpoint=False) for n in range(1, 7)])
+                epds = np.round(epds, 7)
+            self.priority_capital_df = pd.DataFrame(index=pd.Index(epds))
+            for col in self.line_names:
+                for i in range(3):
+                    self.priority_capital_df.loc[:, '{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
+                    self.priority_capital_df.loc[:, '{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
+                col = 'not ' + col
+                for i in range(2):
+                    self.priority_capital_df.loc[:, '{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
+            self.priority_capital_df.loc[:, '{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
+            self.priority_capital_df.columns = self.priority_capital_df.columns.str.split("_", expand=True)
+            self.priority_capital_df.sort_index(axis=1, level=1, inplace=True)
+            self.priority_capital_df.sort_index(axis=0, inplace=True)
 
-        # default priority analysis
-        if epds is None:
-            epds = np.hstack(
-                [np.linspace(0.5, 0.1, 4, endpoint=False)] +
-                [np.linspace(10 ** -n, 10 ** -(n + 1), 9, endpoint=False) for n in range(1, 7)])
-            epds = np.round(epds, 7)
-        self.priority_capital_df = pd.DataFrame(index=pd.Index(epds))
-        for col in self.line_names:
-            for i in range(3):
-                self.priority_capital_df.loc[:, '{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
-                self.priority_capital_df.loc[:, '{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
-            col = 'not ' + col
-            for i in range(2):
-                self.priority_capital_df.loc[:, '{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
-        self.priority_capital_df.loc[:, '{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
-        self.priority_capital_df.columns = self.priority_capital_df.columns.str.split("_", expand=True)
-        self.priority_capital_df.sort_index(axis=1, level=1, inplace=True)
-        self.priority_capital_df.sort_index(axis=0, inplace=True)
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
         if trim_df:
@@ -674,7 +688,7 @@ class Portfolio(object):
                 line = ['p_' + i if i[0:2] != 'ημ' else i for i in line]
             else:
                 raise ValueError
-
+            line = sorted(line)
             if 'subplots' in kwargs and len(line) > 1:
                 axiter = axiter_factory(axiter, len(line), figsize, height, aspect)
                 ax = axiter.grid(len(line))
@@ -724,6 +738,10 @@ class Portfolio(object):
 
             # graph of cumulative loss cost and rate of change of cumulative loss cost
             temp = D.filter(regex='^exa_[^η]')
+            # need to check exa actually computed
+            if temp.shape[1] == 0:
+                print('Update exa before audit plot')
+                return
 
             ax = axiter.grid(1)
             temp.plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, expected_loss_scale),
@@ -734,10 +752,10 @@ class Portfolio(object):
                              title='Change in Loss Cost by Line: $\\nabla E(X_i(a))$')
 
             # E(X_i / X | X > a); exi_x_lea_ dropped
-            prefix_and_titles = dict(exi_xgta_='$E(X_i/X \mid X>a)$',
-                                     exeqa_='$E(X_i \mid X=a)$',
+            prefix_and_titles = dict(exi_xgta_=r'$E(X_i/X \mid X>a)$',
+                                     exeqa_=r'$E(X_i \mid X=a)$',
                                      exlea_=r'$E(X_i \mid X \leq a)$',
-                                     exgta_='$E(X_i \mid X>a)$')
+                                     exgta_=r'$E(X_i \mid X>a)$')
             for prefix in prefix_and_titles.keys():
                 regex = f'^{prefix}[a-zA-Z]'
                 ax = axiter.grid(1)
@@ -1111,15 +1129,15 @@ class Portfolio(object):
                 #       epd_values[:-1][epd_values[1:] <= epd_values[:-1]]))
                 # raise ValueError('Need to be sorted ascending')
                 self.epd_2_assets[(col, i)] = minus_arg_wrapper(
-                    interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True))
+                    interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
                 self.assets_2_epd[(col, i)] = minus_ans_wrapper(
-                    interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True))
+                    interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
             for i in [0, 1]:
                 epd_values = -self.density_df.loc[:, 'epd_{:}_ημ_{:}'.format(i, col)].values
                 self.epd_2_assets[('not ' + col, i)] = minus_arg_wrapper(
-                    interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True))
+                    interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
                 self.assets_2_epd[('not ' + col, i)] = minus_ans_wrapper(
-                    interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True))
+                    interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
 
         # put in totals for the ratios... this is very handy in later use
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
@@ -1132,9 +1150,9 @@ class Portfolio(object):
         # raise ValueError('Need to be sorted ascending')
         loss_values = self.density_df.loss.values
         self.epd_2_assets[('total', 0)] = minus_arg_wrapper(
-            interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True))
+            interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
         self.assets_2_epd[('total', 0)] = minus_ans_wrapper(
-            interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True))
+            interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
 
     def calibrate_distortion(self, name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0):
         """
@@ -1479,10 +1497,12 @@ class Portfolio(object):
 
             # truncate for graphics
             # 1e-4 arb selected min prob for plot truncation... not significant
-            max_threshold = 1e-4
-            max_x = (self.density_df.S < max_threshold).idxmax()
+            max_threshold = 1e-5
+            max_x = (df.gS < max_threshold).idxmax()
+            max_x = 80000  # TODO>>>
             if max_x == 0:
                 max_x = self.density_df.loss.max()
+            df_plot = df.loc[0:max_x, :]
             df_plot = df.loc[0:max_x, :]
 
             ax = next(axiter)
@@ -1538,7 +1558,7 @@ class Portfolio(object):
             ax = next(axiter)
             df_plot.filter(regex='^lrlTl_').sort_index(axis=1).plot(ax=ax)
             ax.set_title('LR: Prem Like Total Loss')
-
+            axiter.tidy()
             plt.tight_layout()
 
         return df, audit
@@ -1563,9 +1583,10 @@ class Portfolio(object):
         """
 
         # interpolation functions for distribution and inverse distribution
-        F = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='linear', assume_sorted=True)
-        Finv = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='nearest', assume_sorted=True,
-                                    fill_value=0, bounds_error=False)
+        F = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='linear',
+                                 assume_sorted=True, bounds_error=False, fill_value='extrapolate')
+        Finv = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='nearest',
+                                    assume_sorted=True, fill_value='extrapolate', bounds_error=False)
 
         # figure regulatory assets; applied to unlimited losses
         a_reg_ix = 0
@@ -1754,7 +1775,7 @@ class Portfolio(object):
             marg_lr = Sa / gSa
 
             # sns.set_palette(sns.color_palette("Paired", 4))
-            df = pd.DataFrame({'$F(x)$': Fa, '$x$': lossa, 'Premium': premium, '$EL=E(X\wedge x)$': el,
+            df = pd.DataFrame({'$F(x)$': Fa, '$x$': lossa, 'Premium': premium, r'$EL=E(X\wedge x)$': el,
                                'Capital': capital, 'Risk Margin': risk_margin, 'Assets': assets, '$S(x)$': Sa,
                                '$g(S(x))$': gSa, 'Loss Ratio': lr, 'Marginal LR': marg_lr, 'ROE': roe,
                                'Marginal ROE': marg_roe, 'P:S levg': leverage})

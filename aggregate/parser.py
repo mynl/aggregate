@@ -413,7 +413,7 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.p(f'MIXED ids numbers {p.ID}, {p.numbers} single param freq, numbers=CVs')
         # return {'freq_name': p.ids, 'freq_a': p.numbers}  # TODO IDS--> poisson for now
-        return {'freq_name': p.ID, 'freq_a': p.numbers}  # TODO IDS--> poisson for now
+        return {'freq_name': 'poisson', 'freq_a': p.numbers}  # TODO IDS--> poisson for now
 
     @_('FIXED')
     def freq(self, p):
@@ -457,7 +457,10 @@ class UnderwritingParser(Parser):
         if 'sev_scale' in p.sev:
             p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_scale', 0))
             p.sev['sev_scale'] *= p.numbers
-        else:
+        if 'sev_mean' not in p.sev:
+            # e.g. Pareto has no mean and it is important to set the scale
+            # but if there is a mean it handles the scaling and setting scale will
+            # confuse the distribution maker
             p.sev['sev_scale'] = p.numbers
         return p.sev
 
@@ -471,6 +474,12 @@ class UnderwritingParser(Parser):
     def sev(self, p):
         self.p(f'resolving ids {p.ids} numbers {p[1]} to sev (one param dist)')
         return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
+
+    # TODO a bit restrictive on numerical densities here!
+    @_('ids xps')
+    def sev(self, p):
+        self.p(f'resolving ids {p.ids} xps {p.xps} to sev (fixed or histogram type)')
+        return {'sev_name': p.ids, **p.xps}
 
     @_('ids numbers numbers weights xps')
     def sev(self, p):
@@ -504,9 +513,10 @@ class UnderwritingParser(Parser):
 
     @_('builtinids')
     def sev(self, p):
-        self.p(f'builtinds to sev {p.builtinids} IS THIS RIGHT? HAS IT BEEN CHECKED?')
+        self.p(f'builtinds {p.builtinids} to sev')
         # look up ID in uw
-        return [self._safe_lookup(n, 'severity') for n in p.builtinids]
+        return self._safe_lookup(p.builtinids, 'severity')
+        # return self._safe_lookup(n, 'severity') for n in p.builtinids]
         # for n in p.builtinids:
         #     built_in_dict = self._safe_lookup(n, 'severity')
         #     self.arg_dict.update(built_in_dict)
@@ -544,29 +554,30 @@ class UnderwritingParser(Parser):
         return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
 
     # lists for ids and numbers and builtinids ================================
-    @_('"[" builtinidl "]"')
-    def builtinids(self, p):
-        self.p(f'resolving [builtinidl] to builtinids {p.builtinidl}')
-        return p.builtinidl
-
-    @_('builtinidl BUILTINID')
-    def builtinidl(self, p):
-        s1 = f'resolving builtinidl ID {p.builtinidl}, {p.ID} --> '
-        p.builtinidl.append(p.ID)
-        s1 += f'{p.builtinidl}'
-        self.p(s1)
-        return p.builtinidl
+    # for now, do not allow a list of severities...too tricky
+    # @_('"[" builtinidl "]"')
+    # def builtinids(self, p):
+    #     self.p(f'resolving [builtinidl] to builtinids {p.builtinidl}')
+    #     return p.builtinidl
+    #
+    # @_('builtinidl BUILTINID')
+    # def builtinidl(self, p):
+    #     s1 = f'resolving builtinidl BUILTINID {p.builtinidl}, {p.BUILTINID} --> '
+    #     p.builtinidl.append(p.BUILTINID)
+    #     s1 += f'{p.builtinidl}'
+    #     self.p(s1)
+    #     return p.builtinidl
+    #
+    # @_('BUILTINID')
+    # def builtinidl(self, p):
+    #     self.p(f'resolving BUILTINID to builtinidl {p.BUILTINID} --> {ans}')
+    #     ans = [p.BUILTINID]
+    #     return ans
 
     @_('BUILTINID')
-    def builtinidl(self, p):
-        self.p(f'resolving ID to builtinidl {p.ID} --> {ans}')
-        ans = [p.ID]
-        return ans
-
-    @_('BUILTINID')
     def builtinids(self, p):
-        self.p(f'resolving ID to builtinids {p.ID}')
-        return p.ID
+        self.p(f'resolving BUILTINID to builtinids {p.BUILTINID}')
+        return p.BUILTINID  # will always be treated as a list
 
     @_('"[" idl "]"')
     def ids(self, p):
@@ -617,17 +628,17 @@ class UnderwritingParser(Parser):
         return p.NUMBER
 
     # elements made from named portfolios ========================
-    @_('BUILTINID TIMES NUMBER')
+    @_('builtin_aggregate_dist TIMES NUMBER')
     def builtin_aggregate(self, p):
         """  inhomogeneous change of scale """
-        self.p(f'Lookup BUILTINID {p.BUILTINID} TIMES NUMBER {p.NUMBER}')
-        bid = self._safe_lookup(p.BUILTINID, 'aggregate')
+        self.p(f'builtin_aggregate_dist TIMES NUMBER {p.NUMBER}')
+        bid = p.builtin_aggregate_dist
         bid['exp_en'] = bid.get('exp_en', 0) * p.NUMBER
         bid['exp_el'] = bid.get('exp_el', 0) * p.NUMBER
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.NUMBER
         return bid
 
-    @_('NUMBER TIMES BUILTINID')
+    @_('NUMBER TIMES builtin_aggregate_dist')
     def builtin_aggregate(self, p):
         """
         homogeneous change of scale
@@ -635,20 +646,29 @@ class UnderwritingParser(Parser):
         :param p:
         :return:
         """
-        self.p(f'NUMBER {p.NUMBER} TIMES Lookup BUILTINID {p.BUILTINID}')
-        # bid = built_in_dict
-        bid = self._safe_lookup(p.BUILTINID, 'aggregate')  # ? does this need copying. if so do in safelookup!
-        bid['sev_mean'] = bid.get('sev_mean', 0) * p.NUMBER
-        bid['sev_scale'] = bid.get('sev_scale', 1) * p.NUMBER
-        bid['sev_loc'] = bid.get('sev_loc', 0) * p.NUMBER
+        self.p(f'NUMBER {p.NUMBER} TIMES builtin_aggregate_dist')
+        # bid = built_in_dict, want to be careful not to add scale too much
+        bid = p.builtin_aggregate_dist  # ? does this need copying. if so do in safelookup!
+        if 'sev_mean' in bid:
+            bid['sev_mean'] = bid['sev_mean'] * p.NUMBER
+        if 'sev_scale' in bid:
+            bid['sev_scale'] = bid['sev_scale'] * p.NUMBER
+        if 'sev_loc' in bid:
+            bid['sev_loc'] = bid['sev_loc'] * p.NUMBER
         bid['exp_attachment'] = bid.get('exp_attachment', 0) * p.NUMBER
         bid['exp_limit'] = bid.get('exp_limit', np.inf) *p.NUMBER
         bid['exp_el'] = bid.get('exp_el', 0) * p.NUMBER
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.NUMBER
         return bid
 
-    @_('BUILTINID')
+    @_('builtin_aggregate_dist')
     def builtin_aggregate(self, p):
+        self.p('builtin_aggregate_dist becomese builtin_aggregate')
+        return p.builtin_aggregate_dist
+
+    @_('BUILTINID')
+    def builtin_aggregate_dist(self, p):
+        # ensure lookup only happens here
         self.p(f'Lookup BUILTINID {p.BUILTINID}')
         built_in_dict = self._safe_lookup(p.BUILTINID, 'aggregate')
         return built_in_dict

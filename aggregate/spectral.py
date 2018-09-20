@@ -160,11 +160,11 @@ class Distortion(object):
 
         :return:
         """
-        s = f'{self._distortion_names_[self.name]} ({self.shape:.3f}'
+        s = f'{self._distortion_names_[self.name]}\n{self.shape:.3f}'
         if self.has_mass:
-            s += f', {self.r0:.3f})'
-        else:
-            s += ')'
+            s += f', {self.r0:.3f}'
+        # else:
+        #     s += ')'
         return s
 
     def __repr__(self):
@@ -223,6 +223,7 @@ class Distortion(object):
             dist = Distortion(name, shape, r0)
             dist.plot(xs, ax=next(axiter))
 
+        axiter.tidy()
         suptitle_and_tight('Example Distortion Functions')
 
     @staticmethod
@@ -244,7 +245,7 @@ class Distortion(object):
             dists[dn] = Distortion(name=dn, shape=param, r0=r0)
 
         if plot:
-            axiter = axiter_factory(None, 5, height=3, aspect=1)
+            axiter = axiter_factory(None, 5)
             # f, axs = plt.subplots(2, 3, figsize=(8, 6))
             # it = iter(axs.flatten())
             for dn in Distortion.available_distortions():

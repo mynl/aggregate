@@ -678,6 +678,9 @@ class MomentAggregator(object):
         """
         m = ex1
         var = ex2 - ex1 ** 2
+        # rounding errors...
+        if np.allclose(var, 0):
+            var = 0
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan

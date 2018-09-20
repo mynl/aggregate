@@ -404,6 +404,8 @@ class UnderwritingParser(Parser):
         self.sev_out_dict[p.sev_name] = p.sev
 
     # frequency term ==========================================
+    # for all frequency distributions claim count is determined by exposure / severity
+    # only freq shape parameters need be entered
     @_('MIXED ID numbers numbers')
     def freq(self, p):
         self.p(f'MIXED ids numbers numbers {p.ID}, {p.numbers}, {p.numbers} two param freq, numbers.1=CVs')
@@ -464,7 +466,6 @@ class UnderwritingParser(Parser):
             p.sev['sev_scale'] = p.numbers
         return p.sev
 
-
     @_('ids numbers CV numbers weights')
     def sev(self, p):
         self.p(f'resolving ids {p.ids} numbers CV numbers sev {p[1]}, {p[3]}')
@@ -475,16 +476,17 @@ class UnderwritingParser(Parser):
         self.p(f'resolving ids {p.ids} numbers {p[1]} to sev (one param dist)')
         return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
 
+    #                                v can go
+    @_('ids numbers numbers weights xps')
+    def sev(self, p):
+        self.p(f'resolving ids {p.ids} numbers numbers {p[1]}, {p[2]} to sev (two param sev dist)')
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
+
     # TODO a bit restrictive on numerical densities here!
     @_('ids xps')
     def sev(self, p):
         self.p(f'resolving ids {p.ids} xps {p.xps} to sev (fixed or histogram type)')
         return {'sev_name': p.ids, **p.xps}
-
-    @_('ids numbers numbers weights xps')
-    def sev(self, p):
-        self.p(f'resolving ids {p.ids} numbers numbers {p[1]}, {p[2]} to sev (two param sev dist)')
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
 
     @_('XPS numbers numbers')
     def xps(self, p):

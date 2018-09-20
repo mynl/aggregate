@@ -267,7 +267,16 @@ class Aggregate(object):
 
     def discretize(self, sev_calc, discretization_calc='survival'):
         """
+        continuous is used when you think of the resulting distribution as continuous across the buckets
+        (which we generally don't). We use the discretized distribution as though it is fully discrete
+        and only takes values at the bucket points. Hence we should use sev_calc='discrete'. The buckets are
+        shifted left by half a bucket, so Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2).
 
+        The other wrinkle is the right hand end of the range. If we extend to np.inf then we ensure we have
+        probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
+        is often not desirable (we expect to see a smooth continuous distribution and we get a mass). The
+        other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
+        the probabilities short. We opt here for the latter and rescale
 
         :param sev_calc:  continuous or discrete or raw (for...)
         :param discretization_calc:  survival, distribution or both
@@ -275,9 +284,11 @@ class Aggregate(object):
         """
 
         if sev_calc == 'continuous':
-            adj_xs = np.hstack((self.xs, np.inf))
+            # adj_xs = np.hstack((self.xs, np.inf))  # undesirable mass at the end
+            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
         elif sev_calc == 'discrete':
-            adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
+            # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))  # as above
+            adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
         elif sev_calc == 'raw':
             adj_xs = self.xs
         else:
@@ -296,6 +307,9 @@ class Aggregate(object):
             else:
                 raise ValueError(
                     f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
+
+        # see comments: we rescale
+        beds = beds / np.sum(beds)
 
         return beds
 
@@ -316,7 +330,10 @@ class Aggregate(object):
         self.log2 = log2
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
-            kwargs['approximation'] = 'slognorm'
+            if self.n > 100:
+                kwargs['approximation'] = 'slognorm'
+            else:
+                kwargs['approximation'] = 'exact'
         self.update(xs, **kwargs)
 
     def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
@@ -335,13 +352,13 @@ class Aggregate(object):
         """
 
         if verbose:
-            axm = axiter_factory(None, len(self.sevs) + 2, aspect=1.66)
+            axiter = axiter_factory(None, len(self.sevs) + 2, aspect=1.66)
             df = pd.DataFrame(
                 columns=['n', 'limit', 'attachment', 'en', 'emp ex1', 'emp cv', 'sum p_i', 'wt', 'nans', 'max', 'wtmax',
                          'min'])
             df = df.set_index('n')
         else:
-            axm = None
+            axiter = None
             df = None
         audit = None
         r = 0
@@ -365,22 +382,22 @@ class Aggregate(object):
                                     w, np.sum(np.where(np.isinf(temp), 1, 0)),
                                     temp.max(), w * temp.max(), temp.min()]
                     r += 1
-                    next(axm).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
-                    axm.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
+                    next(axiter).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
+                    axiter.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
                     if np.all(self.limit < np.inf):
-                        axm.ax.set(xlim=(0, np.max(self.limit) * 1.1), title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
+                        axiter.ax.set(xlim=(0, np.max(self.limit) * 1.1), title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
                     else:
-                        axm.ax.set(title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
-                    axm.ax.legend()
+                        axiter.ax.set(title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
+                    axiter.ax.legend()
             if verbose:
-                next(axm).plot(xs, self.sev_density, lw=0.5, drawstyle='steps-post')
-                axm.ax.set_title('occ')
+                next(axiter).plot(xs, self.sev_density, lw=0.5, drawstyle='steps-post')
+                axiter.ax.set_title('occ')
                 aa = float(np.sum(df.attachment * df.wt))
                 al = float(np.sum(df.limit * df.wt))
                 if np.all(self.limit < np.inf):
-                    axm.ax.set_xlim(0, np.max(self.limit))
+                    axiter.ax.set_xlim(0, np.max(self.limit))
                 else:
-                    axm.ax.set_xlim(0, xs[-1])
+                    axiter.ax.set_xlim(0, xs[-1])
                 _m = np.sum(self.xs * np.nan_to_num(self.sev_density))
                 _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.sev_density)) - _m ** 2) / _m
                 df.loc["Occ", :] = [al, aa, self.n, _m, _cv,
@@ -453,7 +470,7 @@ class Aggregate(object):
         self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
 
         if verbose:
-            ax = next(axm)
+            ax = next(axiter)
             ax.plot(xs, self.agg_density, 'b')
             ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='aggregate_project')
             suptitle_and_tight(f'{self.name} severity audit')
@@ -554,9 +571,15 @@ class Aggregate(object):
             raise ValueError('Must use compound Poisson for DH density')
         self.beta_name = beta_name
 
-    def plot(self, kind='long', axiter=None, aspect=1, figsize=None):
+    def plot(self, kind='quick', axiter=None, aspect=1, figsize=None):
         """
-        make a quick plot of fz: computed density and aggregate_project
+        plot fz: computed density and aggregate_project
+
+        kind
+
+        * long: severity, log sev density, sev dist, agg with sev,
+                agg on own, agg on log, S, Lee, return period
+        * quick (default): Density for sev and agg on nominal and log scale; Lee diagram sev and agg
 
         :param kind:
         :param aspect:
@@ -866,7 +889,7 @@ class Severity(ss.rv_continuous):
                 raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
                                  f', you passed {sev_name}')
 
-        elif sev_name in ['norm', 'expon']:
+        elif sev_name in ['norm', 'expon', 'uniform']:
             # distributions with no shape parameters
             #     Normal (and possibly others) does not have a shape parameter
             if sev_loc == 0 and sev_mean > 0:

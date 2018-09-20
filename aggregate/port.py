@@ -333,12 +333,13 @@ class Portfolio(object):
                                  bounds_error=False, fill_value='extrapolate')
         return q
 
-    def fit(self, kind='slognorm'):
+    def fit(self, approx_type='slognorm', output='agg'):
         """
         returns a dictionary specification of the portfolio aggregate_project
         if updated uses empirical moments, otherwise uses theoretic moments
 
-        :param kind: slognorm | sgamma
+        :param approx_type: slognorm | sgamma
+        :param output: return a dict or agg language specification
         :return:
         """
         if self.audit_df is None:
@@ -350,29 +351,40 @@ class Portfolio(object):
             # use statistics_df matched to computed aggregate_project
             m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
 
-        if kind == 'slognorm':
+        name = f'{approx_type[0:4]}_{self.name[0:5]}'
+        agg_str = f'agg {name} 1 claim sev '
+
+        if approx_type == 'slognorm':
             shift, mu, sigma = sln_fit(m, cv, skew)
             # self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-            sev = {'name': 'lognorm', 'shape': sigma, 'scale': np.exp(mu), 'loc': shift}
-        elif kind == 'sgamma':
+            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+            agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+        elif approx_type == 'sgamma':
             shift, alpha, theta = sgamma_fit(m, cv, skew)
             # self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
-            sev = {'name': 'lognorm', 'shape': alpha, 'scale': theta, 'loc': shift}
+            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+            agg_str += f'{theta} * lognorm {alpha} + {shift} '
         else:
-            raise ValueError(f'Inadmissible kind {kind} passed to fit')
+            raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
 
-        return {'name': f'{kind[0:4]}_{self.name[0:5]}', 'severity': sev, 'frequency': {'n': 1, 'fixed': 1}}
+        if output == 'agg':
+            agg_str += ' fixed'
+            return agg_str
+        else:
+            return {'name': name, 'note': f'frozen version of {self.name}', 'exp_en': 1, **sev, 'freq_name': 'fixed'}
 
-    def collapse(self, kind='slognorm'):
+    def collapse(self, approx_type='slognorm'):
         """
-        returns new CPortfolio with the fit
+        returns new Portfolio with the fit
 
-        :param kind: slognorm | sgamma
+        deprecated...prefer uw(self.fit()) to go through the agg language approach
+
+        :param approx_type: slognorm | sgamma
         :return:
         """
-        spec = self.fit(kind)
-        logging.debug(f'CPortfolio.collapse | Collapse created new CPortfolio with spec {spec}')
-        return Portfolio(self.name, [spec])
+        spec = self.fit(approx_type, output='dict')
+        logging.debug(f'Portfolio.collapse | Collapse created new Portfolio with spec {spec}')
+        return Portfolio(f'Collapsed {self.name}', [spec])
 
     def percentiles(self, pvalues=None):
         """
@@ -1344,7 +1356,8 @@ class Portfolio(object):
             As = np.array([float(self.q(p)) for p in Ps])
 
         for g in dist_dict.values():
-            df, au = self.apply_distortion(g, None)  # no plots at this point...
+            axiter = axiter_factory(None, 24)
+            df, au = self.apply_distortion(g, axiter)  # no plots at this point...
             # extract range of S values
             temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-z]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
@@ -1405,7 +1418,7 @@ class Portfolio(object):
 
         # initially work will "full precision"
         # OK to work on original? .copy()  # will be adding columns, do not want to mess up original
-        df = self.density_df
+        df = self.density_df.copy()
 
         # make g and ginv and other interpolation functions
         g, g_inv = dist.g, dist.g_inv
@@ -1925,7 +1938,7 @@ class Portfolio(object):
                 ans.append([loss, int1, int2, int3, int3 * loss / a / ptot, ptot, incr, c1, c2, c3, gt, p])
             if incr / gt < 1e-12:
                 if debug:
-                    print(f'incremental change {incr/gt:12.6f}, breaking')
+                    logging.info(f'incremental change {incr/gt:12.6f}, breaking')
                 break
         exlea = self.density_df.loc[a, 'exlea_' + line]
         exgta = self.density_df.loc[a, 'exgta_' + line]

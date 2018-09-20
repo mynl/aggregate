@@ -98,7 +98,7 @@ from .port import Portfolio
 from .utils import html_title
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
-
+import re
 
 class Underwriter(object):
     """
@@ -369,7 +369,7 @@ class Underwriter(object):
                 # TODO FIX this clusterfuck
                 s = Aggregate(k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
                 if update:
-                    s.easy_update(self.log2)
+                    s.easy_update(self.log2, verbose=verbose)
                 rv.append(s)
 
         elif len(self.parser.sev_out_dict) > 0 and rv is None:
@@ -449,6 +449,15 @@ class Underwriter(object):
         :return:
         """
         # preprocess line continuation and replace ; with new line
+        # remove \n in vectors. these are put in by np str e.g. in np.linspace. this is a bit tricky...
+        # split on [], results in out in out in vectors, so need to replace \n in the odd part only
+        s = portfolio_program
+        out_in = re.split(r'\[|\]', s)
+        assert len(out_in) % 2  # must be odd
+        odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
+        even = out_in[0::2]  # otherwise pass through
+        # reassemble
+        portfolio_program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
         portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
                              replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
                              split('\n') if len(i.strip()) > 0]

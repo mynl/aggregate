@@ -25,57 +25,51 @@ Valid program
 Language Specification
 ----------------------
 
-    ans 		name exposures layers sevs freq
-                name builtinagg
+answer              	:: sev_out
+                    	 | agg_out
 
-    name 		ID   # name for portfolio
+port_out            	:: port_name agg_list
 
-    # id list
-    idl 		ID
-                idl ID
+agg_list            	:: agg_list agg_out
 
-    ids 		ID
-                [ idl ]
+sev_out             	:: sev_out sev_name sev
 
-    numbers 	NUMBER
-                [ numberl ]
+freq                	:: FIXED
+                    	 | POISSON
 
-    numberl 	NUMBER
-                numberl NUMBER
+sev                 	:: sev PLUS numbers
+                    	 | sev MINUS numbers
+                    	 | ids numbers CV numbers weights
+                    	 | ids xps
 
-    builtin_agg	uw.ID
-                NUMBER TIMES builtin_agg
-                builtin_agg TIMES NUMBER
+xps                 	:: XPS numbers numbers
+                    	 | 
 
-    exposures 	numbers LOSS
-                numbers CLAIMS
-                numbers PREMIUM AT numbers
-                numbers PREMIUM AT numbers LR
-                numbers PREMIUM numbers LR
-                empty
+weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER
+                    	 | WEIGHTS numbers
+                    	 | 
 
-    xps         xps numbers numbers
-                empty
+layers              	:: numbers XS numbers
 
-    layers		numbers XS numbers
-                empty
+exposures           	:: numbers CLAIMS
+                    	 | numbers LOSS
+                    	 | numbers PREMIUM AT numbers LR
 
-    # singular sev term...is a list ; in agg it is called agg_sev ==> do not use sevs
-    sev 		builtins
-                ids numbers numbers WT weights XPS numbers numbers
-                ids numbers CV numbers WT weights
-                numbers * sev
-                sev * numbers
-                sev + numbers
+ids                 	:: "[" idl "]"
+                    	 | ID
 
-    weights 	numbers
-                empty
+idl                 	:: idl ID
+                    	 | ID
 
-    freq 		POISSON
-                FIXED   # number must be defined in expos term!
-                ID NUMBER
-                ID NUMBER NUMBER
-                empty
+numbers             	:: "[" numberl "]"
+
+numberl             	:: numberl NUMBER
+                    	 | NUMBER
+
+builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER
+                    	 | builtin_aggregate_dist
+
+sev_name            	:: SEV ID
 
 parser.out parser debug information
 -----------------------------------
@@ -483,6 +477,7 @@ class UnderwritingParser(Parser):
         return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
 
     # TODO a bit restrictive on numerical densities here!
+    #      v put in weights here instead (if xps relevant then cannot need shape parameters)
     @_('ids xps')
     def sev(self, p):
         self.p(f'resolving ids {p.ids} xps {p.xps} to sev (fixed or histogram type)')
@@ -704,3 +699,42 @@ class UnderwritingParser(Parser):
             raise ValueError(p)
         else:
             raise ValueError('Unexpected end of file')
+
+if __name__ == '__main__':
+    # print the grammar and add to this file as part of docstring
+    # TODO fix comments!
+
+    start_string = '''Language Specification
+----------------------
+
+'''
+    end_string = 'parser.out parser debug information'
+
+    with open(__file__, 'r') as f:
+        txt = f.read()
+    stxt = txt.split('@_')
+    ans = {}
+    for it in stxt[3:-1]:
+        if it.find('#') >= 0:
+            # skip rows with a comment between @_ and def
+            pass
+        else:
+            b = it.split('def')
+            b0 = b[0].strip()[2:-2]
+            b1 = b[1].split("(self, p):")[0].strip()
+            if b1 in ans:
+                ans[b1] += [b0]
+            else:
+                ans[b1] = [b0]
+    s = ''
+    for k, v in ans.items():
+        s += f'{k:<20s}\t:: {v[0]:<s}\n'
+        for rhs in v[1:]:
+            s += f'{" "*20}\t | {rhs:<s}\n'
+        s += '\n'
+    st = txt.find(start_string) + len(start_string)
+    end = txt.find(end_string)
+    txt = txt[0:st] + s + txt[end:]
+    with open(__file__, 'w') as f:
+        f.write(txt)
+    print(s)

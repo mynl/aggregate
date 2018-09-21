@@ -6,6 +6,7 @@ from IPython.core.display import HTML, display
 import logging
 import itertools
 import os
+import seaborn as sns
 
 # logging
 # TODO better filename!
@@ -718,3 +719,73 @@ class MomentAggregator(object):
                           *self.moments('freq', total),
                           *self.moments('sev', total),
                           limit, p999e], name=name, index=idx)
+
+
+class qd(object):
+    """
+    quick display for dictionaries and Pandas dataframes, with some sensible number defaults
+    experimental
+
+    """
+
+    # Set CSS properties for th elements in dataframe
+    th_props = [
+        ('font-size', '11px'),
+        ('text-align', 'center'),
+        ('font-weight', 'bold'),
+        ('color', '#6d6d6d'),
+        ('background-color', '#f7f7f9')
+    ]
+
+    # Set CSS properties for td elements in dataframe
+    td_props = [
+        ('font-size', '10px'),
+        ('text-align', 'left')
+    ]
+
+    # Set table styles
+    styles = [
+        dict(selector="th", props=th_props),
+        dict(selector="td", props=td_props)
+    ]
+
+    cm = sns.light_palette("green", as_cmap=True)
+
+    def __init__(self, d):
+        self.x = d
+
+    def _repr_html_(self):
+        if isinstance(self.x, dict):
+            return pd.DataFrame(self.x, index=[len(self.x)])._repr_html_()
+        if isinstance(self.x, list) or isinstance(self.x, tuple) and len(self.x) == 2:
+            if isinstance(self.x[1], dict):
+                return f'<h2>{self.x[0]}</h2><br>' + qd(self.x[1])._repr_html_()
+        elif isinstance(self.x, pd.DataFrame):
+            # do a bit of styling
+            num_cols = self.x.select_dtypes(np.number).columns
+            fmt = {}
+            for a, b in zip(self.x.columns, self.x.dtypes):
+                if np.issubdtype(b, np.number):
+                    m, s = self.x[a].agg([np.mean, np.std])
+                    x = np.abs(m) + 3 * s
+                    if abs(x) > self.x[a].max():
+                        x = self.x[a].max()
+                    if x < 10:
+                        fmt[a] = '{:7.3f}'
+                    elif x < 1000:
+                        fmt[a] = '{:7.1f}'
+                    elif x < 10e6:
+                        fmt[a] = '{:12,.1f}'
+                    else:
+                        fmt[a] = '{:12.3e}'
+                else:
+                    fmt[a] = '{:}'
+
+            return (self.x.style
+                    .background_gradient(cmap=cm, subset=num_cols)
+                    .highlight_max(subset=num_cols)
+                    #   .set_caption('This is a custom caption.')
+                    .format(fmt)
+                    .set_table_styles(styles))._repr_html_()
+        else:
+            return repr(self.x)

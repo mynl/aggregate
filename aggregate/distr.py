@@ -255,6 +255,7 @@ class Aggregate(object):
             _df.loc['Sev', 'Est CV(X)'] = esev_cv
             _df.loc['Agg', 'Est CV(X)'] = ea_cv
             _df.loc[:, 'Err CV(X)'] = _df['Est CV(X)'] / _df['CV(X)'] - 1
+            _df = _df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
         _df.fillna('')
         return '\n'.join(s) + _df._repr_html_()
 
@@ -299,17 +300,18 @@ class Aggregate(object):
         beds = []
         for fz in self.sevs:
             if discretization_calc == 'both':
-                beds.append(np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs))))
+                # see comments: we rescale each severity...
+                appx = np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
+                beds.append(appx / np.sum(appx))
             elif discretization_calc == 'survival':
-                beds.append(-np.diff(fz.sf(adj_xs)))
+                appx = -np.diff(fz.sf(adj_xs))
+                beds.append(appx / np.sum(appx))
             elif discretization_calc == 'distribution':
-                beds.append(np.diff(fz.cdf(adj_xs)))
+                appx = np.diff(fz.cdf(adj_xs))
+                beds.append(appx / np.sum(appx))
             else:
                 raise ValueError(
                     f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
-
-        # see comments: we rescale
-        beds = beds / np.sum(beds)
 
         return beds
 
@@ -327,7 +329,6 @@ class Aggregate(object):
         # guess bucket and update
         if bs == 0:
             bs = self.recommend_bucket(log2)
-        self.log2 = log2
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
             if self.n > 100:
@@ -424,7 +425,7 @@ class Aggregate(object):
                 else:
                     self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
             elif self.freq_name == 'bernoulli':
-                # binomial M_N(t) = p M_X(t) + (1-p) at zero point
+                # binomial M_N(t) = log M_X(t) + (1-log) at zero point
                 assert ((self.n > 0) and (self.n < 1))
                 self.ftagg_density = self.n * ft(self.sev_density, padding, tilt_vector)
                 self.ftagg_density += (1 - self.n) * np.ones_like(self.ftagg_density)
@@ -773,7 +774,7 @@ class Aggregate(object):
                     rbr = rb
                 print(f'Recommended bucket size with {2**n} buckets: {rb:,.0f}')
             if self.bs != 0:
-                print(f'Bucket size set with {2**self.log2} buckets at {self.bs:,.0f}')
+                print(f'Bucket size set with {N} buckets at {self.bs:,.0f}')
             return rbr
 
     def q(self, p):
@@ -854,7 +855,7 @@ class Severity(ss.rv_continuous):
         self.sev1 = self.sev2 = self.sev3 = None
 
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
-        # allows you to define fixed with just xs=1 (no p)
+        # allows you to define fixed with just xs=1 (no log)
         if sev_xs is not None:
             if sev_name == 'fixed':
                 # fixed is a special case of dhistogram with just one point

@@ -682,6 +682,8 @@ class MomentAggregator(object):
         # rounding errors...
         if np.allclose(var, 0):
             var = 0
+        if var < 0:
+            print(f'weird var < 0 = {var}')
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan

@@ -13,7 +13,6 @@ install_requires = [
     'matplotlib>=2.2',
     'numpy>=1.13',
     'pandas>=0.23',
-    'ruamel.yaml>=0.15',
     'scipy>=0.19',
     'seaborn>=0.8',
     'sly>=0.3'

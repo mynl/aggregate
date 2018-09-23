@@ -84,21 +84,19 @@ Etc. etc.
 
 """
 
-
 import os
-from ruamel import yaml
 import numpy as np
-import collections
-from io import StringIO
-from textwrap import fill, indent
 from IPython.core.display import display
 import logging
 import pandas as pd
+from collections import Iterable
 from .port import Portfolio
 from .utils import html_title
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
 import re
+import warnings
+
 
 class Underwriter(object):
     """
@@ -112,9 +110,11 @@ class Underwriter(object):
     Is interface into program parser
     Handles safe lookup from database for parser
 
-    Persisitence to and from YAML managed
+    Persisitence to and from agg files
 
     """
+
+    data_types = ['portfolio', 'aggregate', 'severity']
 
     def __init__(self, dir_name="", name='Rory', databases=None, store_mode=True, update=False,
                  verbose=False, log2=10, debug=False):
@@ -130,7 +130,6 @@ class Underwriter(object):
 
         self.last_spec = None
         self.name = name
-        self.store_mode = store_mode
         self.update = update
         self.log2 = log2
         self.debug = debug
@@ -138,26 +137,24 @@ class Underwriter(object):
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
         # otherwise these are hidden from pyCharm....
-        self.severity = None
-        self.aggregate = None
-        self.portfolio = None
+        self.severity = {}
+        self.aggregate = {}
+        self.portfolio = {}
         if databases is None:
-            databases = dict(severity=['severities.yaml'], aggregate=['aggregates.yaml', 'user_aggregates.yaml'],
-                             portfolio=['portfolios.yaml', 'user_portfolios.yaml'])
-        self.databases = databases
+            databases = ['site.agg', 'user.agg']
         self.dir_name = dir_name
         if self.dir_name == '':
             self.dir_name = os.path.split(__file__)[0]
-            self.dir_name = os.path.join(self.dir_name, 'yaml')
-        for k, v in self.databases.items():
-            d = dict()
-            for fn in v:
-                with open(os.path.join(self.dir_name, fn), 'r') as f:
-                    temp = yaml.load(f, Loader=yaml.Loader)
-                    for kt, vt in temp.items():
-                        d[kt] = vt
-            # port, agg and sev actually set here...
-            self.__setattr__(k, d)
+            self.dir_name = os.path.join(self.dir_name, 'agg')
+        # make sure all database entries are stored:
+        self.store_mode = True
+        for fn in databases:
+            with open(os.path.join(self.dir_name, fn), 'r') as f:
+                program = f.read()
+            # read in, parse, save to sev/agg/port dictionaries
+            self._runner(program)
+        # set desired store_mode
+        self.store_mode = store_mode
 
     def __getitem__(self, item):
         """
@@ -170,16 +167,30 @@ class Underwriter(object):
         :param item:
         :return:
         """
-
-        for k in self.databases.keys():
-            if item in self.__getattribute__(k).keys():
-                # stip the s off the name: Books to Book etc.
-                return k, self.__getattribute__(k)[item]
-        raise LookupError
+        # much less fancy version:
+        obj = self.portfolio.get(item, None)
+        if obj is not None:
+            logging.info(f'Underwriter.__getitem__ | found {item} of type port')
+            return 'port', obj
+        obj = self.aggregate.get(item, None)
+        if obj is not None:
+            logging.info(f'Underwriter.__getitem__ | found {item} of type agg')
+            return 'agg', obj
+        obj = self.severity.get(item, None)
+        if obj is not None:
+            logging.info(f'Underwriter.__getitem__ | found {item} of type sev')
+            return 'sev', obj
+        raise LookupError(f'Item {item} not found in any database')
+        # old, clever, generic, unreadable, unnecessary generality
+        # for k in self.databases.keys():
+        #     if item in self.__getattribute__(k).keys():
+        #         # stip the s off the name: Books to Book etc.
+        #         return k, self.__getattribute__(k)[item]
+        # raise LookupError
 
     def _repr_html_(self):
         s = [f'<h1>Underwriter {self.name}</h1>']
-        s.append(f'Underwriter knows about {len(self.severity)} severities, {len(self.aggregate)} aggregates'
+        s.append(f'Underwriter expert in all classes including {len(self.severity)} severities, {len(self.aggregate)} aggregates'
                  f' and {len(self.portfolio)} portfolios<br>')
         for what in ['severity', 'aggregate', 'portfolio']:
             s.append(f'<b>{what.title()}</b>: ')
@@ -187,7 +198,7 @@ class Underwriter(object):
             s.append('<br>')
         s.append(f'<h3>Settings</h3>')
         for k in ['update', 'log2', 'store_mode', 'verbose', 'last_spec']:
-            s.append(f'{k}: {getattr(self, k)}; ')
+            s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
     # this is evil: it passes unknown things through to write...
@@ -207,7 +218,12 @@ class Underwriter(object):
     #         return self.write(item)
 
     def __call__(self, portfolio_program):
-        # print(f'Call on underwriter with {portfolio_program[:100]}')
+        """
+        make the Underwriter object callable; pass through to write
+
+        :param portfolio_program:
+        :return:
+        """
         return self.write(portfolio_program)
 
     def list(self):
@@ -217,7 +233,7 @@ class Underwriter(object):
         :return:
         """
         sers = dict()
-        for k in self.databases.keys():
+        for k in Underwriter.data_types:
             d = sorted(list(self.__getattribute__(k).keys()))
             sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
         df = pd.DataFrame(data=sers)
@@ -228,29 +244,43 @@ class Underwriter(object):
     def describe(self, item_type='', pretty_print=False):
         """
         more informative version of list
-        Pull notes from YAML descriptions for type items
+        Pull notes for type items
 
         :return:
         """
+        def deal_with_sequences(x):
+            """
+            pandas can't have a field set as a sequence
+            need to check if x is a sequence and if so return something suitable...
+
+            :param x:
+            :return:
+            """
+            if isinstance(x, Iterable):
+                return str(x)
+            else:
+                return x
         df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b',
                                    'EN', 'Freq_a',
                                    'ELoss', 'Notes'])
         df = df.set_index('Name')
         df['ELoss'] = np.maximum(df.ELoss, df.ESev * df.EN)
         if item_type == '':
-            item_type = self.databases.keys()
+            item_type = Underwriter.data_types
         else:
             item_type = [item_type.lower()]
         for k in item_type:  # self.databases.keys():
             for kk, vv in self.__getattribute__(k).items():
-                df.loc[kk, :] = (k, vv.get('sev_name', ''),
-                                 vv.get('sev_mean', 0),
-                                 vv.get('sev_a', 0),
-                                 vv.get('sev_b', 0),
-                                 vv.get('exp_en', 0),
-                                 vv.get('freq_a', 0),
-                                 vv.get('exp_el', 0),
-                                 vv.get('note', ''))
+                _data_fields = [vv.get('sev_name', ''), vv.get('sev_mean', 0), vv.get('sev_a', 0),
+                                vv.get('sev_b', 0), vv.get('exp_en', 0), vv.get('freq_a', 0),
+                                vv.get('exp_el', 0), vv.get('note', '')]
+                try:
+                    df.loc[kk, :] = [k] + _data_fields
+                except ValueError as e:
+                    if e.args[0] == "setting an array element with a sequence":
+                        df.loc[kk, :] = [k] + list(map(deal_with_sequences, _data_fields))
+                    else:
+                        raise e
         df = df.fillna('')
         if pretty_print:
             for t, egs in df.groupby('Type'):
@@ -284,33 +314,7 @@ class Underwriter(object):
         :param kwargs:
         :return:
         """
-
-        # first see if it is a built in object
-        lookup_success = True
-        _type = ''
-        obj = None
-        try:
-            _type, obj = self.__getitem__(portfolio_program)
-        except LookupError:
-            lookup_success = False
-            logging.warning(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
-        if lookup_success:
-            logging.info(f'underwriter.write | object {portfolio_program[:500]} found, returning object...')
-            if _type == 'aggregate':
-                # TODO, sure this isn't the solution to the double name problem....
-                _name = obj.get('name', portfolio_program)
-                return Aggregate(_name, **{k: v for k, v in obj.items() if k != 'name'})
-            elif _type == 'portfolio':
-                return Portfolio(portfolio_program, obj['spec'])
-            elif _type == 'severity':
-                return Severity(**obj)
-            else:
-                ValueError(f'Cannot build {_type} objects')
-            return obj
-
-        # run
-        self._runner(portfolio_program)
-
+        # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
         update = kwargs.get('update', self.update)
@@ -336,30 +340,68 @@ class Underwriter(object):
             else:
                 add_exa = False
 
-        # what shall we create? only create if there is one item  port then agg then sev, create in rv
+        # function to handle update madness, use in either script or lookup updats for ports
+        def _update(s):
+            if update:
+                if bs > 0 and log2 > 0:
+                    _bs = bs
+                    _log2 = log2
+                else:
+                    if bs == 0:  # and log2 > 0
+                        # for log2 = 10
+                        _bs = s.recommend_bucket().iloc[-1, 0]
+                        _log2 = log2  # which must be > 0
+                        # adjust bucket size for new actual log2
+                        _bs *= 2 ** (10 - _log2)
+                    else:  # bs > 0 and log2 = 0 which doesn't really make sense...
+                        logging.warning('Underwriter.write | nonsensical options bs > 0 and log2 = 0')
+                        _bs = bs
+                        _log2 = 10
+                logging.info(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
+                s.update(log2=_log2, bs=_bs, verbose=verbose, add_exa=add_exa, **kwargs)
+
+        # first see if it is a built in object
+        lookup_success = True
+        _type = ''
+        obj = None
+        try:
+            _type, obj = self.__getitem__(portfolio_program)
+        except LookupError:
+            lookup_success = False
+            logging.warning(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
+        if lookup_success:
+            logging.info(f'underwriter.write | object {portfolio_program[:500]} found, returning object...')
+            if _type == 'agg':
+                # TODO, sure this isn't the solution to the double name problem....
+                _name = obj.get('name', portfolio_program)
+                obj = Aggregate(_name, **{k: v for k, v in obj.items() if k != 'name'})
+                if update:
+                    obj.easy_update(log2, bs)
+                return obj
+            elif _type == 'port':
+                obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
+                _update(obj)
+                return obj
+            elif _type == 'sev':
+                if 'sev_wt' in obj:
+                    del obj['sev_wt']
+                return Severity(**obj)
+            else:
+                ValueError(f'Cannot build {_type} objects')
+            return obj
+
+        # run
+        self._runner(portfolio_program)
+
+        # create objects
         rv = None
         if len(self.parser.port_out_dict) > 0:
             # create ports
             rv = []
             for k in self.parser.port_out_dict.keys():
-                s = Portfolio(k, self.portfolio[k]['spec'])
-                if update:
-                    if bs > 0 and log2 > 0:
-                        _bs = bs
-                        _log2 = log2
-                    else:
-                        if bs == 0:  # and log2 > 0
-                            # for log2 = 10
-                            _bs = s.recommend_bucket().iloc[-1, 0]
-                            _log2 = log2  # which must be > 0
-                            # adjust bucket size for new actual log2
-                            _bs *= 2 ** (10 - _log2)
-                        else:  # bs > 0 and log2 = 0 which doesn't really make sense...
-                            logging.warning('Underwriter.write | nonsensical options bs > 0 and log2 = 0')
-                            _bs = bs
-                            _log2 = 10
-                    logging.info(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
-                    s.update(log2=_log2, bs=_bs, verbose=verbose, add_exa=add_exa, **kwargs)
+                # remember the spec comes back as a list of aggs that have been entered into the uw
+                s = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
+                _update(s)
                 rv.append(s)
 
         elif len(self.parser.agg_out_dict) > 0 and rv is None:
@@ -414,14 +456,6 @@ class Underwriter(object):
         """
         logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
         self._runner(portfolio_program)
-        # for a in ['sev_out_dict', 'agg_out_dict', 'port_out_dict']:
-        #     ans = getattr(self.parser, a)
-        #     if len(ans) > 0:
-        #         _s = f'{len(ans)} {a[0:4]} objects created'
-        #         print('\n'+_s)
-        #         print('='*len(_s))
-        #         for k, v in ans.items():
-        #             print(f'{k:<10s}\t{v}')
         ans1 = ans2 = ans3 = None
         if len(self.parser.sev_out_dict) > 0:
             for v in self.parser.sev_out_dict.values():
@@ -438,30 +472,35 @@ class Underwriter(object):
     def _runner(self, portfolio_program):
         """
         preprocessing:
+            remove \n in [] (vectors) e.g. put by f{np.linspace} TODO only works for 1d vectors
             ; mapped to newline
             backslash (line continuation) mapped to space
             split on newlines
             parse one line at a time
             PIPE format no longer supported
+
         error handling and piping through parser
 
         :param portfolio_program:
         :return:
         """
-        # preprocess line continuation and replace ; with new line
-        # remove \n in vectors. these are put in by np str e.g. in np.linspace. this is a bit tricky...
-        # split on [], results in out in out in vectors, so need to replace \n in the odd part only
-        s = portfolio_program
-        out_in = re.split(r'\[|\]', s)
+        # Preprocess ---------------------------------------------------------------------
+        # handle \n in vectors; first item is outside, then inside... (multidimensional??)
+        # remove coments # xxx
+        portfolio_program = re.sub(r'\s*#[^\n]*\n', r'\n', portfolio_program)
+        out_in = re.split(r'\[|\]', portfolio_program)
         assert len(out_in) % 2  # must be odd
         odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
         even = out_in[0::2]  # otherwise pass through
         # reassemble
         portfolio_program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
+        # other preprocessing: line continuation; \n\t or \n____ to space (for port indents),
+        # ; to new line, split on new line
         portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
                              replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
                              split('\n') if len(i.strip()) > 0]
-        # portfolio_program = portfolio_program.replace('\\\n', ' ') # .replace(';', '\n')
+
+        # Parse      ---------------------------------------------------------------------
         self.parser.reset()
         for program_line in portfolio_program:
             # print(program_line)
@@ -473,15 +512,19 @@ class Underwriter(object):
                     print(e)
                     raise e
                 else:
-                    t = e.args[0].type; v = e.args[0].value; i = e.args[0].index
+                    t = e.args[0].type;
+                    v = e.args[0].value;
+                    i = e.args[0].index
                     txt2 = program_line[0:i] + f'>>>' + program_line[i:]
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
+
+        # Post process -------------------------------------------------------------------
         if self.store_mode:
             # could do this with a loop and getattr but it is too hard to read, so go easy route
             if len(self.parser.sev_out_dict) > 0:
                 # for k, v in self.parser.sev_out_dict.items():
-                self.severity.update(self.parser.sev_out_dict) # [k] = v
+                self.severity.update(self.parser.sev_out_dict)  # [k] = v
                 logging.info(f'Underwriter._runner | saving {self.parser.sev_out_dict.keys()} severity/ies')
             if len(self.parser.agg_out_dict) > 0:
                 # for k, v in self.parser.agg_out_dict.items():
@@ -492,7 +535,8 @@ class Underwriter(object):
                 for k, v in self.parser.port_out_dict.items():
                     # v is a list of aggregate names, these have all been added to the database...
                     logging.info(f'Underwriter._runner | saving {k} portfolio')
-                    self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
+                    self.portfolio[k] = {'spec': v['spec'], 'arg_dict': {}}
+                    # self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
         # can we still do something like this?
         #     self.parser.arg_dict['note'] = txt
         return
@@ -506,8 +550,8 @@ class Underwriter(object):
         :return:
         """
         defaults = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                    sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
-                    freq_name='poisson', freq_a=0, freq_b=0)
+                        sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
+                        freq_name='poisson', freq_a=0, freq_b=0)
         if kind == 'agg':
             for k, v in defaults.items():
                 if k not in dict_:
@@ -517,33 +561,29 @@ class Underwriter(object):
                 if k[0:3] == 'sev' and k not in dict_ and k != 'sev_wt':
                     dict_[k] = v
 
-    def _safe_lookup(self, uw_id, expected_type):
+    def _safe_lookup(self, uw_id):
         """
         lookup uw_id in uw of expected type and merge safely into self.arg_dict
         delete name and note if appropriate
 
-        :param uw_id:
+        :param uw_id:  type.name format
         :param expected_type:
         :return:
         """
-        _type = 'not found'
-        builtin_dict = None
+
+        expected_type, uw_id = uw_id.split('.')
+        found_type = 'not found'
+        found_dict = None
         try:
-            # strip the uw. off here
-            _type, builtin_dict = self[uw_id[3:]]
+            # lookup in Underwriter
+            found_type, found_dict = self[uw_id]
         except LookupError as e:
-            print(f'ERROR Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
+            print(f'ERROR id {expected_type}.{uw_id} not found')
             raise e
-        logging.info(f'Looked up {uw_id} found {builtin_dict} of type {_type}, expected {expected_type}')
-        assert _type != 'portfolio'  # this is a problem
-        logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} type {type(builtin_dict)}')
-        if _type != expected_type:
-            print(f'WARNING: type of {uw_id} is  {_type}, not expected {expected_type}')
-        assert _type == expected_type
-        # may need to delete various items
-        # if 'note' in builtin_dict:
-        #     del builtin_dict['note']
-        return builtin_dict.copy()
+        logging.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} as type {found_type}')
+        if found_type != expected_type:
+            raise ValueError(f'Error: type of {uw_id} is  {found_type}, not expected {expected_type}')
+        return found_dict.copy()
 
     @staticmethod
     def obj_to_agg(obj):
@@ -553,7 +593,6 @@ class Underwriter(object):
         :return:
         """
         pass
-
 
 # def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
 #     """

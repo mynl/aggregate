@@ -132,7 +132,7 @@ class Distortion(object):
             # TODO sort out g_inv...it is incorrect...
             # g, g_inv = agg.distortion_factory({'name': 'lep', 'shape': [0.05, 0.35]})
             # ps = np.linspace(0, 1, 1001)
-            # df = pd.DataFrame({'p': ps, 'gg_inv': g(g_inv(ps)), 'g_invg': g_inv(g(ps)),
+            # df = pd.DataFrame({'log': ps, 'gg_inv': g(g_inv(ps)), 'g_invg': g_inv(g(ps)),
             # 'g': g(ps), 'g_inv': g_inv(ps)})
             # df.query(' abs(gg_inv - g_invg) > 1e-5')
             sigma = (delta - d) ** 2

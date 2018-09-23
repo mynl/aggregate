@@ -294,7 +294,7 @@ class Portfolio(object):
 
         for d in new_spec:
             # d is a dictionary agg spec, need to adjust the frequency
-            # TODO better freq dists; deal with Bernoulli where n=p<1
+            # TODO better freq dists; deal with Bernoulli where n=log<1
             d['frequency']['n'] *= other
 
         return Portfolio(f'Sum of {other} copies of {self.name}', new_spec)
@@ -391,11 +391,11 @@ class Portfolio(object):
         report_ser on percentiles and large losses
         uses interpolation, audit_df uses nearest
 
-        :pvalues: optional vector of p values to use. If None sensible defaults provided
-        :return: DataFrame of percentiles indexed by line and p
+        :pvalues: optional vector of log values to use. If None sensible defaults provided
+        :return: DataFrame of percentiles indexed by line and log
         """
-        df = pd.DataFrame(columns=['line', 'p', 'Agg Quantile'])
-        df = df.set_index(['line', 'p'])
+        df = pd.DataFrame(columns=['line', 'log', 'Agg Quantile'])
+        df = df.set_index(['line', 'log'])
         # df.columns.name = 'perspective'
         if pvalues is None:
             pvalues = [0.5, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99, 0.994, 0.995, 0.999, 0.9999]
@@ -472,7 +472,7 @@ class Portfolio(object):
         # add the densities
         # tilting: [@Grubel1999]: Computation of Compound Distributions I: Aliasing Errors and Exponential Tilting
         # (ASTIN 1999)
-        # tilt x numbuck < 20 recommented p. 210
+        # tilt x numbuck < 20 recommented log. 210
         # num buckets and max loss from bucket size
         N = 1 << log2
         MAXL = N * bs
@@ -538,7 +538,7 @@ class Portfolio(object):
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
         percentiles = [0.9, 0.95, 0.99, 0.996, 0.999, 0.9999, 1 - 1e-6]
         self.audit_df = pd.DataFrame(
-            columns=['Sum p', 'EmpMean', 'EmpCV', 'EmpSkew', 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
+            columns=['Sum log', 'EmpMean', 'EmpCV', 'EmpSkew', 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
                     ['P' + str(100 * i) for i in percentiles])
         for col in self.line_names_ex:
             sump = np.sum(self.density_df[f'p_{col}'])
@@ -639,7 +639,7 @@ class Portfolio(object):
         kind = density
         simple plotting of line density or not line density
         input single line or list of lines
-        p underscore appended as appropriate
+        log underscore appended as appropriate
 
         kind = audit
             Miscellaneous audit graphs
@@ -1359,7 +1359,7 @@ class Portfolio(object):
             axiter = axiter_factory(None, 24)
             df, au = self.apply_distortion(g, axiter)  # no plots at this point...
             # extract range of S values
-            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-z]*$|exag_sumparts|lr_').copy()
+            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-zA-Z0-9_]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name
@@ -1495,7 +1495,7 @@ class Portfolio(object):
             df[f'lr_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
 
         # make a convenient audit extract for viewing
-        audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^n]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
+        audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^η]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
         # audit.columns = audit.columns.str.split('_', expand=True)
         # audit = audit.sort_index(axis=1)
 
@@ -1535,7 +1535,7 @@ class Portfolio(object):
             for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
                 # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
                 ax = next(axiter)  # XXXX??? was (?![n])
-                df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-z]+$').sort_index(axis=1).plot(ax=ax)
+                df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9_]+$').sort_index(axis=1).plot(ax=ax)
                 ax.set_title(f'{prefix.title()} by line')
                 if prefix.find('xi_x') > 0:
                     # fix scale for proportions
@@ -1555,12 +1555,12 @@ class Portfolio(object):
                 ax.set_title(f'{line} EL and Transf EL')
 
             ax = next(axiter)
-            df_plot.filter(regex='^exa_[a-z]+_pcttotal').sort_index(axis=1).plot(ax=ax)
+            df_plot.filter(regex='^exa_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
             ax.set_title('Pct loss')
             ax.set_ylim(0, 1.05)
 
             ax = next(axiter)
-            df_plot.filter(regex='^exag_[a-z]+_pcttotal').sort_index(axis=1).plot(ax=ax)
+            df_plot.filter(regex='^exag_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
             ax.set_title('Pct premium')
             ax.set_ylim(0, 1.05)
 
@@ -1581,7 +1581,7 @@ class Portfolio(object):
         Price using regulatory and pricing g functions
         i.e. compute E_price (X wedge E_reg(X) )
         regulatory capital distortion is applied on unlimited basis
-        reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =p value in either case }
+        reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =log value in either case }
         pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
         overwritten
 
@@ -1738,7 +1738,7 @@ class Portfolio(object):
     def top_down(self, distortions, A_or_p):
         """
         DataFrama summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A
-        If A=0 A=q(p) is used
+        If A=0 A=q(log) is used
 
         Not integrated into graphcis format (plot)
 
@@ -1750,7 +1750,7 @@ class Portfolio(object):
         assert A_or_p > 0
 
         if A_or_p < 1:
-            # call with one arg and interpret as p
+            # call with one arg and interpret as log
             A = self.q(A_or_p)
         else:
             A = A_or_p
@@ -1956,7 +1956,7 @@ class Portfolio(object):
         if debug:
             ans = pd.DataFrame(ans,
                                columns=['loss', 'int1', 'int2', 'int3', 'exeqa', 'ptot', 'incr', 'c1', 'c2', 'c3', 'gt',
-                                        'p'])
+                                        'log'])
             ans = ans.set_index('loss', drop=True)
             ans.index.name = 'loss'
         else:
@@ -2020,7 +2020,7 @@ class Portfolio(object):
         p = pd.concat(pdfs)
         p['lr err'] = p['lr'] - LR
 
-        # a from apply, p from price
+        # a from apply, log from price
         a = table.query(f' loss=={K} ')
 
         # easier tests

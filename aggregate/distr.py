@@ -126,7 +126,7 @@ class Aggregate(object):
                                                   ['contagion', 'mix_cv'])
         self.statistics_total_df = self.statistics_df.copy()
 
-        ma = MomentAggregator(self.freq_name, self.freq_a, self.freq_b)
+        self.ma = MomentAggregator(self.freq_name, self.freq_a, self.freq_b)
 
         # broadcast arrays: first line forces them all to be arrays
         # TODO this approach forces EITHER a mixture OR multi exposures
@@ -136,8 +136,8 @@ class Aggregate(object):
             exp_el = np.array([exp_el])
 
         # pyCharm formatting
-        exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, \
-        sev_scale, sev_wt = \
+        exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, \
+        sev_loc, sev_scale, sev_wt = \
             np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b,
                                 sev_mean, sev_cv,
                                 sev_loc, sev_scale, sev_wt)
@@ -178,17 +178,18 @@ class Aggregate(object):
             _en *= smix
 
             # accumulate moments
-            ma.add_fs(_en, sev1, sev2, sev3)
+            self.ma.add_f1s(_en, sev1, sev2, sev3)
 
             # store
-            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [
-                c, self.freq_a]
+            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + self.ma.get_fsa_stats(
+                total=False) + [
+                                               c, self.freq_a]
             r += 1
 
         # average exp_limit and exp_attachment
-        avg_limit = np.sum(self.statistics_df.limit * self.statistics_df.freq_1) / ma.tot_freq_1
-        avg_attach = np.sum(self.statistics_df.attachment * self.statistics_df.freq_1) / ma.tot_freq_1
-        # assert np.allclose(ma.freq_1, self.statistics_df.exp_en)
+        avg_limit = np.sum(self.statistics_df.limit * self.statistics_df.freq_1) / self.ma.tot_freq_1
+        avg_attach = np.sum(self.statistics_df.attachment * self.statistics_df.freq_1) / self.ma.tot_freq_1
+        # assert np.allclose(self.ma.freq_1, self.statistics_df.exp_en)
 
         # store answer for total
         tot_prem = self.statistics_df.prem.sum()
@@ -198,18 +199,19 @@ class Aggregate(object):
         else:
             lr = np.nan
         self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-                                                    ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+                                                    self.ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
         self.statistics_total_df.loc[f'independent', :] = \
-            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True,
-                                                                                             remix=False) + [c, root_c]
-        self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
+            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + self.ma.get_fsa_stats(total=True,
+                                                                                                  remix=False) + [c,
+                                                                                                                  root_c]
+        self.statistics_df['wt'] = self.statistics_df.freq_1 / self.ma.tot_freq_1
         self.statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
-        self.n = ma.tot_freq_1
+        self.n = self.ma.tot_freq_1
         self.agg_m = self.statistics_total_df.loc['mixed', 'agg_m']
         self.agg_cv = self.statistics_total_df.loc['mixed', 'agg_cv']
         self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
         # finally, need a report_ser series for Portfolio to consolidate
-        self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
+        self.report_ser = self.ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
         # TODO fill in missing p99                                   ^ pctile
 
     def __str__(self):
@@ -242,7 +244,8 @@ class Aggregate(object):
         a_m = st.agg_m
         a_cv = st.agg_cv
         _df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                            'Skew(X)': [None, None, st.agg_skew]}, index=['Sev', 'Freq', 'Agg'])
+                            'Skew(X)': [None, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
+                           index=['Sev', 'Freq', 'Agg'])
         _df.index.name = 'X'
         if self.audit_df is not None:
             esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
@@ -367,8 +370,7 @@ class Aggregate(object):
         self.xs = xs
         self.bs = xs[1]
 
-        # make the severity vector
-        # case 1 (all for now) it is the claim count weighted average of the severities
+        # make the severity vector: a claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
             wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
@@ -406,33 +408,16 @@ class Aggregate(object):
                                     np.sum(wts), np.sum(np.where(np.isinf(self.sev_density), 1, 0)),
                                     self.sev_density.max(), np.nan, self.sev_density.min()]
         if force_severity:
+            # only asking for severity (used by plot)
             return
+
         if approximation == 'exact':
-            if self.freq_name == 'poisson':
-                # TODO ignoring contagion! Where are other freq dists!!!
-                # convolve for compound Poisson
-                # TODO put back!
-                if self.n > 100:
-                    logging.warning(f' | warning, {self.n} very high claim count ')
-                # assert self.n < 100
-                self.ftagg_density = np.exp(self.n * (ft(self.sev_density, padding, tilt_vector) - 1))
-                self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
-            elif self.freq_name == 'fixed':
-                # fixed count distribution...still need to do convolution
-                self.ftagg_density = ft(self.sev_density, padding, tilt_vector) ** self.n
-                if self.n == 1:
-                    self.agg_density = self.sev_density
-                else:
-                    self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
-            elif self.freq_name == 'bernoulli':
-                # binomial M_N(t) = log M_X(t) + (1-log) at zero point
-                assert ((self.n > 0) and (self.n < 1))
-                self.ftagg_density = self.n * ft(self.sev_density, padding, tilt_vector)
-                self.ftagg_density += (1 - self.n) * np.ones_like(self.ftagg_density)
-                self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
-            else:
-                raise ValueError(f'Inadmissible value for fixed {self.freq_name}'
-                                 ' Allowable values are -1 (or bernoulli) 1 (or fixed), missing or 0 (Poisson)')
+            if self.n > 100:
+                logging.warning(f' | warning, {self.n} very high claim count ')
+            # assert self.n < 100
+            z = ft(self.sev_density, padding, tilt_vector)
+            self.ftagg_density = self.ma.mgf(self.n, z)
+            self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
         else:
             # regardless of request if skew == 0 have to use normal
             if self.agg_skew == 0:
@@ -672,6 +657,8 @@ class Aggregate(object):
             mx = np.argmax(F > 1 - 1e-5)
             if mx == 0:
                 mx = len(F) + 1
+            else:
+                mx += 1  # a little extra room
             dh_F = None
             if self.dh_agg_density is not None:
                 dh_F = np.cumsum(self.dh_agg_density)
@@ -686,12 +673,16 @@ class Aggregate(object):
             f = self.sev_density[:mx]
 
             ax = next(axiter)
-            ax.plot(xs, d, label='agg')
-            ax.plot(xs, f, label='sev')
+            # ? correct format?
+            ax.plot(xs, d, label='agg', drawstyle='steps-post')
+            ax.plot(xs, f, label='sev', drawstyle='steps-post')
+            if np.sum(f > 1e-6) < 20:
+                # if there are few points...highlight the points
+                ax.plot(xs, f, 'o', label=None, )
             if self.dh_agg_density is not None:
                 ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
                 ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-            max_y = min(2 * np.max(d), np.max(f[1:]))
+            max_y = min(2 * np.max(d), np.max(f[1:])) * 1.05  # want some extra space...
             if max_y > 0:
                 ax.set_ylim(0, max_y)
             ax.legend()
@@ -977,7 +968,7 @@ class Severity(ss.rv_continuous):
         """
         # some special cases we can handle:
         if self.sev_name == 'lognorm':
-            shape = np.sqrt(np.log(cv*cv + 1))
+            shape = np.sqrt(np.log(cv * cv + 1))
             fz = ss.lognorm(shape)
             return shape, fz
 

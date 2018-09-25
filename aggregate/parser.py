@@ -7,20 +7,11 @@ Overview
 
 Ignored colon, comma, ( ) |
 
-A markdown pipe table: ignores pipes and first two rows
+port BODOFF1 note{Bodoff Thought Experiment No. 1}
+    agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
+    agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
-Valid program
-
-| name        | expos                 | limit                    | sev                                               | freq              |
-|:------------|:----------------------|:-------------------------|:--------------------------------------------------|:------------------|
-| big_mixture | 50 claims             | [50, 100, 150, 200] xs 0 | on lognorm 12 cv [1,2,3,4] wts [0.25 .25 .25 .25] | poisson           |
-| A1          | 500 premium at 0.5    |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
-| A1          | 500 premium at 0.5 lr |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
-| A2          | 50  claims            | 30 xs 10                 | on gamma 12 cv .30                                | mixed gamma 0.014 |
-| A3          | 50  claims            |                          | on gamma 12 cv .30                                | mixed gamma 0.014 |
-| A4          | 50  claims            | 30 xs 20                 | on gamma 12 cv .30                                | mixed gamma 0.14  |
-| hcmp        | 1000 * uw.cmp         |                          |                                                   |                   |
-| incmp       | uw.cmp * 0.001        |                          |                                                   |                   |
+tab or four spaces needed and are replaced with space (program is on one line)
 
 Language Specification
 ----------------------
@@ -285,11 +276,11 @@ class UnderwritingLexer(Lexer):
     ID['loss'] = LOSS
     ID['at'] = AT
     ID['cv'] = CV
-    ID['prem'] = PREMIUM
     ID['premium'] = PREMIUM
+    ID['prem'] = PREMIUM
     ID['lr'] = LR
-    ID['claim'] = CLAIMS
     ID['claims'] = CLAIMS
+    ID['claim'] = CLAIMS
     ID['x'] = XS
     ID['xs'] = XS
     ID['wts'] = WEIGHTS
@@ -436,16 +427,15 @@ class UnderwritingParser(Parser):
     # one and two parameter mixing distributions
     @_('MIXED ID NUMBER NUMBER')
     def freq(self, p):
-        self.log(f'MIXED ID NUMBER NUMBER {p.ID}, {p.NUMBER}, {p.NUMBER} to two param freq, NUMBER.1=CV')
-        return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}  # TODO IDS--> poisson for now
+        self.log(f'MIXED ID NUMBER NUMBER {p.ID}, {p[2]}, {p[3]} to two param freq, NUMBER.1=CV')
+        return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}
 
     @_('MIXED ID NUMBER')
     def freq(self, p):
         self.log(f'MIXED ID NUMBER {p.ID}, {p.NUMBER} to single param freq, NUMBER=CVs')
-        return {'freq_name': p.ID, 'freq_a': p.NUMBER}  # TODO IDS--> poisson for now
-        # return {'freq_name': 'poisson', 'freq_a': p.numbers}  # TODO IDS--> poisson for now
+        return {'freq_name': p.ID, 'freq_a': p.NUMBER}
 
-    # binomial p
+    # binomial p or TODO inflated poisson
     @_('FREQ NUMBER')
     def freq(self, p):
         self.log(f'Named frequency distribution {p.FREQ} parameter {p.NUMBER} to freq')
@@ -456,6 +446,8 @@ class UnderwritingParser(Parser):
     @_('FREQ')
     def freq(self, p):
         self.log(f'Named frequency distribution {p.FREQ} resolve to freq')
+        if p.FREQ not in ('poisson', 'bernoulli', 'fixed'):
+            warnings.warn(f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli or fixed')
         return {'freq_name': p.FREQ}
 
     # require a frequency distribution

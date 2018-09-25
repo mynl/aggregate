@@ -51,8 +51,8 @@ class Portfolio(object):
             a = Aggregate(**spec)
             self.agg_list.append(a)
             self.line_names.append(spec['name'][0] if isinstance(spec['name'], list) else spec['name'])
-            ma.add_fs(a.report_ser[('freq', 'ex1')],
-                      a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
+            ma.add_f123s(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
+                         a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
             max_limit = max(max_limit, np.max(np.array(a.limit)))
         self.line_names_ex = self.line_names + ['total']
         for n in self.line_names:
@@ -147,9 +147,12 @@ class Portfolio(object):
         s.append(f'Portfolio contains {_n} aggregate component{_s}')
         if self.audit_df is not None:
             _df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
+            # another option TODO consider
+            # pd.concat((port.statistics_df.iloc[0:9, :], port.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV',
+            # 'CVErr', 'P99.0']].T), sort=True)
             s.append(_df._repr_html_())
         else:
-            s.append('Not updated, no estimated statistics available')
+            s.append(self.statistics_df.iloc[0:9, :]._repr_html_())
         return '\n'.join(s)
 
     def __hash__(self):

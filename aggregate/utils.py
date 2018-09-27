@@ -8,7 +8,7 @@ import itertools
 import os
 import seaborn as sns
 from scipy.special import kv
-from scipy.optimize import broyden2
+from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 
 
@@ -80,9 +80,10 @@ def ft(z, padding, tilt):
     :param tilt: vector of tilt values
     :return:
     """
-    locft = np.fft.fft
+    # locft = np.fft.fft
+    locft = np.fft.rfft
     if z.shape != (len(z),):
-        raise ValueError('FUKYUPY error, wrong shape passed into ft: ' + str(z.shape))
+        raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
     # tilt
     if tilt is not None:
         zt = z * tilt
@@ -108,9 +109,10 @@ def ift(z, padding, tilt):
     :param tilt:
     :return:
     """
-    locift = np.fft.ifft
+    # locift = np.fft.ifft
+    locift = np.fft.irfft
     if z.shape != (len(z),):
-        raise ValueError('FUKYUPY error, wrong shape passed into ft: ' + str(z.shape))
+        raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
     temp = locift(z)
     # unpad
     temp = temp[0:]
@@ -213,6 +215,7 @@ class AxisManager(object):
 
 
     """
+    __slots__ = ['n', 'nr', 'r', 'ax', 'axs', 'c', 'f', 'faxs', 'it']
 
     def __init__(self, n, figsize=None, height=2, aspect=1, nr=5):
         """
@@ -330,15 +333,18 @@ def lognorm_lev(mu, sigma, n, limit):
 
 
 # display related
-def html_title(txt, n=1):
+def html_title(txt, n=1, title_case=True):
     """
 
     :param txt:
     :param n:
+    :param title_case:
     :return:
     """
-    display(HTML('<h{:}> {:}'.format(n, txt.replace("_", " ").title())))
-
+    if title_case:
+        display(HTML('<h{:}> {:}'.format(n, txt.replace("_", " ").title())))
+    else:
+        display(HTML('<h{:}> {:}'.format(n, txt.replace("_", " "))))
 
 def sensible_jump(n, desired_rows=20):
     """
@@ -430,30 +436,21 @@ def read_log():
 
 class MomentAggregator(object):
     """
-    Accumulate moments
-    Used by Portfolio and Aggregate (when there are multiple severities)
+    Purely accumulates moments
+    Used by Portfolio
+    Not frequency aware
     makes report_ser df and statistics_df
 
     Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
 
-
     """
+    __slots__ = ['freq_1', 'freq_2', 'freq_3', 'sev_1', 'sev_2', 'sev_3', 'agg_1', 'agg_2', 'agg_3',
+                 'tot_freq_1', 'tot_freq_2', 'tot_freq_3',
+                 'tot_sev_1', 'tot_sev_2', 'tot_sev_3',
+                 'tot_agg_1', 'tot_agg_2', 'tot_agg_3', 'freq_moms'
+                 ]
 
-    def __init__(self, freq_name, freq_a, freq_b):
-        """
-        two modes:
-            for use in an aggregate where you are aggregating mixed severities and know about freq
-            for use in a portfolio where you are just aggregating...
-            TODO separate two distinct uses!
-        :param freq_name:
-        :param freq_a:
-        :param freq_b:
-        """
-
-        self.freq_name = freq_name
-        self.freq_a = freq_a
-        self.freq_b = freq_b
-
+    def __init__(self, freq_moms=None):
         # accumulators
         self.agg_1 = self.agg_2 = self.agg_3 = 0
         self.tot_agg_1 = self.tot_agg_2 = self.tot_agg_3 = 0
@@ -461,200 +458,10 @@ class MomentAggregator(object):
         self.tot_freq_1 = self.tot_freq_2 = self.tot_freq_3 = 0
         self.sev_1 = self.sev_2 = self.sev_3 = 0
         self.tot_sev_1 = self.tot_sev_2 = self.tot_sev_3 = 0
+        # function to comptue frequency moments, hence can call add_f1s(...)
+        self.freq_moms = freq_moms
 
-        if freq_name == '':
-            self.freq_moms = None
-            self.mgf = None
-            return
-
-
-        # potentially call freq_moms many times, so should built the freq_moms function once
-        # at the same time build the MGF function, called so mgf(fz) = mgf of aggregate
-        # e.g. for poisson mgf(fz) = exp(freq_1 * (fz - 1) ); called on ft(z, padding...)
-        # mgf function will be stored in aggregate for future use...
-        if self.freq_name == 'fixed':
-            def f(n):
-                # fixed distribution N=n certainly
-                freq_2 = n ** 2
-                freq_3 = n * freq_2
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return z ** n
-
-        elif self.freq_name == 'bernoulli':
-            def f(n):
-                # code for bernoulli n, E(N^k) = E(N) = n
-                # n in this case only means probability of claim (=expected claim count)
-                freq_2 = n
-                freq_3 = n
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                # E(e^tlog(z)) = p z + (1-p), z = ft(severity)
-                return z * n + (1 - n) * np.ones_like(z)
-
-        elif self.freq_name == 'binomial':
-            def f(en):
-                # binomial(n=en/p, n = p)
-                # http://mathworld.wolfram.com/BinomialDistribution.html
-                p = self.freq_a
-                n = en / p
-                freq_2 = n * p * (1 - p + n * p)
-                freq_3 = n * p * (1 + p * (n - 1) * (3 + p * (n - 2)))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return (z * self.freq_a + (1 - self.freq_a) * np.ones_like(z)) ** (n / self.freq_a)
-
-        elif self.freq_name == 'poisson' and self.freq_a == 0:
-            def f(n):
-                # Poisson
-                freq_2 = n * (1 + n)
-                freq_3 = n * (1 + n * (3 + n))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return np.exp(n * (z - 1))
-
-        elif self.freq_name == 'pascal':
-            # solve for local c to hit overall c=ν^2 value input
-            ν = self.freq_a  # desired overall cv
-            κ = self.freq_b  # claims per occurrence
-
-            def f(n):
-                c = (n * ν ** 2 - 1 - κ) / κ
-                # a = 1 / c
-                # θ = κ * c
-                λ = n / κ  # poisson parameter for number of claims
-                g = κ * λ * (
-                        2 * c ** 2 * κ ** 2 + 3 * c * κ ** 2 * λ + 3 * c * κ ** 2 + 3 * c * κ + κ ** 2 * λ ** 2 +
-                        3 * κ ** 2 * λ + κ ** 2 + 3 * κ * λ + 3 * κ + 1)
-                return n * (κ * (1 + c + λ) + 1), g
-
-            def mgf(n, z):
-                c = (n * ν ** 2 - 1 - κ) / κ
-                a = 1 / c
-                θ = κ * c
-                λ = n / κ  # poisson parameter for number of claims
-                return np.exp(λ * ((1 - θ * (z - 1)) ** -a - 1))
-
-        # the remaining options are all mixed poisson ==================================================
-        # the factorial moments of the mixed poisson are the noncentral moments of the mixing distribution
-        # so for each case we compute the noncentral moments of mix and then convert factorial to non-central
-        # the mixing distributions have mean 1 so they can be scaled as appropriate
-        elif self.freq_name == 'gamma':
-            # gamma parameters a (shape) and  theta (scale)
-            # a = 1/c, theta = c
-            c = self.freq_a * self.freq_a
-            a = 1 / c
-            θ = c
-            g = 1 + 3 * c + 2 * c * c
-
-            def f(n):
-                freq_2 = n * (1 + (1 + c) * n)
-                freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return (1 - θ * n * (z - 1)) ** -a
-
-        elif self.freq_name == 'delaporte':
-            # shifted gamma, freq_a is CV mixing and freq_b  = proportion of certain claims
-            ν = self.freq_a
-            c = ν * ν
-            certain = self.freq_b
-            # parameters of mixing distribution (excluding the n)
-            a = (1 - certain) ** 2 / c
-            θ = (1 - certain) / a
-            g = 2 * ν ** 4 / (1 - certain) + 3 * c + 1
-
-            def f(n):
-                freq_2 = n * (1 + (1 + c) * n)
-                freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return np.exp(certain * n * (z - 1) * (1 - θ * n * (z - 1)) ** -a)
-
-        elif self.freq_name == 'ig':
-            # inverse Gaussian distribution
-            ν = self.freq_a
-            c = ν ** 2
-            μ = c
-            λ = 1 / μ
-            # skewness and E(G^3)
-            γ = 3 * np.sqrt(μ)
-            g = γ * ν ** 3 + 3 * c + 1
-
-            def f(n):
-                freq_2 = n * (1 + (1 + c) * n)
-                freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return np.exp(1 / μ * (1 - np.sqrt(1 - 2 * μ ** 2 * λ * n * (z - 1))))
-
-        elif self.freq_name == 'sig':
-            # shifted pig with a proportion of certain claims
-            ν = self.freq_a
-            certain = self.freq_b
-            c = ν * ν  # contagion
-            μ = c / (1 - certain) ** 2
-            λ = (1 - certain) / μ
-            γ = 3 * np.sqrt(μ)
-            g = γ * ν ** 3 + 3 * c + 1
-
-            def f(n):
-                freq_2 = n * (1 + (1 + c) * n)
-                freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
-                return freq_2, freq_3
-
-            def mgf(n, z):
-                return np.exp(certain * n * (z - 1)) * np.exp(1 / μ * (1 - np.sqrt(1 - 2 * μ ** 2 * λ * n * (z - 1))))
-
-        # elif self.freq_name == 'sichel':
-        #     def f(n):
-        #         # Sichel's distribution
-        #
-        #     def mgf(n, z):
-        #         pass
-
-        else:
-            raise ValueError(f'Inadmissible frequency type {self.freq_name}...')
-
-        self.freq_moms = f
-        self.mgf = mgf
-
-    @staticmethod
-    def factorial_to_noncentral(f1, f2, f3):
-        # eg. Panjer Willmot p 29, 2.3.13
-        nc2 = f2 + f1
-        nc3 = f3 + 3 * f2 + f1
-        return nc2, nc3
-
-    def add_f1s(self, f1, s1, s2, s3):
-        """
-        accumulate new moments defined by f1 and s - fills in f2, f3 based on
-        stored frequency distribution
-
-        used by Aggregate
-
-        compute agg for the latest values
-
-
-        :param f1:
-        :param s1:
-        :param s2:
-        :param s3:
-        :return:
-        """
-
-        # fill in the frequency moments and store away
-        f2, f3 = self.freq_moms(f1)
-        self.add_f123s(f1, f2, f3, s1, s2, s3)
-
-    def add_f123s(self, f1, f2, f3, s1, s2, s3):
+    def add_fs(self, f1, f2, f3, s1, s2, s3):
         """
         accumulate new moments defined by f and s
 
@@ -695,23 +502,26 @@ class MomentAggregator(object):
         self.tot_agg_1, self.tot_agg_2, self.tot_agg_3 = \
             self.cumulate_moments(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, self.agg_1, self.agg_2, self.agg_3)
 
-    @staticmethod
-    def agg_from_fs(f1, f2, f3, s1, s2, s3):
+    def add_f1s(self, f1, s1, s2, s3):
         """
-        aggregate_project moments from freq and sev components
+        accumulate new moments defined by f1 and s - fills in f2, f3 based on
+        stored frequency distribution
+
+        used by Aggregate
+
+        compute agg for the latest values
 
 
         :param f1:
-        :param f2:
-        :param f3:
         :param s1:
         :param s2:
         :param s3:
         :return:
         """
-        return f1 * s1, \
-               f1 * s2 + (f2 - f1) * s1 ** 2, \
-               f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
+
+        # fill in the frequency moments and store away
+        f2, f3 = self.freq_moms(f1)
+        self.add_fs(f1, f2, f3, s1, s2, s3)
 
     def get_fsa_stats(self, total, remix=False):
         """
@@ -745,6 +555,32 @@ class MomentAggregator(object):
             return [self.freq_1, self.freq_2, self.freq_3, *self.moments_to_mcvsk('freq', False),
                     self.sev_1, self.sev_2, self.sev_3, *self.moments_to_mcvsk('sev', False),
                     self.agg_1, self.agg_2, self.agg_3, *self.moments_to_mcvsk('agg', False)]
+
+    @staticmethod
+    def factorial_to_noncentral(f1, f2, f3):
+        # eg. Panjer Willmot p 29, 2.3.13
+        nc2 = f2 + f1
+        nc3 = f3 + 3 * f2 + f1
+        return nc2, nc3
+
+    @staticmethod
+    def agg_from_fs(f1, f2, f3, s1, s2, s3):
+        """
+        aggregate_project moments from freq and sev components
+
+
+        :param f1:
+        :param f2:
+        :param f3:
+        :param s1:
+        :param s2:
+        :param s3:
+        :return:
+        """
+        return f1 * s1, \
+               f1 * s2 + (f2 - f1) * s1 ** 2, \
+               f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
+
 
     def moments_to_mcvsk(self, mom_type, total=True):
         """
@@ -830,8 +666,9 @@ class MomentAggregator(object):
         """
 
         if agg_only:
-            return [i + j for i, j in itertools.product(['agg'], [f'_{i}' for i in range(1, 4)] +
-                                                        ['_m', '_cv', '_skew'])]
+            raise ValueError('did not think this was used... ')
+            # return [i + j for i, j in itertools.product(['agg'], [f'_{i}' for i in range(1, 4)] +
+            #                                             ['_m', '_cv', '_skew'])]
         else:
             return [i + j for i, j in itertools.product(['freq', 'sev', 'agg'], [f'_{i}' for i in range(1, 4)] +
                                                         ['_m', '_cv', '_skew'])]
@@ -877,6 +714,8 @@ class MomentAggregator(object):
         :param total:
         :return:
         """
+        # TODO seems like always called with total = true, so can delete?
+        assert total
         idx = pd.MultiIndex.from_arrays(
             [['agg', 'agg', 'agg', 'freq', 'freq', 'freq', 'sev', 'sev', 'sev'] * 2 + ['agg', 'agg'],
              ['mean', 'cv', 'skew'] * 3 + ['ex1', 'ex2', 'ex3'] * 3 + ['limit', 'P99.9e']],
@@ -901,6 +740,8 @@ class MomentWrangler(object):
     Stores moments as noncentral internally
 
     """
+
+    __slots__ = ['_central', '_noncentral', '_factorial']
 
     def __init__(self):
         self._central = None
@@ -1039,10 +880,12 @@ class qd(object):
             return repr(self.x)
 
 
-def frequency_examples(n, ν, f, κ, g_mult, log2, xmax=500, **kwds):
+def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     """
     Illustrate different frequency distributions and frequency moment
     calculations.
+
+    sichel_case = gamma | ig | ''
 
     n = E(N) = expected claim count
     ν = CV(mixing) = asymptotic CV of any compound aggregate whose severity has a second moment
@@ -1190,52 +1033,131 @@ def frequency_examples(n, ν, f, κ, g_mult, log2, xmax=500, **kwds):
     ans.loc[(dist, 'diff'), :] = ans.loc[(dist, 'empirical'), :] / ans.loc[(dist, 'theoretical'), :] - 1
 
     # sichel: find sichel to increase mixing skewness indicated amount from IG skewness
-    # =====
+    # ======
+    # three flavors
+    # 1. sichel        cv, lambda  solve for beta and mu to hit mean and cv given lambda
+    #                     lambda = -0.5 = ig; lambda = 0.5 inverse IG
+    # 2. sichel.gamma  cv, certain match moments to negative binomial
+    # 3. sichel.ig     cv, certain match moments to shifted ig distribution
     dist = 'sichel'
-    # find method of moments parameters for Sichel mixed with GIG whose skewness = γ_mult x IG(n, ν)
-    # starting parameters = IG estimates in Panjer Willmot p.282 (8.3.12) and (8.3.13) format
-    c = ν ** 2
-    λ = -0.5
-    μ = n
-    β = ν ** 2 * n
-    ig_param = (μ, β, λ)
-    # EG^3; noncentral moments of G = factorial of N
-    eg, eg2, eg3 = tuple((μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)))
-    target = (eg, eg2, eg3 * g_mult)
+    c = ν * ν  # contagion
+    if sichel_case == 'gamma':
+        # sichel_case 2: match delaporte moments
+        # G = f + G'; E(G') = 1 - f, SD(G) = SD(G') = ν, skew(G') = skew(G)
+        # a = ((1 - f) / ν) ** 2
+        # FWIW θ = ν / (1 - f)  # (1 - f) / a
+        target = np.array([1, ν, 2 * ν / (1 - f)])   # / np.sqrt(a)])
+    elif sichel_case == 'ig':
+        # match shifted IG moments
+        # μ = (ν / (1 - f)) ** 2
+        target = np.array([1, ν, 3.0 * ν / (1 - f)])   # np.sqrt(μ)])
+    elif sichel_case == '':
+        # input lambda, match mean = 1 and cv (input)
+        pass
+    else:
+        raise ValueError("Idiot")
+
     add_sichel = True
 
-    def f(arrIn):
-        μ, β, λ = arrIn
-        # mu and beta are positive...
-        μ = np.exp(μ)
-        β = np.exp(β)
-        return np.array([μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)]) - target
+    if sichel_case in ('gamma', 'ig'):
+        # need starting parameters (Panjer and Willmost format
+        if sichel_case == 'gamma':
+            λ = -0.5
+        else:
+            λ = -0.5
+        μ = 1
+        β = ν ** 2
+        def f(arrIn):
+            """
+            calibration function to match target mean, cv and skewness (keeps the scale about the same)
+            :param arrIn:
+            :return:
+            """
+            μ, β, λ = arrIn
+            # mu and beta are positive...
+            μ = np.exp(μ)
+            β = np.exp(β)
+            ex1, ex2, ex3 = np.array([μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)])
+            sd = np.sqrt(ex2 - ex1*ex1)
+            skew = (ex3 - 3 * ex2 * ex1 + 2 * ex1 ** 3) / (sd**3)
+            return np.array([ex1, sd, skew]) - target
 
-    try:
-        params = broyden2(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000,
-                          f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
+        try:
+            params1 = broyden2(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000,
+                               f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
+            params2 = newton_krylov(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000,
+                              f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
+            if np.sum((params1-params2)**2) > 0.05:
+                print(f'Broyden {params1}\nNewton K {params2}')
+                m1 = np.sum(np.abs(params1))
+                m2 = np.sum(np.abs(params2))
+                if m1 < m2:
+                    print(f'selecting Broyden {params1}')
+                    params = params1
+                else:
+                    print(f'selecting Newton K {params2}')
+                    params = params2
+            else:
+                print(f'Two estimates similar, selecting Bry {params1}, {params2}')
+                params = params1
+        except NoConvergence as e:
+            print('ERROR: broyden did not converge')
+            print(e)
+            add_sichel = False
+            raise e
 
-    except NoConvergence as e:
-        print('ERROR: broyden did not converge')
-        print(e)
-        add_sichel = False
-        raise e
+    elif sichel_case == '':
+        # input lambda match mean = 1 and cv
+        λ = κ  # will actually be freq_b
+        # need starting parameters (for lamda = -0.5) Panjer Willmot format
+        μ = 1
+        β = ν ** 2
+        target = np.array([1, ν])
+        def f(arrIn):
+            """
+            calibration function to match target mean = 1 and cv
+            :param arrIn:
+            :return:
+            """
+            μ, β = arrIn
+            # mu and beta are positive...
+            μ = np.exp(μ)
+            β = np.exp(β)
+            ex1, ex2 = np.array([μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2)])
+            sd = np.sqrt(ex2 - ex1 * ex1)
+            return np.array([ex1, sd]) - target
+
+        try:
+            params = broyden2(f, (np.log(μ), np.log(β)), verbose=False, iter=10000,
+                              f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
+
+        except NoConvergence as e:
+            print('ERROR: broyden did not converge')
+            print(e)
+            add_sichel = False
+            raise e
+
+    else:
+        raise ValueError("Idiot ")
 
     # if parameters found...
     if add_sichel:
-        μ, β, λ = params
+        if sichel_case == '':
+            μ, β = params
+        else:
+            μ, β, λ = params
         μ, β = np.exp(μ), np.exp(β)
-        print(f'IG params     {ig_param}\nSichel params {(μ, β, λ)}')
+        print(f'Sichel params {(μ, β, λ)}')
         # theoretic noncentral moments of the **mixing** distribution = Factorial of N
-        kernel = (fz - 1)  # not n*(fz-1)
+        # have calibrated to EG=1 so use same kernel n * (z - 1)
         # compute density
         inner = np.sqrt(1 - 2 * β * kernel)
         sichel = np.real(ift(inner ** (-λ) * kv(λ, μ * inner / β) / kv(λ, μ / β)))
         sichel = defuzz(sichel)
         ans.loc[(dist, 'empirical'), :] = row(sichel)
         mw = MomentWrangler()
-        junk = [μ**r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1,2,3)]
-        g = junk[2] / n ** 3  # non central G
+        junk = [μ**r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)]
+        g = junk[2]   # non central G
         temp = noncentral_n_moms_from_mixing_moms(n, c, g)
         print('Noncentral N from mixing moms            ', temp)
         mw.factorial = junk

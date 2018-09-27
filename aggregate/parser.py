@@ -268,7 +268,7 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
     FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][a-zA-Z0-9_]*'
+    ID = r'[a-zA-Z][\.a-zA-Z0-9_]*'
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
@@ -313,7 +313,7 @@ class UnderwritingLexer(Lexer):
 class UnderwritingParser(Parser):
     # debugfile = 'parser.out'
     tokens = UnderwritingLexer.tokens
-    precedence = (('left', PLUS, MINUS), ('left', TIMES))
+    precedence = (('left', PLUS, MINUS), ('left', TIMES), ('right', UMINUS))
 
     def __init__(self, safe_lookup_function, debug=False):
         self.arg_dict = None
@@ -425,23 +425,23 @@ class UnderwritingParser(Parser):
     # for all frequency distributions claim count is determined by exposure / severity
     # only freq shape parameters need be entered
     # one and two parameter mixing distributions
-    @_('MIXED ID NUMBER NUMBER')
+    @_('MIXED ID snumber snumber')
     def freq(self, p):
-        self.log(f'MIXED ID NUMBER NUMBER {p.ID}, {p[2]}, {p[3]} to two param freq, NUMBER.1=CV')
+        self.log(f'MIXED ID snumber snumber {p.ID}, {p[2]}, {p[3]} to two param freq, snumber.1=CV')
         return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}
 
-    @_('MIXED ID NUMBER')
+    @_('MIXED ID snumber')
     def freq(self, p):
-        self.log(f'MIXED ID NUMBER {p.ID}, {p.NUMBER} to single param freq, NUMBER=CVs')
-        return {'freq_name': p.ID, 'freq_a': p.NUMBER}
+        self.log(f'MIXED ID snumber {p.ID}, {p.snumber} to single param freq, snumber=CVs')
+        return {'freq_name': p.ID, 'freq_a': p.snumber}
 
     # binomial p or TODO inflated poisson
-    @_('FREQ NUMBER')
+    @_('FREQ snumber')
     def freq(self, p):
-        self.log(f'Named frequency distribution {p.FREQ} parameter {p.NUMBER} to freq')
+        self.log(f'Named frequency distribution {p.FREQ} parameter {p.snumber} to freq')
         if p.FREQ != 'binomial':
             warnings.warn(f'Illogical choice of frequency {p.FREQ}, expected binomial')
-        return {'freq_name': p.FREQ, 'freq_a': p.NUMBER}
+        return {'freq_name': p.FREQ, 'freq_a': p.snumber}
 
     @_('FREQ')
     def freq(self, p):
@@ -449,6 +449,16 @@ class UnderwritingParser(Parser):
         if p.FREQ not in ('poisson', 'bernoulli', 'fixed'):
             warnings.warn(f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli or fixed')
         return {'freq_name': p.FREQ}
+
+    @_('NUMBER')
+    def snumber(self, p):
+        self.log(f'NUMBER {p.NUMBER} to signed number')
+        return p.NUMBER
+
+    @_('MINUS NUMBER %prec UMINUS')
+    def snumber(self, p):
+        self.log(f'-NUMBER {p.NUMBER} to signed number')
+        return -p.NUMBER
 
     # require a frequency distribution
     # @_('')

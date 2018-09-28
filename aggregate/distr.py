@@ -16,6 +16,7 @@ from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 import itertools
 
+
 class Aggregate(object):
     """
     Aggregate distribution class manages creation and calculation of aggregate distributions.
@@ -66,6 +67,21 @@ class Aggregate(object):
                 3	200	        50			 8
                 4	 75	        75			18
                 5	 75	        75			12
+
+        Circumventing Products
+        ----------------------
+
+        It is sometimes desirable to enter two or more lines each with a different severity but
+        with a shared mixing variable. For example to model the current accident year and a run-
+        off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
+        larger lognormal mean 150 cv 1.25 claims requires
+
+        agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]
+
+        so that the result is not the four-way exposure / severity product but just a two-way
+        combination. These two cases are distinguished looking at the total weights. If the weights sum to
+        one then the result is an exposure / severity product. If the weights are missing or sum to the number
+        of severity components (i.e. are all equal to 1) then the result is a row by row combination.
 
         Other notes
         -----------
@@ -124,14 +140,7 @@ class Aggregate(object):
                  sev_xs=None, sev_ps=None, sev_wt=1,
                  freq_name='', freq_a=0, freq_b=0, note=''):
 
-        assert np.allclose(np.sum(sev_wt), 1)
-
-        # self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-        #                  exp_attachment=exp_attachment, exp_limit=exp_limit,
-        #                  sev_name=sev_name, sev_a=sev_a, sev_b=sev_b,
-        #                  sev_mean=sev_mean, sev_cv=sev_cv, sev_loc=sev_loc, sev_scale=sev_scale,
-        #                  sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-        #                  freq_name=freq_name, freq_a=freq_a, freq_b=freq_b)
+        # assert np.allclose(np.sum(sev_wt), 1)
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
         def get_value(v):
@@ -140,7 +149,7 @@ class Aggregate(object):
             else:
                 return v
 
-        # class variables (mostly)
+        # class variables
         self.name = get_value(name)
         self.freq_name = get_value(freq_name)
         self.freq_a = get_value(freq_a)
@@ -153,10 +162,8 @@ class Aggregate(object):
         self.fzapprox = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._nearest_quantile_function = None
-
-        # get other variables defined in init
         self.en = None  # this is for a sublayer e.g. for limit profile
-        self.n = 0      # this is total frequency
+        self.n = 0  # this is total frequency
         self.attachment = None
         self.limit = None
         self.sev_density = None
@@ -180,34 +187,53 @@ class Aggregate(object):
         # broadcast arrays: force answers all to be arrays
         if not isinstance(exp_el, collections.Iterable):
             exp_el = np.array([exp_el])
-        if not isinstance(sev_a, collections.Iterable):
-            sev_a = np.array([sev_a])
+        if not isinstance(sev_wt, collections.Iterable):
+            sev_wt = np.array([sev_wt])
 
-        # broadcast exposure terms (el, epremium, en, lr, attachment, limit) and sev terms (sev_) separately
-        # then we take an "outer product" of the two parts...
-        exp_el, exp_premium, exp_lr, en, attachment, limit = \
-            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit)
-        sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
-            np.broadcast_arrays(sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
+        # broadcast together and create container for the severity distributions
+        if np.sum(sev_wt) == len(sev_wt):
+            # do not perform the exp / sev product, in this case
+            # broadcast all exposure and sev terms together
+            exp_el, exp_premium, exp_lr, en, attachment, limit, \
+            sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
+                np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit,
+                                    sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
+            exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
+            all_arrays = list(zip(exp_el, exp_premium, exp_lr, en, attachment, limit,
+                                  sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt))
+            self.en = en
+            self.attachment = attachment
+            self.limit = limit
+            n_components = len(all_arrays)
+            logging.info(f'Aggregate.__init__ | Stacking: exposures + severity = {len(exp_el)} = {len(sev_a)} '
+                         f'=  {n_components}')
+            self.sevs = np.empty(n_components, dtype=type(Severity))
 
-        exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
+        else:
+            # perform exp / sev product
+            # broadcast exposure terms (el, epremium, en, lr, attachment, limit) and sev terms (sev_) separately
+            # then we take an "outer product" of the two parts...
+            exp_el, exp_premium, exp_lr, en, attachment, limit = \
+                np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit)
+            sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
+                np.broadcast_arrays(sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
+            exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
+            exp_arrays = [exp_el, exp_premium, exp_lr, en, attachment, limit]
+            sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt]
+            all_arrays = [[k for j in i for k in j] for i in itertools.product(zip(*exp_arrays), zip(*sev_arrays))]
+            self.en = np.array([i[3] * i[-1] for i in all_arrays])
+            self.attachment = np.array([i[4] for i in all_arrays])
+            self.limit = np.array([i[5] for i in all_arrays])
+            n_components = len(all_arrays)
+            logging.info(f'Aggregate.__init__ | Product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
+                         f'=  {n_components}')
+            self.sevs = np.empty(n_components, dtype=type(Severity))
 
-        # holder for the severity distributions
-        exp_arrays = [exp_el, exp_premium, exp_lr, en, attachment, limit]
-        sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt]
-        all_arrays = [[k for j in i for k in j] for i in itertools.product(zip(*exp_arrays), zip(*sev_arrays))]
-        self.en = np.array([i[3] * i[-1] for i in all_arrays])
-        self.attachment = np.array([i[4] for i in all_arrays])
-        self.limit = np.array([i[5] for i in all_arrays])
-        n_components = len(all_arrays)
-        logging.info(f'Aggregate.__init__ | Shape of severity x exposures = {len(exp_arrays)} x {len(sev_arrays)} '
-                     f'=  {n_components}')
-        self.sevs = np.empty(n_components, dtype=type(Severity))
-        # compute the grand total for approximations
         # overall freq CV with common mixing TODO this is dubious
         mix_cv = self.freq_a
-        # counter
+        # counter to label components
         r = 0
+        # perform looping creation of severity distribution
         for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
             # XXXX TODO WARNING: note sev_xs and sev_ps are NOT broadcast
@@ -438,9 +464,9 @@ class Aggregate(object):
                 if verbose:
                     _m, _cv = xsden_to_meancv(xs, temp)
                     verbose_audit_df.loc[r, :] = [l, a, n, _m, _cv,
-                                    temp.sum(),
-                                    w, np.sum(np.where(np.isinf(temp), 1, 0)),
-                                    temp.max(), w * temp.max(), temp.min()]
+                                                  temp.sum(),
+                                                  w, np.sum(np.where(np.isinf(temp), 1, 0)),
+                                                  temp.max(), w * temp.max(), temp.min()]
                     r += 1
                     next(axiter).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
                     axiter.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
@@ -455,14 +481,14 @@ class Aggregate(object):
                 aa = float(np.sum(verbose_audit_df.attachment * verbose_audit_df.wt))
                 al = float(np.sum(verbose_audit_df.limit * verbose_audit_df.wt))
                 if np.all(self.limit < np.inf):
-                    axiter.ax.set_xlim(0, np.max(self.limit)*1.05)
+                    axiter.ax.set_xlim(0, np.max(self.limit) * 1.05)
                 else:
                     axiter.ax.set_xlim(0, xs[-1])
                 _m, _cv = xsden_to_meancv(xs, self.sev_density)
                 verbose_audit_df.loc["Occ", :] = [al, aa, self.n, _m, _cv,
-                                    self.sev_density.sum(),
-                                    np.sum(wts), np.sum(np.where(np.isinf(self.sev_density), 1, 0)),
-                                    self.sev_density.max(), np.nan, self.sev_density.min()]
+                                                  self.sev_density.sum(),
+                                                  np.sum(wts), np.sum(np.where(np.isinf(self.sev_density), 1, 0)),
+                                                  self.sev_density.max(), np.nan, self.sev_density.min()]
         if force_severity:
             # only asking for severity (used by plot)
             return
@@ -516,7 +542,10 @@ class Aggregate(object):
             suptitle_and_tight(f'Severity Audit For: {self.name}')
             verbose_audit_df = pd.concat((verbose_audit_df[['limit', 'attachment', 'emp ex1', 'emp cv']],
                                           self.statistics_df[['freq_1', 'sev_1', 'sev_cv']]),
-                                          sort=True, axis=1)
+                                         sort=True, axis=1)
+            verbose_audit_df.loc['Occ', 'freq_1'] = self.statistics_total_df.loc['mixed', 'freq_1']
+            verbose_audit_df.loc[:, 'freq_cv'] = np.hstack((self.statistics_df.loc[:, 'freq_cv'],
+                                                            self.statistics_total_df.loc['mixed', 'freq_cv']))
             verbose_audit_df.loc['Occ', 'sev_1'] = self.statistics_total_df.loc['mixed', 'sev_1']
             verbose_audit_df.loc['Occ', 'sev_cv'] = self.statistics_total_df.loc['mixed', 'sev_cv']
             verbose_audit_df['abs sev err'] = verbose_audit_df.sev_1 - verbose_audit_df['emp ex1']
@@ -1030,12 +1059,12 @@ class Severity(ss.rv_continuous):
             return shape, fz
 
         if self.sev_name == 'invgamma':
-            shape = 1 / cv**2 + 2
+            shape = 1 / cv ** 2 + 2
             fz = ss.invgamma(shape)
             return shape, fz
 
         if self.sev_name == 'invgauss':
-            shape = cv**2
+            shape = cv ** 2
             fz = ss.invgauss(shape)
             return shape, fz
 
@@ -1469,6 +1498,7 @@ class Frequency(object):
             c = ν * ν
             r = self.freq_b  # rhs of beta which must be > 1 for mean to equal 1
             assert r > 1
+
             # mean = a / (a + b) = n / r, var = a x b / [(a + b)^2( a + b + 1)] = c x mean
 
             def _freq_moms(n):
@@ -1534,8 +1564,9 @@ class Frequency(object):
                         μ = 1
                         β = ν ** 2
                         params1 = newton_krylov(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000, f_rtol=1e-11)
-                        logging.warning(f'Frequency.__init__ | {self.freq_name} type Broyden gave large result {params},'
-                                        f'Newton Krylov {params1}')
+                        logging.warning(
+                            f'Frequency.__init__ | {self.freq_name} type Broyden gave large result {params},'
+                            f'Newton Krylov {params1}')
                         if np.linalg.norm(params) > np.linalg.norm(params1):
                             params = params1
                             logging.warning('Frequency.__init__ | using Newton K')
@@ -1600,4 +1631,3 @@ class Frequency(object):
 
         self.freq_moms = _freq_moms
         self.mgf = mgf
-

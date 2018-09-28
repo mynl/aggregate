@@ -1289,6 +1289,7 @@ class Frequency(object):
 
     mgf(n, z): returns the moment generating function applied to z when EN=n
 
+    =================================
     Available Frequency Distributions
     =================================
 
@@ -1315,22 +1316,22 @@ class Frequency(object):
 
     * ``gamma``: negative binomial, freq_a = cv of gamma distribution
     * ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
-        certain claims = shift. freq_b must be between 0 and 1.
+      certain claims = shift. freq_b must be between 0 and 1.
     * ``ig``: inverse gaussian, freq_a = cv of mixing distribution
     * ``sig``: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
-        certain claims = shift. freq_b must be between 0 and 1.
+      certain claims = shift. freq_b must be between 0 and 1.
     * ``sichel``: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
-        freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
-        -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
-        cases are available.
+      freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
+      -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
+      cases are available.
     * ``sichel.nb``: generalized inverse gaussian mixture where the parameters match the moments of a
-        delaporte distribution with given freq_a and freq_b
+      delaporte distribution with given freq_a and freq_b
     * ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
-        shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
-        has poor numerical stability and may fail.
+      shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
+      has poor numerical stability and may fail.
     * ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
-        method should be used carefully. It has poor numerical stability and can produce bizzare
-        aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
+      method should be used carefully. It has poor numerical stability and can produce bizzare
+      aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
     """
 
     __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b']

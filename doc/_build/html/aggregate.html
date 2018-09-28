@@ -81,6 +81,15 @@ limit profile component. For example</p>
 3       200             50                       8
 4        75             75                      18
 5        75             75                      12</div></blockquote>
+<p>It is sometimes desirable to enter two or more lines each with a different severity but
+with a shared mixing variable. For example to model the current accident year and a run-
+off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
+larger lognormal mean 150 cv 1.25 claims requires</p>
+<p>agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]</p>
+<p>so that the result is not the four-way exposure / severity product but just a two-way
+combination. These two cases are distinguished looking at the total weights. If the weights sum to
+one then the result is an exposure / severity product. If the weights are missing or sum to the number
+of severity components (i.e. are all equal to 1) then the result is a row by row combination.</p>
 <ul class="simple">
 <li>en determines en</li>
 <li>prem x loss ratio -&gt; el</li>
@@ -421,41 +430,23 @@ distribution. See Panjer and Willmot or JKK.</p>
 asympototic CV of the frequency distribution.</p>
 <ul class="simple">
 <li><code class="docutils literal"><span class="pre">gamma</span></code>: negative binomial, freq_a = cv of gamma distribution</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">delaporte</span></code>: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of</dt>
-<dd>certain claims = shift. freq_b must be between 0 and 1.</dd>
-</dl>
-</li>
+<li><code class="docutils literal"><span class="pre">delaporte</span></code>: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
+certain claims = shift. freq_b must be between 0 and 1.</li>
 <li><code class="docutils literal"><span class="pre">ig</span></code>: inverse gaussian, freq_a = cv of mixing distribution</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">sig</span></code>: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of</dt>
-<dd>certain claims = shift. freq_b must be between 0 and 1.</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">sichel</span></code>: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and</dt>
-<dd>freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
+<li><code class="docutils literal"><span class="pre">sig</span></code>: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
+certain claims = shift. freq_b must be between 0 and 1.</li>
+<li><code class="docutils literal"><span class="pre">sichel</span></code>: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
+freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
 -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
-cases are available.</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">sichel.nb</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a</dt>
-<dd>delaporte distribution with given freq_a and freq_b</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">sichel.ig</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a</dt>
-<dd>shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
-has poor numerical stability and may fail.</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">beta</span></code>: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This</dt>
-<dd>method should be used carefully. It has poor numerical stability and can produce bizzare
-aggregates when the alpha or beta parameters are &lt; 1 (so there is a mode at 0 or freq_b).</dd>
-</dl>
-</li>
+cases are available.</li>
+<li><code class="docutils literal"><span class="pre">sichel.nb</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a
+delaporte distribution with given freq_a and freq_b</li>
+<li><code class="docutils literal"><span class="pre">sichel.ig</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a
+shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
+has poor numerical stability and may fail.</li>
+<li><code class="docutils literal"><span class="pre">beta</span></code>: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
+method should be used carefully. It has poor numerical stability and can produce bizzare
+aggregates when the alpha or beta parameters are &lt; 1 (so there is a mode at 0 or freq_b).</li>
 </ul>
 </dd></dl>
 

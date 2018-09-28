@@ -4,7 +4,7 @@ Development Outline
 Non programming Enhancements
 ----------------------------
 * Better sample of realistic severity curves
-* Better sample of by line aggregate Blocks in YAML
+* Better sample of by line aggregate Blocks in agg format
 * Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing?
 * Jon Evans note and severity
 * Jed note

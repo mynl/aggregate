@@ -160,13 +160,14 @@ ro for LY, it ro/(1+ro) corresponds to a minimum rate on line</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.collapse">
-<code class="descname">collapse</code><span class="sig-paren">(</span><em>kind='slognorm'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.collapse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.collapse" title="Permalink to this definition">¶</a></dt>
-<dd><p>returns new CPortfolio with the fit</p>
+<code class="descname">collapse</code><span class="sig-paren">(</span><em>approx_type='slognorm'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.collapse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.collapse" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns new Portfolio with the fit</p>
+<p>deprecated…prefer uw(self.fit()) to go through the agg language approach</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kind</strong> – slognorm | sgamma</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>approx_type</strong> – slognorm | sgamma</td>
 </tr>
 <tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
 </tr>
@@ -197,16 +198,21 @@ ro for LY, it ro/(1+ro) corresponds to a minimum rate on line</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.fit">
-<code class="descname">fit</code><span class="sig-paren">(</span><em>kind='slognorm'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.fit" title="Permalink to this definition">¶</a></dt>
+<code class="descname">fit</code><span class="sig-paren">(</span><em>approx_type='slognorm'</em>, <em>output='agg'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>returns a dictionary specification of the portfolio aggregate_project
 if updated uses empirical moments, otherwise uses theoretic moments</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kind</strong> – slognorm | sgamma</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>approx_type</strong> – slognorm | sgamma</li>
+<li><strong>output</strong> – return a dict or agg language specification</li>
+</ul>
+</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -289,9 +295,9 @@ uses interpolation, audit_df uses nearest</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Pvalues:</th><td class="field-body">optional vector of p values to use. If None sensible defaults provided</td>
+<tr class="field-odd field"><th class="field-name">Pvalues:</th><td class="field-body">optional vector of log values to use. If None sensible defaults provided</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">DataFrame of percentiles indexed by line and p</td>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">DataFrame of percentiles indexed by line and log</td>
 </tr>
 </tbody>
 </table>
@@ -303,7 +309,7 @@ uses interpolation, audit_df uses nearest</p>
 <dd><p>kind = density
 simple plotting of line density or not line density
 input single line or list of lines
-p underscore appended as appropriate</p>
+log underscore appended as appropriate</p>
 <dl class="docutils">
 <dt>kind = audit</dt>
 <dd>Miscellaneous audit graphs</dd>
@@ -345,7 +351,7 @@ p underscore appended as appropriate</p>
 <dd><p>Price using regulatory and pricing g functions
 i.e. compute E_price (X wedge E_reg(X) )
 regulatory capital distortion is applied on unlimited basis
-reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =p value in either case }
+reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =log value in either case }
 pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
 overwritten</p>
 <p>ly  must include ro in spec</p>
@@ -456,7 +462,7 @@ used</li>
 <dt id="aggregate.port.Portfolio.top_down">
 <code class="descname">top_down</code><span class="sig-paren">(</span><em>distortions</em>, <em>A_or_p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.top_down"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.top_down" title="Permalink to this definition">¶</a></dt>
 <dd><p>DataFrama summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A
-If A=0 A=q(p) is used</p>
+If A=0 A=q(log) is used</p>
 <p>Not integrated into graphcis format (plot)</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -535,7 +541,7 @@ If A=0 A=q(p) is used</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.update">
-<code class="descname">update</code><span class="sig-paren">(</span><em>log2</em>, <em>bs</em>, <em>approx_freq_ge=100</em>, <em>approx_type='slognorm'</em>, <em>remove_fuzz=False</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>padding=1</em>, <em>tilt_amount=0</em>, <em>epds=None</em>, <em>trim_df=True</em>, <em>verbose=False</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.update" title="Permalink to this definition">¶</a></dt>
+<code class="descname">update</code><span class="sig-paren">(</span><em>log2</em>, <em>bs</em>, <em>approx_freq_ge=100</em>, <em>approx_type='slognorm'</em>, <em>remove_fuzz=False</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>padding=1</em>, <em>tilt_amount=0</em>, <em>epds=None</em>, <em>trim_df=True</em>, <em>verbose=False</em>, <em>add_exa=True</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.update" title="Permalink to this definition">¶</a></dt>
 <dd><p>interp guesses exa etc. for small losses, but that doesn’t work</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -622,8 +628,8 @@ If A=0 A=q(p) is used</p>
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probrst.html">Probability and Risk Theory (rst)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory (Markdown)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Distribution Classes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Portfolio Class</a></li>

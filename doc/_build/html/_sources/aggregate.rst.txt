@@ -3,8 +3,8 @@
 Distribution Classes
 ====================
 
-Aggregate and Severity Classes
-------------------------------
+Aggregate, Frequency and Severity Classes
+-----------------------------------------
 
 .. automodule:: aggregate.distr
 	:members:

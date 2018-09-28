@@ -20,8 +20,8 @@ Table of Contents
    intro
    histapp
    tutorial
-   probrst
    prob.md
+   freq_dist.md
    devel
    aggregate
    portfolio

@@ -685,33 +685,33 @@
 
   var popupTemplate = '\
     <div class="sphinx-comments" id="sc<%id%>">\
-      <log class="sort-options">\
+      <p class="sort-options">\
         Sort by:\
         <a href="#" class="sort-option byrating">best rated</a>\
         <a href="#" class="sort-option byascage">newest</a>\
         <a href="#" class="sort-option byage">oldest</a>\
-      </log>\
+      </p>\
       <div class="comment-header">Comments</div>\
       <div class="comment-loading" id="cn<%id%>">\
         loading comments... <img src="<%loadingImage%>" alt="" /></div>\
       <ul id="cl<%id%>" class="comment-ul"></ul>\
       <div id="ca<%id%>">\
-      <log class="add-a-comment">Add a comment\
-        (<a href="#" class="comment-markup" id="ab<%id%>">markup</a>):</log>\
+      <p class="add-a-comment">Add a comment\
+        (<a href="#" class="comment-markup" id="ab<%id%>">markup</a>):</p>\
       <div class="comment-markup-box" id="mb<%id%>">\
         reStructured text markup: <i>*emph*</i>, <b>**strong**</b>, \
         <code>``code``</code>, \
         code blocks: <code>::</code> and an indented block after blank line</div>\
       <form method="post" id="cf<%id%>" class="comment-form" action="">\
         <textarea name="comment" cols="80"></textarea>\
-        <log class="propose-button">\
+        <p class="propose-button">\
           <a href="#" id="pc<%id%>" class="show-propose-change">\
             Propose a change &#9657;\
           </a>\
           <a href="#" id="hc<%id%>" class="hide-propose-change">\
             Propose a change &#9663;\
           </a>\
-        </log>\
+        </p>\
         <textarea name="proposal" id="pt<%id%>" cols="80"\
                   spellcheck="false"></textarea>\
         <input type="submit" value="Add comment" />\
@@ -742,13 +742,13 @@
         </div>\
       </div>\
       <div class="comment-content">\
-        <log class="tagline comment">\
+        <p class="tagline comment">\
           <span class="user-id"><%username%></span>\
           <span class="rating"><%pretty_rating%></span>\
           <span class="delta"><%time.delta%></span>\
-        </log>\
+        </p>\
         <div class="comment-text comment"><#text#></div>\
-        <log class="comment-opts comment">\
+        <p class="comment-opts comment">\
           <a href="#" class="reply hidden" id="rl<%id%>">reply &#9657;</a>\
           <a href="#" class="close-reply" id="cr<%id%>">reply &#9663;</a>\
           <a href="#" id="sp<%id%>" class="show-proposal">proposal &#9657;</a>\
@@ -757,7 +757,7 @@
           <span id="cm<%id%>" class="moderation hidden">\
             <a href="#" id="ac<%id%>" class="accept-comment">accept</a>\
           </span>\
-        </log>\
+        </p>\
         <pre class="proposal" id="pr<%id%>">\
 <#proposal_diff#>\
         </pre>\

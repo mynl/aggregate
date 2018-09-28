@@ -399,7 +399,7 @@ var Search = {
     this.out = $('#search-results');
     this.title = $('<h2>' + _('Searching') + '</h2>').appendTo(this.out);
     this.dots = $('<span></span>').appendTo(this.title);
-    this.status = $('<log style="display: none"></log>').appendTo(this.out);
+    this.status = $('<p style="display: none"></p>').appendTo(this.out);
     this.output = $('<ul class="search"/>').appendTo(this.out);
 
     $('#search-progress').text(_('Preparing search...'));

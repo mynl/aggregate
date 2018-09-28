@@ -174,7 +174,7 @@
             <span class="c1"># TODO sort out g_inv...it is incorrect...</span>
             <span class="c1"># g, g_inv = agg.distortion_factory({&#39;name&#39;: &#39;lep&#39;, &#39;shape&#39;: [0.05, 0.35]})</span>
             <span class="c1"># ps = np.linspace(0, 1, 1001)</span>
-            <span class="c1"># df = pd.DataFrame({&#39;p&#39;: ps, &#39;gg_inv&#39;: g(g_inv(ps)), &#39;g_invg&#39;: g_inv(g(ps)),</span>
+            <span class="c1"># df = pd.DataFrame({&#39;log&#39;: ps, &#39;gg_inv&#39;: g(g_inv(ps)), &#39;g_invg&#39;: g_inv(g(ps)),</span>
             <span class="c1"># &#39;g&#39;: g(ps), &#39;g_inv&#39;: g_inv(ps)})</span>
             <span class="c1"># df.query(&#39; abs(gg_inv - g_invg) &gt; 1e-5&#39;)</span>
             <span class="n">sigma</span> <span class="o">=</span> <span class="p">(</span><span class="n">delta</span> <span class="o">-</span> <span class="n">d</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
@@ -202,11 +202,11 @@
 
 <span class="sd">        :return:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">s</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self._distortion_names_[self.name]}</span><span class="s1"> (</span><span class="si">{self.shape:.3f}</span><span class="s1">&#39;</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self._distortion_names_[self.name]}</span><span class="se">\n</span><span class="si">{self.shape:.3f}</span><span class="s1">&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_mass</span><span class="p">:</span>
-            <span class="n">s</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;, </span><span class="si">{self.r0:.3f}</span><span class="s1">)&#39;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">s</span> <span class="o">+=</span> <span class="s1">&#39;)&#39;</span>
+            <span class="n">s</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;, </span><span class="si">{self.r0:.3f}</span><span class="s1">&#39;</span>
+        <span class="c1"># else:</span>
+        <span class="c1">#     s += &#39;)&#39;</span>
         <span class="k">return</span> <span class="n">s</span>
 
     <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -265,6 +265,7 @@
             <span class="n">dist</span> <span class="o">=</span> <span class="n">Distortion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">r0</span><span class="p">)</span>
             <span class="n">dist</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">))</span>
 
+        <span class="n">axiter</span><span class="o">.</span><span class="n">tidy</span><span class="p">()</span>
         <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="s1">&#39;Example Distortion Functions&#39;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Distortion.distortions_from_params"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.distortions_from_params">[docs]</a>    <span class="nd">@staticmethod</span>
@@ -286,7 +287,7 @@
             <span class="n">dists</span><span class="p">[</span><span class="n">dn</span><span class="p">]</span> <span class="o">=</span> <span class="n">Distortion</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">dn</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">param</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="n">r0</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
-            <span class="n">axiter</span> <span class="o">=</span> <span class="n">axiter_factory</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">axiter</span> <span class="o">=</span> <span class="n">axiter_factory</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
             <span class="c1"># f, axs = plt.subplots(2, 3, figsize=(8, 6))</span>
             <span class="c1"># it = iter(axs.flatten())</span>
             <span class="k">for</span> <span class="n">dn</span> <span class="ow">in</span> <span class="n">Distortion</span><span class="o">.</span><span class="n">available_distortions</span><span class="p">():</span>
@@ -332,8 +333,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction to aggregate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../probrst.html">Probability and Risk Theory (rst)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../prob.html">Probability and Risk Theory (Markdown)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../freq_dist.html">Frequency Distributions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../devel.html">Development Outline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../aggregate.html">Distribution Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../portfolio.html">Portfolio Class</a></li>

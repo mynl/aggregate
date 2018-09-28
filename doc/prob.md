@@ -1,5 +1,5 @@
-Probability and Risk Theory (Markdown)
-======================================
+Probability and Risk Theory
+============================
 
 Discretizing Severity Distributions
 -----------------------------------
@@ -55,7 +55,7 @@ x_i=1$ by construction. The FFT of the $m\times 1$ vector $\bm{x}$ is
 another $m\times 1$ vector $\hat\bm{x}$ whose $j$th component is
 $$
 \sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).\label{fft}
-$$ 
+$$
 The
 coefficients of $\hat\bm{x}$ are complex numbers. It is also possible to
 express $\hat\bm{x}=\F\bm{x}$ where $\F$ is an appropriate matrix of complex
@@ -76,15 +76,15 @@ process can also be computed in $m\log(m)$ time.
 
 The next step is magic in actuarial science. Remember that if $N$ is a
 $G$-mixed Poisson and $A=X_1+\cdots+X_N$ is an aggregate distribution
-then 
+then
 $$
 M_A(\zeta)=M_G(n(M_X(\zeta)-1)).
-$$ 
+$$
 Using FFTs you can replace the *function* $M_X$ with the discrete approximation *vector* $\hat\bm{x}$ and
-compute 
+compute
 $$
 \hat\a=M_G(n(\hat\bm{x} -1))
-$$ 
+$$
 component-by-component to get an
 approximation vector to the function $M_A$. You can then use the inverse
 FFT to recover an discrete approximation $\a$ of $A$ from $\hat\a$! See

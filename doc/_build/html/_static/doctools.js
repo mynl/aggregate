@@ -202,8 +202,8 @@ var Documentation = {
           body.highlightText(this.toLowerCase(), 'highlighted');
         });
       }, 10);
-      $('<log class="highlight-link"><a href="javascript:Documentation.' +
-        'hideSearchWords()">' + _('Hide Search Matches') + '</a></log>')
+      $('<p class="highlight-link"><a href="javascript:Documentation.' +
+        'hideSearchWords()">' + _('Hide Search Matches') + '</a></p>')
           .appendTo($('#searchbox'));
     }
   },

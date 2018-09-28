@@ -18,9 +18,103 @@ import itertools
 
 class Aggregate(object):
     """
-    Aggregate help placeholder
+    Aggregate distribution class manages creation and calculation of aggregate distributions.
+        Aggregate allows for very flexible creation of Aggregate distributions. Severity
+        can express a limit profile, a mixed severity or both. Mixed frequency types share
+        a mixing distribution across all broadcast terms to ensure an appropriate inter-
+        class correlation.
 
+        Limit Profiles
+        --------------
+
+        The exposure variables can be vectors to express a *limit profile*.
+        All exp_ elements are broadcast against one-another. For example
+
+        [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000
+
+        expresses a limit profile with 100 of premium at 1000 x 1000; 200 at 2000 x 1000
+        400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
+        the same, but they could vary too, as could the attachments.
+
+        Mixtures
+        --------
+
+        The severity variables can be vectors to express a *mixed severity*. All sev_
+        elements are broadcast against one-another. For example
+
+        sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
+
+        expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
+        weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
+        relevant number of components.
+
+        Limit Profiles and Mixtures
+        ---------------------------
+
+        Limit profiles and mixtures can be combined. Each mixed severity is applied to each
+        limit profile component. For example
+
+        ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75] '
+                'sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')
+
+        creates an aggregate with six severity subcomponents
+
+                #  limit	attachment    claims
+                0	100	         0			 6
+                1	100	         0			 4
+                2	200	        50			12
+                3	200	        50			 8
+                4	 75	        75			18
+                5	 75	        75			12
+
+        Other notes
+        -----------
+
+        * en determines en
+        * prem x loss ratio -> el
+        * severity x en -> el
+
+        * always have en and el; may have prem and exp_lr
+        * if prem then exp_lr computed
+        * if exp_lr then premium computed
+
+        * el is determined using np.where(el==0, prem*exp_lr, el)
+        * if el==0 then el = freq * sev
+        * assert np.all( el>0 or en>0 )
+
+        * call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity
+        * call with el expressing lines of business with an array of severities
+        * call with single el and array of sevs expressing a mixture; [] broken down by weights
+
+        * n is the CONDITIONAL claim count
+        * X is the GROUND UP severity, so X | X > attachment is used and generates n claims
+
+        * For fixed or histogram have to separate the parameter so they are not broad cast; otherwise
+        you end up with multiple lines when you intend only one
+
+
+        :param name:
+        :param exp_el:   expected loss or vector
+        :param exp_premium: premium volume or vector  (requires loss ratio)
+        :param exp_lr:  loss ratio or vector  (requires premium)
+        :param exp_en:  expected claim count per segment (self.n = total claim count)
+        :param exp_attachment: occurrence attachment
+        :param exp_limit: occurrence limit
+        :param sev_name: severity name or sev.BUILTIN_SEV or meta.BUILTIN agg or port or similar or vector or matrix
+        :param sev_a:  scipy stats shape parameter
+        :param sev_b: scipy stats shape parameter
+        :param sev_mean: average (unlimited) severity
+        :param sev_cv: unlimited severity coefficient of variation
+        :param sev_loc: scipy stats location parameter
+        :param sev_scale: scipy stats scale parameter
+        :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram
+        :param sev_ps:
+        :param sev_wt: weight for mixed distribution
+        :param freq_name: name of frequency distribution
+        :param freq_a: cv of freq dist mixing distribution
+        :param freq_b: claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
     """
+
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
                       'sev_wt', 'freq_name', 'freq_a', 'freq_b', 'note']
@@ -29,53 +123,6 @@ class Aggregate(object):
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1,
                  freq_name='', freq_a=0, freq_b=0, note=''):
-        """
-
-        el -> en
-        prem x exp_lr -> el
-        x . en -> el
-        always have en x and el; may have prem and exp_lr
-        if prem then exp_lr computed; if exp_lr then premium computed
-
-        el is determined using np.where(el==0, prem*exp_lr, el)
-        if el==0 then el = freq * sev
-        assert np.all( el>0 or en>0 )
-
-        call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity
-        call with el expressing lines of business with an array of severities
-        call with single el and array of sevs expressing a mixture; [] broken down by weights
-
-        n is the CONDITIONAL claim count
-        X is the GROUND UP severity, so X | X > attachment is used and generates n claims
-
-        For fixed or histogram have to separate the parameter so they are not broad cast; otherwise
-        you end up with multiple lines when you intend only one
-
-        TODO: later do both, for now assume one or other is a scalar
-        call with both that does the cross product... (note the sev array may not be equal sizes)
-
-        :param name:
-        :param exp_el:   expected loss or vector or matrix
-        :param exp_premium:
-        :param exp_lr:  loss ratio
-        :param exp_en:  expected claim count per segment (self.n = total claim count)
-        :param exp_attachment: occ attachment
-        :param exp_limit: occ limit
-        :param sev_name: Severity class object or similar or vector or matrix
-        :param sev_a:
-        :param sev_b:
-        :param sev_mean:
-        :param sev_cv:
-        :param sev_loc:
-        :param sev_scale:
-        :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram or fixed
-        :param sev_ps:
-        :param sev_wt: weight for mixed distribution
-        :param freq_name: name of frequency distribution
-        :param freq_a: freq dist shape1 OR CV = sq root contagion
-        :param freq_b: freq dist shape2
-
-        """
 
         assert np.allclose(np.sum(sev_wt), 1)
 
@@ -282,7 +329,7 @@ class Aggregate(object):
 
     def discretize(self, sev_calc, discretization_calc='survival'):
         """
-        continuous is used when you think of the resulting distribution as continuous across the buckets
+        Continuous is used when you think of the resulting distribution as continuous across the buckets
         (which we generally don't). We use the discretized distribution as though it is fully discrete
         and only takes values at the bucket points. Hence we should use sev_calc='discrete'. The buckets are
         shifted left by half a bucket, so Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2).
@@ -331,7 +378,7 @@ class Aggregate(object):
 
     def easy_update(self, log2=13, bs=0, **kwargs):
         """
-        Convenience function
+        Convenience function, delegates to update. Avoids having to pass xs.
 
 
         :param log2:
@@ -355,14 +402,17 @@ class Aggregate(object):
                discretization_calc='survival', force_severity=False, verbose=False):
         """
         Compute the density
-        :param xs:
-        :param padding:
+
+        :param xs:  range of x values used to discretize
+        :param padding: for FFT calculation
         :param tilt_vector:
-        :param approximation:
+        :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
+                sgamma apply shifted lognormal or shifted gamma approximations.
         :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
         :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
         :param force_severity: make severities even if using approximation, for plotting
-        :param verbose: make partial plots and return details of all moments
+        :param verbose: make partial plots and return details of all moments by limit profile or
+                severity mixture component.
         :return:
         """
         axiter = None
@@ -475,7 +525,7 @@ class Aggregate(object):
 
     def emp_stats(self):
         """
-        report_ser on empirical statistics_df
+        report_ser on empirical statistics_df - useful when investigating dh transformations.
 
         :return:
         """
@@ -715,6 +765,8 @@ class Aggregate(object):
 
     def report(self, report_list='quick'):
         """
+        statistics, quick or audit reports
+
 
         :param report_list:
         :return:
@@ -744,7 +796,7 @@ class Aggregate(object):
         """
         recommend a bucket size given 2**N buckets
 
-        :param N:
+        :param log2: log2 of number of buckets. log2=10 is default.
         :return:
         """
         N = 1 << log2
@@ -767,9 +819,10 @@ class Aggregate(object):
 
     def q(self, p):
         """
-        return a quantile using nearest (i.e. will be in the index
+        return a quantile using nearest matching, ensures returned value is in the index
+        of the aggregate distribution
 
-        :param p:
+        :param p: percentile in range 0 to 1
         :return:
         """
         if self._nearest_quantile_function is None:
@@ -780,9 +833,7 @@ class Aggregate(object):
         """
         return an approximation to the quantile function
 
-        TODO sort out...this isn't right
-
-        :param kind:
+        :param kind: ```interpolate.interp1d``` kind variable
         :return:
         """
         q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind,
@@ -806,7 +857,9 @@ class Severity(ss.rv_continuous):
 
     Should consider over-riding: sf, **statistics_df** ?munp
 
-
+    TODO issues remain using numerical integration to compute moments for distributions having
+    infinite support and a low standard deviation. See logging for more information in particular
+    cases.
 
     """
 
@@ -956,8 +1009,10 @@ class Severity(ss.rv_continuous):
     def cv_to_shape(self, cv, hint=1):
         """
         create a frozen object of type dist_name with given cv
-        dist_name = 'lognorm'
-        cv = 0.25
+
+        lognormal, gamma, inverse gamma and inverse gaussian solved analytically.
+
+        Other distributions solved numerically and may be unstable.
 
         :param cv:
         :param hint:
@@ -1199,27 +1254,66 @@ class Severity(ss.rv_continuous):
 
 class Frequency(object):
     """
-    Knowledge about Frequency distributions lives here: create moment function and MGF for each type
-    ...possibly not the best name...
+    Manages Frequency distributions: creates moment function and MGF.
 
-    potentially call freq_moms many times, so should built the freq_moms function once
-    at the same time build the MGF function, called so mgf(fz) = mgf of aggregate
-    e.g. for poisson mgf(fz) = exp(freq_1 * (fz - 1) ); called on ft(z, padding...)
-    mgf function will be stored in aggregate for future use...
+    freq_moms(n): returns EN^2 and EN^3 when EN=n
 
+    mgf(n, z): returns the moment generating function applied to z when EN=n
+
+    Available Frequency Distributions
+    =================================
+
+    **Non-Mixture** Types
+
+    * ``fixed``: no parameters
+    * ``bernoulli``: exp_en interpreted as a probability, must be < 1
+    * ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
+    * ``poisson``: Poisson(freq_a)
+    * ``pascal`` [poisson]: a poisson stopped sum of negative binomial; exp_en gives the overall
+        claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
+        number of claimants per claim (or claims per occurrence). Hence the Poisson component
+        has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
+        cv freq_a
+
+    **Mixture** Types
+
+    These distributions are G-mixed Poisson, so N | G ~ Poisson(n G). They are labelled by
+    the name of the mixing distribution or the common name for the resulting frequency
+    distribution. See Panjer and Willmot or JKK.
+
+    In all cases freq_a is the CV of the mixing distribution which corresponds to the
+    asympototic CV of the frequency distribution.
+
+    * ``gamma``: negative binomial, freq_a = cv of gamma distribution
+    * ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
+        certain claims = shift. freq_b must be between 0 and 1.
+    * ``ig``: inverse gaussian, freq_a = cv of mixing distribution
+    * ``sig``: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
+        certain claims = shift. freq_b must be between 0 and 1.
+    * ``sichel``: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
+        freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
+        -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
+        cases are available.
+    * ``sichel.nb``: generalized inverse gaussian mixture where the parameters match the moments of a
+        delaporte distribution with given freq_a and freq_b
+    * ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
+        shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
+        has poor numerical stability and may fail.
+    * ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
+        method should be used carefully. It has poor numerical stability and can produce bizzare
+        aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
     """
 
     __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b']
 
     def __init__(self, freq_name, freq_a, freq_b):
         """
-        two modes:
-            for use in an aggregate where you are aggregating mixed severities and know about freq
-            for use in a portfolio where you are just aggregating...
-            TODO separate two distinct uses!
+        creates the mgf and moment function
+
         :param freq_name:
         :param freq_a:
         :param freq_b:
+
         """
         self.freq_name = freq_name
         self.freq_a = freq_a

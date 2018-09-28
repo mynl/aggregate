@@ -45,18 +45,23 @@
 <h1>Underwriter Module<a class="headerlink" href="#underwriter-module" title="Permalink to this headline">¶</a></h1>
 <dl class="class">
 <dt id="aggregate.underwriter.Underwriter">
-<em class="property">class </em><code class="descclassname">aggregate.underwriter.</code><code class="descname">Underwriter</code><span class="sig-paren">(</span><em>dir_name=''</em>, <em>databases=None</em>, <em>store_mode=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">aggregate.underwriter.</code><code class="descname">Underwriter</code><span class="sig-paren">(</span><em>dir_name=''</em>, <em>name='Rory'</em>, <em>databases=None</em>, <em>store_mode=True</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=10</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter" title="Permalink to this definition">¶</a></dt>
 <dd><p>The underwriter class constructs real world examples from stored and user input Lines and Accounts.
 Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.</p>
 <p>Handles persistence
 Is interface into program parser
 Handles safe lookup from database for parser</p>
-<p>Persisitence to and from YAML managed</p>
+<p>Persisitence to and from agg files</p>
+<dl class="attribute">
+<dt id="aggregate.underwriter.Underwriter.data_types">
+<code class="descname">data_types</code><em class="property"> = ['portfolio', 'aggregate', 'severity']</em><a class="headerlink" href="#aggregate.underwriter.Underwriter.data_types" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.describe">
 <code class="descname">describe</code><span class="sig-paren">(</span><em>item_type=''</em>, <em>pretty_print=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.describe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.describe" title="Permalink to this definition">¶</a></dt>
 <dd><p>more informative version of list
-Pull notes from YAML descriptions for type items</p>
+Pull notes for type items</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -65,14 +70,6 @@ Pull notes from YAML descriptions for type items</p>
 </tr>
 </tbody>
 </table>
-</dd></dl>
-
-<dl class="staticmethod">
-<dt id="aggregate.underwriter.Underwriter.dict_to_agg">
-<em class="property">static </em><code class="descname">dict_to_agg</code><span class="sig-paren">(</span><em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.dict_to_agg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.dict_to_agg" title="Permalink to this definition">¶</a></dt>
-<dd><p>convert a spec dictionary d into an agg language specification
-:param d:
-:return:</p>
 </dd></dl>
 
 <dl class="method">
@@ -89,9 +86,17 @@ Pull notes from YAML descriptions for type items</p>
 </table>
 </dd></dl>
 
+<dl class="staticmethod">
+<dt id="aggregate.underwriter.Underwriter.obj_to_agg">
+<em class="property">static </em><code class="descname">obj_to_agg</code><span class="sig-paren">(</span><em>obj</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.obj_to_agg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.obj_to_agg" title="Permalink to this definition">¶</a></dt>
+<dd><p>convert an object into an agg language specification, used for saving
+:param obj: a dictionary, Aggregate, Severity or Portfolio object
+:return:</p>
+</dd></dl>
+
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.write">
-<code class="descname">write</code><span class="sig-paren">(</span><em>portfolio_program</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
+<code class="descname">write</code><span class="sig-paren">(</span><em>portfolio_program</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
 <dd><p>write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project</p>
 <p>e.g. Input
 port my_portfolio</p>
@@ -101,16 +106,19 @@ port my_portfolio</p>
 100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1</div></blockquote>
 <p>The indents are required…</p>
 <p>See parser for full language spec!</p>
+<p>Reasonable kwargs:</p>
+<blockquote>
+<div>bs
+log2
+verbose
+update overrides class default
+add_exa should port.add_exa add the exa related columns to the output?</div></blockquote>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>portfolio_program</strong> – </li>
-<li><strong>update</strong> – </li>
-<li><strong>verbose</strong> – </li>
-<li><strong>log2</strong> – </li>
-<li><strong>bs</strong> – </li>
 <li><strong>kwargs</strong> – </li>
 </ul>
 </td>
@@ -124,7 +132,7 @@ port my_portfolio</p>
 
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.write_from_file">
-<code class="descname">write_from_file</code><span class="sig-paren">(</span><em>file_name</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=0</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_from_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_from_file" title="Permalink to this definition">¶</a></dt>
+<code class="descname">write_from_file</code><span class="sig-paren">(</span><em>file_name</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_from_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_from_file" title="Permalink to this definition">¶</a></dt>
 <dd><p>read program from file. delegates to write</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -166,32 +174,77 @@ fka test_run</p>
 
 </dd></dl>
 
-<span class="target" id="module-aggregate.underwriter"></span><div class="section" id="id1">
-<h2>Underwriter Module<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
-<p>Does lots of cool things</p>
-<dl class="function">
-<dt id="aggregate.underwriter.dict_2_string">
-<code class="descclassname">aggregate.underwriter.</code><code class="descname">dict_2_string</code><span class="sig-paren">(</span><em>type_name</em>, <em>dict_in</em>, <em>tab_level=0</em>, <em>sio=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#dict_2_string"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.dict_2_string" title="Permalink to this definition">¶</a></dt>
-<dd><p>nice formating for str function</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>type_name</strong> – </li>
-<li><strong>dict_in</strong> – </li>
-<li><strong>tab_level</strong> – </li>
-<li><strong>sio</strong> – </li>
+<span class="target" id="module-aggregate.underwriter"></span><div class="section" id="underwriter-class">
+<h2>Underwriter Class<a class="headerlink" href="#underwriter-class" title="Permalink to this headline">¶</a></h2>
+<p>The Underwriter is an easy to use interface into the computational functionality of aggregate.</p>
+<p>The Underwriter</p>
+<ul class="simple">
+<li>Maintains a default library of severity curves</li>
+<li>Maintains a default library of aggregate distributions corresponding to industry losses in
+major classes of business, total catastrophe losses from major perils, and other useful constructs</li>
+<li>Maintains a default library of portfolios, including several example instances and examples used in
+papers on risk theory (e.g. the Bodoff examples)</li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
+<p>The library functions can be listed using</p>
+<blockquote>
+<div>uw.list()</div></blockquote>
+<p>or, for more detail</p>
+<blockquote>
+<div>uw.describe()</div></blockquote>
+<p>A given example can be inspected using <code class="docutils literal"><span class="pre">uw['cmp']</span></code> which returns the defintion of the database
+object cmp (an aggregate representing industry losses from the line Commercial Multiperil). It can
+be created as an Aggregate class using <code class="docutils literal"><span class="pre">ag</span> <span class="pre">=</span> <span class="pre">uw('cmp')</span></code>. The Aggregate class can then be updated,
+plotted and various reports run on it. In iPython or Jupyter <code class="docutils literal"><span class="pre">ag</span></code> returns an informative HTML
+description.</p>
+<p>The real power of Underwriter is access to the agg scripting language (see parser module). The scripting
+language allows severities, aggregates and portfolios to be created using more-or-less natural language.
+For example</p>
+<blockquote>
+<div><p>pf = uw(‘’’
+port MyCompanyBook</p>
+<blockquote>
+<div>agg LineA 100 claims 100000 xs 0 sev lognorm 30000 cv 1.25
+agg LineB 150 claims 250000 xs 5000 sev lognorm 50000 cv 0.9
+agg Cat 2 claims 100000000 xs 0 sev 500000 * pareto 1.8 - 500000</div></blockquote>
+<p>‘’‘)</p>
+</div></blockquote>
+<p>creates a portfolio with three sublines, LineA, LineB and Cat. LineA is 100 (expected) claims, each pulled
+from a lognormal distribution with mean of 30000 and coefficient of variation 1.25 within the layer
+100000 xs 0 (i.e. limited at 100000). The frequency distribution is Poisson. LineB is similar. Cat is jsut
+2 claims from the indicated limit, with severity given by a Pareto distribution with shape parameter 1.8,
+scale 500000, shifted left by 500000. This corresponds to the usual Pareto with survival function
+S(x) = (lambda / (lambda + x))^1.8, x &gt;= 0.</p>
+<p>The portfolio can be approximated using FFTs to convolve the aggregates and add the lines. The severities
+are first discretized using a certain bucket-size (bs). The port object has a port.recommend_bucket() to
+suggest reasonable buckets:</p>
+<p>&gt;&gt; pf.recommend_bucket()</p>
+<div class="line-block">
+<div class="line">|      bs10 |     bs11 |       bs12 |       bs13 |      bs14 |      bs15 |      bs16 |   bs18 |   bs20 |</div>
+</div>
+<p><a href="#id1"><span class="problematic" id="id2">|:------|</span></a>———-:<a href="#id3"><span class="problematic" id="id4">|---------:|</span></a>———–:<a href="#id5"><span class="problematic" id="id6">|-----------:|</span></a>———-:<a href="#id7"><span class="problematic" id="id8">|----------:|</span></a>———-:<a href="#id9"><span class="problematic" id="id10">|-------:|</span></a>——-:|
+| LineA |   3,903     |  1,951     |      976     |      488     |     244     |     122     |      61.0 |   15.2 |    3.8 |
+| LineB |   8,983     |  4,491     |  2,245       |  1,122       |     561     |     280     |     140     |   35.1 |    8.8 |
+| Cat   |  97,656     | 48,828     | 24,414       | 12,207       | 6,103       | 3,051       | 1,525       |  381     |   95.4 |
+| total | 110,543     | 55,271     | 27,635       | 13,817       | 6,908       | 3,454       | 1,727       |  431     |  108     |</p>
+<p>The column bsNcorrespond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each
+line and in total. For example with N=13 (i.e. 8196 buckets) the suggestion is 13817. It is best the bucket
+size is a divisor of any limits or attachment points, so we select 10000.</p>
+<p>Updating can then be run as</p>
+<blockquote>
+<div>bs = 10000
+pf.update(13, bs)
+pf.report(‘quick’)
+pf.plot(‘density’)
+pf.plot(‘density’, logy=True)
+print(pf)</div></blockquote>
+<p>Portfolio name           MyCompanyBook
+Theoretic expected loss     10,684,541.2
+Actual expected loss        10,657,381.1
+Error                          -0.002542
+Discretization size                   13
+Bucket size                     10000.00
+&lt;aggregate.port.Portfolio object at 0x0000023950683CF8&gt;</p>
+<p>Etc. etc.</p>
 </div>
 </div>
 
@@ -231,8 +284,8 @@ fka test_run</p>
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="probrst.html">Probability and Risk Theory (rst)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory (Markdown)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="freq_dist.html">Frequency Distributions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aggregate.html">Distribution Classes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>

@@ -493,12 +493,11 @@ class Portfolio(object):
         ftall = None
         for agg in self.agg_list:
             nm = agg.name
-            _a, _b = agg.update(xs, self.padding, tilt_vector,
+            _a = agg.update(xs, self.padding, tilt_vector,
                                 'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
                                 verbose=verbose)
             if verbose:
                 display(_a)
-                display(_b)
             ft_line_density[nm] = agg.ftagg_density
             line_density[nm] = agg.agg_density
             if ftall is None:

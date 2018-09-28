@@ -880,6 +880,25 @@ class qd(object):
             return repr(self.x)
 
 
+def xsden_to_meancv(xs, den):
+    """
+    compute mean and cv from xs and density
+
+    consider adding: np.nan_to_num(den)
+
+    :param xs:
+    :param den:
+    :return:
+    """
+    ex1 = np.sum(xs * den)
+    ex2 = np.sum(xs**2 * den)
+    sd = np.sqrt(ex2 - ex1 ** 2)
+    if ex1 != 0:
+        cv = sd / ex1
+    else:
+        cv = np.nan
+    return ex1, cv
+
 def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     """
     Illustrate different frequency distributions and frequency moment

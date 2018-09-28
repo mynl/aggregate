@@ -6,14 +6,15 @@ import collections
 import logging
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
-    MomentAggregator
+    MomentAggregator, xsden_to_meancv
 from .spectral import Distortion
 from scipy import interpolate
 from scipy.optimize import newton
 from IPython.core.display import display
-from scipy.special import kv
+from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
+import itertools
 
 class Aggregate(object):
     """
@@ -103,16 +104,14 @@ class Aggregate(object):
         self.agg_density = None
         self.xs = None
         self.fzapprox = None
-        self.n = 0  # total frequency
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._nearest_quantile_function = None
 
         # get other variables defined in init
         self.en = None  # this is for a sublayer e.g. for limit profile
-        self.n = 0  # this is total frequency
+        self.n = 0      # this is total frequency
         self.attachment = None
         self.limit = None
-        self.scalar_business = None
         self.sev_density = None
         self.fzapprox = None
         self.agg_density = None
@@ -126,66 +125,71 @@ class Aggregate(object):
         self.audit_df = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names(agg_only=False) +
-                                                  ['contagion', 'mix_cv'])
+                                                  ['mix_cv'])
         self.statistics_total_df = self.statistics_df.copy()
         self.freq = Frequency(self.freq_name, self.freq_a, self.freq_b)
         ma = MomentAggregator(self.freq.freq_moms)
 
-        # broadcast arrays: first line forces them all to be arrays
-        # TODO this approach forces EITHER a mixture OR multi exposures
-        # TODO need to expand to product for general case, however, that should be easy
-
+        # broadcast arrays: force answers all to be arrays
         if not isinstance(exp_el, collections.Iterable):
             exp_el = np.array([exp_el])
+        if not isinstance(sev_a, collections.Iterable):
+            sev_a = np.array([sev_a])
 
-        # pyCharm formatting
-        exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean, sev_cv, \
-        sev_loc, sev_scale, sev_wt = \
-            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit, sev_name, sev_a, sev_b,
-                                sev_mean, sev_cv,
-                                sev_loc, sev_scale, sev_wt)
-        # just one overall line/class of business?
-        self.scalar_business = \
-            np.all(
-                list(map(lambda x: len(x) == 1, [exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit])))
+        # broadcast exposure terms (el, epremium, en, lr, attachment, limit) and sev terms (sev_) separately
+        # then we take an "outer product" of the two parts...
+        exp_el, exp_premium, exp_lr, en, attachment, limit = \
+            np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit)
+        sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
+            np.broadcast_arrays(sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
+
+        exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
 
         # holder for the severity distributions
-        self.sevs = np.empty(exp_el.shape, dtype=type(Severity))
-        exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
+        exp_arrays = [exp_el, exp_premium, exp_lr, en, attachment, limit]
+        sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt]
+        all_arrays = [[k for j in i for k in j] for i in itertools.product(zip(*exp_arrays), zip(*sev_arrays))]
+        self.en = np.array([i[3] * i[-1] for i in all_arrays])
+        self.attachment = np.array([i[4] for i in all_arrays])
+        self.limit = np.array([i[5] for i in all_arrays])
+        n_components = len(all_arrays)
+        logging.info(f'Aggregate.__init__ | Shape of severity x exposures = {len(exp_arrays)} x {len(sev_arrays)} '
+                     f'=  {n_components}')
+        self.sevs = np.empty(n_components, dtype=type(Severity))
         # compute the grand total for approximations
         # overall freq CV with common mixing TODO this is dubious
-        c = self.freq_a
-        root_c = np.sqrt(self.freq_a)
+        mix_cv = self.freq_a
         # counter
         r = 0
-        for _el, _pr, _lr, _en, _at, _y, sn, sa, sb, sm, scv, sloc, ssc, smix in \
-                zip(exp_el, exp_premium, exp_lr, self.en, self.attachment, self.limit, sev_name, sev_a, sev_b, sev_mean,
-                    sev_cv, sev_loc, sev_scale, sev_wt):
+        for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
-            self.sevs[r] = Severity(sn, _at, _y, sm, scv, sa, sb, sloc, ssc, sev_xs, sev_ps, True)
+            # XXXX TODO WARNING: note sev_xs and sev_ps are NOT broadcast
+            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, True)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
-            if _el > 0:
-                _en = _el / sev1
-            elif _en > 0:
+            # input claim count trumps input loss
+            if _en > 0:
                 _el = _en * sev1
+            elif _el > 0:
+                _en = _el / sev1
+            # if premium compute loss ratio, if loss ratio compute premium
             if _pr > 0:
                 _lr = _el / _pr
             elif _lr > 0:
                 _pr = _el / _lr
 
-            # scale for the mix
-            _pr *= smix
-            _el *= smix
-            _lr *= smix
-            _en *= smix
+            # scale for the mix - OK because we have split the exposure and severity components
+            _pr *= _swt
+            _el *= _swt
+            _lr *= _swt
+            _en *= _swt
 
             # accumulate moments
             ma.add_f1s(_en, sev1, sev2, sev3)
 
             # store
-            self.statistics_df.loc[r, :] = [self.name, _y, _at, scv, _el, _pr, _lr] + \
-                                           ma.get_fsa_stats(total=False) + [c, self.freq_a]
+            self.statistics_df.loc[r, :] = \
+                [self.name, _y, _at, _scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
             r += 1
 
         # average exp_limit and exp_attachment
@@ -200,11 +204,12 @@ class Aggregate(object):
             lr = tot_loss / tot_prem
         else:
             lr = np.nan
-        self.statistics_total_df.loc[f'mixed', :] = [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-                                                    ma.get_fsa_stats(total=True, remix=True) + [c, root_c]
+        self.statistics_total_df.loc[f'mixed', :] = \
+            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=True) \
+            + [mix_cv]
         self.statistics_total_df.loc[f'independent', :] = \
-            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + \
-            ma.get_fsa_stats(total=True, remix=False) + [c, root_c]
+            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) \
+            + [mix_cv]
         self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
         self.statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
         self.n = ma.tot_freq_1
@@ -213,7 +218,7 @@ class Aggregate(object):
         self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, total=True)
-        # TODO fill in missing p99                                   ^ pctile
+        # TODO fill in missing p99                                       ^ pctile
 
     def __str__(self):
         """
@@ -224,7 +229,8 @@ class Aggregate(object):
         # pull out agg statistics_df
         ags = self.statistics_total_df.loc['mixed', :]
         s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, CV(X)={ags['sev_cv']:5.3f}\n\t" \
+            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, ' " \
+            f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
@@ -343,7 +349,7 @@ class Aggregate(object):
                 kwargs['approximation'] = 'slognorm'
             else:
                 kwargs['approximation'] = 'exact'
-        self.update(xs, **kwargs)
+        return self.update(xs, **kwargs)
 
     def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', force_severity=False, verbose=False):
@@ -359,19 +365,16 @@ class Aggregate(object):
         :param verbose: make partial plots and return details of all moments
         :return:
         """
-
+        axiter = None
+        verbose_audit_df = None
         if verbose:
             axiter = axiter_factory(None, len(self.sevs) + 2, aspect=1.414)
-            df = pd.DataFrame(
+            verbose_audit_df = pd.DataFrame(
                 columns=['n', 'limit', 'attachment', 'en', 'emp ex1', 'emp cv', 'sum p_i', 'wt', 'nans', 'max', 'wtmax',
                          'min'])
-            df = df.set_index('n')
-        else:
-            axiter = None
-            df = None
-        audit = None
+            verbose_audit_df = verbose_audit_df.set_index('n')
+
         r = 0
-        aa = al = 0
         self.xs = xs
         self.bs = xs[1]
 
@@ -383,9 +386,8 @@ class Aggregate(object):
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
                 self.sev_density += temp * w
                 if verbose:
-                    _m = np.sum(self.xs * temp)
-                    _cv = np.sqrt(np.sum((self.xs ** 2) * temp) - (_m ** 2)) / _m
-                    df.loc[r, :] = [l, a, n, _m, _cv,
+                    _m, _cv = xsden_to_meancv(xs, temp)
+                    verbose_audit_df.loc[r, :] = [l, a, n, _m, _cv,
                                     temp.sum(),
                                     w, np.sum(np.where(np.isinf(temp), 1, 0)),
                                     temp.max(), w * temp.max(), temp.min()]
@@ -393,22 +395,21 @@ class Aggregate(object):
                     next(axiter).plot(xs, temp, label='compt', lw=0.5, drawstyle='steps-post')
                     axiter.ax.plot(xs, self.sev_density, label='run tot', lw=0.5, drawstyle='steps-post')
                     if np.all(self.limit < np.inf):
-                        axiter.ax.set(xlim=(0, np.max(self.limit) * 1.1), title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
+                        axiter.ax.set(xlim=(0, np.max(self.limit) * 1.1), title=f'{l:,.0f} xs {a:,.0f}, wt={w:.2f}')
                     else:
-                        axiter.ax.set(title=f'{l:,.0f} xs {a:,.0f}\twt={w:.2f}')
+                        axiter.ax.set(title=f'{l:,.0f} xs {a:,.0f}, wt={w:.2f}')
                     axiter.ax.legend()
             if verbose:
                 next(axiter).plot(xs, self.sev_density, lw=0.5, drawstyle='steps-post')
-                axiter.ax.set_title('occ')
-                aa = float(np.sum(df.attachment * df.wt))
-                al = float(np.sum(df.limit * df.wt))
+                axiter.ax.set_title('Occurrence Density')
+                aa = float(np.sum(verbose_audit_df.attachment * verbose_audit_df.wt))
+                al = float(np.sum(verbose_audit_df.limit * verbose_audit_df.wt))
                 if np.all(self.limit < np.inf):
-                    axiter.ax.set_xlim(0, np.max(self.limit))
+                    axiter.ax.set_xlim(0, np.max(self.limit)*1.05)
                 else:
                     axiter.ax.set_xlim(0, xs[-1])
-                _m = np.sum(self.xs * np.nan_to_num(self.sev_density))
-                _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.sev_density)) - _m ** 2) / _m
-                df.loc["Occ", :] = [al, aa, self.n, _m, _cv,
+                _m, _cv = xsden_to_meancv(xs, self.sev_density)
+                verbose_audit_df.loc["Occ", :] = [al, aa, self.n, _m, _cv,
                                     self.sev_density.sum(),
                                     np.sum(wts), np.sum(np.where(np.isinf(self.sev_density), 1, 0)),
                                     self.sev_density.max(), np.nan, self.sev_density.min()]
@@ -418,7 +419,7 @@ class Aggregate(object):
 
         if approximation == 'exact':
             if self.n > 100:
-                logging.warning(f' | warning, {self.n} very high claim count ')
+                logging.warning(f' | warning, claim count {self.n} is high; consider an approximation ')
             # assert self.n < 100
             z = ft(self.sev_density, padding, tilt_vector)
             self.ftagg_density = self.freq.mgf(self.n, z)
@@ -448,38 +449,29 @@ class Aggregate(object):
                                   axis=0)
         # add empirical stats
         if self.sev_density is not None:
-            _m = np.sum(self.xs * np.nan_to_num(self.sev_density))
-            _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.sev_density)) - _m ** 2) / _m
+            _m, _cv = xsden_to_meancv(self.xs, self.sev_density)
         else:
             _m = np.nan
             _cv = np.nan
         self.audit_df.loc['mixed', 'emp_sev_1'] = _m
         self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
-        _m = np.sum(self.xs * np.nan_to_num(self.agg_density))
-        _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.agg_density)) - _m ** 2) / _m
+        _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
         self.audit_df.loc['mixed', 'emp_agg_1'] = _m
         self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
 
         if verbose:
             ax = next(axiter)
             ax.plot(xs, self.agg_density, 'b')
-            ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='aggregate_project')
-            suptitle_and_tight(f'{self.name} severity audit')
-            _m = np.sum(self.xs * np.nan_to_num(self.agg_density))
-            _cv = np.sqrt(np.sum(self.xs ** 2 * np.nan_to_num(self.agg_density)) - _m ** 2) / _m
-            df.loc['Agg', :] = [al, aa, self.n, _m, _cv,
-                                self.agg_density.sum(),
-                                np.nan, np.sum(np.where(np.isinf(self.agg_density), 1, 0)),
-                                self.agg_density.max(), np.nan, self.agg_density.min()]
-            audit = pd.concat((df[['limit', 'attachment', 'emp ex1', 'emp cv']],
-                               pd.concat((self.statistics_df, self.statistics_total_df))[[
-                                   'freq_1', 'sev_1', 'sev_cv']]), sort=True, axis=1)
-            # TODO should one be mixed?
-            audit.iloc[-1, -1] = self.statistics_total_df.loc['independent', 'agg_cv']
-            audit.iloc[-1, -2] = self.statistics_total_df.loc['independent', 'agg_1']
-            audit['abs sev err'] = audit.sev_1 - audit['emp ex1']
-            audit['rel sev err'] = audit['abs sev err'] / audit['emp ex1']
-        return df, audit
+            ax.set(xlim=(0, self.agg_m * (1 + 5 * self.agg_cv)), title='Aggregate Density')
+            suptitle_and_tight(f'Severity Audit For: {self.name}')
+            verbose_audit_df = pd.concat((verbose_audit_df[['limit', 'attachment', 'emp ex1', 'emp cv']],
+                                          self.statistics_df[['freq_1', 'sev_1', 'sev_cv']]),
+                                          sort=True, axis=1)
+            verbose_audit_df.loc['Occ', 'sev_1'] = self.statistics_total_df.loc['mixed', 'sev_1']
+            verbose_audit_df.loc['Occ', 'sev_cv'] = self.statistics_total_df.loc['mixed', 'sev_cv']
+            verbose_audit_df['abs sev err'] = verbose_audit_df.sev_1 - verbose_audit_df['emp ex1']
+            verbose_audit_df['rel sev err'] = verbose_audit_df['abs sev err'] / verbose_audit_df['emp ex1']
+        return verbose_audit_df
 
     def emp_stats(self):
         """
@@ -982,6 +974,18 @@ class Severity(ss.rv_continuous):
             fz = ss.gamma(shape)
             return shape, fz
 
+        if self.sev_name == 'invgamma':
+            shape = 1 / cv**2 + 2
+            fz = ss.invgamma(shape)
+            return shape, fz
+
+        if self.sev_name == 'invgauss':
+            shape = cv**2
+            fz = ss.invgauss(shape)
+            return shape, fz
+
+        # pareto with loc=-1 alpha = 2 cv^2  / (cv^2 - 1)
+
         gen = getattr(ss, self.sev_name)
 
         def f(shape):
@@ -1363,6 +1367,28 @@ class Frequency(object):
 
             def mgf(n, z):
                 return np.exp(f * n * (z - 1)) * np.exp(1 / μ * (1 - np.sqrt(1 - 2 * μ ** 2 * λ * n * (z - 1))))
+
+        elif self.freq_name == 'beta':
+            # beta-Poisson mixture [0, b] with mean 1 and cv ν
+            # warning: numerically unstable
+            ν = self.freq_a  # cv of beta
+            c = ν * ν
+            r = self.freq_b  # rhs of beta which must be > 1 for mean to equal 1
+            assert r > 1
+            # mean = a / (a + b) = n / r, var = a x b / [(a + b)^2( a + b + 1)] = c x mean
+
+            def _freq_moms(n):
+                b = (r - n * (1 + c)) * (r - n) / (c * n * r)
+                a = n / (r - n) * b
+                g = r ** 3 * np.exp(gammaln(a + b) + gammaln(a + 3) - gammaln(a + b + 3) - gammaln(a))
+                freq_2 = n * (1 + (1 + c) * n)
+                freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
+                return freq_2, freq_3
+
+            def mgf(n, z):
+                b = (r - n * (1 + c)) * (r - n) / (c * n * r)
+                a = (r - n * (1 + c)) / (c * r)
+                return hyp1f1(a, a + b, r * (z - 1))
 
         elif self.freq_name[0:6] == 'sichel':
             # flavors: sichel.gamma = match to delaporte moments, .ig = match to spig moments (not very numerically

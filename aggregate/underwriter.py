@@ -218,14 +218,14 @@ class Underwriter(object):
     #     else:
     #         return self.write(item)
 
-    def __call__(self, portfolio_program):
+    def __call__(self, portfolio_program, **kwargs):
         """
         make the Underwriter object callable; pass through to write
 
         :param portfolio_program:
         :return:
         """
-        return self.write(portfolio_program)
+        return self.write(portfolio_program, **kwargs)
 
     def list(self):
         """
@@ -289,7 +289,7 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
-    def write(self, portfolio_program, **kwargs):
+    def write(self, portfolio_program, globs=None, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
@@ -312,9 +312,12 @@ class Underwriter(object):
             add_exa should port.add_exa add the exa related columns to the output?
 
         :param portfolio_program:
+        :param globs: to use meta have to pass in dictionary containing all meta variables. E.g. globals()
+        is overkill but gets the job done.
         :param kwargs:
         :return:
         """
+
         # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
@@ -342,7 +345,7 @@ class Underwriter(object):
                 add_exa = False
 
         # function to handle update madness, use in either script or lookup updats for ports
-        def _update(s):
+        def _update(s, k):
             if update:
                 if bs > 0 and log2 > 0:
                     _bs = bs
@@ -380,8 +383,9 @@ class Underwriter(object):
                     obj.easy_update(log2, bs)
                 return obj
             elif _type == 'port':
+                # actually make the object
                 obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
-                _update(obj)
+                _update(obj, portfolio_program)
                 return obj
             elif _type == 'sev':
                 if 'sev_wt' in obj:
@@ -394,6 +398,20 @@ class Underwriter(object):
         # run
         self._runner(portfolio_program)
 
+        # if globs replace all meta objects with a lookup object
+        if globs is not None:
+            for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
+                if a['sev_name'][0:4] == 'meta':
+                    obj_name = a['sev_name'][5:]
+                    try:
+                        obj = globs[obj_name]
+                    except NameError as e:
+                        print(f'Object {obj_name} passed as a proto-severity cannot be found')
+                        raise e
+                    a['sev_name'] = obj
+                    logging.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
+                                 f'replaced with object {obj.name} from glob')
+
         # create objects
         rv = None
         if len(self.parser.port_out_dict) > 0:
@@ -402,7 +420,7 @@ class Underwriter(object):
             for k in self.parser.port_out_dict.keys():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
                 s = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
-                _update(s)
+                _update(s, k)
                 rv.append(s)
 
         elif len(self.parser.agg_out_dict) > 0 and rv is None:
@@ -449,8 +467,11 @@ class Underwriter(object):
 
     def write_test(self, portfolio_program):
         """
-        replaced     def test_write(self, portfolio_program):
-        fka test_run
+        write programs in testing mode
+
+        dictionary definitions are added to uw but no objects are created
+
+        returns data frame description of added severity/aggregate/portfolios
 
         :param portfolio_program:
         :return:
@@ -562,19 +583,16 @@ class Underwriter(object):
                 if k[0:3] == 'sev' and k not in dict_ and k != 'sev_wt':
                     dict_[k] = v
 
-    def _safe_lookup(self, uw_id):
+    def _safe_lookup(self, full_uw_id):
         """
         lookup uw_id in uw of expected type and merge safely into self.arg_dict
         delete name and note if appropriate
 
-        :param uw_id:  type.name format
-        :param expected_type:
+        :param full_uw_id:  type.name format
         :return:
         """
 
-        expected_type, uw_id = uw_id.split('.')
-        found_type = 'not found'
-        found_dict = None
+        expected_type, uw_id = full_uw_id.split('.')
         try:
             # lookup in Underwriter
             found_type, found_dict = self[uw_id]

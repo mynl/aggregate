@@ -1,320 +1,142 @@
+<!DOCTYPE html>
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Underwriter Module &#8212; aggregate 0.6.1 documentation</title>
-    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <meta charset="utf-8">
+    
+    <title>Underwriter Module &mdash; aggregate 0.6.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
         VERSION:     '0.6.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true,
-        SOURCELINK_SUFFIX: '.txt'
+        HAS_SOURCE:  true
       };
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Parser Module" href="parser.html" />
-    <link rel="prev" title="Distortion Class" href="distortion.html" />
-   
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
-
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="next" title="Parser Module" href="parser.html" >
+    <link rel="prev" title="Distortion Class" href="distortion.html" > 
   </head>
   <body>
-  
 
-    <div class="document">
-      <div class="documentwrapper">
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
+        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+      <li class="active">
+        <a href="parser.html" title="Parser Module"
+           accesskey="N">next</a>
+      </li>
+      <li class="active">
+        <a href="distortion.html" title="Distortion Class"
+           accesskey="P">previous</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
         <div class="bodywrapper">
-          <div class="body" role="main">
+          <div class="body" id="spc-section-body">
             
   <div class="section" id="underwriter-module">
 <h1>Underwriter Module<a class="headerlink" href="#underwriter-module" title="Permalink to this headline">¶</a></h1>
-<dl class="class">
-<dt id="aggregate.underwriter.Underwriter">
-<em class="property">class </em><code class="descclassname">aggregate.underwriter.</code><code class="descname">Underwriter</code><span class="sig-paren">(</span><em>dir_name=''</em>, <em>name='Rory'</em>, <em>databases=None</em>, <em>store_mode=True</em>, <em>update=False</em>, <em>verbose=False</em>, <em>log2=10</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter" title="Permalink to this definition">¶</a></dt>
-<dd><p>The underwriter class constructs real world examples from stored and user input Lines and Accounts.
-Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.</p>
-<p>Handles persistence
-Is interface into program parser
-Handles safe lookup from database for parser</p>
-<p>Persisitence to and from agg files</p>
-<dl class="attribute">
-<dt id="aggregate.underwriter.Underwriter.data_types">
-<code class="descname">data_types</code><em class="property"> = ['portfolio', 'aggregate', 'severity']</em><a class="headerlink" href="#aggregate.underwriter.Underwriter.data_types" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="aggregate.underwriter.Underwriter.describe">
-<code class="descname">describe</code><span class="sig-paren">(</span><em>item_type=''</em>, <em>pretty_print=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.describe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.describe" title="Permalink to this definition">¶</a></dt>
-<dd><p>more informative version of list
-Pull notes for type items</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.underwriter.Underwriter.list">
-<code class="descname">list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.list"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.list" title="Permalink to this definition">¶</a></dt>
-<dd><p>list all available databases</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="staticmethod">
-<dt id="aggregate.underwriter.Underwriter.obj_to_agg">
-<em class="property">static </em><code class="descname">obj_to_agg</code><span class="sig-paren">(</span><em>obj</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.obj_to_agg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.obj_to_agg" title="Permalink to this definition">¶</a></dt>
-<dd><p>convert an object into an agg language specification, used for saving
-:param obj: a dictionary, Aggregate, Severity or Portfolio object
-:return:</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.underwriter.Underwriter.write">
-<code class="descname">write</code><span class="sig-paren">(</span><em>portfolio_program</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
-<dd><p>write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project</p>
-<p>e.g. Input
-port my_portfolio</p>
-<blockquote>
-<div>20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
-10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
-100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1</div></blockquote>
-<p>The indents are required…</p>
-<p>See parser for full language spec!</p>
-<p>Reasonable kwargs:</p>
-<blockquote>
-<div>bs
-log2
-verbose
-update overrides class default
-add_exa should port.add_exa add the exa related columns to the output?</div></blockquote>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>portfolio_program</strong> – </li>
-<li><strong>kwargs</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.underwriter.Underwriter.write_from_file">
-<code class="descname">write_from_file</code><span class="sig-paren">(</span><em>file_name</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_from_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_from_file" title="Permalink to this definition">¶</a></dt>
-<dd><p>read program from file. delegates to write</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>file_name</strong> – </li>
-<li><strong>update</strong> – </li>
-<li><strong>verbose</strong> – </li>
-<li><strong>log2</strong> – </li>
-<li><strong>bs</strong> – </li>
-<li><strong>kwargs</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.underwriter.Underwriter.write_test">
-<code class="descname">write_test</code><span class="sig-paren">(</span><em>portfolio_program</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write_test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write_test" title="Permalink to this definition">¶</a></dt>
-<dd><p>replaced     def test_write(self, portfolio_program):
-fka test_run</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>portfolio_program</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-</dd></dl>
-
-<span class="target" id="module-aggregate.underwriter"></span><div class="section" id="underwriter-class">
-<h2>Underwriter Class<a class="headerlink" href="#underwriter-class" title="Permalink to this headline">¶</a></h2>
-<p>The Underwriter is an easy to use interface into the computational functionality of aggregate.</p>
-<p>The Underwriter</p>
-<ul class="simple">
-<li>Maintains a default library of severity curves</li>
-<li>Maintains a default library of aggregate distributions corresponding to industry losses in
-major classes of business, total catastrophe losses from major perils, and other useful constructs</li>
-<li>Maintains a default library of portfolios, including several example instances and examples used in
-papers on risk theory (e.g. the Bodoff examples)</li>
-</ul>
-<p>The library functions can be listed using</p>
-<blockquote>
-<div>uw.list()</div></blockquote>
-<p>or, for more detail</p>
-<blockquote>
-<div>uw.describe()</div></blockquote>
-<p>A given example can be inspected using <code class="docutils literal"><span class="pre">uw['cmp']</span></code> which returns the defintion of the database
-object cmp (an aggregate representing industry losses from the line Commercial Multiperil). It can
-be created as an Aggregate class using <code class="docutils literal"><span class="pre">ag</span> <span class="pre">=</span> <span class="pre">uw('cmp')</span></code>. The Aggregate class can then be updated,
-plotted and various reports run on it. In iPython or Jupyter <code class="docutils literal"><span class="pre">ag</span></code> returns an informative HTML
-description.</p>
-<p>The real power of Underwriter is access to the agg scripting language (see parser module). The scripting
-language allows severities, aggregates and portfolios to be created using more-or-less natural language.
-For example</p>
-<blockquote>
-<div><p>pf = uw(‘’’
-port MyCompanyBook</p>
-<blockquote>
-<div>agg LineA 100 claims 100000 xs 0 sev lognorm 30000 cv 1.25
-agg LineB 150 claims 250000 xs 5000 sev lognorm 50000 cv 0.9
-agg Cat 2 claims 100000000 xs 0 sev 500000 * pareto 1.8 - 500000</div></blockquote>
-<p>‘’‘)</p>
-</div></blockquote>
-<p>creates a portfolio with three sublines, LineA, LineB and Cat. LineA is 100 (expected) claims, each pulled
-from a lognormal distribution with mean of 30000 and coefficient of variation 1.25 within the layer
-100000 xs 0 (i.e. limited at 100000). The frequency distribution is Poisson. LineB is similar. Cat is jsut
-2 claims from the indicated limit, with severity given by a Pareto distribution with shape parameter 1.8,
-scale 500000, shifted left by 500000. This corresponds to the usual Pareto with survival function
-S(x) = (lambda / (lambda + x))^1.8, x &gt;= 0.</p>
-<p>The portfolio can be approximated using FFTs to convolve the aggregates and add the lines. The severities
-are first discretized using a certain bucket-size (bs). The port object has a port.recommend_bucket() to
-suggest reasonable buckets:</p>
-<p>&gt;&gt; pf.recommend_bucket()</p>
-<div class="line-block">
-<div class="line">|      bs10 |     bs11 |       bs12 |       bs13 |      bs14 |      bs15 |      bs16 |   bs18 |   bs20 |</div>
-</div>
-<p><a href="#id1"><span class="problematic" id="id2">|:------|</span></a>———-:<a href="#id3"><span class="problematic" id="id4">|---------:|</span></a>———–:<a href="#id5"><span class="problematic" id="id6">|-----------:|</span></a>———-:<a href="#id7"><span class="problematic" id="id8">|----------:|</span></a>———-:<a href="#id9"><span class="problematic" id="id10">|-------:|</span></a>——-:|
-| LineA |   3,903     |  1,951     |      976     |      488     |     244     |     122     |      61.0 |   15.2 |    3.8 |
-| LineB |   8,983     |  4,491     |  2,245       |  1,122       |     561     |     280     |     140     |   35.1 |    8.8 |
-| Cat   |  97,656     | 48,828     | 24,414       | 12,207       | 6,103       | 3,051       | 1,525       |  381     |   95.4 |
-| total | 110,543     | 55,271     | 27,635       | 13,817       | 6,908       | 3,454       | 1,727       |  431     |  108     |</p>
-<p>The column bsNcorrespond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each
-line and in total. For example with N=13 (i.e. 8196 buckets) the suggestion is 13817. It is best the bucket
-size is a divisor of any limits or attachment points, so we select 10000.</p>
-<p>Updating can then be run as</p>
-<blockquote>
-<div>bs = 10000
-pf.update(13, bs)
-pf.report(‘quick’)
-pf.plot(‘density’)
-pf.plot(‘density’, logy=True)
-print(pf)</div></blockquote>
-<p>Portfolio name           MyCompanyBook
-Theoretic expected loss     10,684,541.2
-Actual expected loss        10,657,381.1
-Error                          -0.002542
-Discretization size                   13
-Bucket size                     10000.00
-&lt;aggregate.port.Portfolio object at 0x0000023950683CF8&gt;</p>
-<p>Etc. etc.</p>
-</div>
 </div>
 
 
           </div>
         </div>
-      </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+          </div>
+      <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
-<p class="logo">
-  <a href="index.html">
-    <img class="logo" src="_static/logo.PNG" alt="Logo"/>
-    
-    <h1 class="logo logo-name">aggregate</h1>
-    
-  </a>
-</p>
-
-
-
-<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
-
-
-
-
-<p>
-<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
-  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
-</p>
-
-
-
-
-
-<h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
-<li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
-<li class="toctree-l1"><a class="reference internal" href="freq_dist.html">Frequency Distributions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="aggregate.html">Distribution Classes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Underwriter Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="parser.html">Parser Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
-<li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
-</ul>
-
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="distortion.html"
+                        title="previous chapter">Distortion Class</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="parser.html"
+                        title="next chapter">Parser Module</a></p>
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/underwriter.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/underwriter.rst.rst">Edit page</a>
+</div>
 
         </div>
       </div>
-      <div class="clearer"></div>
+        </div>
+      </div>
     </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
     <div class="footer">
-      &copy;2018, Stephen J. Mildenhall.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
-      
-      |
-      <a href="_sources/underwriter.rst.txt"
-          rel="nofollow">Page source</a>
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018, Stephen J. Mildenhall.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      </li>
+    </ul>
     </div>
-
-    
-
-    
+    </div>
+    </div>
   </body>
 </html>

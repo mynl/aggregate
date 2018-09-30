@@ -1,43 +1,84 @@
+<!DOCTYPE html>
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>aggregate.port &#8212; aggregate 0.6.1 documentation</title>
-    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <meta charset="utf-8">
+    
+    <title>aggregate.port &mdash; aggregate 0.6.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="../../_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="../../_static/css/spc-extend.css">
+    <link rel="stylesheet" href="../../_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" >
+    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
         VERSION:     '0.6.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true,
-        SOURCELINK_SUFFIX: '.txt'
+        HAS_SOURCE:  true
       };
     </script>
     <script type="text/javascript" src="../../_static/jquery.js"></script>
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link rel="index" title="Index" href="../../genindex.html" />
-    <link rel="search" title="Search" href="../../search.html" />
-   
-  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
-
+    <script type="text/javascript" src="../../_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" >
+    <link rel="search" title="Search" href="../../search.html" >
+    <link rel="top" title="aggregate 0.6.1 documentation" href="../../index.html" >
+    <link rel="up" title="Module code" href="../index.html" > 
   </head>
   <body>
-  
 
-    <div class="document">
-      <div class="documentwrapper">
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="../../index.html">
+      <img style="border: 0;" alt="SciPy" src="../../_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
+        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+	
+        <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
+	
+          <li class="active"><a href="../index.html" accesskey="U">Module code</a></li> 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="../../genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="../../py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
         <div class="bodywrapper">
-          <div class="body" role="main">
+          <div class="body" id="spc-section-body">
             
   <h1>Source code for aggregate.port</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;</span>
@@ -105,7 +146,7 @@
         <span class="n">temp_report</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">a</span><span class="o">.</span><span class="n">report_ser</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># max_limit = np.inf # np.max([np.max(a.get(&#39;limit&#39;, np.inf)) for a in spec_list])</span>
-        <span class="n">temp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">ma</span><span class="o">.</span><span class="n">stats_series</span><span class="p">(</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="n">max_limit</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">ma</span><span class="o">.</span><span class="n">stats_series</span><span class="p">(</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="n">max_limit</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">,</span> <span class="n">remix</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">statistics_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">temp_report</span><span class="p">,</span> <span class="n">temp</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="c1"># future storage</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span> <span class="o">=</span> <span class="kc">None</span>
@@ -190,7 +231,7 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1"># _df = self.audit_df[[&#39;Mean&#39;, &#39;EmpMean&#39;, &#39;MeanErr&#39;, &#39;CV&#39;, &#39;EmpCV&#39;, &#39;CVErr&#39;, &#39;P99.0&#39;]]</span>
             <span class="c1"># another option TODO consider</span>
-            <span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">statistics_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">,</span> <span class="p">:],</span>
+            <span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">statistics_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">,</span> <span class="s1">&#39;skew&#39;</span><span class="p">]),</span> <span class="p">:],</span>
                              <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[[</span><span class="s1">&#39;Mean&#39;</span><span class="p">,</span> <span class="s1">&#39;EmpMean&#39;</span><span class="p">,</span> <span class="s1">&#39;MeanErr&#39;</span><span class="p">,</span> <span class="s1">&#39;CV&#39;</span><span class="p">,</span> <span class="s1">&#39;EmpCV&#39;</span><span class="p">,</span> <span class="s1">&#39;CVErr&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.0&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">T</span><span class="p">),</span>
                             <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">s</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_df</span><span class="o">.</span><span class="n">_repr_html_</span><span class="p">())</span>
@@ -397,7 +438,7 @@
             <span class="c1"># use statistics_df matched to computed aggregate_project</span>
             <span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;EmpMean&#39;</span><span class="p">,</span> <span class="s1">&#39;EmpCV&#39;</span><span class="p">,</span> <span class="s1">&#39;EmpSkew&#39;</span><span class="p">]]</span>
 
-        <span class="n">name</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{approx_type[0:4]}</span><span class="s1">_</span><span class="si">{self.name[0:5]}</span><span class="s1">&#39;</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{approx_type[0:4]}</span><span class="s1">~</span><span class="si">{self.name[0:5]}</span><span class="s1">&#39;</span>
         <span class="n">agg_str</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;agg </span><span class="si">{name}</span><span class="s1"> 1 claim sev &#39;</span>
 
         <span class="k">if</span> <span class="n">approx_type</span> <span class="o">==</span> <span class="s1">&#39;slognorm&#39;</span><span class="p">:</span>
@@ -535,9 +576,8 @@
         <span class="n">ftall</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">agg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">:</span>
             <span class="n">nm</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">name</span>
-            <span class="n">_a</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">,</span>
-                                <span class="s1">&#39;exact&#39;</span> <span class="k">if</span> <span class="n">agg</span><span class="o">.</span><span class="n">n</span> <span class="o">&lt;</span> <span class="n">approx_freq_ge</span> <span class="k">else</span> <span class="n">approx_type</span><span class="p">,</span> <span class="n">sev_calc</span><span class="p">,</span> <span class="n">discretization_calc</span><span class="p">,</span>
-                                <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+            <span class="n">_a</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">padding</span><span class="p">,</span> <span class="n">tilt_vector</span><span class="p">,</span> <span class="s1">&#39;exact&#39;</span> <span class="k">if</span> <span class="n">agg</span><span class="o">.</span><span class="n">n</span> <span class="o">&lt;</span> <span class="n">approx_freq_ge</span> <span class="k">else</span> <span class="n">approx_type</span><span class="p">,</span>
+                            <span class="n">sev_calc</span><span class="p">,</span> <span class="n">discretization_calc</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
                 <span class="n">display</span><span class="p">(</span><span class="n">_a</span><span class="p">)</span>
             <span class="n">ft_line_density</span><span class="p">[</span><span class="n">nm</span><span class="p">]</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">ftagg_density</span>
@@ -579,7 +619,7 @@
 
         <span class="c1"># make audit statistics_df df</span>
         <span class="n">theoretical_stats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">statistics_df</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;agg&#39;</span><span class="p">)</span>
-        <span class="n">theoretical_stats</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Mean&#39;</span><span class="p">,</span> <span class="s1">&#39;CV&#39;</span><span class="p">,</span> <span class="s1">&#39;Skew&#39;</span><span class="p">,</span> <span class="s1">&#39;EX1&#39;</span><span class="p">,</span> <span class="s1">&#39;EX2&#39;</span><span class="p">,</span> <span class="s1">&#39;EX3&#39;</span><span class="p">,</span> <span class="s1">&#39;Limit&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.9Est&#39;</span><span class="p">]</span>
+        <span class="n">theoretical_stats</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;EX1&#39;</span><span class="p">,</span> <span class="s1">&#39;EX2&#39;</span><span class="p">,</span> <span class="s1">&#39;EX3&#39;</span><span class="p">,</span> <span class="s1">&#39;Mean&#39;</span><span class="p">,</span> <span class="s1">&#39;CV&#39;</span><span class="p">,</span> <span class="s1">&#39;Skew&#39;</span><span class="p">,</span> <span class="s1">&#39;Limit&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.9Est&#39;</span><span class="p">]</span>
         <span class="n">theoretical_stats</span> <span class="o">=</span> <span class="n">theoretical_stats</span><span class="p">[[</span><span class="s1">&#39;Mean&#39;</span><span class="p">,</span> <span class="s1">&#39;CV&#39;</span><span class="p">,</span> <span class="s1">&#39;Skew&#39;</span><span class="p">,</span> <span class="s1">&#39;Limit&#39;</span><span class="p">,</span> <span class="s1">&#39;P99.9Est&#39;</span><span class="p">]]</span>
         <span class="n">percentiles</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.99</span><span class="p">,</span> <span class="mf">0.996</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">,</span> <span class="mf">0.9999</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-6</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
@@ -605,7 +645,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;CVErr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;EmpCV&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;CV&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;SkewErr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;EmpSkew&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="p">[</span><span class="s1">&#39;Skew&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
 
-        <span class="c1"># add exa detasil</span>
+        <span class="c1"># add exa details</span>
         <span class="k">if</span> <span class="n">add_exa</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_add_exa</span><span class="p">()</span>
             <span class="c1"># default priority analysis</span>
@@ -986,7 +1026,7 @@
         <span class="c1"># defuzz(self.density_df, cut_eps)</span>
 
         <span class="c1"># bucket size</span>
-        <span class="n">bs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;loss&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;loss&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">bs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bs</span>  <span class="c1">#  self.density_df.loc[:, &#39;loss&#39;].iloc[1] - self.density_df.loc[:, &#39;loss&#39;].iloc[0]</span>
         <span class="c1"># index has already been reset</span>
 
         <span class="c1"># sum of p_total is so important...we will rescale it...</span>
@@ -998,11 +1038,9 @@
             <span class="c1"># TODO what does this all mean?!</span>
             <span class="c1"># self.density_df.p_total.iloc[first_neg:] = 0</span>
         <span class="n">sum_p_total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | </span><span class="si">{self.name}</span><span class="s1">: sum of p_total prior to rescaling is 1-{1-sum_p_total:12.8e}&#39;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">sum_p_total</span> <span class="o">&gt;=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1e-12</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                <span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | </span><span class="si">{self.name}</span><span class="s1">: sum of p_total prior to rescaling is 1-{1-sum_p_total:12.8e}&#39;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span> <span class="o">/=</span> <span class="n">sum_p_total</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | </span><span class="si">{self.name}</span><span class="s1">: sum of p_total is 1 - &#39;</span>
+                     <span class="n">f</span><span class="s1">&#39;{1-sum_p_total:12.8e} NOT RESCALING&#39;</span><span class="p">)</span>
+        <span class="c1"># self.density_df.p_total /= sum_p_total</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="p">[</span><span class="s1">&#39;F&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="p">[</span><span class="s1">&#39;S&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">F</span>
         <span class="c1"># get rounding errors, S may not go below zero</span>
@@ -1401,10 +1439,12 @@
             <span class="n">As</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">q</span><span class="p">(</span><span class="n">p</span><span class="p">))</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">Ps</span><span class="p">])</span>
 
         <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">dist_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="n">axiter</span> <span class="o">=</span> <span class="n">axiter_factory</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">24</span><span class="p">)</span>
-            <span class="n">df</span><span class="p">,</span> <span class="n">au</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_distortion</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">axiter</span><span class="p">)</span>  <span class="c1"># no plots at this point...</span>
+            <span class="c1"># axiter = axiter_factory(None, 24)</span>
+            <span class="c1"># df, au = self.apply_distortion(g, axiter)</span>
+            <span class="c1"># no plots at this point...</span>
+            <span class="n">df</span><span class="p">,</span> <span class="n">au</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_distortion</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
             <span class="c1"># extract range of S values</span>
-            <span class="n">temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">As</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;^loss|^S|exa[g]?_[^η][a-zA-Z0-9_]*$|exag_sumparts|lr_&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">As</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;^loss|^S|exa[g]?_[^η][a-zA-Z0-9]*$|exag_sumparts|lr_&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
             <span class="c1"># jump = sensible_jump(len(temp), num_assets)</span>
             <span class="c1"># temp = temp.loc[::jump, :].copy()</span>
             <span class="n">temp</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">name</span>
@@ -2164,67 +2204,34 @@
 
           </div>
         </div>
-      </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+          </div>
+      <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
-<p class="logo">
-  <a href="../../index.html">
-    <img class="logo" src="../../_static/logo.PNG" alt="Logo"/>
-    
-    <h1 class="logo logo-name">aggregate</h1>
-    
-  </a>
-</p>
-
-
-
-<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
-
-
-
-
-<p>
-<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
-  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
-</p>
-
-
-
-
-
-<h3>Navigation</h3>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction to aggregate</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../histapp.html">History and Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../prob.html">Probability and Risk Theory</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../freq_dist.html">Frequency Distributions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../devel.html">Development Outline</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../aggregate.html">Distribution Classes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../portfolio.html">Portfolio Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../underwriter.html">Underwriter Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../parser.html">Parser Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../utilities.html">Utilities</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../parameters.html">Parameters Module</a></li>
-</ul>
-
 
         </div>
       </div>
-      <div class="clearer"></div>
+        </div>
+      </div>
     </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
     <div class="footer">
-      &copy;2018, Stephen J. Mildenhall.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
-      
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018, Stephen J. Mildenhall.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      </li>
+    </ul>
     </div>
-
-    
-
-    
+    </div>
+    </div>
   </body>
 </html>

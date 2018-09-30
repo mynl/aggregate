@@ -63,7 +63,7 @@ class Portfolio(object):
         temp_report = pd.concat([a.report_ser for a in self.agg_list], axis=1)
 
         # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
-        temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, total=True))
+        temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, remix=False))
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
         self.density_df = None
@@ -148,7 +148,7 @@ class Portfolio(object):
         if self.audit_df is not None:
             # _df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
             # another option TODO consider
-            _df = pd.concat((self.statistics_df.iloc[0:9, :],
+            _df = pd.concat((self.statistics_df.loc[(slice(None), ['mean', 'cv', 'skew']), :],
                              self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
                             sort=True)
             s.append(_df._repr_html_())
@@ -355,7 +355,7 @@ class Portfolio(object):
             # use statistics_df matched to computed aggregate_project
             m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
 
-        name = f'{approx_type[0:4]}_{self.name[0:5]}'
+        name = f'{approx_type[0:4]}~{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
 
         if approx_type == 'slognorm':
@@ -493,9 +493,8 @@ class Portfolio(object):
         ftall = None
         for agg in self.agg_list:
             nm = agg.name
-            _a = agg.update(xs, self.padding, tilt_vector,
-                                'exact' if agg.n < approx_freq_ge else approx_type, sev_calc, discretization_calc,
-                                verbose=verbose)
+            _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
+                            sev_calc, discretization_calc, verbose=verbose)
             if verbose:
                 display(_a)
             ft_line_density[nm] = agg.ftagg_density
@@ -537,7 +536,7 @@ class Portfolio(object):
 
         # make audit statistics_df df
         theoretical_stats = self.statistics_df.T.filter(regex='agg')
-        theoretical_stats.columns = ['Mean', 'CV', 'Skew', 'EX1', 'EX2', 'EX3', 'Limit', 'P99.9Est']
+        theoretical_stats.columns = ['EX1', 'EX2', 'EX3', 'Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
         percentiles = [0.9, 0.95, 0.99, 0.996, 0.999, 0.9999, 1 - 1e-6]
         self.audit_df = pd.DataFrame(
@@ -563,7 +562,7 @@ class Portfolio(object):
         self.audit_df['CVErr'] = self.audit_df['EmpCV'] / self.audit_df['CV'] - 1
         self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
 
-        # add exa detasil
+        # add exa details
         if add_exa:
             self._add_exa()
             # default priority analysis
@@ -944,7 +943,7 @@ class Portfolio(object):
         # defuzz(self.density_df, cut_eps)
 
         # bucket size
-        bs = self.density_df.loc[:, 'loss'].iloc[1] - self.density_df.loc[:, 'loss'].iloc[0]
+        bs = self.bs  #  self.density_df.loc[:, 'loss'].iloc[1] - self.density_df.loc[:, 'loss'].iloc[0]
         # index has already been reset
 
         # sum of p_total is so important...we will rescale it...
@@ -956,11 +955,9 @@ class Portfolio(object):
             # TODO what does this all mean?!
             # self.density_df.p_total.iloc[first_neg:] = 0
         sum_p_total = self.density_df.p_total.sum()
-        logging.info(f'CPortfolio._add_exa | {self.name}: sum of p_total prior to rescaling is 1-{1-sum_p_total:12.8e}')
-        if sum_p_total >= 1.0 - 1e-12:
-            logging.error(
-                f'CPortfolio._add_exa | {self.name}: sum of p_total prior to rescaling is 1-{1-sum_p_total:12.8e}')
-        self.density_df.p_total /= sum_p_total
+        logging.info(f'CPortfolio._add_exa | {self.name}: sum of p_total is 1 - '
+                     f'{1-sum_p_total:12.8e} NOT RESCALING')
+        # self.density_df.p_total /= sum_p_total
         self.density_df['F'] = np.cumsum(self.density_df.p_total)
         self.density_df['S'] = 1 - self.density_df.F
         # get rounding errors, S may not go below zero
@@ -1359,10 +1356,12 @@ class Portfolio(object):
             As = np.array([float(self.q(p)) for p in Ps])
 
         for g in dist_dict.values():
-            axiter = axiter_factory(None, 24)
-            df, au = self.apply_distortion(g, axiter)  # no plots at this point...
+            # axiter = axiter_factory(None, 24)
+            # df, au = self.apply_distortion(g, axiter)
+            # no plots at this point...
+            df, au = self.apply_distortion(g, None)
             # extract range of S values
-            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-zA-Z0-9_]*$|exag_sumparts|lr_').copy()
+            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name

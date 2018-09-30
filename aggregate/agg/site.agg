@@ -1,6 +1,6 @@
-sev directors_a lognorm 10000000 cv 1.25 note{directors and officers liability class a, sigma=1.25}
-sev directors_b lognorm 10000000 cv 1.75 note{directors and officers liability class b, sigma=1.75}
-sev directors_c lognorm 10000000 cv 2.0  note{directors and officers liability class c, sigma=2.00}
+sev directorsA lognorm 10000000 cv 1.25 note{directors and officers liability class a, sigma=1.25}
+sev directorsB lognorm 10000000 cv 1.75 note{directors and officers liability class b, sigma=1.75}
+sev directorsC lognorm 10000000 cv 2.0  note{directors and officers liability class c, sigma=2.00}
 sev cata pareto 2.1 -1  note{small cat, pareto 2.1}
 sev catb pareto 1.7 -1  note{moderate cat, pareto 1.7}
 sev catc pareto 1.4 -1  note{severe cat, pareto 1.4}
@@ -20,13 +20,13 @@ agg Casxol               0.5         claims 100e6 xs 0 sev lognorm   50e6 cv 0.7
 agg Noncata        1000000.00        claims            sev lognorm  50000 cv 1.0  mixed gamma 0.175   note{industry total non cat losses, all lines}
 agg CAL             462316.42        claims            sev lognorm  40000 cv 0.5  mixed gamma 0.240   note{US statutory industry commercial auto liability, SNL 2017}
 agg CMP             268153.90        claims            sev lognorm 100000 cv 0.5  mixed gamma 0.280   note{US statutory industry commercial multiperil (property and liability), SNL 2017}
-agg Comm_Prop        65087.40        claims            sev lognorm 250000 cv 1.25 mixed gamma 0.250   note{US statutory industry commercial property (fire + allied lines), SNL 2017}
+agg CommProp        65087.40        claims            sev lognorm 250000 cv 1.25 mixed gamma 0.250   note{US statutory industry commercial property (fire + allied lines), SNL 2017}
 agg Homeowners     4337346.31        claims 2500 xs 0  sev lognorm     15 cv 0.5  mixed gamma 0.240   note{US statutory industry homeowners, SNL 2017}
-agg Inland_Marine   314117.40        claims            sev lognorm  50000 cv 0.5  mixed gamma 0.350   note{US statutory industry indland marine, SNL 2017}
+agg InlandMarine   314117.40        claims            sev lognorm  50000 cv 0.5  mixed gamma 0.350   note{US statutory industry indland marine, SNL 2017}
 agg PPAL           5676073.30        claims            sev lognorm   5000 cv 10.0 mixed gamma 0.080   note{US statutory industry private passenger auto liability, SNL 2017}
-agg Work_Comp      2664340.53        claims            sev lognorm  15000 cv 7.0  mixed gamma 0.190   note{US statutory industry workers compensation (excluding excess), SNL 2017}
-agg Pers_Auto      5676073.30        claims 3e6 xs 0   sev lognorm  50000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
-agg Comm_Auto      5676073.30        claims            sev lognorm  30000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
+agg WorkComp      2664340.53        claims            sev lognorm  15000 cv 7.0  mixed gamma 0.190   note{US statutory industry workers compensation (excluding excess), SNL 2017}
+agg PersAuto      5676073.30        claims 3e6 xs 0   sev lognorm  50000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
+agg CommAuto      5676073.30        claims            sev lognorm  30000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
 
 port BODOFF1 note{Bodoff Thought Experiment No. 1}
     agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed

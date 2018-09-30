@@ -141,6 +141,9 @@ def sln_fit(m, cv, skew):
                 1 / (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3))
         sigma = np.sqrt(np.log(1 + eta ** 2))
         shift = m - cv * m / eta
+        if shift > m:
+            logging.warning(f'utils sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
+            shift = m - 1e-6
         mu = np.log(m - shift) - sigma ** 2 / 2
         return shift, mu, sigma
 
@@ -175,8 +178,9 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     """
 
     pn = pl = pg = 0
-    if skew == 0:
+    if skew <= 0:
         # neither sln nor sgamma works, use a normal
+        # for negative skewness the right tail will be thin anyway so normal not outrageous
         fzn = ss.norm(scale=m * cv, loc=m)
         pn = fzn.isf(1 - p)
     else:
@@ -520,7 +524,7 @@ class MomentAggregator(object):
         """
 
         # fill in the frequency moments and store away
-        f2, f3 = self.freq_moms(f1)
+        f1, f2, f3 = self.freq_moms(f1)
         self.add_fs(f1, f2, f3, s1, s2, s3)
 
     def get_fsa_stats(self, total, remix=False):
@@ -538,7 +542,7 @@ class MomentAggregator(object):
             if remix:
                 # recompute the frequency moments; all local variables
                 f1 = self.tot_freq_1
-                f2, f3 = self.freq_moms(f1)
+                f1, f2, f3 = self.freq_moms(f1)
                 s1, s2, s3 = self.tot_sev_1 / f1, self.tot_sev_2 / f1, self.tot_sev_3 / f1
                 a1, a2, a3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
                 return [f1, f2, f3, *self._moments_to_mcvsk(f1, f2, f3),
@@ -656,24 +660,6 @@ class MomentAggregator(object):
         return t1, t2, t3
 
     @staticmethod
-    def column_names(agg_only):
-        """
-        list of the moment and statistics_df names for f x s = a
-        list of the moment and statistics_df names for just agg
-
-        :param agg_only: = True for total r
-        :return:
-        """
-
-        if agg_only:
-            raise ValueError('did not think this was used... ')
-            # return [i + j for i, j in itertools.product(['agg'], [f'_{i}' for i in range(1, 4)] +
-            #                                             ['_m', '_cv', '_skew'])]
-        else:
-            return [i + j for i, j in itertools.product(['freq', 'sev', 'agg'], [f'_{i}' for i in range(1, 4)] +
-                                                        ['_m', '_cv', '_skew'])]
-
-    @staticmethod
     def _moments_to_mcvsk(ex1, ex2, ex3):
         """
         returns mean, cv and skewness from non-central moments
@@ -689,7 +675,7 @@ class MomentAggregator(object):
         if np.allclose(var, 0):
             var = 0
         if var < 0:
-            print(f'weird var < 0 = {var}')
+            logging.error(f'MomentAggregator._moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan
@@ -703,7 +689,18 @@ class MomentAggregator(object):
             skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
         return m, cv, skew
 
-    def stats_series(self, name, limit, pvalue, total=False):
+    @staticmethod
+    def column_names():
+        """
+        list of the moment and statistics_df names for f x s = a
+
+        :return:
+        """
+
+        return [i + j for i, j in itertools.product(['freq', 'sev', 'agg'], [f'_{i}' for i in range(1, 4)] +
+                                                        ['_m', '_cv', '_skew'])]
+
+    def stats_series(self, name, limit, pvalue, remix):
         """
         combine elements into a reporting series
         handles order, index names etc. in one place
@@ -711,24 +708,16 @@ class MomentAggregator(object):
         :param name: series name
         :param limit:
         :param pvalue:
-        :param total:
+        :param remix: called from Aggregate want remix=True to collect mix terms; from Portfolio remix=False
         :return:
         """
-        # TODO seems like always called with total = true, so can delete?
-        assert total
-        idx = pd.MultiIndex.from_arrays(
-            [['agg', 'agg', 'agg', 'freq', 'freq', 'freq', 'sev', 'sev', 'sev'] * 2 + ['agg', 'agg'],
-             ['mean', 'cv', 'skew'] * 3 + ['ex1', 'ex2', 'ex3'] * 3 + ['limit', 'P99.9e']],
-            names=['component', 'measure'])
-        agg_stats = self.moments_to_mcvsk('agg', total)
-        p999e = estimate_agg_percentile(*agg_stats, pvalue)
-        return pd.Series([*agg_stats,
-                          *self.moments_to_mcvsk('freq', total),
-                          *self.moments_to_mcvsk('sev', total),
-                          *self.moments('agg', total),
-                          *self.moments('freq', total),
-                          *self.moments('sev', total),
-                          limit, p999e], name=name, index=idx)
+        # TODO: needs to be closer link to column_names()
+        idx = pd.MultiIndex.from_arrays([['freq']*6 + ['sev'] * 6 + ['agg']*8,
+             (['ex1', 'ex2', 'ex3'] + ['mean', 'cv', 'skew']) * 3 + ['limit', 'P99.9e']],
+             names=['component', 'measure'])
+        all_stats = self.get_fsa_stats(total=True, remix=remix)
+        p999e = estimate_agg_percentile(*all_stats[15:18], pvalue)
+        return pd.Series([*all_stats, limit, p999e], name=name, index=idx)
 
 
 class MomentWrangler(object):

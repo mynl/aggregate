@@ -94,16 +94,25 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+# html_theme = 'alabaster'
+html_theme = 'agg_theme'
+html_theme_path = ['_theme']
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 # See https://alabaster.readthedocs.io/en/latest/customization.html
-html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
-'description': 'aggregate is a Python package providing fast, accurate, and expressive data'
-'structures designed to make working with probability distributions easy and intuitive.',
- 'github_user' :'mynl', 'github_repo': 'aggregate', 'github_button': True, 'github_banner': False}
+html_theme_options = {
+    "edit_link": "true",
+    "sidebar": "right",
+    "scipy_org_logo": "false",
+    "rootlinks": [("http://SOMETHING/", "agg?"),
+                  ("http://www.mynl.com/aggregate/index.html", "agg Docs")]
+}
+# html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
+# 'description': 'aggregate is a Python package providing fast, accurate, and expressive data'
+# 'structures designed to make working with probability distributions easy and intuitive.',
+#  'github_user' :'mynl', 'github_repo': 'aggregate', 'github_button': True, 'github_banner': False}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -115,15 +124,15 @@ html_static_path = ['_static']
 #
 # This is required for the alabaster theme
 # refs: http://alabaster.readthedocs.io/en/latest/installation.html#sidebars
-html_sidebars = {
-    '**': [
-        'about.html',
-        'navigation.html',
+html_sidebars = { }
+    # '**': [
+#        'about.html',
+#        'navigation.html',
        # 'relations.html',  # needs 'show_related': True theme option to display
        # 'searchbox.html',
        # 'donate.html',
-    ]
-}
+#     ]
+# }
 
 
 # -- Options for HTMLHelp output ------------------------------------------

@@ -1,626 +1,153 @@
+<!DOCTYPE html>
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Distribution Classes &#8212; aggregate 0.6.1 documentation</title>
-    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <meta charset="utf-8">
+    
+    <title>Distribution Classes &mdash; aggregate 0.6.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
         VERSION:     '0.6.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true,
-        SOURCELINK_SUFFIX: '.txt'
+        HAS_SOURCE:  true
       };
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Portfolio Class" href="portfolio.html" />
-    <link rel="prev" title="Development Outline" href="devel.html" />
-   
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
-
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="next" title="Portfolio Class" href="portfolio.html" >
+    <link rel="prev" title="Development Outline" href="devel.html" > 
   </head>
   <body>
-  
 
-    <div class="document">
-      <div class="documentwrapper">
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
+        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+      <li class="active">
+        <a href="portfolio.html" title="Portfolio Class"
+           accesskey="N">next</a>
+      </li>
+      <li class="active">
+        <a href="devel.html" title="Development Outline"
+           accesskey="P">previous</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
         <div class="bodywrapper">
-          <div class="body" role="main">
+          <div class="body" id="spc-section-body">
             
   <div class="section" id="distribution-classes">
 <h1>Distribution Classes<a class="headerlink" href="#distribution-classes" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="module-aggregate.distr">
-<span id="aggregate-frequency-and-severity-classes"></span><h2>Aggregate, Frequency and Severity Classes<a class="headerlink" href="#module-aggregate.distr" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="aggregate.distr.Aggregate">
-<em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Aggregate</code><span class="sig-paren">(</span><em>name</em>, <em>exp_el=0</em>, <em>exp_premium=0</em>, <em>exp_lr=0</em>, <em>exp_en=0</em>, <em>exp_attachment=0</em>, <em>exp_limit=inf</em>, <em>sev_name=''</em>, <em>sev_a=0</em>, <em>sev_b=0</em>, <em>sev_mean=0</em>, <em>sev_cv=0</em>, <em>sev_loc=0</em>, <em>sev_scale=0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>sev_wt=1</em>, <em>freq_name=''</em>, <em>freq_a=0</em>, <em>freq_b=0</em>, <em>note=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="docutils">
-<dt>Aggregate distribution class manages creation and calculation of aggregate distributions.</dt>
-<dd><p class="first">Aggregate allows for very flexible creation of Aggregate distributions. Severity
-can express a limit profile, a mixed severity or both. Mixed frequency types share
-a mixing distribution across all broadcast terms to ensure an appropriate inter-
-class correlation.</p>
-<p>The exposure variables can be vectors to express a <em>limit profile</em>.
-All <a href="#id1"><span class="problematic" id="id2">exp_</span></a> elements are broadcast against one-another. For example</p>
-<p>[100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000</p>
-<p>expresses a limit profile with 100 of premium at 1000 x 1000; 200 at 2000 x 1000
-400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
-the same, but they could vary too, as could the attachments.</p>
-<p>The severity variables can be vectors to express a <em>mixed severity</em>. All <a href="#id3"><span class="problematic" id="id4">sev_</span></a>
-elements are broadcast against one-another. For example</p>
-<p>sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]</p>
-<p>expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
-weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
-relevant number of components.</p>
-<p>Limit profiles and mixtures can be combined. Each mixed severity is applied to each
-limit profile component. For example</p>
-<dl class="docutils">
-<dt>ag = uw(‘agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75] ‘</dt>
-<dd>‘sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4’)</dd>
-</dl>
-<p>creates an aggregate with six severity subcomponents</p>
-<blockquote>
-<div>#  limit        attachment    claims
-0       100              0                       6
-1       100              0                       4
-2       200             50                      12
-3       200             50                       8
-4        75             75                      18
-5        75             75                      12</div></blockquote>
-<p>It is sometimes desirable to enter two or more lines each with a different severity but
-with a shared mixing variable. For example to model the current accident year and a run-
-off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
-larger lognormal mean 150 cv 1.25 claims requires</p>
-<p>agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]</p>
-<p>so that the result is not the four-way exposure / severity product but just a two-way
-combination. These two cases are distinguished looking at the total weights. If the weights sum to
-one then the result is an exposure / severity product. If the weights are missing or sum to the number
-of severity components (i.e. are all equal to 1) then the result is a row by row combination.</p>
-<ul class="simple">
-<li>en determines en</li>
-<li>prem x loss ratio -&gt; el</li>
-<li>severity x en -&gt; el</li>
-<li>always have en and el; may have prem and exp_lr</li>
-<li>if prem then exp_lr computed</li>
-<li>if exp_lr then premium computed</li>
-<li>el is determined using np.where(el==0, prem*exp_lr, el)</li>
-<li>if el==0 then el = freq * sev</li>
-<li>assert np.all( el&gt;0 or en&gt;0 )</li>
-<li>call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity</li>
-<li>call with el expressing lines of business with an array of severities</li>
-<li>call with single el and array of sevs expressing a mixture; [] broken down by weights</li>
-<li>n is the CONDITIONAL claim count</li>
-<li>X is the GROUND UP severity, so X | X &gt; attachment is used and generates n claims</li>
-<li>For fixed or histogram have to separate the parameter so they are not broad cast; otherwise</li>
-</ul>
-<p>you end up with multiple lines when you intend only one</p>
-<table class="last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param name:</th><td class="field-body"></td>
-</tr>
-<tr class="field-even field"><th class="field-name">param exp_el:</th><td class="field-body">expected loss or vector</td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">param exp_premium:</th></tr>
-<tr class="field-odd field"><td>&#160;</td><td class="field-body">premium volume or vector  (requires loss ratio)</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param exp_lr:</th><td class="field-body">loss ratio or vector  (requires premium)</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param exp_en:</th><td class="field-body">expected claim count per segment (self.n = total claim count)</td>
-</tr>
-<tr class="field-even field"><th class="field-name" colspan="2">param exp_attachment:</th></tr>
-<tr class="field-even field"><td>&#160;</td><td class="field-body">occurrence attachment</td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">param exp_limit:</th></tr>
-<tr class="field-odd field"><td>&#160;</td><td class="field-body">occurrence limit</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param sev_name:</th><td class="field-body">severity name or sev.BUILTIN_SEV or meta.BUILTIN agg or port or similar or vector or matrix</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param sev_a:</th><td class="field-body">scipy stats shape parameter</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param sev_b:</th><td class="field-body">scipy stats shape parameter</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param sev_mean:</th><td class="field-body">average (unlimited) severity</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param sev_cv:</th><td class="field-body">unlimited severity coefficient of variation</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param sev_loc:</th><td class="field-body">scipy stats location parameter</td>
-</tr>
-<tr class="field-even field"><th class="field-name" colspan="2">param sev_scale:</th></tr>
-<tr class="field-even field"><td>&#160;</td><td class="field-body">scipy stats scale parameter</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param sev_xs:</th><td class="field-body">xs and ps must be provided if sev_name is (c|d)histogram</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param sev_ps:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param sev_wt:</th><td class="field-body">weight for mixed distribution</td>
-</tr>
-<tr class="field-even field"><th class="field-name" colspan="2">param freq_name:</th></tr>
-<tr class="field-even field"><td>&#160;</td><td class="field-body">name of frequency distribution</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param freq_a:</th><td class="field-body">cv of freq dist mixing distribution</td>
-</tr>
-<tr class="field-even field"><th class="field-name">param freq_b:</th><td class="field-body">claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)</td>
-</tr>
-</tbody>
-</table>
-</dd>
-</dl>
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.delbaen_haezendonck_density">
-<code class="descname">delbaen_haezendonck_density</code><span class="sig-paren">(</span><em>xs</em>, <em>padding</em>, <em>tilt_vector</em>, <em>beta</em>, <em>beta_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.delbaen_haezendonck_density"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.delbaen_haezendonck_density" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compare the base and Delbaen Haezendonck transformed aggregates</p>
-<ul class="simple">
-<li>beta(x) = alpha + gamma(x)</li>
-<li>alpha = log(freq’ / freq): log of the increase in claim count</li>
-<li>gamma = log(RND of adjusted severity) = log(tilde f / f)</li>
-</ul>
-<p>Adjustment guarantees a positive loading iff beta is an increasing function
-iff gamma is increasing iff tilde f / f is increasing.
-cf. eqn 3.7 and 3.8</p>
-<p>Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
-form of beta function described in 2.23 via, 2.16-17 and 2.18</p>
-<p>From examples on last page of paper:</p>
-<blockquote>
-<div>beta(x) = a ==&gt; adjust frequency by factor of e^a
-beta(x) = log(1 + b(x - E(X)))  ==&gt; variance principle EN(EX + bVar(X))
-beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</div></blockquote>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>xs</strong> – </li>
-<li><strong>padding</strong> – </li>
-<li><strong>tilt_vector</strong> – </li>
-<li><strong>beta</strong> – function R+ to R with appropriate properties or name of prob distortion function</li>
-<li><strong>beta_name</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.discretize">
-<code class="descname">discretize</code><span class="sig-paren">(</span><em>sev_calc</em>, <em>discretization_calc='survival'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.discretize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.discretize" title="Permalink to this definition">¶</a></dt>
-<dd><p>Continuous is used when you think of the resulting distribution as continuous across the buckets
-(which we generally don’t). We use the discretized distribution as though it is fully discrete
-and only takes values at the bucket points. Hence we should use sev_calc=’discrete’. The buckets are
-shifted left by half a bucket, so Pr(X=b_i) = Pr( b_i - b/2 &lt; X &lt;= b_i + b/2).</p>
-<p>The other wrinkle is the right hand end of the range. If we extend to np.inf then we ensure we have
-probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
-is often not desirable (we expect to see a smooth continuous distribution and we get a mass). The
-other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
-the probabilities short. We opt here for the latter and rescale</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>sev_calc</strong> – continuous or discrete or raw (for…)</li>
-<li><strong>discretization_calc</strong> – survival, distribution or both</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.easy_update">
-<code class="descname">easy_update</code><span class="sig-paren">(</span><em>log2=13</em>, <em>bs=0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.easy_update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.easy_update" title="Permalink to this definition">¶</a></dt>
-<dd><p>Convenience function, delegates to update. Avoids having to pass xs.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>log2</strong> – </li>
-<li><strong>bs</strong> – </li>
-<li><strong>reporting_level</strong> – </li>
-<li><strong>kwargs</strong> – passed through to update</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.emp_stats">
-<code class="descname">emp_stats</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.emp_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.emp_stats" title="Permalink to this definition">¶</a></dt>
-<dd><p>report_ser on empirical statistics_df - useful when investigating dh transformations.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>kind='quick'</em>, <em>axiter=None</em>, <em>aspect=1</em>, <em>figsize=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.plot" title="Permalink to this definition">¶</a></dt>
-<dd><blockquote>
-<div><p>plot fz: computed density and aggregate_project</p>
-<p>kind</p>
-<ul class="simple">
-<li><dl class="first docutils">
-<dt>long: severity, log sev density, sev dist, agg with sev,</dt>
-<dd>agg on own, agg on log, S, Lee, return period</dd>
-</dl>
-</li>
-<li>quick (default): Density for sev and agg on nominal and log scale; Lee diagram sev and agg</li>
-</ul>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param kind:</th><td class="field-body"></td>
-</tr>
-<tr class="field-even field"><th class="field-name">param aspect:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name">param axiter:</th><td class="field-body"></td>
-</tr>
-<tr class="field-even field"><th class="field-name">param figsize:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</div></blockquote>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.q">
-<code class="descname">q</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.q"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.q" title="Permalink to this definition">¶</a></dt>
-<dd><p>return a quantile using nearest matching, ensures returned value is in the index
-of the aggregate distribution</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>p</strong> – percentile in range 0 to 1</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.quantile_function">
-<code class="descname">quantile_function</code><span class="sig-paren">(</span><em>kind='nearest'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.quantile_function"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.quantile_function" title="Permalink to this definition">¶</a></dt>
-<dd><p>return an approximation to the quantile function</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kind</strong> – <code class="docutils literal"><span class="pre">`interpolate.interp1d`</span></code> kind variable</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.recommend_bucket">
-<code class="descname">recommend_bucket</code><span class="sig-paren">(</span><em>log2=10</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.recommend_bucket"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.recommend_bucket" title="Permalink to this definition">¶</a></dt>
-<dd><p>recommend a bucket size given 2**N buckets</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>log2</strong> – log2 of number of buckets. log2=10 is default.</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.report">
-<code class="descname">report</code><span class="sig-paren">(</span><em>report_list='quick'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.report"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.report" title="Permalink to this definition">¶</a></dt>
-<dd><p>statistics, quick or audit reports</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>report_list</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Aggregate.update">
-<code class="descname">update</code><span class="sig-paren">(</span><em>xs</em>, <em>padding=1</em>, <em>tilt_vector=None</em>, <em>approximation='exact'</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>force_severity=False</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.update" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compute the density</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>xs</strong> – range of x values used to discretize</li>
-<li><strong>padding</strong> – for FFT calculation</li>
-<li><strong>tilt_vector</strong> – </li>
-<li><strong>approximation</strong> – exact = perform frequency / severity convolution using FFTs. slognorm or
-sgamma apply shifted lognormal or shifted gamma approximations.</li>
-<li><strong>sev_calc</strong> – discrete = suitable for fft, continuous = for rv_histogram cts version</li>
-<li><strong>discretization_calc</strong> – use survival, distribution or both (=max(cdf, sf)) which is most accurate calc</li>
-<li><strong>force_severity</strong> – make severities even if using approximation, for plotting</li>
-<li><strong>verbose</strong> – make partial plots and return details of all moments by limit profile or
-severity mixture component.</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="aggregate.distr.Frequency">
-<em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Frequency</code><span class="sig-paren">(</span><em>freq_name</em>, <em>freq_a</em>, <em>freq_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Frequency"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Frequency" title="Permalink to this definition">¶</a></dt>
-<dd><p>Manages Frequency distributions: creates moment function and MGF.</p>
-<p>freq_moms(n): returns EN^2 and EN^3 when EN=n</p>
-<p>mgf(n, z): returns the moment generating function applied to z when EN=n</p>
-<p><strong>Non-Mixture</strong> Types</p>
-<ul class="simple">
-<li><code class="docutils literal"><span class="pre">fixed</span></code>: no parameters</li>
-<li><code class="docutils literal"><span class="pre">bernoulli</span></code>: exp_en interpreted as a probability, must be &lt; 1</li>
-<li><code class="docutils literal"><span class="pre">binomial</span></code>: Binomial(n, p) where p = freq_a, and n = exp_en</li>
-<li><code class="docutils literal"><span class="pre">poisson</span></code>: Poisson(freq_a)</li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">pascal</span></code> [poisson]: a poisson stopped sum of negative binomial; exp_en gives the overall</dt>
-<dd>claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
-number of claimants per claim (or claims per occurrence). Hence the Poisson component
-has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
-cv freq_a</dd>
-</dl>
-</li>
-</ul>
-<p><strong>Mixture</strong> Types</p>
-<p>These distributions are G-mixed Poisson, so N | G ~ Poisson(n G). They are labelled by
-the name of the mixing distribution or the common name for the resulting frequency
-distribution. See Panjer and Willmot or JKK.</p>
-<p>In all cases freq_a is the CV of the mixing distribution which corresponds to the
-asympototic CV of the frequency distribution.</p>
-<ul class="simple">
-<li><code class="docutils literal"><span class="pre">gamma</span></code>: negative binomial, freq_a = cv of gamma distribution</li>
-<li><code class="docutils literal"><span class="pre">delaporte</span></code>: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
-certain claims = shift. freq_b must be between 0 and 1.</li>
-<li><code class="docutils literal"><span class="pre">ig</span></code>: inverse gaussian, freq_a = cv of mixing distribution</li>
-<li><code class="docutils literal"><span class="pre">sig</span></code>: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
-certain claims = shift. freq_b must be between 0 and 1.</li>
-<li><code class="docutils literal"><span class="pre">sichel</span></code>: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
-freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
--0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
-cases are available.</li>
-<li><code class="docutils literal"><span class="pre">sichel.nb</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a
-delaporte distribution with given freq_a and freq_b</li>
-<li><code class="docutils literal"><span class="pre">sichel.ig</span></code>: generalized inverse gaussian mixture where the parameters match the moments of a
-shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
-has poor numerical stability and may fail.</li>
-<li><code class="docutils literal"><span class="pre">beta</span></code>: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
-method should be used carefully. It has poor numerical stability and can produce bizzare
-aggregates when the alpha or beta parameters are &lt; 1 (so there is a mode at 0 or freq_b).</li>
-</ul>
-</dd></dl>
-
-<dl class="class">
-<dt id="aggregate.distr.Severity">
-<em class="property">class </em><code class="descclassname">aggregate.distr.</code><code class="descname">Severity</code><span class="sig-paren">(</span><em>sev_name</em>, <em>exp_attachment=0</em>, <em>exp_limit=inf</em>, <em>sev_mean=0</em>, <em>sev_cv=0</em>, <em>sev_a=0</em>, <em>sev_b=0</em>, <em>sev_loc=0</em>, <em>sev_scale=0</em>, <em>sev_xs=None</em>, <em>sev_ps=None</em>, <em>conditional=True</em>, <em>name=''</em>, <em>note=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity" title="Permalink to this definition">¶</a></dt>
-<dd><p>A continuous random variable, subclasses <code class="docutils literal"><span class="pre">scipy.statistics_df.rv_continuous</span></code>.</p>
-<p>adds layer and attachment to scipy statistics_df continuous random variable class
-overrides</p>
-<ul class="simple">
-<li>cdf</li>
-<li>pdf</li>
-<li>isf</li>
-<li>ppf</li>
-<li>moments</li>
-</ul>
-<p>Should consider over-riding: sf, <strong>statistics_df</strong> ?munp</p>
-<p>TODO issues remain using numerical integration to compute moments for distributions having
-infinite support and a low standard deviation. See logging for more information in particular
-cases.</p>
-<dl class="method">
-<dt id="aggregate.distr.Severity.cv_to_shape">
-<code class="descname">cv_to_shape</code><span class="sig-paren">(</span><em>cv</em>, <em>hint=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.cv_to_shape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.cv_to_shape" title="Permalink to this definition">¶</a></dt>
-<dd><p>create a frozen object of type dist_name with given cv</p>
-<p>lognormal, gamma, inverse gamma and inverse gaussian solved analytically.</p>
-<p>Other distributions solved numerically and may be unstable.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>cv</strong> – </li>
-<li><strong>hint</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Severity.mean_to_scale">
-<code class="descname">mean_to_scale</code><span class="sig-paren">(</span><em>shape</em>, <em>mean</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.mean_to_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.mean_to_scale" title="Permalink to this definition">¶</a></dt>
-<dd><p>adjust scale of fz to have desired mean
-return frozen instance</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>shape</strong> – </li>
-<li><strong>mean</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Severity.moms">
-<code class="descname">moms</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.moms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.moms" title="Permalink to this definition">¶</a></dt>
-<dd><p>moms method
-remember have to use integral of survival function otherwise quad can fail to “see” the distribution
-for unlimited integral of a low sd variable</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.distr.Severity.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>N=100</em>, <em>axiter=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Severity.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Severity.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>quick plot</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>axiter</strong> – </li>
-<li><strong>N</strong> – </li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-</dd></dl>
-
+<div class="section" id="aggregate-frequency-and-severity-classes">
+<h2>Aggregate, Frequency and Severity Classes<a class="headerlink" href="#aggregate-frequency-and-severity-classes" title="Permalink to this headline">¶</a></h2>
 </div>
 </div>
 
 
           </div>
         </div>
-      </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+          </div>
+      <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
-<p class="logo">
-  <a href="index.html">
-    <img class="logo" src="_static/logo.PNG" alt="Logo"/>
-    
-    <h1 class="logo logo-name">aggregate</h1>
-    
-  </a>
-</p>
-
-
-
-<p class="blurb">aggregate is a Python package providing fast, accurate, and expressive datastructures designed to make working with probability distributions easy and intuitive.</p>
-
-
-
-
-<p>
-<iframe src="https://ghbtns.com/github-btn.html?user=mynl&repo=aggregate&type=watch&count=true&size=large&v=2"
-  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
-</p>
-
-
-
-
-
-<h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction to aggregate</a></li>
-<li class="toctree-l1"><a class="reference internal" href="histapp.html">History and Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
-<li class="toctree-l1"><a class="reference internal" href="prob.html">Probability and Risk Theory</a></li>
-<li class="toctree-l1"><a class="reference internal" href="freq_dist.html">Frequency Distributions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="devel.html">Development Outline</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Distribution Classes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="distortion.html">Distortion Class</a></li>
-<li class="toctree-l1"><a class="reference internal" href="underwriter.html">Underwriter Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="parser.html">Parser Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities</a></li>
-<li class="toctree-l1"><a class="reference internal" href="parameters.html">Parameters Module</a></li>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Distribution Classes</a><ul>
+<li><a class="reference internal" href="#aggregate-frequency-and-severity-classes">Aggregate, Frequency and Severity Classes</a></li>
+</ul>
+</li>
 </ul>
 
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="devel.html"
+                        title="previous chapter">Development Outline</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="portfolio.html"
+                        title="next chapter">Portfolio Class</a></p>
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/aggregate.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/aggregate.rst.rst">Edit page</a>
+</div>
 
         </div>
       </div>
-      <div class="clearer"></div>
+        </div>
+      </div>
     </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
     <div class="footer">
-      &copy;2018, Stephen J. Mildenhall.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
-      
-      |
-      <a href="_sources/aggregate.rst.txt"
-          rel="nofollow">Page source</a>
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018, Stephen J. Mildenhall.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      </li>
+    </ul>
     </div>
-
-    
-
-    
+    </div>
+    </div>
   </body>
 </html>

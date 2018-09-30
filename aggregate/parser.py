@@ -268,7 +268,7 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
     FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9_]*'
+    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
@@ -397,6 +397,9 @@ class UnderwritingParser(Parser):
     @_('agg_name builtin_aggregate note')
     def agg_out(self, p):
         self.log(f'ADDING agg_name builtin_aggregate note {p.builtin_aggregate} to agg_out')
+        if 'name' in p.builtin_aggregate:
+            # otherwise will overwrite the agg name
+            del p.builtin_aggregate['name']
         self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.builtin_aggregate, 'note': p.note}
         return p.agg_name
 
@@ -552,6 +555,15 @@ class UnderwritingParser(Parser):
         self.log('missing weights term')
         return 1
 
+    @_('builtinids numbers numbers')
+    def sev(self, p):
+        self.log(f'builtinds {p.builtinids} numbers numbers log2={p[1]}, bs={p[2]} to sev')
+        requested_type = p.builtinids.split('.')[0]
+        if requested_type == "meta":
+            return {'sev_name': p.builtinids, 'sev_a': p[1], 'sev_b': p[2]}
+        else:
+            raise ValueError(f'Only meta type can be used with arguments, not {p.builtinids}')
+
     @_('builtinids')
     def sev(self, p):
         self.log(f'builtinds {p.builtinids} to sev')
@@ -562,11 +574,10 @@ class UnderwritingParser(Parser):
         requested_type = p.builtinids.split('.')[0]
         if requested_type not in ("sev", "meta"):
             raise ValueError(f'built in type must be sev or meta, not {p.builtinids}')
-        return self._safe_lookup(p.builtinids)
-        # return self._safe_lookup(n, 'severity') for n in p.builtinids]
-        # for n in p.builtinids:
-        #     built_in_dict = self._safe_lookup(n, 'severity')
-        #     self.arg_dict.update(built_in_dict)
+        if requested_type == 'meta':
+            return {'sev_name': p.builtinids}
+        else:
+            return self._safe_lookup(p.builtinids)
 
     # layer terms, optoinal ===================================
     @_('numbers XS numbers')

@@ -9,10 +9,10 @@ __email__ = "mildenhs@stjohns.edu"
 __status__ = "alpha"
 
 # imports
-from .distr import *
-from .underwriter import *
 from .param import *
+from .underwriter import *
 from .port import *
+from .distr import *
 from .spectral import *
 from .utils import *
 from .parser import *

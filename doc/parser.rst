@@ -2,11 +2,14 @@
 Parser Module
 =============
 
-.. autoclass:: aggregate.UnderwritingLexer
+.. automodule:: aggregate.parser
+	:exclude-members: UnderwritingLexer, UnderwritingParser
+
+.. autoclass:: aggregate.parser.UnderwritingLexer
 	:members:
 	:undoc-members:
 
-.. autoclass:: aggregate.UnderwritingParser
+.. autoclass:: aggregate.parser.UnderwritingParser
 	:members:
 	:undoc-members:
 

@@ -1,6 +1,6 @@
 # Frequency Distributions
 
-A random variable $N$ is **$G$-mixed Poisson** if $N\mid G$ has a Poisson $nG$
+A random variable $N$ is $G$-mixed Poisson if $N\mid G$ has a Poisson $nG$
 distribution for some fixed non-negative $n$ and a non-negative mixing distribution
 $G$ with $\text{E}(G)=1$. Let $\text{Var}(G)=c$ (Glenn Meyers calls $c$ the contagion) and let $\text{E}(G^3)=g$.
 
@@ -9,24 +9,28 @@ $$\label{mgfi}
 M_N(\zeta)=\text{E}(e^{\zeta N})=\text{E}(\text{E}(e^{\zeta N} \mid G))=\text{E}(e^{n
   G(e^\zeta-1)})=M_G(n(e^\zeta-1))
 $$
+
 since $M_G(\zeta):=\text{E}(e^{\zeta G})$ and the MGF of a Poisson with mean $n$ is $\exp(n(e^\zeta-1))$.
 Thus
 $$
 \text{E}(N)=M_N'(0)=n M_G'(0)=n,
 $$
+
 because $\text{E}(G)=M_G'(0)=1$. Similarly
 $$
 \text{E}(N^2)=M_N''(0)=n^2M_G''(0)+n M_G'(0)=n^2(1+c)+n
 $$
+
 and so
 $$
 \text{Var}(N)=n(1+cn).
 $$
+
 Finally
-\begin{align*}
-\text{E}(N^3) &= M_N'''(0) =n^3M_G'''(0)+3n^2M_G''(0)+n M_G'(0) \\
-&= gn^3 + 3n^2(1+c) + n
-\end{align*}
+$$
+\text{E}(N^3) = M_N'''(0) =n^3M_G'''(0)+3n^2M_G''(0)+n M_G'(0) = gn^3 + 3n^2(1+c) + n
+$$
+
 and therefore the central moment
 $$
 \text{E}(N-\text{E}(N))^3 = n^3(g -3c -1) + 3cn^2 + n.
@@ -76,7 +80,7 @@ We can adjust the skewness of mixing with shifting. In addition to a target CV $
 
 As $f$ increases from 0 to 1 the skewness of $G$ will increase. Delaporte first introduced this idea.
 
-Since $skew(G)=skew(G')$ we have $g=\E(G^3)=\nu^3 skew(G')+3c+1$.
+Since $\text{skew}(G)=\text{skew}(G')$ we have $g=\text{E}(G^3)=\nu^3 \text{skew}(G')+3c+1$.
 
 ## Delaporte Mixing (Shifted Gamma)
 

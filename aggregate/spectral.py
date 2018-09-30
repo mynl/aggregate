@@ -5,6 +5,10 @@ Distortion functions to implement spectral risk measures
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
+from scipy.interpolate import interp1d
+from scipy.spatial import ConvexHull
+from io import StringIO
+import pandas as pd
 from . utils import axiter_factory, suptitle_and_tight
 
 
@@ -15,9 +19,9 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'lep', 'ly', 'clin', 'tvar')
+    _available_distortions_ = ('ph', 'wang', 'lep', 'ly', 'clin', 'tvar', 'convex')
     _long_names_ = ("Proportional Hazard", "Wang-normal", "Layer Equivalent Pricing", "Linear Yield", "Capped Linear",
-                    "Tail VaR")
+                    "Tail VaR", "Convex Envelope")
     _eg_param_1_ = (.9, 1, 0.25, 0.9, 1.1, 0.75)
     _eg_param_2_ = (.5, 2, 0.35, 1.5, 1.8, 0.95)
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
@@ -32,19 +36,21 @@ class Distortion(object):
         """
 
         if pricing:
-            return cls._available_distortions_[:-1]
+            return cls._available_distortions_[:-2]
         else:
             return cls._available_distortions_
 
-    def __init__(self, name, shape, r0=0.0):
+    def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y=''):
         """
         create new distortion
-        create from  g_spec = {name, shape} ising **g_spec!
 
-        :param name: ph wang lep ly clin
+        :param name: name of an available distortion, call ``Distortion.available_distortions()`` for a list
         :param shape: float or [float, float]
-
-
+        :param shape: shape parameter
+        :param r0: risk free or rental rate of interest
+        :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize
+        :param col_x:
+        :param col_y:
         """
         self.name = name
         self.shape = shape
@@ -146,6 +152,14 @@ class Distortion(object):
                 u = (mb - rad) / (2 * a)
                 return np.where(x < d, 0, np.maximum(0, u))
 
+        elif self.name == 'convex':
+            self.has_mass = False
+            hull = ConvexHull(df[[col_x, col_y]])
+            knots = list(set(hull.simplices.flatten()))
+            g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
+                         df.iloc[knots, df.columns.get_loc(col_y)], kind='linear')
+            g_inv = interp1d(df.iloc[knots, df.columns.get_loc(col_y)],
+                         df.iloc[knots, df.columns.get_loc(col_x)], kind='linear')
         else:
             raise ValueError(
                 "Incorrect spec passed to distortion_factory; implemented g types are ph, wang, tvar, "
@@ -160,7 +174,10 @@ class Distortion(object):
 
         :return:
         """
-        s = f'{self._distortion_names_[self.name]}\n{self.shape:.3f}'
+        if isinstance(self.shape, str):
+            s = f'{self._distortion_names_[self.name]}\n{self.shape}'
+        else:
+            s = f'{self._distortion_names_[self.name]}\n{self.shape:.3f}'
         if self.has_mass:
             s += f', {self.r0:.3f}'
         # else:
@@ -223,6 +240,12 @@ class Distortion(object):
             dist = Distortion(name, shape, r0)
             dist.plot(xs, ax=next(axiter))
 
+        dist = Distortion.convex_example('yield')
+        dist.plot(xs, ax=next(axiter))
+
+        dist = Distortion.convex_example('cat')
+        dist.plot(xs, ax=next(axiter))
+
         axiter.tidy()
         suptitle_and_tight('Example Distortion Functions')
 
@@ -254,3 +277,47 @@ class Distortion(object):
             plt.tight_layout()
 
         return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]
+
+    @staticmethod
+    def convex_example(source='yield'):
+        """
+        example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf
+
+        :param source: yield gives yield curve example, cat gives cat bond / cat reinsurance pricing based example
+        :return:
+        """
+
+        if source == 'yield':
+            yield_curve = '''
+            AAAA    0.000000  0.000000
+            AAA     0.000018  0.006386
+            AA      0.000144  0.007122
+            A       0.000278  0.010291
+            BBB     0.002012  0.017089
+            BB      0.012674  0.036455
+            B       0.040052  0.069181
+            Z       1.000000  1.000000'''
+
+            df = pd.read_fwf(StringIO(yield_curve))
+            df.columns = ['Rating', 'EL', 'Yield']
+            return Distortion('convex', 'Yield Curve', df=df, col_x='EL', col_y='Yield')
+
+        elif source.lower() == 'cat':
+            cat_bond = '''EL,ROL
+            0.116196,0.32613
+            0.088113,0.2452
+            0.074811,0.22769
+            0.056385,0.17131
+            0.046923,0.15326
+            0.032961,0.12222
+            0.02807,0.11037
+            0.024205,0.1022
+            0.011564,0.07284
+            0.005813,0.06004
+            0,0
+            1,1'''
+            df = pd.read_csv(StringIO(cat_bond))
+            return Distortion('convex', 'Cat Bond', df=df, col_x='EL', col_y='ROL')
+
+        else:
+            raise ValueError(f'Inadmissible value {source} passed to convex_example, expected yield or cat')

@@ -216,21 +216,22 @@ def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
 
 class AxisManager(object):
     """
+    Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to
+    plot to same set of axes.
+
+    Always created and managed through axiter_factory function
+
+    :param n:       number of plots in grid
+    :param figsize:
+    :param height:  height of individual plot
+    :param aspect:  aspect ratio of individual plot
+    :param nr:      number of plots per row
 
 
     """
     __slots__ = ['n', 'nr', 'r', 'ax', 'axs', 'c', 'f', 'faxs', 'it']
 
     def __init__(self, n, figsize=None, height=2, aspect=1, nr=5):
-        """
-
-        :param n:
-        :param figsize:
-        :param height:
-        :param aspect:
-        :param nr: number of plots per row
-        """
-
         self.n = n
         self.nr = nr
         self.r, self.c = self.grid_size(n)
@@ -446,6 +447,8 @@ class MomentAggregator(object):
     makes report_ser df and statistics_df
 
     Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
+
+    :param freq_moms: function of one variable returning first three noncentral moments of the underlying frequency distribution
 
     """
     __slots__ = ['freq_1', 'freq_2', 'freq_3', 'sev_1', 'sev_2', 'sev_3', 'agg_1', 'agg_2', 'agg_3',

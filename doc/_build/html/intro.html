@@ -3,14 +3,14 @@
 <html>
   <head>
     <meta charset="utf-8">
-    
+
     <title>Introduction to aggregate &mdash; aggregate 0.6.1 documentation</title>
-    
+
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
     <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
-    
+
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
@@ -29,7 +29,7 @@
     <link rel="search" title="Search" href="search.html" >
     <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
     <link rel="next" title="History and Applications" href="histapp.html" >
-    <link rel="prev" title="aggregate: Working with Probability Distributions" href="index.html" > 
+    <link rel="prev" title="aggregate: Working with Probability Distributions" href="index.html" >
   </head>
   <body>
 
@@ -44,20 +44,19 @@
 
     <div class="container">
       <div class="main">
-        
+
 	<div class="row-fluid">
 	  <div class="span12">
 	    <div class="spc-navbar">
-              
+
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
-	
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
+
         <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
-	 
+
     </ul>
-              
-              
+
+
     <ul class="nav nav-pills pull-right">
       <li class="active">
         <a href="genindex.html" title="General Index"
@@ -76,23 +75,20 @@
            accesskey="P">previous</a>
       </li>
     </ul>
-              
+
 	    </div>
 	  </div>
 	</div>
-        
+
 
 	<div class="row-fluid">
           <div class="span9">
-            
+
         <div class="bodywrapper">
           <div class="body" id="spc-section-body">
-            
+
   <div class="section" id="introduction-to-aggregate">
 <h1>Introduction to aggregate<a class="headerlink" href="#introduction-to-aggregate" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="contents">
-<h2>Contents<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h2>
-</div>
 <div class="section" id="what-is-aggregate">
 <h2>What is aggregate?<a class="headerlink" href="#what-is-aggregate" title="Permalink to this headline">¶</a></h2>
 <p><strong>aggregate</strong> is a Python package providing fast, accurate, and expressive data
@@ -103,11 +99,9 @@ insurance, risk management, actuarial science and related areas.</p>
 </div>
 <div class="section" id="main-features">
 <h2>Main Features<a class="headerlink" href="#main-features" title="Permalink to this headline">¶</a></h2>
-<p>Here are just a few of the things that <code class="docutils literal"><span class="pre">aggregate</span></code> does well:</p>
-<blockquote>
-<div><ul class="simple">
-<li>Output in tabular form using Pandas</li>
-<li>Human readable persistence in YAML</li>
+<p>Here are a few of the things that <code class="docutils literal"><span class="pre">aggregate</span></code> does well:</p>
+<ul class="simple">
+<li>Human readable input with the simple <code class="docutils literal"><span class="pre">agg</span></code> language</li>
 <li>Built in library of insurance severity curves for both catastrophe and non
 catastrophe lines</li>
 <li>Built in parameterization for most major lines of insurance in the US, making it
@@ -117,13 +111,29 @@ easy to build a “toy company” based on market share by line</li>
 tools based on simulation</li>
 <li>Fast, accurate - no simulations!</li>
 <li>Graphics and summaries following Pandas and Matplotlib syntax</li>
+<li>Outputs in easy-to-manipulate Pandas dataframes</li>
 </ul>
-</div></blockquote>
+<p>For example, to specify an aggregate distribution based on 50 claims from a lognormal
+distribution with a CV of 2.0, a mean of 1000 and a Poisson frequency distribution
+and plot the resulting severity and aggregate distributions enter:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">aggregate</span> <span class="k">as</span> <span class="nn">agg</span>
+<span class="n">uw</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">Underwriter</span><span class="p">()</span>
+<span class="n">port</span> <span class="o">=</span> <span class="n">uw</span><span class="p">(</span><span class="s1">&#39;agg MyAgg 50 claims sev lognorm 1000 cv 2&#39;</span><span class="p">)</span>
+<span class="n">port</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>MyAgg is a label for the aggregate.</p>
+<p>To create a more complex portfolio with catastrophe and non catastrophe losses:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">port</span> <span class="o">=</span> <span class="n">uw</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;port MyPortfolio</span>
+<span class="s1">  agg nonCat 10 claims 100 x 0 sev lognorm 1000 cv 2 mixed gamma 0.4</span>
+<span class="s1">  agg cat     2 claims 1000 x 0 sev 1000 * pareto 1.8 - 1000 poisson</span>
+<span class="s1">&#39;&#39;&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="potential-applications">
 <h2>Potential Applications<a class="headerlink" href="#potential-applications" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><ul class="simple">
+<ul class="simple">
 <li><dl class="first docutils">
 <dt>Education</dt>
 <dd><ul class="first last">
@@ -157,7 +167,6 @@ dependence structures, or in situations where it is necessary to
 track individual events, e.g. to compute gross, ceded and net bi-
 and trivariate distributions.</li>
 </ul>
-</div></blockquote>
 </div>
 <div class="section" id="practical-modeling-examples">
 <h2>Practical Modeling Examples<a class="headerlink" href="#practical-modeling-examples" title="Permalink to this headline">¶</a></h2>
@@ -171,15 +180,13 @@ and trivariate distributions.</li>
 <div class="section" id="missing-features">
 <h2>Missing Features<a class="headerlink" href="#missing-features" title="Permalink to this headline">¶</a></h2>
 <p>Here are some important things that <code class="docutils literal"><span class="pre">aggregate</span></code> does <strong>not</strong> do:</p>
-<blockquote>
-<div><ul class="simple">
+<ul class="simple">
 <li>It is strictly univariate. It is impossible to model bivariate or multivariate distributions.
 As a result <code class="docutils literal"><span class="pre">aggregate</span></code> is fast and accurate</li>
 <li><code class="docutils literal"><span class="pre">aggregate</span></code> can model correlation between variables using shared mixing variables. This
 is adequate to build realistic distributions but would not be adequate for an industrial-
 strength insurance company model.</li>
 </ul>
-</div></blockquote>
 </div>
 <div class="section" id="documentation">
 <h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
@@ -190,13 +197,16 @@ strength insurance company model.</li>
 <ul class="simple">
 <li>The source code is currently hosted on GitHub at:</li>
 <li><a class="reference external" href="https://github.com/mynl/aggregate">https://github.com/mynl/aggregate</a></li>
+<li>Install from PyPI <code class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">aggregate</span></code>, see <a class="reference external" href="https://pypi.org/project/aggregate/">https://pypi.org/project/aggregate/</a></li>
 </ul>
 </div>
 <div class="section" id="dependencies">
 <h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
+<p>The usual suspects: numpy, pandas, matplotlib, seaborn, ipython, scipy)</p>
+<p>Python 3.5 or higher…much use is made of f-strings.</p>
+<p>Plus</p>
 <ul class="simple">
-<li>[NumPy](<a class="reference external" href="https://www.numpy.org">https://www.numpy.org</a>): 1.9.0 or higher</li>
-<li>[Pandas](<a class="reference external" href="https://github.com/pandas-dev/pandas">https://github.com/pandas-dev/pandas</a>): 0.23.0 or higher</li>
+<li>sly - a fantastic lex/yacc for Python, <a class="reference external" href="https://github.com/dabeaz/sly">https://github.com/dabeaz/sly</a></li>
 </ul>
 </div>
 <div class="section" id="license">
@@ -214,7 +224,6 @@ strength insurance company model.</li>
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Introduction to aggregate</a><ul>
-<li><a class="reference internal" href="#contents">Contents</a></li>
 <li><a class="reference internal" href="#what-is-aggregate">What is aggregate?</a></li>
 <li><a class="reference internal" href="#main-features">Main Features</a></li>
 <li><a class="reference internal" href="#potential-applications">Potential Applications</a></li>
@@ -251,7 +260,7 @@ strength insurance company model.</li>
 
     <div class="container container-navbar-bottom">
       <div class="spc-navbar">
-        
+
       </div>
     </div>
     <div class="container">

@@ -50,8 +50,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
 	 
@@ -95,7 +94,25 @@
 <dl class="class">
 <dt id="aggregate.utils.AxisManager">
 <em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">AxisManager</code><span class="sig-paren">(</span><em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="method">
+<dd><p>Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to
+plot to same set of axes.</p>
+<p>Always created and managed through axiter_factory function</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>n</strong> – number of plots in grid</li>
+<li><strong>figsize</strong> – </li>
+<li><strong>height</strong> – height of individual plot</li>
+<li><strong>aspect</strong> – aspect ratio of individual plot</li>
+<li><strong>nr</strong> – number of plots per row</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
 <dt id="aggregate.utils.AxisManager.dimensions">
 <code class="descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
 <dd><p>return dimensions (width and height) of current layout</p>
@@ -174,6 +191,14 @@ Used by Portfolio
 Not frequency aware
 makes report_ser df and statistics_df</p>
 <p>Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>freq_moms</strong> – function of one variable returning first three noncentral moments of the underlying frequency distribution</td>
+</tr>
+</tbody>
+</table>
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.add_f1s">
 <code class="descname">add_f1s</code><span class="sig-paren">(</span><em>f1</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_f1s"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_f1s" title="Permalink to this definition">¶</a></dt>

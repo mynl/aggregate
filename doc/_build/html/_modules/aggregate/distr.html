@@ -49,8 +49,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
 	
@@ -104,13 +103,11 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Manages Frequency distributions: creates moment function and MGF.</span>
 
-<span class="sd">    freq_moms(n): returns EN^2 and EN^3 when EN=n</span>
+<span class="sd">    freq_moms(n): returns EN, EN^2 and EN^3 when EN=n</span>
 
 <span class="sd">    mgf(n, z): returns the moment generating function applied to z when EN=n</span>
 
-<span class="sd">    =================================</span>
-<span class="sd">    Available Frequency Distributions</span>
-<span class="sd">    =================================</span>
+<span class="sd">    **Available Frequency Distributions**</span>
 
 <span class="sd">    **Non-Mixture** Types</span>
 
@@ -118,11 +115,11 @@
 <span class="sd">    * ``bernoulli``: exp_en interpreted as a probability, must be &lt; 1</span>
 <span class="sd">    * ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en</span>
 <span class="sd">    * ``poisson``: Poisson(freq_a)</span>
-<span class="sd">    * ``pascal`` [poisson]: a poisson stopped sum of negative binomial; exp_en gives the overall</span>
-<span class="sd">        claim count. freq_a is the CV of the negative binomial distribution and freq_b is the</span>
-<span class="sd">        number of claimants per claim (or claims per occurrence). Hence the Poisson component</span>
-<span class="sd">        has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and</span>
-<span class="sd">        cv freq_a</span>
+<span class="sd">    * ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall</span>
+<span class="sd">      claim count. freq_a is the CV of the negative binomial distribution and freq_b is the</span>
+<span class="sd">      number of claimants per claim (or claims per occurrence). Hence the Poisson component</span>
+<span class="sd">      has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and</span>
+<span class="sd">      cv freq_a</span>
 
 <span class="sd">    **Mixture** Types</span>
 
@@ -131,7 +128,7 @@
 <span class="sd">    distribution. See Panjer and Willmot or JKK.</span>
 
 <span class="sd">    In all cases freq_a is the CV of the mixing distribution which corresponds to the</span>
-<span class="sd">    asympototic CV of the frequency distribution.</span>
+<span class="sd">    asympototic CV of the frequency distribution and of any aggregate when the severity has a variance.</span>
 
 <span class="sd">    * ``gamma``: negative binomial, freq_a = cv of gamma distribution</span>
 <span class="sd">    * ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of</span>
@@ -151,6 +148,11 @@
 <span class="sd">    * ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This</span>
 <span class="sd">      method should be used carefully. It has poor numerical stability and can produce bizzare</span>
 <span class="sd">      aggregates when the alpha or beta parameters are &lt; 1 (so there is a mode at 0 or freq_b).</span>
+
+<span class="sd">    :param freq_name:</span>
+<span class="sd">    :param freq_a:</span>
+<span class="sd">    :param freq_b:</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;freq_moms&#39;</span><span class="p">,</span> <span class="s1">&#39;mgf&#39;</span><span class="p">,</span> <span class="s1">&#39;freq_name&#39;</span><span class="p">,</span> <span class="s1">&#39;freq_a&#39;</span><span class="p">,</span> <span class="s1">&#39;freq_b&#39;</span><span class="p">]</span>
@@ -159,9 +161,6 @@
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        creates the mgf and moment function</span>
 
-<span class="sd">        :param freq_name:</span>
-<span class="sd">        :param freq_a:</span>
-<span class="sd">        :param freq_b:</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">freq_name</span> <span class="o">=</span> <span class="n">freq_name</span>
@@ -462,11 +461,11 @@
 <span class="sd">        a mixing distribution across all broadcast terms to ensure an appropriate inter-</span>
 <span class="sd">        class correlation.</span>
 
-<span class="sd">        Limit Profiles</span>
-<span class="sd">        --------------</span>
-
+<span class="sd">    Limit Profiles</span>
 <span class="sd">        The exposure variables can be vectors to express a *limit profile*.</span>
 <span class="sd">        All exp_ elements are broadcast against one-another. For example</span>
+
+<span class="sd">        ::</span>
 
 <span class="sd">        [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000</span>
 
@@ -474,55 +473,61 @@
 <span class="sd">        400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are</span>
 <span class="sd">        the same, but they could vary too, as could the attachments.</span>
 
-<span class="sd">        Mixtures</span>
-<span class="sd">        --------</span>
-
-<span class="sd">        The severity variables can be vectors to express a *mixed severity*. All sev_</span>
+<span class="sd">    Mixtures</span>
+<span class="sd">        The severity variables can be vectors to express a *mixed severity*. All ``sev_``</span>
 <span class="sd">        elements are broadcast against one-another. For example</span>
 
-<span class="sd">        sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]</span>
+<span class="sd">        ::</span>
+
+<span class="sd">            sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]</span>
 
 <span class="sd">        expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with</span>
 <span class="sd">        weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the</span>
 <span class="sd">        relevant number of components.</span>
 
-<span class="sd">        Limit Profiles and Mixtures</span>
-<span class="sd">        ---------------------------</span>
-
+<span class="sd">    Limit Profiles and Mixtures</span>
 <span class="sd">        Limit profiles and mixtures can be combined. Each mixed severity is applied to each</span>
 <span class="sd">        limit profile component. For example</span>
 
-<span class="sd">        ag = uw(&#39;agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75] &#39;</span>
-<span class="sd">                &#39;sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4&#39;)</span>
+<span class="sd">        ::</span>
+
+<span class="sd">            ag = uw(&#39;agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]</span>
+<span class="sd">                sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4&#39;)```</span>
 
 <span class="sd">        creates an aggregate with six severity subcomponents</span>
 
-<span class="sd">                #  limit	attachment    claims</span>
-<span class="sd">                0	100	         0			 6</span>
-<span class="sd">                1	100	         0			 4</span>
-<span class="sd">                2	200	        50			12</span>
-<span class="sd">                3	200	        50			 8</span>
-<span class="sd">                4	 75	        75			18</span>
-<span class="sd">                5	 75	        75			12</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | # | limit | attachment | claims |</span>
+<span class="sd">        +===+=======+============+========+</span>
+<span class="sd">        | 0 | 100   |  0         |  6     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | 1 | 100   |  0         |  4     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | 2 | 200   | 50         | 12     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | 3 | 200   | 50         |  8     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | 4 |  75   | 75         | 18     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
+<span class="sd">        | 5 |  75   | 75         | 12     |</span>
+<span class="sd">        +---+-------+------------+--------+</span>
 
-<span class="sd">        Circumventing Products</span>
-<span class="sd">        ----------------------</span>
-
+<span class="sd">    Circumventing Products</span>
 <span class="sd">        It is sometimes desirable to enter two or more lines each with a different severity but</span>
 <span class="sd">        with a shared mixing variable. For example to model the current accident year and a run-</span>
 <span class="sd">        off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are</span>
 <span class="sd">        larger lognormal mean 150 cv 1.25 claims requires</span>
 
-<span class="sd">        agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]</span>
+<span class="sd">        ::</span>
+
+<span class="sd">            agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]</span>
 
 <span class="sd">        so that the result is not the four-way exposure / severity product but just a two-way</span>
 <span class="sd">        combination. These two cases are distinguished looking at the total weights. If the weights sum to</span>
 <span class="sd">        one then the result is an exposure / severity product. If the weights are missing or sum to the number</span>
 <span class="sd">        of severity components (i.e. are all equal to 1) then the result is a row by row combination.</span>
 
-<span class="sd">        Other notes</span>
-<span class="sd">        -----------</span>
-
+<span class="sd">    Other notes</span>
 <span class="sd">        * en determines en</span>
 <span class="sd">        * prem x loss ratio -&gt; el</span>
 <span class="sd">        * severity x en -&gt; el</span>
@@ -543,29 +548,29 @@
 <span class="sd">        * X is the GROUND UP severity, so X | X &gt; attachment is used and generates n claims</span>
 
 <span class="sd">        * For fixed or histogram have to separate the parameter so they are not broad cast; otherwise</span>
-<span class="sd">        you end up with multiple lines when you intend only one</span>
+<span class="sd">          you end up with multiple lines when you intend only one</span>
 
 
-<span class="sd">        :param name:</span>
-<span class="sd">        :param exp_el:   expected loss or vector</span>
-<span class="sd">        :param exp_premium: premium volume or vector  (requires loss ratio)</span>
-<span class="sd">        :param exp_lr:  loss ratio or vector  (requires premium)</span>
-<span class="sd">        :param exp_en:  expected claim count per segment (self.n = total claim count)</span>
-<span class="sd">        :param exp_attachment: occurrence attachment</span>
-<span class="sd">        :param exp_limit: occurrence limit</span>
-<span class="sd">        :param sev_name: severity name or sev.BUILTIN_SEV or meta.BUILTIN agg or port or similar or vector or matrix</span>
-<span class="sd">        :param sev_a:  scipy stats shape parameter</span>
-<span class="sd">        :param sev_b: scipy stats shape parameter</span>
-<span class="sd">        :param sev_mean: average (unlimited) severity</span>
-<span class="sd">        :param sev_cv: unlimited severity coefficient of variation</span>
-<span class="sd">        :param sev_loc: scipy stats location parameter</span>
-<span class="sd">        :param sev_scale: scipy stats scale parameter</span>
-<span class="sd">        :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram</span>
-<span class="sd">        :param sev_ps:</span>
-<span class="sd">        :param sev_wt: weight for mixed distribution</span>
-<span class="sd">        :param freq_name: name of frequency distribution</span>
-<span class="sd">        :param freq_a: cv of freq dist mixing distribution</span>
-<span class="sd">        :param freq_b: claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)</span>
+<span class="sd">        :param name:            name of the aggregate</span>
+<span class="sd">        :param exp_el:          expected loss or vector</span>
+<span class="sd">        :param exp_premium:     premium volume or vector  (requires loss ratio)</span>
+<span class="sd">        :param exp_lr:          loss ratio or vector  (requires premium)</span>
+<span class="sd">        :param exp_en:          expected claim count per segment (self.n = total claim count)</span>
+<span class="sd">        :param exp_attachment:  occurrence attachment</span>
+<span class="sd">        :param exp_limit:       occurrence limit</span>
+<span class="sd">        :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix</span>
+<span class="sd">        :param sev_a:           scipy stats shape parameter</span>
+<span class="sd">        :param sev_b:           scipy stats shape parameter</span>
+<span class="sd">        :param sev_mean:        average (unlimited) severity</span>
+<span class="sd">        :param sev_cv:          unlimited severity coefficient of variation</span>
+<span class="sd">        :param sev_loc:         scipy stats location parameter</span>
+<span class="sd">        :param sev_scale:       scipy stats scale parameter</span>
+<span class="sd">        :param sev_xs:          xs and ps must be provided if sev_name is (c|d)histogram, xs are the bucket break points</span>
+<span class="sd">        :param sev_ps:          ps are the probability densities within each bucket; if buckets equal size no adjustments needed</span>
+<span class="sd">        :param sev_wt:          weight for mixed distribution</span>
+<span class="sd">        :param freq_name:       name of frequency distribution</span>
+<span class="sd">        :param freq_a:          cv of freq dist mixing distribution</span>
+<span class="sd">        :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">aggregate_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_el&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_premium&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_lr&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_en&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_attachment&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;sev_name&#39;</span><span class="p">,</span>
@@ -640,8 +645,8 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="n">attachment</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">limit</span>
             <span class="n">n_components</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_arrays</span><span class="p">)</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Aggregate.__init__ | Stacking: exposures + severity = {len(exp_el)} = {len(sev_a)} &#39;</span>
-                         <span class="n">f</span><span class="s1">&#39;=  </span><span class="si">{n_components}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = &#39;</span>
+                         <span class="n">f</span><span class="s1">&#39;{len(sev_a)} sevs = </span><span class="si">{n_components}</span><span class="s1"> componets&#39;</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">n_components</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">Severity</span><span class="p">))</span>
 
         <span class="k">else</span><span class="p">:</span>
@@ -660,7 +665,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">all_arrays</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">all_arrays</span><span class="p">])</span>
             <span class="n">n_components</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_arrays</span><span class="p">)</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Aggregate.__init__ | Product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} &#39;</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} &#39;</span>
                          <span class="n">f</span><span class="s1">&#39;=  </span><span class="si">{n_components}</span><span class="s1">&#39;</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">sevs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">n_components</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">Severity</span><span class="p">))</span>
 
@@ -795,7 +800,7 @@
 <span class="sd">        Continuous is used when you think of the resulting distribution as continuous across the buckets</span>
 <span class="sd">        (which we generally don&#39;t). We use the discretized distribution as though it is fully discrete</span>
 <span class="sd">        and only takes values at the bucket points. Hence we should use sev_calc=&#39;discrete&#39;. The buckets are</span>
-<span class="sd">        shifted left by half a bucket, so Pr(X=b_i) = Pr( b_i - b/2 &lt; X &lt;= b_i + b/2).</span>
+<span class="sd">        shifted left by half a bucket, so :math:`Pr(X=b_i) = Pr( b_i - b/2 &lt; X &lt;= b_i + b/2)`.</span>
 
 <span class="sd">        The other wrinkle is the right hand end of the range. If we extend to np.inf then we ensure we have</span>
 <span class="sd">        probabilities that sum to 1. But that method introduces a probability mass in the last bucket that</span>
@@ -1040,6 +1045,8 @@
 
 <span class="sd">        From examples on last page of paper:</span>
 
+<span class="sd">        ::</span>
+
 <span class="sd">            beta(x) = a ==&gt; adjust frequency by factor of e^a</span>
 <span class="sd">            beta(x) = log(1 + b(x - E(X)))  ==&gt; variance principle EN(EX + bVar(X))</span>
 <span class="sd">            beta(x) = ax- logE_P(exp(a x))  ==&gt; Esscher principle</span>
@@ -1085,7 +1092,7 @@
 <span class="sd">        :param axiter: optional axiter object</span>
 <span class="sd">        :param aspect: optional aspect ratio of individual plots</span>
 <span class="sd">        :param figsize: optional overall figure size</span>
-<span class="sd">       :return:</span>
+<span class="sd">        :return:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_density</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -1348,6 +1355,8 @@
 <span class="sd">        :param conditional: conditional or unconditional; for severities use conditional</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
+        <span class="kn">from</span> <span class="nn">.port</span> <span class="k">import</span> <span class="n">Portfolio</span>
+
         <span class="n">ss</span><span class="o">.</span><span class="n">rv_continuous</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{sev_name}</span><span class="s1">[</span><span class="si">{exp_limit}</span><span class="s1"> xs </span><span class="si">{exp_attachment:,.0f}</span><span class="s1">]&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">exp_limit</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">attachment</span> <span class="o">=</span> <span class="n">exp_attachment</span>
@@ -1397,6 +1406,37 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Histogram must be chistogram (continuous) or dhistogram (discrete)&#39;</span>
                                  <span class="n">f</span><span class="s1">&#39;, you passed </span><span class="si">{sev_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sev_name</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">str_</span><span class="p">)):</span>
+            <span class="c1"># must be a meta object - replaced in Undewriter.write</span>
+            <span class="n">log2</span> <span class="o">=</span> <span class="n">sev_a</span>
+            <span class="n">bs</span> <span class="o">=</span> <span class="n">sev_b</span>       <span class="c1"># if zero it is happy to take whatever....</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;In meta, </span><span class="si">{sev_name}</span><span class="s1">, {type(sev_name)}&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sev_name</span><span class="p">,</span> <span class="n">Aggregate</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">log2</span> <span class="o">!=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">log2</span> <span class="ow">or</span> <span class="p">(</span><span class="n">bs</span> <span class="o">!=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">bs</span> <span class="ow">and</span> <span class="n">bs</span><span class="o">==</span><span class="mi">0</span><span class="p">):</span>
+                    <span class="c1"># recompute</span>
+                    <span class="n">sev_name</span><span class="o">.</span><span class="n">easy_update</span><span class="p">(</span><span class="n">log2</span><span class="p">,</span> <span class="n">bs</span><span class="p">)</span>
+                <span class="n">xs</span> <span class="o">=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">xs</span>
+                <span class="n">ps</span> <span class="o">=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">agg_density</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sev_name</span><span class="p">,</span> <span class="n">Portfolio</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">log2</span> <span class="o">!=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">log2</span> <span class="ow">or</span> <span class="p">(</span><span class="n">bs</span> <span class="o">!=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">bs</span> <span class="ow">and</span> <span class="n">bs</span><span class="o">==</span><span class="mi">0</span><span class="p">):</span>
+                    <span class="c1"># recompute</span>
+                    <span class="n">sev_name</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">log2</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">add_exa</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">xs</span> <span class="o">=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">loss</span><span class="o">.</span><span class="n">values</span>
+                <span class="n">ps</span> <span class="o">=</span> <span class="n">sev_name</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span><span class="o">.</span><span class="n">values</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Object </span><span class="si">{sev_name}</span><span class="s1"> passed as a proto-severity type {type(obj)}&#39;</span>
+                                 <span class="n">f</span><span class="s1">&#39; only Aggregate, Portfolio and Severity objects allowed&#39;</span><span class="p">)</span>
+            <span class="c1"># will make as a combo discrete/continuous histogram</span>
+            <span class="c1"># nail the bucket at zero and use a continuous approx +/- bs/2 around each other bucket</span>
+            <span class="c1"># leaves an ugly gap between 0 and bs/2...which is ignored</span>
+            <span class="n">b1size</span> <span class="o">=</span> <span class="mf">1e-7</span>  <span class="c1"># size of the first &quot;bucket&quot;</span>
+            <span class="n">xss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="o">-</span><span class="n">bs</span> <span class="o">*</span> <span class="n">b1size</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">bs</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">bs</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">pss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">ps</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">b1size</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ps</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fz</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">rv_histogram</span><span class="p">((</span><span class="n">pss</span><span class="p">,</span> <span class="n">xss</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sev1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">xs</span> <span class="o">*</span> <span class="n">ps</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sev2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ps</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sev3</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">xs</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ps</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">sev_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;norm&#39;</span><span class="p">,</span> <span class="s1">&#39;expon&#39;</span><span class="p">,</span> <span class="s1">&#39;uniform&#39;</span><span class="p">]:</span>
             <span class="c1"># distributions with no shape parameters</span>

@@ -50,8 +50,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
 	 
@@ -94,66 +93,101 @@
 <h2>Purpose<a class="headerlink" href="#purpose" title="Permalink to this headline">¶</a></h2>
 <p>A Portfolio represents a collection of Aggregate objects. Applications include</p>
 <ul class="simple">
-<li>A book of insurance or reinsurance business</li>
+<li>Model a book of insurance</li>
+<li>Model a large account with several sub lines</li>
+<li>Model a reinsurance portfolio or large treaty</li>
 </ul>
-</div>
-<div class="section" id="important-methods">
-<h2>Important Methods<a class="headerlink" href="#important-methods" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="example-calls">
-<h2>Example Calls<a class="headerlink" href="#example-calls" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="other-notes">
-<h2>Other Notes<a class="headerlink" href="#other-notes" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="aggregate.port.Portfolio">
 <em class="property">class </em><code class="descclassname">aggregate.port.</code><code class="descname">Portfolio</code><span class="sig-paren">(</span><em>name</em>, <em>spec_list</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio" title="Permalink to this definition">¶</a></dt>
-<dd><p>CPortfolio creates and manages a portfolio of CAgg risks.</p>
+<dd><p>Portfolio creates and manages a portfolio of Aggregate objects.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> – the name of the portfolio, no spaces or underscores</li>
+<li><strong>spec_list</strong> – a list of Aggregate object dictionary specifications</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.analysis_collateral">
 <code class="descname">analysis_collateral</code><span class="sig-paren">(</span><em>line</em>, <em>c</em>, <em>a</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.analysis_collateral"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.analysis_collateral" title="Permalink to this definition">¶</a></dt>
-<dd><p>E(C(a,c)) expected value of C_line against not C with collateral c and assets a, c &lt;= a
-:param debug:
-:param line: line of business with collateral, analyzed against not line
-:param c: collateral, c &lt;= a required; c=0 reproduces exa, c=a reproduces lev
-:param a: assets, assumed less than the max loss (i.e. within the square)
-:return:</p>
+<dd><p>E(C(a,c)) expected value of line against not line with collateral c and assets a, c &lt;= a</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>line</strong> – line of business with collateral, analyzed against not line</li>
+<li><strong>c</strong> – collateral, c &lt;= a required; c=0 reproduces exa, c=a reproduces lev</li>
+<li><strong>a</strong> – assets, assumed less than the max loss (i.e. within the square)</li>
+<li><strong>debug</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.analysis_priority">
 <code class="descname">analysis_priority</code><span class="sig-paren">(</span><em>asset_spec</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.analysis_priority"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.analysis_priority" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create priority analysis report_ser
-This can be called multiple times so keep as method
-:param asset_spec: epd
-:return:</p>
+<dd><p>Create priority analysis report_ser.
+Can be called multiple times with different <code class="docutils literal"><span class="pre">asset_specs</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>asset_spec</strong> – epd</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.apply_distortion">
 <code class="descname">apply_distortion</code><span class="sig-paren">(</span><em>dist</em>, <em>axiter=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.apply_distortion"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.apply_distortion" title="Permalink to this definition">¶</a></dt>
 <dd><p>Apply the distorion, make a copy of density_df and append various columns
-Handy graphic of results
-:param dist: CDistortion
-:param axiter: axis iterator, if None no plots are returned
-:return: density_df with extra columns appended</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="aggregate.port.Portfolio.apply_distortions">
-<code class="descname">apply_distortions</code><span class="sig-paren">(</span><em>dist_dict</em>, <em>As=None</em>, <em>Ps=None</em>, <em>num_plots=2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.apply_distortions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.apply_distortions" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="docutils">
-<dt>Apply a list of distortions, summarize pricing and produce graphical output</dt>
-<dd>show s_ub &gt; S &gt; s_lb by jump</dd>
-</dl>
+Handy graphic of results</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>dist_dict</strong> – dictionary of CDistortion objects</li>
+<li><strong>dist</strong> – CDistortion</li>
+<li><strong>axiter</strong> – axis iterator, if None no plots are returned</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">density_df with extra columns appended</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.port.Portfolio.apply_distortions">
+<code class="descname">apply_distortions</code><span class="sig-paren">(</span><em>dist_dict</em>, <em>As=None</em>, <em>Ps=None</em>, <em>num_plots=2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.apply_distortions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.apply_distortions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply a list of distortions, summarize pricing and produce graphical output
+show loss values where  <span class="math">\(s_ub &gt; S(loss) &gt; s_lb\)</span> by jump</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>dist_dict</strong> – dictionary of Distortion objects</li>
 <li><strong>As</strong> – input asset levels to consider OR</li>
-<li><strong>Ps</strong> – input probs (near 1) converted to assets using self.q()</li>
+<li><strong>Ps</strong> – input probs (near 1) converted to assets using <code class="docutils literal"><span class="pre">self.q()</span></code></li>
 <li><strong>num_plots</strong> – 0, 1 or 2</li>
 </ul>
 </td>
@@ -168,23 +202,35 @@ Handy graphic of results
 <dl class="method">
 <dt id="aggregate.port.Portfolio.calibrate_distortion">
 <code class="descname">calibrate_distortion</code><span class="sig-paren">(</span><em>name</em>, <em>r0=0.0</em>, <em>premium_target=0.0</em>, <em>roe=0.0</em>, <em>assets=0.0</em>, <em>p=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.calibrate_distortion"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.calibrate_distortion" title="Permalink to this definition">¶</a></dt>
-<dd><p>Find transform to hit a premium target given assets of a
-this fills in the values in g_spec and returns params and diagnostics…so
-you can use it either way…more convenient
-:param name: name of distortion
-:param r0:   fixed parameter if applicable
-:param premium_target: target premium
-:param roe:             or ROE
-:param assets: asset level
-:param p:
-:return:</p>
+<dd><p>Find transform to hit a premium target given assets of <code class="docutils literal"><span class="pre">a</span></code>.
+Fills in the values in <code class="docutils literal"><span class="pre">g_spec</span></code> and returns params and diagnostics…so
+you can use it either way…more convenient</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> – name of distortion</li>
+<li><strong>r0</strong> – fixed parameter if applicable</li>
+<li><strong>premium_target</strong> – target premium</li>
+<li><strong>roe</strong> – or ROE</li>
+<li><strong>assets</strong> – asset level</li>
+<li><strong>p</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.calibrate_distortions">
 <code class="descname">calibrate_distortions</code><span class="sig-paren">(</span><em>LRs=None</em>, <em>ROEs=None</em>, <em>As=None</em>, <em>Ps=None</em>, <em>r0=0.03</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.calibrate_distortions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.calibrate_distortions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calibrate assets a to loss ratios LRs and asset levels As (iterables)
-ro for LY, it ro/(1+ro) corresponds to a minimum rate on line</p>
+ro for LY, it <span class="math">\(ro/(1+ro)\)</span> corresponds to a minimum rate on line</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -210,6 +256,7 @@ ro for LY, it ro/(1+ro) corresponds to a minimum rate on line</p>
 <code class="descname">collapse</code><span class="sig-paren">(</span><em>approx_type='slognorm'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.collapse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.collapse" title="Permalink to this definition">¶</a></dt>
 <dd><p>returns new Portfolio with the fit</p>
 <p>deprecated…prefer uw(self.fit()) to go through the agg language approach</p>
+<p>TODO: make a version returning an rv_histogram</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -353,11 +400,11 @@ uses interpolation, audit_df uses nearest</p>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.plot">
 <code class="descname">plot</code><span class="sig-paren">(</span><em>kind='density'</em>, <em>line='all'</em>, <em>p=0.99</em>, <em>c=0</em>, <em>a=0</em>, <em>axiter=None</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>kind = density
-simple plotting of line density or not line density
-input single line or list of lines
-log underscore appended as appropriate</p>
-<dl class="docutils">
+<dd><dl class="docutils">
+<dt>kind = density</dt>
+<dd>simple plotting of line density or not line density;
+input single line or list of lines;
+log underscore appended as appropriate</dd>
 <dt>kind = audit</dt>
 <dd>Miscellaneous audit graphs</dd>
 <dt>kind = priority</dt>
@@ -372,16 +419,16 @@ log underscore appended as appropriate</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>kind</strong> – </li>
-<li><strong>line</strong> – </li>
+<li><strong>kind</strong> – density | audit | priority | quick | collateral</li>
+<li><strong>line</strong> – lines to use, defaults to all</li>
 <li><strong>p</strong> – for graphics audit controls loss scale</li>
-<li><strong>c</strong> – </li>
-<li><strong>a</strong> – </li>
-<li><strong>axiter</strong> – </li>
+<li><strong>c</strong> – collateral level</li>
+<li><strong>a</strong> – asset level</li>
+<li><strong>axiter</strong> – optional, pass in to use existing <code class="docutils literal"><span class="pre">axiter</span></code></li>
 <li><strong>figsize</strong> – </li>
 <li><strong>height</strong> – </li>
 <li><strong>aspect</strong> – </li>
-<li><strong>kwargs</strong> – </li>
+<li><strong>kwargs</strong> – passed to pandas plot routines</li>
 </ul>
 </td>
 </tr>
@@ -395,14 +442,18 @@ log underscore appended as appropriate</p>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.price">
 <code class="descname">price</code><span class="sig-paren">(</span><em>reg_g</em>, <em>pricing_g=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.price"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.price" title="Permalink to this definition">¶</a></dt>
-<dd><p>Price using regulatory and pricing g functions
-i.e. compute E_price (X wedge E_reg(X) )
-regulatory capital distortion is applied on unlimited basis
-reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =log value in either case }
+<dd><dl class="docutils">
+<dt>Price using regulatory and pricing g functions</dt>
+<dd><p class="first">Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
+the regulatory distortion</p>
+<p>regulatory capital distortion is applied on unlimited basis</p>
+<p>reg_g is number; Distortion; spec { name = var|tvar|  ,  shape =log value in either case }
 pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
 overwritten</p>
 <p>ly  must include ro in spec</p>
-<p>if lr and roe then lr is used</p>
+<p class="last">if lr and roe then lr is used</p>
+</dd>
+</dl>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -424,7 +475,7 @@ used</li>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.q">
 <code class="descname">q</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.q"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.q" title="Permalink to this definition">¶</a></dt>
-<dd><p>return a quantile using nearest (i.e. will be in the index</p>
+<dd><p>return a quantile using nearest methodl so result is in density_df index</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -547,6 +598,24 @@ If A=0 A=q(log) is used</p>
 <dt id="aggregate.port.Portfolio.uat">
 <code class="descname">uat</code><span class="sig-paren">(</span><em>As=None, Ps=[0.98], LRs=[0.965], r0=0.03, verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.uat"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.uat" title="Permalink to this definition">¶</a></dt>
 <dd><p>Reconcile apply_distortion(s) with price and calibrate</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>As</strong> – Asset levels</li>
+<li><strong>Ps</strong> – probability levels used to determine asset levels using quantile function</li>
+<li><strong>LRs</strong> – loss ratios used to determine profitability</li>
+<li><strong>r0</strong> – r0 level for distortions</li>
+<li><strong>verbose</strong> – controls level of output</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
@@ -588,26 +657,27 @@ If A=0 A=q(log) is used</p>
 
 <dl class="method">
 <dt id="aggregate.port.Portfolio.update">
-<code class="descname">update</code><span class="sig-paren">(</span><em>log2</em>, <em>bs</em>, <em>approx_freq_ge=100</em>, <em>approx_type='slognorm'</em>, <em>remove_fuzz=False</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>padding=1</em>, <em>tilt_amount=0</em>, <em>epds=None</em>, <em>trim_df=True</em>, <em>verbose=False</em>, <em>add_exa=True</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.update" title="Permalink to this definition">¶</a></dt>
-<dd><p>interp guesses exa etc. for small losses, but that doesn’t work</p>
+<code class="descname">update</code><span class="sig-paren">(</span><em>log2</em>, <em>bs</em>, <em>approx_freq_ge=100</em>, <em>approx_type='slognorm'</em>, <em>remove_fuzz=False</em>, <em>sev_calc='discrete'</em>, <em>discretization_calc='survival'</em>, <em>padding=1</em>, <em>tilt_amount=0</em>, <em>epds=None</em>, <em>trim_df=True</em>, <em>verbose=False</em>, <em>add_exa=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>create density_df, performs convolution. optionally adds additional information if <code class="docutils literal"><span class="pre">add_exa=True</span></code>
+for allocation and priority analysis</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>discretization_calc</strong> – </li>
-<li><strong>verbose</strong> – </li>
 <li><strong>log2</strong> – </li>
 <li><strong>bs</strong> – bucket size</li>
-<li><strong>approx_freq_ge</strong> – </li>
-<li><strong>approx_type</strong> – </li>
-<li><strong>remove_fuzz</strong> – </li>
-<li><strong>sev_calc</strong> – how to calculate the severity gradient | rescale</li>
+<li><strong>approx_freq_ge</strong> – use method of moments if frequency is larger than <code class="docutils literal"><span class="pre">approx_freq_ge</span></code></li>
+<li><strong>approx_type</strong> – type of method of moments approx to use (slognorm or sgamma)</li>
+<li><strong>remove_fuzz</strong> – remove machine noise elements from FFT</li>
+<li><strong>sev_calc</strong> – how to calculate the severity, discrete (point masses as xs) or continuous (uniform between xs points)</li>
+<li><strong>discretization_calc</strong> – survival or distribution (accurate on right or left tails)</li>
 <li><strong>padding</strong> – for fft 1 = double, 2 = quadruple</li>
 <li><strong>tilt_amount</strong> – for tiling methodology - see notes on density for suggested parameters</li>
 <li><strong>epds</strong> – epd points for priority analysis; if None-&gt; sensible defaults</li>
 <li><strong>trim_df</strong> – remove unnecessary columns from density_df before returning</li>
-<li><strong>kwargs</strong> – allows you to pass in other crap which is ignored, useful for YAML persistence</li>
+<li><strong>verbose</strong> – level of output</li>
+<li><strong>add_exa</strong> – run add_exa to append additional allocation information needed for pricing</li>
 </ul>
 </td>
 </tr>
@@ -649,9 +719,6 @@ If A=0 A=q(log) is used</p>
   <ul>
 <li><a class="reference internal" href="#">Portfolio Class</a><ul>
 <li><a class="reference internal" href="#purpose">Purpose</a></li>
-<li><a class="reference internal" href="#important-methods">Important Methods</a></li>
-<li><a class="reference internal" href="#example-calls">Example Calls</a></li>
-<li><a class="reference internal" href="#other-notes">Other Notes</a></li>
 </ul>
 </li>
 </ul>

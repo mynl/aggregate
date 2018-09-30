@@ -19,9 +19,9 @@ Table of Contents
 
    intro
    histapp
-   tutorial
-   prob.md
-   freq_dist.md
+   basic_examples
+   prob
+   freq_dist
    devel
    aggregate
    portfolio

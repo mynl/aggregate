@@ -4,24 +4,16 @@ Purpose
 
 A Portfolio represents a collection of Aggregate objects. Applications include
 
-* A book of insurance or reinsurance business
+* Model a book of insurance
+* Model a large account with several sub lines
+* Model a reinsurance portfolio or large treaty
 
 
-Important Methods
------------------
-
-
-Example Calls
--------------
-
-Other Notes
------------
 
 """
 
 import collections
 import matplotlib.cm as cm
-import seaborn as sns
 from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
@@ -32,16 +24,14 @@ from .spectral import Distortion
 
 class Portfolio(object):
     """
-    CPortfolio creates and manages a portfolio of CAgg risks.
+    Portfolio creates and manages a portfolio of Aggregate objects.
+
+    :param name: the name of the portfolio, no spaces or underscores
+    :param spec_list: a list of Aggregate object dictionary specifications
 
     """
 
     def __init__(self, name, spec_list):
-        """
-
-        :param name:
-        :param spec_list:
-        """
         self.name = name
         self.agg_list = []
         self.line_names = []
@@ -145,15 +135,16 @@ class Portfolio(object):
         _n = len(self.agg_list)
         _s = "" if _n <= 1 else "s"
         s.append(f'Portfolio contains {_n} aggregate component{_s}')
+        summary_sl = (slice(None), ['mean', 'cv', 'skew'])
         if self.audit_df is not None:
             # _df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
             # another option TODO consider
-            _df = pd.concat((self.statistics_df.loc[(slice(None), ['mean', 'cv', 'skew']), :],
+            _df = pd.concat((self.statistics_df.loc[summary_sl, :],
                              self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
                             sort=True)
             s.append(_df._repr_html_())
         else:
-            s.append(self.statistics_df.iloc[0:9, :]._repr_html_())
+            s.append(self.statistics_df.loc[summary_sl, :]._repr_html_())
         return '\n'.join(s)
 
     def __hash__(self):
@@ -315,7 +306,7 @@ class Portfolio(object):
 
     def q(self, p):
         """
-        return a quantile using nearest (i.e. will be in the index
+        return a quantile using nearest methodl so result is in density_df index
 
         :param p:
         :return:
@@ -383,6 +374,9 @@ class Portfolio(object):
 
         deprecated...prefer uw(self.fit()) to go through the agg language approach
 
+        TODO: make a version returning an rv_histogram
+
+
         :param approx_type: slognorm | sgamma
         :return:
         """
@@ -435,23 +429,24 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', padding=1, tilt_amount=0, epds=None,
-               trim_df=True, verbose=False, add_exa=True, **kwargs):
+               trim_df=True, verbose=False, add_exa=True):
         """
-        interp guesses exa etc. for small losses, but that doesn't work
+        create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
+        for allocation and priority analysis
 
-        :param discretization_calc:
-        :param verbose:
         :param log2:
         :param bs: bucket size
-        :param approx_freq_ge:
-        :param approx_type:
-        :param remove_fuzz:
-        :param sev_calc: how to calculate the severity gradient | rescale
+        :param approx_freq_ge: use method of moments if frequency is larger than ``approx_freq_ge``
+        :param approx_type: type of method of moments approx to use (slognorm or sgamma)
+        :param remove_fuzz: remove machine noise elements from FFT
+        :param sev_calc: how to calculate the severity, discrete (point masses as xs) or continuous (uniform between xs points)
+        :param discretization_calc:  survival or distribution (accurate on right or left tails)
         :param padding: for fft 1 = double, 2 = quadruple
         :param tilt_amount: for tiling methodology - see notes on density for suggested parameters
         :param epds: epd points for priority analysis; if None-> sensible defaults
         :param trim_df: remove unnecessary columns from density_df before returning
-        :param kwargs: allows you to pass in other crap which is ignored, useful for YAML persistence
+        :param verbose: level of output
+        :param add_exa: run add_exa to append additional allocation information needed for pricing
         :return:
         """
 
@@ -639,9 +634,9 @@ class Portfolio(object):
              aspect=1, **kwargs):
         """
         kind = density
-        simple plotting of line density or not line density
-        input single line or list of lines
-        log underscore appended as appropriate
+            simple plotting of line density or not line density;
+            input single line or list of lines;
+            log underscore appended as appropriate
 
         kind = audit
             Miscellaneous audit graphs
@@ -655,16 +650,16 @@ class Portfolio(object):
         kind = collateral
             plot to illustrate bivariate density of line vs not line with indicated asset a and capital c
 
-        :param kind:
-        :param line:
+        :param kind: density | audit | priority | quick | collateral
+        :param line: lines to use, defaults to all
         :param p:   for graphics audit controls loss scale
-        :param c:
-        :param a:
-        :param axiter:
+        :param c:   collateral level
+        :param a:   asset level
+        :param axiter: optional, pass in to use existing ``axiter``
         :param figsize:
         :param height:
         :param aspect:
-        :param kwargs:
+        :param kwargs: passed to pandas plot routines
         :return:
         """
         do_tight = (axiter is None)
@@ -1168,9 +1163,11 @@ class Portfolio(object):
 
     def calibrate_distortion(self, name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0):
         """
-        Find transform to hit a premium target given assets of a
-        this fills in the values in g_spec and returns params and diagnostics...so
+        Find transform to hit a premium target given assets of ``a``.
+        Fills in the values in ``g_spec`` and returns params and diagnostics...so
         you can use it either way...more convenient
+
+
         :param name: name of distortion
         :param r0:   fixed parameter if applicable
         :param premium_target: target premium
@@ -1299,7 +1296,8 @@ class Portfolio(object):
     def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, r0=0.03):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
-        ro for LY, it ro/(1+ro) corresponds to a minimum rate on line
+        ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
+
 
         :param LRs:  LR or ROEs given
         :param ROEs: ROEs override LRs
@@ -1343,11 +1341,11 @@ class Portfolio(object):
     def apply_distortions(self, dist_dict, As=None, Ps=None, num_plots=2):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
-            show s_ub > S > s_lb by jump
+        show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
 
-        :param dist_dict: dictionary of CDistortion objects
+        :param dist_dict: dictionary of Distortion objects
         :param As: input asset levels to consider OR
-        :param Ps: input probs (near 1) converted to assets using self.q()
+        :param Ps: input probs (near 1) converted to assets using ``self.q()``
         :param num_plots: 0, 1 or 2
         :return:
         """
@@ -1408,6 +1406,8 @@ class Portfolio(object):
         """
         Apply the distorion, make a copy of density_df and append various columns
         Handy graphic of results
+
+
         :param dist: CDistortion
         :param axiter: axis iterator, if None no plots are returned
         :return: density_df with extra columns appended
@@ -1581,15 +1581,18 @@ class Portfolio(object):
     def price(self, reg_g, pricing_g=None):
         """
         Price using regulatory and pricing g functions
-        i.e. compute E_price (X wedge E_reg(X) )
-        regulatory capital distortion is applied on unlimited basis
-        reg_g is number; CDistortion; spec { name = var|tvar|  ,  shape =log value in either case }
-        pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
-        overwritten
+            Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
+            the regulatory distortion
 
-        ly  must include ro in spec
+            regulatory capital distortion is applied on unlimited basis
 
-        if lr and roe then lr is used
+            reg_g is number; Distortion; spec { name = var|tvar|  ,  shape =log value in either case }
+            pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
+            overwritten
+
+            ly  must include ro in spec
+
+            if lr and roe then lr is used
 
         :param reg_g: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
         :param pricing_g: spec or CDistortion class or lr= or roe =; must have name= to define spec; if CDist that is
@@ -1803,8 +1806,10 @@ class Portfolio(object):
 
     def analysis_priority(self, asset_spec):
         """
-        Create priority analysis report_ser
-        This can be called multiple times so keep as method
+        Create priority analysis report_ser.
+        Can be called multiple times with different ``asset_specs``
+
+
         :param asset_spec: epd
         :return:
         """
@@ -1869,11 +1874,12 @@ class Portfolio(object):
 
     def analysis_collateral(self, line, c, a, debug=False):
         """
-        E(C(a,c)) expected value of C_line against not C with collateral c and assets a, c <= a
-        :param debug:
+        E(C(a,c)) expected value of line against not line with collateral c and assets a, c <= a
+
         :param line: line of business with collateral, analyzed against not line
         :param c: collateral, c <= a required; c=0 reproduces exa, c=a reproduces lev
         :param a: assets, assumed less than the max loss (i.e. within the square)
+        :param debug:
         :return:
         """
         assert (c <= a)
@@ -1994,6 +2000,14 @@ class Portfolio(object):
     def uat(self, As=None, Ps=[0.98], LRs=[0.965], r0=0.03, verbose=False):
         """
         Reconcile apply_distortion(s) with price and calibrate
+
+
+        :param As:   Asset levels
+        :param Ps:   probability levels used to determine asset levels using quantile function
+        :param LRs:  loss ratios used to determine profitability
+        :param r0:   r0 level for distortions
+        :param verbose: controls level of output
+        :return:
         """
 
         # figure As

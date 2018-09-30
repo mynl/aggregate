@@ -49,8 +49,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
 	
@@ -299,21 +298,22 @@
 
 <div class="viewcode-block" id="AxisManager"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager">[docs]</a><span class="k">class</span> <span class="nc">AxisManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to</span>
+<span class="sd">    plot to same set of axes.</span>
+
+<span class="sd">    Always created and managed through axiter_factory function</span>
+
+<span class="sd">    :param n:       number of plots in grid</span>
+<span class="sd">    :param figsize:</span>
+<span class="sd">    :param height:  height of individual plot</span>
+<span class="sd">    :param aspect:  aspect ratio of individual plot</span>
+<span class="sd">    :param nr:      number of plots per row</span>
 
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n&#39;</span><span class="p">,</span> <span class="s1">&#39;nr&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="s1">&#39;ax&#39;</span><span class="p">,</span> <span class="s1">&#39;axs&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="s1">&#39;faxs&#39;</span><span class="p">,</span> <span class="s1">&#39;it&#39;</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nr</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-
-<span class="sd">        :param n:</span>
-<span class="sd">        :param figsize:</span>
-<span class="sd">        :param height:</span>
-<span class="sd">        :param aspect:</span>
-<span class="sd">        :param nr: number of plots per row</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-
         <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">nr</span> <span class="o">=</span> <span class="n">nr</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
@@ -529,6 +529,8 @@
 <span class="sd">    makes report_ser df and statistics_df</span>
 
 <span class="sd">    Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</span>
+
+<span class="sd">    :param freq_moms: function of one variable returning first three noncentral moments of the underlying frequency distribution</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;freq_1&#39;</span><span class="p">,</span> <span class="s1">&#39;freq_2&#39;</span><span class="p">,</span> <span class="s1">&#39;freq_3&#39;</span><span class="p">,</span> <span class="s1">&#39;sev_1&#39;</span><span class="p">,</span> <span class="s1">&#39;sev_2&#39;</span><span class="p">,</span> <span class="s1">&#39;sev_3&#39;</span><span class="p">,</span> <span class="s1">&#39;agg_1&#39;</span><span class="p">,</span> <span class="s1">&#39;agg_2&#39;</span><span class="p">,</span> <span class="s1">&#39;agg_3&#39;</span><span class="p">,</span>

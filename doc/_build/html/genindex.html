@@ -49,8 +49,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
 	 
@@ -96,6 +95,7 @@
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#Q"><strong>Q</strong></a>
  | <a href="#R"><strong>R</strong></a>
@@ -136,21 +136,29 @@
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator.agg_from_fs">agg_from_fs() (aggregate.utils.MomentAggregator static method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.agg_list">agg_list() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.agg_list">agg_list() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.agg_name">agg_name() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.agg_name">agg_name() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.agg_out">agg_out() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.agg_out">agg_out() (aggregate.parser.UnderwritingParser method)</a>
+</li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate">Aggregate (class in aggregate.distr)</a>
 </li>
       <li><a href="index.html#module-aggregate">aggregate (module)</a>
 </li>
+      <li><a href="aggregate.html#module-aggregate.distr">aggregate.distr (module)</a>
+</li>
       <li><a href="parameters.html#module-aggregate.param">aggregate.param (module)</a>
 </li>
-      <li><a href="portfolio.html#module-aggregate.port">aggregate.port (module)</a>
+      <li><a href="parser.html#module-aggregate.parser">aggregate.parser (module)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="portfolio.html#module-aggregate.port">aggregate.port (module)</a>
+</li>
       <li><a href="distortion.html#module-aggregate.spectral">aggregate.spectral (module)</a>
+</li>
+      <li><a href="underwriter.html#module-aggregate.underwriter">aggregate.underwriter (module)</a>
 </li>
       <li><a href="utilities.html#module-aggregate.utils">aggregate.utils (module)</a>
 </li>
@@ -158,7 +166,7 @@
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.analysis_priority">analysis_priority() (aggregate.port.Portfolio method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.answer">answer() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.answer">answer() (aggregate.parser.UnderwritingParser method)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.apply_distortion">apply_distortion() (aggregate.port.Portfolio method)</a>
 </li>
@@ -176,15 +184,15 @@
 <h2 id="B">B</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.builtin_aggregate">builtin_aggregate() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.builtin_aggregate">builtin_aggregate() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.builtin_aggregate_dist">builtin_aggregate_dist() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.builtin_aggregate_dist">builtin_aggregate_dist() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.BUILTINID">BUILTINID (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.BUILTINID">BUILTINID (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.builtinids">builtinids() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.builtinids">builtinids() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -200,15 +208,19 @@
 </li>
       <li><a href="utilities.html#aggregate.utils.qd.cm">cm (aggregate.utils.qd attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="portfolio.html#aggregate.port.Portfolio.collapse">collapse() (aggregate.port.Portfolio method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator.column_names">column_names() (aggregate.utils.MomentAggregator static method)</a>
+</li>
+      <li><a href="distortion.html#aggregate.spectral.Distortion.convex_example">convex_example() (aggregate.spectral.Distortion static method)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.cumintegral">cumintegral() (aggregate.port.Portfolio method)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator.cumulate_moments">cumulate_moments() (aggregate.utils.MomentAggregator static method)</a>
+</li>
+      <li><a href="aggregate.html#aggregate.distr.Severity.cv_to_shape">cv_to_shape() (aggregate.distr.Severity method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -216,10 +228,18 @@
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#aggregate.utils.AxisManager.dimensions">dimensions() (aggregate.utils.AxisManager method)</a>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.data_types">data_types (aggregate.underwriter.Underwriter attribute)</a>
+</li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.delbaen_haezendonck_density">delbaen_haezendonck_density() (aggregate.distr.Aggregate method)</a>
+</li>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.describe">describe() (aggregate.underwriter.Underwriter method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities.html#aggregate.utils.AxisManager.dimensions">dimensions() (aggregate.utils.AxisManager method)</a>
+</li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.discretize">discretize() (aggregate.distr.Aggregate method)</a>
+</li>
       <li><a href="distortion.html#aggregate.spectral.Distortion">Distortion (class in aggregate.spectral)</a>
 </li>
       <li><a href="distortion.html#aggregate.spectral.Distortion.distortions_from_params">distortions_from_params() (aggregate.spectral.Distortion static method)</a>
@@ -230,19 +250,23 @@
 <h2 id="E">E</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.EQUAL_WEIGHT">EQUAL_WEIGHT (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.easy_update">easy_update() (aggregate.distr.Aggregate method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.error">error() (aggregate.UnderwritingLexer method)</a>
-
-      <ul>
-        <li><a href="parser.html#aggregate.UnderwritingParser.error">(aggregate.UnderwritingParser method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.emp_stats">emp_stats() (aggregate.distr.Aggregate method)</a>
 </li>
-      </ul></li>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.EQUAL_WEIGHT">EQUAL_WEIGHT (aggregate.parser.UnderwritingLexer attribute)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.error">error() (aggregate.parser.UnderwritingLexer method)</a>
+
+      <ul>
+        <li><a href="parser.html#aggregate.parser.UnderwritingParser.error">(aggregate.parser.UnderwritingParser method)</a>
+</li>
+      </ul></li>
       <li><a href="utilities.html#aggregate.utils.estimate_agg_percentile">estimate_agg_percentile() (in module aggregate.utils)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.exposures">exposures() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.exposures">exposures() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -254,12 +278,14 @@
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.fit">fit() (aggregate.port.Portfolio method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.FREQ">FREQ (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.FREQ">FREQ (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.freq">freq() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.freq">freq() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="aggregate.html#aggregate.distr.Frequency">Frequency (class in aggregate.distr)</a>
+</li>
       <li><a href="utilities.html#aggregate.utils.frequency_examples">frequency_examples() (in module aggregate.utils)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.from_DataFrame">from_DataFrame() (aggregate.port.Portfolio static method)</a>
@@ -304,17 +330,17 @@
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.ID">ID (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.ID">ID (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.idl">idl() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.idl">idl() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.ids">ids() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.ids">ids() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.ift">ift() (in module aggregate.utils)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.ignore">ignore (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.ignore">ignore (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.insurability_triangle">insurability_triangle() (in module aggregate.utils)</a>
 </li>
@@ -324,11 +350,13 @@
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.layers">layers() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.layers">layers() (aggregate.parser.UnderwritingParser method)</a>
+</li>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.list">list() (aggregate.underwriter.Underwriter method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.literals">literals (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.literals">literals (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.lognorm_lev">lognorm_lev() (in module aggregate.utils)</a>
 </li>
@@ -338,7 +366,9 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.MINUS">MINUS (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="aggregate.html#aggregate.distr.Severity.mean_to_scale">mean_to_scale() (aggregate.distr.Severity method)</a>
+</li>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.MINUS">MINUS (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator">MomentAggregator (class in aggregate.utils)</a>
 </li>
@@ -350,27 +380,37 @@
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentWrangler">MomentWrangler (class in aggregate.utils)</a>
 </li>
+      <li><a href="aggregate.html#aggregate.distr.Severity.moms">moms() (aggregate.distr.Severity method)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.newline">newline() (aggregate.UnderwritingLexer method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.newline">newline() (aggregate.parser.UnderwritingLexer method)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentWrangler.noncentral">noncentral (aggregate.utils.MomentWrangler attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.NOTE">NOTE (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.NOTE">NOTE (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.note">note() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.note">note() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.NUMBER">NUMBER() (aggregate.UnderwritingLexer method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.NUMBER">NUMBER() (aggregate.parser.UnderwritingLexer method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.numberl">numberl() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.numberl">numberl() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.numbers">numbers() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.numbers">numbers() (aggregate.parser.UnderwritingParser method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.obj_to_agg">obj_to_agg() (aggregate.underwriter.Underwriter static method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -380,23 +420,27 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="portfolio.html#aggregate.port.Portfolio.percentiles">percentiles() (aggregate.port.Portfolio method)</a>
 </li>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.plot">plot() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.plot">plot() (aggregate.distr.Aggregate method)</a>
 
       <ul>
+        <li><a href="aggregate.html#aggregate.distr.Severity.plot">(aggregate.distr.Severity method)</a>
+</li>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.plot">(aggregate.port.Portfolio method)</a>
+</li>
         <li><a href="distortion.html#aggregate.spectral.Distortion.plot">(aggregate.spectral.Distortion method)</a>
 </li>
       </ul></li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.PLUS">PLUS (aggregate.UnderwritingLexer attribute)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.port_name">port_name() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.PLUS">PLUS (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.port_out">port_out() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.port_name">port_name() (aggregate.parser.UnderwritingParser method)</a>
+</li>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.port_out">port_out() (aggregate.parser.UnderwritingParser method)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio">Portfolio (class in aggregate.port)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.precedence">precedence (aggregate.UnderwritingParser attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.precedence">precedence (aggregate.parser.UnderwritingParser attribute)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.price">price() (aggregate.port.Portfolio method)</a>
 </li>
@@ -406,14 +450,22 @@
 <h2 id="Q">Q</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.q">q() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.q">q() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.q">(aggregate.port.Portfolio method)</a>
 </li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.qd">qd (class in aggregate.utils)</a>
 </li>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.quantile_function">quantile_function() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.quantile_function">quantile_function() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.quantile_function">(aggregate.port.Portfolio method)</a>
 </li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -422,13 +474,21 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.read_log">read_log() (in module aggregate.utils)</a>
 </li>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.recommend_bucket">recommend_bucket() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.recommend_bucket">recommend_bucket() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.recommend_bucket">(aggregate.port.Portfolio method)</a>
 </li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.report">report() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.report">report() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.report">(aggregate.port.Portfolio method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.reset">reset() (aggregate.UnderwritingParser method)</a>
+      </ul></li>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.reset">reset() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -440,19 +500,21 @@
 </li>
       <li><a href="utilities.html#aggregate.utils.sensible_jump">sensible_jump() (in module aggregate.utils)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.sev">sev() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.sev">sev() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.sev_name">sev_name() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.sev_name">sev_name() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.sev_out">sev_out() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.sev_out">sev_out() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="utilities.html#aggregate.utils.sgamma_fit">sgamma_fit() (in module aggregate.utils)</a>
+      <li><a href="aggregate.html#aggregate.distr.Severity">Severity (class in aggregate.distr)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities.html#aggregate.utils.sgamma_fit">sgamma_fit() (in module aggregate.utils)</a>
+</li>
       <li><a href="utilities.html#aggregate.utils.sln_fit">sln_fit() (in module aggregate.utils)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser.snumber">snumber() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.snumber">snumber() (aggregate.parser.UnderwritingParser method)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentWrangler.stats">stats (aggregate.utils.MomentWrangler attribute)</a>
 </li>
@@ -478,12 +540,12 @@
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.TIMES">TIMES (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.TIMES">TIMES (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingLexer.tokens">tokens (aggregate.UnderwritingLexer attribute)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer.tokens">tokens (aggregate.parser.UnderwritingLexer attribute)</a>
 
       <ul>
-        <li><a href="parser.html#aggregate.UnderwritingParser.tokens">(aggregate.UnderwritingParser attribute)</a>
+        <li><a href="parser.html#aggregate.parser.UnderwritingParser.tokens">(aggregate.parser.UnderwritingParser attribute)</a>
 </li>
       </ul></li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.top_down">top_down() (aggregate.port.Portfolio method)</a>
@@ -502,21 +564,35 @@
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.uat_interpolation_functions">uat_interpolation_functions() (aggregate.port.Portfolio method)</a>
 </li>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter">Underwriter (class in aggregate.underwriter)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingLexer">UnderwritingLexer (class in aggregate)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingLexer">UnderwritingLexer (class in aggregate.parser)</a>
 </li>
-      <li><a href="parser.html#aggregate.UnderwritingParser">UnderwritingParser (class in aggregate)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser">UnderwritingParser (class in aggregate.parser)</a>
 </li>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.update">update() (aggregate.port.Portfolio method)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.update">update() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.update">(aggregate.port.Portfolio method)</a>
 </li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="W">W</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.weights">weights() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.weights">weights() (aggregate.parser.UnderwritingParser method)</a>
+</li>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.write">write() (aggregate.underwriter.Underwriter method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.write_from_file">write_from_file() (aggregate.underwriter.Underwriter method)</a>
+</li>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.write_test">write_test() (aggregate.underwriter.Underwriter method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -524,7 +600,7 @@
 <h2 id="X">X</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="parser.html#aggregate.UnderwritingParser.xps">xps() (aggregate.UnderwritingParser method)</a>
+      <li><a href="parser.html#aggregate.parser.UnderwritingParser.xps">xps() (aggregate.parser.UnderwritingParser method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>

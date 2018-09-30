@@ -3,183 +3,110 @@ lexer and parser specification for aggregate
 ============================================
 
 Overview
---------
+    Implements the ``agg`` programming lanaguage
 
-Ignored colon, comma, ( ) |
+Example program
+    The following short program replicates Thought Experiemnt 1 from Neil Bodoff's
+    paper Capital Allocation by Percentile Layer
 
-port BODOFF1 note{Bodoff Thought Experiment No. 1}
-    agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
-    agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+    ::
 
-tab or four spaces needed and are replaced with space (program is on one line)
+        port BODOFF1 note{Bodoff Thought Experiment No. 1}
+            agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
+            agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+Preprocessing
+    tab or four spaces needed and are replaced with space (program is on one line)
+
+
+Ignored characters
+    colon, comma, ( ) |
+
 
 Language Specification
 ----------------------
 
-answer              	:: sev_out
-                    	 | agg_out
-                    	 | port_out
+::
 
-port_out            	:: port_name note agg_list
+    answer              :: sev_out
+                             | agg_out
+                             | port_out
 
-agg_list            	:: agg_list agg_out
-                    	 | agg_out
+    port_out            :: port_name note agg_list
 
-agg_out             	:: agg_name builtin_aggregate note
-                    	 | agg_name exposures layers SEV sev freq note
+    agg_list            :: agg_list agg_out
+                             | agg_out
 
-sev_out             	:: sev_out sev_name sev note
-                    	 | sev_name sev note
+    agg_out             :: agg_name builtin_aggregate note
+                             | agg_name exposures layers SEV sev freq note
 
-freq                	:: MIXED ID NUMBER NUMBER
-                    	 | MIXED ID NUMBER
-                    	 | FREQ NUMBER
-                    	 | FREQ
+    sev_out             :: sev_out sev_name sev note
+                             | sev_name sev note
 
-sev                 	:: sev PLUS numbers
-                    	 | sev MINUS numbers
-                    	 | numbers TIMES sev
-                    	 | ids numbers CV numbers weights
-                    	 | ids numbers weights
-                    	 | ids numbers numbers weights xps
-                    	 | ids xps
-                    	 | builtinids
+    freq                :: MIXED ID snumber snumber
+                             | MIXED ID snumber
+                             | FREQ snumber
+                             | FREQ
 
-xps                 	:: XPS numbers numbers
-                    	 | 
+    snumber             :: NUMBER
+                             | MINUS NUMBER %prec UMINUS
 
-weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER
-                    	 | WEIGHTS numbers
-                    	 | 
+    sev                 :: sev PLUS numbers
+                             | sev MINUS numbers
+                             | numbers TIMES sev
+                             | ids numbers CV numbers weights
+                             | ids numbers weights
+                             | ids numbers numbers weights xps
+                             | ids xps
+                             | builtinids numbers numbers
+                             | builtinids
 
-layers              	:: numbers XS numbers
-                    	 | 
+    xps                 :: XPS numbers numbers
+                             |
 
-note                	:: NOTE
-                    	 | 
+    weights             :: WEIGHTS EQUAL_WEIGHT NUMBER
+                             | WEIGHTS numbers
+                             |
 
-exposures           	:: numbers CLAIMS
-                    	 | numbers LOSS
-                    	 | numbers PREMIUM AT numbers LR
-                    	 | numbers PREMIUM AT numbers
+    layers              :: numbers XS numbers
+                             |
 
-builtinids          	:: BUILTINID
+    note                :: NOTE
+                             |
 
-ids                 	:: "[" idl "]"
-                    	 | ID
+    exposures           :: numbers CLAIMS
+                             | numbers LOSS
+                             | numbers PREMIUM AT numbers LR
+                             | numbers PREMIUM AT numbers
 
-idl                 	:: idl ID
-                    	 | ID
+    builtinids          :: BUILTINID
 
-numbers             	:: "[" numberl "]"
-                    	 | NUMBER
+    ids                 :: "[" idl "]"
+                             | ID
 
-numberl             	:: numberl NUMBER
-                    	 | NUMBER
+    idl                 :: idl ID
+                             | ID
 
-builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER
-                    	 | NUMBER TIMES builtin_aggregate_dist
-                    	 | builtin_aggregate_dist
+    numbers             :: "[" numberl "]"
+                             | NUMBER
 
-builtin_aggregate_dist	:: BUILTINID
+    numberl             :: numberl NUMBER
+                             | NUMBER
 
-sev_name            	:: SEV ID
+    builtin_aggregate   :: builtin_aggregate_dist TIMES NUMBER
+                             | NUMBER TIMES builtin_aggregate_dist
+                             | builtin_aggregate_dist
 
-agg_name            	:: AGG ID
+    builtin_aggregate_dist	:: BUILTINID
 
-port_name           	:: PORT ID
+    sev_name            :: SEV ID
+
+    agg_name            :: AGG ID
+
+    port_name           :: PORT ID
 
 parser.out parser debug information
 -----------------------------------
-
-Grammar:
-
-Rule 0     S' -> ans
-Rule 1     ans -> name exposures layers sev_term freq
-Rule 2     ans -> name builtin_aggregate
-Rule 3     freq -> <empty>
-Rule 4     freq -> POISSON
-Rule 5     freq -> FIXED
-Rule 6     freq -> MIXED ids numbers
-Rule 7     freq -> MIXED ids numbers numbers
-Rule 8     sev_term -> ON sev
-Rule 9     sev -> builtinids
-Rule 10    sev -> ids numbers numbers weights xps
-Rule 11    sev -> ids numbers weights
-Rule 12    sev -> ids numbers CV numbers weights
-Rule 13    sev -> numbers TIMES sev  [precedence=left, level=2]
-Rule 14    sev -> sev MINUS numbers  [precedence=left, level=1]
-Rule 15    sev -> sev PLUS numbers  [precedence=left, level=1]
-Rule 16    xps -> <empty>
-Rule 17    xps -> XPS numbers numbers
-Rule 18    weights -> <empty>
-Rule 19    weights -> WEIGHTS numbers
-Rule 20    layers -> <empty>
-Rule 21    layers -> numbers XS numbers
-Rule 22    exposures -> numbers PREMIUM AT numbers
-Rule 23    exposures -> numbers PREMIUM AT numbers LR
-Rule 24    exposures -> numbers LOSS
-Rule 25    exposures -> numbers CLAIMS
-Rule 26    builtinids -> BUILTINID
-Rule 27    builtinids -> [ builtinidl ]
-Rule 28    builtinidl -> BUILTINID
-Rule 29    builtinidl -> builtinidl BUILTINID
-Rule 30    ids -> ID
-Rule 31    ids -> [ idl ]
-Rule 32    idl -> ID
-Rule 33    idl -> idl ID
-Rule 34    numbers -> NUMBER
-Rule 35    numbers -> [ numberl ]
-Rule 36    numberl -> NUMBER
-Rule 37    numberl -> numberl NUMBER
-Rule 38    builtin_aggregate -> BUILTINID
-Rule 39    builtin_aggregate -> NUMBER TIMES BUILTINID
-Rule 40    builtin_aggregate -> BUILTINID TIMES NUMBER
-Rule 41    name -> ID
-
-Terminals, with rules where they appear:
-
-AT                   : 22 23
-BUILTINID            : 26 28 29 38 39 40
-CLAIMS               : 25
-CV                   : 12
-FIXED                : 5
-ID                   : 30 32 33 41
-LOSS                 : 24
-LR                   : 23
-MINUS                : 14
-MIXED                : 6 7
-NUMBER               : 34 36 37 39 40
-ON                   : 8
-PLUS                 : 15
-POISSON              : 4
-PREMIUM              : 22 23
-TIMES                : 13 39 40
-WEIGHTS              : 19
-XPS                  : 17
-XS                   : 21
-[                    : 27 31 35
-]                    : 27 31 35
-error                :
-
-Nonterminals, with rules where they appear:
-
-ans                  : 0
-builtin_aggregate    : 2
-builtinidl           : 27 29
-builtinids           : 9
-exposures            : 1
-freq                 : 1
-idl                  : 31 33
-ids                  : 6 7 10 11 12
-layers               : 1
-name                 : 1 2
-numberl              : 35 37
-numbers              : 6 7 7 10 10 11 12 12 13 14 15 17 17 19 21 21 22 22 23 23 24 25
-sev                  : 8 13 14 15
-sev_term             : 1
-weights              : 10 11 12
-xps                  : 10
 
 Lexer term definition
 ---------------------
@@ -212,33 +139,54 @@ Lexer term definition
     ID['fixed'] = FIXED
     ID['inf'] = NUMBER
 
-Testing Code
+Example Code
 ------------
 
+    ::
 
-    from aggregate.underwriter import Underwriter
-    uu = Underwriter(debug=True)
+        port Complex~Portfolio~Mixed
+            agg LineA  50  claims           sev lognorm 12 cv [2, 3, 4] wt [.3 .5 .2] mixed gamma 0.4
+            agg LineB  24  claims 10 x 5    sev lognorm 12 cv [{', '.join([str(i) for i in np.linspace(2,5, 20)])}] wt=20 mixed gamma 0.35
+            agg LineC 124  claims 120 x 5   sev lognorm 16 cv 3.4                     mixed gamma 0.45
 
-    # test cases
+        port Complex~Portfolio
+            agg Line3  50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 2, 3]        mixed gamma 0.25
+            agg Line9  24  claims [5 10 15] x 5         sev lognorm 12 cv [1, 2, 3] wt=3   mixed gamma 0.25
 
-    uw.test_write('myname: 100 premium at .4 lr lognorm 12 .3')
-    uw.test_write('myname: 100 premium at .4 lr lognorm 12 cv .3')
-    uw.test_write('myname: uw.cmp')
-    uw.test_write('mycmp: uw.cmp; my1000cmp: 1000 * uw.cmp; mycmp1000 uw.cmp*0.001')
-    uw.test_write('myname:  uw.cmp * 0.000001')
+        port Portfolio~2
+            agg CA 500 prem at .5 lr 15 x 12  sev gamma 12 cv [2 3 4] wt [.3 .5 .2] mixed gamma 0.4
+            agg FL 1.7 claims 100 x 5         sev 10000 * pareto 1.3 - 10000        poisson
+            agg IL 1e-8 * agg.CMP
+            agg OH agg.CMP * 1e-8
+            agg NY 500 prem at .5 lr 15 x 12  sev [20 30 40 10] * gamma [9 10 11 12] cv [1 2 3 4] wt =4 mixed gamma 0.4
 
-    uw.test_write('''A: 500 premium at 0.5   gamma 12 cv .30 (mixed gamma 0.014)
-    A1: 500 premium at 0.5 lr  gamma 12 cv .30 (mixed gamma 0.014)
-    A2: 50  claims 30 xs 10  gamma 12 cv .30 (mixed gamma 0.014)
-    A3: 50  claims    gamma 12 cv .30 (mixed gamma 0.014)
-    A4: 50  claims 30 xs 20  gamma 12 cv .30 (mixed gamma 0.14)
-    cmp: 1000 * uw.cmp''')
+        sev proda 30000 * lognorm 2
+        sev prodc:   50000 * lognorm(3)
+        sev weird    50000 * beta(1, 4) + 10000
+        sev premsop1 25000 * lognorm 2.3; sev premsop2 35000 * lognorm 2.4;
+        sev premsop3 45000 * lognorm 2.8
 
-    uw.test_write(''' B 15 claims 15 xs 15 lognorm 12 cv 1.5 + 2 mixed gamma 4.8
-    Cat 1.7 claims 25 xs 5 25 * pareto 1.3 0 - 25 poisson ''')
+        agg Agg1     20 claims 10 x 2 sev lognorm 12 cv 0.2 mixed gamma 0.8
+        agg Agg2     20 claims 10 x 2 sev 15 * lognorm 2.5  poisson;
+        sev premsop1 25000 * lognorm 2.3;
+        agg Agg3     20 claims 10 x 2 on 25 * lognorm 2 fixed;
 
-    uw.test_write('weighted 1000 loss 500 xs 100 lognorm 12 [0.3, 0.5, 0.9] wts [.3333, .3333, .3334] ')
+        port MyFirstPortfolio
+            agg A1: 50  claims          sev gamma 12 cv .30 (mixed gamma 0.014)
+            agg A2: 50  claims 30 xs 10 sev gamma 12 cv .30 (mixed gamma 0.014)
+            agg A3: 50  claims          sev gamma 12 cv 1.30 (mixed gamma 0.014)
+            agg A4: 50  claims 30 xs 20 sev gamma 12 cv 1.30 (mixed gamma 0.14)
+            agg B 15 claims 15 xs 15 sev lognorm 12 cv 1.5 + 2 mixed gamma 4.8
+            agg Cat 1.7 claims 25 xs 5  sev 25 * pareto 1.3 0 - 25 poisson
+            agg ppa: 1e-8 * agg.PPAL
 
+        port distortionTest
+            agg mix    50 claims              [50, 100, 150, 200] xs 0  sev lognorm 12 cv [1,2,3,4]    poisson
+            agg low    500 premium at 0.5     5 xs 5                    sev gamma 12 cv .30            mixed gamma 0.2
+            agg med    500 premium at 0.5 lr  15 xs 10                  sev gamma 12 cv .30            mixed gamma 0.4
+            agg xsa    50  claims             30 xs 10                  sev gamma 12 cv .30            mixed gamma 1.2
+            agg hcmp   1e-8 * agg.CMP
+            agg ihmp   agg.PPAL * 1e-8
 
 References
 ----------
@@ -441,14 +389,14 @@ class UnderwritingParser(Parser):
     # binomial p or TODO inflated poisson
     @_('FREQ snumber')
     def freq(self, p):
-        self.log(f'Named frequency distribution {p.FREQ} parameter {p.snumber} to freq')
+        self.log(f'resolving named frequency distribution {p.FREQ} parameter {p.snumber} to freq')
         if p.FREQ != 'binomial':
             warnings.warn(f'Illogical choice of frequency {p.FREQ}, expected binomial')
         return {'freq_name': p.FREQ, 'freq_a': p.snumber}
 
     @_('FREQ')
     def freq(self, p):
-        self.log(f'Named frequency distribution {p.FREQ} resolve to freq')
+        self.log(f'resolving named frequency distribution {p.FREQ} to freq')
         if p.FREQ not in ('poisson', 'bernoulli', 'fixed'):
             warnings.warn(f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli or fixed')
         return {'freq_name': p.FREQ}
@@ -582,7 +530,7 @@ class UnderwritingParser(Parser):
     # layer terms, optoinal ===================================
     @_('numbers XS numbers')
     def layers(self, p):
-        self.log(f'numbers XS numbers to layers {p[0]} xs {p[2]}')
+        self.log(f'resolving numbers XS numbers to layers {p[0]} xs {p[2]}')
         return {'exp_attachment': p[2], 'exp_limit': p[0]}
 
     @_('')

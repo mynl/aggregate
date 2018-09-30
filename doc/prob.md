@@ -47,29 +47,31 @@ annual aggregate deductibles or other variable features. The FFT
 provides a discrete approximation to the moment generating function.
 
 To use the FFT method, first "bucket" (or quantize) the severity
-distribution into a density vector $\bm{x}=(x_1,\dots,x_{m})$ whose length
-$m$ is a power of two $m=2^n$. Here $$\begin{gathered}
-x_i= \text{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\text{Pr}(X<b/2),\quad x_{m}=\text{Pr}(X>(m-1/2)b)\end{gathered}$$
+distribution into a density vector $\text{x}=(x_1,\dots,x_{m})$ whose length
+$m$ is a power of two $m=2^n$. Here
+$$
+\begin{gathered}
+x_i= \text{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\text{Pr}(X<b/2),\quad x_{m}=\text{Pr}(X>(m-1/2)b)\end{gathered}
+$$
+
 for some fixed $b$. We call $b$ the bucket size. Note $\sum_i
-x_i=1$ by construction. The FFT of the $m\times 1$ vector $\bm{x}$ is
-another $m\times 1$ vector $\hat\bm{x}$ whose $j$th component is
+x_i=1$ by construction. The FFT of the $m\times 1$ vector $\text{x}$ is
+another $m\times 1$ vector $\hat{\text{x}}$ whose $j$th component is
 $$
 \sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).\label{fft}
 $$
-The
-coefficients of $\hat\bm{x}$ are complex numbers. It is also possible to
-express $\hat\bm{x}=\F\bm{x}$ where $\F$ is an appropriate matrix of complex
+
+The coefficients of $\hat{\text{x}}$ are complex numbers. It is also possible to
+express $\hat{\text{x}}=\text{F}\text{x}$ where $\text{F}$ is an appropriate matrix of complex
 roots of unity, so there is nothing inherently mysterious about a FFT.
-The trick is that there exists a very efficient algorithm for computing
-([\[fft\]](#fft){reference-type="ref" reference="fft"}). Rather than
+The trick is that there exists a very efficient algorithm for computing. Rather than
 taking time proportional to $m^2$, as one would expect, it can be
 computed in time proportional to $m\log(m)$. The difference between
 $m\log(m)$ and $m^2$ time is the difference between practically possible
 and practically impossible.
 
-You can use the inverse FFT to recover $\bm{x}$ from its transform $\hat\bm{x}$.
-The inverse FFT is computed using the same equation
-([\[fft\]](#fft){reference-type="ref" reference="fft"}) as the FFT
+You can use the inverse FFT to recover $\text{x}$ from its transform $\hat{\text{x}}$.
+The inverse FFT is computed using the same equation as the FFT
 except there is a minus sign in the exponent and the result is divided
 by $2^n$. Because the equation is essentially the same, the inversion
 process can also be computed in $m\log(m)$ time.
@@ -80,18 +82,20 @@ then
 $$
 M_A(\zeta)=M_G(n(M_X(\zeta)-1)).
 $$
-Using FFTs you can replace the *function* $M_X$ with the discrete approximation *vector* $\hat\bm{x}$ and
+
+Using FFTs you can replace the *function* $M_X$ with the discrete approximation *vector* $\hat{\text{x}}$ and
 compute
 $$
-\hat\a=M_G(n(\hat\bm{x} -1))
+\hat{\text{a}}=M_G(n(\hat{\text{x}} -1))
 $$
+
 component-by-component to get an
 approximation vector to the function $M_A$. You can then use the inverse
-FFT to recover an discrete approximation $\a$ of $A$ from $\hat\a$! See
-Wang [@bigWang] for more details.
+FFT to recover an discrete approximation $\text{a}$ of $A$ from $\hat{\text{a}}$! See
+Wang for more details.
 
-Similar tricks are possible in two dimensions---see Press et al. [@nrc]
-and Homer and Clark [@homerclark] for a discussion.
+Similar tricks are possible in two dimensions---see Press et al.
+and Homer and Clark for a discussion.
 
 The FFT allows us to use the following very simple method to
 qualitatively approximate the density of an aggregate of dependent
@@ -112,12 +116,12 @@ to an $N$. (It is easy to use MGFs to deconvolve $N$ from the true sum
 using Fourier methods; the question is whether the resulting
 "distribution" is non-negative.)
 
-Heckman and Meyers [@heckmeyers] used Fourier transforms to compute
+Heckman and Meyers   used Fourier transforms to compute
 aggregate distributions by numerically integrating the characteristic
 function. Direct inversion of the Fourier transform is also possible
 using FFTs. The application of FFTs is not completely straight forward
 because of certain aspects of the approximations involved. The details
-are very clearly explained in Menn and Rachev [@mennrachev]. Their
+are very clearly explained in Menn and Rachev. Their
 method allows the use of FFTs to determine densities for distributions
 which have analytic MGFs but not densities---notably the class of stable
 distributions.

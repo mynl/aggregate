@@ -21,13 +21,11 @@ class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
 
-    freq_moms(n): returns EN^2 and EN^3 when EN=n
+    freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
 
     mgf(n, z): returns the moment generating function applied to z when EN=n
 
-    =================================
-    Available Frequency Distributions
-    =================================
+    **Available Frequency Distributions**
 
     **Non-Mixture** Types
 
@@ -35,11 +33,11 @@ class Frequency(object):
     * ``bernoulli``: exp_en interpreted as a probability, must be < 1
     * ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
     * ``poisson``: Poisson(freq_a)
-    * ``pascal`` [poisson]: a poisson stopped sum of negative binomial; exp_en gives the overall
-        claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
-        number of claimants per claim (or claims per occurrence). Hence the Poisson component
-        has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
-        cv freq_a
+    * ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
+      claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
+      number of claimants per claim (or claims per occurrence). Hence the Poisson component
+      has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
+      cv freq_a
 
     **Mixture** Types
 
@@ -48,7 +46,7 @@ class Frequency(object):
     distribution. See Panjer and Willmot or JKK.
 
     In all cases freq_a is the CV of the mixing distribution which corresponds to the
-    asympototic CV of the frequency distribution.
+    asympototic CV of the frequency distribution and of any aggregate when the severity has a variance.
 
     * ``gamma``: negative binomial, freq_a = cv of gamma distribution
     * ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
@@ -68,6 +66,11 @@ class Frequency(object):
     * ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
       method should be used carefully. It has poor numerical stability and can produce bizzare
       aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
+
+    :param freq_name:
+    :param freq_a:
+    :param freq_b:
+
     """
 
     __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b']
@@ -76,9 +79,6 @@ class Frequency(object):
         """
         creates the mgf and moment function
 
-        :param freq_name:
-        :param freq_a:
-        :param freq_b:
 
         """
         self.freq_name = freq_name
@@ -379,11 +379,11 @@ class Aggregate(Frequency):
         a mixing distribution across all broadcast terms to ensure an appropriate inter-
         class correlation.
 
-        Limit Profiles
-        --------------
-
+    Limit Profiles
         The exposure variables can be vectors to express a *limit profile*.
         All exp_ elements are broadcast against one-another. For example
+
+        ::
 
         [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000
 
@@ -391,55 +391,61 @@ class Aggregate(Frequency):
         400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
         the same, but they could vary too, as could the attachments.
 
-        Mixtures
-        --------
-
-        The severity variables can be vectors to express a *mixed severity*. All sev_
+    Mixtures
+        The severity variables can be vectors to express a *mixed severity*. All ``sev_``
         elements are broadcast against one-another. For example
 
-        sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
+        ::
+
+            sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
 
         expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
         weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
         relevant number of components.
 
-        Limit Profiles and Mixtures
-        ---------------------------
-
+    Limit Profiles and Mixtures
         Limit profiles and mixtures can be combined. Each mixed severity is applied to each
         limit profile component. For example
 
-        ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75] '
-                'sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')
+        ::
+
+            ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]
+                sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')```
 
         creates an aggregate with six severity subcomponents
 
-                #  limit	attachment    claims
-                0	100	         0			 6
-                1	100	         0			 4
-                2	200	        50			12
-                3	200	        50			 8
-                4	 75	        75			18
-                5	 75	        75			12
+        +---+-------+------------+--------+
+        | # | limit | attachment | claims |
+        +===+=======+============+========+
+        | 0 | 100   |  0         |  6     |
+        +---+-------+------------+--------+
+        | 1 | 100   |  0         |  4     |
+        +---+-------+------------+--------+
+        | 2 | 200   | 50         | 12     |
+        +---+-------+------------+--------+
+        | 3 | 200   | 50         |  8     |
+        +---+-------+------------+--------+
+        | 4 |  75   | 75         | 18     |
+        +---+-------+------------+--------+
+        | 5 |  75   | 75         | 12     |
+        +---+-------+------------+--------+
 
-        Circumventing Products
-        ----------------------
-
+    Circumventing Products
         It is sometimes desirable to enter two or more lines each with a different severity but
         with a shared mixing variable. For example to model the current accident year and a run-
         off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
         larger lognormal mean 150 cv 1.25 claims requires
 
-        agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]
+        ::
+
+            agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]
 
         so that the result is not the four-way exposure / severity product but just a two-way
         combination. These two cases are distinguished looking at the total weights. If the weights sum to
         one then the result is an exposure / severity product. If the weights are missing or sum to the number
         of severity components (i.e. are all equal to 1) then the result is a row by row combination.
 
-        Other notes
-        -----------
-
+    Other notes
         * en determines en
         * prem x loss ratio -> el
         * severity x en -> el
@@ -460,29 +466,29 @@ class Aggregate(Frequency):
         * X is the GROUND UP severity, so X | X > attachment is used and generates n claims
 
         * For fixed or histogram have to separate the parameter so they are not broad cast; otherwise
-        you end up with multiple lines when you intend only one
+          you end up with multiple lines when you intend only one
 
 
-        :param name:
-        :param exp_el:   expected loss or vector
-        :param exp_premium: premium volume or vector  (requires loss ratio)
-        :param exp_lr:  loss ratio or vector  (requires premium)
-        :param exp_en:  expected claim count per segment (self.n = total claim count)
-        :param exp_attachment: occurrence attachment
-        :param exp_limit: occurrence limit
-        :param sev_name: severity name or sev.BUILTIN_SEV or meta.BUILTIN agg or port or similar or vector or matrix
-        :param sev_a:  scipy stats shape parameter
-        :param sev_b: scipy stats shape parameter
-        :param sev_mean: average (unlimited) severity
-        :param sev_cv: unlimited severity coefficient of variation
-        :param sev_loc: scipy stats location parameter
-        :param sev_scale: scipy stats scale parameter
-        :param sev_xs:  xs and ps must be provided if sev_name is (c|d)histogram
-        :param sev_ps:
-        :param sev_wt: weight for mixed distribution
-        :param freq_name: name of frequency distribution
-        :param freq_a: cv of freq dist mixing distribution
-        :param freq_b: claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
+        :param name:            name of the aggregate
+        :param exp_el:          expected loss or vector
+        :param exp_premium:     premium volume or vector  (requires loss ratio)
+        :param exp_lr:          loss ratio or vector  (requires premium)
+        :param exp_en:          expected claim count per segment (self.n = total claim count)
+        :param exp_attachment:  occurrence attachment
+        :param exp_limit:       occurrence limit
+        :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
+        :param sev_a:           scipy stats shape parameter
+        :param sev_b:           scipy stats shape parameter
+        :param sev_mean:        average (unlimited) severity
+        :param sev_cv:          unlimited severity coefficient of variation
+        :param sev_loc:         scipy stats location parameter
+        :param sev_scale:       scipy stats scale parameter
+        :param sev_xs:          xs and ps must be provided if sev_name is (c|d)histogram, xs are the bucket break points
+        :param sev_ps:          ps are the probability densities within each bucket; if buckets equal size no adjustments needed
+        :param sev_wt:          weight for mixed distribution
+        :param freq_name:       name of frequency distribution
+        :param freq_a:          cv of freq dist mixing distribution
+        :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
     """
 
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
@@ -712,7 +718,7 @@ class Aggregate(Frequency):
         Continuous is used when you think of the resulting distribution as continuous across the buckets
         (which we generally don't). We use the discretized distribution as though it is fully discrete
         and only takes values at the bucket points. Hence we should use sev_calc='discrete'. The buckets are
-        shifted left by half a bucket, so Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2).
+        shifted left by half a bucket, so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2)`.
 
         The other wrinkle is the right hand end of the range. If we extend to np.inf then we ensure we have
         probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
@@ -957,6 +963,8 @@ class Aggregate(Frequency):
 
         From examples on last page of paper:
 
+        ::
+
             beta(x) = a ==> adjust frequency by factor of e^a
             beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
             beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
@@ -1002,7 +1010,7 @@ class Aggregate(Frequency):
         :param axiter: optional axiter object
         :param aspect: optional aspect ratio of individual plots
         :param figsize: optional overall figure size
-       :return:
+        :return:
         """
 
         if self.agg_density is None:
@@ -1317,7 +1325,7 @@ class Severity(ss.rv_continuous):
                 raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
                                  f', you passed {sev_name}')
 
-        elif type(sev_name) is not np.str_:
+        elif not isinstance(sev_name, (str, np.str_)):
             # must be a meta object - replaced in Undewriter.write
             log2 = sev_a
             bs = sev_b       # if zero it is happy to take whatever....

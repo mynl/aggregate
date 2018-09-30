@@ -106,8 +106,8 @@ html_theme_options = {
     "edit_link": "true",
     "sidebar": "right",
     "scipy_org_logo": "false",
-    "rootlinks": [("http://SOMETHING/", "agg?"),
-                  ("http://www.mynl.com/aggregate/index.html", "agg Docs")]
+    "rootlinks": [("https://github.com/mynl/aggregate", "aggregate Code"),]
+                  # ("http://www.mynl.com/aggregate/index.html", "aggregate Docs")]
 }
 # html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
 # 'description': 'aggregate is a Python package providing fast, accurate, and expressive data'

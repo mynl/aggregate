@@ -49,8 +49,7 @@
 	    <div class="spc-navbar">
               
     <ul class="nav nav-pills pull-left">
-        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
-        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
         <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
 	
@@ -88,6 +87,10 @@
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">ss</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">from</span> <span class="nn">scipy.spatial</span> <span class="k">import</span> <span class="n">ConvexHull</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="k">import</span> <span class="n">StringIO</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">from</span> <span class="nn">.</span> <span class="n">utils</span> <span class="kn">import</span> <span class="nn">axiter_factory</span><span class="o">,</span> <span class="nn">suptitle_and_tight</span>
 
 
@@ -98,9 +101,9 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># make these (mostly) immutable...avoid changing by mistake</span>
-    <span class="n">_available_distortions_</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;ph&#39;</span><span class="p">,</span> <span class="s1">&#39;wang&#39;</span><span class="p">,</span> <span class="s1">&#39;lep&#39;</span><span class="p">,</span> <span class="s1">&#39;ly&#39;</span><span class="p">,</span> <span class="s1">&#39;clin&#39;</span><span class="p">,</span> <span class="s1">&#39;tvar&#39;</span><span class="p">)</span>
+    <span class="n">_available_distortions_</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;ph&#39;</span><span class="p">,</span> <span class="s1">&#39;wang&#39;</span><span class="p">,</span> <span class="s1">&#39;lep&#39;</span><span class="p">,</span> <span class="s1">&#39;ly&#39;</span><span class="p">,</span> <span class="s1">&#39;clin&#39;</span><span class="p">,</span> <span class="s1">&#39;tvar&#39;</span><span class="p">,</span> <span class="s1">&#39;convex&#39;</span><span class="p">)</span>
     <span class="n">_long_names_</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;Proportional Hazard&quot;</span><span class="p">,</span> <span class="s2">&quot;Wang-normal&quot;</span><span class="p">,</span> <span class="s2">&quot;Layer Equivalent Pricing&quot;</span><span class="p">,</span> <span class="s2">&quot;Linear Yield&quot;</span><span class="p">,</span> <span class="s2">&quot;Capped Linear&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;Tail VaR&quot;</span><span class="p">)</span>
+                    <span class="s2">&quot;Tail VaR&quot;</span><span class="p">,</span> <span class="s2">&quot;Convex Envelope&quot;</span><span class="p">)</span>
     <span class="n">_eg_param_1_</span> <span class="o">=</span> <span class="p">(</span><span class="o">.</span><span class="mi">9</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">)</span>
     <span class="n">_eg_param_2_</span> <span class="o">=</span> <span class="p">(</span><span class="o">.</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">1.8</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">)</span>
     <span class="n">_distortion_names_</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">_available_distortions_</span><span class="p">,</span> <span class="n">_long_names_</span><span class="p">))</span>
@@ -115,19 +118,21 @@
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">pricing</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_available_distortions_</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_available_distortions_</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_available_distortions_</span></div>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">col_x</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">col_y</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        create new distortion</span>
-<span class="sd">        create from  g_spec = {name, shape} ising **g_spec!</span>
 
-<span class="sd">        :param name: ph wang lep ly clin</span>
+<span class="sd">        :param name: name of an available distortion, call ``Distortion.available_distortions()`` for a list</span>
 <span class="sd">        :param shape: float or [float, float]</span>
-
-
+<span class="sd">        :param shape: shape parameter</span>
+<span class="sd">        :param r0: risk free or rental rate of interest</span>
+<span class="sd">        :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize</span>
+<span class="sd">        :param col_x:</span>
+<span class="sd">        :param col_y:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span>
@@ -229,6 +234,14 @@
                 <span class="n">u</span> <span class="o">=</span> <span class="p">(</span><span class="n">mb</span> <span class="o">-</span> <span class="n">rad</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">a</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="n">d</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">u</span><span class="p">))</span>
 
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;convex&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">has_mass</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">hull</span> <span class="o">=</span> <span class="n">ConvexHull</span><span class="p">(</span><span class="n">df</span><span class="p">[[</span><span class="n">col_x</span><span class="p">,</span> <span class="n">col_y</span><span class="p">]])</span>
+            <span class="n">knots</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">hull</span><span class="o">.</span><span class="n">simplices</span><span class="o">.</span><span class="n">flatten</span><span class="p">()))</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">knots</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">col_x</span><span class="p">)],</span>
+                         <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">knots</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">col_y</span><span class="p">)],</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">)</span>
+            <span class="n">g_inv</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">knots</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">col_y</span><span class="p">)],</span>
+                         <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">knots</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">col_x</span><span class="p">)],</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Incorrect spec passed to distortion_factory; implemented g types are ph, wang, tvar, &quot;</span>
@@ -243,7 +256,10 @@
 
 <span class="sd">        :return:</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">s</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self._distortion_names_[self.name]}</span><span class="se">\n</span><span class="si">{self.shape:.3f}</span><span class="s1">&#39;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self._distortion_names_[self.name]}</span><span class="se">\n</span><span class="si">{self.shape}</span><span class="s1">&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self._distortion_names_[self.name]}</span><span class="se">\n</span><span class="si">{self.shape:.3f}</span><span class="s1">&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_mass</span><span class="p">:</span>
             <span class="n">s</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;, </span><span class="si">{self.r0:.3f}</span><span class="s1">&#39;</span>
         <span class="c1"># else:</span>
@@ -306,6 +322,12 @@
             <span class="n">dist</span> <span class="o">=</span> <span class="n">Distortion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">r0</span><span class="p">)</span>
             <span class="n">dist</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">))</span>
 
+        <span class="n">dist</span> <span class="o">=</span> <span class="n">Distortion</span><span class="o">.</span><span class="n">convex_example</span><span class="p">(</span><span class="s1">&#39;yield&#39;</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">))</span>
+
+        <span class="n">dist</span> <span class="o">=</span> <span class="n">Distortion</span><span class="o">.</span><span class="n">convex_example</span><span class="p">(</span><span class="s1">&#39;cat&#39;</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">axiter</span><span class="p">))</span>
+
         <span class="n">axiter</span><span class="o">.</span><span class="n">tidy</span><span class="p">()</span>
         <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="s1">&#39;Example Distortion Functions&#39;</span><span class="p">)</span></div>
 
@@ -336,7 +358,51 @@
             <span class="n">axiter</span><span class="o">.</span><span class="n">tidy</span><span class="p">()</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="n">dists</span>  <span class="c1"># [g_lep, g_ph, g_wang, g_ly, g_clin]</span></div></div>
+        <span class="k">return</span> <span class="n">dists</span>  <span class="c1"># [g_lep, g_ph, g_wang, g_ly, g_clin]</span></div>
+
+<div class="viewcode-block" id="Distortion.convex_example"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.convex_example">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">convex_example</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s1">&#39;yield&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf</span>
+
+<span class="sd">        :param source: yield gives yield curve example, cat gives cat bond / cat reinsurance pricing based example</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">source</span> <span class="o">==</span> <span class="s1">&#39;yield&#39;</span><span class="p">:</span>
+            <span class="n">yield_curve</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">            AAAA    0.000000  0.000000</span>
+<span class="s1">            AAA     0.000018  0.006386</span>
+<span class="s1">            AA      0.000144  0.007122</span>
+<span class="s1">            A       0.000278  0.010291</span>
+<span class="s1">            BBB     0.002012  0.017089</span>
+<span class="s1">            BB      0.012674  0.036455</span>
+<span class="s1">            B       0.040052  0.069181</span>
+<span class="s1">            Z       1.000000  1.000000&#39;&#39;&#39;</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_fwf</span><span class="p">(</span><span class="n">StringIO</span><span class="p">(</span><span class="n">yield_curve</span><span class="p">))</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Rating&#39;</span><span class="p">,</span> <span class="s1">&#39;EL&#39;</span><span class="p">,</span> <span class="s1">&#39;Yield&#39;</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">Distortion</span><span class="p">(</span><span class="s1">&#39;convex&#39;</span><span class="p">,</span> <span class="s1">&#39;Yield Curve&#39;</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">col_x</span><span class="o">=</span><span class="s1">&#39;EL&#39;</span><span class="p">,</span> <span class="n">col_y</span><span class="o">=</span><span class="s1">&#39;Yield&#39;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">source</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;cat&#39;</span><span class="p">:</span>
+            <span class="n">cat_bond</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;EL,ROL</span>
+<span class="s1">            0.116196,0.32613</span>
+<span class="s1">            0.088113,0.2452</span>
+<span class="s1">            0.074811,0.22769</span>
+<span class="s1">            0.056385,0.17131</span>
+<span class="s1">            0.046923,0.15326</span>
+<span class="s1">            0.032961,0.12222</span>
+<span class="s1">            0.02807,0.11037</span>
+<span class="s1">            0.024205,0.1022</span>
+<span class="s1">            0.011564,0.07284</span>
+<span class="s1">            0.005813,0.06004</span>
+<span class="s1">            0,0</span>
+<span class="s1">            1,1&#39;&#39;&#39;</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">StringIO</span><span class="p">(</span><span class="n">cat_bond</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">Distortion</span><span class="p">(</span><span class="s1">&#39;convex&#39;</span><span class="p">,</span> <span class="s1">&#39;Cat Bond&#39;</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">col_x</span><span class="o">=</span><span class="s1">&#39;EL&#39;</span><span class="p">,</span> <span class="n">col_y</span><span class="o">=</span><span class="s1">&#39;ROL&#39;</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Inadmissible value </span><span class="si">{source}</span><span class="s1"> passed to convex_example, expected yield or cat&#39;</span><span class="p">)</span></div></div>
 </pre></div>
 
           </div>

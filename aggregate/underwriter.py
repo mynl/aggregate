@@ -6,6 +6,7 @@ Underwriter Class
 The Underwriter is an easy to use interface into the computational functionality of aggregate.
 
 The Underwriter
+---------------
 
 * Maintains a default library of severity curves
 * Maintains a default library of aggregate distributions corresponding to industry losses in
@@ -16,9 +17,13 @@ The Underwriter
 
 The library functions can be listed using
 
+::
+
         uw.list()
 
 or, for more detail
+
+::
 
         uw.describe()
 
@@ -31,6 +36,8 @@ description.
 The real power of Underwriter is access to the agg scripting language (see parser module). The scripting
 language allows severities, aggregates and portfolios to be created using more-or-less natural language.
 For example
+
+::
 
         pf = uw('''
         port MyCompanyBook
@@ -52,12 +59,17 @@ suggest reasonable buckets:
 
 >> pf.recommend_bucket()
 
-|       |      bs10 |     bs11 |       bs12 |       bs13 |      bs14 |      bs15 |      bs16 |   bs18 |   bs20 |
-|:------|----------:|---------:|-----------:|-----------:|----------:|----------:|----------:|-------:|-------:|
-| LineA |   3,903     |  1,951     |      976     |      488     |     244     |     122     |      61.0 |   15.2 |    3.8 |
-| LineB |   8,983     |  4,491     |  2,245       |  1,122       |     561     |     280     |     140     |   35.1 |    8.8 |
-| Cat   |  97,656     | 48,828     | 24,414       | 12,207       | 6,103       | 3,051       | 1,525       |  381     |   95.4 |
-| total | 110,543     | 55,271     | 27,635       | 13,817       | 6,908       | 3,454       | 1,727       |  431     |  108     |
++-------+---------+--------+--------+--------+-------+-------+-------+------+------+
+|       | bs10    | bs11   | bs12   | bs13   | bs14  | bs15  | bs16  | bs18 | bs20 |
++=======+=========+========+========+========+=======+=======+=======+======+======+
+| LineA | 3,903   | 1,951  | 976    | 488    | 244   | 122   | 61.0  | 15.2 | 3.8  |
++-------+---------+--------+--------+--------+-------+-------+-------+------+------+
+| LineB | 8,983   | 4,491  | 2,245  | 1,122  | 561   | 280   | 140   | 35.1 | 8.8  |
++-------+---------+--------+--------+--------+-------+-------+-------+------+------+
+| Cat   | 97,656  | 48,828 | 24,414 | 12,207 | 6,103 | 3,051 | 1,525 | 381  | 95.4 |
++-------+---------+--------+--------+--------+-------+-------+-------+------+------+
+| total | 110,543 | 55,271 | 27,635 | 13,817 | 6,908 | 3,454 | 1,727 | 431  | 108  |
++-------+---------+--------+--------+--------+-------+-------+-------+------+------+
 
 The column bsNcorrespond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each
 line and in total. For example with N=13 (i.e. 8196 buckets) the suggestion is 13817. It is best the bucket
@@ -65,20 +77,22 @@ size is a divisor of any limits or attachment points, so we select 10000.
 
 Updating can then be run as
 
-        bs = 10000
-        pf.update(13, bs)
-        pf.report('quick')
-        pf.plot('density')
-        pf.plot('density', logy=True)
-        print(pf)
+::
 
-Portfolio name           MyCompanyBook
-Theoretic expected loss     10,684,541.2
-Actual expected loss        10,657,381.1
-Error                          -0.002542
-Discretization size                   13
-Bucket size                     10000.00
-<aggregate.port.Portfolio object at 0x0000023950683CF8>
+    bs = 10000
+    pf.update(13, bs)
+    pf.report('quick')
+    pf.plot('density')
+    pf.plot('density', logy=True)
+    print(pf)
+
+    Portfolio name           MyCompanyBook
+    Theoretic expected loss     10,684,541.2
+    Actual expected loss        10,657,381.1
+    Error                          -0.002542
+    Discretization size                   13
+    Bucket size                     10000.00
+    <aggregate.port.Portfolio object at 0x0000023950683CF8>
 
 
 Etc. etc.
@@ -101,9 +115,6 @@ import warnings
 
 class Underwriter(object):
     """
-    Underwriter class
-    -----------------
-
     The underwriter class constructs real world examples from stored and user input Lines and Accounts.
     Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.
 
@@ -117,16 +128,19 @@ class Underwriter(object):
 
     data_types = ['portfolio', 'aggregate', 'severity']
 
-    def __init__(self, dir_name="", name='Rory', databases=None, store_mode=True, update=False,
+    def __init__(self, dir_name="", name='Rory', databases=None, glob=None, store_mode=True, update=False,
                  verbose=False, log2=10, debug=False):
         """
 
         :param dir_name:
+        :param name:
         :param databases:
+        :param glob: reference, e.g. to globals(), used to resolve meta.XX references
         :param store_mode: add newly created aggregates to the database?
         :param update:
+        :param verbose:
         :param log2:
-        :param debug: run parser in debug mode?
+        :param debug: run parser in debug mode
         """
 
         self.last_spec = None
@@ -135,6 +149,7 @@ class Underwriter(object):
         self.log2 = log2
         self.debug = debug
         self.verbose = verbose  # for update
+        self.glob = glob
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
         # otherwise these are hidden from pyCharm....
@@ -160,10 +175,9 @@ class Underwriter(object):
     def __getitem__(self, item):
         """
         handles self[item]
+
         subscriptable: try user portfolios, b/in portfolios, line, severity
         to access specifically use severity or line methods
-
-        ORDERING PROBLEM!
 
         :param item:
         :return:
@@ -289,15 +303,18 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
-    def write(self, portfolio_program, globs=None, **kwargs):
+    def write(self, portfolio_program, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
 
-        e.g. Input
-        port my_portfolio
-            20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
-            10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
-            100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
+        Input
+
+        ::
+
+            port my_portfolio
+                20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
+                10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
+                100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
 
         The indents are required...
 
@@ -305,15 +322,13 @@ class Underwriter(object):
 
         Reasonable kwargs:
 
-            bs
-            log2
-            verbose
-            update overrides class default
-            add_exa should port.add_exa add the exa related columns to the output?
+        * bs
+        * log2
+        * verbose
+        * update overrides class default
+        * add_exa should port.add_exa add the exa related columns to the output?
 
         :param portfolio_program:
-        :param globs: to use meta have to pass in dictionary containing all meta variables. E.g. globals()
-        is overkill but gets the job done.
         :param kwargs:
         :return:
         """
@@ -372,7 +387,7 @@ class Underwriter(object):
             _type, obj = self.__getitem__(portfolio_program)
         except LookupError:
             lookup_success = False
-            logging.warning(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
+            logging.info(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
         if lookup_success:
             logging.info(f'underwriter.write | object {portfolio_program[:500]} found, returning object...')
             if _type == 'agg':
@@ -399,12 +414,12 @@ class Underwriter(object):
         self._runner(portfolio_program)
 
         # if globs replace all meta objects with a lookup object
-        if globs is not None:
+        if self.glob is not None:
             for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
                 if a['sev_name'][0:4] == 'meta':
                     obj_name = a['sev_name'][5:]
                     try:
-                        obj = globs[obj_name]
+                        obj = self.glob[obj_name]
                     except NameError as e:
                         print(f'Object {obj_name} passed as a proto-severity cannot be found')
                         raise e

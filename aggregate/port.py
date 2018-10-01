@@ -20,7 +20,7 @@ from ruamel import yaml
 from .utils import *
 from .distr import Aggregate
 from .spectral import Distortion
-
+from .distr import Severity
 
 class Portfolio(object):
     """
@@ -66,6 +66,7 @@ class Portfolio(object):
         self.padding = 0
         self.tilt_amount = 0
         self.nearest_quantile_function = None
+        self._F = None
         self.log2 = 0
         self.last_update = 0
         self.hash_rep_at_last_update = ''
@@ -218,7 +219,7 @@ class Portfolio(object):
         """
         if filename == "":
             # TODO: directory naming
-            filename = 'c:/S/TELOS/Python/aggregate_project/user.yaml'
+            filename = './agg/user.yaml'
 
         with open(filename, mode=mode) as f:
             self.yaml(stream=f)
@@ -327,6 +328,43 @@ class Portfolio(object):
         q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind,
                                  bounds_error=False, fill_value='extrapolate')
         return q
+
+    def cdf(self, x):
+        """
+        distribution function
+
+        :param x:
+        :return:
+        """
+        if self._F is None:
+            self._F = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='linear',
+                                          bounds_error=False, fill_value='extrapolate')
+        return self._F(x)
+
+    def sf(self, x):
+        """
+        survival function
+
+        :param x:
+        :return:
+        """
+        return 1 - self.cdf(x)
+
+    def as_severity(self, limit=np.inf, attachment=0, conditional=False):
+        """
+        convert into a severity without recomputing
+
+        throws error if self not updated
+
+        :param limit:
+        :param attachment:
+        :param conditional:
+        :return:
+        """
+        if self.density_df is None:
+            raise ValueError('Must update prior to converting to severity')
+        return Severity(sev_name=self, sev_a=self.log2, sev_b=self.bs,
+                        exp_attachment=attachment, exp_limit=limit, conditional=conditional)
 
     def fit(self, approx_type='slognorm', output='agg'):
         """
@@ -652,11 +690,11 @@ class Portfolio(object):
 
         :param kind: density | audit | priority | quick | collateral
         :param line: lines to use, defaults to all
-        :param p:   for graphics audit controls loss scale
-        :param c:   collateral level
-        :param a:   asset level
+        :param p:   for graphics audit, x-axis scale has maximum q(p)
+        :param c:   collateral amount
+        :param a:   asset amount
         :param axiter: optional, pass in to use existing ``axiter``
-        :param figsize:
+        :param figsize: arguments passed to axis_factory if no axiter
         :param height:
         :param aspect:
         :param kwargs: passed to pandas plot routines
@@ -1338,7 +1376,7 @@ class Portfolio(object):
                                                   dist.shape, dist.error]
         return ans
 
-    def apply_distortions(self, dist_dict, As=None, Ps=None, num_plots=2):
+    def apply_distortions(self, dist_dict, As=None, Ps=None, axiter=None, num_plots=1):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
         show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
@@ -1353,11 +1391,15 @@ class Portfolio(object):
         if As is None:
             As = np.array([float(self.q(p)) for p in Ps])
 
+        if num_plots == 2 and axiter is None:
+            axiter = axiter_factory(None, len(dist_dict))
+        elif num_plots == 3 and axiter is None:
+            axiter = axiter_factory(None, 30)
+        else:
+            pass
+
         for g in dist_dict.values():
-            # axiter = axiter_factory(None, 24)
-            # df, au = self.apply_distortion(g, axiter)
-            # no plots at this point...
-            df, au = self.apply_distortion(g, None)
+            df, au = self.apply_distortion(g, axiter, num_plots)
             # extract range of S values
             temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
@@ -1390,19 +1432,16 @@ class Portfolio(object):
         # by line columns=method x capital
         if num_plots >= 1:
             display(ans_table)
-            html_title('LOSS RATIO row=return period, column=method, by line within plot', 3)
             sns.factorplot(x='line', y='value', row='return', col='method', size=2.5, kind='bar',
                            data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
-            html_title('LOSS RATIO row=return period, column=line, by method within plot', 3)
             sns.factorplot(x='method', y='value', row='return', col='line', size=2.5, kind='bar',
                            data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
-            html_title('LOSS RATIO row=line, column=method, by assets within plot', 3)
-            sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
-                           data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
+            # sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
+            #                data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
 
         return ans_table, ans_stacked
 
-    def apply_distortion(self, dist, axiter=None):
+    def apply_distortion(self, dist, axiter=None, num_plots=0):
         """
         Apply the distorion, make a copy of density_df and append various columns
         Handy graphic of results
@@ -1410,11 +1449,9 @@ class Portfolio(object):
 
         :param dist: CDistortion
         :param axiter: axis iterator, if None no plots are returned
+        :param num_plots: =2 plot the sum of parts vs. total plot; =3 go to town
         :return: density_df with extra columns appended
         """
-        # make sure we have enough colors - no, up to user to manage palette
-        # sns.set_palette('Set1', 2 * len(self.line_names_ex))
-
         # store for reference
         self.last_distortion = dist
 
@@ -1428,32 +1465,7 @@ class Portfolio(object):
         # add the exag and distorted probs
         df['gS'] = g(df.S)
         df['gF'] = 1 - df.gS
-        df['gp_total'] = np.diff(np.hstack((0, df.gF)))  # np.gradient(df.gF): XXXX grad messes up the zero point
-
-        # NEW, sensible method
-        # code to audit the two are the same======>
-        # col = 'catpar'
-        # temp = pd.DataFrame({'xs': port.density_df.loss})
-        # for col in port.line_names:
-        #     exleaUC = np.cumsum(port.density_df['exeqa_' + col] * df.gp_total)  # unconditional
-        #     exixgtaUC = np.cumsum(
-        #         port.density_df.loc[::-1, 'exeqa_' + col] / port.density_df.loc[::-1, 'loss'] * df.loc[::-1,
-        #                                                                                         'gp_total'])
-        #     exa = exleaUC + exixgtaUC * port.density_df.loss
-        #     temp[f'old_{col}'] = df[f'exag_{col}']
-        #     temp[f'new_{col}'] = exa
-        # temp = temp.set_index('xs')
-        #
-        # for line in port.line_names:
-        #     plt.figure()
-        #     plt.plot(temp.index, temp[f'new_{line}'], label=f'new_{line}')
-        #     plt.plot(temp.index, temp[f'old_{line}'], label=f'old_{line}')
-        #     plt.legend()
-        #
-        # for line in port.line_names:
-        #     plt.figure()
-        #     plt.plot(temp.index, (temp[f'new_{line}'] - temp[f'old_{line}']) / temp[f'old_{line}'], label=line)
-        #     plt.legend()
+        df['gp_total'] = np.diff(np.hstack((0, df.gF)))
 
         # Impact of mass at zero
         # if total has an ess sup < top of computed range then any integral a > ess sup needs to have
@@ -1467,24 +1479,15 @@ class Portfolio(object):
                 df.loc[::-1, 'gp_total'])
             # if S>0 but flat and there is a mass then need to include loss X g(S(loss)) term!
             # pick  up right hand places where S is very small (rounding issues...)
-            # parts_0_loss = np.cumsum( np.where( (df.p_total==0) & (df.S < 1e-14),  dist.mass *
-            #                                     0.333333333 , 0)) * self.bs
-            #                                     # self.density_df[f'exi_xeqa_{line}'] , 0)) * self.bs
-            # print(parts_0_loss[parts_0_loss > 0])
-            # df[f'exag_{line}'] = exleaUC + (exixgtaUC + mass * lim_xi_x) * self.density_df.loss
             if dist.mass:
                 mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}']
             df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
         # sum of parts: careful not to include the total twice!
         df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
         # LEV under distortion g
-        # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'gS'].cumsum())))
-        # df['exag_total'] = temp * self.bs
         df['exag_total'] = self.cumintegral(df['gS'])
 
         # comparison of total and sum of parts
-        # df.loc[:, ['exag_sumparts', 'exag_total', 'exa_total']].plot(ax=pno())
-        # pno.curr.set_title("exag sum of parts and total, exa_total")
         for line in self.line_names_ex:
             df[f'exa_{line}_pcttotal'] = df.loc[:, 'exa_' + line] / df.exa_total
             # exag is the premium
@@ -1498,10 +1501,8 @@ class Portfolio(object):
 
         # make a convenient audit extract for viewing
         audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^η]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
-        # audit.columns = audit.columns.str.split('_', expand=True)
-        # audit = audit.sort_index(axis=1)
 
-        if axiter is not None:
+        if num_plots >= 2:
             # short run debugger!
             ax = next(axiter)
             ax.plot(df.exag_sumparts, label='Sum of Parts')
@@ -1510,71 +1511,73 @@ class Portfolio(object):
             ax.legend()
             ax.set_title(f'Mass audit for {dist.name}')
 
-            # truncate for graphics
-            # 1e-4 arb selected min prob for plot truncation... not significant
-            max_threshold = 1e-5
-            max_x = (df.gS < max_threshold).idxmax()
-            max_x = 80000  # TODO>>>
-            if max_x == 0:
-                max_x = self.density_df.loss.max()
-            df_plot = df.loc[0:max_x, :]
-            df_plot = df.loc[0:max_x, :]
+            if num_plots >= 3:
+                # yet more graphics, but the previous one is the main event
+                # truncate for graphics
+                # 1e-4 arb selected min prob for plot truncation... not significant
+                max_threshold = 1e-5
+                max_x = (df.gS < max_threshold).idxmax()
+                max_x = 80000  # TODO>>>
+                if max_x == 0:
+                    max_x = self.density_df.loss.max()
+                df_plot = df.loc[0:max_x, :]
+                df_plot = df.loc[0:max_x, :]
 
-            ax = next(axiter)
-            df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
-            ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
-            ax.set_title("Densities")
-
-            ax = next(axiter)
-            df_plot.loc[:, ['p_total', 'gp_total']].plot(ax=ax)
-            ax.set_title("Total Density and Distortion")
-
-            ax = next(axiter)
-            df_plot.loc[:, ['S', 'gS']].plot(ax=ax)
-            ax.set_title("S, gS")
-
-            # exi_xlea removed
-            for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
-                # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
-                ax = next(axiter)  # XXXX??? was (?![n])
-                df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9_]+$').sort_index(axis=1).plot(ax=ax)
-                ax.set_title(f'{prefix.title()} by line')
-                if prefix.find('xi_x') > 0:
-                    # fix scale for proportions
-                    ax.set_ylim(0, 1.05)
-
-            for line in self.line_names:
                 ax = next(axiter)
-                df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
-                ax.set_title(f'{line} EXs')
+                df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
+                ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
+                ax.set_title("Densities")
 
-            # compare exa with exag for all lines
-            # pno().plot(df_plot.loss, *(df_plot.exa_total, df_plot.exag_total))
-            # ax.set_title("exa and exag Total")
-            for line in self.line_names_ex:
                 ax = next(axiter)
-                df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
-                ax.set_title(f'{line} EL and Transf EL')
+                df_plot.loc[:, ['p_total', 'gp_total']].plot(ax=ax)
+                ax.set_title("Total Density and Distortion")
 
-            ax = next(axiter)
-            df_plot.filter(regex='^exa_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
-            ax.set_title('Pct loss')
-            ax.set_ylim(0, 1.05)
+                ax = next(axiter)
+                df_plot.loc[:, ['S', 'gS']].plot(ax=ax)
+                ax.set_title("S, gS")
 
-            ax = next(axiter)
-            df_plot.filter(regex='^exag_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
-            ax.set_title('Pct premium')
-            ax.set_ylim(0, 1.05)
+                # exi_xlea removed
+                for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
+                    # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
+                    ax = next(axiter)  # XXXX??? was (?![n])
+                    df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9_]+$').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{prefix.title()} by line')
+                    if prefix.find('xi_x') > 0:
+                        # fix scale for proportions
+                        ax.set_ylim(0, 1.05)
 
-            ax = next(axiter)
-            df_plot.filter(regex='^lr_').sort_index(axis=1).plot(ax=ax)
-            ax.set_title('LR: Natural Allocation')
+                for line in self.line_names:
+                    ax = next(axiter)
+                    df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{line} EXs')
 
-            ax = next(axiter)
-            df_plot.filter(regex='^lrlTl_').sort_index(axis=1).plot(ax=ax)
-            ax.set_title('LR: Prem Like Total Loss')
-            axiter.tidy()
-            plt.tight_layout()
+                # compare exa with exag for all lines
+                # pno().plot(df_plot.loss, *(df_plot.exa_total, df_plot.exag_total))
+                # ax.set_title("exa and exag Total")
+                for line in self.line_names_ex:
+                    ax = next(axiter)
+                    df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{line} EL and Transf EL')
+
+                ax = next(axiter)
+                df_plot.filter(regex='^exa_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('Pct loss')
+                ax.set_ylim(0, 1.05)
+
+                ax = next(axiter)
+                df_plot.filter(regex='^exag_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('Pct premium')
+                ax.set_ylim(0, 1.05)
+
+                ax = next(axiter)
+                df_plot.filter(regex='^lr_').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('LR: Natural Allocation')
+
+                ax = next(axiter)
+                df_plot.filter(regex='^lrlTl_').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('LR: Prem Like Total Loss')
+                axiter.tidy()
+                plt.tight_layout()
 
         return df, audit
 
@@ -1997,7 +2000,7 @@ class Portfolio(object):
         axs[2].plot(test.index, ddtest2, label='-EXi(a)/a')
         axs[2].legend()
 
-    def uat(self, As=None, Ps=[0.98], LRs=[0.965], r0=0.03, verbose=False):
+    def uat(self, As=None, Ps=[0.98], LRs=[0.965], r0=0.03, num_plots=1, verbose=False):
         """
         Reconcile apply_distortion(s) with price and calibrate
 
@@ -2024,7 +2027,13 @@ class Portfolio(object):
         LR = LRs[0]
         idx = (K, LR)
         dd = Distortion.distortions_from_params(params, index=idx, r0=r0, plot=False)
-        table, stacked = self.apply_distortions(dd, As, num_plots=0)
+        if num_plots == 2:
+            axiter = axiter_factory(None, len(dd))
+        elif num_plots == 3:
+            axiter = axiter_factory(None, 30)
+        else:
+            axiter = None
+        table, stacked = self.apply_distortions(dd, As, axiter, num_plots)
         table['lr err'] = table['lr_total'] - LR
 
         # 2. Price and compare to calibration
@@ -2042,10 +2051,10 @@ class Portfolio(object):
         # easier tests
         # sum of parts = total
         logging.info(
-            f'CPortfolio.uat | {self.name} Sum of parts all close to total: '
+            f'Portfolio.uat | {self.name} Sum of parts all close to total: '
             f'{np.allclose(a.exag_total, a.exag_sumparts)}')
         logging.info(
-            f'CPortfolio.uat | {self.name} Sum of parts vs total: '
+            f'Portfolio.uat | {self.name} Sum of parts vs total: '
             f'{np.sum(np.abs(a.exag_total - a.exag_sumparts)):15,.1f}')
 
         pp = p[['dist', 'exag']]
@@ -2068,15 +2077,15 @@ class Portfolio(object):
             display(test)
 
         if lr_err.errs.abs().max() > 1e-4:
-            logging.error('CPortfolio.uat | {self.name} UAT Loss Ratio Error {lr_err.errs.abs().max()}')
+            logging.error('Portfolio.uat | {self.name} UAT Loss Ratio Error {lr_err.errs.abs().max()}')
 
         if overall_test < 1e-7:
-            logging.info(f'CPortfolio.uat | {self.name} UAT All good, total error {overall_test:6.4e}')
+            logging.info(f'Portfolio.uat | {self.name} UAT All good, total error {overall_test:6.4e}')
         else:
             s = f'{self.name} UAT total error {overall_test:6.4e}'
-            logging.error(f'CPortfolio.uat | {s}')
-            logging.error(f'CPortfolio.uat | {s}')
-            logging.error(f'CPortfolio.uat | {s}')
+            logging.error(f'Portfolio.uat | {s}')
+            logging.error(f'Portfolio.uat | {s}')
+            logging.error(f'Portfolio.uat | {s}')
 
         return a, p, test, params, dd, table, stacked
 

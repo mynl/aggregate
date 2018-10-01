@@ -240,7 +240,7 @@ class Distortion(object):
             dist = Distortion(name, shape, r0)
             dist.plot(xs, ax=next(axiter))
 
-        dist = Distortion.convex_example('yield')
+        dist = Distortion.convex_example('bond')
         dist.plot(xs, ax=next(axiter))
 
         dist = Distortion.convex_example('cat')
@@ -279,15 +279,15 @@ class Distortion(object):
         return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]
 
     @staticmethod
-    def convex_example(source='yield'):
+    def convex_example(source='bond'):
         """
         example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf
 
-        :param source: yield gives yield curve example, cat gives cat bond / cat reinsurance pricing based example
+        :param source: bond gives a bond yield curve example, cat gives cat bond / cat reinsurance pricing based example
         :return:
         """
 
-        if source == 'yield':
+        if source == 'bond':
             yield_curve = '''
             AAAA    0.000000  0.000000
             AAA     0.000018  0.006386

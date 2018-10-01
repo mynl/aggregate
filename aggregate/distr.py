@@ -1325,19 +1325,21 @@ class Severity(ss.rv_continuous):
                 raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
                                  f', you passed {sev_name}')
 
+        elif isinstance(sev_name, Severity):
+            self.fz = sev_name
+
         elif not isinstance(sev_name, (str, np.str_)):
             # must be a meta object - replaced in Undewriter.write
             log2 = sev_a
             bs = sev_b       # if zero it is happy to take whatever....
-            print(f'In meta, {sev_name}, {type(sev_name)}')
             if isinstance(sev_name, Aggregate):
-                if log2 != sev_name.log2 or (bs != sev_name.bs and bs==0):
+                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs!=0)):
                     # recompute
                     sev_name.easy_update(log2, bs)
                 xs = sev_name.xs
                 ps = sev_name.agg_density
             elif isinstance(sev_name, Portfolio):
-                if log2 != sev_name.log2 or (bs != sev_name.bs and bs==0):
+                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs != 0)):
                     # recompute
                     sev_name.update(log2, bs, add_exa=False)
                 xs = sev_name.density_df.loss.values
@@ -1582,10 +1584,10 @@ class Severity(ss.rv_continuous):
         :return:
         """
 
-        if self.sev1 is not None:
-            # precomputed (fixed and (c|d)histogram classes
-            # TODO ignores layer and attach...
-            return self.sev1, self.sev2, self.sev3
+        # if self.sev1 is not None:
+        #     # precomputed (fixed and (c|d)histogram classes
+        #     # TODO ignores layer and attach...
+        #     return self.sev1, self.sev2, self.sev3
 
         median = self.fz.isf(0.5)
 

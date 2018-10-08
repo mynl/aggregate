@@ -7,14 +7,8 @@
 from setuptools import setup
 import os
 
-tests_require = ['unittest', 'pandas', 'matplotlib', 'sly']
+tests_require = ['unittest', 'sly']
 install_requires = [
-    'ipython>=6.1',
-    'matplotlib>=2.2',
-    'numpy>=1.13',
-    'pandas>=0.23',
-    'scipy>=0.19',
-    'seaborn>=0.8',
     'sly>=0.3'
 ]
 
@@ -24,11 +18,11 @@ def read(fname):
 
 long_description = read('README.rst')
 
-setup(name="aggregate_project",
-      description="aggregate_project - working with compound probability distributions",
+setup(name="aggregate",
+      description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version="0.6",
+      version="0.6.3",
       author="Stephen J. Mildenhall",
       author_email="mildenhs@stjohns.edu",
       maintainer="Stephen J. Mildenhall",
@@ -39,7 +33,7 @@ setup(name="aggregate_project",
       tests_require=tests_require,
       install_requires=install_requires,
       classifiers=[
-          'Development Status :: 3 - Alpha',
+          'Development Status :: 4 - Beta',
           'Programming Language :: Python :: 3',
           'License :: OSI Approved :: BSD License',
           'Topic :: Education',

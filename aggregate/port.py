@@ -616,11 +616,18 @@ class Portfolio(object):
             self.priority_capital_df.columns = self.priority_capital_df.columns.str.split("_", expand=True)
             self.priority_capital_df.sort_index(axis=1, level=1, inplace=True)
             self.priority_capital_df.sort_index(axis=0, inplace=True)
+        else:
+            # at least want F and S to get quantile functions
+            self.density_df['F'] = np.cumsum(self.density_df.p_total)
+            self.density_df['S'] = 1 - self.density_df.F
 
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
         if trim_df:
             self.trim_df()
+        # invalidate stored functions
+        self.nearest_quantile_function = None
+        self._F = None
 
     def trim_df(self):
         """

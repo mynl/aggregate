@@ -520,6 +520,7 @@ class Aggregate(Frequency):
         self.fzapprox = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._nearest_quantile_function = None
+        self._F = None
         self.en = None  # this is for a sublayer e.g. for limit profile
         self.n = 0  # this is total frequency
         self.attachment = None
@@ -912,6 +913,10 @@ class Aggregate(Frequency):
             verbose_audit_df.loc[10001, 'sev_cv'] = self.statistics_total_df.loc['mixed', 'sev_cv']
             verbose_audit_df['abs sev err'] = verbose_audit_df.sev_1 - verbose_audit_df['emp ex1']
             verbose_audit_df['rel sev err'] = verbose_audit_df['abs sev err'] / verbose_audit_df['emp ex1']
+
+        # invalidate stored functions
+        self.nearest_quantile_function = None
+        self._F = None
         return verbose_audit_df
 
     def emp_stats(self):
@@ -1220,6 +1225,27 @@ class Aggregate(Frequency):
         if self._nearest_quantile_function is None:
             self._nearest_quantile_function = self.quantile_function("nearest")
         return float(self._nearest_quantile_function(p))
+
+    def cdf(self, x):
+        """
+        return cumulative probability distribution using linear interpolation
+
+        :param x: loss size
+        :return:
+        """
+        if self._F is None:
+            self._F = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind='linear',
+                                           bounds_error=False, fill_value='extrapolate')
+        return self._F(x)
+
+    def sf(self, x):
+        """
+        return survival function using linear interpolation
+
+        :param x: loss size
+        :return:
+        """
+        return 1 - self.cdf(x)
 
     def quantile_function(self, kind='nearest'):
         """

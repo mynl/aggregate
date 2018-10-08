@@ -10,11 +10,12 @@ import seaborn as sns
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
+from io import StringIO
+import re
 
 
 # logging
-# TODO better filename!
-LOGFILE = os.path.join(os.path.split(__file__)[0], 'log/aggregate.log')
+LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
 logging.basicConfig(filename=LOGFILE,
                     filemode='w',
                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
@@ -64,6 +65,24 @@ def get_fmts(df):
     for k, v in df.mean().items():
         fmts[k] = guess_fmt(k, v)
     return fmts
+
+
+def tidy_agg_program(txt):
+    """
+    guess a nice format for an agg program
+
+    :param txt: program text input
+
+    """
+    bits = re.split(r'(agg|sev|mixed|poisson|fixed)', txt)
+    clean = [re.sub(r'[ ]+', ' ', i.strip()) for i in bits]
+    sio = StringIO()
+    sio.write(clean[0])
+    for agg, exp, sev, sevd, fs, freq in zip(*[clean[i::6] for i in range(1,7)]):
+        nm, *rest = exp.split(' ')
+        sio.write(f'\n\t{agg} {nm:^12s} {float(rest[0]):8.1f} {" ".join(rest[1:]):^20s} '
+                  f'{sev} {sevd:^25s} {fs:>8s}   {freq}')
+    return sio.getvalue()
 
 
 # moment utility functions

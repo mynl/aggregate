@@ -1,7 +1,1 @@
-ipython==6.1.0
-matplotlib==2.2.2
-numpy==1.13.3
-pandas==0.23.0
-scipy==0.19.1
-seaborn==0.8.1
 sly==0.3

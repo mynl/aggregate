@@ -17,6 +17,8 @@ import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy
 from ruamel import yaml
+import pypandoc
+from IPython.core.display import HTML, display
 from .utils import *
 from .distr import Aggregate
 from .spectral import Distortion
@@ -1814,73 +1816,112 @@ class Portfolio(object):
             dfs.append(df)
         return pd.concat(dfs)
 
-    def analysis_priority(self, asset_spec):
+    def analysis_priority(self, asset_spec, output='df'):
         """
         Create priority analysis report_ser.
         Can be called multiple times with different ``asset_specs``
+        asset_spec either a float used as an epd percentage or a dictionary. Entering an epd percentage
+        generates the dictionary
 
+                base = {i: self.epd_2_assets[('not ' + i, 0)](asset_spec) for i in self.line_names}
 
         :param asset_spec: epd
+        :param output: df = pandas data frame; html = nice report, markdown = raw markdown text
         :return:
         """
 
-        def cn(aa, bb):
-            """
-            make a cheap column name .... until you figure out multiindex add row
-            :param aa:
-            :param bb:
-            :return:
-            """
-            return '{:}_{:}'.format(aa, bb)
+        ea = self.epd_2_assets
+        ae = self.assets_2_epd
 
-        e2a = self.epd_2_assets
-        a2e = self.assets_2_epd
-
-        priority_analysis_df = pd.DataFrame(columns=['a', 'chg a', 'not_line_sa', 'line_sec', 'not_line',
-                                                     'line', 'total'])
-        priority_analysis_df.index.name = 'scenario'
         if isinstance(asset_spec, dict):
             base = asset_spec
         else:
             if type(asset_spec) != float:
                 raise ValueError("Input dictionary or float = epd target")
-            base = {i: self.epd_2_assets[('not ' + i, 0)](asset_spec) for i in self.line_names}
-        for col in self.line_names:
-            notcol = 'not ' + col
-            a_base = base[col]
-            a = a_base
-            e0 = a2e[(notcol, 0)](a_base)
-            e = e0
-            priority_analysis_df.loc[cn(col, 'base'), :] = (
-                a, a - a_base, e, a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a), a2e[('total', 0)](a))
+            base = {i: ea[('not ' + i, 0)](asset_spec) for i in self.line_names}
 
-            a = e2a[(col, 2)](e0)
-            priority_analysis_df.loc[cn(col, '2 as ballast'), :] = (
-                a, a - a_base, a2e[(notcol, 0)](a), a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a),
-                a2e[('total', 0)](a))
+        if output=='df':
+            priority_analysis_df = pd.DataFrame(columns=['a', 'chg a', 'not_line epd sa @a', 'line epd @a 2pri', 'not_line epd eq pri',
+                                                         'line epd eq pri', 'total epd'],
+                                                index=pd.MultiIndex.from_arrays([[], []], names=['Line', 'Scenario']))
+            for col in set(self.line_names).intersection(set(base.keys())):
+                notcol = 'not ' + col
+                a_base = base[col]
+                a = a_base
+                e0 = ae[(notcol, 0)](a_base)
+                e = e0
+                priority_analysis_df.loc[(col, 'base'), :] = (
+                    a, a - a_base, e, ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a), ae[('total', 0)](a))
 
-            a = e2a[(col, 2)](priority_analysis_df.ix[cn(col, 'base'), 'line'])
-            priority_analysis_df.loc[cn(col, 'thought buying'), :] = (
-                a, a - a_base, a2e[(notcol, 0)](a), a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a),
-                a2e[('total', 0)](a))
+                a = ea[(col, 2)](e0)
+                priority_analysis_df.loc[(col, '2pri line epd = not line sa'), :] = (
+                    a, a - a_base, ae[(notcol, 0)](a), ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a),
+                    ae[('total', 0)](a))
 
-            a = e2a[(notcol, 1)](e0)
-            priority_analysis_df.loc[cn(col, 'ballast equity'), :] = (
-                a, a - a_base, a2e[(notcol, 0)](a), a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a),
-                a2e[('total', 0)](a))
+                a = ea[(col, 2)](priority_analysis_df.ix[(col, 'base'), 'line epd eq pri'])
+                priority_analysis_df.loc[(col, 'thought buying (line 2pri epd = base not line eq pri epd'), :] = (
+                    a, a - a_base, ae[(notcol, 0)](a), ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a),
+                    ae[('total', 0)](a))
 
-            a = e2a[(col, 1)](e0)
-            priority_analysis_df.loc[cn(col, 'equity'), :] = (
-                a, a - a_base, a2e[(notcol, 0)](a), a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a),
-                a2e[('total', 0)](a))
+                a = ea[(notcol, 1)](e0)
+                priority_analysis_df.loc[(col, 'fair to not line, not line eq pri epd = base sa epd'), :] = (
+                    a, a - a_base, ae[(notcol, 0)](a), ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a),
+                    ae[('total', 0)](a))
 
-            a = e2a[('total', 0)](e0)
-            priority_analysis_df.loc[cn(col, 'pool equity'), :] = (
-                a, a - a_base, a2e[(notcol, 0)](a), a2e[(col, 2)](a), a2e[(notcol, 1)](a), a2e[(col, 1)](a),
-                a2e[('total', 0)](a))
+                a = ea[(col, 1)](e0)
+                priority_analysis_df.loc[(col, 'line eq pri epd = base not line sa'), :] = (
+                    a, a - a_base, ae[(notcol, 0)](a), ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a),
+                    ae[('total', 0)](a))
 
-        priority_analysis_df.loc[:, 'pct chg'] = priority_analysis_df.loc[:, 'chg a'] / priority_analysis_df.a
-        return priority_analysis_df
+                a = ea[('total', 0)](e0)
+                priority_analysis_df.loc[(col, 'total epd = base sa not line epd'), :] = (
+                    a, a - a_base, ae[(notcol, 0)](a), ae[(col, 2)](a), ae[(notcol, 1)](a), ae[(col, 1)](a),
+                    ae[('total', 0)](a))
+
+            priority_analysis_df.loc[:, 'pct chg'] = priority_analysis_df.loc[:, 'chg a'] / priority_analysis_df.a
+            return priority_analysis_df
+
+        # else HTML or markdown output
+        ans = []
+        for line in set(self.line_names).intersection(set(base.keys())):
+            a = base[line]
+            e = ae[(f'not {line}', 0)](a)
+            a0 = float(ea[('total', 0)](e))
+            eb0a0 = ae[(f'not {line}', 0)](a0)
+            eba0 = ae[(f'not {line}', 1)](a0)
+            e2a0 = ae[(line, 2)](a0)
+            e1a0 = ae[(line, 1)](a0)
+            e2 = ae[(line, 2)](a)
+            e1 = float(ae[(line, 1)](a))
+            a2 = float(ea[(line, 2)](e1))
+            af = float(ea[(f'not {line}', 1)](e))
+            af2 = float(ea[(line, 1)](e))
+            a3 = float(ea[(line, 2)](e))
+            a4 = float(ea[(f'not {line}', 1)](e))
+
+            story = f"""
+Consider adding **{line}** to the existing portfolio. The existing portfolio has capital {a:,.1f} and and epd of {e:.4g}.
+
+* If {line} is added as second priority to the existing lines with no increase in capital it has an epd of {e2:.4g}.
+* If the regulator requires the overall epd be a constant then the firm must increase capital to {a0:,.1f} or by {(a0/a-1)*100:.2f} percent.
+    - At the higher capital {line} has an epd of {e2a0:.4g} as second priority and the existing lines have an epd of {eb0a0:.4g} as first priority.
+    - The existing and {line} epds under equal priority are {eba0:.4g} and {e1a0:.4g}.
+* If {line} *thought* it was added at equal priority it would have expected an epd of {e1:.4g}. 
+  In order to achieve this epd as second priority would require capital of {a2:,.1f}, an increase of {(a2/a-1)*100:.2f} percent.
+* In order for {line} to have an epd equal to the existing lines as second priority would require capital
+  of {a3:,.1f}, and increase of {(a3/a-1)*100:.2f} percent. 
+* In order for {line} to be added at equal priority and for the existing lines to have an unchanged epd requires capital of {af:,.1f}, an 
+  increase of {(af/a-1)*100:.2f} percent.
+* In order for {line} to be added at equal priority and to have an epd equal to the existing line epd requires capital of {af2:,.1f}, an 
+  increase of {(af2/a-1)*100:.2f} percent.
+* In order for the existing lines to have an unchanged epd at equal priority requires capital of {a4:,.1f}, an increase of {(a4/a-1)*100:.2f} percent.
+"""
+            ans.append(story)
+        ans = '\n'.join(ans)
+        if output=='html':
+            display(HTML(pypandoc.convert_text(ans, to='html', format='markdown')))
+        else:
+            return ans
 
     def analysis_collateral(self, line, c, a, debug=False):
         """

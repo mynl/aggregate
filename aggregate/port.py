@@ -61,6 +61,7 @@ class Portfolio(object):
         self.density_df = None
         self.epd_2_assets = {}
         self.assets_2_epd = {}
+        self.tail_var = None
         self.priority_capital_df = None
         self.priority_analysis_df = None
         self.audit_df = None
@@ -352,6 +353,42 @@ class Portfolio(object):
         """
         return 1 - self.cdf(x)
 
+    # make some handy aliases
+    def F(self, x):
+        """
+        handy alias for distribution, CDF
+        :param x:
+        :return:
+        """
+        return self.cdf(x)
+
+    def S(self, x):
+        """
+        handy alias for survival function, S
+        :param x:
+        :return:
+        """
+        return self.sf(x)
+
+    def TVaR(self, alpha):
+        """
+        Compute the TVaR at threshold alpha
+
+
+
+        :param alpha:
+        :return:
+        """
+
+        assert self.density_df is not None
+
+        if self.tail_var is None:
+            # make tvar function
+            self.tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
+                                                 kind='linear', bounds_error=False,
+                                                 fill_value='extrapolate')
+        return self.tail_var(alpha)
+
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """
         convert into a severity without recomputing
@@ -462,7 +499,9 @@ class Portfolio(object):
         df['bs14'] = df['bs10'] / 16
         df['bs15'] = df['bs10'] / 32
         df['bs16'] = df['bs10'] / 64
+        df['bs17'] = df['bs10'] / 128
         df['bs18'] = df['bs10'] / 256
+        df['bs19'] = df['bs10'] / 515
         df['bs20'] = df['bs10'] / 1024
         df.loc['total', :] = df.sum()
         return df

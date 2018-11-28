@@ -1,0 +1,228 @@
+\hypertarget{premium-allocation-and-default-priority-rules}{%
+\section{Premium Allocation and Default Priority
+Rules}\label{premium-allocation-and-default-priority-rules}}
+
+Nov 25, 2018
+
+Derived from MM\_2RM
+
+\hypertarget{three-important-differentials-homogeneous-case}{%
+\subsection{Three important differentials (homogeneous
+case)}\label{three-important-differentials-homogeneous-case}}
+
+From Tasche and other references. Let \(X_u=X=u_1X_1 + u_2X_2\) be a
+homogeneous portfolio.
+
+The deriviative of the survival function \(S_u(t)=\text{Pr}(X_u>t)\) is
+\[
+\nabla_u S(t) = \text{E}[X_i 1_{\{X=t\}}] = \text{E}[X_i \mid X=t] f_u(t)
+\] where \(f_u\) is the sensity of \(X_u\).
+
+The deriviative of value at risk \(Q(u)\) for \(X_u\) at a fixed
+threshold \(p\) is \[
+\nabla_u Q(u) = E[X_i\mid \sum u_ix_i = Q(u,p)]
+\]
+
+The deriviative of tail value at risk \(T\) is \[
+\nabla_u T(u) = E[X_i\mid \sum u_ix_i>Q(u,p)]
+\]
+
+\hypertarget{method-a}{%
+\subsection{Method A}\label{method-a}}
+
+For M\textbf{A}jor :-)
+
+Homogeneous portfolio \(X_u=X=u_1X_1 + u_2X_2\).
+
+Regulatory capital measure \(\alpha\), typically VaR or TVaR.
+\textbf{Assume \(\alpha=\)TVaR} at a threshold \(p\) close to 1. Thus
+\(\alpha(X_u) = \text{E}[X\mid X > F_u^{-1}(p)]\). Total assets
+\(\alpha\) have a natural co-measure allocation given by
+\(\alpha_i(X_u)= \text{E}[u_iX_i \mid X_u > F_u^{-1}(p)] = u_i \partial T/\partial u_i\).
+
+Distortion \(g\) determines market pricing for risk transfer, via
+\(E_g(X) = \int g(S_X(t))dt\).
+
+Price is determined by using \(g\) to price
+\(X\wedge \alpha(X):=\text{min}(X, \alpha(X))\).
+
+The resulting pricing functional \(\pi\) can be written in several ways.
+Let \(F_u^{-1}\) be the quantile function (i.e.~value at risk) of
+\(X_u\). Then \[
+\begin{align}
+\pi(X_u) &= \int_0^{\alpha(X)} g(S_u(t))dt \\
+&= \text{E}[(X_u\wedge \alpha(X_u)) g'(S_u(X)] \\
+&= \int_0^1 (F_u^{-1}(p)\wedge \alpha(X_u)) g'(1-p)dp. \\
+\end{align}
+\]
+
+We both agree that, subject to certain continuity and differentiability
+assumptions, \[
+\begin{align}
+\frac{\partial\pi}{\partial u_i}(u) &= \text{E}\left[\left(X_i 1_{\{X\le \alpha\}} + E[X_i\mid X >  F_u^{-1}(p)]1_{\{X > \alpha\}}\right) g'(S_u(X_u) \right] \\
+&= \text{E}[ X_i g'(S(X)) \mid X \le \alpha](1-g(S(\alpha)))+ \text{E}[X_i \mid X > F_u^{-1}(p)]g(S(\alpha)).\\
+\end{align}
+\] The premium for line \(i\) is \(u_i\partial\pi / \partial u_i\) in
+the usual way. Euler implies the premium ``adds-up'' because the
+portfolio is homogeneous.
+
+The result can be seen in a couple of ways. From the first defintion of
+\(\pi\) as an \(\int_0^\alpha\) and the three differentials noted above
+we get \[
+\begin{align}
+\nabla_u\pi &= \int_0^{\alpha(X)} \nabla_u(g(S_u(t)))dt + g(S_u(\alpha))\nabla_u\alpha(u) \\
+&=\int_0^{\alpha(X)} g'(S_u(t))\text{E}[X_i 1_{\{X=t\}}] dt + g(S_u(\alpha))E[X_i\mid X> F_u^{-1}(p) ] \\
+&=\int_0^{\alpha(X)} g'(S_u(t))\text{E}[X_i \mid X=t] f_u(t) dt + g(S_u(\alpha))E[X_i\mid X> F_u^{-1}(p) ] \\
+&=\text{E}\left[\left(X_i 1_{\{X\le \alpha\}} + E[X_i\mid X> F_u^{-1}(p)]1_{\{X > \alpha\}}\right) g'(S_u(X)) \right]
+\end{align}
+\] where the last line follows from the conditional expectation (tower
+property) formula. Notice that the default expectation is take wrt
+\(X>F_u^{-1}(p)\) whereas the outside integral is split at tvar.
+
+Alternatively using the third definition of \(\pi\) \[
+\begin{align}
+\nabla_u\pi
+&= \nabla_u \int_0^1 (F_u^{-1}(p)\wedge \alpha(u)) g'(1-p)dp  \\
+&= \int_0^1 \left(\nabla_u F_u^{-1}(p) 1_{\{X_u\le \alpha\}} +
+            \nabla_u \alpha(u) 1_{\{X_u > \alpha\}}\right) g'(1-p)dp  \\
+&= \int_0^{F(\alpha)} \text{E}[X_i \mid X=F_u^{-1}(p) ] g'(1-p)dp + \text{E}[X_i \mid X> F_u^{-1}(p)] g(S(\alpha)) \\
+&= \int_0^{\alpha} \text{E}[X_i \mid X=t ] g'(S(t))f(t)dt + \text{E}[X_i \mid X> F_u^{-1}(p)] g(S(\alpha)) \\
+&= \text{E}\left[ \text{E}[X_i \mid X ]1_{\{X\le\alpha\}} g'(S(X_u)) \right]
++ \text{E}[X_i \mid X> F_u^{-1}(p)] g(S(\alpha)) \\
+&= \text{E}\left[ X_i 1_{\{X\le\alpha\}} g'(S(X_u)) \right]
++ \text{E}[X_i \mid X> F_u^{-1}(p)] g(S(\alpha)) \\
+\end{align}
+\] It is important that \(g'(1-p)\) \emph{does not depend on \(u\)}. The
+dependence on \(u\) has been subsumed into the re-ordering defined by
+\(F_u^{-1}\). The fourth line follows from the third via substituting
+\(F(t)=p\).
+
+\hypertarget{properties-of-method-a}{%
+\subsubsection{Properties of Method A}\label{properties-of-method-a}}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Assumes and relies critically on homogeneity}
+\item
+  Result is independent of the default rule
+\item
+  Produces core of fuzzy game and only measure consistent with
+  performance management. (In fuzzy game approach there is an assumption
+  that the underlying risks can be fractionally quota shared, not that
+  they are homogeneous themselves.)
+\end{itemize}
+
+\hypertarget{method-b}{%
+\subsection{Method B}\label{method-b}}
+
+Portfolio \(X(u)\) that may or may not be homogeneous. An inhomogenous
+example is \(X(u)=X_1(u_1) + X_2(u_2)\) where \(X_i(u_i)\) is a compound
+Poisson distribution with expected claim count \(u_i\).
+
+Regulatory capital \(\alpha\) determined by TVaR. Same distortion \(g\)
+determines cost of risk transfer.
+
+The insurer sells the residual value of the risk when supported by
+assets of \(a\) to the capital markets for a premium \(P(a)\). The sale
+is structured by tranche, so the premium is an integral of the premium
+density. For a layer attaching at \(x\) (i.e.~a layer \(x\) to \(x+dx\))
+the expected loss cost is \(S(x)dx\). As is well known, the expected
+losses upto total capital \(a\) are given by \[
+\int_0^a S(x)dx.
+\] The distortion function \(g\) prices the layer at \(x\) as
+\(g(S(x))\). Therefore the total premium is \[
+P(a) = \int_0^a g(S(x))dx.
+\] The premium density is therefore \[
+P'(x) = \frac{dP}{da} = g(S(x)).
+\]
+
+The insurer now faces the problem of allocating the premium
+\(P(\alpha(X))\) back to lines 1 and 2. Use a co-measure approach---this
+is exavtly what our spreadsheet did in the CAS sessions! We have a
+stable world, with \(u_1,u_2\) are fixed. The pricing distortion
+function \(g\) combined with fixed \(X\) gives a probability distortion
+\(g'(S(X))\), i.e.~and \(E_{\Bbb{Q}}[X] := E[Xg'(S(X))]\). Standard
+finance theory says that in this situation, with a linear pricing rule,
+we price any payoff \(Y\) by \$
+E\_\{\Bbb{Q}\}{[}Y{]}=E{[}Yg'(S(X)){]}\$.
+
+We have to specify the payoff to line \(i\) when the insurer only has
+assets \(a\). Consider two possibilities.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  The two lines have equal priority in event of default. The payment to
+  line \(i\) is \[
+  X_i(a):=
+  \begin{cases}
+  X_i & X \le a \\
+  X_i\frac{a}{X} & X > a \\
+  \end{cases}
+  = X_i \frac{X\wedge a}{X}.
+  \]
+\item
+  Line 2 has lower priority than line 1. In this case the payout to line
+  1 is \(X_1\wedge a\) and the payout to line 2 is \[
+  X_2(a):=
+  \begin{cases}
+  X_2    & X \le a \\
+  a-X_1  & X_1 \le a < X  \\
+  0      & X_1 > a.
+  \end{cases}
+  \]
+\end{enumerate}
+
+In the case of equal priority the expected recovery to line \(i\) when
+the insurer has assets \(a\) is \[
+\begin{align}
+\text{E}[X_i(a)] &= \text{E}[X_i \mid X \le a ]F(a) + a \text{E}\left[\frac{X_i}{X} \mid X > a \right] S(a) \\
+&= \text{E}\left[ X_i\frac{X\wedge a}{X} \right].
+\end{align}
+\] From the second expression it is obvious this is an additive
+allocation---in all cases, not just when \(X\) is a homogeneous family.
+
+Finance theory now tells us the price of the contingent payout
+\(X_i(\alpha)\) is \[
+\begin{align}
+P_i(u)=P_i(\alpha(X_u) &= \text{E}_{\Bbb{Q}}\left[  X_i\frac{X\wedge a}{X} \right] \\
+&= \text{E}\left[  X_i\frac{X\wedge a}{X} g'(S(X)) \right] \\
+&= \text{E}\left[ \text{E}\left[  X_i\frac{X\wedge a}{X} g'(S(X)) \mid X \right] \right] \\
+&= \text{E}\left[ \text{E}\left[\frac{X_i}{X}\mid X \right] (X\wedge a) g'(S(X)) \right] \\
+&= \text{E}\left[ \text{E}\left[ X_i \mid X \le \alpha \right] g'(S(X)) \right] (1-g(S(\alpha)))
+    + a\text{E}\left[ \text{E}\left[\frac{X_i}{X}\mid X>\alpha \right] g'(S(X)) \right] g(S(\alpha)) \\
+&= \text{E}\left[ X_i 1_{\{X \le \alpha \}} g'(S(X)) \right]
+    + a\text{E}\left[ \frac{X_i}{X} g'(S(X)) 1_{\{ X>\alpha\}} \right] \\
+&= \text{E}_{\Bbb{Q}}\left[ X_i 1_{\{X \le \alpha \}} + a \frac{X_i}{X} 1_{\{ X>\alpha\}} \right] \\
+\end{align}
+\]
+
+The price component when the insurer remains solvent is the same as for
+Method A. However the value of the payment made in the event of
+insolvency is different---and depends on the explicit default
+assumption: \[
+\begin{align}
+\text{Method A: } & \text{E}[X_i | X > \alpha]g(S(\alpha) \\
+\text{Method B: } & a\text{E}\left[ \frac{X_i}{X} g'(S(X)) \mid X>\alpha \right] g(S(\alpha))
+= a\text{E}\left[ \text{E}[\frac{X_i}{X} \mid X] g'(S(X)) 1_{\{ X>\alpha\}} \right] \\
+\end{align}
+\]
+
+In method A the expectation is the allocation of total assets \(\alpha\)
+to line \(i\).
+
+Similar calculations can be performed for the case Line 2 has lower
+priority.
+
+\hypertarget{properties-of-method-b}{%
+\subsubsection{Properties of Method B}\label{properties-of-method-b}}
+
+\begin{itemize}
+\tightlist
+\item
+  Does \textbf{not} assume or rely on homogeneity
+\item
+  Result dependents particular the default rule
+\end{itemize}

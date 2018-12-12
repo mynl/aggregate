@@ -310,7 +310,7 @@ class Portfolio(object):
 
     def q(self, p):
         """
-        return a quantile using nearest methodl so result is in density_df index
+        return a quantile using nearest method so result is in density_df index
 
         :param p:
         :return:
@@ -1529,6 +1529,8 @@ class Portfolio(object):
             # pick  up right hand places where S is very small (rounding issues...)
             if dist.mass:
                 mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}']
+            # exixgtaUC is in reverse order but it has an index. When mult by .loss (which also has an index) it gets
+            # re-sorted into ascending order
             df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
         # sum of parts: careful not to include the total twice!
         df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)

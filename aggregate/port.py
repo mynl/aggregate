@@ -42,7 +42,9 @@ class Portfolio(object):
         for spec in spec_list:
             a = Aggregate(**spec)
             self.agg_list.append(a)
-            self.line_names.append(spec['name'][0] if isinstance(spec['name'], list) else spec['name'])
+            nm = spec['name'][0] if isinstance(spec['name'], list) else spec['name']
+            self.line_names.append(nm)
+            self.__setattr__(nm, a)
             ma.add_fs(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
                       a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
             max_limit = max(max_limit, np.max(np.array(a.limit)))
@@ -61,15 +63,16 @@ class Portfolio(object):
         self.density_df = None
         self.epd_2_assets = {}
         self.assets_2_epd = {}
-        self.tail_var = None
         self.priority_capital_df = None
         self.priority_analysis_df = None
         self.audit_df = None
-        self.bs = 0
         self.padding = 0
         self.tilt_amount = 0
-        self.nearest_quantile_function = None
-        self._F = None
+        self._linear_quantile_function = None
+        self._cdf = None
+        self._pdf = None
+        self._tail_var = None
+        self.bs = 0
         self.log2 = 0
         self.last_update = 0
         self.hash_rep_at_last_update = ''
@@ -310,27 +313,46 @@ class Portfolio(object):
 
     def q(self, p):
         """
-        return a quantile using nearest method so result is in density_df index
+        return lowest quantile, appropriate for discrete bucketing.
+        quantile guaranteed to be in the index
+        nearest does not work because you always want to pick rounding up
+
+        Definition 2.1 (Quantiles)
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
+
+        We use the x-notation if the dependence on X is evident, otherwise the q-notion.
+        Acerbi and Tasche (2002)
 
         :param p:
         :return:
         """
-        if self.nearest_quantile_function is None:
-            self.nearest_quantile_function = self.quantile_function("nearest")
-        return float(self.nearest_quantile_function(p))
+        if self._linear_quantile_function is None:
+            self._linear_quantile_function = \
+                interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='nearest', bounds_error=False,
+                                     fill_value='extrapolate')
 
-    def quantile_function(self, kind='nearest'):
-        """
-        return an approximation to the quantile function
+        l = float(self._linear_quantile_function(p))
+        # find next nearest index value if not an exact match (this is slightly faster and more robust
+        # than l/bs related math)
+        l1 = self.density_df.index.get_loc(l, 'bfill')
+        l1 = self.density_df.index[l1]
+        return l1
 
-        TODO sort out...this isn't right
-
-        :param kind:
-        :return:
-        """
-        q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind,
-                                 bounds_error=False, fill_value='extrapolate')
-        return q
+    # def quantile_function(self, kind='linear'):
+    #     """
+    #     return an approximation to the quantile function
+    #     linear is approximation for a continuous (uniform) version of bucketing
+    #     linear does not return an item in the index and is not correct for the discrete bucketing
+    #
+    #     TODO sort out...this isn't right
+    #
+    #     :param kind:
+    #     :return:
+    #     """
+    #     q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind,
+    #                              bounds_error=False, fill_value='extrapolate')
+    #     return q
 
     def cdf(self, x):
         """
@@ -339,10 +361,10 @@ class Portfolio(object):
         :param x:
         :return:
         """
-        if self._F is None:
-            self._F = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='linear',
-                                          bounds_error=False, fill_value='extrapolate')
-        return self._F(x)
+        if self._cdf is None:
+            self._cdf = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='linear',
+                                             bounds_error=False, fill_value='extrapolate')
+        return self._cdf(x)
 
     def sf(self, x):
         """
@@ -353,41 +375,79 @@ class Portfolio(object):
         """
         return 1 - self.cdf(x)
 
-    # make some handy aliases
-    def F(self, x):
+    def pdf(self, x):
         """
-        handy alias for distribution, CDF
+        probability density function, assuming a continuous approximation of the bucketed density
         :param x:
         :return:
         """
-        return self.cdf(x)
+        if self._pdf is None:
+            self._pdf = interpolate.interp1d(self.density_df.loss, self.density_df.p_total, kind='linear',
+                                             bounds_error=False, fill_value='extrapolate')
+        return self._pdf(x) / self.bs
 
-    def S(self, x):
+    # # make some handy aliases; delete these go strictly with scipy.stats notation
+    # def F(self, x):
+    #     """
+    #     handy alias for distribution, CDF
+    #     :param x:
+    #     :return:
+    #     """
+    #     return self.cdf(x)
+    #
+    # def S(self, x):
+    #     """
+    #     handy alias for survival function, S
+    #     :param x:
+    #     :return:
+    #     """
+    #     return self.sf(x)
+
+    def var(self, p):
         """
-        handy alias for survival function, S
-        :param x:
+        value at risk = alias for quantile function
+
+        :param p:
         :return:
         """
-        return self.sf(x)
+        return self.q(p)
 
-    def TVaR(self, alpha):
+    def tvar(self, p):
         """
-        Compute the TVaR at threshold alpha
+        Compute the tail value at risk at threshold p
+
+        Definition 2.6 (Tail mean and Expected Shortfall)
+        Assume E[X−] < ∞. Then
+        x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
+        is α-tail mean at level α the of X.
+        Acerbi and Tasche (2002)
+
+        We are interested in the right hand exceedence [?? note > vs ≥]
+        α^{−1}E[X 1{X > x(α)}] + x(α) (P[X ≤ x(α)] − α)
+
+        McNeil etc. p66-70 - this follows from def of ES as an integral
+        of the quantile function
 
 
-
-        :param alpha:
+        :param p:
         :return:
         """
-
         assert self.density_df is not None
 
-        if self.tail_var is None:
-            # make tvar function
-            self.tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
-                                                 kind='linear', bounds_error=False,
-                                                 fill_value='extrapolate')
-        return self.tail_var(alpha)
+        _var = self.q(p)
+        # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
+        ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p_total', 'loss']].product(axis=1).sum()
+        pip = (self.density_df.loc[_var, 'F'] - p) * _var
+        t_var = 1 / (1 - p) * (ex + pip)
+        return t_var
+
+        # original implementation interpolated
+        # if self._tail_var is None:
+        #     # make tvar function
+        #     self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
+        #                                           kind='linear', bounds_error=False,
+        #                                           fill_value='extrapolate')
+        # return self._tail_var(p)
 
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """
@@ -667,8 +727,8 @@ class Portfolio(object):
         if trim_df:
             self.trim_df()
         # invalidate stored functions
-        self.nearest_quantile_function = None
-        self._F = None
+        self._linear_quantile_function = None
+        self._cdf = None
 
     def trim_df(self):
         """

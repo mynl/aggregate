@@ -519,8 +519,10 @@ class Aggregate(Frequency):
         self.xs = None
         self.fzapprox = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
-        self._nearest_quantile_function = None
-        self._F = None
+        self._linear_quantile_function = None
+        self._cdf = None
+        self._pdf = None
+        self.density_df = None
         self.en = None  # this is for a sublayer e.g. for limit profile
         self.n = 0  # this is total frequency
         self.attachment = None
@@ -916,7 +918,7 @@ class Aggregate(Frequency):
 
         # invalidate stored functions
         self.nearest_quantile_function = None
-        self._F = None
+        self._cdf = None
         return verbose_audit_df
 
     def emp_stats(self):
@@ -1216,15 +1218,73 @@ class Aggregate(Frequency):
 
     def q(self, p):
         """
-        return a quantile using nearest matching, ensures returned value is in the index
-        of the aggregate distribution
+        return lowest quantile, appropriate for discrete bucketing.
+        quantile guaranteed to be in the index
+        nearest does not work because you always want to pick rounding up
 
-        :param p: percentile in range 0 to 1
+        Definition 2.1 (Quantiles)
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
+
+        We use the x-notation if the dependence on X is evident, otherwise the q-notion.
+        Acerbi and Tasche (2002)
+
+        :param p:
         :return:
         """
-        if self._nearest_quantile_function is None:
-            self._nearest_quantile_function = self.quantile_function("nearest")
-        return float(self._nearest_quantile_function(p))
+        if self._linear_quantile_function is None:
+            # really should have one of these anyway...
+            self.density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density))
+            self.density_df = self.density_df.set_index('loss', drop=False)
+            self.density_df['F'] = self.density_df.p.cumsum()
+
+        q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
+        l = float(q(p))
+        # find next nearest index value if not an exact match (this is slightly faster and more robust
+        # than l/bs related math)
+        l1 = self.density_df.index.get_loc(l, 'bfill')
+        l1 = self.density_df.index[l1]
+        return l1
+
+    def var(self, p):
+        """
+        value at risk = alias for quantile function
+
+        :param p:
+        :return:
+        """
+        return self.q(p)
+
+    def tvar(self, p):
+        """
+        Compute the tail value at risk at threshold p
+
+        Definition 2.6 (Tail mean and Expected Shortfall)
+        Assume E[X−] < ∞. Then
+        x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
+        is α-tail mean at level α the of X.
+        Acerbi and Tasche (2002)
+
+        We are interested in the right hand exceedence [?? note > vs ≥]
+        α^{−1}E[X 1{X > x(α)}] + x(α) (P[X ≤ x(α)] − α)
+
+        McNeil etc. p66-70 - this follows from def of ES as an integral
+        of the quantile function
+
+
+        :param p:
+        :return:
+        """
+        if self.density_df is None:
+            # force recomputation
+            throwaway = self.q(p)
+
+        _var = self.q(p)
+        # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
+        ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p', 'loss']].product(axis=1).sum()
+        pip = (self.density_df.loc[_var, 'F'] - p) * _var
+        t_var = 1 / (1 - p) * (ex + pip)
+        return t_var
 
     def cdf(self, x):
         """
@@ -1233,10 +1293,10 @@ class Aggregate(Frequency):
         :param x: loss size
         :return:
         """
-        if self._F is None:
-            self._F = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind='linear',
-                                           bounds_error=False, fill_value='extrapolate')
-        return self._F(x)
+        if self._cdf is None:
+            self._cdf = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind='linear',
+                                             bounds_error=False, fill_value='extrapolate')
+        return self._cdf(x)
 
     def sf(self, x):
         """
@@ -1247,16 +1307,27 @@ class Aggregate(Frequency):
         """
         return 1 - self.cdf(x)
 
-    def quantile_function(self, kind='nearest'):
+    def pdf(self, x):
         """
-        return an approximation to the quantile function
-
-        :param kind: ```interpolate.interp1d``` kind variable
+        probability density function, assuming a continuous approximation of the bucketed density
+        :param x:
         :return:
         """
-        q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind,
-                                 bounds_error=False, fill_value='extrapolate')
-        return q
+        if self._pdf is None:
+            self._pdf = interpolate.interp1d(self.xs, self.agg_density, kind='linear',
+                                             bounds_error=False, fill_value='extrapolate')
+        return self._pdf(x) / self.bs
+
+    # def quantile_function(self, kind='nearest'):
+    #     """
+    #     return an approximation to the quantile function
+    #
+    #     :param kind: ```interpolate.interp1d``` kind variable
+    #     :return:
+    #     """
+    #     q = interpolate.interp1d(self.agg_density.cumsum(), self.xs, kind=kind,
+    #                              bounds_error=False, fill_value='extrapolate')
+    #     return q
 
 
 class Severity(ss.rv_continuous):

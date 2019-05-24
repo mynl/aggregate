@@ -1,5 +1,7 @@
 """
 Distortion functions to implement spectral risk measures
+
+May 2019: added capped log linear and tt distortions
 """
 
 import numpy as np
@@ -19,9 +21,10 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'lep', 'ly', 'clin', 'tvar', 'convex')
-    _long_names_ = ("Proportional Hazard", "Wang-normal", "Layer Equivalent Pricing", "Linear Yield", "Capped Linear",
+    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'tvar', 'convex')
+    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing", "Linear Yield", "Capped Linear",
                     "Tail VaR", "Convex Envelope")
+    # TODO fix examples!
     _eg_param_1_ = (.9, 1, 0.25, 0.9, 1.1, 0.75)
     _eg_param_2_ = (.5, 2, 0.35, 1.5, 1.8, 0.95)
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
@@ -48,7 +51,7 @@ class Distortion(object):
         :param shape: float or [float, float]
         :param shape: shape parameter
         :param r0: risk free or rental rate of interest
-        :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize
+        :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize or df for t
         :param col_x:
         :param col_y:
         """
@@ -60,6 +63,7 @@ class Distortion(object):
         self.premium_target = 0.0
         self.assets = 0.0
         self.mass = 0.0
+        self.df = df
 
         # now make g and g_inv
         if self.name == 'ph':
@@ -84,6 +88,31 @@ class Distortion(object):
 
             def g_inv(x):
                 return n.cdf(n.ppf(x) - lam)
+
+        elif self.name == 'tt':
+            lam = self.shape
+            t = ss.t(self.df)
+            self.has_mass = False
+
+            def g(x):
+                return t.cdf(t.ppf(x) + lam)
+
+            def g_inv(x):
+                return t.cdf(t.ppf(x) - lam)
+
+        elif self.name == 'cll':
+            # capped log linear
+            b = self.shape
+            binv = 1/b
+            ea = np.exp(self.r0)
+            a = self.r0
+            self.has_mass = False
+
+            def g(x):
+                return np.where(x==0, 0, np.minimum(1, ea * x ** b))
+
+            def g_inv(x):
+                return np.where(x < 1, (x/a) ** binv, 1)
 
         elif self.name == 'tvar':
             p = self.shape
@@ -217,6 +246,8 @@ class Distortion(object):
         ax.plot(xs, y1, **kwargs)
         ax.plot(xs, y2, **kwargs)
         ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+        if self.name == 'convex':
+            ax.plot(self.df.iloc[:, 0], self.df.iloc[:, 1], 'o')
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set_title(self.__str__())
 

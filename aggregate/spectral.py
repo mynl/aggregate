@@ -22,8 +22,8 @@ class Distortion(object):
     """
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'tvar', 'convex')
-    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing", "Linear Yield", "Capped Linear",
-                    "Tail VaR", "Convex Envelope")
+    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
+                    "Linear Yield", "Capped Linear", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
     _eg_param_1_ = (.9, 1, 0.25, 0.9, 1.1, 0.75)
     _eg_param_2_ = (.5, 2, 0.35, 1.5, 1.8, 0.95)

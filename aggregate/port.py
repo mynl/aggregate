@@ -1416,8 +1416,31 @@ class Portfolio(object):
                 ex = np.sum(np.minimum(1, temp)) * self.bs + mass
                 ex_prime = (1 + r) ** -2 * np.sum(np.where(temp < 1, rSF, 0)) * self.bs
                 return ex - premium_target, ex_prime
+        elif name == 'tt':
+            # wang-t-t ... issue with df, will set equal to 5.5 per Shaun's paper
+            # finding that is a reasonable level for now TODO sort out!
+            # param is shape like normal
+            t = ss.t(5.5)
+            shape = 0.95  # starting param
+
+            def f(lam):
+                temp = t.ppf(S) + lam
+                tlam = t.cdf(temp)
+                ex = np.sum(tlam) * self.bs
+                ex_prime = np.sum(t.pdf(temp)) * self.bs
+                return ex - premium_target, ex_prime
+        elif name == 'cll':
+            # capped loglinear
+            shape = 1.01 # starting parameter
+            lS = np.log(S)
+            ea = np.exp(r0)
+            def f(b):
+                uncapped = ea * S ** b
+                ex = np.sum(np.minimum(1, uncapped)) * self.bs
+                ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * self.bs
+                return ex - premium_target, ex_prime
         else:
-            raise ValueError('calibrate_distortions only works with ph and wang')
+            raise ValueError(f'calibrate_distortion not implemented for {name}')
 
         # numerical solve
         i = 0
@@ -1432,8 +1455,8 @@ class Portfolio(object):
                 f'CPortfolio.calibrate_distortion | Questionable convergenge! {name}, target '
                 f'{premium_target} error {fx}, {i} iterations')
 
-        # build answer
-        dist = Distortion(name=name, shape=shape, r0=r0)
+        # build answer (note df is hack for t at the moment TODO)
+        dist = Distortion(name=name, shape=shape, r0=r0, df=5.5)
         dist.error = fx
         dist.assets = assets
         dist.premium_target = premium_target

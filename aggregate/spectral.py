@@ -294,12 +294,14 @@ class Distortion(object):
         """
         temp = params.loc[index, :]
         dists = {}
+        # TODO fix Wang-t df hack
+        df = 5.5
         for dn in Distortion.available_distortions():
             param = float(temp.loc[dn, 'param'])
-            dists[dn] = Distortion(name=dn, shape=param, r0=r0)
+            dists[dn] = Distortion(name=dn, shape=param, r0=r0, df=df)
 
         if plot:
-            axiter = axiter_factory(None, 5)
+            axiter = axiter_factory(None, len(dists))
             # f, axs = plt.subplots(2, 3, figsize=(8, 6))
             # it = iter(axs.flatten())
             for dn in Distortion.available_distortions():

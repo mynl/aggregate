@@ -303,6 +303,47 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
+    def parse_portfolio_program(self, portfolio_program):
+        """
+        Utility routine to parse the program and return the spec suitable to pass to Portfolio to
+        create the object.
+        Initially just for a single portfolio program (which it checks!)
+        No argument of default conniptions
+
+
+        TODO make more robust
+        :param portfolio_program:
+        :return:
+        """
+
+        self._runner(portfolio_program)
+
+        # if globs replace all meta objects with a lookup object
+        # copy from code below FRAGILE
+        if self.glob is not None:
+            for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
+                if a['sev_name'][0:4] == 'meta':
+                    obj_name = a['sev_name'][5:]
+                    try:
+                        obj = self.glob[obj_name]
+                    except NameError as e:
+                        print(f'Object {obj_name} passed as a proto-severity cannot be found')
+                        raise e
+                    a['sev_name'] = obj
+                    logging.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
+                                 f'replaced with object {obj.name} from glob')
+
+        # expecting a single portfolio for this simple function
+        # create the spec list string
+        nm = ''
+        spec_list = None
+        assert len(self.parser.port_out_dict) == 1
+        if len(self.parser.port_out_dict) > 0:
+            for nm in self.parser.port_out_dict.keys():
+                # remember the spec comes back as a list of aggs that have been entered into the uw
+                spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
+        return nm, spec_list
+
     def write(self, portfolio_program, **kwargs):
         """
         write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project

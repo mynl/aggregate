@@ -25,8 +25,9 @@ class Distortion(object):
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
-    _eg_param_1_ = (.9, 1, 0.25, 0.9, 1.1, 0.75)
-    _eg_param_2_ = (.5, 2, 0.35, 1.5, 1.8, 0.95)
+    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'tvar', 'convex')
+    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1,  0.75)
+    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8,  0.95)
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
 
     @classmethod
@@ -84,6 +85,8 @@ class Distortion(object):
         self.assets = 0.0
         self.mass = 0.0
         self.df = df
+        self.col_x = col_x
+        self.col_y = col_y
 
         # now make g and g_inv
         if self.name == 'ph':
@@ -222,14 +225,16 @@ class Distortion(object):
             s = f'{self._distortion_names_[self.name]}\n{self.shape:.3f}'
         if self.has_mass:
             s += f', {self.r0:.3f}'
-        # else:
-        #     s += ')'
+        if self.name == 'tt':
+            s += f', {self.df:.2f}'
         return s
 
     def __repr__(self):
         s = f'{self.name} ({self.shape}'
         if self.has_mass:
             s += f', {self.r0})'
+        elif self.name == 'tt':
+            s += f', {self.df:.2f})'
         else:
             s += ')'
         return s
@@ -260,28 +265,28 @@ class Distortion(object):
         ax.plot(xs, y2, **kwargs)
         ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
         if self.name == 'convex':
-            ax.plot(self.df.iloc[:, 0], self.df.iloc[:, 1], 'o')
+            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], 'o')
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set_title(self.__str__())
+        return ax
 
     @classmethod
     def test(cls, r0=0.05):
         """
         tester: make some nice plots
+        TODO add new distortions and fix df for tt
 
         :return:
         """
 
-        axiter = axiter_factory(None, 12, figsize=(10, 6))
+        axiter = axiter_factory(None, 18, figsize=(10, 10 * 4 / 5))
 
         xs = np.linspace(0, 1, 1001)
 
+        # zip stops at the shorter of the vectors, so this does not include convex
+        # added df for the t; everyone else can ignore it
         for name, shape in zip(cls._available_distortions_, cls._eg_param_1_):
-            dist = Distortion(name, shape, r0)
-            dist.plot(xs, ax=next(axiter))
-
-        for name, shape in zip(cls._available_distortions_, cls._eg_param_2_):
-            dist = Distortion(name, shape, r0)
+            dist = Distortion(name, shape, r0, df=4)
             dist.plot(xs, ax=next(axiter))
 
         dist = Distortion.convex_example('bond')
@@ -289,6 +294,11 @@ class Distortion(object):
 
         dist = Distortion.convex_example('cat')
         dist.plot(xs, ax=next(axiter))
+
+        # order will look better like this
+        for name, shape in zip(cls._available_distortions_, cls._eg_param_2_):
+            dist = Distortion(name, shape, r0, df=2)
+            dist.plot(xs, ax=next(axiter))
 
         axiter.tidy()
         suptitle_and_tight('Example Distortion Functions')

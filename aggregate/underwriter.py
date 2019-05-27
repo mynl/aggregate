@@ -590,8 +590,8 @@ class Underwriter(object):
                     print(e)
                     raise e
                 else:
-                    t = e.args[0].type;
-                    v = e.args[0].value;
+                    t = e.args[0].type
+                    v = e.args[0].value
                     i = e.args[0].index
                     txt2 = program_line[0:i] + f'>>>' + program_line[i:]
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')

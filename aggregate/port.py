@@ -74,6 +74,7 @@ class Portfolio(object):
         self._tail_var = None
         self.bs = 0
         self.log2 = 0
+        self.ex = 0
         self.last_update = 0
         self.hash_rep_at_last_update = ''
         self.last_distortion = None
@@ -722,6 +723,7 @@ class Portfolio(object):
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
 
+        self.ex = self.audit_df.loc['total', 'EmpMean']
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
         if trim_df:
@@ -1790,7 +1792,7 @@ class Portfolio(object):
                 delta = roe / (1 + roe)
                 prem = row['exa_total'] + delta * (a_reg - row['exa_total'])
             if prem > 0:
-                pricing_g = self.calibrate_distortion(name=pricing_g, premium_target=prem, assets=a_reg_ix)
+                pricing_g = self.calibrate_distortion(name=pricing_g['name'], premium_target=prem, assets=a_reg_ix)
             else:
                 pricing_g = Distortion(**pricing_g)
 
@@ -1874,7 +1876,7 @@ class Portfolio(object):
         logging.info(f'CPortfolio.price | Capital quantization error {(a_reg - a_reg_ix) / a_reg:7.5f}')
         if prem > 0:
             logging.info(f'CPortfolio.price | Premium calculated as {prem:18,.1f}')
-            logging.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape[0]:6.3f}')
+            logging.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape}')
 
         return df, pricing_g
 
@@ -2219,7 +2221,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         p = pd.concat(pdfs)
         p['lr err'] = p['lr'] - LR
 
-        # a from apply, log from price
+        # a from apply, p from price
         a = table.query(f' loss=={K} ')
 
         # easier tests

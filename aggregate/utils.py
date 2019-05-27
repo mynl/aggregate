@@ -396,13 +396,19 @@ def suptitle_and_tight(title, **kwargs):
 
 
 # general nonsense
-def insurability_triangle():
+def insurability_triangle(figsize=(10, 3)):
     """
     Illustrate the insurability triangle...
+        λ = A / L
+        ROE = (P-L) / (A - P) = (P/L - 1) / (A/L - P/L)
+            = (1/LR - 1) / (λ - 1/LR) = (1 - LR) / (λLR - 1)
 
+    Hence
+
+        δ = ROE / (1 + ROE) = (1 - LR) / [LR (λ - 1)]
     :return:
     """
-    f, axs = plt.subplots(1, 3, figsize=(12, 4))
+    f, axs = plt.subplots(1, 3, figsize=figsize)
     it = iter(axs.flatten())
     λs = [1.5, 2, 3, 5, 10, 25, 50, 100]
     # up to user to manage colors

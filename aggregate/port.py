@@ -1431,9 +1431,11 @@ class Portfolio(object):
                 return ex - premium_target, ex_prime
         elif name == 'cll':
             # capped loglinear
-            shape = 1.01 # starting parameter
+            shape = 0.95   # starting parameter
             lS = np.log(S)
+            lS[0] = 0
             ea = np.exp(r0)
+
             def f(b):
                 uncapped = ea * S ** b
                 ex = np.sum(np.minimum(1, uncapped)) * self.bs

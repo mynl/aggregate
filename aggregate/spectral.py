@@ -47,6 +47,26 @@ class Distortion(object):
         """
         create new distortion
 
+        Tester:
+
+            ps = np.linspace(0, 1, 201)
+            for dn in agg.Distortion.available_distortions(True):
+                if dn=='clin':
+                    # shape param must be > 1
+                    g_dist = agg.Distortion(**{'name': dn, 'shape': 1.25, 'r0': 0.02, 'df': 5.5})
+                else:
+                    g_dist = agg.Distortion(**{'name': dn, 'shape': 0.5, 'r0': 0.02, 'df': 5.5})
+                g_dist.plot()
+                g = g_dist.g
+                g_inv = g_dist.g_inv
+
+                df = pd.DataFrame({'p': ps, 'gg_inv': g(g_inv(ps)), 'g_invg': g_inv(g(ps)),
+                'g': g(ps), 'g_inv': g_inv(ps)})
+                print(dn)
+                print("errors")
+                display(df.query(' abs(gg_inv - g_invg) > 1e-5'))
+
+
         :param name: name of an available distortion, call ``Distortion.available_distortions()`` for a list
         :param shape: float or [float, float]
         :param shape: shape parameter
@@ -103,7 +123,7 @@ class Distortion(object):
         elif self.name == 'cll':
             # capped log linear
             b = self.shape
-            binv = 1/b
+            binv = 1 / b
             ea = np.exp(self.r0)
             a = self.r0
             self.has_mass = False
@@ -112,7 +132,7 @@ class Distortion(object):
                 return np.where(x==0, 0, np.minimum(1, ea * x ** b))
 
             def g_inv(x):
-                return np.where(x < 1, (x/a) ** binv, 1)
+                return np.where(x < 1, np.minimum(1, (x / ea) ** binv), 1)
 
         elif self.name == 'tvar':
             p = self.shape
@@ -139,7 +159,7 @@ class Distortion(object):
                 return np.maximum(0, (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
 
         elif self.name == 'clin':
-            # capped linear
+            # capped linear, needs shape > 1 to make sense...
             sl = self.shape
             self.has_mass = (r0 > 0)
             self.mass = r0
@@ -163,23 +183,16 @@ class Distortion(object):
             def g(x):
                 return np.minimum(1, d + (1 - d) * x + spread * np.sqrt(x * (1 - x)))
 
-            # kludge for now
-            # TODO sort out g_inv...it is incorrect...
-            # g, g_inv = agg.distortion_factory({'name': 'lep', 'shape': [0.05, 0.35]})
-            # ps = np.linspace(0, 1, 1001)
-            # df = pd.DataFrame({'log': ps, 'gg_inv': g(g_inv(ps)), 'g_invg': g_inv(g(ps)),
-            # 'g': g(ps), 'g_inv': g_inv(ps)})
-            # df.query(' abs(gg_inv - g_invg) > 1e-5')
-            sigma = (delta - d) ** 2
-            a = (1 - d) ** 2 + sigma
+            spread2 = spread ** 2
+            a = (1 - d) ** 2 + spread2
 
-            def g_inv(x):
-                mb = (2 * (x - d) * (1 - d) + sigma)  # mb = -b
-                c = (x - d) ** 2
+            def g_inv(y):
+                mb = (2 * (y - d) * (1 - d) + spread2)  # mb = -b
+                c = (y - d) ** 2
                 rad = np.sqrt(mb * mb - 4 * a * c)
                 # l = (mb + rad)/(2 * a)
                 u = (mb - rad) / (2 * a)
-                return np.where(x < d, 0, np.maximum(0, u))
+                return np.where(y < d, 0, np.maximum(0, u))
 
         elif self.name == 'convex':
             self.has_mass = False
@@ -191,7 +204,7 @@ class Distortion(object):
                          df.iloc[knots, df.columns.get_loc(col_x)], kind='linear')
         else:
             raise ValueError(
-                "Incorrect spec passed to distortion_factory; implemented g types are ph, wang, tvar, "
+                "Incorrect spec passed to Distortion; implemented g types are ph, wang, tvar, "
                 "ly (linear yield), lep (layer equivalent pricing) and clin (clipped linear)")
 
         self.g = g

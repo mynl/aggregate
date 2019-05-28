@@ -1724,9 +1724,12 @@ class Portfolio(object):
             Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
             the regulatory distortion
 
-            regulatory capital distortion is applied on unlimited basis
+            regulatory capital distortion is applied on unlimited basis: reg_g can be:
+            a number:   if input < 1 interpreted as a p value and used to deterine VaR capital
+                        if > 1 directly as a capital number
+            d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value
+            a distortion used directly
 
-            reg_g is number; Distortion; spec { name = var|tvar|  ,  shape =log value in either case }
             pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
             overwritten
 
@@ -1757,21 +1760,23 @@ class Portfolio(object):
                 # print(f'a_reg {a_reg} and ix {a_reg_ix}')
             else:
                 a_reg = a_reg_ix = float(Finv(reg_g))
-        else:
-            if isinstance(reg_g, dict):
-                a_reg = 0
-                if reg_g['name'] == 'var':  # must be dictionary
-                    # given var, nearest interpolation for assets
-                    a_reg = a_reg_ix = float(Finv(reg_g['shape']))
-                elif reg_g['name'] == 'tvar':
-                    reg_g = Distortion(**reg_g)
-                if a_reg == 0:
-                    # not VaR, need to figure capital
-                    assert (isinstance(reg_g, Distortion))
-                    gS = reg_g.g(self.density_df.S)
-                    a_reg = self.bs * np.sum(gS)
-                    ix = self.density_df.index.get_loc(a_reg, method='ffill')
-                    a_reg_ix = self.density_df.index[ix]
+        elif isinstance(reg_g, dict):
+            if reg_g['name'] == 'var':  # must be dictionary
+                # given var, nearest interpolation for assets
+                a_reg = a_reg_ix = float(Finv(reg_g['shape']))
+            elif reg_g['name'] == 'epd':
+                a_reg = float(self.epd_2_assets[('total', 0)](reg_g['shape']))
+                a_reg_ix = self.density_df.iloc[
+                    self.density_df.index.get_loc(a_reg, 'ffill'), 0]
+            else:
+                reg_g = Distortion(**reg_g)
+        if a_reg == 0:
+            # still need to figure capital
+            assert (isinstance(reg_g, Distortion))
+            gS = reg_g.g(self.density_df.S)
+            a_reg = self.bs * np.sum(gS)
+            ix = self.density_df.index.get_loc(a_reg, method='ffill')
+            a_reg_ix = self.density_df.index[ix]
 
         # relevant row for all statistics_df
         row = self.density_df.loc[a_reg_ix, :]

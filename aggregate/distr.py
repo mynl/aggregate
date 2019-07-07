@@ -959,7 +959,7 @@ class Aggregate(Frequency):
 
         * beta(x) = alpha + gamma(x)
         * alpha = log(freq' / freq): log of the increase in claim count
-        * gamma = log(RND of adjusted severity) = log(tilde f / f)
+        * gamma = log(Radon Nikodym derv of adjusted severity) = log(tilde f / f)
 
         Adjustment guarantees a positive loading iff beta is an increasing function
         iff gamma is increasing iff tilde f / f is increasing.
@@ -989,11 +989,13 @@ class Aggregate(Frequency):
         if isinstance(beta, Distortion):
             # passed in a distortion function
             beta_name = beta.name
-            self.dh_sev_density = np.diff(beta.g(np.cumsum(np.hstack((0, self.sev_density)))))
-            # expect ex_beta = 1 but allow to pass multiples....
+            self.dh_sev_density = -np.diff(beta.g(1 - np.cumsum(np.hstack((0, self.sev_density)))))
+            # ex_beta from Radon N derv, e^beta = dh / objective, so E[e^beta] = int dh/obj x obj = sum(dh)
+            # which we expect to equal 1...hummm not adjusting the freq?!
+            ex_beta = np.sum(self.dh_sev_density)
         else:
             self.dh_sev_density = self.sev_density * np.exp(beta.g(xs))
-        ex_beta = np.sum(self.dh_sev_density)
+            ex_beta = np.sum(self.dh_sev_density)
         self.dh_sev_density = self.dh_sev_density / ex_beta
         adj_n = ex_beta * self.n
         if self.freq_name == 'poisson':

@@ -1309,9 +1309,9 @@ class Portfolio(object):
         self.assets_2_epd[('total', 0)] = minus_ans_wrapper(
             interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
 
-    def calibrate_distortion(self, name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0):
+    def calibrate_distortion(self, name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0, S_column='S'):
         """
-        Find transform to hit a premium target given assets of ``a``.
+        Find transform to hit a premium target given assets of ``assets``.
         Fills in the values in ``g_spec`` and returns params and diagnostics...so
         you can use it either way...more convenient
 
@@ -1322,24 +1322,30 @@ class Portfolio(object):
         :param roe:             or ROE
         :param assets: asset level
         :param p:
+        :param S_column: column of density_df to use for calibration (allows routine to be used in other contexts; if
+                so used must input a premium_target directly).
         :return:
         """
 
         # figure assets
-        if assets == 0:
-            assert (p > 0)
-            assets = self.q(p)
-        # expected losses with assets
-        el = self.density_df.loc[assets, 'exa_total']
+        if S_column == 'S':
+            if assets == 0:
+                assert (p > 0)
+                assets = self.q(p)
 
-        # figure premium target
-        if premium_target == 0:
-            assert (roe > 0)
-            premium_target = (el + roe * assets) / (1 + roe)
+            # figure premium target
+            if premium_target == 0:
+                assert (roe > 0)
+                # expected losses with assets
+                el = self.density_df.loc[assets, 'exa_total']
+                premium_target = (el + roe * assets) / (1 + roe)
+        else:
+            # no need for roe, set assets = max loss and let code trim it
+            assets = self.density_df.loss.iloc[-1]
 
         # extract S and trim it: we are doing int from zero to assets
         # integration including ENDpoint is
-        Splus = self.density_df.loc[0:assets, 'S'].values
+        Splus = self.density_df.loc[0:assets, S_column].values
         last_non_zero = np.argwhere(Splus)
         ess_sup = 0
         if len(last_non_zero) == 0:
@@ -1357,7 +1363,7 @@ class Portfolio(object):
                 'CPortfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
-            S = self.density_df.loc[0:assets - self.bs, 'S'].values
+            S = self.density_df.loc[0:assets - self.bs, S_column].values
 
         # now all S values should be greater than zero  and it is decreasing
         assert np.all(S > 0) and np.all(S[:-1] >= S[1:])

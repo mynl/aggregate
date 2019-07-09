@@ -976,9 +976,23 @@ class Aggregate(Frequency):
             beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
             beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
 
-        :param xs:
-        :param padding:
-        :param tilt_vector:
+        To make a 'multiple' of an existing distortion you can use a simple wrapper class like this:
+
+            class dist_wrap(agg.Distortion):
+                '''
+                wrap a distortion to include higher or lower freq
+                in DH α is actually exp(α)
+                this will pass isinstance(g2, agg.Distortion)
+                '''
+                def __init__(self, α, dist):
+                    def loc_g(s):
+                        return α * dist.g(s)
+                    self.g = loc_g
+                    self.name = dist.name
+
+        :param xs: is part of agg so can use that
+        :param padding: = 1 (default)
+        :param tilt_vector: None (default)
         :param beta: function R+ to R with appropriate properties or name of prob distortion function
         :param beta_name:
         :return:
@@ -1375,6 +1389,8 @@ class Severity(ss.rv_continuous):
         from .port import Portfolio
 
         ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        # I think this is preferred now, but these are the same (probably...)
+        # super().__init__(name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
         self.limit = exp_limit
         self.attachment = exp_attachment
         self.detachment = exp_limit + exp_attachment
@@ -1405,13 +1421,20 @@ class Severity(ss.rv_continuous):
             exp_limit = min(np.min(exp_limit), xs.max())
             if sev_name == 'chistogram':
                 # continuous histogram: uniform between xs's
-                xss = np.sort(np.hstack((xs, xs[-1] + xs[1])))
+                # if the inputs are not evenly spaced this messes up because it interprets p as the
+                #  height of the density over the range...hence have to rescale
+                #  it DOES NOT matter that the p's add up to 1...that is handled automatically
+                # changed 1 to -2 so the last bucket is bigger WHY SORTED???
+                xss = np.sort(np.hstack((xs, xs[-1] + xs[-2])))
+                aps = ps / np.diff(xss)
+                # this is now slightly bigger
+                exp_limit = min(np.min(exp_limit), xss.max())
                 # midpoints
                 xsm = (xss[:-1] + xss[1:]) / 2
                 self.sev1 = np.sum(xsm * ps)
                 self.sev2 = np.sum(xsm ** 2 * ps)
                 self.sev3 = np.sum(xsm ** 3 * ps)
-                self.fz = ss.rv_histogram((ps, xss))
+                self.fz = ss.rv_histogram((aps, xss))
             elif sev_name == 'dhistogram':
                 # discrete histogram: point masses at xs's
                 self.sev1 = np.sum(xs * ps)

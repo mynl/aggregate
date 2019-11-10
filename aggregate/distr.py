@@ -1413,7 +1413,13 @@ class Severity(ss.rv_continuous):
                 sev_ps = np.array(1)
             assert sev_name[1:] == 'histogram'
             # TODO: make histogram work with exp_limit and exp_attachment; currently they are ignored
-            xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
+            try:
+                xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
+            except ValueError:
+                # for empirical
+                logging.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast')
+                xs = np.array(sev_xs)
+                ps = np.array(sev_ps)
             if not np.isclose(np.sum(ps), 1.0):
                 logging.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
                               f'{np.sum(ps)}')
@@ -1425,7 +1431,11 @@ class Severity(ss.rv_continuous):
                 #  height of the density over the range...hence have to rescale
                 #  it DOES NOT matter that the p's add up to 1...that is handled automatically
                 # changed 1 to -2 so the last bucket is bigger WHY SORTED???
-                xss = np.sort(np.hstack((xs, xs[-1] + xs[-2])))
+                if len(xs) == len(ps):
+                    xss = np.sort(np.hstack((xs, xs[-1] + xs[-2])))
+                else:
+                    # allows to pass in with the right hand end specified
+                    xss = xs
                 aps = ps / np.diff(xss)
                 # this is now slightly bigger
                 exp_limit = min(np.min(exp_limit), xss.max())
@@ -1511,7 +1521,7 @@ class Severity(ss.rv_continuous):
             if sev_a == 0:  # TODO figuring 0 is invalid shape...
                 sev_a, _ = self.cv_to_shape(sev_cv)
             if sev_scale == 0 and sev_mean > 0:
-                sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean)
+                sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
             else:
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
@@ -1531,10 +1541,11 @@ class Severity(ss.rv_continuous):
             st = self.fz.stats('mv')
             m = st[0]
             acv = st[1] ** .5 / m  # achieved sev_cv
-            if sev_mean > 0 and not np.isclose(sev_mean, m):
+            # sev_loc added so you can write lognorm 5 cv .3 + 10 a shifted lognorm mean 5
+            if sev_mean > 0 and not np.isclose(sev_mean + sev_loc, m):
                 print(f'WARNING target mean {sev_mean} and achieved mean {m} not close')
                 # assert (np.isclose(sev_mean, m))
-            if sev_cv > 0 and not np.isclose(sev_cv, acv):
+            if sev_cv > 0 and not np.isclose(sev_cv * sev_mean / (sev_mean + sev_loc), acv):
                 print(f'WARNING target cv {sev_cv} and achieved cv {acv} not close')
                 # assert (np.isclose(sev_cv, acv))
             # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
@@ -1606,20 +1617,21 @@ class Severity(ss.rv_continuous):
         fz = gen(ans)
         return ans, fz
 
-    def mean_to_scale(self, shape, mean):
+    def mean_to_scale(self, shape, mean, loc=0):
         """
         adjust scale of fz to have desired mean
         return frozen instance
 
         :param shape:
         :param mean:
+        :param loc: location parameter (note: location is added to the mean...)
         :return:
         """
         gen = getattr(ss, self.sev_name)
         fz = gen(shape)
         m = fz.stats('m')
         scale = mean / m
-        fz = gen(shape, scale=scale)
+        fz = gen(shape, scale=scale, loc=loc)
         return scale, fz
 
     def __enter__(self):

@@ -199,7 +199,9 @@ import logging
 import numpy as np
 import warnings
 
+
 class UnderwritingLexer(Lexer):
+
     tokens = {ID, BUILTINID, NOTE,
               SEV, AGG, PORT,
               PLUS, MINUS, TIMES, NUMBER,

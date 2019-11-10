@@ -456,8 +456,10 @@ class Underwriter(object):
 
         # if globs replace all meta objects with a lookup object
         if self.glob is not None:
+            logging.info(f'Underwriter.write | Resolving globals')
             for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
                 if a['sev_name'][0:4] == 'meta':
+                    logging.info(f'Underwriter.write | Resolving {a["sev_name"]}')
                     obj_name = a['sev_name'][5:]
                     try:
                         obj = self.glob[obj_name]

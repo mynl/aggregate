@@ -84,6 +84,7 @@ class Frequency(object):
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
+        logging.info(f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
 
         if self.freq_name == 'fixed':
             def _freq_moms(n):
@@ -370,6 +371,13 @@ class Frequency(object):
         self.freq_moms = _freq_moms
         self.mgf = mgf
 
+    def __str__(self):
+        """
+        wrap default with name
+        :return:
+        """
+        return f'Frequency object of type {self.freq_name}\n{super(Frequency, self).__repr__()}'
+
 
 class Aggregate(Frequency):
     """
@@ -511,6 +519,8 @@ class Aggregate(Frequency):
 
         # class variables
         self.name = get_value(name)
+        logging.info(
+            f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
         self.note = note
         self.sev_density = None
@@ -653,6 +663,13 @@ class Aggregate(Frequency):
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
 
+    def __repr__(self):
+        """
+        wrap default with name
+        :return:
+        """
+        return f'{super(Aggregate, self).__repr__()} name: {self.name}'
+
     def __str__(self):
         """
         Goal: readability
@@ -772,7 +789,6 @@ class Aggregate(Frequency):
 
         :param log2:
         :param bs:
-        :param reporting_level:
         :param kwargs:  passed through to update
         :return:
         """
@@ -1403,7 +1419,8 @@ class Severity(ss.rv_continuous):
         self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
-
+        logging.info(
+            f'Severity.__init__  | creating new Severity {self.sev_name} at {super(Severity, self).__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
         # allows you to define fixed with just xs=1 (no log)
         if sev_xs is not None:
@@ -1565,6 +1582,13 @@ class Severity(ss.rv_continuous):
             self.long_name = f'{name}: {sev_name}{layer_text}'
 
         assert self.fz is not None
+
+    def __repr__(self):
+        """
+        wrap default with name
+        :return:
+        """
+        return f'{super(Severity, self).__repr__()} of type {self.sev_name}'
 
     def cv_to_shape(self, cv, hint=1):
         """

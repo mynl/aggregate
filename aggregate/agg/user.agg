@@ -6,6 +6,7 @@ port THREE~LINE~EXAMPLE note{User example, single line, mixed sev, and sublines}
     agg Single   10 claims                                              sev lognorm 100 cv 0.75                                                    poisson
     agg MixedSev 10 claims 250 xs 0                                     sev lognorm 100 cv [0.2, 0.4, 0.6, 0.8, 1.0] wts [0.2, 0.2, 0.2, 0.2, 0.2] poisson
     agg Sublines [10 10 10 10] claims [inf 100 inf 100] xs [0 0 100 50] sev lognorm 100 cv 1.25                                                    poisson
+
 port single  note{single line example}
     agg a: 10 claims sev lognorm 100 cv 0.75 poisson
 
@@ -14,7 +15,8 @@ port MIXED note{mixed severity example with different CVs}
 
 port SUBLINES note{sublines defining a limit profile}
     agg Sublines: [10 10 10 10] claims [inf 100 inf 100] xs [0 0 100 50] sev lognorm 100 cv 1.25 poisson
-# here is a coment
+
+# here is a comment
 port SMALL~MEDIUM~LARGE note{three line example with small, medium and large claims}
     agg Small:    10 claims 10000000 xs 0 sev lognorm 500000 cv 1.5 mixed gamma 0.1
     agg Medium:  100 claims  1000000 xs 0 sev lognorm  50000 cv 1.5 mixed gamma 0.1

@@ -29,22 +29,52 @@ class Portfolio(object):
     Portfolio creates and manages a portfolio of Aggregate objects.
 
     :param name: the name of the portfolio, no spaces or underscores
-    :param spec_list: a list of Aggregate object dictionary specifications
+    :param spec_list: a list of 1) dictionary: Aggregate object dictionary specifications or
+                                2) Aggregate: An actual aggregate objects or
+                                3) tuple (type, dict) as returned by uw['name'] or
+                                4) string: Names referencing objects in the optionally passed underwriter
 
     """
 
-    def __init__(self, name, spec_list):
+    def __init__(self, name, spec_list, uw=None):
         self.name = name
         self.agg_list = []
         self.line_names = []
+        logging.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
         for spec in spec_list:
-            a = Aggregate(**spec)
+            if isinstance(spec, Aggregate):
+                # directly passed in an agg object
+                a = spec
+                agg_name = spec.name
+            elif isinstance(spec, str):
+                # look up object in uw return actual instance
+                # note here you could do uw.aggregate[spec] and get the dictionary def
+                # or uw(spec) to return the already-created (and maybe updated) object
+                # we go the latter route...if user wants they can pull off the dict item themselves
+                if uw is None:
+                    raise ValueError(f'Must pass valid Underwriter instance to create aggs by name')
+                try:
+                    a = uw(spec)
+                except e:
+                    print(f'Item {spec} not found in your underwriter')
+                    raise e
+                agg_name = a.name
+            elif isinstance(spec, tuple):
+                # uw returns type, spec
+                assert spec[0] == 'agg'
+                a = Aggregate(**spec[1])
+                agg_name = spec[1]['name']
+            elif isinstance(spec, dict):
+                a = Aggregate(**spec)
+                agg_name = spec['name'][0] if isinstance(spec['name'], list) else spec['name']
+            else:
+                raise ValueError(f'Invalid type {type(spec)} passed to Portfolio, expect Aggregate, str or dict.')
+
             self.agg_list.append(a)
-            nm = spec['name'][0] if isinstance(spec['name'], list) else spec['name']
-            self.line_names.append(nm)
-            self.__setattr__(nm, a)
+            self.line_names.append(agg_name)
+            self.__setattr__(agg_name, a)
             ma.add_fs(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
                       a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
             max_limit = max(max_limit, np.max(np.array(a.limit)))
@@ -122,7 +152,7 @@ class Portfolio(object):
         """
         # return str(self.to_dict())
 
-        s = [f'{{ "name": "{self.name}"']
+        s = [super(Portfolio, self).__repr__(), f"{{ 'name': '{self.name}'"]
         agg_list = [str({k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys})
                     for a in self.agg_list]
         s.append(f"'spec': [{', '.join(agg_list)}]")

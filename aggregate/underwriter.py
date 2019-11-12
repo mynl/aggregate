@@ -129,7 +129,7 @@ class Underwriter(object):
     data_types = ['portfolio', 'aggregate', 'severity']
 
     def __init__(self, dir_name="", name='Rory', databases=None, glob=None, store_mode=True, update=False,
-                 verbose=False, log2=10, debug=False):
+                 verbose=False, log2=10, debug=False, create_all=False):
         """
 
         :param dir_name:
@@ -141,6 +141,7 @@ class Underwriter(object):
         :param verbose:
         :param log2:
         :param debug: run parser in debug mode
+        :param create_all: by default write only creates portfolios.
         """
 
         self.last_spec = None
@@ -171,6 +172,7 @@ class Underwriter(object):
             self._runner(program)
         # set desired store_mode
         self.store_mode = store_mode
+        self.create_all = create_all
 
     def __getitem__(self, item):
         """
@@ -212,7 +214,7 @@ class Underwriter(object):
             s.append(', '.join([k for k in sorted(getattr(self, what).keys())]))
             s.append('<br>')
         s.append(f'<h3>Settings</h3>')
-        for k in ['update', 'log2', 'store_mode', 'verbose', 'last_spec']:
+        for k in ['update', 'log2', 'store_mode', 'verbose', 'last_spec', 'create_all']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
@@ -368,15 +370,18 @@ class Underwriter(object):
         * verbose
         * update overrides class default
         * add_exa should port.add_exa add the exa related columns to the output?
+        * create_all: create all objects, default just portfolios. You generally
+                     don't want to create underlying sevs and aggs in a portfolio.
 
         :param portfolio_program:
         :param kwargs:
-        :return:
+        :return: single created object or dictionary name: object
         """
 
         # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
+        create_all = kwargs.get('create_all', self.create_all)
         update = kwargs.get('update', self.update)
         if update:
             if 'log2' in kwargs:
@@ -451,7 +456,8 @@ class Underwriter(object):
                 ValueError(f'Cannot build {_type} objects')
             return obj
 
-        # run
+        # if you fall through to here then the portfolio_program did not refer to a built in object
+        # run the program
         self._runner(portfolio_program)
 
         # if globs replace all meta objects with a lookup object
@@ -469,42 +475,55 @@ class Underwriter(object):
                     a['sev_name'] = obj
                     logging.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
                                  f'replaced with object {obj.name} from glob')
+            logging.info(f'Underwriter.write | Done resolving globals')
 
         # create objects
+        # 2019-11: create all objects not just the portfolios if create_all==True
         rv = None
         if len(self.parser.port_out_dict) > 0:
             # create ports
-            rv = []
+            rv = {}
             for k in self.parser.port_out_dict.keys():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
                 s = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
                 _update(s, k)
-                rv.append(s)
+                rv[k] = s
 
-        elif len(self.parser.agg_out_dict) > 0 and rv is None:
+        if len(self.parser.agg_out_dict) > 0 and create_all:
             # new aggs, create them
-            rv = []
+            if rv is None:
+                rv = {}
             for k, v in self.parser.agg_out_dict.items():
                 # TODO FIX this clusterfuck
                 s = Aggregate(k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
                 if update:
                     s.easy_update(self.log2, verbose=verbose)
-                rv.append(s)
+                rv[k] = s
 
-        elif len(self.parser.sev_out_dict) > 0 and rv is None:
-            # sev all sevs
-            rv = []
+        if len(self.parser.sev_out_dict) > 0 and create_all:
+            # new sevs, create them
+            if rv is None:
+                rv = {}
             for v in self.parser.sev_out_dict.values():
                 if 'sev_wt' in v:
                     del v['sev_wt']
                 s = Severity(**v)
-                rv.append(s)
+                rv[f'sev_{s.__repr__()[38:54]}'] = s
 
-        else:
+        # report on what has been done
+        if rv is None:
             print('WARNING: Program did not contain any output...')
             logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output')
-        if rv is not None and len(rv) == 1:
-            rv = rv[0]
+        else:
+            if len(rv):
+                logging.info(f'Underwriter.write | Program created {len(rv)} objects and ' 
+                     f'defined {len(self.parser.port_out_dict)} Portfolio(s), ' 
+                     f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
+                     f'{len(self.parser.sev_out_dict)} Severity(ies)')
+            if len(rv) == 1:
+                rv = rv.popitem()[1]
+
+        # return created objects
         return rv
 
     def write_from_file(self, file_name, **kwargs):

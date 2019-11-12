@@ -26,84 +26,82 @@ Ignored characters
 Language Specification
 ----------------------
 
-::
+answer              	:: sev_out
+                    	 | agg_out
+                    	 | port_out
 
-    answer              :: sev_out
-                             | agg_out
-                             | port_out
+port_out            	:: port_name note agg_list
 
-    port_out            :: port_name note agg_list
+agg_list            	:: agg_list agg_out
+                    	 | agg_out
 
-    agg_list            :: agg_list agg_out
-                             | agg_out
+agg_out             	:: agg_name builtin_aggregate note
+                    	 | agg_name exposures layers SEV sev freq note
 
-    agg_out             :: agg_name builtin_aggregate note
-                             | agg_name exposures layers SEV sev freq note
+sev_out             	:: sev_out sev_name sev note
+                    	 | sev_name sev note
 
-    sev_out             :: sev_out sev_name sev note
-                             | sev_name sev note
+freq                	:: MIXED ID snumber snumber
+                    	 | MIXED ID snumber
+                    	 | FREQ snumber
+                    	 | FREQ
 
-    freq                :: MIXED ID snumber snumber
-                             | MIXED ID snumber
-                             | FREQ snumber
-                             | FREQ
+snumber             	:: NUMBER
+                    	 | MINUS NUMBER %prec UMINUS
 
-    snumber             :: NUMBER
-                             | MINUS NUMBER %prec UMINUS
+sev                 	:: sev PLUS numbers
+                    	 | sev MINUS numbers
+                    	 | numbers TIMES sev
+                    	 | ids numbers CV numbers weights
+                    	 | ids numbers weights
+                    	 | ids numbers numbers weights xps
+                    	 | ids xps
+                    	 | builtinids numbers numbers
+                    	 | builtinids
 
-    sev                 :: sev PLUS numbers
-                             | sev MINUS numbers
-                             | numbers TIMES sev
-                             | ids numbers CV numbers weights
-                             | ids numbers weights
-                             | ids numbers numbers weights xps
-                             | ids xps
-                             | builtinids numbers numbers
-                             | builtinids
+xps                 	:: XPS numbers numbers
+                    	 | 
 
-    xps                 :: XPS numbers numbers
-                             |
+weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER
+                    	 | WEIGHTS numbers
+                    	 | 
 
-    weights             :: WEIGHTS EQUAL_WEIGHT NUMBER
-                             | WEIGHTS numbers
-                             |
+layers              	:: numbers XS numbers
+                    	 | 
 
-    layers              :: numbers XS numbers
-                             |
+note                	:: NOTE
+                    	 | 
 
-    note                :: NOTE
-                             |
+exposures           	:: numbers CLAIMS
+                    	 | numbers LOSS
+                    	 | numbers PREMIUM AT numbers LR
+                    	 | numbers PREMIUM AT numbers
 
-    exposures           :: numbers CLAIMS
-                             | numbers LOSS
-                             | numbers PREMIUM AT numbers LR
-                             | numbers PREMIUM AT numbers
+builtinids          	:: BUILTINID
 
-    builtinids          :: BUILTINID
+ids                 	:: "[" idl "]"
+                    	 | ID
 
-    ids                 :: "[" idl "]"
-                             | ID
+idl                 	:: idl ID
+                    	 | ID
 
-    idl                 :: idl ID
-                             | ID
+numbers             	:: "[" numberl "]"
+                    	 | NUMBER
 
-    numbers             :: "[" numberl "]"
-                             | NUMBER
+numberl             	:: numberl NUMBER
+                    	 | NUMBER
 
-    numberl             :: numberl NUMBER
-                             | NUMBER
+builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER
+                    	 | NUMBER TIMES builtin_aggregate_dist
+                    	 | builtin_aggregate_dist
 
-    builtin_aggregate   :: builtin_aggregate_dist TIMES NUMBER
-                             | NUMBER TIMES builtin_aggregate_dist
-                             | builtin_aggregate_dist
+builtin_aggregate_dist	:: BUILTINID
 
-    builtin_aggregate_dist	:: BUILTINID
+sev_name            	:: SEV ID
 
-    sev_name            :: SEV ID
+agg_name            	:: AGG ID
 
-    agg_name            :: AGG ID
-
-    port_name           :: PORT ID
+port_name           	:: PORT ID
 
 parser.out parser debug information
 -----------------------------------
@@ -112,32 +110,47 @@ Lexer term definition
 ---------------------
 
 
-    tokens = {ID, PLUS, MINUS, TIMES, NUMBER, CV, LOSS, PREMIUM, AT, LR, CLAIMS, XS, MIXED,
-              FIXED, POISSON, BUILTINID, WEIGHTS, XPS, ON}
+    tokens = {ID, BUILTINID, NOTE,
+              SEV, AGG, PORT,
+              PLUS, MINUS, TIMES, NUMBER,
+              LOSS, PREMIUM, AT, LR, CLAIMS,
+              XS,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
+              MIXED, FREQ
+              }
     ignore = ' \t,\\:\\(\\)|'
     literals = {'[', ']'}
 
-    BUILTINID = r'uw\.[a-zA-Z_][a-zA-Z0-9_]*'
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    # per manual, need to list longer tokens before shorter ones
+    # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
+    NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
+    BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
+    FREQ = r'binomial|poisson|bernoulli|fixed'
+    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: WHY?
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
+    EQUAL_WEIGHT = r'='
     ID['loss'] = LOSS
     ID['at'] = AT
     ID['cv'] = CV
     ID['premium'] = PREMIUM
     ID['prem'] = PREMIUM
     ID['lr'] = LR
-    ID['on'] = ON
     ID['claims'] = CLAIMS
     ID['claim'] = CLAIMS
+    ID['x'] = XS
     ID['xs'] = XS
     ID['wts'] = WEIGHTS
+    ID['wt'] = WEIGHTS
     ID['xps'] = XPS
     ID['mixed'] = MIXED
-    ID['poisson'] = POISSON
-    ID['fixed'] = FIXED
     ID['inf'] = NUMBER
+    ID['sev'] = SEV
+    ID['on'] = SEV
+    ID['agg'] = AGG
+    ID['port'] = PORT
+
 
 Example Code
 ------------
@@ -218,7 +231,7 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
     FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead
+    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: WHY?
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'

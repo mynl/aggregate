@@ -14,9 +14,9 @@ There are two simple ways to discretize a continuous distribution.
 
    ::
 
-        xss = np.sort(np.hstack((xs, xs + 1e-5)))
-        pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
-        fz_discr = ss.rv_histogram((pss, xss))
+       xss = np.sort(np.hstack((xs, xs + 1e-5)))
+       pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
+       fz_discr = ss.rv_histogram((pss, xss))
 
 The value 1e-5 just needs to be smaller than the resolution requested,
 i.e. do not “split the bucket”. Generally histograms will be
@@ -29,8 +29,8 @@ downsampled, not upsampled, so this is not a restriction.
 
    ::
 
-        xs2 = np.hstack((xs, xs[-1] + xs[1]))
-        fz_cts = ss.rv_histogram((ps2, xs2))
+       xs2 = np.hstack((xs, xs[-1] + xs[1]))
+       fz_cts = ss.rv_histogram((ps2, xs2))
 
 The first method we call **discrete** and the second **histogram**. The
 discrete method is appropriate when the distribution will be used and

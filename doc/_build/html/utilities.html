@@ -23,7 +23,8 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
@@ -93,89 +94,73 @@
 <h2>Axis Manager Class<a class="headerlink" href="#axis-manager-class" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="aggregate.utils.AxisManager">
-<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">AxisManager</code><span class="sig-paren">(</span><em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">AxisManager</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">figsize=None</em>, <em class="sig-param">height=2</em>, <em class="sig-param">aspect=1</em>, <em class="sig-param">nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager" title="Permalink to this definition">¶</a></dt>
 <dd><p>Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to
 plot to same set of axes.</p>
 <p>Always created and managed through axiter_factory function</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>n</strong> – number of plots in grid</li>
-<li><strong>figsize</strong> – </li>
-<li><strong>height</strong> – height of individual plot</li>
-<li><strong>aspect</strong> – aspect ratio of individual plot</li>
-<li><strong>nr</strong> – number of plots per row</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – number of plots in grid</p></li>
+<li><p><strong>figsize</strong> – </p></li>
+<li><p><strong>height</strong> – height of individual plot</p></li>
+<li><p><strong>aspect</strong> – aspect ratio of individual plot</p></li>
+<li><p><strong>nr</strong> – number of plots per row</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 <dl class="method">
 <dt id="aggregate.utils.AxisManager.dimensions">
-<code class="descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
 <dd><p>return dimensions (width and height) of current layout</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.AxisManager.grid">
-<code class="descname">grid</code><span class="sig-paren">(</span><em>size=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">grid</code><span class="sig-paren">(</span><em class="sig-param">size=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid" title="Permalink to this definition">¶</a></dt>
 <dd><p>return a block of axes suitable for Pandas
 if size=0 return all the axes</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>size</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>size</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.AxisManager.grid_size">
-<code class="descname">grid_size</code><span class="sig-paren">(</span><em>n</em>, <em>subgrid=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid_size" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">grid_size</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">subgrid=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid_size" title="Permalink to this definition">¶</a></dt>
 <dd><p>appropriate grid size given class parameters</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>n</strong> – </li>
-<li><strong>subgrid</strong> – call is for a subgrid, no special treatment for 6 and 8</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>subgrid</strong> – call is for a subgrid, no special treatment for 6 and 8</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.AxisManager.tidy">
-<code class="descname">tidy</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.tidy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.tidy" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">tidy</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.tidy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.tidy" title="Permalink to this definition">¶</a></dt>
 <dd><p>delete unused axes to tidy up a plot</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -185,226 +170,188 @@ if size=0 return all the axes</p>
 <h2>Moment Aggregator Class<a class="headerlink" href="#moment-aggregator-class" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="aggregate.utils.MomentAggregator">
-<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">MomentAggregator</code><span class="sig-paren">(</span><em>freq_moms=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">MomentAggregator</code><span class="sig-paren">(</span><em class="sig-param">freq_moms=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
 <dd><p>Purely accumulates moments
 Used by Portfolio
 Not frequency aware
 makes report_ser df and statistics_df</p>
 <p>Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>freq_moms</strong> – function of one variable returning first three noncentral moments of the underlying frequency distribution</td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>freq_moms</strong> – function of one variable returning first three noncentral moments of the underlying frequency distribution</p>
+</dd>
+</dl>
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.add_f1s">
-<code class="descname">add_f1s</code><span class="sig-paren">(</span><em>f1</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_f1s"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_f1s" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">add_f1s</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_f1s"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_f1s" title="Permalink to this definition">¶</a></dt>
 <dd><p>accumulate new moments defined by f1 and s - fills in f2, f3 based on
 stored frequency distribution</p>
 <p>used by Aggregate</p>
 <p>compute agg for the latest values</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>f1</strong> – </li>
-<li><strong>s1</strong> – </li>
-<li><strong>s2</strong> – </li>
-<li><strong>s3</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.add_fs">
-<code class="descname">add_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>f2</em>, <em>f3</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_fs" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">add_fs</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">f2</em>, <em class="sig-param">f3</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_fs" title="Permalink to this definition">¶</a></dt>
 <dd><p>accumulate new moments defined by f and s</p>
 <p>used by Portfolio</p>
 <p>compute agg for the latest values</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>f1</strong> – </li>
-<li><strong>f2</strong> – </li>
-<li><strong>f3</strong> – </li>
-<li><strong>s1</strong> – </li>
-<li><strong>s2</strong> – </li>
-<li><strong>s3</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>f2</strong> – </p></li>
+<li><p><strong>f3</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="staticmethod">
+<dl class="method">
 <dt id="aggregate.utils.MomentAggregator.agg_from_fs">
-<em class="property">static </em><code class="descname">agg_from_fs</code><span class="sig-paren">(</span><em>f1</em>, <em>f2</em>, <em>f3</em>, <em>s1</em>, <em>s2</em>, <em>s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.agg_from_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.agg_from_fs" title="Permalink to this definition">¶</a></dt>
+<em class="property">static </em><code class="sig-name descname">agg_from_fs</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">f2</em>, <em class="sig-param">f3</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.agg_from_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.agg_from_fs" title="Permalink to this definition">¶</a></dt>
 <dd><p>aggregate_project moments from freq and sev components</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>f1</strong> – </li>
-<li><strong>f2</strong> – </li>
-<li><strong>f3</strong> – </li>
-<li><strong>s1</strong> – </li>
-<li><strong>s2</strong> – </li>
-<li><strong>s3</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>f2</strong> – </p></li>
+<li><p><strong>f3</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="staticmethod">
+<dl class="method">
 <dt id="aggregate.utils.MomentAggregator.column_names">
-<em class="property">static </em><code class="descname">column_names</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
+<em class="property">static </em><code class="sig-name descname">column_names</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
 <dd><p>list of the moment and statistics_df names for f x s = a</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="staticmethod">
+<dl class="method">
 <dt id="aggregate.utils.MomentAggregator.cumulate_moments">
-<em class="property">static </em><code class="descname">cumulate_moments</code><span class="sig-paren">(</span><em>m1</em>, <em>m2</em>, <em>m3</em>, <em>n1</em>, <em>n2</em>, <em>n3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.cumulate_moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.cumulate_moments" title="Permalink to this definition">¶</a></dt>
+<em class="property">static </em><code class="sig-name descname">cumulate_moments</code><span class="sig-paren">(</span><em class="sig-param">m1</em>, <em class="sig-param">m2</em>, <em class="sig-param">m3</em>, <em class="sig-param">n1</em>, <em class="sig-param">n2</em>, <em class="sig-param">n3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.cumulate_moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.cumulate_moments" title="Permalink to this definition">¶</a></dt>
 <dd><p>Moments of sum of indepdendent variables</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>m1</strong> – 1st moment, E(X)</li>
-<li><strong>m2</strong> – 2nd moment, E(X^2)</li>
-<li><strong>m3</strong> – 3rd moment, E(X^3)</li>
-<li><strong>n1</strong> – </li>
-<li><strong>n2</strong> – </li>
-<li><strong>n3</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m1</strong> – 1st moment, E(X)</p></li>
+<li><p><strong>m2</strong> – 2nd moment, E(X^2)</p></li>
+<li><p><strong>m3</strong> – 3rd moment, E(X^3)</p></li>
+<li><p><strong>n1</strong> – </p></li>
+<li><p><strong>n2</strong> – </p></li>
+<li><p><strong>n3</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.get_fsa_stats">
-<code class="descname">get_fsa_stats</code><span class="sig-paren">(</span><em>total</em>, <em>remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">get_fsa_stats</code><span class="sig-paren">(</span><em class="sig-param">total</em>, <em class="sig-param">remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
 <dd><p>get the current f x s = agg statistics_df and moments
 total = true use total else, current
 remix = true for total only, re-compute freq statistics_df based on total freq 1</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>total</strong> – binary</li>
-<li><strong>remix</strong> – combine all sevs and recompute the freq moments from total freq</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>total</strong> – binary</p></li>
+<li><p><strong>remix</strong> – combine all sevs and recompute the freq moments from total freq</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.moments">
-<code class="descname">moments</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">moments</code><span class="sig-paren">(</span><em class="sig-param">mom_type</em>, <em class="sig-param">total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments" title="Permalink to this definition">¶</a></dt>
 <dd><p>vector of the moments; convenience function</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>mom_type</strong> – </li>
-<li><strong>total</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mom_type</strong> – </p></li>
+<li><p><strong>total</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.moments_to_mcvsk">
-<code class="descname">moments_to_mcvsk</code><span class="sig-paren">(</span><em>mom_type</em>, <em>total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments_to_mcvsk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments_to_mcvsk" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">moments_to_mcvsk</code><span class="sig-paren">(</span><em class="sig-param">mom_type</em>, <em class="sig-param">total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments_to_mcvsk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments_to_mcvsk" title="Permalink to this definition">¶</a></dt>
 <dd><p>convert noncentral moments into mean, cv and skewness
 type = agg | freq | sev | mix
 delegates work</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>mom_type</strong> – </li>
-<li><strong>total</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mom_type</strong> – </p></li>
+<li><p><strong>total</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentAggregator.stats_series">
-<code class="descname">stats_series</code><span class="sig-paren">(</span><em>name</em>, <em>limit</em>, <em>pvalue</em>, <em>remix</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.stats_series" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">stats_series</code><span class="sig-paren">(</span><em class="sig-param">name</em>, <em class="sig-param">limit</em>, <em class="sig-param">pvalue</em>, <em class="sig-param">remix</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.stats_series" title="Permalink to this definition">¶</a></dt>
 <dd><p>combine elements into a reporting series
 handles order, index names etc. in one place</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>name</strong> – series name</li>
-<li><strong>limit</strong> – </li>
-<li><strong>pvalue</strong> – </li>
-<li><strong>remix</strong> – called from Aggregate want remix=True to collect mix terms; from Portfolio remix=False</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – series name</p></li>
+<li><p><strong>limit</strong> – </p></li>
+<li><p><strong>pvalue</strong> – </p></li>
+<li><p><strong>remix</strong> – called from Aggregate want remix=True to collect mix terms; from Portfolio remix=False</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -414,110 +361,102 @@ handles order, index names etc. in one place</p>
 <span id="utilities-module"></span><h2>Utilities Module<a class="headerlink" href="#module-aggregate.utils" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="aggregate.utils.MomentWrangler">
-<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">MomentWrangler</code><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">MomentWrangler</code><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler" title="Permalink to this definition">¶</a></dt>
 <dd><p>Conversion between central, noncentral and factorial moments</p>
 <p>Input any one and ask for any translation.</p>
 <p>Stores moments as noncentral internally</p>
 <dl class="attribute">
 <dt id="aggregate.utils.MomentWrangler._central">
-<code class="descname">_central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._central" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._central" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.MomentWrangler._factorial">
-<code class="descname">_factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._factorial" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._factorial" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentWrangler._make_central">
-<code class="descname">_make_central</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_central"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_central" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_make_central</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_central"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_central" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="aggregate.utils.MomentWrangler._make_factorial">
-<code class="descname">_make_factorial</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_factorial"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_factorial" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_make_factorial</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_factorial"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_factorial" title="Permalink to this definition">¶</a></dt>
 <dd><p>add factorial from central</p>
 </dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.MomentWrangler._noncentral">
-<code class="descname">_noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._noncentral" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._noncentral" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="attribute">
+<dl class="method">
 <dt id="aggregate.utils.MomentWrangler.central">
-<code class="descname">central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.central" title="Permalink to this definition">¶</a></dt>
+<em class="property">property </em><code class="sig-name descname">central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.central" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="attribute">
+<dl class="method">
 <dt id="aggregate.utils.MomentWrangler.factorial">
-<code class="descname">factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.factorial" title="Permalink to this definition">¶</a></dt>
+<em class="property">property </em><code class="sig-name descname">factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.factorial" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="attribute">
+<dl class="method">
 <dt id="aggregate.utils.MomentWrangler.noncentral">
-<code class="descname">noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.noncentral" title="Permalink to this definition">¶</a></dt>
+<em class="property">property </em><code class="sig-name descname">noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.noncentral" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="attribute">
+<dl class="method">
 <dt id="aggregate.utils.MomentWrangler.stats">
-<code class="descname">stats</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.stats" title="Permalink to this definition">¶</a></dt>
+<em class="property">property </em><code class="sig-name descname">stats</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.stats" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.axiter_factory">
-<code class="descclassname">aggregate.utils.</code><code class="descname">axiter_factory</code><span class="sig-paren">(</span><em>axiter</em>, <em>n</em>, <em>figsize=None</em>, <em>height=2</em>, <em>aspect=1</em>, <em>nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#axiter_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.axiter_factory" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">axiter_factory</code><span class="sig-paren">(</span><em class="sig-param">axiter</em>, <em class="sig-param">n</em>, <em class="sig-param">figsize=None</em>, <em class="sig-param">height=2</em>, <em class="sig-param">aspect=1</em>, <em class="sig-param">nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#axiter_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.axiter_factory" title="Permalink to this definition">¶</a></dt>
 <dd><p>axiter = check_axiter(axiter, …) to allow chaining
 TODO can this be done in the class somehow?</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>axiter</strong> – </li>
-<li><strong>n</strong> – </li>
-<li><strong>figsize</strong> – </li>
-<li><strong>height</strong> – </li>
-<li><strong>aspect</strong> – </li>
-<li><strong>nr</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axiter</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>figsize</strong> – </p></li>
+<li><p><strong>height</strong> – </p></li>
+<li><p><strong>aspect</strong> – </p></li>
+<li><p><strong>nr</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.estimate_agg_percentile">
-<code class="descclassname">aggregate.utils.</code><code class="descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em>, <em>p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em>, <em class="sig-param">p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>m</strong> – </li>
-<li><strong>cv</strong> – </li>
-<li><strong>skew</strong> – </li>
-<li><strong>p</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
+<li><p><strong>p</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.frequency_examples">
-<code class="descclassname">aggregate.utils.</code><code class="descname">frequency_examples</code><span class="sig-paren">(</span><em>n</em>, <em>ν</em>, <em>f</em>, <em>κ</em>, <em>sichel_case</em>, <em>log2</em>, <em>xmax=500</em>, <em>**kwds</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#frequency_examples"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.frequency_examples" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">frequency_examples</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">ν</em>, <em class="sig-param">f</em>, <em class="sig-param">κ</em>, <em class="sig-param">sichel_case</em>, <em class="sig-param">log2</em>, <em class="sig-param">xmax=500</em>, <em class="sig-param">**kwds</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#frequency_examples"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.frequency_examples" title="Permalink to this definition">¶</a></dt>
 <dd><p>Illustrate different frequency distributions and frequency moment
 calculations.</p>
 <p>sichel_case = gamma | ig | ‘’</p>
@@ -530,274 +469,254 @@ g_mult = adjust EG^3 of Sichel above/below standard PIG</p>
 
 <dl class="function">
 <dt id="aggregate.utils.ft">
-<code class="descclassname">aggregate.utils.</code><code class="descname">ft</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ft" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">ft</code><span class="sig-paren">(</span><em class="sig-param">z</em>, <em class="sig-param">padding</em>, <em class="sig-param">tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ft" title="Permalink to this definition">¶</a></dt>
 <dd><p>fft with padding and tilt
 padding = n makes vector 2^n as long
 n=1 doubles (default)
 n=2 quadruples
 tilt is passed in as the tilting vector or None: easier for the caller to have a single instance</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>z</strong> – </li>
-<li><strong>padding</strong> – = 1 doubles</li>
-<li><strong>tilt</strong> – vector of tilt values</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>z</strong> – </p></li>
+<li><p><strong>padding</strong> – = 1 doubles</p></li>
+<li><p><strong>tilt</strong> – vector of tilt values</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.get_fmts">
-<code class="descclassname">aggregate.utils.</code><code class="descname">get_fmts</code><span class="sig-paren">(</span><em>df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#get_fmts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.get_fmts" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">get_fmts</code><span class="sig-paren">(</span><em class="sig-param">df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#get_fmts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.get_fmts" title="Permalink to this definition">¶</a></dt>
 <dd><p>reasonable formats for a styler</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>df</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>df</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.html_title">
-<code class="descclassname">aggregate.utils.</code><code class="descname">html_title</code><span class="sig-paren">(</span><em>txt</em>, <em>n=1</em>, <em>title_case=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#html_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.html_title" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>txt</strong> – </li>
-<li><strong>n</strong> – </li>
-<li><strong>title_case</strong> – </li>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">html_title</code><span class="sig-paren">(</span><em class="sig-param">txt</em>, <em class="sig-param">n=1</em>, <em class="sig-param">title_case=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#html_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.html_title" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>txt</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>title_case</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.ift">
-<code class="descclassname">aggregate.utils.</code><code class="descname">ift</code><span class="sig-paren">(</span><em>z</em>, <em>padding</em>, <em>tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ift"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ift" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">ift</code><span class="sig-paren">(</span><em class="sig-param">z</em>, <em class="sig-param">padding</em>, <em class="sig-param">tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ift"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ift" title="Permalink to this definition">¶</a></dt>
 <dd><p>ift that strips out padding and adjusts for tilt</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>z</strong> – </li>
-<li><strong>padding</strong> – </li>
-<li><strong>tilt</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>z</strong> – </p></li>
+<li><p><strong>padding</strong> – </p></li>
+<li><p><strong>tilt</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.insurability_triangle">
-<code class="descclassname">aggregate.utils.</code><code class="descname">insurability_triangle</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
-<dd><p>Illustrate the insurability triangle…</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">insurability_triangle</code><span class="sig-paren">(</span><em class="sig-param">figsize=(10</em>, <em class="sig-param">3)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
+<dd><dl>
+<dt>Illustrate the insurability triangle…</dt><dd><p>λ = A / L
+ROE = (P-L) / (A - P) = (P/L - 1) / (A/L - P/L)</p>
+<blockquote>
+<div><p>= (1/LR - 1) / (λ - 1/LR) = (1 - LR) / (λLR - 1)</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>Hence</p>
+<blockquote>
+<div><p>δ = ROE / (1 + ROE) = (1 - LR) / [LR (λ - 1)]</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.lognorm_lev">
-<code class="descclassname">aggregate.utils.</code><code class="descname">lognorm_lev</code><span class="sig-paren">(</span><em>mu</em>, <em>sigma</em>, <em>n</em>, <em>limit</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#lognorm_lev"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.lognorm_lev" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">lognorm_lev</code><span class="sig-paren">(</span><em class="sig-param">mu</em>, <em class="sig-param">sigma</em>, <em class="sig-param">n</em>, <em class="sig-param">limit</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#lognorm_lev"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.lognorm_lev" title="Permalink to this definition">¶</a></dt>
 <dd><p>return E(min(X, limit)^n) for lognormal using exact calculation
 currently only for n=1, 2</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>mu</strong> – </li>
-<li><strong>sigma</strong> – </li>
-<li><strong>n</strong> – </li>
-<li><strong>limit</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mu</strong> – </p></li>
+<li><p><strong>sigma</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>limit</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="class">
 <dt id="aggregate.utils.qd">
-<em class="property">class </em><code class="descclassname">aggregate.utils.</code><code class="descname">qd</code><span class="sig-paren">(</span><em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">qd</code><span class="sig-paren">(</span><em class="sig-param">d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd" title="Permalink to this definition">¶</a></dt>
 <dd><p>quick display for dictionaries and Pandas dataframes, with some sensible number defaults
 experimental</p>
 <dl class="method">
 <dt id="aggregate.utils.qd._repr_html_">
-<code class="descname">_repr_html_</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd._repr_html_"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd._repr_html_" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">_repr_html_</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd._repr_html_"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd._repr_html_" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.qd.cm">
-<code class="descname">cm</code><em class="property"> = &lt;matplotlib.colors.LinearSegmentedColormap object&gt;</em><a class="headerlink" href="#aggregate.utils.qd.cm" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">cm</code><em class="property"> = &lt;matplotlib.colors.LinearSegmentedColormap object&gt;</em><a class="headerlink" href="#aggregate.utils.qd.cm" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.qd.styles">
-<code class="descname">styles</code><em class="property"> = [{'selector': 'th', 'props': [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]}, {'selector': 'td', 'props': [('font-size', '10px'), ('text-align', 'left')]}]</em><a class="headerlink" href="#aggregate.utils.qd.styles" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">styles</code><em class="property"> = [{'selector': 'th', 'props': [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]}, {'selector': 'td', 'props': [('font-size', '10px'), ('text-align', 'left')]}]</em><a class="headerlink" href="#aggregate.utils.qd.styles" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.qd.td_props">
-<code class="descname">td_props</code><em class="property"> = [('font-size', '10px'), ('text-align', 'left')]</em><a class="headerlink" href="#aggregate.utils.qd.td_props" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">td_props</code><em class="property"> = [('font-size', '10px'), ('text-align', 'left')]</em><a class="headerlink" href="#aggregate.utils.qd.td_props" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="attribute">
 <dt id="aggregate.utils.qd.th_props">
-<code class="descname">th_props</code><em class="property"> = [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]</em><a class="headerlink" href="#aggregate.utils.qd.th_props" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">th_props</code><em class="property"> = [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]</em><a class="headerlink" href="#aggregate.utils.qd.th_props" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.read_log">
-<code class="descclassname">aggregate.utils.</code><code class="descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.read_log" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.read_log" title="Permalink to this definition">¶</a></dt>
 <dd><p>read and return the log file</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.sensible_jump">
-<code class="descclassname">aggregate.utils.</code><code class="descname">sensible_jump</code><span class="sig-paren">(</span><em>n</em>, <em>desired_rows=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sensible_jump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sensible_jump" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sensible_jump</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">desired_rows=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sensible_jump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sensible_jump" title="Permalink to this definition">¶</a></dt>
 <dd><p>return a sensible jump size to output desired_rows given input of n</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>n</strong> – </li>
-<li><strong>desired_rows</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>desired_rows</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.sgamma_fit">
-<code class="descclassname">aggregate.utils.</code><code class="descname">sgamma_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sgamma_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sgamma_fit" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sgamma_fit</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sgamma_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sgamma_fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>method of moments shifted gamma fit matching given mean, cv and skewness</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>m</strong> – </li>
-<li><strong>cv</strong> – </li>
-<li><strong>skew</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.sln_fit">
-<code class="descclassname">aggregate.utils.</code><code class="descname">sln_fit</code><span class="sig-paren">(</span><em>m</em>, <em>cv</em>, <em>skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sln_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sln_fit" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sln_fit</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sln_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sln_fit" title="Permalink to this definition">¶</a></dt>
 <dd><p>method of moments shifted lognormal fit matching given mean, cv and skewness</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>m</strong> – </li>
-<li><strong>cv</strong> – </li>
-<li><strong>skew</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.suptitle_and_tight">
-<code class="descclassname">aggregate.utils.</code><code class="descname">suptitle_and_tight</code><span class="sig-paren">(</span><em>title</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">suptitle_and_tight</code><span class="sig-paren">(</span><em class="sig-param">title</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
 <dd><p>deal with tight layout when there is a suptitle</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>title</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>title</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.tidy_agg_program">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">tidy_agg_program</code><span class="sig-paren">(</span><em class="sig-param">txt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#tidy_agg_program"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.tidy_agg_program" title="Permalink to this definition">¶</a></dt>
+<dd><p>guess a nice format for an agg program</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>txt</strong> – program text input</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="aggregate.utils.xsden_to_meancv">
-<code class="descclassname">aggregate.utils.</code><code class="descname">xsden_to_meancv</code><span class="sig-paren">(</span><em>xs</em>, <em>den</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#xsden_to_meancv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.xsden_to_meancv" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">xsden_to_meancv</code><span class="sig-paren">(</span><em class="sig-param">xs</em>, <em class="sig-param">den</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#xsden_to_meancv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.xsden_to_meancv" title="Permalink to this definition">¶</a></dt>
 <dd><p>compute mean and cv from xs and density</p>
 <p>consider adding: np.nan_to_num(den)</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>xs</strong> – </li>
-<li><strong>den</strong> – </li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – </p></li>
+<li><p><strong>den</strong> – </p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -809,7 +728,7 @@ experimental</p>
           </div>
       <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
+  <h3><a href="index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Utilities</a><ul>
 <li><a class="reference internal" href="#axis-manager-class">Axis Manager Class</a></li>
@@ -850,10 +769,10 @@ experimental</p>
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018, Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Stephen J. Mildenhall.
       </li>
       <li>
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
       </li>
     </ul>
     </div>

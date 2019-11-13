@@ -24,7 +24,8 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="#" >
     <link rel="search" title="Search" href="search.html" >
@@ -102,6 +103,7 @@
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
  | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
  | <a href="#W"><strong>W</strong></a>
  | <a href="#X"><strong>X</strong></a>
  | <a href="#Y"><strong>Y</strong></a>
@@ -152,10 +154,10 @@
 </li>
       <li><a href="parser.html#module-aggregate.parser">aggregate.parser (module)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="portfolio.html#module-aggregate.port">aggregate.port (module)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="distortion.html#module-aggregate.spectral">aggregate.spectral (module)</a>
 </li>
       <li><a href="underwriter.html#module-aggregate.underwriter">aggregate.underwriter (module)</a>
@@ -171,6 +173,8 @@
       <li><a href="portfolio.html#aggregate.port.Portfolio.apply_distortion">apply_distortion() (aggregate.port.Portfolio method)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.apply_distortions">apply_distortions() (aggregate.port.Portfolio method)</a>
+</li>
+      <li><a href="portfolio.html#aggregate.port.Portfolio.as_severity">as_severity() (aggregate.port.Portfolio method)</a>
 </li>
       <li><a href="distortion.html#aggregate.spectral.Distortion.available_distortions">available_distortions() (aggregate.spectral.Distortion class method)</a>
 </li>
@@ -204,14 +208,20 @@
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.calibrate_distortions">calibrate_distortions() (aggregate.port.Portfolio method)</a>
 </li>
-      <li><a href="utilities.html#aggregate.utils.MomentWrangler.central">central (aggregate.utils.MomentWrangler attribute)</a>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.cdf">cdf() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.cdf">(aggregate.port.Portfolio method)</a>
+</li>
+      </ul></li>
+      <li><a href="utilities.html#aggregate.utils.MomentWrangler.central">central() (aggregate.utils.MomentWrangler property)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.qd.cm">cm (aggregate.utils.qd attribute)</a>
 </li>
-      <li><a href="portfolio.html#aggregate.port.Portfolio.collapse">collapse() (aggregate.port.Portfolio method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="portfolio.html#aggregate.port.Portfolio.collapse">collapse() (aggregate.port.Portfolio method)</a>
+</li>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator.column_names">column_names() (aggregate.utils.MomentAggregator static method)</a>
 </li>
       <li><a href="distortion.html#aggregate.spectral.Distortion.convex_example">convex_example() (aggregate.spectral.Distortion static method)</a>
@@ -274,7 +284,7 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#aggregate.utils.MomentWrangler.factorial">factorial (aggregate.utils.MomentWrangler attribute)</a>
+      <li><a href="utilities.html#aggregate.utils.MomentWrangler.factorial">factorial() (aggregate.utils.MomentWrangler property)</a>
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.fit">fit() (aggregate.port.Portfolio method)</a>
 </li>
@@ -390,7 +400,7 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="parser.html#aggregate.parser.UnderwritingLexer.newline">newline() (aggregate.parser.UnderwritingLexer method)</a>
 </li>
-      <li><a href="utilities.html#aggregate.utils.MomentWrangler.noncentral">noncentral (aggregate.utils.MomentWrangler attribute)</a>
+      <li><a href="utilities.html#aggregate.utils.MomentWrangler.noncentral">noncentral() (aggregate.utils.MomentWrangler property)</a>
 </li>
       <li><a href="parser.html#aggregate.parser.UnderwritingLexer.NOTE">NOTE (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
@@ -418,6 +428,14 @@
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="underwriter.html#aggregate.underwriter.Underwriter.parse_portfolio_program">parse_portfolio_program() (aggregate.underwriter.Underwriter method)</a>
+</li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.pdf">pdf() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.pdf">(aggregate.port.Portfolio method)</a>
+</li>
+      </ul></li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.percentiles">percentiles() (aggregate.port.Portfolio method)</a>
 </li>
       <li><a href="aggregate.html#aggregate.distr.Aggregate.plot">plot() (aggregate.distr.Aggregate method)</a>
@@ -460,12 +478,6 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.qd">qd (class in aggregate.utils)</a>
 </li>
-      <li><a href="aggregate.html#aggregate.distr.Aggregate.quantile_function">quantile_function() (aggregate.distr.Aggregate method)</a>
-
-      <ul>
-        <li><a href="portfolio.html#aggregate.port.Portfolio.quantile_function">(aggregate.port.Portfolio method)</a>
-</li>
-      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -508,6 +520,12 @@
 </li>
       <li><a href="aggregate.html#aggregate.distr.Severity">Severity (class in aggregate.distr)</a>
 </li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.sf">sf() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.sf">(aggregate.port.Portfolio method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#aggregate.utils.sgamma_fit">sgamma_fit() (in module aggregate.utils)</a>
@@ -516,7 +534,7 @@
 </li>
       <li><a href="parser.html#aggregate.parser.UnderwritingParser.snumber">snumber() (aggregate.parser.UnderwritingParser method)</a>
 </li>
-      <li><a href="utilities.html#aggregate.utils.MomentWrangler.stats">stats (aggregate.utils.MomentWrangler attribute)</a>
+      <li><a href="utilities.html#aggregate.utils.MomentWrangler.stats">stats() (aggregate.utils.MomentWrangler property)</a>
 </li>
       <li><a href="utilities.html#aggregate.utils.MomentAggregator.stats_series">stats_series() (aggregate.utils.MomentAggregator method)</a>
 </li>
@@ -538,10 +556,12 @@
 </li>
       <li><a href="utilities.html#aggregate.utils.AxisManager.tidy">tidy() (aggregate.utils.AxisManager method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities.html#aggregate.utils.tidy_agg_program">tidy_agg_program() (in module aggregate.utils)</a>
+</li>
       <li><a href="parser.html#aggregate.parser.UnderwritingLexer.TIMES">TIMES (aggregate.parser.UnderwritingLexer attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="parser.html#aggregate.parser.UnderwritingLexer.tokens">tokens (aggregate.parser.UnderwritingLexer attribute)</a>
 
       <ul>
@@ -552,6 +572,12 @@
 </li>
       <li><a href="portfolio.html#aggregate.port.Portfolio.trim_df">trim_df() (aggregate.port.Portfolio method)</a>
 </li>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.tvar">tvar() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.tvar">(aggregate.port.Portfolio method)</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -576,6 +602,18 @@
 
       <ul>
         <li><a href="portfolio.html#aggregate.port.Portfolio.update">(aggregate.port.Portfolio method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="aggregate.html#aggregate.distr.Aggregate.var">var() (aggregate.distr.Aggregate method)</a>
+
+      <ul>
+        <li><a href="portfolio.html#aggregate.port.Portfolio.var">(aggregate.port.Portfolio method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -625,9 +663,6 @@
       <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
 
-   
-
-
         </div>
       </div>
         </div>
@@ -644,10 +679,10 @@
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018, Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Stephen J. Mildenhall.
       </li>
       <li>
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
       </li>
     </ul>
     </div>

@@ -230,8 +230,8 @@ class UnderwritingLexer(Lexer):
     # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
-    FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: WHY?
+    FREQ = r'binomial|poisson|bernoulli|pascal|fixed'
+    ID = r'[a-zA-Z][\.a-zA-Z0-9~_]*'  # do not allow _ in line names, use ~ instead: WHY?
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
@@ -400,6 +400,13 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.log(f'MIXED ID snumber {p.ID}, {p.snumber} to single param freq, snumber=CVs')
         return {'freq_name': p.ID, 'freq_a': p.snumber}
+
+    @_('FREQ snumber snumber')
+    def freq(self, p):
+        self.log(f'resolving named frequency distribution {p.FREQ} parameters {p[1]}, {p[2]} to freq')
+        if p.FREQ != 'pascal':
+            warnings.warn(f'Illogical choice of frequency {p.FREQ}, expected pascal')
+        return {'freq_name': p.FREQ, 'freq_a': p[1], 'freq_b': p[2]}
 
     # binomial p or TODO inflated poisson
     @_('FREQ snumber')

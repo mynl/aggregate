@@ -15,7 +15,7 @@ ftp.retrlines('LIST')
 ftp.cwd('/web/trash')
 ftp.pwd()
 
-with open(r'C:\temp\aggregate\_build\singlehtml\documentation.html', 'rb') as f:
+with open('C:\\temp\\aggregate\\_build\\singlehtml\\documentation.html', 'rb') as f:
     ftp.storbinary('STOR documentation.html', f)
 
 ftp.quit()

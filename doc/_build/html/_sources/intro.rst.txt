@@ -37,7 +37,7 @@ and plot the resulting severity and aggregate distributions enter:
 
   import aggregate as agg
   uw = agg.Underwriter()
-  port = uw('agg MyAgg 50 claims sev 1000 cv 2')
+  port = uw('agg MyAgg 50 claims sev lognorm 1000 cv 2')
   port.plot()
 
 

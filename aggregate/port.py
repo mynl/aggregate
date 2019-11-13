@@ -16,7 +16,8 @@ import collections
 import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy
-from ruamel import yaml
+# TODO FIX
+# from ruamel import yaml
 import pypandoc
 from IPython.core.display import HTML, display
 from .utils import *

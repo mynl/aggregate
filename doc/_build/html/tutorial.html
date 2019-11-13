@@ -23,7 +23,8 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
@@ -80,8 +81,8 @@
   <div class="section" id="tutorial">
 <h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="aggregate-simple-examples">
-<h2><code class="docutils literal"><span class="pre">aggregate</span></code>: Simple Examples<a class="headerlink" href="#aggregate-simple-examples" title="Permalink to this headline">¶</a></h2>
-<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<h2><code class="docutils literal notranslate"><span class="pre">aggregate</span></code>: Simple Examples<a class="headerlink" href="#aggregate-simple-examples" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
@@ -93,8 +94,8 @@
 <span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s1">&#39;display.max_colwidth&#39;</span><span class="p">,</span> <span class="mi">150</span><span class="p">)</span>
 
 <span class="c1"># matplotlib and plotting options</span>
-<span class="o">%</span><span class="n">matplotlib</span> <span class="n">inline</span>
-<span class="o">%</span><span class="n">config</span> <span class="n">InlineBackend</span><span class="o">.</span><span class="n">figure_format</span> <span class="o">=</span> <span class="s1">&#39;svg&#39;</span>
+<span class="o">%</span><span class="k">matplotlib</span> inline
+<span class="o">%</span><span class="k">config</span> InlineBackend.figure_format = &#39;svg&#39;
 
 <span class="c1"># seaborn options</span>
 <span class="n">sns</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="s1">&#39;paper&#39;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">)</span>
@@ -102,16 +103,16 @@
 <span class="n">sns</span><span class="o">.</span><span class="n">set_style</span><span class="p">(</span><span class="s2">&quot;ticks&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">aggregate</span> <span class="k">as</span> <span class="nn">agg</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">aggregate</span> <span class="k">as</span> <span class="nn">agg</span>
 </pre></div>
 </div>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">WARNING</span><span class="p">:</span> <span class="mi">2</span> <span class="n">shift</span><span class="o">/</span><span class="n">reduce</span> <span class="n">conflicts</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">WARNING</span><span class="p">:</span> <span class="mi">2</span> <span class="n">shift</span><span class="o">/</span><span class="n">reduce</span> <span class="n">conflicts</span>
 </pre></div>
 </div>
-<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">uw</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">Underwriter</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">uw</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">Underwriter</span><span class="p">()</span>
 </pre></div>
 </div>
-<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">uw</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">uw</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
 </pre></div>
 </div>
 <div>
@@ -248,23 +249,21 @@
     </tr>
   </tbody>
 </table>
-</div><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span> <span class="o">=</span> <span class="n">uw</span><span class="o">.</span><span class="n">homeowners</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+</div><div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span> <span class="o">=</span> <span class="n">uw</span><span class="o">.</span><span class="n">homeowners</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
 <span class="n">biz</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">250e6</span><span class="p">,</span> <span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">13</span><span class="p">),</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">);</span>
 </pre></div>
 </div>
-<div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;quick&#39;</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;quick&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<img alt="output_6_1.svg" src="output_6_1.svg" /><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">)</span>
+<img alt="output_6_1.svg" src="output_6_1.svg" /><div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<pre class="literal-block">
-C:UserssteveAnaconda3libsite-packagesmatplotlibaxes_base.py:3443: UserWarning: Attempting to set identical bottom==top results
+<pre class="literal-block">C:UserssteveAnaconda3libsite-packagesmatplotlibaxes_base.py:3443: UserWarning: Attempting to set identical bottom==top results
 in singular transformations; automatically expanding.
 bottom=1.0, top=1.0
-  'bottom=%s, top=%s') % (bottom, top))
-</pre>
-<img alt="output_7_1.svg" src="output_7_1.svg" /><div class="code ipython3 highlight-default"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">audit_df</span>
+  'bottom=%s, top=%s') % (bottom, top))</pre>
+<img alt="output_7_1.svg" src="output_7_1.svg" /><div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">audit_df</span>
 </pre></div>
 </div>
 <div>
@@ -335,10 +334,10 @@ bottom=1.0, top=1.0
           </div>
       <div class="spc-rightsidebar span3">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
+  <h3><a href="index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Tutorial</a><ul>
-<li><a class="reference internal" href="#aggregate-simple-examples"><code class="docutils literal"><span class="pre">aggregate</span></code>: Simple Examples</a></li>
+<li><a class="reference internal" href="#aggregate-simple-examples"><code class="docutils literal notranslate"><span class="pre">aggregate</span></code>: Simple Examples</a></li>
 </ul>
 </li>
 </ul>
@@ -368,10 +367,10 @@ bottom=1.0, top=1.0
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018, Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Stephen J. Mildenhall.
       </li>
       <li>
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
       </li>
     </ul>
     </div>

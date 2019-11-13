@@ -58,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'aggregate'
-copyright = '2018, Stephen J. Mildenhall'
+copyright = '2018-19 Stephen J. Mildenhall'
 author = 'Stephen J. Mildenhall'
 
 # The version info for the project you're documenting, acts as replacement for

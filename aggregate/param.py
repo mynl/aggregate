@@ -5,7 +5,8 @@ Functions to determine and setup parameters
 import numpy as np
 import pandas as pd
 from IPython.core.display import display
-from ruamel import yaml
+## TODO FIX yaml issues
+## from ruamel import yaml
 
 
 def hack_make_lines_from_csv(fn='../../../data/DIRECT_IEE.csv', do_save=False):

@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>aggregate.spectral &mdash; aggregate 0.6.1 documentation</title>
+    <title>aggregate.spectral &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
     <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="../../None"></script>
     <script type="text/javascript" src="../../_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" >
     <link rel="search" title="Search" href="../../search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="../../index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="../../index.html" >
     <link rel="up" title="Module code" href="../index.html" > 
   </head>
   <body>
@@ -52,7 +54,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="../../index.html">aggregate 0.7.1 documentation</a></li>
 	
           <li class="active"><a href="../index.html" accesskey="U">Module code</a></li> 
     </ul>
@@ -97,7 +99,7 @@
 <span class="kn">from</span> <span class="nn">.</span> <span class="n">utils</span> <span class="kn">import</span> <span class="nn">axiter_factory</span><span class="o">,</span> <span class="nn">suptitle_and_tight</span>
 
 
-<div class="viewcode-block" id="Distortion"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion">[docs]</a><span class="k">class</span> <span class="nc">Distortion</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Distortion"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion">[docs]</a><span class="k">class</span> <span class="nc">Distortion</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    handles everything to do with distortion functions</span>
 
@@ -113,7 +115,7 @@
     <span class="n">_eg_param_2_</span> <span class="o">=</span>              <span class="p">(</span><span class="o">.</span><span class="mi">5</span><span class="p">,</span>     <span class="mi">2</span><span class="p">,</span>     <span class="mi">2</span><span class="p">,</span>     <span class="o">.</span><span class="mi">8</span><span class="p">,</span>    <span class="mf">0.35</span><span class="p">,</span>  <span class="mf">1.5</span><span class="p">,</span>   <span class="mf">1.8</span><span class="p">,</span>  <span class="mf">0.95</span><span class="p">)</span>
     <span class="n">_distortion_names_</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">_available_distortions_</span><span class="p">,</span> <span class="n">_long_names_</span><span class="p">))</span>
 
-<div class="viewcode-block" id="Distortion.available_distortions"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.available_distortions">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Distortion.available_distortions"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion.available_distortions">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">available_distortions</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pricing</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        list of the available distortions</span>
@@ -323,7 +325,7 @@
         <span class="k">return</span> <span class="n">s</span>
 
     <span class="c1"># noinspection PyUnusedLocal</span>
-<div class="viewcode-block" id="Distortion.plot"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">both</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Distortion.plot"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">both</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        quick plot of the distortion</span>
 
@@ -353,7 +355,7 @@
         <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="fm">__str__</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">ax</span></div>
 
-<div class="viewcode-block" id="Distortion.test"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.test">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Distortion.test"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion.test">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">test</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.05</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        tester: make some nice plots</span>
@@ -386,7 +388,7 @@
         <span class="n">axiter</span><span class="o">.</span><span class="n">tidy</span><span class="p">()</span>
         <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="s1">&#39;Example Distortion Functions&#39;</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Distortion.distortions_from_params"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.distortions_from_params">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="Distortion.distortions_from_params"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion.distortions_from_params">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">distortions_from_params</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.025</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        make set of dist funs and inverses from params, output of port.calibrate_distortions</span>
@@ -417,7 +419,7 @@
 
         <span class="k">return</span> <span class="n">dists</span>  <span class="c1"># [g_lep, g_ph, g_wang, g_ly, g_clin]</span></div>
 
-<div class="viewcode-block" id="Distortion.convex_example"><a class="viewcode-back" href="../../distortion.html#aggregate.spectral.Distortion.convex_example">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="Distortion.convex_example"><a class="viewcode-back" href="../../spectral.html#aggregate.spectral.Distortion.convex_example">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">convex_example</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s1">&#39;bond&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf</span>
@@ -484,7 +486,7 @@
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

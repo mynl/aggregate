@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>aggregate.utils &mdash; aggregate 0.6.1 documentation</title>
+    <title>aggregate.utils &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
     <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="../../None"></script>
     <script type="text/javascript" src="../../_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" >
     <link rel="search" title="Search" href="../../search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="../../index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="../../index.html" >
     <link rel="up" title="Module code" href="../index.html" > 
   </head>
   <body>
@@ -52,7 +54,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="../../index.html">aggregate 0.7.1 documentation</a></li>
 	
           <li class="active"><a href="../index.html" accesskey="U">Module code</a></li> 
     </ul>
@@ -120,7 +122,7 @@
     <span class="n">display</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">max_rows</span><span class="p">)</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">get_fmts</span><span class="p">(</span><span class="n">df</span><span class="p">)))</span>
 
 
-<div class="viewcode-block" id="get_fmts"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.get_fmts">[docs]</a><span class="k">def</span> <span class="nf">get_fmts</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+<div class="viewcode-block" id="get_fmts"><a class="viewcode-back" href="../../utils.html#aggregate.utils.get_fmts">[docs]</a><span class="k">def</span> <span class="nf">get_fmts</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    reasonable formats for a styler</span>
 
@@ -150,7 +152,7 @@
     <span class="k">return</span> <span class="n">fmts</span></div>
 
 
-<div class="viewcode-block" id="tidy_agg_program"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.tidy_agg_program">[docs]</a><span class="k">def</span> <span class="nf">tidy_agg_program</span><span class="p">(</span><span class="n">txt</span><span class="p">):</span>
+<div class="viewcode-block" id="tidy_agg_program"><a class="viewcode-back" href="../../utils.html#aggregate.utils.tidy_agg_program">[docs]</a><span class="k">def</span> <span class="nf">tidy_agg_program</span><span class="p">(</span><span class="n">txt</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    guess a nice format for an agg program</span>
 
@@ -169,7 +171,7 @@
 
 
 <span class="c1"># moment utility functions</span>
-<div class="viewcode-block" id="ft"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.ft">[docs]</a><span class="k">def</span> <span class="nf">ft</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
+<div class="viewcode-block" id="ft"><a class="viewcode-back" href="../../utils.html#aggregate.utils.ft">[docs]</a><span class="k">def</span> <span class="nf">ft</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    fft with padding and tilt</span>
 <span class="sd">    padding = n makes vector 2^n as long</span>
@@ -202,7 +204,7 @@
     <span class="k">return</span> <span class="n">locft</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="ift"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.ift">[docs]</a><span class="k">def</span> <span class="nf">ift</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
+<div class="viewcode-block" id="ift"><a class="viewcode-back" href="../../utils.html#aggregate.utils.ift">[docs]</a><span class="k">def</span> <span class="nf">ift</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">tilt</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    ift that strips out padding and adjusts for tilt</span>
 
@@ -227,7 +229,7 @@
     <span class="c1"># return temp[0:int(len(temp) / 2)]</span>
 
 
-<div class="viewcode-block" id="sln_fit"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.sln_fit">[docs]</a><span class="k">def</span> <span class="nf">sln_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
+<div class="viewcode-block" id="sln_fit"><a class="viewcode-back" href="../../utils.html#aggregate.utils.sln_fit">[docs]</a><span class="k">def</span> <span class="nf">sln_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    method of moments shifted lognormal fit matching given mean, cv and skewness</span>
 
@@ -250,7 +252,7 @@
         <span class="k">return</span> <span class="n">shift</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span></div>
 
 
-<div class="viewcode-block" id="sgamma_fit"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.sgamma_fit">[docs]</a><span class="k">def</span> <span class="nf">sgamma_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
+<div class="viewcode-block" id="sgamma_fit"><a class="viewcode-back" href="../../utils.html#aggregate.utils.sgamma_fit">[docs]</a><span class="k">def</span> <span class="nf">sgamma_fit</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    method of moments shifted gamma fit matching given mean, cv and skewness</span>
 
@@ -268,7 +270,7 @@
         <span class="k">return</span> <span class="n">shift</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">theta</span></div>
 
 
-<div class="viewcode-block" id="estimate_agg_percentile"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.estimate_agg_percentile">[docs]</a><span class="k">def</span> <span class="nf">estimate_agg_percentile</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.999</span><span class="p">):</span>
+<div class="viewcode-block" id="estimate_agg_percentile"><a class="viewcode-back" href="../../utils.html#aggregate.utils.estimate_agg_percentile">[docs]</a><span class="k">def</span> <span class="nf">estimate_agg_percentile</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.999</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</span>
 
@@ -297,7 +299,7 @@
 
 
 <span class="c1"># axis management</span>
-<div class="viewcode-block" id="axiter_factory"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.axiter_factory">[docs]</a><span class="k">def</span> <span class="nf">axiter_factory</span><span class="p">(</span><span class="n">axiter</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nr</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<div class="viewcode-block" id="axiter_factory"><a class="viewcode-back" href="../../utils.html#aggregate.utils.axiter_factory">[docs]</a><span class="k">def</span> <span class="nf">axiter_factory</span><span class="p">(</span><span class="n">axiter</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nr</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    axiter = check_axiter(axiter, ...) to allow chaining</span>
 <span class="sd">    TODO can this be done in the class somehow?</span>
@@ -316,7 +318,7 @@
         <span class="k">return</span> <span class="n">axiter</span></div>
 
 
-<div class="viewcode-block" id="AxisManager"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager">[docs]</a><span class="k">class</span> <span class="nc">AxisManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="AxisManager"><a class="viewcode-back" href="../../utils.html#aggregate.utils.AxisManager">[docs]</a><span class="k">class</span> <span class="nc">AxisManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to</span>
 <span class="sd">    plot to same set of axes.</span>
@@ -359,7 +361,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">it</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span>
 
-<div class="viewcode-block" id="AxisManager.grid_size"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager.grid_size">[docs]</a>    <span class="k">def</span> <span class="nf">grid_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">subgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="AxisManager.grid_size"><a class="viewcode-back" href="../../utils.html#aggregate.utils.AxisManager.grid_size">[docs]</a>    <span class="k">def</span> <span class="nf">grid_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">subgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        appropriate grid size given class parameters</span>
 
@@ -378,7 +380,7 @@
                 <span class="n">c</span> <span class="o">=</span> <span class="mi">4</span>
         <span class="k">return</span> <span class="n">r</span><span class="p">,</span> <span class="n">c</span></div>
 
-<div class="viewcode-block" id="AxisManager.dimensions"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager.dimensions">[docs]</a>    <span class="k">def</span> <span class="nf">dimensions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="AxisManager.dimensions"><a class="viewcode-back" href="../../utils.html#aggregate.utils.AxisManager.dimensions">[docs]</a>    <span class="k">def</span> <span class="nf">dimensions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        return dimensions (width and height) of current layout</span>
 
@@ -386,7 +388,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span></div>
 
-<div class="viewcode-block" id="AxisManager.grid"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager.grid">[docs]</a>    <span class="k">def</span> <span class="nf">grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<div class="viewcode-block" id="AxisManager.grid"><a class="viewcode-back" href="../../utils.html#aggregate.utils.AxisManager.grid">[docs]</a>    <span class="k">def</span> <span class="nf">grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        return a block of axes suitable for Pandas</span>
 <span class="sd">        if size=0 return all the axes</span>
@@ -405,7 +407,7 @@
             <span class="c1"># r, c = self.grid_size(size, subgrid=True)</span>
             <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="fm">__next__</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">size</span><span class="p">)]</span>  <span class="c1"># range(c) for _ in range(r)]</span></div>
 
-<div class="viewcode-block" id="AxisManager.tidy"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.AxisManager.tidy">[docs]</a>    <span class="k">def</span> <span class="nf">tidy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="AxisManager.tidy"><a class="viewcode-back" href="../../utils.html#aggregate.utils.AxisManager.tidy">[docs]</a>    <span class="k">def</span> <span class="nf">tidy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        delete unused axes to tidy up a plot</span>
 
@@ -416,7 +418,7 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">delaxes</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="lognorm_lev"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.lognorm_lev">[docs]</a><span class="k">def</span> <span class="nf">lognorm_lev</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">limit</span><span class="p">):</span>
+<div class="viewcode-block" id="lognorm_lev"><a class="viewcode-back" href="../../utils.html#aggregate.utils.lognorm_lev">[docs]</a><span class="k">def</span> <span class="nf">lognorm_lev</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">limit</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    return E(min(X, limit)^n) for lognormal using exact calculation</span>
 <span class="sd">    currently only for n=1, 2</span>
@@ -440,7 +442,7 @@
 
 
 <span class="c1"># display related</span>
-<div class="viewcode-block" id="html_title"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.html_title">[docs]</a><span class="k">def</span> <span class="nf">html_title</span><span class="p">(</span><span class="n">txt</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">title_case</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="html_title"><a class="viewcode-back" href="../../utils.html#aggregate.utils.html_title">[docs]</a><span class="k">def</span> <span class="nf">html_title</span><span class="p">(</span><span class="n">txt</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">title_case</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="sd">    :param txt:</span>
@@ -453,7 +455,7 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="n">display</span><span class="p">(</span><span class="n">HTML</span><span class="p">(</span><span class="s1">&#39;&lt;h</span><span class="si">{:}</span><span class="s1">&gt; </span><span class="si">{:}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">txt</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">))))</span></div>
 
-<div class="viewcode-block" id="sensible_jump"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.sensible_jump">[docs]</a><span class="k">def</span> <span class="nf">sensible_jump</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">desired_rows</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+<div class="viewcode-block" id="sensible_jump"><a class="viewcode-back" href="../../utils.html#aggregate.utils.sensible_jump">[docs]</a><span class="k">def</span> <span class="nf">sensible_jump</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">desired_rows</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    return a sensible jump size to output desired_rows given input of n</span>
 
@@ -467,7 +469,7 @@
     <span class="k">return</span> <span class="nb">round</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="suptitle_and_tight"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.suptitle_and_tight">[docs]</a><span class="k">def</span> <span class="nf">suptitle_and_tight</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="suptitle_and_tight"><a class="viewcode-back" href="../../utils.html#aggregate.utils.suptitle_and_tight">[docs]</a><span class="k">def</span> <span class="nf">suptitle_and_tight</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    deal with tight layout when there is a suptitle</span>
 
@@ -479,16 +481,22 @@
 
 
 <span class="c1"># general nonsense</span>
-<div class="viewcode-block" id="insurability_triangle"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.insurability_triangle">[docs]</a><span class="k">def</span> <span class="nf">insurability_triangle</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">)):</span>
+<div class="viewcode-block" id="insurability_triangle"><a class="viewcode-back" href="../../utils.html#aggregate.utils.insurability_triangle">[docs]</a><span class="k">def</span> <span class="nf">insurability_triangle</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">)):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Illustrate the insurability triangle...</span>
+
+<span class="sd">    ::</span>
+
 <span class="sd">        λ = A / L</span>
 <span class="sd">        ROE = (P-L) / (A - P) = (P/L - 1) / (A/L - P/L)</span>
 <span class="sd">            = (1/LR - 1) / (λ - 1/LR) = (1 - LR) / (λLR - 1)</span>
 
 <span class="sd">    Hence</span>
 
+<span class="sd">    ::</span>
+
 <span class="sd">        δ = ROE / (1 + ROE) = (1 - LR) / [LR (λ - 1)]</span>
+
 <span class="sd">    :return:</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">f</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
@@ -531,7 +539,7 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Loss Ratio vs. Investor Discount Rate </span><span class="se">\n</span><span class="s1">By PML to EL Ratio&#39;</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="read_log"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.read_log">[docs]</a><span class="k">def</span> <span class="nf">read_log</span><span class="p">():</span>
+<div class="viewcode-block" id="read_log"><a class="viewcode-back" href="../../utils.html#aggregate.utils.read_log">[docs]</a><span class="k">def</span> <span class="nf">read_log</span><span class="p">():</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    read and return the log file</span>
 
@@ -547,7 +555,7 @@
     <span class="k">return</span> <span class="n">df</span></div>
 
 
-<div class="viewcode-block" id="MomentAggregator"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator">[docs]</a><span class="k">class</span> <span class="nc">MomentAggregator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator">[docs]</a><span class="k">class</span> <span class="nc">MomentAggregator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Purely accumulates moments</span>
 <span class="sd">    Used by Portfolio</span>
@@ -576,7 +584,7 @@
         <span class="c1"># function to comptue frequency moments, hence can call add_f1s(...)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">freq_moms</span> <span class="o">=</span> <span class="n">freq_moms</span>
 
-<div class="viewcode-block" id="MomentAggregator.add_fs"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.add_fs">[docs]</a>    <span class="k">def</span> <span class="nf">add_fs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.add_fs"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.add_fs">[docs]</a>    <span class="k">def</span> <span class="nf">add_fs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        accumulate new moments defined by f and s</span>
 
@@ -617,7 +625,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span> <span class="o">=</span> \
             <span class="bp">self</span><span class="o">.</span><span class="n">cumulate_moments</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tot_agg_3</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_3</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MomentAggregator.add_f1s"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.add_f1s">[docs]</a>    <span class="k">def</span> <span class="nf">add_f1s</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.add_f1s"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.add_f1s">[docs]</a>    <span class="k">def</span> <span class="nf">add_f1s</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f1</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        accumulate new moments defined by f1 and s - fills in f2, f3 based on</span>
 <span class="sd">        stored frequency distribution</span>
@@ -638,7 +646,7 @@
         <span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freq_moms</span><span class="p">(</span><span class="n">f1</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">add_fs</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MomentAggregator.get_fsa_stats"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.get_fsa_stats">[docs]</a>    <span class="k">def</span> <span class="nf">get_fsa_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">remix</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.get_fsa_stats"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.get_fsa_stats">[docs]</a>    <span class="k">def</span> <span class="nf">get_fsa_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">remix</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        get the current f x s = agg statistics_df and moments</span>
 <span class="sd">        total = true use total else, current</span>
@@ -678,7 +686,7 @@
         <span class="n">nc3</span> <span class="o">=</span> <span class="n">f3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">f2</span> <span class="o">+</span> <span class="n">f1</span>
         <span class="k">return</span> <span class="n">nc2</span><span class="p">,</span> <span class="n">nc3</span>
 
-<div class="viewcode-block" id="MomentAggregator.agg_from_fs"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.agg_from_fs">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="MomentAggregator.agg_from_fs"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.agg_from_fs">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">agg_from_fs</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">s3</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        aggregate_project moments from freq and sev components</span>
@@ -697,7 +705,7 @@
                <span class="n">f1</span> <span class="o">*</span> <span class="n">s3</span> <span class="o">+</span> <span class="n">f3</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">f2</span> <span class="o">-</span> <span class="n">f1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">*</span> <span class="n">s2</span> <span class="o">+</span> <span class="p">(</span><span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">f2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">f1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s1</span> <span class="o">**</span> <span class="mi">3</span></div>
 
 
-<div class="viewcode-block" id="MomentAggregator.moments_to_mcvsk"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.moments_to_mcvsk">[docs]</a>    <span class="k">def</span> <span class="nf">moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.moments_to_mcvsk"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.moments_to_mcvsk">[docs]</a>    <span class="k">def</span> <span class="nf">moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        convert noncentral moments into mean, cv and skewness</span>
 <span class="sd">        type = agg | freq | sev | mix</span>
@@ -726,7 +734,7 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">MomentAggregator</span><span class="o">.</span><span class="n">_moments_to_mcvsk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MomentAggregator.moments"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.moments">[docs]</a>    <span class="k">def</span> <span class="nf">moments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.moments"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.moments">[docs]</a>    <span class="k">def</span> <span class="nf">moments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mom_type</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        vector of the moments; convenience function</span>
 
@@ -751,7 +759,7 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sev_3</span></div>
 
-<div class="viewcode-block" id="MomentAggregator.cumulate_moments"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.cumulate_moments">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="MomentAggregator.cumulate_moments"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.cumulate_moments">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">cumulate_moments</span><span class="p">(</span><span class="n">m1</span><span class="p">,</span> <span class="n">m2</span><span class="p">,</span> <span class="n">m3</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n3</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Moments of sum of indepdendent variables</span>
@@ -800,7 +808,7 @@
             <span class="n">skew</span> <span class="o">=</span> <span class="p">(</span><span class="n">ex3</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">*</span> <span class="n">ex2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span> <span class="o">/</span> <span class="n">sd</span> <span class="o">**</span> <span class="mi">3</span>
         <span class="k">return</span> <span class="n">m</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span>
 
-<div class="viewcode-block" id="MomentAggregator.column_names"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.column_names">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="MomentAggregator.column_names"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.column_names">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">column_names</span><span class="p">():</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        list of the moment and statistics_df names for f x s = a</span>
@@ -811,7 +819,7 @@
         <span class="k">return</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">([</span><span class="s1">&#39;freq&#39;</span><span class="p">,</span> <span class="s1">&#39;sev&#39;</span><span class="p">,</span> <span class="s1">&#39;agg&#39;</span><span class="p">],</span> <span class="p">[</span><span class="n">f</span><span class="s1">&#39;_</span><span class="si">{i}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)]</span> <span class="o">+</span>
                                                         <span class="p">[</span><span class="s1">&#39;_m&#39;</span><span class="p">,</span> <span class="s1">&#39;_cv&#39;</span><span class="p">,</span> <span class="s1">&#39;_skew&#39;</span><span class="p">])]</span></div>
 
-<div class="viewcode-block" id="MomentAggregator.stats_series"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentAggregator.stats_series">[docs]</a>    <span class="k">def</span> <span class="nf">stats_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">pvalue</span><span class="p">,</span> <span class="n">remix</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentAggregator.stats_series"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentAggregator.stats_series">[docs]</a>    <span class="k">def</span> <span class="nf">stats_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">pvalue</span><span class="p">,</span> <span class="n">remix</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        combine elements into a reporting series</span>
 <span class="sd">        handles order, index names etc. in one place</span>
@@ -831,7 +839,7 @@
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="o">*</span><span class="n">all_stats</span><span class="p">,</span> <span class="n">limit</span><span class="p">,</span> <span class="n">p999e</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="MomentWrangler"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentWrangler">[docs]</a><span class="k">class</span> <span class="nc">MomentWrangler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentWrangler"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentWrangler">[docs]</a><span class="k">class</span> <span class="nc">MomentWrangler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Conversion between central, noncentral and factorial moments</span>
 
@@ -898,19 +906,19 @@
         <span class="c1"># shorter names are better</span>
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">((</span><span class="n">m</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">skew</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;ex&#39;</span><span class="p">,</span> <span class="s1">&#39;var&#39;</span><span class="p">,</span> <span class="s1">&#39;sd&#39;</span><span class="p">,</span> <span class="s1">&#39;cv&#39;</span><span class="p">,</span> <span class="s1">&#39;skew&#39;</span><span class="p">))</span>
 
-<div class="viewcode-block" id="MomentWrangler._make_central"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentWrangler._make_central">[docs]</a>    <span class="k">def</span> <span class="nf">_make_central</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentWrangler._make_central"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentWrangler._make_central">[docs]</a>    <span class="k">def</span> <span class="nf">_make_central</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span><span class="p">,</span> <span class="n">ex3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_noncentral</span>
         <span class="c1"># p 42, 1.240</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_central</span> <span class="o">=</span> <span class="p">(</span><span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ex3</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ex2</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ex1</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MomentWrangler._make_factorial"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.MomentWrangler._make_factorial">[docs]</a>    <span class="k">def</span> <span class="nf">_make_factorial</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="MomentWrangler._make_factorial"><a class="viewcode-back" href="../../utils.html#aggregate.utils.MomentWrangler._make_factorial">[docs]</a>    <span class="k">def</span> <span class="nf">_make_factorial</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot; add factorial from central &quot;&quot;&quot;</span>
         <span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span><span class="p">,</span> <span class="n">ex3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_noncentral</span>
         <span class="c1"># p. 43, 1.245 (below)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_factorial</span> <span class="o">=</span> <span class="p">(</span><span class="n">ex1</span><span class="p">,</span> <span class="n">ex2</span> <span class="o">-</span> <span class="n">ex1</span><span class="p">,</span> <span class="n">ex3</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ex2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ex1</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="qd"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.qd">[docs]</a><span class="k">class</span> <span class="nc">qd</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="qd"><a class="viewcode-back" href="../../utils.html#aggregate.utils.qd">[docs]</a><span class="k">class</span> <span class="nc">qd</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    quick display for dictionaries and Pandas dataframes, with some sensible number defaults</span>
 <span class="sd">    experimental</span>
@@ -943,7 +951,7 @@
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">d</span>
 
-<div class="viewcode-block" id="qd._repr_html_"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.qd._repr_html_">[docs]</a>    <span class="k">def</span> <span class="nf">_repr_html_</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="qd._repr_html_"><a class="viewcode-back" href="../../utils.html#aggregate.utils.qd._repr_html_">[docs]</a>    <span class="k">def</span> <span class="nf">_repr_html_</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)])</span><span class="o">.</span><span class="n">_repr_html_</span><span class="p">()</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
@@ -980,7 +988,7 @@
             <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="xsden_to_meancv"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.xsden_to_meancv">[docs]</a><span class="k">def</span> <span class="nf">xsden_to_meancv</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">den</span><span class="p">):</span>
+<div class="viewcode-block" id="xsden_to_meancv"><a class="viewcode-back" href="../../utils.html#aggregate.utils.xsden_to_meancv">[docs]</a><span class="k">def</span> <span class="nf">xsden_to_meancv</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">den</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    compute mean and cv from xs and density</span>
 
@@ -999,7 +1007,7 @@
         <span class="n">cv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
     <span class="k">return</span> <span class="n">ex1</span><span class="p">,</span> <span class="n">cv</span></div>
 
-<div class="viewcode-block" id="frequency_examples"><a class="viewcode-back" href="../../utilities.html#aggregate.utils.frequency_examples">[docs]</a><span class="k">def</span> <span class="nf">frequency_examples</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">ν</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">κ</span><span class="p">,</span> <span class="n">sichel_case</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
+<div class="viewcode-block" id="frequency_examples"><a class="viewcode-back" href="../../utils.html#aggregate.utils.frequency_examples">[docs]</a><span class="k">def</span> <span class="nf">frequency_examples</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">ν</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">κ</span><span class="p">,</span> <span class="n">sichel_case</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Illustrate different frequency distributions and frequency moment</span>
 <span class="sd">    calculations.</span>
@@ -1336,7 +1344,7 @@
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

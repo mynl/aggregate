@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    
+    <title>aggregate.parser &mdash; aggregate 0.7.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="../../_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="../../_static/css/spc-extend.css">
+    <link rel="stylesheet" href="../../_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" >
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.7.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="../../None"></script>
+    <script type="text/javascript" src="../../_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" >
+    <link rel="search" title="Search" href="../../search.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="../../index.html" >
+    <link rel="up" title="Module code" href="../index.html" > 
+  </head>
+  <body>
+
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="../../index.html">
+      <img style="border: 0;" alt="SciPy" src="../../_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
+	
+        <li class="active"><a href="../../index.html">aggregate 0.7.1 documentation</a></li>
+	
+          <li class="active"><a href="../index.html" accesskey="U">Module code</a></li> 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="../../genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="../../py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
+        <div class="bodywrapper">
+          <div class="body" id="spc-section-body">
+            
+  <h1>Source code for aggregate.parser</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">lexer and parser specification for aggregate</span>
+<span class="sd">============================================</span>
+
+<span class="sd">Overview</span>
+<span class="sd">    Implements the ``agg`` programming lanaguage</span>
+
+<span class="sd">Example program</span>
+<span class="sd">    The following short program replicates Thought Experiemnt 1 from Neil Bodoff&#39;s</span>
+<span class="sd">    paper Capital Allocation by Percentile Layer</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        port BODOFF1 note{Bodoff Thought Experiment No. 1}</span>
+<span class="sd">            agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed</span>
+<span class="sd">            agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed</span>
+
+<span class="sd">Preprocessing</span>
+<span class="sd">    tab or four spaces needed and are replaced with space (program is on one line)</span>
+
+
+<span class="sd">Ignored characters</span>
+<span class="sd">    colon, comma, ( ) |</span>
+
+
+<span class="sd">Language Specification</span>
+<span class="sd">----------------------</span>
+
+<span class="sd">The ```agg``` Language Grammar:</span>
+
+<span class="sd">::</span>
+
+<span class="sd">    answer              	:: sev_out</span>
+<span class="sd">                        	 | agg_out</span>
+<span class="sd">                        	 | port_out</span>
+
+<span class="sd">    port_out            	:: port_name note agg_list</span>
+
+<span class="sd">    agg_list            	:: agg_list agg_out</span>
+<span class="sd">                        	 | agg_out</span>
+
+<span class="sd">    agg_out             	:: agg_name builtin_aggregate note</span>
+<span class="sd">                        	 | agg_name exposures layers SEV sev freq note</span>
+
+<span class="sd">    sev_out             	:: sev_out sev_name sev note</span>
+<span class="sd">                        	 | sev_name sev note</span>
+
+<span class="sd">    freq                	:: MIXED ID snumber snumber</span>
+<span class="sd">                        	 | MIXED ID snumber</span>
+<span class="sd">                        	 | FREQ snumber</span>
+<span class="sd">                        	 | FREQ</span>
+
+<span class="sd">    snumber             	:: NUMBER</span>
+<span class="sd">                        	 | MINUS NUMBER %prec UMINUS</span>
+
+<span class="sd">    sev                 	:: sev PLUS numbers</span>
+<span class="sd">                        	 | sev MINUS numbers</span>
+<span class="sd">                        	 | numbers TIMES sev</span>
+<span class="sd">                        	 | ids numbers CV numbers weights</span>
+<span class="sd">                        	 | ids numbers weights</span>
+<span class="sd">                        	 | ids numbers numbers weights xps</span>
+<span class="sd">                        	 | ids xps</span>
+<span class="sd">                        	 | builtinids numbers numbers</span>
+<span class="sd">                        	 | builtinids</span>
+
+<span class="sd">    xps                 	:: XPS numbers numbers</span>
+<span class="sd">                        	 |</span>
+
+<span class="sd">    weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER</span>
+<span class="sd">                        	 | WEIGHTS numbers</span>
+<span class="sd">                        	 |</span>
+
+<span class="sd">    layers              	:: numbers XS numbers</span>
+<span class="sd">                        	 |</span>
+
+<span class="sd">    note                	:: NOTE</span>
+<span class="sd">                        	 |</span>
+
+<span class="sd">    exposures           	:: numbers CLAIMS</span>
+<span class="sd">                        	 | numbers LOSS</span>
+<span class="sd">                        	 | numbers PREMIUM AT numbers LR</span>
+<span class="sd">                        	 | numbers PREMIUM AT numbers</span>
+
+<span class="sd">    builtinids          	:: BUILTINID</span>
+
+<span class="sd">    ids                 	:: &quot;[&quot; idl &quot;]&quot;</span>
+<span class="sd">                        	 | ID</span>
+
+<span class="sd">    idl                 	:: idl ID</span>
+<span class="sd">                        	 | ID</span>
+
+<span class="sd">    numbers             	:: &quot;[&quot; numberl &quot;]&quot;</span>
+<span class="sd">                        	 | NUMBER</span>
+
+<span class="sd">    numberl             	:: numberl NUMBER</span>
+<span class="sd">                        	 | NUMBER</span>
+
+<span class="sd">    builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER</span>
+<span class="sd">                        	 | NUMBER TIMES builtin_aggregate_dist</span>
+<span class="sd">                        	 | builtin_aggregate_dist</span>
+
+<span class="sd">    builtin_aggregate_dist	:: BUILTINID</span>
+
+<span class="sd">    sev_name            	:: SEV ID</span>
+
+<span class="sd">    agg_name            	:: AGG ID</span>
+
+<span class="sd">    port_name           	:: PORT ID</span>
+
+<span class="sd">parser.out parser debug information</span>
+<span class="sd">-----------------------------------</span>
+
+<span class="sd">Lexer term definition</span>
+<span class="sd">---------------------</span>
+
+<span class="sd">::</span>
+
+<span class="sd">    tokens = {ID, BUILTINID, NOTE,</span>
+<span class="sd">              SEV, AGG, PORT,</span>
+<span class="sd">              PLUS, MINUS, TIMES, NUMBER,</span>
+<span class="sd">              LOSS, PREMIUM, AT, LR, CLAIMS,</span>
+<span class="sd">              XS,</span>
+<span class="sd">              CV, WEIGHTS, EQUAL_WEIGHT, XPS,</span>
+<span class="sd">              MIXED, FREQ</span>
+<span class="sd">              }</span>
+<span class="sd">    ignore = &#39; \t,\\:\\(\\)|&#39;</span>
+<span class="sd">    literals = {&#39;[&#39;, &#39;]&#39;}</span>
+
+<span class="sd">    # per manual, need to list longer tokens before shorter ones</span>
+<span class="sd">    # NOTE = r&#39;note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}&#39;  # r&#39;[^\}]+&#39;</span>
+<span class="sd">    NOTE = r&#39;note\{[^\}]*\}&#39;  # r&#39;[^\}]+&#39;</span>
+<span class="sd">    BUILTINID = r&#39;(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*&#39;</span>
+<span class="sd">    FREQ = r&#39;binomial|poisson|bernoulli|fixed&#39;</span>
+<span class="sd">    ID = r&#39;[a-zA-Z][\.a-zA-Z0-9~]*&#39;  # do not allow _ in line names, use ~ instead: WHY?</span>
+<span class="sd">    PLUS = r&#39;\+&#39;</span>
+<span class="sd">    MINUS = r&#39;\-&#39;</span>
+<span class="sd">    TIMES = r&#39;\*&#39;</span>
+<span class="sd">    EQUAL_WEIGHT = r&#39;=&#39;</span>
+<span class="sd">    ID[&#39;loss&#39;] = LOSS</span>
+<span class="sd">    ID[&#39;at&#39;] = AT</span>
+<span class="sd">    ID[&#39;cv&#39;] = CV</span>
+<span class="sd">    ID[&#39;premium&#39;] = PREMIUM</span>
+<span class="sd">    ID[&#39;prem&#39;] = PREMIUM</span>
+<span class="sd">    ID[&#39;lr&#39;] = LR</span>
+<span class="sd">    ID[&#39;claims&#39;] = CLAIMS</span>
+<span class="sd">    ID[&#39;claim&#39;] = CLAIMS</span>
+<span class="sd">    ID[&#39;x&#39;] = XS</span>
+<span class="sd">    ID[&#39;xs&#39;] = XS</span>
+<span class="sd">    ID[&#39;wts&#39;] = WEIGHTS</span>
+<span class="sd">    ID[&#39;wt&#39;] = WEIGHTS</span>
+<span class="sd">    ID[&#39;xps&#39;] = XPS</span>
+<span class="sd">    ID[&#39;mixed&#39;] = MIXED</span>
+<span class="sd">    ID[&#39;inf&#39;] = NUMBER</span>
+<span class="sd">    ID[&#39;sev&#39;] = SEV</span>
+<span class="sd">    ID[&#39;on&#39;] = SEV</span>
+<span class="sd">    ID[&#39;agg&#39;] = AGG</span>
+<span class="sd">    ID[&#39;port&#39;] = PORT</span>
+
+
+<span class="sd">Example Code</span>
+<span class="sd">------------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        port Complex~Portfolio~Mixed</span>
+<span class="sd">            agg LineA  50  claims           sev lognorm 12 cv [2, 3, 4] wt [.3 .5 .2] mixed gamma 0.4</span>
+<span class="sd">            agg LineB  24  claims 10 x 5    sev lognorm 12 cv [{&#39;, &#39;.join([str(i) for i in np.linspace(2,5, 20)])}] wt=20 mixed gamma 0.35</span>
+<span class="sd">            agg LineC 124  claims 120 x 5   sev lognorm 16 cv 3.4                     mixed gamma 0.45</span>
+
+<span class="sd">        port Complex~Portfolio</span>
+<span class="sd">            agg Line3  50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 2, 3]        mixed gamma 0.25</span>
+<span class="sd">            agg Line9  24  claims [5 10 15] x 5         sev lognorm 12 cv [1, 2, 3] wt=3   mixed gamma 0.25</span>
+
+<span class="sd">        port Portfolio~2</span>
+<span class="sd">            agg CA 500 prem at .5 lr 15 x 12  sev gamma 12 cv [2 3 4] wt [.3 .5 .2] mixed gamma 0.4</span>
+<span class="sd">            agg FL 1.7 claims 100 x 5         sev 10000 * pareto 1.3 - 10000        poisson</span>
+<span class="sd">            agg IL 1e-8 * agg.CMP</span>
+<span class="sd">            agg OH agg.CMP * 1e-8</span>
+<span class="sd">            agg NY 500 prem at .5 lr 15 x 12  sev [20 30 40 10] * gamma [9 10 11 12] cv [1 2 3 4] wt =4 mixed gamma 0.4</span>
+
+<span class="sd">        sev proda 30000 * lognorm 2</span>
+<span class="sd">        sev prodc:   50000 * lognorm(3)</span>
+<span class="sd">        sev weird    50000 * beta(1, 4) + 10000</span>
+<span class="sd">        sev premsop1 25000 * lognorm 2.3; sev premsop2 35000 * lognorm 2.4;</span>
+<span class="sd">        sev premsop3 45000 * lognorm 2.8</span>
+
+<span class="sd">        agg Agg1     20 claims 10 x 2 sev lognorm 12 cv 0.2 mixed gamma 0.8</span>
+<span class="sd">        agg Agg2     20 claims 10 x 2 sev 15 * lognorm 2.5  poisson;</span>
+<span class="sd">        sev premsop1 25000 * lognorm 2.3;</span>
+<span class="sd">        agg Agg3     20 claims 10 x 2 on 25 * lognorm 2 fixed;</span>
+
+<span class="sd">        port MyFirstPortfolio</span>
+<span class="sd">            agg A1: 50  claims          sev gamma 12 cv .30 (mixed gamma 0.014)</span>
+<span class="sd">            agg A2: 50  claims 30 xs 10 sev gamma 12 cv .30 (mixed gamma 0.014)</span>
+<span class="sd">            agg A3: 50  claims          sev gamma 12 cv 1.30 (mixed gamma 0.014)</span>
+<span class="sd">            agg A4: 50  claims 30 xs 20 sev gamma 12 cv 1.30 (mixed gamma 0.14)</span>
+<span class="sd">            agg B 15 claims 15 xs 15 sev lognorm 12 cv 1.5 + 2 mixed gamma 4.8</span>
+<span class="sd">            agg Cat 1.7 claims 25 xs 5  sev 25 * pareto 1.3 0 - 25 poisson</span>
+<span class="sd">            agg ppa: 1e-8 * agg.PPAL</span>
+
+<span class="sd">        port distortionTest</span>
+<span class="sd">            agg mix    50 claims              [50, 100, 150, 200] xs 0  sev lognorm 12 cv [1,2,3,4]    poisson</span>
+<span class="sd">            agg low    500 premium at 0.5     5 xs 5                    sev gamma 12 cv .30            mixed gamma 0.2</span>
+<span class="sd">            agg med    500 premium at 0.5 lr  15 xs 10                  sev gamma 12 cv .30            mixed gamma 0.4</span>
+<span class="sd">            agg xsa    50  claims             30 xs 10                  sev gamma 12 cv .30            mixed gamma 1.2</span>
+<span class="sd">            agg hcmp   1e-8 * agg.CMP</span>
+<span class="sd">            agg ihmp   agg.PPAL * 1e-8</span>
+
+<span class="sd">References</span>
+<span class="sd">----------</span>
+
+<span class="sd">https://sly.readthedocs.io/en/latest/sly.html</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">sly</span> <span class="k">import</span> <span class="n">Lexer</span><span class="p">,</span> <span class="n">Parser</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+
+<div class="viewcode-block" id="UnderwritingLexer"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingLexer">[docs]</a><span class="k">class</span> <span class="nc">UnderwritingLexer</span><span class="p">(</span><span class="n">Lexer</span><span class="p">):</span>
+
+    <span class="n">tokens</span> <span class="o">=</span> <span class="p">{</span><span class="n">ID</span><span class="p">,</span> <span class="n">BUILTINID</span><span class="p">,</span> <span class="n">NOTE</span><span class="p">,</span>
+              <span class="n">SEV</span><span class="p">,</span> <span class="n">AGG</span><span class="p">,</span> <span class="n">PORT</span><span class="p">,</span>
+              <span class="n">PLUS</span><span class="p">,</span> <span class="n">MINUS</span><span class="p">,</span> <span class="n">TIMES</span><span class="p">,</span> <span class="n">NUMBER</span><span class="p">,</span>
+              <span class="n">LOSS</span><span class="p">,</span> <span class="n">PREMIUM</span><span class="p">,</span> <span class="n">AT</span><span class="p">,</span> <span class="n">LR</span><span class="p">,</span> <span class="n">CLAIMS</span><span class="p">,</span>
+              <span class="n">XS</span><span class="p">,</span>
+              <span class="n">CV</span><span class="p">,</span> <span class="n">WEIGHTS</span><span class="p">,</span> <span class="n">EQUAL_WEIGHT</span><span class="p">,</span> <span class="n">XPS</span><span class="p">,</span>
+              <span class="n">MIXED</span><span class="p">,</span> <span class="n">FREQ</span>
+              <span class="p">}</span>
+    <span class="n">ignore</span> <span class="o">=</span> <span class="s1">&#39; </span><span class="se">\t</span><span class="s1">,</span><span class="se">\\</span><span class="s1">:</span><span class="se">\\</span><span class="s1">(</span><span class="se">\\</span><span class="s1">)|&#39;</span>
+    <span class="n">literals</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;[&#39;</span><span class="p">,</span> <span class="s1">&#39;]&#39;</span><span class="p">}</span>
+
+    <span class="c1"># per manual, need to list longer tokens before shorter ones</span>
+    <span class="c1"># NOTE = r&#39;note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}&#39;  # r&#39;[^\}]+&#39;</span>
+    <span class="n">NOTE</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;note\{[^\}]*\}&#39;</span>  <span class="c1"># r&#39;[^\}]+&#39;</span>
+    <span class="n">BUILTINID</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*&#39;</span>
+    <span class="n">FREQ</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;binomial|poisson|bernoulli|pascal|fixed&#39;</span>
+    <span class="n">ID</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;[a-zA-Z][\.a-zA-Z0-9~_]*&#39;</span>  <span class="c1"># do not allow _ in line names, use ~ instead: WHY?</span>
+    <span class="n">PLUS</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;\+&#39;</span>
+    <span class="n">MINUS</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;\-&#39;</span>
+    <span class="n">TIMES</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;\*&#39;</span>
+    <span class="n">EQUAL_WEIGHT</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;=&#39;</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LOSS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;at&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">AT</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;cv&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CV</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;premium&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">PREMIUM</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;prem&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">PREMIUM</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;lr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LR</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;claims&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CLAIMS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;claim&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CLAIMS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">XS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;xs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">XS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;wts&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">WEIGHTS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;wt&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">WEIGHTS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;xps&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">XPS</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;mixed&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">MIXED</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;inf&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">NUMBER</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;sev&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SEV</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;on&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SEV</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;agg&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">AGG</span>
+    <span class="n">ID</span><span class="p">[</span><span class="s1">&#39;port&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">PORT</span>
+
+<div class="viewcode-block" id="UnderwritingLexer.NUMBER"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingLexer.NUMBER">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">NUMBER</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;INF&#39;</span> <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;inf&#39;</span><span class="p">:</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">t</span></div>
+
+<div class="viewcode-block" id="UnderwritingLexer.newline"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingLexer.newline">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\n+&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">newline</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lineno</span> <span class="o">+=</span> <span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="UnderwritingLexer.error"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingLexer.error">[docs]</a>    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Illegal character &#39;</span><span class="si">{t.value[0]:s}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span></div></div>
+
+
+<div class="viewcode-block" id="UnderwritingParser"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser">[docs]</a><span class="k">class</span> <span class="nc">UnderwritingParser</span><span class="p">(</span><span class="n">Parser</span><span class="p">):</span>
+    <span class="c1"># debugfile = &#39;parser.out&#39;</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="n">UnderwritingLexer</span><span class="o">.</span><span class="n">tokens</span>
+    <span class="n">precedence</span> <span class="o">=</span> <span class="p">((</span><span class="s1">&#39;left&#39;</span><span class="p">,</span> <span class="n">PLUS</span><span class="p">,</span> <span class="n">MINUS</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;left&#39;</span><span class="p">,</span> <span class="n">TIMES</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;right&#39;</span><span class="p">,</span> <span class="n">UMINUS</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">safe_lookup_function</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arg_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_out_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_out_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">port_out_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        <span class="c1"># instance of uw class to look up severities</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_safe_lookup</span> <span class="o">=</span> <span class="n">safe_lookup_function</span>
+        <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">_print</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="n">_print</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">_print</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;UnderwritingParser | &#39;</span> <span class="o">+</span> <span class="n">message</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="n">_print</span>
+
+<div class="viewcode-block" id="UnderwritingParser.reset"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># TODO Add sev_xs and sev_ps !!</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_out_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_out_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">port_out_dict</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_check_vectorizable</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check the if value can be vectorized</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># @staticmethod</span>
+    <span class="c1"># def new_arg_dict():</span>
+    <span class="c1">#     # to</span>
+    <span class="c1">#     # in order to allow for missing terms this must reflect sensible defaults</span>
+    <span class="c1">#     return dict(name=&quot;&quot;, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,</span>
+    <span class="c1">#                 sev_name=&#39;&#39;, sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,</span>
+    <span class="c1">#                 freq_name=&#39;poisson&#39;, freq_a=0, freq_b=0)</span>
+
+    <span class="c1"># final answer exit points ===================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;sev_out&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">answer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t\t</span><span class="s1">Exiting through sev_out, created severity </span><span class="si">{p.sev_out}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;agg_out&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">answer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t\t</span><span class="s1">Exiting through agg_out, created aggregate </span><span class="si">{p.agg_out}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UnderwritingParser.answer"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.answer">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;port_out&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">answer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t\t</span><span class="s1">Exiting through port_out, created portfolio </span><span class="si">{p.port_out}</span><span class="s1"> &#39;</span>
+                 <span class="n">f</span><span class="s1">&#39;with {len(self.port_out_dict[p.port_out][&quot;spec&quot;])} aggregates&#39;</span><span class="p">)</span></div>
+
+    <span class="c1"># building portfolios =======================================</span>
+<div class="viewcode-block" id="UnderwritingParser.port_out"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.port_out">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;port_name note agg_list&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">port_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">ADDING port_name note (</span><span class="si">{p.note[:10]}</span><span class="s1">...) agg_list to port_out </span><span class="si">{p.port_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">port_out_dict</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">port_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_list</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">note</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">port_name</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;agg_list agg_out&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">agg_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_list</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;ODD agg list is empty&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">agg_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">agg_out</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">ADDED agg_out </span><span class="si">{p.agg_out}</span><span class="s1"> to agg_list </span><span class="si">{p.agg_list}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_list</span>
+
+<div class="viewcode-block" id="UnderwritingParser.agg_list"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.agg_list">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;agg_out&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">agg_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">ADDING agg_out </span><span class="si">{p.agg_out}</span><span class="s1"> to new agg_list&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">agg_out</span><span class="p">]</span></div>
+
+    <span class="c1"># building aggregates ========================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;agg_name builtin_aggregate note&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">agg_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;ADDING agg_name builtin_aggregate note </span><span class="si">{p.builtin_aggregate}</span><span class="s1"> to agg_out&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;name&#39;</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate</span><span class="p">:</span>
+            <span class="c1"># otherwise will overwrite the agg name</span>
+            <span class="k">del</span> <span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_out_dict</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">agg_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_name</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">note</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_name</span>
+
+    <span class="c1"># standard spec expos [layers] sevs freq</span>
+<div class="viewcode-block" id="UnderwritingParser.agg_out"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.agg_out">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;agg_name exposures layers SEV sev freq note&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">agg_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;ADDING agg_name exposures layers SEV sev freq note to agg_out </span><span class="si">{p.agg_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">agg_out_dict</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">agg_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_name</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">exposures</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">,</span>
+                                         <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">freq</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">note</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">agg_name</span></div>
+
+    <span class="c1"># building severities ======================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;sev_out sev_name sev note&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;ADDING sev_out sev_name </span><span class="si">{p.sev_name}</span><span class="s1"> sev note to sev_out, appending to sev_out_dict&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">note</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_out_dict</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">sev_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span>
+
+<div class="viewcode-block" id="UnderwritingParser.sev_out"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.sev_out">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;sev_name sev note&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;ADDING sev_name sev note resolving to sev_part </span><span class="si">{p.sev_name}</span><span class="s1">, adding to sev_out_dict&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">note</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sev_out_dict</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">sev_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span></div>
+
+    <span class="c1"># frequency term ==========================================</span>
+    <span class="c1"># for all frequency distributions claim count is determined by exposure / severity</span>
+    <span class="c1"># only freq shape parameters need be entered</span>
+    <span class="c1"># one and two parameter mixing distributions</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;MIXED ID snumber snumber&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;MIXED ID snumber snumber </span><span class="si">{p.ID}</span><span class="s1">, </span><span class="si">{p[2]}</span><span class="s1">, </span><span class="si">{p[3]}</span><span class="s1"> to two param freq, snumber.1=CV&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span><span class="p">,</span> <span class="s1">&#39;freq_a&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;freq_b&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">]}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;MIXED ID snumber&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;MIXED ID snumber </span><span class="si">{p.ID}</span><span class="s1">, </span><span class="si">{p.snumber}</span><span class="s1"> to single param freq, snumber=CVs&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span><span class="p">,</span> <span class="s1">&#39;freq_a&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">snumber</span><span class="p">}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;FREQ snumber snumber&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving named frequency distribution </span><span class="si">{p.FREQ}</span><span class="s1"> parameters </span><span class="si">{p[1]}</span><span class="s1">, </span><span class="si">{p[2]}</span><span class="s1"> to freq&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span> <span class="o">!=</span> <span class="s1">&#39;pascal&#39;</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Illogical choice of frequency </span><span class="si">{p.FREQ}</span><span class="s1">, expected pascal&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span><span class="p">,</span> <span class="s1">&#39;freq_a&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;freq_b&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]}</span>
+
+    <span class="c1"># binomial p or TODO inflated poisson</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;FREQ snumber&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving named frequency distribution </span><span class="si">{p.FREQ}</span><span class="s1"> parameter </span><span class="si">{p.snumber}</span><span class="s1"> to freq&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span> <span class="o">!=</span> <span class="s1">&#39;binomial&#39;</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Illogical choice of frequency </span><span class="si">{p.FREQ}</span><span class="s1">, expected binomial&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span><span class="p">,</span> <span class="s1">&#39;freq_a&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">snumber</span><span class="p">}</span>
+
+<div class="viewcode-block" id="UnderwritingParser.freq"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.freq">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;FREQ&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving named frequency distribution </span><span class="si">{p.FREQ}</span><span class="s1"> to freq&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;poisson&#39;</span><span class="p">,</span> <span class="s1">&#39;bernoulli&#39;</span><span class="p">,</span> <span class="s1">&#39;fixed&#39;</span><span class="p">):</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Illogical choice for FREQ </span><span class="si">{p.FREQ}</span><span class="s1">, should be poisson, bernoulli or fixed&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">FREQ</span><span class="p">}</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">snumber</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;NUMBER </span><span class="si">{p.NUMBER}</span><span class="s1"> to signed number&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+
+<div class="viewcode-block" id="UnderwritingParser.snumber"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.snumber">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;MINUS NUMBER %prec UMINUS&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">snumber</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;-NUMBER </span><span class="si">{p.NUMBER}</span><span class="s1"> to signed number&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span></div>
+
+    <span class="c1"># require a frequency distribution</span>
+    <span class="c1"># @_(&#39;&#39;)</span>
+    <span class="c1"># def freq(self, p):</span>
+    <span class="c1">#     self.log(&#39;missing frequency term&#39;)</span>
+    <span class="c1">#     return { &#39;freq_name&#39;: &#39;poisson&#39;}</span>
+
+    <span class="c1"># severity term ============================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;sev PLUS numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving sev PLUS numbers to sev </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">numbers</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numbers</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;sev MINUS numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving sev MINUS numbers to sev </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers TIMES sev&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers TIMES sev to sev </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">numbers</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numbers</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_mean&#39;</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sev_mean&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_mean&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="c1"># only scale scale if there is a scale (otherwise you double count)</span>
+        <span class="c1"># TODO OK? sev_scale...</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_scale&#39;</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_mean&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">:</span>
+            <span class="c1"># e.g. Pareto has no mean and it is important to set the scale</span>
+            <span class="c1"># but if there is a mean it handles the scaling and setting scale will</span>
+            <span class="c1"># confuse the distribution maker</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="c1"># if there is a location it needs to scale too</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_loc&#39;</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">UnderwritingParser</span><span class="o">.</span><span class="n">_check_vectorizable</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">])</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">sev</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">sev</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ids numbers CV numbers weights&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ids </span><span class="si">{p.ids}</span><span class="s1"> numbers CV numbers weights </span><span class="si">{p[1]}</span><span class="s1">, </span><span class="si">{p[3]}</span><span class="s1">, </span><span class="si">{p.weights}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="s1">&#39;sev_mean&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sev_cv&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="s1">&#39;sev_wt&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">weights</span><span class="p">}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ids numbers weights&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ids </span><span class="si">{p.ids}</span><span class="s1"> numbers </span><span class="si">{p[1]}</span><span class="s1"> to sev (one param dist)&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="s1">&#39;sev_a&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sev_wt&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">weights</span><span class="p">}</span>
+
+    <span class="c1">#                                v can go</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ids numbers numbers weights xps&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ids </span><span class="si">{p.ids}</span><span class="s1"> numbers numbers </span><span class="si">{p[1]}</span><span class="s1">, </span><span class="si">{p[2]}</span><span class="s1"> to sev (two param sev dist)&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="s1">&#39;sev_a&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sev_b&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;sev_wt&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">weights</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">xps</span><span class="p">}</span>
+
+    <span class="c1"># TODO a bit restrictive on numerical densities here!</span>
+    <span class="c1">#      v put in weights here instead (if xps relevant then cannot need shape parameters)</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ids xps&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ids </span><span class="si">{p.ids}</span><span class="s1"> xps </span><span class="si">{p.xps}</span><span class="s1"> to sev (fixed or histogram type)&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span> <span class="o">**</span><span class="n">p</span><span class="o">.</span><span class="n">xps</span><span class="p">}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;XPS numbers numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">xps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;XPS numbers numbers resolving to xs and ps </span><span class="si">{p[1]}</span><span class="s1">, </span><span class="si">{p[2]}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_xs&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sev_ps&#39;</span><span class="p">:</span>  <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]}</span>
+
+<div class="viewcode-block" id="UnderwritingParser.xps"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.xps">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">xps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s1">&#39;missing xps term&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;WEIGHTS EQUAL_WEIGHT NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;WEIGHTS EQUAL_WEIGHTS </span><span class="si">{p.NUMBER}</span><span class="s1"> resolving to equal weights&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span><span class="p">))</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;WEIGHTS numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;WEIGHTS numbers resolving to weights </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span>
+
+<div class="viewcode-block" id="UnderwritingParser.weights"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.weights">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s1">&#39;missing weights term&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;builtinids numbers numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;builtinds </span><span class="si">{p.builtinids}</span><span class="s1"> numbers numbers log2=</span><span class="si">{p[1]}</span><span class="s1">, bs=</span><span class="si">{p[2]}</span><span class="s1"> to sev&#39;</span><span class="p">)</span>
+        <span class="n">requested_type</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">builtinids</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">requested_type</span> <span class="o">==</span> <span class="s2">&quot;meta&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">builtinids</span><span class="p">,</span> <span class="s1">&#39;sev_a&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;sev_b&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Only meta type can be used with arguments, not </span><span class="si">{p.builtinids}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UnderwritingParser.sev"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.sev">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;builtinids&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;builtinds </span><span class="si">{p.builtinids}</span><span class="s1"> to sev&#39;</span><span class="p">)</span>
+        <span class="c1"># look up ID in uw</span>
+        <span class="c1"># it is not accepetable to ask for an agg or port here; they need to be accessed through</span>
+        <span class="c1"># meta. E.g. if you request and agg it will overwrite other (freq) variables defined</span>
+        <span class="c1"># in the script...</span>
+        <span class="n">requested_type</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">builtinids</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">requested_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;sev&quot;</span><span class="p">,</span> <span class="s2">&quot;meta&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;built in type must be sev or meta, not </span><span class="si">{p.builtinids}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">requested_type</span> <span class="o">==</span> <span class="s1">&#39;meta&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;sev_name&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">builtinids</span><span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_safe_lookup</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">builtinids</span><span class="p">)</span></div>
+
+    <span class="c1"># layer terms, optoinal ===================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers XS numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">layers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers XS numbers to layers </span><span class="si">{p[0]}</span><span class="s1"> xs </span><span class="si">{p[2]}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;exp_attachment&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;exp_limit&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]}</span>
+
+<div class="viewcode-block" id="UnderwritingParser.layers"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.layers">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">layers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s1">&#39;missing layer term&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+    <span class="c1"># optional note  ==========================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;NOTE&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">note</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;NOTE to note: </span><span class="si">{p.NOTE[5:-1]}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">NOTE</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+<div class="viewcode-block" id="UnderwritingParser.note"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.note">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">note</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Empty note term&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span></div>
+
+    <span class="c1"># exposures term ==========================================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers CLAIMS&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">exposures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers CLAIMS to exposures </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;exp_en&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span><span class="p">}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers LOSS&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">exposures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers LOSS to exposures </span><span class="si">{p.numbers}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;exp_el&#39;</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">numbers</span><span class="p">}</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers PREMIUM AT numbers LR&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">exposures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers PREMIUM AT numbers LR to exposures </span><span class="si">{p[0]}</span><span class="s1"> at </span><span class="si">{p[3]}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;exp_lr&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="s1">&#39;exp_el&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">]}</span>
+
+<div class="viewcode-block" id="UnderwritingParser.exposures"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.exposures">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numbers PREMIUM AT numbers&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">exposures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving numbers PREMIUM AT numbers to exposures </span><span class="si">{p[0]}</span><span class="s1"> at </span><span class="si">{p[3]}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;exp_lr&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="s1">&#39;exp_el&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">]}</span></div>
+
+    <span class="c1"># lists for ids and numbers and builtinids ================================</span>
+    <span class="c1"># for now, do not allow a list of severities...too tricky</span>
+    <span class="c1"># @_(&#39;&quot;[&quot; builtinidl &quot;]&quot;&#39;)</span>
+    <span class="c1"># def builtinids(self, log):</span>
+    <span class="c1">#     self.log(f&#39;resolving [builtinidl] to builtinids {p.builtinidl}&#39;)</span>
+    <span class="c1">#     return p.builtinidl</span>
+    <span class="c1">#</span>
+    <span class="c1"># @_(&#39;builtinidl BUILTINID&#39;)</span>
+    <span class="c1"># def builtinidl(self, log):</span>
+    <span class="c1">#     s1 = f&#39;resolving builtinidl BUILTINID {p.builtinidl}, {p.BUILTINID} --&gt; &#39;</span>
+    <span class="c1">#     p.builtinidl.append(p.BUILTINID)</span>
+    <span class="c1">#     s1 += f&#39;{p.builtinidl}&#39;</span>
+    <span class="c1">#     self.log(s1)</span>
+    <span class="c1">#     return p.builtinidl</span>
+    <span class="c1">#</span>
+    <span class="c1"># @_(&#39;BUILTINID&#39;)</span>
+    <span class="c1"># def builtinidl(self, log):</span>
+    <span class="c1">#     self.log(f&#39;resolving BUILTINID to builtinidl {p.BUILTINID} --&gt; {ans}&#39;)</span>
+    <span class="c1">#     ans = [p.BUILTINID]</span>
+    <span class="c1">#     return ans</span>
+
+<div class="viewcode-block" id="UnderwritingParser.builtinids"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.builtinids">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;BUILTINID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">builtinids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving BUILTINID to builtinids </span><span class="si">{p.BUILTINID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">BUILTINID</span>  <span class="c1"># will always be treated as a list</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;&quot;[&quot; idl &quot;]&quot;&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving [id1] to ids </span><span class="si">{p.idl}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">idl</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;idl ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">idl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;resolving idl ID </span><span class="si">{p.idl}</span><span class="s1">, </span><span class="si">{p.ID}</span><span class="s1"> --&gt; &#39;</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">idl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">ID</span><span class="p">)</span>
+        <span class="n">s1</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{p.idl}</span><span class="s1">&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">s1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">idl</span>
+
+<div class="viewcode-block" id="UnderwritingParser.idl"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.idl">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">idl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">ID</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ID to idl </span><span class="si">{p.ID}</span><span class="s1"> --&gt; </span><span class="si">{ans}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ans</span></div>
+
+<div class="viewcode-block" id="UnderwritingParser.ids"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.ids">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving ID to ids </span><span class="si">{p.ID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span></div>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;&quot;[&quot; numberl &quot;]&quot;&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">numbers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving [number1] to numbers </span><span class="si">{p.numberl}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">numberl</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;numberl NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">numberl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;resolving numberl NUMBER </span><span class="si">{p.numberl}</span><span class="s1">, </span><span class="si">{p.NUMBER}</span><span class="s1"> --&gt; &#39;</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">numberl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span><span class="p">)</span>
+        <span class="n">s1</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{p.numberl}</span><span class="s1">&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">s1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">numberl</span>
+
+<div class="viewcode-block" id="UnderwritingParser.numberl"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.numberl">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">numberl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving NUMBER to numberl </span><span class="si">{p.NUMBER}</span><span class="s1"> --&gt; </span><span class="si">{ans}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ans</span></div>
+
+<div class="viewcode-block" id="UnderwritingParser.numbers"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.numbers">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">numbers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;resolving NUMBER to numbers </span><span class="si">{p.NUMBER}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span></div>
+
+    <span class="c1"># elements made from named portfolios ========================</span>
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;builtin_aggregate_dist TIMES NUMBER&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">builtin_aggregate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;  inhomogeneous change of scale &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;builtin_aggregate_dist TIMES NUMBER </span><span class="si">{p.NUMBER}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">bid</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate_dist</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_en&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_en&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_el&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_el&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="k">return</span> <span class="n">bid</span>
+
+    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;NUMBER TIMES builtin_aggregate_dist&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">builtin_aggregate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        homogeneous change of scale</span>
+
+<span class="sd">        :param p:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;NUMBER </span><span class="si">{p.NUMBER}</span><span class="s1"> TIMES builtin_aggregate_dist&#39;</span><span class="p">)</span>
+        <span class="c1"># bid = built_in_dict, want to be careful not to add scale too much</span>
+        <span class="n">bid</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate_dist</span>  <span class="c1"># ? does this need copying. if so do in safelookup!</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_mean&#39;</span> <span class="ow">in</span> <span class="n">bid</span><span class="p">:</span>
+            <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_mean&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_scale&#39;</span> <span class="ow">in</span> <span class="n">bid</span><span class="p">:</span>
+            <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_scale&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="k">if</span> <span class="s1">&#39;sev_loc&#39;</span> <span class="ow">in</span> <span class="n">bid</span><span class="p">:</span>
+            <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;sev_loc&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_attachment&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_attachment&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_limit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_limit&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span> <span class="o">*</span><span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_el&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_el&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="n">bid</span><span class="p">[</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bid</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exp_premium&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">NUMBER</span>
+        <span class="k">return</span> <span class="n">bid</span>
+
+<div class="viewcode-block" id="UnderwritingParser.builtin_aggregate"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.builtin_aggregate">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;builtin_aggregate_dist&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">builtin_aggregate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s1">&#39;builtin_aggregate_dist becomese builtin_aggregate&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">builtin_aggregate_dist</span></div>
+
+<div class="viewcode-block" id="UnderwritingParser.builtin_aggregate_dist"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.builtin_aggregate_dist">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;BUILTINID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">builtin_aggregate_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="c1"># ensure lookup only happens here</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Lookup BUILTINID </span><span class="si">{p.BUILTINID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">built_in_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_safe_lookup</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">BUILTINID</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">built_in_dict</span></div>
+
+    <span class="c1"># ids =========================================================</span>
+<div class="viewcode-block" id="UnderwritingParser.sev_name"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.sev_name">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;SEV ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sev_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;SEV ID resolves to sev_name </span><span class="si">{p.ID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span></div>
+
+<div class="viewcode-block" id="UnderwritingParser.agg_name"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.agg_name">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;AGG ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">agg_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;AGG ID resolves to agg_name </span><span class="si">{p.ID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="c1"># return {&#39;name&#39;: p.ID}</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span></div>
+
+    <span class="c1"># require the AGG keyword to start a new agg</span>
+    <span class="c1"># @_(&#39;ID&#39;)</span>
+    <span class="c1"># def agg_name(self, p):</span>
+    <span class="c1">#     self.log(f&#39;ID resolves to agg_name {p.ID}&#39;)</span>
+    <span class="c1">#     # return {&#39;name&#39;: p.ID}</span>
+    <span class="c1">#     return p.ID</span>
+
+<div class="viewcode-block" id="UnderwritingParser.port_name"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.port_name">[docs]</a>    <span class="nd">@_</span><span class="p">(</span><span class="s1">&#39;PORT ID&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">port_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;PORT ID note resolves to port_name </span><span class="si">{p.ID}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="c1"># return {&#39;name&#39;: p.ID}</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">ID</span></div>
+
+<div class="viewcode-block" id="UnderwritingParser.error"><a class="viewcode-back" href="../../parser.html#aggregate.parser.UnderwritingParser.error">[docs]</a>    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">p</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Unexpected end of file&#39;</span><span class="p">)</span></div></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1"># print the grammar and add to this file as part of docstring</span>
+    <span class="c1"># TODO fix comments!</span>
+
+    <span class="c1"># may need to put an extra indent for rst to work properly</span>
+
+    <span class="n">start_string</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;Language Specification</span>
+<span class="s1">----------------------</span>
+
+<span class="s1">The ```agg``` Language Grammar:</span>
+
+<span class="s1">::</span>
+
+<span class="s1">&#39;&#39;&#39;</span>
+    <span class="n">end_string</span> <span class="o">=</span> <span class="s1">&#39;parser.out parser debug information&#39;</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">txt</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="n">stxt</span> <span class="o">=</span> <span class="n">txt</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@_&#39;</span><span class="p">)</span>
+    <span class="n">ans</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">stxt</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">it</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;# def&#39;</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># skip rows with a comment between @_ and def</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">it</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;def&#39;</span><span class="p">)</span>
+            <span class="n">b0</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()[</span><span class="mi">2</span><span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">b1</span> <span class="o">=</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;(self, p):&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">b1</span> <span class="ow">in</span> <span class="n">ans</span><span class="p">:</span>
+                <span class="n">ans</span><span class="p">[</span><span class="n">b1</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">b0</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ans</span><span class="p">[</span><span class="n">b1</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">]</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ans</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{k:&lt;20s}</span><span class="se">\t</span><span class="s1">:: </span><span class="si">{v[0]:&lt;s}</span><span class="se">\n</span><span class="s1">&#39;</span>
+        <span class="k">for</span> <span class="n">rhs</span> <span class="ow">in</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">s</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;{&quot; &quot;*20}</span><span class="se">\t</span><span class="s1"> | </span><span class="si">{rhs:&lt;s}</span><span class="se">\n</span><span class="s1">&#39;</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    <span class="n">st</span> <span class="o">=</span> <span class="n">txt</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">start_string</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">start_string</span><span class="p">)</span>
+    <span class="n">end</span> <span class="o">=</span> <span class="n">txt</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">end_string</span><span class="p">)</span>
+    <span class="n">txt</span> <span class="o">=</span> <span class="n">txt</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">st</span><span class="p">]</span> <span class="o">+</span> <span class="n">s</span> <span class="o">+</span> <span class="n">txt</span><span class="p">[</span><span class="n">end</span><span class="p">:]</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="vm">__file__</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">txt</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+          </div>
+      <div class="spc-rightsidebar span3">
+        <div class="sphinxsidebarwrapper">
+
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
+    <div class="footer">
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018-19 Convex Risk LLC.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
+      </li>
+    </ul>
+    </div>
+    </div>
+    </div>
+  </body>
+</html>

@@ -16,8 +16,7 @@ import collections
 import matplotlib.cm as cm
 from scipy import interpolate
 from copy import deepcopy
-# TODO FIX
-# from ruamel import yaml
+import json
 import pypandoc
 from IPython.core.display import HTML, display
 from .utils import *
@@ -212,12 +211,12 @@ class Portfolio(object):
         """
         return self.agg_list[item]
 
-    def yaml(self, stream=None):
+    def json(self, stream=None):
         """
-        write object as YAML
+        write object as json
 
-        :param stream:
-        :return:
+        :param    stream:
+        :return:  stream or text
         """
 
         args = dict()
@@ -235,11 +234,15 @@ class Portfolio(object):
         args["hash_rep_at_last_update"] = str(self.hash_rep_at_last_update)
 
         d = dict()
-        d[self.name] = dict(args=args, spec=[a.spec for a in self.agg_list])
+        # original
+        # d[self.name] = dict(args=args, spec=[a.spec for a in self.agg_list])
+        d['name'] = self.name
+        d['args'] = args
+        d['spec_list'] = [a.spec for a in self.agg_list]
 
-        logging.info(f'Portfolio.yaml | dummping {self.name} to {stream}')
-        s = yaml.dump(d, default_flow_style=False, indent=4)
-        logging.debug(f'Portfolio.yaml | {s}')
+        logging.info(f'Portfolio.json| dummping {self.name} to {stream}')
+        s = json.dumps(d) # , default_flow_style=False, indent=4)
+        logging.debug(f'Portfolio.json | {s}')
         if stream is None:
             return s
         else:
@@ -247,7 +250,7 @@ class Portfolio(object):
 
     def save(self, filename='', mode='a'):
         """
-        persist to YAML in filename; if none save to user.yaml
+        persist to json in filename; if none save to user.json
 
         TODO: update user list in Examples?
 
@@ -257,10 +260,10 @@ class Portfolio(object):
         """
         if filename == "":
             # TODO: directory naming
-            filename = './agg/user.yaml'
+            filename = './agg/user.json'
 
         with open(filename, mode=mode) as f:
-            self.yaml(stream=f)
+            self.json(stream=f)
             logging.info(f'Portfolio.save | {self.name} saved to {filename}')
 
     def __add__(self, other):
@@ -787,7 +790,7 @@ class Portfolio(object):
             report_list = full_report_list
         for r in full_report_list:
             if r in report_list:
-                html_title(f'{r} Report', 1)
+                html_title(f'{r} Report for {self.name}', 1)
                 if r == 'priority_capital':
                     if self.priority_capital_df is not None:
                         display(self.priority_capital_df.loc[1e-3:1e-2, :].style)
@@ -882,7 +885,11 @@ class Portfolio(object):
                 ax = axiter.grid(len(line))
             else:
                 axiter = axiter_factory(axiter, 1, figsize, height, aspect)
-                ax = axiter.grid(1)
+                # want to be able to pass an axis in rather than an axiter...
+                if isinstance(axiter, AxisManager):
+                    ax = axiter.grid(1)
+                else:
+                    ax = axiter
             self.density_df.loc[:, line].sort_index(axis=1). \
                 plot(sort_columns=True, ax=ax, **kwargs)
             if 'logy' in kwargs:
@@ -961,7 +968,7 @@ class Portfolio(object):
                     # scale like mean
                     ax.set_ylim(0, expected_loss_scale)
                 ax.set_title(prefix_and_titles[prefix])
-                ax.legend()
+                ax.legend(frameon=False)
 
             # Lee diagrams by peril - will fit in the sixth small plot
             ax = next(axiter)
@@ -969,7 +976,7 @@ class Portfolio(object):
             ax.plot(D.loc[:, 'p_total'].cumsum(), D.loss, label='total')
             for c in D.filter(regex='^p_[^t]').columns:
                 ax.plot(D.loc[:, c].cumsum(), D.loss, label=c[2:])
-            ax.legend()
+            ax.legend(frameon=False)
             ax.set_title('Lee Diagram')
             ax.set_xlim(0, 1)
             ax.set_ylim(0, large_loss_scale)
@@ -1761,16 +1768,15 @@ class Portfolio(object):
             Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
             the regulatory distortion
 
-            regulatory capital distortion is applied on unlimited basis: reg_g can be:
-            a number:   if input < 1 interpreted as a p value and used to deterine VaR capital
-                        if > 1 directly as a capital number
-            d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value
-            a distortion used directly
+            regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
 
-            pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
-            overwritten
+            * if input < 1 it is a number interpreted as a p value and used to deterine VaR capital
+            * if input > 1 it is a directly input  capital number
+            * d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value a distortion used directly
 
-            ly  must include ro in spec
+            ``pricing_g`` is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is overwritten
+
+            if ly it must include ro in spec
 
             if lr and roe then lr is used
 
@@ -2076,13 +2082,13 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 * If the regulator requires the overall epd be a constant then the firm must increase capital to {a0:,.1f} or by {(a0/a-1)*100:.2f} percent.
     - At the higher capital {line} has an epd of {e2a0:.4g} as second priority and the existing lines have an epd of {eb0a0:.4g} as first priority.
     - The existing and {line} epds under equal priority are {eba0:.4g} and {e1a0:.4g}.
-* If {line} *thought* it was added at equal priority it would have expected an epd of {e1:.4g}. 
+* If {line} *thought* it was added at equal priority it would have expected an epd of {e1:.4g}.
   In order to achieve this epd as second priority would require capital of {a2:,.1f}, an increase of {(a2/a-1)*100:.2f} percent.
 * In order for {line} to have an epd equal to the existing lines as second priority would require capital
-  of {a3:,.1f}, and increase of {(a3/a-1)*100:.2f} percent. 
-* In order for {line} to be added at equal priority and for the existing lines to have an unchanged epd requires capital of {af:,.1f}, an 
+  of {a3:,.1f}, and increase of {(a3/a-1)*100:.2f} percent.
+* In order for {line} to be added at equal priority and for the existing lines to have an unchanged epd requires capital of {af:,.1f}, an
   increase of {(af/a-1)*100:.2f} percent.
-* In order for {line} to be added at equal priority and to have an epd equal to the existing line epd requires capital of {af2:,.1f}, an 
+* In order for {line} to be added at equal priority and to have an epd equal to the existing line epd requires capital of {af2:,.1f}, an
   increase of {(af2/a-1)*100:.2f} percent.
 * In order for the existing lines to have an unchanged epd at equal priority requires capital of {a4:,.1f}, an increase of {(a4/a-1)*100:.2f} percent.
 """
@@ -2331,6 +2337,8 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         """
         create portfolio from pandas dataframe
         uses columns with appropriate names
+
+        Can be fed the agg output of uw.write_test( agg_program )
 
         :param name:
         :param df:

@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>aggregate.port &mdash; aggregate 0.6.1 documentation</title>
+    <title>aggregate.port &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="../../_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
     <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="../../None"></script>
     <script type="text/javascript" src="../../_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" >
     <link rel="search" title="Search" href="../../search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="../../index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="../../index.html" >
     <link rel="up" title="Module code" href="../index.html" > 
   </head>
   <body>
@@ -52,7 +54,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="../../index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="../../index.html">aggregate 0.7.1 documentation</a></li>
 	
           <li class="active"><a href="../index.html" accesskey="U">Module code</a></li> 
     </ul>
@@ -99,8 +101,7 @@
 <span class="kn">import</span> <span class="nn">matplotlib.cm</span> <span class="k">as</span> <span class="nn">cm</span>
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">interpolate</span>
 <span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">deepcopy</span>
-<span class="c1"># TODO FIX</span>
-<span class="c1"># from ruamel import yaml</span>
+<span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">pypandoc</span>
 <span class="kn">from</span> <span class="nn">IPython.core.display</span> <span class="k">import</span> <span class="n">HTML</span><span class="p">,</span> <span class="n">display</span>
 <span class="kn">from</span> <span class="nn">.utils</span> <span class="k">import</span> <span class="o">*</span>
@@ -108,7 +109,7 @@
 <span class="kn">from</span> <span class="nn">.spectral</span> <span class="k">import</span> <span class="n">Distortion</span>
 <span class="kn">from</span> <span class="nn">.distr</span> <span class="k">import</span> <span class="n">Severity</span>
 
-<div class="viewcode-block" id="Portfolio"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio">[docs]</a><span class="k">class</span> <span class="nc">Portfolio</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio">[docs]</a><span class="k">class</span> <span class="nc">Portfolio</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Portfolio creates and manages a portfolio of Aggregate objects.</span>
 
@@ -295,12 +296,12 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
 
-<div class="viewcode-block" id="Portfolio.yaml"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.yaml">[docs]</a>    <span class="k">def</span> <span class="nf">yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.json"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.json">[docs]</a>    <span class="k">def</span> <span class="nf">json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        write object as YAML</span>
+<span class="sd">        write object as json</span>
 
-<span class="sd">        :param stream:</span>
-<span class="sd">        :return:</span>
+<span class="sd">        :param    stream:</span>
+<span class="sd">        :return:  stream or text</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
@@ -318,19 +319,23 @@
         <span class="n">args</span><span class="p">[</span><span class="s2">&quot;hash_rep_at_last_update&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hash_rep_at_last_update</span><span class="p">)</span>
 
         <span class="n">d</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
-        <span class="n">d</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="o">=</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">spec</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">])</span>
+        <span class="c1"># original</span>
+        <span class="c1"># d[self.name] = dict(args=args, spec=[a.spec for a in self.agg_list])</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;args&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;spec_list&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">spec</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">agg_list</span><span class="p">]</span>
 
-        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.yaml | dummping </span><span class="si">{self.name}</span><span class="s1"> to </span><span class="si">{stream}</span><span class="s1">&#39;</span><span class="p">)</span>
-        <span class="n">s</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">default_flow_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.yaml | </span><span class="si">{s}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.json| dummping </span><span class="si">{self.name}</span><span class="s1"> to </span><span class="si">{stream}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="c1"># , default_flow_style=False, indent=4)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.json | </span><span class="si">{s}</span><span class="s1">&#39;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">stream</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">s</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">s</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.save"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.save"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        persist to YAML in filename; if none save to user.yaml</span>
+<span class="sd">        persist to json in filename; if none save to user.json</span>
 
 <span class="sd">        TODO: update user list in Examples?</span>
 
@@ -340,10 +345,10 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">filename</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
             <span class="c1"># TODO: directory naming</span>
-            <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;./agg/user.yaml&#39;</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;./agg/user.json&#39;</span>
 
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">yaml</span><span class="p">(</span><span class="n">stream</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">json</span><span class="p">(</span><span class="n">stream</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.save | </span><span class="si">{self.name}</span><span class="s1"> saved to </span><span class="si">{filename}</span><span class="s1">&#39;</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -416,7 +421,7 @@
 
         <span class="k">return</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Sum of </span><span class="si">{other}</span><span class="s1"> copies of </span><span class="si">{self.name}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">new_spec</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Portfolio.get_stat"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.get_stat">[docs]</a>    <span class="k">def</span> <span class="nf">get_stat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="n">stat</span><span class="o">=</span><span class="s1">&#39;EmpMean&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.get_stat"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.get_stat">[docs]</a>    <span class="k">def</span> <span class="nf">get_stat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="n">stat</span><span class="o">=</span><span class="s1">&#39;EmpMean&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Other analysis suggests that iloc and iat are about same speed but slower than ix</span>
 
@@ -426,7 +431,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">audit_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">stat</span><span class="p">]</span></div>
 
-<div class="viewcode-block" id="Portfolio.q"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.q">[docs]</a>    <span class="k">def</span> <span class="nf">q</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.q"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.q">[docs]</a>    <span class="k">def</span> <span class="nf">q</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        return lowest quantile, appropriate for discrete bucketing.</span>
 <span class="sd">        quantile guaranteed to be in the index</span>
@@ -469,7 +474,7 @@
     <span class="c1">#                              bounds_error=False, fill_value=&#39;extrapolate&#39;)</span>
     <span class="c1">#     return q</span>
 
-<div class="viewcode-block" id="Portfolio.cdf"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.cdf">[docs]</a>    <span class="k">def</span> <span class="nf">cdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.cdf"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.cdf">[docs]</a>    <span class="k">def</span> <span class="nf">cdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        distribution function</span>
 
@@ -481,7 +486,7 @@
                                              <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="s1">&#39;extrapolate&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cdf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.sf"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.sf">[docs]</a>    <span class="k">def</span> <span class="nf">sf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.sf"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.sf">[docs]</a>    <span class="k">def</span> <span class="nf">sf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        survival function</span>
 
@@ -490,7 +495,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.pdf"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.pdf">[docs]</a>    <span class="k">def</span> <span class="nf">pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.pdf"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.pdf">[docs]</a>    <span class="k">def</span> <span class="nf">pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        probability density function, assuming a continuous approximation of the bucketed density</span>
 <span class="sd">        :param x:</span>
@@ -518,7 +523,7 @@
     <span class="c1">#     &quot;&quot;&quot;</span>
     <span class="c1">#     return self.sf(x)</span>
 
-<div class="viewcode-block" id="Portfolio.var"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.var">[docs]</a>    <span class="k">def</span> <span class="nf">var</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.var"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.var">[docs]</a>    <span class="k">def</span> <span class="nf">var</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        value at risk = alias for quantile function</span>
 
@@ -527,7 +532,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">q</span><span class="p">(</span><span class="n">p</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.tvar"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.tvar">[docs]</a>    <span class="k">def</span> <span class="nf">tvar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.tvar"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.tvar">[docs]</a>    <span class="k">def</span> <span class="nf">tvar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Compute the tail value at risk at threshold p</span>
 
@@ -564,7 +569,7 @@
         <span class="c1">#                                           fill_value=&#39;extrapolate&#39;)</span>
         <span class="c1"># return self._tail_var(p)</span>
 
-<div class="viewcode-block" id="Portfolio.as_severity"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.as_severity">[docs]</a>    <span class="k">def</span> <span class="nf">as_severity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">conditional</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.as_severity"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.as_severity">[docs]</a>    <span class="k">def</span> <span class="nf">as_severity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">attachment</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">conditional</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        convert into a severity without recomputing</span>
 
@@ -580,7 +585,7 @@
         <span class="k">return</span> <span class="n">Severity</span><span class="p">(</span><span class="n">sev_name</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">sev_a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">log2</span><span class="p">,</span> <span class="n">sev_b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bs</span><span class="p">,</span>
                         <span class="n">exp_attachment</span><span class="o">=</span><span class="n">attachment</span><span class="p">,</span> <span class="n">exp_limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span> <span class="n">conditional</span><span class="o">=</span><span class="n">conditional</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.fit"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;agg&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.fit"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;agg&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        returns a dictionary specification of the portfolio aggregate_project</span>
 <span class="sd">        if updated uses empirical moments, otherwise uses theoretic moments</span>
@@ -620,7 +625,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span> <span class="n">f</span><span class="s1">&#39;frozen version of </span><span class="si">{self.name}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;exp_en&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">sev</span><span class="p">,</span> <span class="s1">&#39;freq_name&#39;</span><span class="p">:</span> <span class="s1">&#39;fixed&#39;</span><span class="p">}</span></div>
 
-<div class="viewcode-block" id="Portfolio.collapse"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.collapse">[docs]</a>    <span class="k">def</span> <span class="nf">collapse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.collapse"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.collapse">[docs]</a>    <span class="k">def</span> <span class="nf">collapse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        returns new Portfolio with the fit</span>
 
@@ -636,7 +641,7 @@
         <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Portfolio.collapse | Collapse created new Portfolio with spec </span><span class="si">{spec}</span><span class="s1">&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Collapsed </span><span class="si">{self.name}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">spec</span><span class="p">])</span></div>
 
-<div class="viewcode-block" id="Portfolio.percentiles"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.percentiles">[docs]</a>    <span class="k">def</span> <span class="nf">percentiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pvalues</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.percentiles"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.percentiles">[docs]</a>    <span class="k">def</span> <span class="nf">percentiles</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pvalues</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        report_ser on percentiles and large losses</span>
 <span class="sd">        uses interpolation, audit_df uses nearest</span>
@@ -658,7 +663,7 @@
         <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span></div>
 
-<div class="viewcode-block" id="Portfolio.recommend_bucket"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.recommend_bucket">[docs]</a>    <span class="k">def</span> <span class="nf">recommend_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.recommend_bucket"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.recommend_bucket">[docs]</a>    <span class="k">def</span> <span class="nf">recommend_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        data to help estimate a good bucket size</span>
 
@@ -681,7 +686,7 @@
         <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">df</span></div>
 
-<div class="viewcode-block" id="Portfolio.update"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">approx_freq_ge</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">,</span> <span class="n">remove_fuzz</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<div class="viewcode-block" id="Portfolio.update"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">log2</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">approx_freq_ge</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">approx_type</span><span class="o">=</span><span class="s1">&#39;slognorm&#39;</span><span class="p">,</span> <span class="n">remove_fuzz</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                <span class="n">sev_calc</span><span class="o">=</span><span class="s1">&#39;discrete&#39;</span><span class="p">,</span> <span class="n">discretization_calc</span><span class="o">=</span><span class="s1">&#39;survival&#39;</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">tilt_amount</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">epds</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                <span class="n">trim_df</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">add_exa</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -846,7 +851,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_linear_quantile_function</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_cdf</span> <span class="o">=</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="Portfolio.trim_df"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.trim_df">[docs]</a>    <span class="k">def</span> <span class="nf">trim_df</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.trim_df"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.trim_df">[docs]</a>    <span class="k">def</span> <span class="nf">trim_df</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        trim out unwanted columns from density_df</span>
 
@@ -859,7 +864,7 @@
             <span class="n">axis</span><span class="o">=</span><span class="mi">1</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.report"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.report">[docs]</a>    <span class="k">def</span> <span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_list</span><span class="o">=</span><span class="s1">&#39;quick&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.report"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.report">[docs]</a>    <span class="k">def</span> <span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_list</span><span class="o">=</span><span class="s1">&#39;quick&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="sd">        :param report_list:</span>
@@ -870,7 +875,7 @@
             <span class="n">report_list</span> <span class="o">=</span> <span class="n">full_report_list</span>
         <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">full_report_list</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">report_list</span><span class="p">:</span>
-                <span class="n">html_title</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{r}</span><span class="s1"> Report&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">html_title</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{r}</span><span class="s1"> Report for </span><span class="si">{self.name}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="s1">&#39;priority_capital&#39;</span><span class="p">:</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">priority_capital_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                         <span class="n">display</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">priority_capital_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mf">1e-3</span><span class="p">:</span><span class="mf">1e-2</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">style</span><span class="p">)</span>
@@ -892,7 +897,7 @@
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">html_title</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Report </span><span class="si">{r}</span><span class="s1"> not generated&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.plot"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;density&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<div class="viewcode-block" id="Portfolio.plot"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;density&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
              <span class="n">aspect</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        kind = density</span>
@@ -1117,7 +1122,7 @@
             <span class="n">axiter</span><span class="o">.</span><span class="n">tidy</span><span class="p">()</span>
             <span class="n">suptitle_and_tight</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;{kind.title()} Plots for {self.name.title()}&#39;</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.uat_interpolation_functions"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.uat_interpolation_functions">[docs]</a>    <span class="k">def</span> <span class="nf">uat_interpolation_functions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a0</span><span class="p">,</span> <span class="n">e0</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.uat_interpolation_functions"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.uat_interpolation_functions">[docs]</a>    <span class="k">def</span> <span class="nf">uat_interpolation_functions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a0</span><span class="p">,</span> <span class="n">e0</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Perform quick audit of interpolation functions</span>
 
@@ -1423,7 +1428,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">assets_2_epd</span><span class="p">[(</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="n">minus_ans_wrapper</span><span class="p">(</span>
             <span class="n">interpolate</span><span class="o">.</span><span class="n">interp1d</span><span class="p">(</span><span class="n">loss_values</span><span class="p">,</span> <span class="n">epd_values</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">assume_sorted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="s1">&#39;extrapolate&#39;</span><span class="p">))</span>
 
-<div class="viewcode-block" id="Portfolio.calibrate_distortion"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.calibrate_distortion">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_distortion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">premium_target</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">roe</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">assets</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">S_column</span><span class="o">=</span><span class="s1">&#39;S&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.calibrate_distortion"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.calibrate_distortion">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_distortion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">premium_target</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">roe</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">assets</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">S_column</span><span class="o">=</span><span class="s1">&#39;S&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Find transform to hit a premium target given assets of ``assets``.</span>
 <span class="sd">        Fills in the values in ``g_spec`` and returns params and diagnostics...so</span>
@@ -1586,7 +1591,7 @@
         <span class="n">dist</span><span class="o">.</span><span class="n">premium_target</span> <span class="o">=</span> <span class="n">premium_target</span>
         <span class="k">return</span> <span class="n">dist</span></div>
 
-<div class="viewcode-block" id="Portfolio.calibrate_distortions"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.calibrate_distortions">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_distortions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">LRs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ROEs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.03</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.calibrate_distortions"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.calibrate_distortions">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate_distortions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">LRs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ROEs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.03</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Calibrate assets a to loss ratios LRs and asset levels As (iterables)</span>
 <span class="sd">        ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line</span>
@@ -1631,7 +1636,7 @@
                                                   <span class="n">dist</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">error</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">ans</span></div>
 
-<div class="viewcode-block" id="Portfolio.apply_distortions"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.apply_distortions">[docs]</a>    <span class="k">def</span> <span class="nf">apply_distortions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dist_dict</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.apply_distortions"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.apply_distortions">[docs]</a>    <span class="k">def</span> <span class="nf">apply_distortions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dist_dict</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Apply a list of distortions, summarize pricing and produce graphical output</span>
 <span class="sd">        show loss values where  :math:`s_ub &gt; S(loss) &gt; s_lb` by jump</span>
@@ -1696,7 +1701,7 @@
 
         <span class="k">return</span> <span class="n">ans_table</span><span class="p">,</span> <span class="n">ans_stacked</span></div>
 
-<div class="viewcode-block" id="Portfolio.apply_distortion"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.apply_distortion">[docs]</a>    <span class="k">def</span> <span class="nf">apply_distortion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dist</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.apply_distortion"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.apply_distortion">[docs]</a>    <span class="k">def</span> <span class="nf">apply_distortion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dist</span><span class="p">,</span> <span class="n">axiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Apply the distorion, make a copy of density_df and append various columns</span>
 <span class="sd">        Handy graphic of results</span>
@@ -1838,22 +1843,21 @@
 
         <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">audit</span></div>
 
-<div class="viewcode-block" id="Portfolio.price"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.price">[docs]</a>    <span class="k">def</span> <span class="nf">price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reg_g</span><span class="p">,</span> <span class="n">pricing_g</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.price"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.price">[docs]</a>    <span class="k">def</span> <span class="nf">price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reg_g</span><span class="p">,</span> <span class="n">pricing_g</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Price using regulatory and pricing g functions</span>
 <span class="sd">            Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses</span>
 <span class="sd">            the regulatory distortion</span>
 
-<span class="sd">            regulatory capital distortion is applied on unlimited basis: reg_g can be:</span>
-<span class="sd">            a number:   if input &lt; 1 interpreted as a p value and used to deterine VaR capital</span>
-<span class="sd">                        if &gt; 1 directly as a capital number</span>
-<span class="sd">            d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value</span>
-<span class="sd">            a distortion used directly</span>
+<span class="sd">            regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:</span>
 
-<span class="sd">            pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is</span>
-<span class="sd">            overwritten</span>
+<span class="sd">            * if input &lt; 1 it is a number interpreted as a p value and used to deterine VaR capital</span>
+<span class="sd">            * if input &gt; 1 it is a directly input  capital number</span>
+<span class="sd">            * d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value a distortion used directly</span>
 
-<span class="sd">            ly  must include ro in spec</span>
+<span class="sd">            ``pricing_g`` is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is overwritten</span>
+
+<span class="sd">            if ly it must include ro in spec</span>
 
 <span class="sd">            if lr and roe then lr is used</span>
 
@@ -2005,7 +2009,7 @@
 
         <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">pricing_g</span></div>
 
-<div class="viewcode-block" id="Portfolio.top_down"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.top_down">[docs]</a>    <span class="k">def</span> <span class="nf">top_down</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">distortions</span><span class="p">,</span> <span class="n">A_or_p</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.top_down"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.top_down">[docs]</a>    <span class="k">def</span> <span class="nf">top_down</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">distortions</span><span class="p">,</span> <span class="n">A_or_p</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        DataFrama summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A</span>
 <span class="sd">        If A=0 A=q(log) is used</span>
@@ -2069,7 +2073,7 @@
             <span class="n">dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfs</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.analysis_priority"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.analysis_priority">[docs]</a>    <span class="k">def</span> <span class="nf">analysis_priority</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asset_spec</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;df&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.analysis_priority"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.analysis_priority">[docs]</a>    <span class="k">def</span> <span class="nf">analysis_priority</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asset_spec</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;df&#39;</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create priority analysis report_ser.</span>
 <span class="sd">        Can be called multiple times with different ``asset_specs``</span>
@@ -2159,13 +2163,13 @@
 <span class="s2">* If the regulator requires the overall epd be a constant then the firm must increase capital to </span><span class="si">{a0:,.1f}</span><span class="s2"> or by {(a0/a-1)*100:.2f} percent.</span>
 <span class="s2">    - At the higher capital </span><span class="si">{line}</span><span class="s2"> has an epd of </span><span class="si">{e2a0:.4g}</span><span class="s2"> as second priority and the existing lines have an epd of </span><span class="si">{eb0a0:.4g}</span><span class="s2"> as first priority.</span>
 <span class="s2">    - The existing and </span><span class="si">{line}</span><span class="s2"> epds under equal priority are </span><span class="si">{eba0:.4g}</span><span class="s2"> and </span><span class="si">{e1a0:.4g}</span><span class="s2">.</span>
-<span class="s2">* If </span><span class="si">{line}</span><span class="s2"> *thought* it was added at equal priority it would have expected an epd of </span><span class="si">{e1:.4g}</span><span class="s2">. </span>
+<span class="s2">* If </span><span class="si">{line}</span><span class="s2"> *thought* it was added at equal priority it would have expected an epd of </span><span class="si">{e1:.4g}</span><span class="s2">.</span>
 <span class="s2">  In order to achieve this epd as second priority would require capital of </span><span class="si">{a2:,.1f}</span><span class="s2">, an increase of {(a2/a-1)*100:.2f} percent.</span>
 <span class="s2">* In order for </span><span class="si">{line}</span><span class="s2"> to have an epd equal to the existing lines as second priority would require capital</span>
-<span class="s2">  of </span><span class="si">{a3:,.1f}</span><span class="s2">, and increase of {(a3/a-1)*100:.2f} percent. </span>
-<span class="s2">* In order for </span><span class="si">{line}</span><span class="s2"> to be added at equal priority and for the existing lines to have an unchanged epd requires capital of </span><span class="si">{af:,.1f}</span><span class="s2">, an </span>
+<span class="s2">  of </span><span class="si">{a3:,.1f}</span><span class="s2">, and increase of {(a3/a-1)*100:.2f} percent.</span>
+<span class="s2">* In order for </span><span class="si">{line}</span><span class="s2"> to be added at equal priority and for the existing lines to have an unchanged epd requires capital of </span><span class="si">{af:,.1f}</span><span class="s2">, an</span>
 <span class="s2">  increase of {(af/a-1)*100:.2f} percent.</span>
-<span class="s2">* In order for </span><span class="si">{line}</span><span class="s2"> to be added at equal priority and to have an epd equal to the existing line epd requires capital of </span><span class="si">{af2:,.1f}</span><span class="s2">, an </span>
+<span class="s2">* In order for </span><span class="si">{line}</span><span class="s2"> to be added at equal priority and to have an epd equal to the existing line epd requires capital of </span><span class="si">{af2:,.1f}</span><span class="s2">, an</span>
 <span class="s2">  increase of {(af2/a-1)*100:.2f} percent.</span>
 <span class="s2">* In order for the existing lines to have an unchanged epd at equal priority requires capital of </span><span class="si">{a4:,.1f}</span><span class="s2">, an increase of {(a4/a-1)*100:.2f} percent.</span>
 <span class="s2">&quot;&quot;&quot;</span>
@@ -2176,7 +2180,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">ans</span></div>
 
-<div class="viewcode-block" id="Portfolio.analysis_collateral"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.analysis_collateral">[docs]</a>    <span class="k">def</span> <span class="nf">analysis_collateral</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.analysis_collateral"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.analysis_collateral">[docs]</a>    <span class="k">def</span> <span class="nf">analysis_collateral</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        E(C(a,c)) expected value of line against not line with collateral c and assets a, c &lt;= a</span>
 
@@ -2275,7 +2279,7 @@
             <span class="n">ans</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">ans</span></div>
 
-<div class="viewcode-block" id="Portfolio.uat_differential"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.uat_differential">[docs]</a>    <span class="k">def</span> <span class="nf">uat_differential</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.uat_differential"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.uat_differential">[docs]</a>    <span class="k">def</span> <span class="nf">uat_differential</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Check the numerical and theoretical derivatives of exa agree for given line</span>
 
@@ -2301,7 +2305,7 @@
         <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">ddtest2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;-EXi(a)/a&#39;</span><span class="p">)</span>
         <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="Portfolio.uat"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.uat">[docs]</a>    <span class="k">def</span> <span class="nf">uat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="p">[</span><span class="mf">0.98</span><span class="p">],</span> <span class="n">LRs</span><span class="o">=</span><span class="p">[</span><span class="mf">0.965</span><span class="p">],</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.uat"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.uat">[docs]</a>    <span class="k">def</span> <span class="nf">uat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">As</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ps</span><span class="o">=</span><span class="p">[</span><span class="mf">0.98</span><span class="p">],</span> <span class="n">LRs</span><span class="o">=</span><span class="p">[</span><span class="mf">0.965</span><span class="p">],</span> <span class="n">r0</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">num_plots</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Reconcile apply_distortion(s) with price and calibrate</span>
 
@@ -2390,7 +2394,7 @@
 
         <span class="k">return</span> <span class="n">a</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">test</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">dd</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">stacked</span></div>
 
-<div class="viewcode-block" id="Portfolio.cumintegral"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.cumintegral">[docs]</a>    <span class="k">def</span> <span class="nf">cumintegral</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">bs_override</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<div class="viewcode-block" id="Portfolio.cumintegral"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.cumintegral">[docs]</a>    <span class="k">def</span> <span class="nf">cumintegral</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">bs_override</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        cumulative integral of v with buckets size bs</span>
 
@@ -2409,11 +2413,13 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">values</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span> <span class="o">*</span> <span class="n">bs</span></div>
 
-<div class="viewcode-block" id="Portfolio.from_DataFrame"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.from_DataFrame">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="Portfolio.from_DataFrame"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.from_DataFrame">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">from_DataFrame</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">df</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        create portfolio from pandas dataframe</span>
 <span class="sd">        uses columns with appropriate names</span>
+
+<span class="sd">        Can be fed the agg output of uw.write_test( agg_program )</span>
 
 <span class="sd">        :param name:</span>
 <span class="sd">        :param df:</span>
@@ -2423,7 +2429,7 @@
         <span class="n">spec_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s1">&#39;list&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)]</span>
         <span class="k">return</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">spec_list</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Portfolio.from_Excel"><a class="viewcode-back" href="../../portfolio.html#aggregate.port.Portfolio.from_Excel">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="Portfolio.from_Excel"><a class="viewcode-back" href="../../port.html#aggregate.port.Portfolio.from_Excel">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">from_Excel</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">ffn</span><span class="p">,</span> <span class="n">sheet_name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        read in from Excel</span>
@@ -2465,7 +2471,7 @@
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

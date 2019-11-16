@@ -5,6 +5,7 @@
    http://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
    https://alabaster.readthedocs.io/en/latest/customization.html
 
+
 aggregate: Working with Probability Distributions
 =================================================
 
@@ -15,18 +16,20 @@ Table of Contents
 -----------------
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   intro
-   histapp
-   basic_examples
-   prob
-   freq_dist
-   devel
-   aggregate
-   portfolio
-   distortion
+   01_Intro
+   02_history_applications.rst
+   03_Basic_Examples.ipynb
+   04_Prob_Risk_Thy
+   05_Freq_Dist
+   06_Development
+   distr
+   port
+   spectral
    underwriter
    parser
-   utilities
-   parameters
+   utils
+   param
+
+

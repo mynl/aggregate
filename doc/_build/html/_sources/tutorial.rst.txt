@@ -2,6 +2,7 @@
 Tutorial
 ========
 
+EITHER FIX OR DELETE.
 
 ``aggregate``: Simple Examples
 ------------------------------
@@ -200,9 +201,6 @@ Tutorial
     biz.plot('quick')
 
 
-.. image:: output_6_1.svg
-
-
 .. code:: ipython3
 
     biz.plot('long')
@@ -214,10 +212,6 @@ Tutorial
     in singular transformations; automatically expanding.
     bottom=1.0, top=1.0
       'bottom=%s, top=%s') % (bottom, top))
-
-
-
-.. image:: output_7_1.svg
 
 
 .. code:: ipython3

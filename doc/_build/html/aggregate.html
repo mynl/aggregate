@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>Distribution Classes &mdash; aggregate 0.6.1 documentation</title>
+    <title>Distribution Classes &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
     <link rel="next" title="Portfolio Class" href="portfolio.html" >
     <link rel="prev" title="Development Outline" href="devel.html" > 
   </head>
@@ -53,7 +55,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
 	 
     </ul>
               
@@ -251,7 +253,8 @@ a mixing distribution across all broadcast terms to ensure an appropriate inter-
 class correlation.</p>
 </dd>
 <dt>Limit Profiles</dt><dd><p>The exposure variables can be vectors to express a <em>limit profile</em>.
-All <a href="#id1"><span class="problematic" id="id2">exp_</span></a> elements are broadcast against one-another. For example</p>
+All <code class="docutils literal notranslate"><span class="pre">`exp_[en|prem|loss|count]`</span></code> related elements are broadcast against one-another.
+For example</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="mi">100</span> <span class="mi">200</span> <span class="mi">400</span> <span class="mi">100</span><span class="p">]</span> <span class="n">premium</span> <span class="n">at</span> <span class="mf">0.65</span> <span class="n">lr</span> <span class="p">[</span><span class="mi">1000</span> <span class="mi">2000</span> <span class="mi">5000</span> <span class="mi">10000</span><span class="p">]</span> <span class="n">xs</span> <span class="mi">1000</span>
 </pre></div>
 </div>
@@ -325,9 +328,9 @@ limit profile component. For example</p>
 </dd>
 <dt>Circumventing Products</dt><dd><p>It is sometimes desirable to enter two or more lines each with a different severity but
 with a shared mixing variable. For example to model the current accident year and a run-
-off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
-larger lognormal mean 150 cv 1.25 claims requires</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">agg</span> <span class="n">prem_reserve</span> <span class="p">[</span><span class="mi">100</span> <span class="mi">200</span><span class="p">]</span> <span class="n">claims</span> <span class="n">sev</span> <span class="n">lognorm</span> <span class="p">[</span><span class="mi">100</span> <span class="mi">150</span><span class="p">]</span> <span class="n">cv</span> <span class="p">[</span><span class="mi">1</span> <span class="mf">1.25</span><span class="p">]</span>
+off reserve, where the current year is gamma mean 100 cv 1 and the reserves are
+larger lognormal mean 150 cv 0.5 claims requires</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">agg</span> <span class="n">MixedPremReserve</span> <span class="p">[</span><span class="mi">100</span> <span class="mi">200</span><span class="p">]</span> <span class="n">claims</span> <span class="n">sev</span> <span class="p">[</span><span class="n">gamma</span> <span class="n">lognorm</span><span class="p">]</span> <span class="p">[</span><span class="mi">100</span> <span class="mi">150</span><span class="p">]</span> <span class="n">cv</span> <span class="p">[</span><span class="mi">1</span> <span class="mf">0.5</span><span class="p">]</span> <span class="n">mixed</span> <span class="n">gamma</span> <span class="mf">0.4</span>
 </pre></div>
 </div>
 <p>so that the result is not the four-way exposure / severity product but just a two-way
@@ -335,10 +338,137 @@ combination. These two cases are distinguished looking at the total weights. If 
 one then the result is an exposure / severity product. If the weights are missing or sum to the number
 of severity components (i.e. are all equal to 1) then the result is a row by row combination.</p>
 </dd>
-<dt>Other notes</dt><dd><ul class="simple">
-<li><p>en determines en</p></li>
-<li><p>prem x loss ratio -&gt; el</p></li>
-<li><p>severity x en -&gt; el</p></li>
+<dt>Other Programs</dt><dd><p>Below are a series of programs illustrating the different ways exposure, frequency and severity can be
+broadcast together, several different types of severity and all the different types of severity.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">test_string_0</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># use to create sev and aggs so can illustrate use of sev. and agg. below</span>
+
+<span class="s1">sev sev1 lognorm 10 cv .3</span>
+
+<span class="s1">agg Agg0 1 claim sev lognorm 10 cv .09 fixed</span>
+
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">test_string_1</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">agg Agg1  1 claim sev {10*np.exp(-.3**2/2)} * lognorm .3      fixed note{{sigma=.3 mean=10}}</span>
+<span class="s1">agg Agg2  1 claim sev {10*np.exp(-.3**2/2)} * lognorm .3 + 5  fixed note{{shifted right by 5}}&#39;&#39;&#39;</span>             <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">agg Agg3  1 claim sev 10 * lognorm 0.5 cv .3                  fixed note{mean 0.5 scaled by 10 and cv 0.3}</span>
+<span class="s1">agg Agg4  1 claim sev 10 * lognorm 1 cv .5 + 5                fixed note{shifted right by 5}</span>
+
+<span class="s1">agg Agg5  1 claim sev 10 * gamma .3                           fixed note{gamma distribution....can use any two parameter scipy.stats distribution plus expon, uniform and normal}</span>
+<span class="s1">agg Agg6  1 claim sev 10 * gamma 1 cv .3 + 5                  fixed note{mean 10 x 1, cv 0.3 shifted right by 5}</span>
+
+<span class="s1">agg Agg7  1 claim sev 2 * pareto 1.6 - 2                      fixed note{pareto alpha=1.6 lambda=2}</span>
+<span class="s1">agg Agg8  1 claim sev 2 * uniform 5 + 2.5                     fixed note{uniform 2.5 to 12.5}</span>
+
+<span class="s1">agg Agg9  1 claim 10 x  2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, 1 claim}</span>
+<span class="s1">agg Agg10 10 loss 10 xs 2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, total loss 10, derives requency}</span>
+<span class="s1">agg Agg11 14 prem at .7    10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency}</span>
+<span class="s1">agg Agg11 14 prem at .7 lr 10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency, lr is optional}</span>
+
+<span class="s1">agg Agg12: 14 prem at .7 lr (10 x 1) sev (lognorm 20 cv 1.5)  fixed note{trailing semi and other punct ignored};</span>
+
+<span class="s1">agg Agg13: 1 claim sev 50 * beta 3 2 + 10 fixed note{scaled and shifted beta, two parameter distribution}</span>
+<span class="s1">agg Agg14: 1 claim sev 100 * expon + 10   fixed note{exponential single parameter, needs scale, optional shift}</span>
+<span class="s1">agg Agg15: 1 claim sev 10 * norm + 50     fixed note{normal is single parameter too, needs scale, optional shift}</span>
+
+<span class="s1"># any scipy.stat distribution taking one parameter can be used; only cts vars supported on R+ make sense</span>
+<span class="s1">agg Agg16: 1 claim sev 1 * invgamma 4.07 fixed  note{inverse gamma distribution}</span>
+
+<span class="s1"># mixtures</span>
+<span class="s1">agg MixedLine1: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equally weighted mixture of 5 lognormals different cvs}</span>
+<span class="s1">agg MixedLine2: 1 claim 25 xs 0 sev lognorm [10, 15, 20, 25, 50] cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equal weighted mixture of 5 lognormals different cvs and means}</span>
+<span class="s1">agg MixedLine3: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wt [.2, .3, .3, .15, .05]   fixed note{weights scaled to equal 1 if input}</span>
+
+<span class="s1"># limit profile</span>
+<span class="s1">agg LimitProfile1: 1 claim [1, 5, 10, 20] xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{maybe input EL by band for wt}</span>
+<span class="s1">agg LimitProfile2: 5 claim            20  xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{input EL by band for wt}</span>
+<span class="s1">agg LimitProfile3: [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv 1.25   fixed note{input counts directly}</span>
+
+<span class="s1"># limits and distribution blend</span>
+<span class="s1">agg Blend1 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3]          fixed note{options all broadcast against one another, 50 claims of each}</span>
+<span class="s1">agg Blend2 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3] wt=3     fixed note{options all broadcast against one another, 50 claims of each}</span>
+
+<span class="s1">agg Blend5cv1  50 claims  5 x 0 sev lognorm 12 cv 1 fixed</span>
+<span class="s1">agg Blend10cv1 50 claims 10 x 0 sev lognorm 12 cv 1 fixed</span>
+<span class="s1">agg Blend15cv1 50 claims 15 x 0 sev lognorm 12 cv 1 fixed</span>
+
+<span class="s1">agg Blend5cv15  50 claims  5 x 0 sev lognorm 12 cv 1.5 fixed</span>
+<span class="s1">agg Blend10cv15 50 claims 10 x 0 sev lognorm 12 cv 1.5 fixed</span>
+<span class="s1">agg Blend15cv15 50 claims 15 x 0 sev lognorm 12 cv 1.5 fixed</span>
+
+<span class="s1"># semi colon can be used for newline and backslash works</span>
+<span class="s1">agg Blend5cv3  50 claims  5 x 0 sev lognorm 12 cv 3 fixed; agg Blend10cv3 50 claims 10 x 0 sev lognorm 12 cv 3 fixed</span>
+<span class="s1">agg Blend15cv3 50 claims 15 x 0 sev             lognorm 12 cv 3 fixed</span>
+
+<span class="s1"># not sure if it will broadcast limit profile against severity mixture...</span>
+<span class="s1">agg LimitProfile4: [10 30 15 5] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv [1.0, 1.25, 1.5] wts=3  fixed note{input counts directly}</span>
+<span class="s1">&#39;&#39;&#39;</span>             <span class="n">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># the logo</span>
+<span class="s1">agg logo 1 claim {np.linspace(10, 250, 20)} xs 0 sev lognorm 100 cv 1 fixed&#39;&#39;&#39;</span>
+
+<span class="n">test_string_2</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># empirical distributions</span>
+<span class="s1">agg dHist1 1 claim sev dhistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{discrete histogram}</span>
+<span class="s1">agg cHist1 1 claim sev chistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{continuous histogram, guessed right hand endpiont}</span>
+<span class="s1">agg cHist2 1 claim sev chistogram xps [1 10 40 45] [.5 .3 .2]  fixed     note{continuous histogram, explicit right hand endpoint, don&#39;t need commas}</span>
+<span class="s1">agg BodoffWind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed   note{examples from Bodoffs paper}</span>
+<span class="s1">agg BodoffQuake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed</span>
+
+<span class="s1"># set up fixed sev for future use</span>
+<span class="s1">sev One dhistogram xps [1] [1]   note{a certain loss of 1}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">test_string_3</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># sev, agg and port: using built in objects [have to exist prior to running program]</span>
+<span class="s1">agg ppa:       0.01 * agg.PPAL       note{this is using lmult on aggs, needs a dictionary specification to adjust means}</span>
+<span class="s1">agg cautoQS:   1e-5 * agg.CAL        note{lmult is quota share or scale for rmul see below }</span>
+<span class="s1">agg cautoClms: agg.CAL * 1e-5        note{rmult adjusts the claim count}</span>
+
+<span class="s1"># scaling works with distributions already made by uw</span>
+<span class="s1">agg mdist: 5000 * agg.dHist1</span>
+
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">test_string_4</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"># frequency options</span>
+<span class="s1">agg FreqFixed      10 claims sev sev.One fixed</span>
+<span class="s1">agg FreqPoisson    10 claims sev sev.One poisson                   note{Poisson frequency}</span>
+<span class="s1">agg FreqBernoulli  .8 claims sev sev.One bernoulli               note{Bernoulli en is frequency }</span>
+<span class="s1">agg FreqBinomial   10 claims sev sev.One binomial 0.5</span>
+<span class="s1">agg FreqPascal     10 claims sev sev.One pascal .8 3</span>
+
+<span class="s1"># mixed freqs</span>
+<span class="s1">agg FreqNegBin     10 claims sev sev.One (mixed gamma 0.65)     note{gamma mixed Poisson = negative binomial}</span>
+<span class="s1">agg FreqDelaporte  10 claims sev sev.One mixed delaporte .65 .25</span>
+<span class="s1">agg FreqIG         10 claims sev sev.One mixed ig  .65</span>
+<span class="s1">agg FreqSichel     10 claims sev sev.One mixed delaporte .65 -0.25</span>
+<span class="s1">agg FreqSichel.nb  10 claims sev sev.One mixed delaporte .65 .25</span>
+<span class="s1">agg FreqSichel.ig  10 claims sev sev.One mixed delaporte .65 .25</span>
+<span class="s1">agg FreqBeta       10 claims sev sev.One mixed beta .5  4  note{second param is max mix}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+<span class="n">test_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">test_string_0</span><span class="p">,</span> <span class="n">test_string_1</span><span class="p">,</span> <span class="n">test_string_2</span><span class="p">,</span> <span class="n">test_string_3</span><span class="p">,</span> <span class="n">test_string_4</span><span class="p">]</span>
+
+<span class="c1"># run the various tests</span>
+<span class="n">uw</span> <span class="o">=</span> <span class="n">agg</span><span class="o">.</span><span class="n">Underwriter</span><span class="p">()</span>
+<span class="n">uw</span><span class="o">.</span><span class="n">glob</span> <span class="o">=</span> <span class="nb">globals</span><span class="p">()</span>
+<span class="n">uw</span><span class="o">.</span><span class="n">create_all</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">uw</span><span class="o">.</span><span class="n">update</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">uw</span><span class="o">.</span><span class="n">log2</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">ans</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="c1"># make sure we have this base first:</span>
+<span class="n">uw</span><span class="p">(</span><span class="s1">&#39;sev One dhistogram xps [1] [1]   note{a certain loss of 1}&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">test_strings</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;line </span><span class="si">{i}</span><span class="s1"> of {len(test_strings)}&#39;</span><span class="p">)</span>
+    <span class="n">ans</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">uw</span><span class="p">(</span><span class="n">t</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd>
+<dt>Other Notes</dt><dd><p>How Expected Claim Count is determined etc.
+* en determines en
+* prem x loss ratio -&gt; el
+* severity x en -&gt; el</p>
+<ul class="simple">
 <li><p>always have en and el; may have prem and exp_lr</p></li>
 <li><p>if prem then exp_lr computed</p></li>
 <li><p>if exp_lr then premium computed</p></li>
@@ -418,6 +548,13 @@ you end up with multiple lines when you intend only one</p></li>
 </dd>
 </dl>
 <dl class="method">
+<dt id="aggregate.distr.Aggregate.agg_lang">
+<code class="sig-name descname">agg_lang</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.agg_lang"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.agg_lang" title="Permalink to this definition">¶</a></dt>
+<dd><p>write in aggregate language…
+:return:</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="aggregate.distr.Aggregate.cdf">
 <code class="sig-name descname">cdf</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.cdf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.cdf" title="Permalink to this definition">¶</a></dt>
 <dd><p>return cumulative probability distribution using linear interpolation</p>
@@ -452,25 +589,19 @@ form of beta function described in 2.23 via, 2.16-17 and 2.18</p>
 </pre></div>
 </div>
 <p>To make a ‘multiple’ of an existing distortion you can use a simple wrapper class like this:</p>
-<blockquote>
-<div><dl>
-<dt>class dist_wrap(agg.Distortion):</dt><dd><p>‘’’
-wrap a distortion to include higher or lower freq
-in DH α is actually exp(α)
-this will pass isinstance(g2, agg.Distortion)
-‘’’
-def __init__(self, α, dist):</p>
-<blockquote>
-<div><dl class="simple">
-<dt>def loc_g(s):</dt><dd><p>return α * dist.g(s)</p>
-</dd>
-</dl>
-<p>self.g = loc_g
-self.name = dist.name</p>
-</div></blockquote>
-</dd>
-</dl>
-</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">dist_wrap</span><span class="p">(</span><span class="n">agg</span><span class="o">.</span><span class="n">Distortion</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    wrap a distortion to include higher or lower freq</span>
+<span class="sd">    in DH α is actually exp(α)</span>
+<span class="sd">    this will pass isinstance(g2, agg.Distortion)</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">α</span><span class="p">,</span> <span class="n">dist</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">loc_g</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">α</span> <span class="o">*</span> <span class="n">dist</span><span class="o">.</span><span class="n">g</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">g</span> <span class="o">=</span> <span class="n">loc_g</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">name</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -539,6 +670,13 @@ the probabilities short. We opt here for the latter and rescale</p>
 <dd class="field-odd"><p></p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.distr.Aggregate.json">
+<code class="sig-name descname">json</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/distr.html#Aggregate.json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.distr.Aggregate.json" title="Permalink to this definition">¶</a></dt>
+<dd><p>write in json
+:return:</p>
 </dd></dl>
 
 <dl class="method">
@@ -750,7 +888,7 @@ severity mixture component.</p></li>
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

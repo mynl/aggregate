@@ -207,8 +207,9 @@ class Underwriter(object):
 
     def _repr_html_(self):
         s = [f'<h1>Underwriter {self.name}</h1>']
-        s.append(f'Underwriter expert in all classes including {len(self.severity)} severities, {len(self.aggregate)} aggregates'
-                 f' and {len(self.portfolio)} portfolios<br>')
+        s.append(
+            f'Underwriter expert in all classes including {len(self.severity)} severities, {len(self.aggregate)} aggregates'
+            f' and {len(self.portfolio)} portfolios<br>')
         for what in ['severity', 'aggregate', 'portfolio']:
             s.append(f'<b>{what.title()}</b>: ')
             s.append(', '.join([k for k in sorted(getattr(self, what).keys())]))
@@ -265,6 +266,7 @@ class Underwriter(object):
 
         :return:
         """
+
         def deal_with_sequences(x):
             """
             pandas can't have a field set as a sequence
@@ -277,6 +279,7 @@ class Underwriter(object):
                 return str(x)
             else:
                 return x
+
         df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b',
                                    'EN', 'Freq_a',
                                    'ELoss', 'Notes'])
@@ -305,16 +308,35 @@ class Underwriter(object):
                 display(egs.style)
         return df
 
-    def parse_portfolio_program(self, portfolio_program):
+    def parse_portfolio_program(self, portfolio_program, output='spec'):
         """
         Utility routine to parse the program and return the spec suitable to pass to Portfolio to
         create the object.
         Initially just for a single portfolio program (which it checks!)
         No argument of default conniptions
 
+        To write program in testing mode use output='df':
+
+        * dictionary definitions are added to uw but no objects are created
+        * returns data frame description of added severity/aggregate/portfolios
+        * the dataframe of aggregates can be used to create a portfolio (with all the aggregates) by calling
+
+        ```Portfolio.from_DataFrame(name df)```
+
+        To parse and get dictionary definitions use output='spec'.
+        Aggregate and severity objects are also returned though they could be
+        accessed directly using wu['name']. May be convenient...we'll see.
+
+        Output has form that an Aggregate can be created from Aggregate(**x['name'])
+        etc. which is a bit easier than uw['name'] which returns the type.
 
         TODO make more robust
+
         :param portfolio_program:
+        :param output:  'spec' output a spec (assumes only one portfolio),
+                        or a dictionary {name: spec_list} if multiple
+                        'df' or 'dataframe' output as pandas data frame
+                        'dict' output as dictionary of pandas data frames (old write_test output)
         :return:
         """
 
@@ -335,33 +357,90 @@ class Underwriter(object):
                     logging.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
                                  f'replaced with object {obj.name} from glob')
 
-        # expecting a single portfolio for this simple function
-        # create the spec list string
-        nm = ''
-        spec_list = None
-        assert len(self.parser.port_out_dict) == 1
-        if len(self.parser.port_out_dict) > 0:
-            for nm in self.parser.port_out_dict.keys():
-                # remember the spec comes back as a list of aggs that have been entered into the uw
-                spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
-        return nm, spec_list
+        if output == 'spec':
+            # expecting a single portfolio for this simple function
+            # create the spec list string
+            if len(self.parser.port_out_dict) == 1:
+                # this behaviour to ensure backwards compatibility
+                nm = ""
+                spec_list = None
+                for nm in self.parser.port_out_dict.keys():
+                    # remember the spec comes back as a list of aggs that have been entered into the uw
+                    # self[v] = ('agg', dictionary def) of the agg component v of the portfolio
+                    spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
+                return nm, spec_list
+
+            elif len(self.parser.port_out_dict) > 1 or \
+                    len(self.parser.agg_out_dict) or len(self.parser.sev_out_dict):
+                # return dictionary: {pf_name : { name: pf_name, spec_list : [list] }}
+                # so that you can call Portfolio(*output[pf_name]) to create pf_name
+                # notes are dropped...
+                ans = {}
+                for nm in self.parser.port_out_dict.keys():
+                    # remember the spec comes back as a list of aggs that have been entered into the uw
+                    # self[v] = ('agg', dictionary def) of the agg component v of the portfolio
+                    spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
+                    ans[nm] = dict(name=nm, spec_list=spec_list)
+
+                for nm in self.parser.agg_out_dict.keys():
+                    ans[nm] = self.aggregate[nm]
+
+                for nm in self.parser.sev_out_dict.keys():
+                    ans[nm] = self.severity[nm]
+
+                return ans
+
+            else:
+                logging.warning(f'Underwriter.parse_portfolio_program | program has no Portfolio outputs. '
+                                'Nothing returned. ')
+                return
+
+        elif output == 'df' or output.lower() == 'dataframe':
+            logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
+            ans = {}
+            if len(self.parser.sev_out_dict) > 0:
+                for v in self.parser.sev_out_dict.values():
+                    Underwriter._add_defaults(v, 'sev')
+                ans['sev'] = pd.DataFrame(list(self.parser.sev_out_dict.values()),
+                                          index=self.parser.sev_out_dict.keys())
+            if len(self.parser.agg_out_dict) > 0:
+                for v in self.parser.agg_out_dict.values():
+                    Underwriter._add_defaults(v)
+                ans['agg'] = pd.DataFrame(list(self.parser.agg_out_dict.values()),
+                                          index=self.parser.agg_out_dict.keys())
+            if len(self.parser.port_out_dict) > 0:
+                ans['port'] = pd.DataFrame(list(self.parser.port_out_dict.values()),
+                                           index=self.parser.port_out_dict.keys())
+            return ans
+
+        else:
+            raise ValueError(f'Inadmissible output type {output}  passed to parse_portfolio_program. '
+                             'Expecting spec or df/dataframe.')
 
     def write(self, portfolio_program, **kwargs):
         """
-        write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project
+        Write a natural language program. Write carries out the following steps.
 
-        Input
+        1. Read in the program and cleans it (e.g. punctuation, parens etc. are
+        removed and ignored, replace ; with new line etc.)
+        2. Parse line by line to create a dictioonary definition of sev, agg or port objects
+        3. If glob set, pull in objects
+        4. replace sev.name, agg.name and port.name references with their objects
+        5. If create_all set, create all objects and return in dictionary. If not set only create the port objects
+        6. If update set, update all created objects.
+
+        Sample input
 
         ::
 
-            port my_portfolio
-                20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
-                10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
-                100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
+            port MY_PORTFOLIO
+                agg Line1 20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
+                agg Line2 10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
+                agg Line 3100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
 
         The indents are required...
 
-        See parser for full language spec!
+        See parser for full language spec! See Aggregate class for many examples.
 
         Reasonable kwargs:
 
@@ -516,10 +595,10 @@ class Underwriter(object):
             logging.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output')
         else:
             if len(rv):
-                logging.info(f'Underwriter.write | Program created {len(rv)} objects and ' 
-                     f'defined {len(self.parser.port_out_dict)} Portfolio(s), ' 
-                     f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
-                     f'{len(self.parser.sev_out_dict)} Severity(ies)')
+                logging.info(f'Underwriter.write | Program created {len(rv)} objects and '
+                             f'defined {len(self.parser.port_out_dict)} Portfolio(s), '
+                             f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
+                             f'{len(self.parser.sev_out_dict)} Severity(ies)')
             if len(rv) == 1:
                 rv = rv.popitem()[1]
 
@@ -550,23 +629,32 @@ class Underwriter(object):
 
         returns data frame description of added severity/aggregate/portfolios
 
+        the dataframe of aggregates can be used to create a portfolio (with all the aggregates) by calling
+
+        ```Portfolio.from_DataFrame(name df)```
+
+        TODO rationalize with parse_portfolio_program
+
         :param portfolio_program:
-        :return:
+        :return: dictionary with keys sev agg port and assoicated dataframes
         """
-        logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
-        self._runner(portfolio_program)
-        ans1 = ans2 = ans3 = None
-        if len(self.parser.sev_out_dict) > 0:
-            for v in self.parser.sev_out_dict.values():
-                Underwriter._add_defaults(v, 'sev')
-            ans1 = pd.DataFrame(list(self.parser.sev_out_dict.values()), index=self.parser.sev_out_dict.keys())
-        if len(self.parser.agg_out_dict) > 0:
-            for v in self.parser.agg_out_dict.values():
-                Underwriter._add_defaults(v)
-            ans2 = pd.DataFrame(list(self.parser.agg_out_dict.values()), index=self.parser.agg_out_dict.keys())
-        if len(self.parser.port_out_dict) > 0:
-            ans3 = pd.DataFrame(list(self.parser.port_out_dict.values()), index=self.parser.port_out_dict.keys())
-        return ans1, ans2, ans3
+        print('write_test deprecated...use parse_portfolio_porgram with output="dict".')
+        raise RuntimeError
+        # TODO once sure you don't need this delete!
+        # logging.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
+        # self._runner(portfolio_program)
+        # ans = {}
+        # if len(self.parser.sev_out_dict) > 0:
+        #     for v in self.parser.sev_out_dict.values():
+        #         Underwriter._add_defaults(v, 'sev')
+        #     ans['sev'] = pd.DataFrame(list(self.parser.sev_out_dict.values()), index=self.parser.sev_out_dict.keys())
+        # if len(self.parser.agg_out_dict) > 0:
+        #     for v in self.parser.agg_out_dict.values():
+        #         Underwriter._add_defaults(v)
+        #     ans['agg'] = pd.DataFrame(list(self.parser.agg_out_dict.values()), index=self.parser.agg_out_dict.keys())
+        # if len(self.parser.port_out_dict) > 0:
+        #     ans['port'] = pd.DataFrame(list(self.parser.port_out_dict.values()), index=self.parser.port_out_dict.keys())
+        # return ans
 
     def _runner(self, portfolio_program):
         """
@@ -596,8 +684,8 @@ class Underwriter(object):
         # other preprocessing: line continuation; \n\t or \n____ to space (for port indents),
         # ; to new line, split on new line
         portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
-                             replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
-                             split('\n') if len(i.strip()) > 0]
+            replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
+            split('\n') if len(i.strip()) > 0]
 
         # Parse      ---------------------------------------------------------------------
         self.parser.reset()

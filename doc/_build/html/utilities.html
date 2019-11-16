@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>Utilities &mdash; aggregate 0.6.1 documentation</title>
+    <title>Utilities &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
     <link rel="next" title="Parameters Module" href="parameters.html" >
     <link rel="prev" title="Parser Module" href="parser.html" > 
   </head>
@@ -53,7 +55,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
 	 
     </ul>
               
@@ -541,18 +543,16 @@ tilt is passed in as the tilting vector or None: easier for the caller to have a
 <dl class="function">
 <dt id="aggregate.utils.insurability_triangle">
 <code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">insurability_triangle</code><span class="sig-paren">(</span><em class="sig-param">figsize=(10</em>, <em class="sig-param">3)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
-<dd><dl>
-<dt>Illustrate the insurability triangle…</dt><dd><p>λ = A / L
-ROE = (P-L) / (A - P) = (P/L - 1) / (A/L - P/L)</p>
-<blockquote>
-<div><p>= (1/LR - 1) / (λ - 1/LR) = (1 - LR) / (λLR - 1)</p>
-</div></blockquote>
-</dd>
-</dl>
+<dd><p>Illustrate the insurability triangle…</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">λ</span> <span class="o">=</span> <span class="n">A</span> <span class="o">/</span> <span class="n">L</span>
+<span class="n">ROE</span> <span class="o">=</span> <span class="p">(</span><span class="n">P</span><span class="o">-</span><span class="n">L</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">A</span> <span class="o">-</span> <span class="n">P</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="n">P</span><span class="o">/</span><span class="n">L</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">A</span><span class="o">/</span><span class="n">L</span> <span class="o">-</span> <span class="n">P</span><span class="o">/</span><span class="n">L</span><span class="p">)</span>
+    <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">LR</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="o">/</span><span class="n">LR</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">LR</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">λLR</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>Hence</p>
-<blockquote>
-<div><p>δ = ROE / (1 + ROE) = (1 - LR) / [LR (λ - 1)]</p>
-</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">δ</span> <span class="o">=</span> <span class="n">ROE</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">ROE</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">LR</span><span class="p">)</span> <span class="o">/</span> <span class="p">[</span><span class="n">LR</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
 <dd class="field-odd"><p></p>
@@ -769,7 +769,7 @@ experimental</p>
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

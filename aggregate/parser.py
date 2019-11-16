@@ -26,82 +26,86 @@ Ignored characters
 Language Specification
 ----------------------
 
-answer              	:: sev_out
-                    	 | agg_out
-                    	 | port_out
+The ```agg``` Language Grammar:
 
-port_out            	:: port_name note agg_list
+::
 
-agg_list            	:: agg_list agg_out
-                    	 | agg_out
+    answer              	:: sev_out
+                        	 | agg_out
+                        	 | port_out
 
-agg_out             	:: agg_name builtin_aggregate note
-                    	 | agg_name exposures layers SEV sev freq note
+    port_out            	:: port_name note agg_list
 
-sev_out             	:: sev_out sev_name sev note
-                    	 | sev_name sev note
+    agg_list            	:: agg_list agg_out
+                        	 | agg_out
 
-freq                	:: MIXED ID snumber snumber
-                    	 | MIXED ID snumber
-                    	 | FREQ snumber
-                    	 | FREQ
+    agg_out             	:: agg_name builtin_aggregate note
+                        	 | agg_name exposures layers SEV sev freq note
 
-snumber             	:: NUMBER
-                    	 | MINUS NUMBER %prec UMINUS
+    sev_out             	:: sev_out sev_name sev note
+                        	 | sev_name sev note
 
-sev                 	:: sev PLUS numbers
-                    	 | sev MINUS numbers
-                    	 | numbers TIMES sev
-                    	 | ids numbers CV numbers weights
-                    	 | ids numbers weights
-                    	 | ids numbers numbers weights xps
-                    	 | ids xps
-                    	 | builtinids numbers numbers
-                    	 | builtinids
+    freq                	:: MIXED ID snumber snumber
+                        	 | MIXED ID snumber
+                        	 | FREQ snumber
+                        	 | FREQ
 
-xps                 	:: XPS numbers numbers
-                    	 | 
+    snumber             	:: NUMBER
+                        	 | MINUS NUMBER %prec UMINUS
 
-weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER
-                    	 | WEIGHTS numbers
-                    	 | 
+    sev                 	:: sev PLUS numbers
+                        	 | sev MINUS numbers
+                        	 | numbers TIMES sev
+                        	 | ids numbers CV numbers weights
+                        	 | ids numbers weights
+                        	 | ids numbers numbers weights xps
+                        	 | ids xps
+                        	 | builtinids numbers numbers
+                        	 | builtinids
 
-layers              	:: numbers XS numbers
-                    	 | 
+    xps                 	:: XPS numbers numbers
+                        	 |
 
-note                	:: NOTE
-                    	 | 
+    weights             	:: WEIGHTS EQUAL_WEIGHT NUMBER
+                        	 | WEIGHTS numbers
+                        	 |
 
-exposures           	:: numbers CLAIMS
-                    	 | numbers LOSS
-                    	 | numbers PREMIUM AT numbers LR
-                    	 | numbers PREMIUM AT numbers
+    layers              	:: numbers XS numbers
+                        	 |
 
-builtinids          	:: BUILTINID
+    note                	:: NOTE
+                        	 |
 
-ids                 	:: "[" idl "]"
-                    	 | ID
+    exposures           	:: numbers CLAIMS
+                        	 | numbers LOSS
+                        	 | numbers PREMIUM AT numbers LR
+                        	 | numbers PREMIUM AT numbers
 
-idl                 	:: idl ID
-                    	 | ID
+    builtinids          	:: BUILTINID
 
-numbers             	:: "[" numberl "]"
-                    	 | NUMBER
+    ids                 	:: "[" idl "]"
+                        	 | ID
 
-numberl             	:: numberl NUMBER
-                    	 | NUMBER
+    idl                 	:: idl ID
+                        	 | ID
 
-builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER
-                    	 | NUMBER TIMES builtin_aggregate_dist
-                    	 | builtin_aggregate_dist
+    numbers             	:: "[" numberl "]"
+                        	 | NUMBER
 
-builtin_aggregate_dist	:: BUILTINID
+    numberl             	:: numberl NUMBER
+                        	 | NUMBER
 
-sev_name            	:: SEV ID
+    builtin_aggregate   	:: builtin_aggregate_dist TIMES NUMBER
+                        	 | NUMBER TIMES builtin_aggregate_dist
+                        	 | builtin_aggregate_dist
 
-agg_name            	:: AGG ID
+    builtin_aggregate_dist	:: BUILTINID
 
-port_name           	:: PORT ID
+    sev_name            	:: SEV ID
+
+    agg_name            	:: AGG ID
+
+    port_name           	:: PORT ID
 
 parser.out parser debug information
 -----------------------------------
@@ -109,6 +113,7 @@ parser.out parser debug information
 Lexer term definition
 ---------------------
 
+::
 
     tokens = {ID, BUILTINID, NOTE,
               SEV, AGG, PORT,
@@ -748,8 +753,14 @@ if __name__ == '__main__':
     # print the grammar and add to this file as part of docstring
     # TODO fix comments!
 
+    # may need to put an extra indent for rst to work properly
+
     start_string = '''Language Specification
 ----------------------
+
+The ```agg``` Language Grammar:
+
+::
 
 '''
     end_string = 'parser.out parser debug information'

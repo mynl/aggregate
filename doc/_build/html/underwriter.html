@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>Underwriter Module &mdash; aggregate 0.6.1 documentation</title>
+    <title>Underwriter Module &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,13 +24,15 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
     <link rel="next" title="Parser Module" href="parser.html" >
-    <link rel="prev" title="Distortion Class" href="distortion.html" > 
+    <link rel="prev" title="Distortion Class" href="spectral.html" > 
   </head>
   <body>
 
@@ -53,7 +55,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
 	 
     </ul>
               
@@ -72,7 +74,7 @@
            accesskey="N">next</a>
       </li>
       <li class="active">
-        <a href="distortion.html" title="Distortion Class"
+        <a href="spectral.html" title="Distortion Class"
            accesskey="P">previous</a>
       </li>
     </ul>
@@ -284,6 +286,7 @@ Pull notes for type items</p>
 create the object.
 Initially just for a single portfolio program (which it checks!)
 No argument of default conniptions</p>
+<p>TODO: seems like overlaps with write_test</p>
 <p>TODO make more robust
 :param portfolio_program:
 :return:</p>
@@ -292,16 +295,23 @@ No argument of default conniptions</p>
 <dl class="method">
 <dt id="aggregate.underwriter.Underwriter.write">
 <code class="sig-name descname">write</code><span class="sig-paren">(</span><em class="sig-param">portfolio_program</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/underwriter.html#Underwriter.write"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.underwriter.Underwriter.write" title="Permalink to this definition">¶</a></dt>
-<dd><p>write a pseudo natural language programming spec for a book or (if only one line) an aggregate_project</p>
-<p>Input</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">port</span> <span class="n">my_portfolio</span>
-    <span class="mi">20</span>  <span class="n">loss</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sev</span> <span class="n">gamma</span> <span class="mi">5</span> <span class="n">cv</span> <span class="mf">0.30</span> <span class="n">mixed</span> <span class="n">gamma</span> <span class="mf">0.4</span>
-    <span class="mi">10</span>  <span class="n">claims</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sevgamma</span> <span class="mi">12</span> <span class="n">cv</span> <span class="mf">0.30</span> <span class="n">mixed</span> <span class="n">gamma</span> <span class="mf">1.2</span>
-    <span class="mi">100</span>  <span class="n">premium</span> <span class="n">at</span> <span class="mf">0.4</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sev</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">lognormal</span> <span class="mi">3</span> <span class="n">cv</span> <span class="mf">0.8</span> <span class="n">fixed</span> <span class="mi">1</span>
+<dd><p>Write a natural language program. Write carries out the following steps.</p>
+<p>1. Read in the program and cleans it (e.g. punctuation, parens etc. are
+removed and ignored, replace ; with new line etc.)
+2. Parse line by line to create a dictioonary definition of sev, agg or port objects
+3. If glob set, pull in objects
+4. replace sev.name, agg.name and port.name references with their objects
+5. If create_all set, create all objects and return in dictionary. If not set only create the port objects
+6. If update set, update all created objects.</p>
+<p>Sample input</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">port</span> <span class="n">MY_PORTFOLIO</span>
+    <span class="n">agg</span> <span class="n">Line1</span> <span class="mi">20</span>  <span class="n">loss</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sev</span> <span class="n">gamma</span> <span class="mi">5</span> <span class="n">cv</span> <span class="mf">0.30</span> <span class="n">mixed</span> <span class="n">gamma</span> <span class="mf">0.4</span>
+    <span class="n">agg</span> <span class="n">Line2</span> <span class="mi">10</span>  <span class="n">claims</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sevgamma</span> <span class="mi">12</span> <span class="n">cv</span> <span class="mf">0.30</span> <span class="n">mixed</span> <span class="n">gamma</span> <span class="mf">1.2</span>
+    <span class="n">agg</span> <span class="n">Line</span> <span class="mi">3100</span>  <span class="n">premium</span> <span class="n">at</span> <span class="mf">0.4</span> <span class="mi">3</span> <span class="n">x</span> <span class="mi">2</span> <span class="n">sev</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">lognormal</span> <span class="mi">3</span> <span class="n">cv</span> <span class="mf">0.8</span> <span class="n">fixed</span> <span class="mi">1</span>
 </pre></div>
 </div>
 <p>The indents are required…</p>
-<p>See parser for full language spec!</p>
+<p>See parser for full language spec! See Aggregate class for many examples.</p>
 <p>Reasonable kwargs:</p>
 <ul class="simple">
 <li><p>bs</p></li>
@@ -355,12 +365,15 @@ No argument of default conniptions</p>
 <dd><p>write programs in testing mode</p>
 <p>dictionary definitions are added to uw but no objects are created</p>
 <p>returns data frame description of added severity/aggregate/portfolios</p>
+<p>the dataframe of aggregates can be used to create a portfolio (with all the aggregates) by calling</p>
+<p><code class="docutils literal notranslate"><span class="pre">`Portfolio.from_DataFrame(name</span> <span class="pre">df)`</span></code></p>
+<p>TODO rationalize with parse_portfolio_program</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><p><strong>portfolio_program</strong> – </p>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p></p>
+<dd class="field-even"><p>dictionary with keys sev agg port and assoicated dataframes</p>
 </dd>
 </dl>
 </dd></dl>
@@ -387,7 +400,7 @@ No argument of default conniptions</p>
 </ul>
 
   <h4>Previous topic</h4>
-  <p class="topless"><a href="distortion.html"
+  <p class="topless"><a href="spectral.html"
                         title="previous chapter">Distortion Class</a></p>
   <h4>Next topic</h4>
   <p class="topless"><a href="parser.html"
@@ -417,7 +430,7 @@ No argument of default conniptions</p>
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

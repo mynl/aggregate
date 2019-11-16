@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    
+    <title>History and Applications &mdash; aggregate 0.7.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.7.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
+    <link rel="next" title="aggregate: Basic Examples" href="03_Basic_Examples.html" >
+    <link rel="prev" title="Introduction to aggregate" href="01_Intro.html" > 
+  </head>
+  <body>
+
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+      <li class="active">
+        <a href="03_Basic_Examples.html" title="aggregate: Basic Examples"
+           accesskey="N">next</a>
+      </li>
+      <li class="active">
+        <a href="01_Intro.html" title="Introduction to aggregate"
+           accesskey="P">previous</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
+        <div class="bodywrapper">
+          <div class="body" id="spc-section-body">
+            
+  <div class="section" id="history-and-applications">
+<h1>History and Applications<a class="headerlink" href="#history-and-applications" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="history">
+<h2>History<a class="headerlink" href="#history" title="Permalink to this headline">¶</a></h2>
+<p>I have built several iterations of software to work with aggregate distributions since the first in 1997.</p>
+<ul class="simple">
+<li><p>A Matlab version for CNA Re with a graphical interface. Computed aggregates by business unit and the portfolio total. Used to discover the shocking fact there was only a 53 percent chance of achieving plan…which is obvious in hindsight but was a surprise at the time.</p></li>
+<li><p>A C++ version of the Matlab code called SADCo in 1997-99. This code sits behing [MALT](<a class="reference external" href="http://www.mynl.com/MALT/home.html">http://www.mynl.com/MALT/home.html</a>).</p></li>
+<li><p>Another C++ version with an implementation of the Iman Conover method to combine aggregates with correlation using the (gasp) normal copula, [SCARE](<a class="reference external" href="http://www.mynl.com/wp/default.html">http://www.mynl.com/wp/default.html</a>)</p></li>
+<li><p>At Aon Re I worked on their simulation based tools called ALG (Aggregate Loss Generator) which simulated losses and Prime/Re which manipulated the simulations and applied various reinsurance structures. ALG used a shared mixing variables approach to correlation.</p></li>
+<li><dl class="simple">
+<dt>At Aon Re I also built related tools</dt><dd><ul>
+<li><p>The Levy measure maker</p></li>
+<li><p>A simple approach to multi-year modeling based on re-scaling a base year, convolving using FFTs and tracking (and stopping) in default scenarios</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>At Aon Benfield I was involved with [ReMetric](<a class="reference external" href="http://www.aon.com/reinsurance/analytics-(1)/remetrica.jsp">http://www.aon.com/reinsurance/analytics-(1)/remetrica.jsp</a>), a very sophisticated, general purpose DFA/ERM simulation tool,</p></li>
+</ul>
+</div>
+<div class="section" id="reinsurance-pricing-applications">
+<h2>Reinsurance Pricing Applications<a class="headerlink" href="#reinsurance-pricing-applications" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Excess of loss exposure rating</p></li>
+<li><p>Creation of a severity curve from a limit profile</p></li>
+</ul>
+</div>
+<div class="section" id="insurance-pricing-applications">
+<h2>Insurance Pricing Applications<a class="headerlink" href="#insurance-pricing-applications" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Large accounts: insurance savings and charge for WC</p></li>
+<li><p>Specific and aggregate covers</p></li>
+</ul>
+</div>
+<div class="section" id="capital-modeling">
+<h2>Capital Modeling<a class="headerlink" href="#capital-modeling" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Portfolio level probability of default, EPD, Var and TVaR statistics</p></li>
+</ul>
+</div>
+<div class="section" id="capital-allocation-and-pricing">
+<h2>Capital Allocation and Pricing<a class="headerlink" href="#capital-allocation-and-pricing" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Many and varied</p></li>
+<li><p>Application of distortion risk measures</p></li>
+<li><p>…</p></li>
+</ul>
+</div>
+<div class="section" id="design-and-build">
+<h2>Design and Build<a class="headerlink" href="#design-and-build" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><dl class="simple">
+<dt>Design: abstracting the business problem.</dt><dd><ul>
+<li><p>Getting the right model for your problem is key.</p></li>
+<li><p>What is the problem domain? What are the principle use cases? How will the software actually be used? What is input vs. derived? What is constant vs. an account specific parameter? What is the best way to express the inputs? To view the outputs? How do you bootstrap, using simpler functionality to implement more complex? What are those key simple capabilities?</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Implementation I: mapping design to software, i.e. coding. The joy of objects.</p></li>
+<li><p>Implementation II: wonderful, free tools available today and the whole shareware infrastructure. I am working in Python using Jupyter, pyCharm (not quite free) and Sphinx for documentation. These are fantastic tools that make many things easy. ​People should know about the capabilities. E.g. here is the documentation automatically produced from the source code: <a class="reference external" href="http://www.mynl.com/aggregate/index.html">http://www.mynl.com/aggregate/index.html</a> plus a link to the current code on Github (which is alpha stage, i.e. not even beta yet; do not bother downloading!)</p></li>
+<li><dl class="simple">
+<dt>Use and Lessons</dt><dd><ul>
+<li><p>Educational lessons: convergence to the central limit theorem, mixtures vs. convolution, thick vs thin tail distributions, occurrence vs. aggregate PMLs and many more</p></li>
+<li><p>Capital allocation and distortion risk measures. I am working on several papers here, including one following from the sessions at the Spring meeting with Mango and Major. The software will be used to create all the examples. The source for the examples will be on-line so folks can try themselves….leading to…</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>DIY</dt><dd><ul>
+<li><p>How you can download and use the tools yourself. Some starter lessons.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+          </div>
+      <div class="spc-rightsidebar span3">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">History and Applications</a><ul>
+<li><a class="reference internal" href="#contents">Contents</a></li>
+<li><a class="reference internal" href="#history">History</a></li>
+<li><a class="reference internal" href="#reinsurance-pricing-applications">Reinsurance Pricing Applications</a></li>
+<li><a class="reference internal" href="#insurance-pricing-applications">Insurance Pricing Applications</a></li>
+<li><a class="reference internal" href="#capital-modeling">Capital Modeling</a></li>
+<li><a class="reference internal" href="#capital-allocation-and-pricing">Capital Allocation and Pricing</a></li>
+<li><a class="reference internal" href="#design-and-build">Design and Build</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="01_Intro.html"
+                        title="previous chapter">Introduction to aggregate</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="03_Basic_Examples.html"
+                        title="next chapter"><code class="docutils literal notranslate"><span class="pre">aggregate</span></code>: Basic Examples</a></p>
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/02_history_applications.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/02_history_applications.rst.rst">Edit page</a>
+</div>
+
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
+    <div class="footer">
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018-19 Convex Risk LLC.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
+      </li>
+    </ul>
+    </div>
+    </div>
+    </div>
+  </body>
+</html>

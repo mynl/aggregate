@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>Tutorial &mdash; aggregate 0.6.1 documentation</title>
+    <title>Tutorial &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,14 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" > 
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
+    <link rel="prev" title="Parameters Module" href="param.html" > 
   </head>
   <body>
 
@@ -51,7 +54,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
 	 
     </ul>
               
@@ -64,6 +67,10 @@
       <li class="active">
         <a href="py-modindex.html" title="Python Module Index"
            >modules</a>
+      </li>
+      <li class="active">
+        <a href="param.html" title="Parameters Module"
+           accesskey="P">previous</a>
       </li>
     </ul>
               
@@ -80,6 +87,7 @@
             
   <div class="section" id="tutorial">
 <h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
+<p>EITHER FIX OR DELETE.</p>
 <div class="section" id="aggregate-simple-examples">
 <h2><code class="docutils literal notranslate"><span class="pre">aggregate</span></code>: Simple Examples<a class="headerlink" href="#aggregate-simple-examples" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
@@ -256,14 +264,14 @@
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;quick&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<img alt="output_6_1.svg" src="output_6_1.svg" /><div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;long&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
 <pre class="literal-block">C:UserssteveAnaconda3libsite-packagesmatplotlibaxes_base.py:3443: UserWarning: Attempting to set identical bottom==top results
 in singular transformations; automatically expanding.
 bottom=1.0, top=1.0
   'bottom=%s, top=%s') % (bottom, top))</pre>
-<img alt="output_7_1.svg" src="output_7_1.svg" /><div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">audit_df</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">biz</span><span class="o">.</span><span class="n">audit_df</span>
 </pre></div>
 </div>
 <div>
@@ -342,6 +350,9 @@ bottom=1.0, top=1.0
 </li>
 </ul>
 
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="param.html"
+                        title="previous chapter">Parameters Module</a></p>
   <h3>This Page</h3>
   <div>
     <a href="_sources/tutorial.rst.txt"
@@ -367,7 +378,7 @@ bottom=1.0, top=1.0
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

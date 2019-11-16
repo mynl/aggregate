@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     
-    <title>Portfolio Class &mdash; aggregate 0.6.1 documentation</title>
+    <title>Portfolio Class &mdash; aggregate 0.7.1 documentation</title>
     
     <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
     <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1',
+        VERSION:     '0.7.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,11 +24,13 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
     <script type="text/javascript" src="_static/js/copybutton.js"></script>
     <link rel="index" title="Index" href="genindex.html" >
     <link rel="search" title="Search" href="search.html" >
-    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
     <link rel="next" title="Distortion Class" href="distortion.html" >
     <link rel="prev" title="Distribution Classes" href="aggregate.html" > 
   </head>
@@ -53,7 +55,7 @@
     <ul class="nav nav-pills pull-left">
         <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
 	
-        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
 	 
     </ul>
               
@@ -329,6 +331,7 @@ if updated uses empirical moments, otherwise uses theoretic moments</p>
 <em class="property">static </em><code class="sig-name descname">from_DataFrame</code><span class="sig-paren">(</span><em class="sig-param">name</em>, <em class="sig-param">df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.from_DataFrame"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.from_DataFrame" title="Permalink to this definition">¶</a></dt>
 <dd><p>create portfolio from pandas dataframe
 uses columns with appropriate names</p>
+<p>Can be fed the agg output of uw.write_test( agg_program )</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -376,6 +379,20 @@ drops all blank columns (mostly for auditing purposes)</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.port.Portfolio.json">
+<code class="sig-name descname">json</code><span class="sig-paren">(</span><em class="sig-param">stream=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.json" title="Permalink to this definition">¶</a></dt>
+<dd><p>write object as json</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>stream</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>stream or text</p>
 </dd>
 </dl>
 </dd></dl>
@@ -447,16 +464,14 @@ log underscore appended as appropriate</p>
 <dd><dl>
 <dt>Price using regulatory and pricing g functions</dt><dd><p>Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
 the regulatory distortion</p>
-<p>regulatory capital distortion is applied on unlimited basis: reg_g can be:
-a number:   if input &lt; 1 interpreted as a p value and used to deterine VaR capital</p>
-<blockquote>
-<div><p>if &gt; 1 directly as a capital number</p>
-</div></blockquote>
-<p>d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value
-a distortion used directly</p>
-<p>pricing_g is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is
-overwritten</p>
-<p>ly  must include ro in spec</p>
+<p>regulatory capital distortion is applied on unlimited basis: <code class="docutils literal notranslate"><span class="pre">reg_g</span></code> can be:</p>
+<ul class="simple">
+<li><p>if input &lt; 1 it is a number interpreted as a p value and used to deterine VaR capital</p></li>
+<li><p>if input &gt; 1 it is a directly input  capital number</p></li>
+<li><p>d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value a distortion used directly</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">pricing_g</span></code> is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is overwritten</p>
+<p>if ly it must include ro in spec</p>
 <p>if lr and roe then lr is used</p>
 </dd>
 </dl>
@@ -522,7 +537,7 @@ Acerbi and Tasche (2002)</p>
 <dl class="method">
 <dt id="aggregate.port.Portfolio.save">
 <code class="sig-name descname">save</code><span class="sig-paren">(</span><em class="sig-param">filename=''</em>, <em class="sig-param">mode='a'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.save" title="Permalink to this definition">¶</a></dt>
-<dd><p>persist to YAML in filename; if none save to user.yaml</p>
+<dd><p>persist to json in filename; if none save to user.json</p>
 <p>TODO: update user list in Examples?</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -699,20 +714,6 @@ for allocation and priority analysis</p>
 </dl>
 </dd></dl>
 
-<dl class="method">
-<dt id="aggregate.port.Portfolio.yaml">
-<code class="sig-name descname">yaml</code><span class="sig-paren">(</span><em class="sig-param">stream=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/port.html#Portfolio.yaml"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.port.Portfolio.yaml" title="Permalink to this definition">¶</a></dt>
-<dd><p>write object as YAML</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>stream</strong> – </p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p></p>
-</dd>
-</dl>
-</dd></dl>
-
 </dd></dl>
 
 </div>
@@ -763,7 +764,7 @@ for allocation and priority analysis</p>
     <div class="row-fluid">
     <ul class="inline pull-left">
       <li>
-        &copy; Copyright 2018-19 Stephen J. Mildenhall.
+        &copy; Copyright 2018-19 Convex Risk LLC.
       </li>
       <li>
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.

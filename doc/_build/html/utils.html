@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    
+    <title>Utilities &mdash; aggregate 0.7.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.7.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
+    <link rel="next" title="Parameters Module" href="param.html" >
+    <link rel="prev" title="Parser Module" href="parser.html" > 
+  </head>
+  <body>
+
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+      <li class="active">
+        <a href="param.html" title="Parameters Module"
+           accesskey="N">next</a>
+      </li>
+      <li class="active">
+        <a href="parser.html" title="Parser Module"
+           accesskey="P">previous</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
+        <div class="bodywrapper">
+          <div class="body" id="spc-section-body">
+            
+  <div class="section" id="utilities">
+<h1>Utilities<a class="headerlink" href="#utilities" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="axis-manager-class">
+<h2>Axis Manager Class<a class="headerlink" href="#axis-manager-class" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="aggregate.utils.AxisManager">
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">AxisManager</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">figsize=None</em>, <em class="sig-param">height=2</em>, <em class="sig-param">aspect=1</em>, <em class="sig-param">nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages creation of a grid of axes for plotting. Allows pandas plot and matplotlib to
+plot to same set of axes.</p>
+<p>Always created and managed through axiter_factory function</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – number of plots in grid</p></li>
+<li><p><strong>figsize</strong> – </p></li>
+<li><p><strong>height</strong> – height of individual plot</p></li>
+<li><p><strong>aspect</strong> – aspect ratio of individual plot</p></li>
+<li><p><strong>nr</strong> – number of plots per row</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="aggregate.utils.AxisManager.dimensions">
+<code class="sig-name descname">dimensions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.dimensions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.dimensions" title="Permalink to this definition">¶</a></dt>
+<dd><p>return dimensions (width and height) of current layout</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.AxisManager.grid">
+<code class="sig-name descname">grid</code><span class="sig-paren">(</span><em class="sig-param">size=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid" title="Permalink to this definition">¶</a></dt>
+<dd><p>return a block of axes suitable for Pandas
+if size=0 return all the axes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>size</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.AxisManager.grid_size">
+<code class="sig-name descname">grid_size</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">subgrid=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.grid_size"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.grid_size" title="Permalink to this definition">¶</a></dt>
+<dd><p>appropriate grid size given class parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>subgrid</strong> – call is for a subgrid, no special treatment for 6 and 8</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.AxisManager.tidy">
+<code class="sig-name descname">tidy</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#AxisManager.tidy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.AxisManager.tidy" title="Permalink to this definition">¶</a></dt>
+<dd><p>delete unused axes to tidy up a plot</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="moment-aggregator-class">
+<h2>Moment Aggregator Class<a class="headerlink" href="#moment-aggregator-class" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="aggregate.utils.MomentAggregator">
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">MomentAggregator</code><span class="sig-paren">(</span><em class="sig-param">freq_moms=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Purely accumulates moments
+Used by Portfolio
+Not frequency aware
+makes report_ser df and statistics_df</p>
+<p>Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>freq_moms</strong> – function of one variable returning first three noncentral moments of the underlying frequency distribution</p>
+</dd>
+</dl>
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.add_f1s">
+<code class="sig-name descname">add_f1s</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_f1s"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_f1s" title="Permalink to this definition">¶</a></dt>
+<dd><p>accumulate new moments defined by f1 and s - fills in f2, f3 based on
+stored frequency distribution</p>
+<p>used by Aggregate</p>
+<p>compute agg for the latest values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.add_fs">
+<code class="sig-name descname">add_fs</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">f2</em>, <em class="sig-param">f3</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.add_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.add_fs" title="Permalink to this definition">¶</a></dt>
+<dd><p>accumulate new moments defined by f and s</p>
+<p>used by Portfolio</p>
+<p>compute agg for the latest values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>f2</strong> – </p></li>
+<li><p><strong>f3</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.agg_from_fs">
+<em class="property">static </em><code class="sig-name descname">agg_from_fs</code><span class="sig-paren">(</span><em class="sig-param">f1</em>, <em class="sig-param">f2</em>, <em class="sig-param">f3</em>, <em class="sig-param">s1</em>, <em class="sig-param">s2</em>, <em class="sig-param">s3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.agg_from_fs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.agg_from_fs" title="Permalink to this definition">¶</a></dt>
+<dd><p>aggregate_project moments from freq and sev components</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f1</strong> – </p></li>
+<li><p><strong>f2</strong> – </p></li>
+<li><p><strong>f3</strong> – </p></li>
+<li><p><strong>s1</strong> – </p></li>
+<li><p><strong>s2</strong> – </p></li>
+<li><p><strong>s3</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.column_names">
+<em class="property">static </em><code class="sig-name descname">column_names</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.column_names"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.column_names" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of the moment and statistics_df names for f x s = a</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.cumulate_moments">
+<em class="property">static </em><code class="sig-name descname">cumulate_moments</code><span class="sig-paren">(</span><em class="sig-param">m1</em>, <em class="sig-param">m2</em>, <em class="sig-param">m3</em>, <em class="sig-param">n1</em>, <em class="sig-param">n2</em>, <em class="sig-param">n3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.cumulate_moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.cumulate_moments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Moments of sum of indepdendent variables</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m1</strong> – 1st moment, E(X)</p></li>
+<li><p><strong>m2</strong> – 2nd moment, E(X^2)</p></li>
+<li><p><strong>m3</strong> – 3rd moment, E(X^3)</p></li>
+<li><p><strong>n1</strong> – </p></li>
+<li><p><strong>n2</strong> – </p></li>
+<li><p><strong>n3</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.get_fsa_stats">
+<code class="sig-name descname">get_fsa_stats</code><span class="sig-paren">(</span><em class="sig-param">total</em>, <em class="sig-param">remix=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.get_fsa_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.get_fsa_stats" title="Permalink to this definition">¶</a></dt>
+<dd><p>get the current f x s = agg statistics_df and moments
+total = true use total else, current
+remix = true for total only, re-compute freq statistics_df based on total freq 1</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>total</strong> – binary</p></li>
+<li><p><strong>remix</strong> – combine all sevs and recompute the freq moments from total freq</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.moments">
+<code class="sig-name descname">moments</code><span class="sig-paren">(</span><em class="sig-param">mom_type</em>, <em class="sig-param">total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments" title="Permalink to this definition">¶</a></dt>
+<dd><p>vector of the moments; convenience function</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mom_type</strong> – </p></li>
+<li><p><strong>total</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.moments_to_mcvsk">
+<code class="sig-name descname">moments_to_mcvsk</code><span class="sig-paren">(</span><em class="sig-param">mom_type</em>, <em class="sig-param">total=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.moments_to_mcvsk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.moments_to_mcvsk" title="Permalink to this definition">¶</a></dt>
+<dd><p>convert noncentral moments into mean, cv and skewness
+type = agg | freq | sev | mix
+delegates work</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mom_type</strong> – </p></li>
+<li><p><strong>total</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentAggregator.stats_series">
+<code class="sig-name descname">stats_series</code><span class="sig-paren">(</span><em class="sig-param">name</em>, <em class="sig-param">limit</em>, <em class="sig-param">pvalue</em>, <em class="sig-param">remix</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentAggregator.stats_series"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentAggregator.stats_series" title="Permalink to this definition">¶</a></dt>
+<dd><p>combine elements into a reporting series
+handles order, index names etc. in one place</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – series name</p></li>
+<li><p><strong>limit</strong> – </p></li>
+<li><p><strong>pvalue</strong> – </p></li>
+<li><p><strong>remix</strong> – called from Aggregate want remix=True to collect mix terms; from Portfolio remix=False</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-aggregate.utils">
+<span id="utilities-module"></span><h2>Utilities Module<a class="headerlink" href="#module-aggregate.utils" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="aggregate.utils.MomentWrangler">
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">MomentWrangler</code><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Conversion between central, noncentral and factorial moments</p>
+<p>Input any one and ask for any translation.</p>
+<p>Stores moments as noncentral internally</p>
+<dl class="attribute">
+<dt id="aggregate.utils.MomentWrangler._central">
+<code class="sig-name descname">_central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._central" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.MomentWrangler._factorial">
+<code class="sig-name descname">_factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._factorial" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler._make_central">
+<code class="sig-name descname">_make_central</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_central"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_central" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler._make_factorial">
+<code class="sig-name descname">_make_factorial</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#MomentWrangler._make_factorial"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.MomentWrangler._make_factorial" title="Permalink to this definition">¶</a></dt>
+<dd><p>add factorial from central</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.MomentWrangler._noncentral">
+<code class="sig-name descname">_noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler._noncentral" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler.central">
+<em class="property">property </em><code class="sig-name descname">central</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.central" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler.factorial">
+<em class="property">property </em><code class="sig-name descname">factorial</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.factorial" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler.noncentral">
+<em class="property">property </em><code class="sig-name descname">noncentral</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.noncentral" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="aggregate.utils.MomentWrangler.stats">
+<em class="property">property </em><code class="sig-name descname">stats</code><a class="headerlink" href="#aggregate.utils.MomentWrangler.stats" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.axiter_factory">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">axiter_factory</code><span class="sig-paren">(</span><em class="sig-param">axiter</em>, <em class="sig-param">n</em>, <em class="sig-param">figsize=None</em>, <em class="sig-param">height=2</em>, <em class="sig-param">aspect=1</em>, <em class="sig-param">nr=5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#axiter_factory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.axiter_factory" title="Permalink to this definition">¶</a></dt>
+<dd><p>axiter = check_axiter(axiter, …) to allow chaining
+TODO can this be done in the class somehow?</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axiter</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>figsize</strong> – </p></li>
+<li><p><strong>height</strong> – </p></li>
+<li><p><strong>aspect</strong> – </p></li>
+<li><p><strong>nr</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.estimate_agg_percentile">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">estimate_agg_percentile</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em>, <em class="sig-param">p=0.999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#estimate_agg_percentile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.estimate_agg_percentile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
+<li><p><strong>p</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.frequency_examples">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">frequency_examples</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">ν</em>, <em class="sig-param">f</em>, <em class="sig-param">κ</em>, <em class="sig-param">sichel_case</em>, <em class="sig-param">log2</em>, <em class="sig-param">xmax=500</em>, <em class="sig-param">**kwds</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#frequency_examples"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.frequency_examples" title="Permalink to this definition">¶</a></dt>
+<dd><p>Illustrate different frequency distributions and frequency moment
+calculations.</p>
+<p>sichel_case = gamma | ig | ‘’</p>
+<p>n = E(N) = expected claim count
+ν = CV(mixing) = asymptotic CV of any compound aggregate whose severity has a second moment
+f = proportion of certain claims, 0 &lt;= f &lt; 1, higher f corresponds to greater skewnesss
+κ = claims per occurrence
+g_mult = adjust EG^3 of Sichel above/below standard PIG</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.ft">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">ft</code><span class="sig-paren">(</span><em class="sig-param">z</em>, <em class="sig-param">padding</em>, <em class="sig-param">tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ft" title="Permalink to this definition">¶</a></dt>
+<dd><p>fft with padding and tilt
+padding = n makes vector 2^n as long
+n=1 doubles (default)
+n=2 quadruples
+tilt is passed in as the tilting vector or None: easier for the caller to have a single instance</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>z</strong> – </p></li>
+<li><p><strong>padding</strong> – = 1 doubles</p></li>
+<li><p><strong>tilt</strong> – vector of tilt values</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.get_fmts">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">get_fmts</code><span class="sig-paren">(</span><em class="sig-param">df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#get_fmts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.get_fmts" title="Permalink to this definition">¶</a></dt>
+<dd><p>reasonable formats for a styler</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>df</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.html_title">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">html_title</code><span class="sig-paren">(</span><em class="sig-param">txt</em>, <em class="sig-param">n=1</em>, <em class="sig-param">title_case=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#html_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.html_title" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>txt</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>title_case</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.ift">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">ift</code><span class="sig-paren">(</span><em class="sig-param">z</em>, <em class="sig-param">padding</em>, <em class="sig-param">tilt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#ift"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.ift" title="Permalink to this definition">¶</a></dt>
+<dd><p>ift that strips out padding and adjusts for tilt</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>z</strong> – </p></li>
+<li><p><strong>padding</strong> – </p></li>
+<li><p><strong>tilt</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.insurability_triangle">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">insurability_triangle</code><span class="sig-paren">(</span><em class="sig-param">figsize=(10</em>, <em class="sig-param">3)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#insurability_triangle"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.insurability_triangle" title="Permalink to this definition">¶</a></dt>
+<dd><p>Illustrate the insurability triangle…</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">λ</span> <span class="o">=</span> <span class="n">A</span> <span class="o">/</span> <span class="n">L</span>
+<span class="n">ROE</span> <span class="o">=</span> <span class="p">(</span><span class="n">P</span><span class="o">-</span><span class="n">L</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">A</span> <span class="o">-</span> <span class="n">P</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="n">P</span><span class="o">/</span><span class="n">L</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">A</span><span class="o">/</span><span class="n">L</span> <span class="o">-</span> <span class="n">P</span><span class="o">/</span><span class="n">L</span><span class="p">)</span>
+    <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">LR</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="o">/</span><span class="n">LR</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">LR</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">λLR</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Hence</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">δ</span> <span class="o">=</span> <span class="n">ROE</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">ROE</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">LR</span><span class="p">)</span> <span class="o">/</span> <span class="p">[</span><span class="n">LR</span> <span class="p">(</span><span class="n">λ</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.lognorm_lev">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">lognorm_lev</code><span class="sig-paren">(</span><em class="sig-param">mu</em>, <em class="sig-param">sigma</em>, <em class="sig-param">n</em>, <em class="sig-param">limit</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#lognorm_lev"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.lognorm_lev" title="Permalink to this definition">¶</a></dt>
+<dd><p>return E(min(X, limit)^n) for lognormal using exact calculation
+currently only for n=1, 2</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mu</strong> – </p></li>
+<li><p><strong>sigma</strong> – </p></li>
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>limit</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="aggregate.utils.qd">
+<em class="property">class </em><code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">qd</code><span class="sig-paren">(</span><em class="sig-param">d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd" title="Permalink to this definition">¶</a></dt>
+<dd><p>quick display for dictionaries and Pandas dataframes, with some sensible number defaults
+experimental</p>
+<dl class="method">
+<dt id="aggregate.utils.qd._repr_html_">
+<code class="sig-name descname">_repr_html_</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#qd._repr_html_"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.qd._repr_html_" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.qd.cm">
+<code class="sig-name descname">cm</code><em class="property"> = &lt;matplotlib.colors.LinearSegmentedColormap object&gt;</em><a class="headerlink" href="#aggregate.utils.qd.cm" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.qd.styles">
+<code class="sig-name descname">styles</code><em class="property"> = [{'selector': 'th', 'props': [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]}, {'selector': 'td', 'props': [('font-size', '10px'), ('text-align', 'left')]}]</em><a class="headerlink" href="#aggregate.utils.qd.styles" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.qd.td_props">
+<code class="sig-name descname">td_props</code><em class="property"> = [('font-size', '10px'), ('text-align', 'left')]</em><a class="headerlink" href="#aggregate.utils.qd.td_props" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="aggregate.utils.qd.th_props">
+<code class="sig-name descname">th_props</code><em class="property"> = [('font-size', '11px'), ('text-align', 'center'), ('font-weight', 'bold'), ('color', '#6d6d6d'), ('background-color', '#f7f7f9')]</em><a class="headerlink" href="#aggregate.utils.qd.th_props" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.read_log">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">read_log</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#read_log"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.read_log" title="Permalink to this definition">¶</a></dt>
+<dd><p>read and return the log file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.sensible_jump">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sensible_jump</code><span class="sig-paren">(</span><em class="sig-param">n</em>, <em class="sig-param">desired_rows=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sensible_jump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sensible_jump" title="Permalink to this definition">¶</a></dt>
+<dd><p>return a sensible jump size to output desired_rows given input of n</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> – </p></li>
+<li><p><strong>desired_rows</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.sgamma_fit">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sgamma_fit</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sgamma_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sgamma_fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>method of moments shifted gamma fit matching given mean, cv and skewness</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.sln_fit">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">sln_fit</code><span class="sig-paren">(</span><em class="sig-param">m</em>, <em class="sig-param">cv</em>, <em class="sig-param">skew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#sln_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.sln_fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>method of moments shifted lognormal fit matching given mean, cv and skewness</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> – </p></li>
+<li><p><strong>cv</strong> – </p></li>
+<li><p><strong>skew</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.suptitle_and_tight">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">suptitle_and_tight</code><span class="sig-paren">(</span><em class="sig-param">title</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#suptitle_and_tight"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.suptitle_and_tight" title="Permalink to this definition">¶</a></dt>
+<dd><p>deal with tight layout when there is a suptitle</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>title</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.tidy_agg_program">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">tidy_agg_program</code><span class="sig-paren">(</span><em class="sig-param">txt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#tidy_agg_program"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.tidy_agg_program" title="Permalink to this definition">¶</a></dt>
+<dd><p>guess a nice format for an agg program</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>txt</strong> – program text input</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="aggregate.utils.xsden_to_meancv">
+<code class="sig-prename descclassname">aggregate.utils.</code><code class="sig-name descname">xsden_to_meancv</code><span class="sig-paren">(</span><em class="sig-param">xs</em>, <em class="sig-param">den</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/aggregate/utils.html#xsden_to_meancv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#aggregate.utils.xsden_to_meancv" title="Permalink to this definition">¶</a></dt>
+<dd><p>compute mean and cv from xs and density</p>
+<p>consider adding: np.nan_to_num(den)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – </p></li>
+<li><p><strong>den</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+          </div>
+      <div class="spc-rightsidebar span3">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Utilities</a><ul>
+<li><a class="reference internal" href="#axis-manager-class">Axis Manager Class</a></li>
+<li><a class="reference internal" href="#moment-aggregator-class">Moment Aggregator Class</a></li>
+<li><a class="reference internal" href="#module-aggregate.utils">Utilities Module</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="parser.html"
+                        title="previous chapter">Parser Module</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="param.html"
+                        title="next chapter">Parameters Module</a></p>
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/utils.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/utils.rst.rst">Edit page</a>
+</div>
+
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
+    <div class="footer">
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018-19 Convex Risk LLC.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
+      </li>
+    </ul>
+    </div>
+    </div>
+    </div>
+  </body>
+</html>

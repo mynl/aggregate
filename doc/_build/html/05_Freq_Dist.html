@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    
+    <title>Frequency Distributions &mdash; aggregate 0.7.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.7.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="None"></script>
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.7.1 documentation" href="index.html" >
+    <link rel="next" title="Development Outline" href="06_Development.html" >
+    <link rel="prev" title="Probability and Risk Theory" href="04_Prob_Risk_Thy.html" > 
+  </head>
+  <body>
+
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="https://github.com/mynl/aggregate">aggregate Code</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.7.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+      <li class="active">
+        <a href="06_Development.html" title="Development Outline"
+           accesskey="N">next</a>
+      </li>
+      <li class="active">
+        <a href="04_Prob_Risk_Thy.html" title="Probability and Risk Theory"
+           accesskey="P">previous</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
+        <div class="bodywrapper">
+          <div class="body" id="spc-section-body">
+            
+  <div class="section" id="frequency-distributions">
+<h1>Frequency Distributions<a class="headerlink" href="#frequency-distributions" title="Permalink to this headline">¶</a></h1>
+<p>A random variable <span class="math notranslate nohighlight">\(N\)</span> is <span class="math notranslate nohighlight">\(G\)</span>-mixed Poisson if
+<span class="math notranslate nohighlight">\(N\mid G\)</span> has a Poisson <span class="math notranslate nohighlight">\(nG\)</span> distribution for some fixed
+non-negative <span class="math notranslate nohighlight">\(n\)</span> and a non-negative mixing distribution <span class="math notranslate nohighlight">\(G\)</span>
+with <span class="math notranslate nohighlight">\(\text{E}(G)=1\)</span>. Let <span class="math notranslate nohighlight">\(\text{Var}(G)=c\)</span> (Glenn Meyers
+calls <span class="math notranslate nohighlight">\(c\)</span> the contagion) and let <span class="math notranslate nohighlight">\(\text{E}(G^3)=g\)</span>.</p>
+<p>The MGF of a <span class="math notranslate nohighlight">\(G\)</span>-mixed Poisson is</p>
+<div class="math notranslate nohighlight">
+\[\label{mgfi}
+M_N(\zeta)=\text{E}(e^{\zeta N})=\text{E}(\text{E}(e^{\zeta N} \mid G))=\text{E}(e^{n
+  G(e^\zeta-1)})=M_G(n(e^\zeta-1))\]</div>
+<p>since <span class="math notranslate nohighlight">\(M_G(\zeta):=\text{E}(e^{\zeta G})\)</span> and the MGF of a Poisson
+with mean <span class="math notranslate nohighlight">\(n\)</span> is <span class="math notranslate nohighlight">\(\exp(n(e^\zeta-1))\)</span>. Thus</p>
+<div class="math notranslate nohighlight">
+\[\text{E}(N)=M_N'(0)=n M_G'(0)=n,\]</div>
+<p>because <span class="math notranslate nohighlight">\(\text{E}(G)=M_G'(0)=1\)</span>. Similarly</p>
+<div class="math notranslate nohighlight">
+\[\text{E}(N^2)=M_N''(0)=n^2M_G''(0)+n M_G'(0)=n^2(1+c)+n\]</div>
+<p>and so</p>
+<div class="math notranslate nohighlight">
+\[\text{Var}(N)=n(1+cn).\]</div>
+<p>Finally</p>
+<div class="math notranslate nohighlight">
+\[\text{E}(N^3) = M_N'''(0) =n^3M_G'''(0)+3n^2M_G''(0)+n M_G'(0) = gn^3 + 3n^2(1+c) + n\]</div>
+<p>and therefore the central moment</p>
+<div class="math notranslate nohighlight">
+\[\text{E}(N-\text{E}(N))^3 = n^3(g -3c -1) + 3cn^2 + n.\]</div>
+<p>We can also assume <span class="math notranslate nohighlight">\(G\)</span> has mean <span class="math notranslate nohighlight">\(n\)</span> and work directly with
+<span class="math notranslate nohighlight">\(G\)</span> rather than <span class="math notranslate nohighlight">\(nG\)</span>, <span class="math notranslate nohighlight">\(\text{E}(G)=1\)</span>. We will call
+both forms mixing distributions.</p>
+<div class="section" id="interpretation-of-the-coefficient-of-variation-of-the-mixing-distribution">
+<h2>Interpretation of the Coefficient of Variation of the Mixing Distribution<a class="headerlink" href="#interpretation-of-the-coefficient-of-variation-of-the-mixing-distribution" title="Permalink to this headline">¶</a></h2>
+<p>Per Actuarial Geometry, if <span class="math notranslate nohighlight">\(\nu\)</span> is the CV of <span class="math notranslate nohighlight">\(G\)</span> then the
+<span class="math notranslate nohighlight">\(\nu\)</span> equals the asymptotic coefficient of variation for any
+<span class="math notranslate nohighlight">\(G\)</span>-mixed compound Poisson distribution whose variance exists. The
+variance will exist iff the variance of the severity term exists.</p>
+</div>
+<div class="section" id="gamma-mixing">
+<h2>Gamma Mixing<a class="headerlink" href="#gamma-mixing" title="Permalink to this headline">¶</a></h2>
+<p>A negative binomial is a gamma-mixed Poisson: if <span class="math notranslate nohighlight">\(N \mid G\)</span> is
+distributed as a Poisson with mean <span class="math notranslate nohighlight">\(G\)</span>, and <span class="math notranslate nohighlight">\(G\)</span> has a gamma
+distribution, then the unconditional distribution of <span class="math notranslate nohighlight">\(N\)</span> is a
+negative binomial. A gamma distribution has a shape parameter <span class="math notranslate nohighlight">\(a\)</span>
+and a scale parameter <span class="math notranslate nohighlight">\(\theta\)</span> so that the density is proportional
+to <span class="math notranslate nohighlight">\(x^{a-1}e^{x/\theta}\)</span>, <span class="math notranslate nohighlight">\(\text{E}(G)=a\theta\)</span> and
+<span class="math notranslate nohighlight">\(\text{Var}(G)=a\theta^2\)</span>.</p>
+<p>Let <span class="math notranslate nohighlight">\(c=\text{Var}(G)=\nu^2\)</span>, so <span class="math notranslate nohighlight">\(\nu\)</span> is the coefficient of
+variation of the mixing distribution. Then</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(a\theta=1\)</span> and <span class="math notranslate nohighlight">\(a\theta^2=c\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\theta=c=\nu^2\)</span>, <span class="math notranslate nohighlight">\(a=1/c\)</span></p></li>
+</ul>
+<p>The non-central moments of the gamma distribution are
+<span class="math notranslate nohighlight">\(\text{E}(G^r)=\theta^r\Gamma(a+r)/\Gamma(a)\)</span>. Therefore
+<span class="math notranslate nohighlight">\(Var(G) = a\theta^2\)</span> and <span class="math notranslate nohighlight">\(E(G-E(G))^3 = 2a\theta^3\)</span>. The
+skewness of <span class="math notranslate nohighlight">\(G\)</span> is <span class="math notranslate nohighlight">\(\gamma = 2/\sqrt(a) = 2\nu\)</span>.</p>
+<p>Applying the general formula for the third central moment of <span class="math notranslate nohighlight">\(N\)</span>
+we get an expression for the skewness</p>
+<div class="math notranslate nohighlight">
+\[\text{skew}(N) = \frac{n^3(\gamma -3c -1) + n^2(3c+2) + n}{(n(1+cn))^{3/2}}.\]</div>
+<p>The corresponding MGF of the gamma is
+<span class="math notranslate nohighlight">\(M_G(\zeta) = (1-\theta\zeta)^{-a}\)</span>.</p>
+</div>
+<div class="section" id="shifted-mixing-general">
+<h2>Shifted Mixing (General)<a class="headerlink" href="#shifted-mixing-general" title="Permalink to this headline">¶</a></h2>
+<p>We can adjust the skewness of mixing with shifting. In addition to a
+target CV <span class="math notranslate nohighlight">\(\nu\)</span> assume a proportion <span class="math notranslate nohighlight">\(f\)</span> of claims are sure
+to occur. Use a mixing distribution <span class="math notranslate nohighlight">\(G=f+G'\)</span> such that</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(E(G)= f + E(G') = 1\)</span> and</p></li>
+<li><p><span class="math notranslate nohighlight">\(CV(G) = SD(G') = \nu\)</span>.</p></li>
+</ul>
+<p>As <span class="math notranslate nohighlight">\(f\)</span> increases from 0 to 1 the skewness of <span class="math notranslate nohighlight">\(G\)</span> will
+increase. Delaporte first introduced this idea.</p>
+<p>Since <span class="math notranslate nohighlight">\(\text{skew}(G)=\text{skew}(G')\)</span> we have
+<span class="math notranslate nohighlight">\(g=\text{E}(G^3)=\nu^3 \text{skew}(G')+3c+1\)</span>.</p>
+</div>
+<div class="section" id="delaporte-mixing-shifted-gamma">
+<h2>Delaporte Mixing (Shifted Gamma)<a class="headerlink" href="#delaporte-mixing-shifted-gamma" title="Permalink to this headline">¶</a></h2>
+<p>Inputs are target CV <span class="math notranslate nohighlight">\(\nu\)</span> and proportion of certain claims
+<span class="math notranslate nohighlight">\(f\)</span>, <span class="math notranslate nohighlight">\(0\leq f \leq 1\)</span>. Find parameters <span class="math notranslate nohighlight">\(f\)</span>, <span class="math notranslate nohighlight">\(a\)</span>
+and <span class="math notranslate nohighlight">\(\theta\)</span> for a shifted gamma <span class="math notranslate nohighlight">\(G=f+G'\)</span> with
+<span class="math notranslate nohighlight">\(E(G')=1-f\)</span> and <span class="math notranslate nohighlight">\(SD(G')=\nu\)</span> as</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(f\)</span> is input</p></li>
+<li><p>mean <span class="math notranslate nohighlight">\(a\theta=1-s\)</span> and <span class="math notranslate nohighlight">\(CV=\nu=\sqrt{a}\theta\)</span> so
+<span class="math notranslate nohighlight">\(a=(1-f)^2/\nu^2=(1-f)^2/c\)</span> and <span class="math notranslate nohighlight">\(\theta=(1-f)/a\)</span></p></li>
+</ul>
+<p>The skewness of <span class="math notranslate nohighlight">\(G\)</span> equals the skewness of <span class="math notranslate nohighlight">\(G'\)</span> equals
+<span class="math notranslate nohighlight">\(2/\sqrt{a}= 2\nu/(1-f)\)</span>, which is then greater than the skewness
+<span class="math notranslate nohighlight">\(2\nu\)</span> when <span class="math notranslate nohighlight">\(f=0\)</span>. The third non-central moment
+<span class="math notranslate nohighlight">\(g=2\nu^4/(1-f)+3c+1\)</span></p>
+</div>
+<div class="section" id="poisson-inverse-gaussian-distribution">
+<h2>Poisson Inverse Gaussian Distribution<a class="headerlink" href="#poisson-inverse-gaussian-distribution" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="bernoulli-distribution">
+<h2>Bernoulli Distribution<a class="headerlink" href="#bernoulli-distribution" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="binomial-distribution">
+<h2>Binomial Distribution<a class="headerlink" href="#binomial-distribution" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="fixed-distribution">
+<h2>Fixed Distribution<a class="headerlink" href="#fixed-distribution" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+          </div>
+        </div>
+          </div>
+      <div class="spc-rightsidebar span3">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Frequency Distributions</a><ul>
+<li><a class="reference internal" href="#interpretation-of-the-coefficient-of-variation-of-the-mixing-distribution">Interpretation of the Coefficient of Variation of the Mixing Distribution</a></li>
+<li><a class="reference internal" href="#gamma-mixing">Gamma Mixing</a></li>
+<li><a class="reference internal" href="#shifted-mixing-general">Shifted Mixing (General)</a></li>
+<li><a class="reference internal" href="#delaporte-mixing-shifted-gamma">Delaporte Mixing (Shifted Gamma)</a></li>
+<li><a class="reference internal" href="#poisson-inverse-gaussian-distribution">Poisson Inverse Gaussian Distribution</a></li>
+<li><a class="reference internal" href="#bernoulli-distribution">Bernoulli Distribution</a></li>
+<li><a class="reference internal" href="#binomial-distribution">Binomial Distribution</a></li>
+<li><a class="reference internal" href="#fixed-distribution">Fixed Distribution</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="04_Prob_Risk_Thy.html"
+                        title="previous chapter">Probability and Risk Theory</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="06_Development.html"
+                        title="next chapter">Development Outline</a></p>
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/05_Freq_Dist.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/05_Freq_Dist.rst.rst">Edit page</a>
+</div>
+
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
+    <div class="footer">
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018-19 Convex Risk LLC.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 2.2.1.
+      </li>
+    </ul>
+    </div>
+    </div>
+    </div>
+  </body>
+</html>

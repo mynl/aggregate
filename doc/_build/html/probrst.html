@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    
+    <title>Probability and Risk Theory (rst) &mdash; aggregate 0.6.1 documentation</title>
+    
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="_static/css/spc-extend.css">
+    <link rel="stylesheet" href="_static/scipy.css" type="text/css" >
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" >
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.6.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/js/copybutton.js"></script>
+    <link rel="index" title="Index" href="genindex.html" >
+    <link rel="search" title="Search" href="search.html" >
+    <link rel="top" title="aggregate 0.6.1 documentation" href="index.html" > 
+  </head>
+  <body>
+
+<div class="container">
+  <div class="top-scipy-org-logo-header">
+    <a href="index.html">
+      <img style="border: 0;" alt="SciPy" src="_static/img/scipy_org_logo.gif"></a>
+    </div>
+  </div>
+</div>
+
+
+    <div class="container">
+      <div class="main">
+        
+	<div class="row-fluid">
+	  <div class="span12">
+	    <div class="spc-navbar">
+              
+    <ul class="nav nav-pills pull-left">
+        <li class="active"><a href="http://SOMETHING/">agg?</a></li>
+        <li class="active"><a href="http://www.mynl.com/aggregate/index.html">agg Docs</a></li>
+	
+        <li class="active"><a href="index.html">aggregate 0.6.1 documentation</a></li>
+	 
+    </ul>
+              
+              
+    <ul class="nav nav-pills pull-right">
+      <li class="active">
+        <a href="genindex.html" title="General Index"
+           accesskey="I">index</a>
+      </li>
+      <li class="active">
+        <a href="py-modindex.html" title="Python Module Index"
+           >modules</a>
+      </li>
+    </ul>
+              
+	    </div>
+	  </div>
+	</div>
+        
+
+	<div class="row-fluid">
+          <div class="span9">
+            
+        <div class="bodywrapper">
+          <div class="body" id="spc-section-body">
+            
+  <div class="section" id="probability-and-risk-theory-rst">
+<h1>Probability and Risk Theory (rst)<a class="headerlink" href="#probability-and-risk-theory-rst" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="discretizing-severity-distributions">
+<h2>Discretizing Severity Distributions<a class="headerlink" href="#discretizing-severity-distributions" title="Permalink to this headline">¶</a></h2>
+<p>There are two simple ways to discretize a continuous distribution.</p>
+<ol class="arabic">
+<li><p class="first">Approximate the distribution with a purely discrete distribution
+supported at points <span class="math">\(x_k=x_0+kb\)</span>, <span class="math">\(k=0,1,\dots, N\)</span>. Call
+<span class="math">\(b\)</span> the bucket size. The discrete probabilities are
+<span class="math">\(p_k=P(x_k - b/2 &lt; X \le x_k+b/2)\)</span>. To create a rv_histogram
+variable from <code class="docutils literal"><span class="pre">xs</span></code> and corresponding <code class="docutils literal"><span class="pre">p</span></code> values use:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">xss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">xs</span><span class="p">,</span> <span class="n">xs</span> <span class="o">+</span> <span class="mf">1e-5</span><span class="p">)))</span>
+<span class="n">pss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">ps1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">ps1</span><span class="p">)))</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">fz_discr</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">rv_histogram</span><span class="p">((</span><span class="n">pss</span><span class="p">,</span> <span class="n">xss</span><span class="p">))</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>The value 1e-5 just needs to be smaller than the resolution requested,
+i.e.&nbsp;do not “split the bucket”. Generally histograms will be
+downsampled, not upsampled, so this is not a restriction.</p>
+<ol class="arabic" start="2">
+<li><p class="first">Approximate the distribution with a continuous “histogram”
+distribution that is uniform on <span class="math">\((x_k, x_{k+1}]\)</span>. The discrete
+proababilities are <span class="math">\(p_k=P(x_k &lt; X \le x_{k+1})\)</span>. To create a
+rv_histogram variable is much easier, just use:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">xs2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">xs</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">xs</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+<span class="n">fz_cts</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">rv_histogram</span><span class="p">((</span><span class="n">ps2</span><span class="p">,</span> <span class="n">xs2</span><span class="p">))</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>The first method we call <strong>discrete</strong> and the second <strong>histogram</strong>. The
+discrete method is appropriate when the distribution will be used and
+interpreted as fully discrete, which is the assumption the FFT method
+makes. The histogram method is useful if the distribution will be used
+to create a scipy.stats rv_histogram variable. If the historgram method
+is interpreted as discrete and if the mean is computed appropriately for
+a discrete variable as <span class="math">\(\sum_i p_k x_k\)</span>, then the mean will be
+under-estimated by <span class="math">\(b/2\)</span>.</p>
+</div>
+<div class="section" id="generalized-distributions">
+<h2>Generalized Distributions<a class="headerlink" href="#generalized-distributions" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="fast-fourier-transforms">
+<h2>Fast Fourier Transforms<a class="headerlink" href="#fast-fourier-transforms" title="Permalink to this headline">¶</a></h2>
+<p>The FFT method is a miraculous technique for computing aggregate
+distributions. It is especially effective when the expected claim count
+is relatively small and the underlying severity distribution is bounded.
+These assumptions are true for many excess of loss reinsurance treaties,
+for example. Thus the FFT is very useful when quoting excess layers with
+annual aggregate deductibles or other variable features. The FFT
+provides a discrete approximation to the moment generating function.</p>
+<p>To use the FFT method, first “bucket” (or quantize) the severity
+distribution into a density vector <span class="math">\(\x=(x_1,\dots,x_{m})\)</span> whose
+length <span class="math">\(m\)</span> is a power of two <span class="math">\(m=2^n\)</span>. Here</p>
+<div class="math">
+\[x_i=\text{Pr}((i-1/2)b &lt; X &lt; (i+1/2)b)
+x_1=\text{Pr}(X&lt;b/2),\quad x_{m}=\text{Pr}(X&gt;(m-1/2)b)\]</div>
+<p>for some fixed <span class="math">\(b\)</span>. We call <span class="math">\(b\)</span> the bucket size. Note
+<span class="math">\(\sum_i x_i=1\)</span> by construction. The FFT of the <span class="math">\(m\times 1\)</span> vector
+<span class="math">\(\x\)</span> is another <span class="math">\(m\times 1\)</span> vector <span class="math">\(\hat\x\)</span> whose
+<span class="math">\(j\)</span>th component is</p>
+<div class="math">
+\[\sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).\label{fft}\]</div>
+<p>The coefficients of <span class="math">\(\hat\x\)</span> are complex numbers. It is also
+possible to express <span class="math">\(\hat\x=\F\x\)</span> where <span class="math">\(\F\)</span> is an
+appropriate matrix of complex roots of unity, so there is nothing
+inherently mysterious about a FFT. The trick is that there exists a very
+efficient algorithm for computing (<a class="reference external" href="#fft">[fft]</a>). Rather than taking
+time proportional to <span class="math">\(m^2\)</span>, as one would expect, it can be
+computed in time proportional to <span class="math">\(m\log(m)\)</span>. The difference
+between <span class="math">\(m\log(m)\)</span> and <span class="math">\(m^2\)</span> time is the difference between
+practically possible and practically impossible.</p>
+<p>You can use the inverse FFT to recover <span class="math">\(\x\)</span> from its transform
+<span class="math">\(\hat\x\)</span>. The inverse FFT is computed using the same equation
+(<a class="reference external" href="#fft">[fft]</a>) as the FFT except there is a minus sign in the
+exponent and the result is divided by <span class="math">\(2^n\)</span>. Because the equation
+is essentially the same, the inversion process can also be computed in
+<span class="math">\(m\log(m)\)</span> time.</p>
+<p>The next step is magic in actuarial science. Remember that if <span class="math">\(N\)</span>
+is a <span class="math">\(G\)</span>-mixed Poisson and <span class="math">\(A=X_1+\cdots+X_N\)</span> is an
+aggregate distribution then</p>
+<div class="math">
+\[M_A(\zeta)=M_G(n(M_X(\zeta)-1)).\]</div>
+<p>Using FFTs you can replace the <em>function</em> <span class="math">\(M_X\)</span> with the discrete
+approximation <em>vector</em> <span class="math">\(\hat\x\)</span> and compute</p>
+<div class="math">
+\[\hat\a=M_G(n(\hat\x -1))\]</div>
+<p>component-by-component to get an approximation vector to the function
+<span class="math">\(M_A\)</span>. You can then use the inverse FFT to recover an discrete
+approximation <span class="math">\(\a\)</span> of <span class="math">\(A\)</span> from <span class="math">\(\hat\a\)</span>! See Wang
+<a href="#id1"><span class="problematic" id="id2">:raw-latex:`\cite{bigWang}`</span></a> for more details.</p>
+<p>Similar tricks are possible in two dimensions???—???see Press et al.
+<a href="#id3"><span class="problematic" id="id4">:raw-latex:`\cite{nrc}`</span></a> and Homer and Clark
+<a href="#id5"><span class="problematic" id="id6">:raw-latex:`\cite{homerclark}`</span></a> for a discussion.</p>
+<p>The FFT allows us to use the following very simple method to
+qualitatively approximate the density of an aggregate of dependent
+marginals <span class="math">\(X_1,\dots,X_n\)</span> given a correlation matrix
+<span class="math">\(\Sigma\)</span>. First use the FFT method to compute the sum <span class="math">\(S'\)</span>
+of the <span class="math">\(X_i\)</span> as though they were independent. Let
+<span class="math">\(\Var(S')=\sigma^{'2}\)</span> and let <span class="math">\(\sigma^2\)</span> be the variance of
+the sum of the <span class="math">\(X_i\)</span> implied by <span class="math">\(\Sigma\)</span>. Next use the FFT
+to add a further “noise” random variable <span class="math">\(N\)</span> to <span class="math">\(S'\)</span> with
+mean zero and variance <span class="math">\(\sigma^2-\sigma^{'2}\)</span>. Two obvious choices
+for the distribution of <span class="math">\(N\)</span> are normal or shifted lognormal. Then
+<span class="math">\(S'+N\)</span> has the same mean and variance as the sum of the dependent
+variables <span class="math">\(X_i\)</span>. The range of possible choices for <span class="math">\(N\)</span>
+highlights once again that knowing the marginals and correlation
+structure is not enough to determine the whole multivariate
+distribution. It is an interesting question whether all possible choices
+of <span class="math">\(N\)</span> correspond to actual multivariate structures for the
+<span class="math">\(X_i\)</span> and conversely whether all multivariate structures
+correspond to an <span class="math">\(N\)</span>. (It is easy to use MGFs to deconvolve
+<span class="math">\(N\)</span> from the true sum using Fourier methods; the question is
+whether the resulting “distribution” is non-negative.)</p>
+<p>Heckman and Meyers <a href="#id7"><span class="problematic" id="id8">:raw-latex:`\cite{heckmeyers}`</span></a> used Fourier
+transforms to compute aggregate distributions by numerically integrating
+the characteristic function. Direct inversion of the Fourier transform
+is also possible using FFTs. The application of FFTs is not completely
+straight forward because of certain aspects of the approximations
+involved. The details are very clearly explained in Menn and Rachev
+<a href="#id9"><span class="problematic" id="id10">:raw-latex:`\cite{mennrachev}`</span></a>. Their method allows the use of FFTs to
+determine densities for distributions which have analytic MGFs but not
+densities???—???notably the class of stable distributions.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+          </div>
+      <div class="spc-rightsidebar span3">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Probability and Risk Theory (rst)</a><ul>
+<li><a class="reference internal" href="#discretizing-severity-distributions">Discretizing Severity Distributions</a></li>
+<li><a class="reference internal" href="#generalized-distributions">Generalized Distributions</a></li>
+<li><a class="reference internal" href="#fast-fourier-transforms">Fast Fourier Transforms</a></li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <div>
+    <a href="_sources/probrst.rst.txt"
+       rel="nofollow">Show Source</a>
+  </div>
+<div class="this-page-menu">
+  <a href="/scipy/docs/scipy-docs/probrst.rst.rst">Edit page</a>
+</div>
+
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container container-navbar-bottom">
+      <div class="spc-navbar">
+        
+      </div>
+    </div>
+    <div class="container">
+    <div class="footer">
+    <div class="row-fluid">
+    <ul class="inline pull-left">
+      <li>
+        &copy; Copyright 2018, Stephen J. Mildenhall.
+      </li>
+      <li>
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.6.3.
+      </li>
+    </ul>
+    </div>
+    </div>
+    </div>
+  </body>
+</html>

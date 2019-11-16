@@ -4,6 +4,7 @@ from scipy.integrate import quad
 import pandas as pd
 import collections
 import logging
+import json
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
     MomentAggregator, xsden_to_meancv
@@ -389,7 +390,8 @@ class Aggregate(Frequency):
 
     Limit Profiles
         The exposure variables can be vectors to express a *limit profile*.
-        All exp_ elements are broadcast against one-another. For example
+        All ```exp_[en|prem|loss|count]``` related elements are broadcast against one-another.
+        For example
 
         ::
 
@@ -441,19 +443,151 @@ class Aggregate(Frequency):
     Circumventing Products
         It is sometimes desirable to enter two or more lines each with a different severity but
         with a shared mixing variable. For example to model the current accident year and a run-
-        off reserve, where the current year is lognormal mean 100 cv 1 and the reserves are
-        larger lognormal mean 150 cv 1.25 claims requires
+        off reserve, where the current year is gamma mean 100 cv 1 and the reserves are
+        larger lognormal mean 150 cv 0.5 claims requires
 
         ::
 
-            agg prem_reserve [100 200] claims sev lognorm [100 150] cv [1 1.25]
+            agg MixedPremReserve [100 200] claims sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.4
 
         so that the result is not the four-way exposure / severity product but just a two-way
         combination. These two cases are distinguished looking at the total weights. If the weights sum to
         one then the result is an exposure / severity product. If the weights are missing or sum to the number
         of severity components (i.e. are all equal to 1) then the result is a row by row combination.
 
-    Other notes
+    Other Programs
+        Below are a series of programs illustrating the different ways exposure, frequency and severity can be
+        broadcast together, several different types of severity and all the different types of severity.
+
+        ::
+
+            test_string_0 = '''
+            # use to create sev and aggs so can illustrate use of sev. and agg. below
+
+            sev sev1 lognorm 10 cv .3
+
+            agg Agg0 1 claim sev lognorm 10 cv .09 fixed
+
+            '''
+
+            test_string_1 = f'''
+            agg Agg1  1 claim sev {10*np.exp(-.3**2/2)} * lognorm .3      fixed note{{sigma=.3 mean=10}}
+            agg Agg2  1 claim sev {10*np.exp(-.3**2/2)} * lognorm .3 + 5  fixed note{{shifted right by 5}}''' \
+            '''
+            agg Agg3  1 claim sev 10 * lognorm 0.5 cv .3                  fixed note{mean 0.5 scaled by 10 and cv 0.3}
+            agg Agg4  1 claim sev 10 * lognorm 1 cv .5 + 5                fixed note{shifted right by 5}
+
+            agg Agg5  1 claim sev 10 * gamma .3                           fixed note{gamma distribution....can use any two parameter scipy.stats distribution plus expon, uniform and normal}
+            agg Agg6  1 claim sev 10 * gamma 1 cv .3 + 5                  fixed note{mean 10 x 1, cv 0.3 shifted right by 5}
+
+            agg Agg7  1 claim sev 2 * pareto 1.6 - 2                      fixed note{pareto alpha=1.6 lambda=2}
+            agg Agg8  1 claim sev 2 * uniform 5 + 2.5                     fixed note{uniform 2.5 to 12.5}
+
+            agg Agg9  1 claim 10 x  2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, 1 claim}
+            agg Agg10 10 loss 10 xs 2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, total loss 10, derives requency}
+            agg Agg11 14 prem at .7    10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency}
+            agg Agg11 14 prem at .7 lr 10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency, lr is optional}
+
+            agg Agg12: 14 prem at .7 lr (10 x 1) sev (lognorm 20 cv 1.5)  fixed note{trailing semi and other punct ignored};
+
+            agg Agg13: 1 claim sev 50 * beta 3 2 + 10 fixed note{scaled and shifted beta, two parameter distribution}
+            agg Agg14: 1 claim sev 100 * expon + 10   fixed note{exponential single parameter, needs scale, optional shift}
+            agg Agg15: 1 claim sev 10 * norm + 50     fixed note{normal is single parameter too, needs scale, optional shift}
+
+            # any scipy.stat distribution taking one parameter can be used; only cts vars supported on R+ make sense
+            agg Agg16: 1 claim sev 1 * invgamma 4.07 fixed  note{inverse gamma distribution}
+
+            # mixtures
+            agg MixedLine1: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equally weighted mixture of 5 lognormals different cvs}
+            agg MixedLine2: 1 claim 25 xs 0 sev lognorm [10, 15, 20, 25, 50] cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equal weighted mixture of 5 lognormals different cvs and means}
+            agg MixedLine3: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wt [.2, .3, .3, .15, .05]   fixed note{weights scaled to equal 1 if input}
+
+            # limit profile
+            agg LimitProfile1: 1 claim [1, 5, 10, 20] xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{maybe input EL by band for wt}
+            agg LimitProfile2: 5 claim            20  xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{input EL by band for wt}
+            agg LimitProfile3: [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv 1.25   fixed note{input counts directly}
+
+            # limits and distribution blend
+            agg Blend1 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3]          fixed note{options all broadcast against one another, 50 claims of each}
+            agg Blend2 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3] wt=3     fixed note{options all broadcast against one another, 50 claims of each}
+
+            agg Blend5cv1  50 claims  5 x 0 sev lognorm 12 cv 1 fixed
+            agg Blend10cv1 50 claims 10 x 0 sev lognorm 12 cv 1 fixed
+            agg Blend15cv1 50 claims 15 x 0 sev lognorm 12 cv 1 fixed
+
+            agg Blend5cv15  50 claims  5 x 0 sev lognorm 12 cv 1.5 fixed
+            agg Blend10cv15 50 claims 10 x 0 sev lognorm 12 cv 1.5 fixed
+            agg Blend15cv15 50 claims 15 x 0 sev lognorm 12 cv 1.5 fixed
+
+            # semi colon can be used for newline and backslash works
+            agg Blend5cv3  50 claims  5 x 0 sev lognorm 12 cv 3 fixed; agg Blend10cv3 50 claims 10 x 0 sev lognorm 12 cv 3 fixed
+            agg Blend15cv3 50 claims 15 x 0 sev \
+            lognorm 12 cv 3 fixed
+
+            # not sure if it will broadcast limit profile against severity mixture...
+            agg LimitProfile4: [10 30 15 5] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv [1.0, 1.25, 1.5] wts=3  fixed note{input counts directly}
+            ''' \
+            f'''
+            # the logo
+            agg logo 1 claim {np.linspace(10, 250, 20)} xs 0 sev lognorm 100 cv 1 fixed'''
+
+            test_string_2 = '''
+            # empirical distributions
+            agg dHist1 1 claim sev dhistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{discrete histogram}
+            agg cHist1 1 claim sev chistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{continuous histogram, guessed right hand endpiont}
+            agg cHist2 1 claim sev chistogram xps [1 10 40 45] [.5 .3 .2]  fixed     note{continuous histogram, explicit right hand endpoint, don't need commas}
+            agg BodoffWind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed   note{examples from Bodoffs paper}
+            agg BodoffQuake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+            # set up fixed sev for future use
+            sev One dhistogram xps [1] [1]   note{a certain loss of 1}
+            '''
+
+            test_string_3 = '''
+            # sev, agg and port: using built in objects [have to exist prior to running program]
+            agg ppa:       0.01 * agg.PPAL       note{this is using lmult on aggs, needs a dictionary specification to adjust means}
+            agg cautoQS:   1e-5 * agg.CAL        note{lmult is quota share or scale for rmul see below }
+            agg cautoClms: agg.CAL * 1e-5        note{rmult adjusts the claim count}
+
+            # scaling works with distributions already made by uw
+            agg mdist: 5000 * agg.dHist1
+
+            '''
+
+            test_string_4 = '''
+            # frequency options
+            agg FreqFixed      10 claims sev sev.One fixed
+            agg FreqPoisson    10 claims sev sev.One poisson                   note{Poisson frequency}
+            agg FreqBernoulli  .8 claims sev sev.One bernoulli               note{Bernoulli en is frequency }
+            agg FreqBinomial   10 claims sev sev.One binomial 0.5
+            agg FreqPascal     10 claims sev sev.One pascal .8 3
+
+            # mixed freqs
+            agg FreqNegBin     10 claims sev sev.One (mixed gamma 0.65)     note{gamma mixed Poisson = negative binomial}
+            agg FreqDelaporte  10 claims sev sev.One mixed delaporte .65 .25
+            agg FreqIG         10 claims sev sev.One mixed ig  .65
+            agg FreqSichel     10 claims sev sev.One mixed delaporte .65 -0.25
+            agg FreqSichel.nb  10 claims sev sev.One mixed delaporte .65 .25
+            agg FreqSichel.ig  10 claims sev sev.One mixed delaporte .65 .25
+            agg FreqBeta       10 claims sev sev.One mixed beta .5  4  note{second param is max mix}
+            '''
+            test_strings = [test_string_0, test_string_1, test_string_2, test_string_3, test_string_4]
+
+            # run the various tests
+            uw = agg.Underwriter()
+            uw.glob = globals()
+            uw.create_all = True
+            uw.update = True
+            uw.log2 = 8
+            ans = {}
+            # make sure we have this base first:
+            uw('sev One dhistogram xps [1] [1]   note{a certain loss of 1}')
+            for i, t in enumerate(test_strings):
+                print(f'line {i} of {len(test_strings)}')
+                ans.update(uw(t))
+
+    Other Notes
+        How Expected Claim Count is determined etc.
         * en determines en
         * prem x loss ratio -> el
         * severity x en -> el
@@ -519,6 +653,13 @@ class Aggregate(Frequency):
 
         # class variables
         self.name = get_value(name)
+        # for persistence, save the raw called spec... (except lookups have been replaced...)
+        # TODO want to use the trick with setting properties so that if they are altered spec gets alterned...
+        self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
+                         exp_attachment=exp_attachment, exp_limit=exp_limit,
+                         sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
+                         sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=None, sev_ps=sev_ps, sev_wt=sev_wt,
+                         freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
         logging.info(
             f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
@@ -994,6 +1135,8 @@ class Aggregate(Frequency):
 
         To make a 'multiple' of an existing distortion you can use a simple wrapper class like this:
 
+        ::
+
             class dist_wrap(agg.Distortion):
                 '''
                 wrap a distortion to include higher or lower freq
@@ -1349,6 +1492,22 @@ class Aggregate(Frequency):
             self._pdf = interpolate.interp1d(self.xs, self.agg_density, kind='linear',
                                              bounds_error=False, fill_value='extrapolate')
         return self._pdf(x) / self.bs
+
+    def json(self):
+        """
+        write in json
+        :return:
+        """
+        return json.dumps(self.spec)
+
+    def agg_lang(self):
+        """
+        write in aggregate language...
+        :return:
+        """
+        raise ValueError('agg_lang not yet implemented...')
+
+
 
     # def quantile_function(self, kind='nearest'):
     #     """

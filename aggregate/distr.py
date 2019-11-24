@@ -16,6 +16,7 @@ from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 import itertools
+from numpy.linalg import inv, pinv, det, matrix_rank
 
 
 class Frequency(object):
@@ -59,7 +60,7 @@ class Frequency(object):
       freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
       -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
       cases are available.
-    * ``sichel.nb``: generalized inverse gaussian mixture where the parameters match the moments of a
+    * ``sichel.gamma``: generalized inverse gaussian mixture where the parameters match the moments of a
       delaporte distribution with given freq_a and freq_b
     * ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
       shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
@@ -637,6 +638,15 @@ class Aggregate(Frequency):
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
                       'sev_wt', 'freq_name', 'freq_a', 'freq_b', 'note']
 
+    @property
+    def spec(self):
+        """
+        get the dictionary specification but treat as a read only
+        property
+        :return:
+        """
+        return self._spec
+
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1,
@@ -655,11 +665,11 @@ class Aggregate(Frequency):
         self.name = get_value(name)
         # for persistence, save the raw called spec... (except lookups have been replaced...)
         # TODO want to use the trick with setting properties so that if they are altered spec gets alterned...
-        self.spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                         exp_attachment=exp_attachment, exp_limit=exp_limit,
-                         sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
-                         sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=None, sev_ps=sev_ps, sev_wt=sev_wt,
-                         freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
+        self._spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
+                          exp_attachment=exp_attachment, exp_limit=exp_limit,
+                          sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
+                          sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=None, sev_ps=sev_ps, sev_wt=sev_wt,
+                          freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
         logging.info(
             f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
@@ -690,6 +700,7 @@ class Aggregate(Frequency):
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
+        self._careful_q = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
@@ -1421,6 +1432,135 @@ class Aggregate(Frequency):
         l1 = self.density_df.index[l1]
         return l1
 
+    def careful_q(self, p):
+        """
+        careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
+        Note this is automatically vectorized and returns and array whereas q isn't.
+        It doesn't necessarily return a element of the index.
+
+        Just for reference here is code to illustrate the problem
+
+            uw = agg.Underwriter(create_all=True)
+
+            def plot_eg_agg(b, e, w, n=32, axs=None, x_range=1):
+                '''
+                makes a tricky distribution function with a poss isolated jump
+                creates an agg object and checks the quantile function is correct
+
+                mass at w
+
+                '''
+
+                if axs is None:
+                    f, axs0 = plt.subplots(2,3, figsize=(9,6))
+                    axs = iter(axs0.flatten())
+
+                tm = np.linspace(0, 1, 33)
+                tf = lambda x : f'{32*x:.0f}'
+
+                def pretty(axis, ticks, formatter):
+                    maj = ticks[::4]
+                    mnr = [i for i in ticks if i not in maj]
+                    labels = [formatter(i) for i in maj]
+                    axis.set_ticks(maj)
+                    axis.set_ticks(mnr, True)
+                    axis.set_ticklabels(labels)
+                    axis.grid(True, 'major', lw=0.707, c='lightblue')
+                    axis.grid(True, 'minor', lw=0.35, c='lightblue')
+
+                # make the distribution
+                xs = np.linspace(0, x_range, n+1)
+                Fx = np.zeros_like(xs)
+                Fx[b:13] = 1
+                Fx[20:e] = 1
+                Fx[w] = 32 - np.sum(Fx)
+                Fx = Fx / Fx.sum()
+                Fx = np.cumsum(Fx)
+
+                # make an agg version: find the jumps and create a dhistogram
+                temp = pd.DataFrame(dict(x=xs, F=Fx))
+                temp['f'] = np.diff(temp.F, prepend=0)
+                temp = temp.query('f > 0')
+                pgm = f'agg Tricky 1 claim sev dhistogram xps {temp.x.values} {temp.f.values} fixed'
+                a = uw(pgm)
+                a.easy_update(10, 0.001)
+                # plot
+                a.plot(axiter=axs)
+                pretty(axs0[0,0].xaxis, tm, tf)
+                pretty(axs0[0,2].xaxis, tm, tf)
+                pretty(axs0[0,2].yaxis, tm, tf)
+
+                # lower left plot: distribution function
+                ax = next(axs)
+                ax.step(xs, Fx, where='post', marker='.')
+                ax.plot(a.xs, a.agg_density.cumsum(), linewidth=3, alpha=0.5, label='from agg')
+                ax.set(title=f'b={b}, e={e}, w={w}', ylim=-0.05, aspect='equal')
+                if x_range  == 1:
+                    ax.set(aspect='equal')
+                ax.legend(frameon=False, loc='upper left')
+                pretty(ax.xaxis, tm, tf)
+                pretty(ax.yaxis, tm, tf)
+
+                # lower middle plot
+                ps = np.linspace(0, 1, 301)
+                agg_careful = a.careful_q(ps)
+                ax = next(axs)
+                ax.step(Fx, xs, where='pre', marker='.', label='input')
+                ax.plot(Fx, xs, ':', label='input joined')
+                ax.plot(ps, agg_careful, linewidth=1, label='agg careful')
+                ax.set(title='Inverse', ylim=-0.05)
+                if x_range  == 1:
+                    ax.set(aspect='equal')
+                pretty(ax.xaxis, tm, tf)
+                pretty(ax.yaxis, tm, tf)
+                ax.legend()
+
+                # lower right plot
+                ax = next(axs)
+                dmq = np.zeros_like(ps)
+                for i, p in enumerate(ps):
+                    try:
+                        dmq[i] = a.q(p)
+                    except:
+                        dmq[i] = 0
+                ax.plot(ps, agg_careful, label='careful (agg obj)', linewidth=1, alpha=1)
+                ax.plot(ps, dmq, label='agg version')
+                ax.legend(frameon=False, loc='upper left')
+                pretty(ax.xaxis, tm, tf)
+                pretty(ax.yaxis, tm, tf)
+                ax.set(title='Check with agg version')
+
+                plt.tight_layout()
+
+                return a
+
+            aw = plot_eg_agg(6, 29, 16)
+
+        :param p: single or vector of values of ps, 0<1
+        :return:  quantiles
+        """
+        if self._careful_q is None:
+            self._careful_q = CarefulInverse.dist_inv1d(self.xs, self.agg_density)
+
+        return self._careful_q(p)
+
+    def careful_tvar(self, p):
+        """
+        compute a very careful tvar...this may be very slow...
+        TODO SORT OUT...this does not work well
+        :param p:
+        :return:
+        """
+        if isinstance(p, np.ndarray):
+            ans = np.zeros_like(p)
+            for j, pv in enumerate(p):
+                i = quad(self.careful_q, pv, 1)
+                ans[j] = i[0] / (1 - pv)
+            return ans
+        else:
+            i = quad(self.careful_q, p, 1)
+            return i[0] / (1 - p)
+
     def var(self, p):
         """
         value at risk = alias for quantile function
@@ -1452,7 +1592,7 @@ class Aggregate(Frequency):
         """
         if self.density_df is None:
             # force recomputation
-            throwaway = self.q(p)
+            _ = self.q(p)
 
         _var = self.q(p)
         # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
@@ -1498,7 +1638,7 @@ class Aggregate(Frequency):
         write in json
         :return:
         """
-        return json.dumps(self.spec)
+        return json.dumps(self._spec)
 
     def agg_lang(self):
         """
@@ -1507,7 +1647,57 @@ class Aggregate(Frequency):
         """
         raise ValueError('agg_lang not yet implemented...')
 
+    def entropy_fit(self, n_const, tol=1e-10, verbose=False):
+        """
+        Find  the max entropy fit to the aggregate based on n_moments fit
+        n_moments must include 0 powers (so for two moments enter 3)
 
+        Based on discussions with and R code from Jon Evans
+
+        :param n_const: number of moments to match, including 0 for sum of probs
+        :param tol:
+        :param verbose:
+        :return:
+        """
+        # don't want to mess up the object...
+        xs = self.xs.copy()
+        p = self.agg_density.copy()
+        # more aggressively de-fuzz
+        p = np.where(abs(p) < 1e-16, 0, p)
+        p = p / np.sum(p)
+        p1 = p.copy()
+
+        mtargets = np.zeros(n_const)
+        for i in range(n_const):
+            mtargets[i] = np.sum(p)
+            p *= xs
+
+        parm1 = np.zeros(n_const)
+        x = np.array([xs ** i for i in range(n_const)])
+
+        probs = np.exp(-x.T @ parm1)
+        machieved = x @ probs
+        der1 = -(x * probs) @ x.T
+
+        er = 1
+        iters = 0
+        while er > tol:
+            iters += 1
+            try:
+                parm1 = parm1 - inv(der1) @ (machieved - mtargets)
+            except np.linalg.LinAlgError:
+                print('Singluar matrix')
+                print(der1)
+                return None
+            probs = np.exp(-x.T @ parm1)
+            machieved = x @ probs
+            der1 = -(x * probs) @ x.T
+            er = (machieved - mtargets).dot(machieved - mtargets)
+            if verbose:
+                print(f'Error: {er}\nParameter {parm1}')
+        ans = pd.DataFrame(dict(xs=xs, agg=p1, fit=probs))
+        ans = ans.set_index('xs')
+        return dict(params=parm1, machieved=machieved, mtargets=mtargets, ans_df=ans)
 
     # def quantile_function(self, kind='nearest'):
     #     """
@@ -1996,3 +2186,84 @@ class Severity(ss.rv_continuous):
             suptitle_and_tight(self.long_name)
 
 
+class CarefulInverse(object):
+    """
+    from SRM_Examples Noise: careful inverse functions
+
+    """
+    @staticmethod
+    def make1d(xs, ys, agg_fun=None, kind='linear', **kwargs):
+        """
+        Wrapper to make a reasonable 1d interpolation function with reasonable extrapolation
+        Does NOT handle inverse functions, for those use dist_inv1d
+        :param xs:
+        :param ys:
+        :param agg_fun:
+        :param kind:
+        :param kwargs:
+        :return:
+        """
+        temp = pd.DataFrame(dict(x=xs, y=ys))
+        if agg_fun:
+            temp = temp.groupby('x').agg(agg_fun)
+            fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
+            f = interpolate.interp1d(temp.index, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
+        else:
+            fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
+            f = interpolate.interp1d(temp.x, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
+        return f
+
+    @staticmethod
+    def dist_inv1d(xs, fx, kind='linear', max_Fx=1.):
+        """
+        from SRM_Examples Noise
+        Careful inverse of distribution function with jumps. Assumes xs is evenly spaced.
+        Assumes that if there are two or more xs values between changes in dist it is a jump,
+        otherwise is is a continuous part. Puts in -eps values to make steps around jumps.
+        :param xs:
+        :param fx:  density
+        :param kind:
+        :param max_Fx: what is the max allowable value of F(x)?
+        """
+
+        # make dataframe to allow summarization
+        df = pd.DataFrame(dict(x=xs, fx=fx))
+        # lots of problems with noise...strip it off
+        df['fx'] = np.where(np.abs(df.fx) < 1e-16, 0, df.fx)
+        # compute cumulative probabilities
+        df['Fx'] = df.fx.cumsum()
+        gs = df.groupby('Fx').agg({'x': [np.min, np.max, len]})
+        gs.columns = ['mn', 'mx', 'n']
+        # figure if a jump or not
+        gs['jump'] = 0
+        gs.loc[gs.n > 1, 'jump'] = 1
+        gs = gs.reset_index(drop=False)
+        # figure the right hand end of the jump
+        gs['nextFx'] = gs.Fx.shift(-1, fill_value=1)
+
+        # space for answer
+        ans = np.zeros((2 * len(gs), 2))
+        rn = 0
+        eps = 1e-10
+        max_Fx -= eps / 100
+        # write out known (x, y) points for lin interp
+        for n, r in gs.iterrows():
+            ans[rn, 0] = r.Fx
+            ans[rn, 1] = r.mn if r.Fx >= max_Fx else r.mx
+            rn += 1
+            if r.Fx >= max_Fx:
+                break
+            if r.jump:
+                if r.nextFx >= max_Fx:
+                    break
+                ans[rn, 0] = r.nextFx - eps
+                ans[rn, 1] = r.mx
+                rn += 1
+        # trim up ans
+        ans = ans[:rn, :]
+
+        # make interpolation function and return
+        fv = ((ans[0, 1]), (ans[-1, 1]))
+        ff = interpolate.interp1d(ans[:, 0], ans[:, 1], bounds_error=False, fill_value=fv, kind=kind)
+        # df = input in data frame; gs = grouped df, ans = carefully selected points for inverse
+        return ff

@@ -238,7 +238,7 @@ class Portfolio(object):
         # d[self.name] = dict(args=args, spec=[a.spec for a in self.agg_list])
         d['name'] = self.name
         d['args'] = args
-        d['spec_list'] = [a.spec for a in self.agg_list]
+        d['spec_list'] = [a._spec for a in self.agg_list]
 
         logging.info(f'Portfolio.json| dummping {self.name} to {stream}')
         s = json.dumps(d) # , default_flow_style=False, indent=4)
@@ -279,11 +279,11 @@ class Portfolio(object):
         # TODO consider if better naming of L&R sides is in order
         new_spec = []
         for a in self.agg_list:
-            c = deepcopy(a.spec)
+            c = deepcopy(a._spec)
             c['name'] = c['name']
             new_spec.append(c)
         for a in other.agg_list:
-            c = deepcopy(a.spec)
+            c = deepcopy(a._spec)
             c['name'] = c['name']
             new_spec.append(c)
 
@@ -301,7 +301,7 @@ class Portfolio(object):
 
         new_spec = []
         for a in self.agg_list:
-            new_spec.append(deepcopy(a.spec))
+            new_spec.append(deepcopy(a._spec))
 
         for d in new_spec:
             # d is a dictionary agg spec, need to adjust the severity
@@ -327,7 +327,7 @@ class Portfolio(object):
 
         new_spec = []
         for a in self.agg_list:
-            new_spec.append(deepcopy(a.spec))
+            new_spec.append(deepcopy(a._spec))
 
         for d in new_spec:
             # d is a dictionary agg spec, need to adjust the frequency

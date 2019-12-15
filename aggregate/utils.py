@@ -12,10 +12,11 @@ from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from io import StringIO
 import re
-
+from pathlib import Path
 
 # logging
-LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
+# LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
+LOGFILE = Path.home() / 'log/aggregate.log'
 logging.basicConfig(filename=LOGFILE,
                     filemode='w',
                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',

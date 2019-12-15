@@ -568,8 +568,8 @@ class Aggregate(Frequency):
             agg FreqDelaporte  10 claims sev sev.One mixed delaporte .65 .25
             agg FreqIG         10 claims sev sev.One mixed ig  .65
             agg FreqSichel     10 claims sev sev.One mixed delaporte .65 -0.25
-            agg FreqSichel.nb  10 claims sev sev.One mixed delaporte .65 .25
-            agg FreqSichel.ig  10 claims sev sev.One mixed delaporte .65 .25
+            agg FreqSichel.gamma  10 claims sev sev.One mixed sichel.gamma .65 .25
+            agg FreqSichel.ig     10 claims sev sev.One mixed sichel.ig  .65 .25
             agg FreqBeta       10 claims sev sev.One mixed beta .5  4  note{second param is max mix}
             '''
             test_strings = [test_string_0, test_string_1, test_string_2, test_string_3, test_string_4]
@@ -647,6 +647,58 @@ class Aggregate(Frequency):
         """
         return self._spec
 
+    @property
+    def density_df(self):
+        """
+        create and return the _density_df data frame
+        read only property...though if you write d = a.density_df you can obviously edit d...
+        :return:
+        """
+        if self._density_df is None:
+            # really should have one of these anyway...
+            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_sev=self.sev_density))
+            # remove the fuzz
+            eps = 1.5e-16
+            self.density_df.loc[:, self.density_df.select_dtypes(include=['float64']).columns] = \
+                self.density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+            self._density_df = self.density_df.set_index('loss', drop=False)
+            self._density_df['log_p'] = np.log(self._density_df.p)
+            self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
+            self._density_df['F'] = self.density_df.p.cumsum()
+            self._density_df['F_sev'] = self.density_df.p_sev.cumsum()
+            self._density_df['S'] = 1 - self._density_df.F
+            self._density_df['S_sev'] = 1 - self._density_df.F_sev
+            # add LEV,   TVaR to each threshold point...
+
+            self._density_df['lev'] = np.hstack((0, self._density_df.S.iloc[:-1])).cumsum() * self.bs
+            self._density_df['exa'] = self._density_df['lev']
+            self.density_df['exlea'] = \
+                (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
+            # fix very small values, see port _add_exa
+            n_ = self._density_df.shape[0]
+            if n_ < 1100:
+                mult = 1
+            elif n_ < 15000:
+                mult = 10
+            else:
+                mult = 100
+            loss_max = self._density_df[['loss', 'exlea']].query(' exlea > loss ').loss.max()
+            if np.isnan(loss_max):
+                loss_max = 0
+            else:
+                loss_max += mult * self.bs
+            self._density_df.loc[0:loss_max, 'exlea'] = 0
+            # expected value and epd
+            self._density_df['e'] = np.sum(self._density_df.p * self._density_df.loss)
+            self._density_df.loc[:, 'epd'] = \
+                np.maximum(0, (self._density_df.loc[:, 'e'] - self._density_df.loc[:, 'lev'])) / \
+                self._density_df.loc[:, 'e']
+            self._density_df['exgta'] = self._density_df.loss + (
+                    self._density_df.e - self._density_df.exa) / self._density_df.S
+            self._density_df['exeqa'] = self._density_df.loss  # E(X | X=a) = a(!) included for symmetry was exa
+
+        return self._density_df
+
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1,
@@ -683,7 +735,6 @@ class Aggregate(Frequency):
         self._linear_quantile_function = None
         self._cdf = None
         self._pdf = None
-        self.density_df = None
         self.en = None  # this is for a sublayer e.g. for limit profile
         self.n = 0  # this is total frequency
         self.attachment = None
@@ -701,6 +752,7 @@ class Aggregate(Frequency):
         self.sevs = None
         self.audit_df = None
         self._careful_q = None
+        self._density_df = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
@@ -814,6 +866,8 @@ class Aggregate(Frequency):
         self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
+        self._middle_q = None
+        self._q = None
 
     def __repr__(self):
         """
@@ -831,7 +885,7 @@ class Aggregate(Frequency):
         # pull out agg statistics_df
         ags = self.statistics_total_df.loc['mixed', :]
         s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, ' " \
+            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
             f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
@@ -974,6 +1028,7 @@ class Aggregate(Frequency):
         """
         axiter = None
         verbose_audit_df = None
+        self._density_df = None  # invalidate
         if verbose:
             axiter = axiter_factory(None, len(self.sevs) + 2, aspect=1.414)
             verbose_audit_df = pd.DataFrame(
@@ -1418,19 +1473,32 @@ class Aggregate(Frequency):
         :param p:
         :return:
         """
-        if self._linear_quantile_function is None:
-            # really should have one of these anyway...
-            self.density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density))
-            self.density_df = self.density_df.set_index('loss', drop=False)
-            self.density_df['F'] = self.density_df.p.cumsum()
-
-        q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
-        l = float(q(p))
+        if self._q is None:
+            self._q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
+        l = float(self._q(p))
         # find next nearest index value if not an exact match (this is slightly faster and more robust
         # than l/bs related math)
         l1 = self.density_df.index.get_loc(l, 'bfill')
         l1 = self.density_df.index[l1]
         return l1
+
+    def middle_q(self, p):
+        """
+        not as careful as careful q but much better than q
+        vectorized
+        does not return element of the index!
+
+        :param p:
+        :return:
+        """
+        if self._middle_q is None:
+            temp = self.density_df.groupby('F')[['loss']].agg(np.min)
+            temp.loc[1.0, 'loss'] = temp.iloc[-1, :].loss
+            temp.loc[0.0, 'loss'] = 0.0
+            temp = temp.sort_index()
+            self._middle_q = interpolate.interp1d(temp.index, temp.loss, kind='linear')
+
+        return self._middle_q(p)
 
     def careful_q(self, p):
         """
@@ -1570,6 +1638,43 @@ class Aggregate(Frequency):
         """
         return self.q(p)
 
+    # original tvar --->
+    # def tvar(self, p):
+    #     """
+    #     Compute the tail value at risk at threshold p
+    #
+    #     Definition 2.6 (Tail mean and Expected Shortfall)
+    #     Assume E[X−] < ∞. Then
+    #     x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
+    #     is α-tail mean at level α the of X.
+    #     Acerbi and Tasche (2002)
+    #
+    #     We are interested in the right hand exceedence [?? note > vs ≥]
+    #     α^{−1}E[X 1{X > x(α)}] + x(α) (P[X ≤ x(α)] − α)
+    #
+    #     McNeil etc. p66-70 - this follows from def of ES as an integral
+    #     of the quantile function
+    #
+    #     :param p:
+    #     :return:
+    #     """
+    #     q = self.q(p)
+    #     l1 = self.density_df.index.get_loc(q, 'bfill')
+    #     q1 = self.density_df.index[l1]
+    #
+    #     # original
+    #     if self.density_df is None:
+    #         # force recomputation
+    #         _ = self.q(p)
+    #
+    #     _var = self.q(p)
+    #
+    #     # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
+    #     ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p', 'loss']].product(axis=1).sum()
+    #     pip = (self.density_df.loc[_var, 'F'] - p) * _var
+    #     t_var = 1 / (1 - p) * (ex + pip)
+    #     return t_var
+
     def tvar(self, p):
         """
         Compute the tail value at risk at threshold p
@@ -1586,20 +1691,24 @@ class Aggregate(Frequency):
         McNeil etc. p66-70 - this follows from def of ES as an integral
         of the quantile function
 
+        q is exact quantile (most of the time)
+        q1 is the smallest index element (bucket multiple) greater than or equal to q
+
+        tvar integral is int_p^1 q(s)ds = int_q^infty xf(x)dx = q + int_q^infty S(x)dx
+        we use the last approach. np.trapz approxes the integral. And the missing piece
+        between q and q1 approx as a trapezoid too.
 
         :param p:
         :return:
         """
-        if self.density_df is None:
-            # force recomputation
-            _ = self.q(p)
+        # function not vectorized
+        q = float(self.middle_q(p))
+        l1 = self.density_df.index.get_loc(q, 'bfill')
+        q1 = self.density_df.index[l1]
 
-        _var = self.q(p)
-        # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
-        ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p', 'loss']].product(axis=1).sum()
-        pip = (self.density_df.loc[_var, 'F'] - p) * _var
-        t_var = 1 / (1 - p) * (ex + pip)
-        return t_var
+        i1 = np.trapz(self.density_df.loc[q1:, 'S'], dx=self.bs)
+        i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
+        return q + (i1 + i2) / (1 - p)
 
     def cdf(self, x):
         """

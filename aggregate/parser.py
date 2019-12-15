@@ -131,7 +131,7 @@ Lexer term definition
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
     FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: WHY?
+    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: BECAUSE p_ etc. makes _ special
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
@@ -236,7 +236,9 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
     FREQ = r'binomial|poisson|bernoulli|pascal|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9~_]*'  # do not allow _ in line names, use ~ instead: WHY?
+    # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
+    # on honor system...really need two types of ID, it is OK in a portfolio name
+    ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
@@ -257,7 +259,7 @@ class UnderwritingLexer(Lexer):
     ID['mixed'] = MIXED
     ID['inf'] = NUMBER
     ID['sev'] = SEV
-    ID['on'] = SEV
+    # ID['on'] = SEV
     ID['agg'] = AGG
     ID['port'] = PORT
 
@@ -493,10 +495,12 @@ class UnderwritingParser(Parser):
         return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
 
     #                                v can go
-    @_('ids numbers numbers weights xps')
+    #@_('ids numbers numbers weights xps')
+    @_('ids numbers numbers weights')
     def sev(self, p):
         self.log(f'resolving ids {p.ids} numbers numbers {p[1]}, {p[2]} to sev (two param sev dist)')
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
+        # return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_b':  p[2], 'sev_wt': p.weights, **p.xps}
+        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_b': p[2], 'sev_wt': p.weights}
 
     # TODO a bit restrictive on numerical densities here!
     #      v put in weights here instead (if xps relevant then cannot need shape parameters)

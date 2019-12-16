@@ -1487,6 +1487,18 @@ class Portfolio(object):
                 ex = np.sum(np.minimum(1, uncapped)) * self.bs
                 ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * self.bs
                 return ex - premium_target, ex_prime
+        elif name == 'dual':
+            # dual moment
+            shape = 2.0          # starting parameter
+            lS = -np.log(1 - S)  # prob a bunch of zeros...
+            # lS[0] = 0  # ??
+
+            def f(rho):
+                temp = (1 - S) ** rho
+                trho = 1 - temp
+                ex = np.sum(trho) * self.bs
+                ex_prime = np.sum(temp * lS) * self.bs
+                return ex - premium_target, ex_prime
         else:
             raise ValueError(f'calibrate_distortion not implemented for {name}')
 
@@ -1580,7 +1592,7 @@ class Portfolio(object):
         for g in dist_dict.values():
             df, au = self.apply_distortion(g, axiter, num_plots)
             # extract range of S values
-            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
+            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name
@@ -1610,11 +1622,10 @@ class Portfolio(object):
 
         # by line columns=method x capital
         if num_plots >= 1:
-            display(ans_table)
-            sns.factorplot(x='line', y='value', row='return', col='method', size=2.5, kind='bar',
-                           data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
-            sns.factorplot(x='method', y='value', row='return', col='line', size=2.5, kind='bar',
-                           data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
+            sns.catplot(x='line', y='value', row='return', col='method', height=2.5, kind='bar',
+                           data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
+            sns.catplot(x='method', y='value', row='return', col='line', height=2.5, kind='bar',
+                           data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
             # sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
             #                data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
 

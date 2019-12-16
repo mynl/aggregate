@@ -10,6 +10,8 @@
       <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/distr.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/distr.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/spectral.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/spectral.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/Untitled.ipynb" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/basic_examples.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/examples/basic_examples.ipynb" afterDir="false" />
@@ -35,11 +37,29 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/port.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="426">
-              <caret line="1577" column="16" lean-forward="true" selection-start-line="1577" selection-start-column="16" selection-end-line="1577" selection-end-column="16" />
+            <state relative-caret-position="746">
+              <caret line="1624" selection-start-line="1624" selection-end-line="1627" selection-end-column="98" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/setup.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="360">
+              <caret line="19" lean-forward="true" selection-start-line="19" selection-end-line="19" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/aggregate/spectral.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="935">
+              <caret line="286" lean-forward="true" selection-start-line="286" selection-end-line="286" />
             </state>
           </provider>
         </entry>
@@ -58,6 +78,7 @@
   <component name="FindInProjectRecents">
     <findStrings>
       <find>fuzz</find>
+      <find>_eg_param_1_</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -69,12 +90,15 @@
         <option value="$PROJECT_DIR$/aggregate/distr.py" />
         <option value="$PROJECT_DIR$/aggregate/parser.py" />
         <option value="$PROJECT_DIR$/aggregate/port.py" />
+        <option value="$PROJECT_DIR$/setup.py" />
+        <option value="$PROJECT_DIR$/aggregate/spectral.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="124" />
-    <option name="width" value="2224" />
+    <option name="x" value="218" />
+    <option name="y" value="204" />
+    <option name="width" value="2184" />
     <option name="height" value="3010" />
   </component>
   <component name="ProjectView">
@@ -171,20 +195,20 @@
       <option name="presentableId" value="Default" />
       <updated>1576350498732</updated>
       <workItem from="1576350503441" duration="6691000" />
-      <workItem from="1576427674855" duration="2447000" />
+      <workItem from="1576427674855" duration="8673000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="9138000" />
+    <option name="totallyTimeSpent" value="15364000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="62" y="0" width="1112" height="1505" extended-state="0" />
+    <frame x="109" y="102" width="1092" height="1505" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info id="Structure" order="1" sideWeight="0.49927327" visible="true" weight="0.1903409" />
-      <window_info active="true" content_ui="combo" id="Project" order="2" sideWeight="0.50072676" side_tool="true" visible="true" weight="0.1903409" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.49927327" visible="true" weight="0.19401544" />
+      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.50072676" side_tool="true" visible="true" weight="0.19401544" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
       <window_info anchor="bottom" id="Run" order="2" />
@@ -227,10 +251,31 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/update.bat">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/setup.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="360">
+          <caret line="19" lean-forward="true" selection-start-line="19" selection-end-line="19" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/port.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="426">
-          <caret line="1577" column="16" lean-forward="true" selection-start-line="1577" selection-start-column="16" selection-end-line="1577" selection-end-column="16" />
+        <state relative-caret-position="746">
+          <caret line="1624" selection-start-line="1624" selection-end-line="1627" selection-end-column="98" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/aggregate/spectral.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="935">
+          <caret line="286" lean-forward="true" selection-start-line="286" selection-end-line="286" />
         </state>
       </provider>
     </entry>

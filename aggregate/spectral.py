@@ -21,25 +21,29 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'tvar', 'convex')
+    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'tvar', 'convex')
+    _has_mass_ = ('ly', 'clin', 'lep')
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
-                    "Linear Yield", "Capped Linear", "Tail VaR", "Convex Envelope")
+                    "Linear Yield", "Capped Linear", "Dual Moment", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
-    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'tvar', 'convex')
-    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1,  0.75)
-    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8,  0.95)
+    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'tvar', 'convex')
+    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1, 3,  0.75)
+    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8, 6,  0.95)
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
 
     @classmethod
-    def available_distortions(cls, pricing=True):
+    def available_distortions(cls, pricing=True, strict=True):
         """
         list of the available distortions
 
-        :param pricing: only return list suitable for pricing
+        :param pricing: only return list suitable for pricing, excludes tvar and convex
+        :param strict: only include those without mass at zero  (pricing only)
         :return:
         """
 
-        if pricing:
+        if pricing and strict:
+            return tuple((i for i in cls._available_distortions_[:-2] if i not in cls._has_mass_))
+        elif pricing:
             return cls._available_distortions_[:-2]
         else:
             return cls._available_distortions_
@@ -197,6 +201,17 @@ class Distortion(object):
                 u = (mb - rad) / (2 * a)
                 return np.where(y < d, 0, np.maximum(0, u))
 
+        elif self.name == 'dual':
+            # dual moment
+            p = self.shape
+            q = 1 / p
+            self.has_mass = False
+            def g(x):
+                return 1 - (1 - x)**p
+
+            def g_inv(y):
+                return 1 - (1 - y)**q
+
         elif self.name == 'convex':
             self.has_mass = False
             hull = ConvexHull(df[[col_x, col_y]])
@@ -267,7 +282,7 @@ class Distortion(object):
         if self.name == 'convex':
             ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], 'o')
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
-        ax.set_title(self.__str__())
+        ax.set(title=str(self), aspect='equal')
         return ax
 
     @classmethod
@@ -283,7 +298,7 @@ class Distortion(object):
 
         xs = np.linspace(0, 1, 1001)
 
-        # zip stops at the shorter of the vectors, so this does not include convex
+        # zip stops at the shorter of the vectors, so this does not include convex (must be listed last)
         # added df for the t; everyone else can ignore it
         for name, shape in zip(cls._available_distortions_, cls._eg_param_1_):
             dist = Distortion(name, shape, r0, df=4)
@@ -304,7 +319,7 @@ class Distortion(object):
         suptitle_and_tight('Example Distortion Functions')
 
     @staticmethod
-    def distortions_from_params(params, index, r0=0.025, plot=True):
+    def distortions_from_params(params, index, r0=0.025, plot=True, axiter=None):
         """
         make set of dist funs and inverses from params, output of port.calibrate_distortions
         params must just have one row for each method and be in the output format of cal_dist
@@ -324,12 +339,16 @@ class Distortion(object):
             dists[dn] = Distortion(name=dn, shape=param, r0=r0, df=df)
 
         if plot:
-            axiter = axiter_factory(None, len(dists))
+            axiter = axiter_factory(axiter, len(dists))
             # f, axs = plt.subplots(2, 3, figsize=(8, 6))
             # it = iter(axs.flatten())
             for dn in Distortion.available_distortions():
                 dists[dn].plot(ax=next(axiter))
-            axiter.tidy()
+            try:
+                axiter.tidy()
+            except:
+                # fails if axiter is just an iteration of axis elements
+                pass
             plt.tight_layout()
 
         return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]

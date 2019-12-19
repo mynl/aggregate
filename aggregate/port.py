@@ -23,6 +23,8 @@ from .utils import *
 from .distr import Aggregate
 from .spectral import Distortion
 from .distr import Severity
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter, StrMethodFormatter, FuncFormatter, \
+                               AutoMinorLocator, MaxNLocator, NullFormatter, FixedLocator, FixedFormatter
 
 class Portfolio(object):
     """
@@ -1490,6 +1492,7 @@ class Portfolio(object):
         elif name == 'dual':
             # dual moment
             shape = 2.0          # starting parameter
+            S = S[S<1]
             lS = -np.log(1 - S)  # prob a bunch of zeros...
             # lS[0] = 0  # ??
 
@@ -1633,7 +1636,7 @@ class Portfolio(object):
 
     def apply_distortion(self, dist, axiter=None, num_plots=0):
         """
-        Apply the distorion, make a copy of density_df and append various columns
+        Apply the distortion, make a copy of density_df and append various columns
         Handy graphic of results
 
 
@@ -1939,17 +1942,274 @@ class Portfolio(object):
 
         return df, pricing_g
 
+    def example_factory(self, dname, LR, p, index='loss'):
+        """
+        Helpful graphic and summary dataframes from one distortion, loss ratio and p value.
+
+         C:\\\\ConvexRiskLLC\\convexrisk\\notebooks\\Allocation_Functions.ipynb
+
+
+         :param dname: name of distortion
+         :param LR: loss ratio
+         :param p: p value to determine capital.
+         :param index:  whether to plot against loss or S(x)
+         :return: various dataframes
+
+        """
+
+        a = self.q(1-1e-8)
+        a0 = self.q(1e-4)
+        a_cal = self.q(p)
+        cd = self.calibrate_distortions(LRs=[LR], As=[a_cal])
+        dd = Distortion.distortions_from_params(cd, (a_cal, LR), plot=False)
+        dist = dd[dname]
+        deets, _ = self.apply_distortion(dist)
+        # https://regex101.com/r/jN1kL6/1
+        regex = '^loss|^p_[^η]|^g?(S|F)|exag?_.+?$(?<!(pcttotal|sumparts))'
+
+        g, g_inv = dist.g, dist.g_inv
+
+        S = deets.S
+        # remember loss is the loss limit 'a', not an amount of loss
+        loss = deets.loss
+        lossa = loss[0:a]
+        Sa = S[0:a]
+        Fa = 1 - Sa
+        gSa = g(Sa)
+
+        # top down stats
+        premium_td = np.cumsum(gSa[::-1])[::-1] * self.bs
+        el_td = np.cumsum(Sa[::-1])[::-1] * self.bs
+        # a - lossa is the amount of capital up to lossa, then premium is the amount of premium upto lossa
+        capital_td = (a - lossa) - premium_td
+        lr_td = el_td / premium_td
+        roe_td = (premium_td - el_td) / capital_td
+        leverage_td = premium_td / capital_td
+        risk_margin_td = premium_td - el_td
+        assets_td = capital_td + premium_td
+
+        # bottom up calc
+        premium_bu = np.cumsum(gSa) * self.bs
+        el_bu = np.cumsum(Sa) * self.bs
+        capital_bu = lossa - premium_bu
+        lr_bu = el_bu / premium_bu
+        roe_bu = (premium_bu - el_bu) / capital_bu
+        leverage_bu = premium_bu / capital_bu
+        risk_margin_bu = premium_bu - el_bu
+        assets_bu = capital_bu + premium_bu
+
+        # marginal - same td or bu obviously
+        marg_roe = (gSa - Sa) / (1 - gSa)
+        marg_lr = Sa / gSa
+
+        # extract useful columns only
+        deets = deets.filter(regex=regex).copy()
+
+        # add variou sloss ratios
+        for l in self.line_names_ex:
+            deets[f'LR_{l}']= deets[f'exa_{l}'] / deets[f'exag_{l}']
+
+        # make really interesting elements for graphing and further analysis
+        # note duplicated columns: different names emphasize different viewpoints
+        df = pd.DataFrame({'F(a)': Fa, 'a': lossa, 'S(a)': Sa, 'g(S(a))': gSa,
+                           'Layer Loss': Sa, 'Layer Prem': gSa, 'Layer Margin': gSa-Sa, 'Layer Capital': 1-gSa,
+                           'Premium↓': premium_td, r'Loss↓': el_td,
+                           'Capital↓': capital_td, 'Risk Margin↓': risk_margin_td, 'Assets↓': assets_td,
+                           'Loss Ratio↓': lr_td, 'ROE↓': roe_td, 'P:S↓': leverage_td,
+                           'Premium↑': premium_bu, r'Loss↑': el_bu,
+                           'Capital↑': capital_bu, 'Risk Margin↑': risk_margin_bu, 'Assets↑': assets_bu,
+                           'Loss Ratio↑': lr_bu, 'ROE↑': roe_bu, 'P:S↑': leverage_bu,
+                           'Marginal LR': marg_lr, 'Marginal ROE': marg_roe, })
+
+        # adjust the top down ROE to reflect that you start writing at a_cal and not a
+        df['*ROE↓'] = 0
+        df.loc[:a_cal, '*ROE↓'] = (
+            (df.loc[:a_cal, 'Premium↓'] - df.loc[:a_cal, 'Loss↓'] -
+                 (df.loc[a_cal+self.bs, 'Premium↓'] - df.loc[a_cal+self.bs, 'Loss↓'])) /
+            (df.loc[:a_cal, 'Capital↓'] - df.loc[a_cal+self.bs, 'Capital↓'])
+        )
+
+        if index=='loss':
+            df = df.set_index('a')
+            xlim = [0, a]
+        else:
+            df = df.set_index('S(a)', drop=False)
+            xlim = [-0.05, 1.05]
+
+        def tidy(a, y=True):
+            """
+            function to tidy up the graphics
+            """
+            a.legend(frameon=True, prop={'size': 7}) # , loc='upper right')
+            a.set(xlabel='Assets')
+            n = 8
+            # MaxNLocator uses <= n sensible  points
+            a.xaxis.set_minor_locator(MaxNLocator(n))
+            # fixed just sets that point
+            a.xaxis.set_major_locator(FixedLocator([a_cal]))
+            # MultipleLocator uses multiples of give value
+            # a.xaxis.set_minor_locator(MultipleLocator(a_cal / 5))
+            # NullFormatter for no tick marks (default for minor)
+            # a.xaxis.set_major_formatter(NullFormatter())
+            # StrMethodFormatter suitable for .format(), variable must be called x
+            a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
+            ff = f'A={a_cal:,.0f}'
+            # Fixed formatter: just give the points
+            a.xaxis.set_major_formatter(FixedFormatter([ff]))
+            # FuncFormatter also helpful
+            # a.xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: f'{x:,.0f}' if x != a_cal else f'**{x:,.0f}'))
+
+            if y:
+                a.yaxis.set_major_locator(MaxNLocator(n))
+                a.yaxis.set_minor_locator(MaxNLocator(5*n))
+
+            # gridlines with various options
+            # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+            a.grid(which='major', axis='x', c='cornflowerblue', alpha=1, linewidth=1)
+            a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+            a.grid(which='minor', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+            a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+
+            # tick marks
+            a.tick_params('x', which='major', labelsize=7, length=10, width=0.75, color='cornflowerblue', direction='out')
+            a.tick_params('y', which='major', labelsize=7, length=5, width=0.75, color='black', direction='out')
+            a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
+
+        # plots
+        # https://matplotlib.org/3.1.1/tutorials/intermediate/constrainedlayout_guide.html?highlight=constrained%20layout
+        f1, axs = plt.subplots(3, 2, figsize=(8, 10), sharex=True, constrained_layout=True)
+        ax = iter(axs.flatten())
+
+        a = next(ax)
+        # df[['S(a)', 'g(S(a))', 'F(a)']].plot(xlim=xlim, ax=a).legend(frameon=False, prop={'size': 4}, loc='upper right')
+        df[['Layer Loss', 'Layer Prem', 'Layer Capital']].plot(xlim=xlim, logy=False, ax=a)
+        tidy(a)
+
+        a = next(ax)
+        df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=a, ylim=0) # logy=True, ylim=[1e-6,1], ax=a)
+        # df[['Layer Loss', 'Layer Prem', 'F(a)', 'Layer Capital', 'Layer Margin']].plot(xlim=xlim, logy=False, ax=a).legend(frameon=False, prop={'size': 6}, loc='upper right')
+        tidy(a, False)
+
+        a = next(ax)
+        df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=a)
+        tidy(a)
+        # a.set(aspect=1)
+
+        a = next(ax)
+        df[['Loss Ratio↓', 'Loss Ratio↑', 'Marginal LR']].plot(xlim=xlim, ax=a)
+        tidy(a)
+
+        a = next(ax)
+        df[['Premium↑', 'Loss↑', 'Capital↑', 'Assets↑', 'Risk Margin↑']].plot(xlim=xlim, ax=a)
+        tidy(a)
+        # a.set(aspect=1)
+
+
+        a = next(ax)
+        _ = df.iloc[100:200, :]['Marginal ROE'].max()
+        avg_roe_up = df.at[a_cal, "ROE↑"]
+        # just get rid of this
+        df.loc[0:self.q(1e-5), 'Marginal ROE'] = np.nan
+        df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE',]].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
+        # df[['ROE↓', 'ROE↑', 'Marginal ROE', 'P:S↓', 'P:S↑']].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
+        a.plot(xlim, [avg_roe_up, avg_roe_up], ":", linewidth=2, alpha=0.75, label='Avg ROE')
+        tidy(a, False)
+        a.grid('both','both')
+
+        title = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
+                f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
+        f1.suptitle(title)
+
+        # trinity plots
+        def tidy2(a, k, xloc=0.25):
+
+            a.xaxis.set_major_locator(MultipleLocator(xloc))
+            a.xaxis.set_minor_locator(MultipleLocator(xloc/5))
+            a.xaxis.set_major_formatter(StrMethodFormatter('{x:.2f}'))
+
+            n = 4
+            a.yaxis.set_major_locator(MaxNLocator(2*n))
+            a.yaxis.set_minor_locator(MaxNLocator(8*n))
+
+            # gridlines with various options
+            # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+            a.grid(which='major', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+            a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+            a.grid(which='minor', axis='x', c='gainsboro', alpha=0.25, linewidth=0.5)
+            a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+
+            # tick marks
+            a.tick_params('both', which='major', labelsize=7, length=4, width=0.75, color='black', direction='out')
+            a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
+
+            # line to show where capital lies
+            a.plot([0,1], [k,k], linewidth=1, c='black', label='Capital')
+
+
+        f2, axs = plt.subplots(1, 5, figsize=(8, 3), sharey=True, constrained_layout=True)
+        ax = iter(axs.flatten())
+
+        maxa = self.q(1-1e-8)
+        k = self.q(p)
+        xr = [-0.05, 1.05]
+
+        audit = deets.loc[:maxa, :]
+
+        a = next(ax)
+        a.plot(audit.gS, audit.loss, label='Prem')
+        a.plot(audit.S, audit.loss, label='Loss')
+        a.legend(loc="upper right", frameon=True, prop={'size': 7}, edgecolor=None)
+        a.set(xlim=xr, title='Prem & Loss')
+        a.set(xlabel='Loss = S = Pr(X>a)\nPrem = g(S)', ylabel="Assets, a")
+        tidy2(a, k)
+
+        a = next(ax)
+        m = audit.F - audit.gF
+        a.plot(m, audit.loss, linewidth=2, label='M')
+        a.set(xlim=0, title='Margin, M')
+        a.set(xlabel='M = g(S) - S')
+        tidy2(a, k, m.max() * 1.05 / 4)
+
+        a = next(ax)
+        a.plot(1 - audit.gS, audit.loss, label='Q')
+        a.set(xlim=xr, title='Equity, Q')
+        a.set(xlabel='Q = 1 - g(S)')
+        tidy2(a, k)
+
+        a = next(ax)
+        temp = audit.loc[self.q(1e-5):, :]
+        r = (temp.gS - temp.S) / (1 - temp.gS)
+        a.plot(r, temp.loss, linewidth=2, label='ROE')
+        a.set(xlim=0, title='Layer ROE')
+        a.set(xlabel='ROE = M / Q')
+        tidy2(a, k, r.max() * 1.05 / 4)
+
+        a = next(ax)
+        a.plot(audit.S / audit.gS, audit.loss)
+        a.set(xlim=xr, title='Layer LR')
+        a.set(xlabel='LR = S / g(S)')
+        tidy2(a, k)
+
+        # title2 = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
+        #         f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
+        # f2.suptitle(title2)
+
+        return Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1, fig2=f2)
+
+
     def top_down(self, distortions, A_or_p):
         """
-        DataFrama summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A
+        DataFrame summary and nice plots showing marginal and average ROE, lr etc. as you write a layer from x to A
         If A=0 A=q(log) is used
 
-        Not integrated into graphcis format (plot)
+        Not integrated into graphics format (plot)
 
         :param distortions: list or dictionary of CDistortion objects, or a single CDist object
         :param A_or_p: if <1 interpreted as a quantile, otherwise assets
         :return:
         """
+
+        warnings.warn('Portfolio.top_down is deprecated. It has been replaced by Portfolio.example_factory.')
 
         assert A_or_p > 0
 

@@ -2,20 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/aggregate_project.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dictionaries/steve.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/other.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/distr.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/distr.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/parser.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/spectral.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/spectral.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/Untitled.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/basic_examples.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/examples/basic_examples.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/__init__.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -37,11 +25,14 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/aggregate/port.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="746">
+            <state relative-caret-position="42224">
               <caret line="1624" selection-start-line="1624" selection-end-line="1627" selection-end-column="98" />
+              <folding>
+                <element signature="e#232#250#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -49,17 +40,32 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/setup.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="360">
-              <caret line="19" lean-forward="true" selection-start-line="19" selection-end-line="19" />
+            <state relative-caret-position="432">
+              <caret line="19" selection-start-line="19" selection-end-line="19" />
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/spectral.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="935">
-              <caret line="286" lean-forward="true" selection-start-line="286" selection-end-line="286" />
+            <state relative-caret-position="384">
+              <caret line="16" column="6" selection-start-line="16" selection-start-column="6" selection-end-line="16" selection-end-column="6" />
+              <folding>
+                <element signature="e#120#138#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/aggregate/__init__.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="528">
+              <caret line="22" column="65" lean-forward="true" selection-start-line="22" selection-start-column="65" selection-end-line="22" selection-end-column="65" />
+              <folding>
+                <element signature="e#302#322#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -67,7 +73,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/parser.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="801">
+            <state relative-caret-position="5664">
               <caret line="239" column="81" selection-start-line="239" selection-start-column="81" selection-end-line="239" selection-end-column="81" />
             </state>
           </provider>
@@ -96,9 +102,9 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="218" />
-    <option name="y" value="204" />
-    <option name="width" value="2184" />
+    <option name="x" value="1348" />
+    <option name="y" value="276" />
+    <option name="width" value="2836" />
     <option name="height" value="3010" />
   </component>
   <component name="ProjectView">
@@ -195,20 +201,22 @@
       <option name="presentableId" value="Default" />
       <updated>1576350498732</updated>
       <workItem from="1576350503441" duration="6691000" />
-      <workItem from="1576427674855" duration="8673000" />
+      <workItem from="1576427674855" duration="9270000" />
+      <workItem from="1576544363939" duration="18000" />
+      <workItem from="1576637970825" duration="1062000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="15364000" />
+    <option name="totallyTimeSpent" value="17041000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="109" y="102" width="1092" height="1505" extended-state="0" />
+    <frame x="674" y="138" width="1418" height="1505" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info active="true" id="Structure" order="1" sideWeight="0.49927327" visible="true" weight="0.19401544" />
-      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.50072676" side_tool="true" visible="true" weight="0.19401544" />
+      <window_info id="Structure" order="1" sideWeight="0.49781978" visible="true" weight="0.1534508" />
+      <window_info active="true" content_ui="combo" id="Project" order="2" sideWeight="0.5021802" side_tool="true" visible="true" weight="0.1534508" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
       <window_info anchor="bottom" id="Run" order="2" />
@@ -226,7 +234,7 @@
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="right" id="SciView" order="3" />
-      <window_info anchor="right" x="0" y="0" width="225" height="1305" id="Documentation" order="4" side_tool="true" weight="0.3295129" />
+      <window_info anchor="right" x="0" y="0" width="225" height="1305" id="Documentation" order="4" side_tool="true" visible="true" weight="0.15785609" />
       <window_info anchor="right" id="Database" order="5" />
     </layout>
   </component>
@@ -234,6 +242,13 @@
     <option name="version" value="1" />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/update.bat">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/distr.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="17400">
@@ -244,38 +259,47 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/setup.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="432">
+          <caret line="19" selection-start-line="19" selection-end-line="19" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/parser.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="801">
+        <state relative-caret-position="5664">
           <caret line="239" column="81" selection-start-line="239" selection-start-column="81" selection-end-line="239" selection-end-column="81" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/update.bat">
+    <entry file="file://$PROJECT_DIR$/aggregate/__init__.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/setup.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="19" lean-forward="true" selection-start-line="19" selection-end-line="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/aggregate/port.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="746">
-          <caret line="1624" selection-start-line="1624" selection-end-line="1627" selection-end-column="98" />
+        <state relative-caret-position="528">
+          <caret line="22" column="65" lean-forward="true" selection-start-line="22" selection-start-column="65" selection-end-line="22" selection-end-column="65" />
+          <folding>
+            <element signature="e#302#322#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/spectral.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="935">
-          <caret line="286" lean-forward="true" selection-start-line="286" selection-end-line="286" />
+        <state relative-caret-position="384">
+          <caret line="16" column="6" selection-start-line="16" selection-start-column="6" selection-end-line="16" selection-end-column="6" />
+          <folding>
+            <element signature="e#120#138#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/aggregate/port.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="42224">
+          <caret line="1624" selection-start-line="1624" selection-end-line="1627" selection-end-column="98" />
+          <folding>
+            <element signature="e#232#250#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

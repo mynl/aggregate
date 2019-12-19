@@ -13,6 +13,7 @@ from scipy.optimize.nonlin import NoConvergence
 from io import StringIO
 import re
 from pathlib import Path
+import warnings
 
 # logging
 # LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
@@ -1236,3 +1237,24 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     axiter.tidy()
     display(ans.unstack())
     return df, ans
+
+
+class Answer(dict):
+    def __init__(self, **kwargs):
+        """
+        Generic answer wrapping class with plotting
+
+        :param kwargs: key=value to wrap
+        """
+        super().__init__(kwargs)
+
+    def __getattr__(self, item):
+        return self[item]
+
+    def __repr__(self):
+        return super().__repr__()
+
+    def list(self):
+        """ List elements """
+        return pd.DataFrame(zip(self.keys(),
+            [type(v) for v in self.values()]), columns=['Item', 'Type'])

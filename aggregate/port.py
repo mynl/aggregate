@@ -1349,7 +1349,7 @@ class Portfolio(object):
         self.assets_2_epd[('total', 0)] = minus_ans_wrapper(
             interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True, fill_value='extrapolate'))
 
-    def calibrate_distortion(self, name, r0=0.0, premium_target=0.0, roe=0.0, assets=0.0, p=0.0, S_column='S'):
+    def calibrate_distortion(self, name, r0=0.0, df=5.5, premium_target=0.0, roe=0.0, assets=0.0, p=0.0, S_column='S'):
         """
         Find transform to hit a premium target given assets of ``assets``.
         Fills in the values in ``g_spec`` and returns params and diagnostics...so
@@ -1468,7 +1468,7 @@ class Portfolio(object):
             # wang-t-t ... issue with df, will set equal to 5.5 per Shaun's paper
             # finding that is a reasonable level for now TODO sort out!
             # param is shape like normal
-            t = ss.t(5.5)
+            t = ss.t(df)
             shape = 0.95  # starting param
 
             def f(lam):
@@ -1525,7 +1525,7 @@ class Portfolio(object):
         dist.premium_target = premium_target
         return dist
 
-    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, r0=0.03):
+    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, r0=0.03, df=5.5, strict=True):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
@@ -1536,6 +1536,9 @@ class Portfolio(object):
         :param As:  Assets or probs given
         :param Ps: probability levels for quantiles
         :param r0: for distortions that have a min ROL
+        :param df: for tt
+        :param strict: if True only use distortions with no mass at zero, otherwise
+                        use anything reasonable for pricing
         :return:
         """
         ans = pd.DataFrame(
@@ -1564,8 +1567,8 @@ class Portfolio(object):
                 iota = profit / K
                 delta = iota / (1 + iota)
                 nu = 1 - delta
-                for dname in Distortion.available_distortions(True):
-                    dist = self.calibrate_distortion(name=dname, r0=r0, premium_target=P, assets=a)
+                for dname in Distortion.available_distortions(pricing=True, strict=strict):
+                    dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a)
                     ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
                                                   dist.shape, dist.error]
         return ans
@@ -1677,20 +1680,23 @@ class Portfolio(object):
             # exixgtaUC is in reverse order but it has an index. When mult by .loss (which also has an index) it gets
             # re-sorted into ascending order
             df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
+            df[f'exleag_{line}'] = exleaUC / df.gF
+            df[f'exi_xgtag_{line}'] = exixgtaUC / df.gS
         # sum of parts: careful not to include the total twice!
         df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
         # LEV under distortion g
         df['exag_total'] = self.cumintegral(df['gS'])
 
         # comparison of total and sum of parts
+        # removed lTl and pcttotal (which spent a lot of time removing!) Dec 2019
         for line in self.line_names_ex:
             df[f'exa_{line}_pcttotal'] = df.loc[:, 'exa_' + line] / df.exa_total
             # exag is the premium
-            df[f'exag_{line}_pcttotal'] = df.loc[:, 'exag_' + line] / df.exag_total
+            # df[f'exag_{line}_pcttotal'] = df.loc[:, 'exag_' + line] / df.exag_total
             # premium like Total loss - this is in the aggregate_project and is an exa allocation (obvioulsy)
-            df[f'prem_lTl_{line}'] = df.loc[:, f'exa_{line}_pcttotal'] * df.exag_total
-            df[f'lrlTl_{line}'] = df[f'exa_{line}'] / df[f'prem_lTl_{line}']
-            df.loc[0, f'prem_lTl_{line}'] = 0
+            # df[f'prem_lTl_{line}'] = df.loc[:, f'exa_{line}_pcttotal'] * df.exag_total
+            # df[f'lrlTl_{line}'] = df[f'exa_{line}'] / df[f'prem_lTl_{line}']
+            # df.loc[0, f'prem_lTl_{line}'] = 0
             # loss ratio using my allocation
             df[f'lr_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
 
@@ -1705,6 +1711,7 @@ class Portfolio(object):
             ax.plot(df.exa_total, label='Loss')
             ax.legend()
             ax.set_title(f'Mass audit for {dist.name}')
+            ax.legend(prop={'size': 6})
 
             if num_plots >= 3:
                 # yet more graphics, but the previous one is the main event
@@ -1722,14 +1729,17 @@ class Portfolio(object):
                 df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
                 ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
                 ax.set_title("Densities")
+                ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.loc[:, ['p_total', 'gp_total']].plot(ax=ax)
                 ax.set_title("Total Density and Distortion")
+                ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.loc[:, ['S', 'gS']].plot(ax=ax)
                 ax.set_title("S, gS")
+                ax.legend(prop={'size': 6})
 
                 # exi_xlea removed
                 for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
@@ -1737,6 +1747,7 @@ class Portfolio(object):
                     ax = next(axiter)  # XXXX??? was (?![n])
                     df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9_]+$').sort_index(axis=1).plot(ax=ax)
                     ax.set_title(f'{prefix.title()} by line')
+                    ax.legend(prop={'size': 6})
                     if prefix.find('xi_x') > 0:
                         # fix scale for proportions
                         ax.set_ylim(0, 1.05)
@@ -1745,6 +1756,7 @@ class Portfolio(object):
                     ax = next(axiter)
                     df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
                     ax.set_title(f'{line} EXs')
+                    ax.legend(prop={'size': 6})
 
                 # compare exa with exag for all lines
                 # pno().plot(df_plot.loss, *(df_plot.exa_total, df_plot.exag_total))
@@ -1753,26 +1765,34 @@ class Portfolio(object):
                     ax = next(axiter)
                     df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
                     ax.set_title(f'{line} EL and Transf EL')
+                    ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.filter(regex='^exa_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('Pct loss')
                 ax.set_ylim(0, 1.05)
+                ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.filter(regex='^exag_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('Pct premium')
                 ax.set_ylim(0, 1.05)
+                ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.filter(regex='^lr_').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('LR: Natural Allocation')
+                ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
                 df_plot.filter(regex='^lrlTl_').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('LR: Prem Like Total Loss')
-                axiter.tidy()
-                plt.tight_layout()
+                ax.legend(prop={'size': 6})
+
+                if isinstance(axiter, AxisManager):
+                    axiter.tidy()
+                # prefer constrained_layout
+                # plt.tight_layout()
 
         return df, audit
 
@@ -1942,31 +1962,71 @@ class Portfolio(object):
 
         return df, pricing_g
 
-    def example_factory(self, dname, LR, p, index='loss'):
+    def example_factory(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
+                        p=None, A=None, index='loss', plot=True):
         """
         Helpful graphic and summary dataframes from one distortion, loss ratio and p value.
+        Starting logic is the similar to calibrate_distortions
 
-         C:\\\\ConvexRiskLLC\\convexrisk\\notebooks\\Allocation_Functions.ipynb
+        C:\\\\ConvexRiskLLC\\convexrisk\\notebooks\\Allocation_Functions.ipynb
 
-
-         :param dname: name of distortion
-         :param LR: loss ratio
-         :param p: p value to determine capital.
-         :param index:  whether to plot against loss or S(x)
-         :return: various dataframes
+        :param dname: name of distortion
+        :param dshape:  if input use dshape and dr0 to make the distortion
+        :param dr0, ddf:  r0 and df params for distortion
+        :param LR: otherwise use loss ratio and p or a loss ratio
+        :param p: p value to determine capital.
+        :param index:  whether to plot against loss or S(x)
+        :return: various dataframes
 
         """
 
         a = self.q(1-1e-8)
         a0 = self.q(1e-4)
-        a_cal = self.q(p)
-        cd = self.calibrate_distortions(LRs=[LR], As=[a_cal])
-        dd = Distortion.distortions_from_params(cd, (a_cal, LR), plot=False)
-        dist = dd[dname]
-        deets, _ = self.apply_distortion(dist)
-        # https://regex101.com/r/jN1kL6/1
-        regex = '^loss|^p_[^η]|^g?(S|F)|exag?_.+?$(?<!(pcttotal|sumparts))'
 
+        # figure assets a_cal (for calibration) from p or A
+        if p is None:
+            # have A
+            assert A is not None
+            exa, p = self.density_df.loc[A, ['exa_total', 'F']]
+            a_cal = self.q(p)
+            assert a_cal == A
+        else:
+            # have p
+            a_cal = self.q(p)
+            exa, p = self.density_df.loc[a_cal, ['exa_total', 'F']]
+
+        if dshape is None:
+            # figure distortion from LR or ROE
+            if LR is None:
+                assert ROE is not None
+                delta = ROE / (1 + ROE)
+                nu = 1 - delta
+                exag = nu * exa + delta * a_cal
+                LR = exa / exag
+            else:
+                exag = exa / LR
+
+            profit = exag - exa
+            K = a_cal - exag
+            ROE = profit / K
+            cd = self.calibrate_distortions(LRs=[LR], As=[a_cal], r0=dr0, df=ddf)
+            dd = Distortion.distortions_from_params(cd, (a_cal, LR), plot=False)
+            dist = dd[dname]
+            deets, _ = self.apply_distortion(dist)
+        else:
+            # specified distortion, fill in
+            dist = Distortion(dname, dshape, dr0, ddf)
+            deets, _ = self.apply_distortion(dist)
+            exag = deets.loc[a_cal, 'exag_total']
+            profit = exag - exa
+            K = a_cal - exag
+            ROE = profit / K
+            LR = exa / exag
+
+        audit_df = pd.DataFrame(dict(stat=[p, LR, ROE, a_cal, K, dist.name, dist.shape]),
+            index=['p', 'LR', "ROE", 'a_cal', 'K', 'dname', 'dshape'])
+
+        # we now have consistent set of LR, ROE, a_cal, p, exa, exag all computed
         g, g_inv = dist.g, dist.g_inv
 
         S = deets.S
@@ -2003,11 +2063,14 @@ class Portfolio(object):
         marg_lr = Sa / gSa
 
         # extract useful columns only
-        deets = deets.filter(regex=regex).copy()
+        # https://regex101.com/r/jN1kL6/1
+        regex = '^loss|^p_[^η]|^g?(S|F)|exag?_.+?$(?<!(pcttotal|sumparts))|exi_xgtag?_.+?$(?<!(pcttotal|sumparts))'
+        # deets = deets.filter(regex=regex).copy()
 
         # add variou sloss ratios
-        for l in self.line_names_ex:
-            deets[f'LR_{l}']= deets[f'exa_{l}'] / deets[f'exag_{l}']
+        # these are already in deets, added by apply_distortion)
+        #for l in self.line_names_ex:
+        #    deets[f'LR_{l}']= deets[f'exa_{l}'] / deets[f'exag_{l}']
 
         # make really interesting elements for graphing and further analysis
         # note duplicated columns: different names emphasize different viewpoints
@@ -2036,165 +2099,302 @@ class Portfolio(object):
             df = df.set_index('S(a)', drop=False)
             xlim = [-0.05, 1.05]
 
-        def tidy(a, y=True):
+        # make the pricing summary dataframe and exhibit
+        ex = deets.loc[[a_cal]].T
+        ex.index = [i.replace('xi_x', 'xi/x').replace('epd_', 'epd:').
+                    replace('ημ_', 'ημ') for i in ex.index]
+        pricing = ex.filter(regex='loss|^p_|g?[S]|exi/xgtag?_.+?$(?<!(sum))|'
+                        'exag?_.+?$(?<!(pcttotal|sumparts))|lr_', axis=0).sort_index()
+        pricing.index = [i if i.find('_')>0 else f'{i}_total' for i in pricing.index]
+        pricing.index = pricing.index.str.split('_', expand=True)
+        pricing.index.set_names(['stat', 'line'], inplace=True)
+        pricing = pricing.sort_index(level=[0,1])
+        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', slice('Atame', 'Dthick')) , :].sum(axis=0)
+        pricing = pricing.sort_index(level=[0,1])
+        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', slice('Atame', 'Dthick')) , :].sum(axis=0)
+        pricing = pricing.sort_index(level=[0,1])
+        for l in self.line_names:
+            pricing.loc[('S',l), :] = \
+                pricing.loc[('exi/xgta', l), :].values *   pricing.loc[('S', 'total'), :].values
+            pricing.loc[('gS',l), :] = \
+                pricing.loc[('exi/xgtag', l), :].values *   pricing.loc[('gS', 'total'), :].values
+            pricing.loc[('loss', l), :] = pricing.loc[('loss', 'total')]
+        pricing = pricing.sort_index(level=[0,1])
+
+        # focus on just the indicated capital level a_cal
+        exhibit = pricing.xs(a_cal, axis=1).unstack(1).T.copy()
+        exhibit['M LR'] = exhibit.S / exhibit.gS
+        exhibit['M ROE'] = (exhibit.gS - exhibit.S) / (1 - exhibit.gS)
+        Q = a_cal - exhibit.at['total', 'exag']
+        roe = (exhibit.at['total', 'exag'] -  exhibit.at['total', 'exa']) / Q
+        exhibit['TQ'] = (exhibit.exag -  exhibit.exa) / roe
+        exhibit['MQ'] = 1 - exhibit.gS
+        exhibit['TM'] = exhibit.TP - exhibit.TL
+        exhibit['T ROE'] = roe
+        exhibit['A'] = a_cal
+        exhibit = exhibit[['A', 'S', 'gS', 'M LR', 'MQ', 'M ROE', 'exi/xgta', 'exi/xgtag', 'exa', 'exag', 'TM', 'lr', 'TQ', 'T ROE' ]]
+        exhibit.columns = ['A', 'MC', 'MR', 'M LR', 'M Q', 'M ROE', 'exi/xgta', 'exi/xgtag', 'TL', 'TP', 'TM' 'T LR', 'TQ', 'T ROE' ]
+
+        # some reasonable traditional metrics
+        def tvar_thresh(p):
+            a = self.q(p)
+            def f(p):
+                return self.tvar(p) - a
+            loop = 0
+            p1 = 1 - 2 * (1 - p)
+            fp1 = f(p1)
+            delta = 1e-5
+            while abs(fp1) > 1e-6 and loop < 10:
+                df1 = (f(p1+delta) - fp1) / delta
+                p1 = p1 - fp1 / df1
+                fp1 = f(p1)
+                loop += 1
+            if loop == 10:
+                raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}')
+            return p1
+        # tvar threshold giving the same assets as p on VaR
+        p_t = tvar_thresh(p)
+        def equal_risk(p, p_t):
             """
-            function to tidy up the graphics
+            solve for equal risk var and tvar
             """
-            a.legend(frameon=True, prop={'size': 7}) # , loc='upper right')
-            a.set(xlabel='Assets')
-            n = 8
-            # MaxNLocator uses <= n sensible  points
-            a.xaxis.set_minor_locator(MaxNLocator(n))
-            # fixed just sets that point
-            a.xaxis.set_major_locator(FixedLocator([a_cal]))
-            # MultipleLocator uses multiples of give value
-            # a.xaxis.set_minor_locator(MultipleLocator(a_cal / 5))
-            # NullFormatter for no tick marks (default for minor)
-            # a.xaxis.set_major_formatter(NullFormatter())
-            # StrMethodFormatter suitable for .format(), variable must be called x
-            a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
-            ff = f'A={a_cal:,.0f}'
-            # Fixed formatter: just give the points
-            a.xaxis.set_major_formatter(FixedFormatter([ff]))
-            # FuncFormatter also helpful
-            # a.xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: f'{x:,.0f}' if x != a_cal else f'**{x:,.0f}'))
+            # these two should obviously be the same
+            target_v = self.q(p)
+            target_t = self.tvar(p_t)
+            def fv(p):
+                return sum([float(a.middle_q(p)) for a in self]) - target_v
+            def ft(p):
+                return sum([float(a.tvar(p)) for a in self]) - target_t
+            ans = np.zeros(2)
+            for i, f in enumerate([fv, ft]):
+                p1 = 1 - 2*(1-(p if i==0 else p_t))
+                fp1 = f(p1)
+                loop = 0
+                delta = 1e-5
+                while abs(fp1) > 1e-6 and loop < 10:
+                    dfp1 = (f(p1 + delta) - fp1) / delta
+                    p1 = p1 - fp1 / dfp1
+                    fp1 = f(p1)
+                    loop += 1
+                if loop == 10:
+                    raise ValueError(f'Trouble finding equal risk {"TVaR" if i else "VaR"} at p={p}')
+                ans[i] = p1
+            return ans
+        pv, pt = equal_risk(p, p_t)
+        exhibit['VaR'] = [float(a.middle_q(p)) for a in self] + [self.q(p)]
+        exhibit['TVaR'] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
+        exhibit['ScaledVaR'] = exhibit.VaR
+        exhibit['ScaledTVaR'] = exhibit.TVaR
+        exhibit.loc['total', 'ScaledVaR'] = 0
+        exhibit.loc['total', 'ScaledTVaR'] = 0
+        sumvar = exhibit.ScaledVaR.sum()
+        sumtvar = exhibit.ScaledTVaR.sum()
+        exhibit['ScaledVaR'] = exhibit.ScaledVaR * exhibit.loc['total', 'VaR'] / sumvar
+        exhibit['ScaledTVaR'] = exhibit.ScaledTVaR * exhibit.loc['total', 'TVaR'] / sumtvar
+        exhibit.loc['total', 'ScaledVaR'] = exhibit.loc['total', 'VaR']
+        exhibit.loc['total', 'ScaledTVaR'] = exhibit.loc['total', 'TVaR']
+        exhibit.loc['total', 'VaR'] = sumvar
+        exhibit.loc['total', 'TVaR'] = sumtvar
+        exhibit['EqRiskVaR'] = [float(a.middle_q(pv)) for a in self] + [self.q(p)]
+        exhibit['EqRiskTVaR'] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
+        # EPD and MerPer
+        row = self.density_df.loc[a_cal, :]
+        exhibit['EPD'] = [row.at[f'epd_{0 if l == "total" else 1}_{l}'] for l in self.line_names_ex]
+        def merper(port, l, p, v):
+            """
+            compute merton perold capital at p for line l
+            v = q(p)
+            """
+            if l=='total':
+                a = merper.total
+                merper.total = 0
+                return a
+            df = port.density_df
+            loss = df.loss
+            F = df[f'ημ_{l}'].cumsum()
+            f = interpolate.interp1d(F, loss)
+            a = v - f(p)
+            merper.total += a
+            return a
+        merper.total = 0
+        exhibit['MerPer'] = [merper(self, l, p, a_cal) for l in self.line_names_ex]
+        # subtract the premium to get the actual capital
+        methods =  ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
+        exhibit.loc[:, methods] = exhibit.loc[:, methods].sub(exhibit.TP.values, axis=0)
+        # make a version just focused on comparing ROEs
+        cols = ['ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
+        exhibit2 = exhibit.copy()[['TP', 'TL', 'T LR', 'TQ', 'T ROE'] + cols]
+        exhibit2.loc[:, cols] = (1 / exhibit2[cols]).mul(exhibit2.TP - exhibit2.TL, axis=0)
+        # other helpful audit values
+        audit_df.loc['TVaR@'] = p_t
+        audit_df.loc['erVaR'] = pv
+        audit_df.loc['erTVaR'] = pt
 
-            if y:
-                a.yaxis.set_major_locator(MaxNLocator(n))
-                a.yaxis.set_minor_locator(MaxNLocator(5*n))
+        if plot:
+            def tidy(a, y=True):
+                """
+                function to tidy up the graphics
+                """
+                a.legend(frameon=True, prop={'size': 7}) # , loc='upper right')
+                a.set(xlabel='Assets')
+                n = 8
+                # MaxNLocator uses <= n sensible  points
+                a.xaxis.set_minor_locator(MaxNLocator(n))
+                # fixed just sets that point
+                a.xaxis.set_major_locator(FixedLocator([a_cal]))
+                # MultipleLocator uses multiples of give value
+                # a.xaxis.set_minor_locator(MultipleLocator(a_cal / 5))
+                # NullFormatter for no tick marks (default for minor)
+                # a.xaxis.set_major_formatter(NullFormatter())
+                # StrMethodFormatter suitable for .format(), variable must be called x
+                a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
+                ff = f'A={a_cal:,.0f}'
+                # Fixed formatter: just give the points
+                a.xaxis.set_major_formatter(FixedFormatter([ff]))
+                # FuncFormatter also helpful
+                # a.xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: f'{x:,.0f}' if x != a_cal else f'**{x:,.0f}'))
 
-            # gridlines with various options
-            # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
-            a.grid(which='major', axis='x', c='cornflowerblue', alpha=1, linewidth=1)
-            a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
-            a.grid(which='minor', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
-            a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+                if y:
+                    n=6
+                    a.yaxis.set_major_locator(MaxNLocator(n))
+                    a.yaxis.set_minor_locator(MaxNLocator(5*n))
 
-            # tick marks
-            a.tick_params('x', which='major', labelsize=7, length=10, width=0.75, color='cornflowerblue', direction='out')
-            a.tick_params('y', which='major', labelsize=7, length=5, width=0.75, color='black', direction='out')
-            a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
+                # gridlines with various options
+                # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+                a.grid(which='major', axis='x', c='cornflowerblue', alpha=1, linewidth=1)
+                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
 
-        # plots
-        # https://matplotlib.org/3.1.1/tutorials/intermediate/constrainedlayout_guide.html?highlight=constrained%20layout
-        f1, axs = plt.subplots(3, 2, figsize=(8, 10), sharex=True, constrained_layout=True)
-        ax = iter(axs.flatten())
+                # tick marks
+                a.tick_params('x', which='major', labelsize=7, length=10, width=0.75, color='cornflowerblue', direction='out')
+                a.tick_params('y', which='major', labelsize=7, length=5, width=0.75, color='black', direction='out')
+                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
 
-        a = next(ax)
-        # df[['S(a)', 'g(S(a))', 'F(a)']].plot(xlim=xlim, ax=a).legend(frameon=False, prop={'size': 4}, loc='upper right')
-        df[['Layer Loss', 'Layer Prem', 'Layer Capital']].plot(xlim=xlim, logy=False, ax=a)
-        tidy(a)
+            # plots
+            # https://matplotlib.org/3.1.1/tutorials/intermediate/constrainedlayout_guide.html?highlight=constrained%20layout
+            f1, axs = plt.subplots(3, 2, figsize=(8, 10), sharex=True, constrained_layout=True)
+            ax = iter(axs.flatten())
 
-        a = next(ax)
-        df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=a, ylim=0) # logy=True, ylim=[1e-6,1], ax=a)
-        # df[['Layer Loss', 'Layer Prem', 'F(a)', 'Layer Capital', 'Layer Margin']].plot(xlim=xlim, logy=False, ax=a).legend(frameon=False, prop={'size': 6}, loc='upper right')
-        tidy(a, False)
+            a = next(ax)
+            # df[['S(a)', 'g(S(a))', 'F(a)']].plot(xlim=xlim, ax=a).legend(frameon=False, prop={'size': 4}, loc='upper right')
+            df[['Layer Loss', 'Layer Prem', 'Layer Capital']].plot(xlim=xlim, logy=False, ax=a)
+            tidy(a)
+            a.set(ylim=[-0.05, 1.05])
 
-        a = next(ax)
-        df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=a)
-        tidy(a)
-        # a.set(aspect=1)
-
-        a = next(ax)
-        df[['Loss Ratio↓', 'Loss Ratio↑', 'Marginal LR']].plot(xlim=xlim, ax=a)
-        tidy(a)
-
-        a = next(ax)
-        df[['Premium↑', 'Loss↑', 'Capital↑', 'Assets↑', 'Risk Margin↑']].plot(xlim=xlim, ax=a)
-        tidy(a)
-        # a.set(aspect=1)
-
-
-        a = next(ax)
-        _ = df.iloc[100:200, :]['Marginal ROE'].max()
-        avg_roe_up = df.at[a_cal, "ROE↑"]
-        # just get rid of this
-        df.loc[0:self.q(1e-5), 'Marginal ROE'] = np.nan
-        df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE',]].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
-        # df[['ROE↓', 'ROE↑', 'Marginal ROE', 'P:S↓', 'P:S↑']].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
-        a.plot(xlim, [avg_roe_up, avg_roe_up], ":", linewidth=2, alpha=0.75, label='Avg ROE')
-        tidy(a, False)
-        a.grid('both','both')
-
-        title = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
-                f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
-        f1.suptitle(title)
-
-        # trinity plots
-        def tidy2(a, k, xloc=0.25):
-
-            a.xaxis.set_major_locator(MultipleLocator(xloc))
-            a.xaxis.set_minor_locator(MultipleLocator(xloc/5))
-            a.xaxis.set_major_formatter(StrMethodFormatter('{x:.2f}'))
-
-            n = 4
-            a.yaxis.set_major_locator(MaxNLocator(2*n))
-            a.yaxis.set_minor_locator(MaxNLocator(8*n))
-
-            # gridlines with various options
-            # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
-            a.grid(which='major', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
-            a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
-            a.grid(which='minor', axis='x', c='gainsboro', alpha=0.25, linewidth=0.5)
-            a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
-
-            # tick marks
-            a.tick_params('both', which='major', labelsize=7, length=4, width=0.75, color='black', direction='out')
-            a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
-
-            # line to show where capital lies
-            a.plot([0,1], [k,k], linewidth=1, c='black', label='Capital')
+            a = next(ax)
+            df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=a) # logy=True, ylim=[1e-6,1], ax=a)
+            # df[['Layer Loss', 'Layer Prem', 'F(a)', 'Layer Capital', 'Layer Margin']].plot(xlim=xlim, logy=False, ax=a).legend(frameon=False, prop={'size': 6}, loc='upper right')
+            tidy(a)
+            a.set(ylim=[-0.05, 1.05])
 
 
-        f2, axs = plt.subplots(1, 5, figsize=(8, 3), sharey=True, constrained_layout=True)
-        ax = iter(axs.flatten())
+            a = next(ax)
+            df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=a)
+            tidy(a)
+            # a.set(aspect=1)
 
-        maxa = self.q(1-1e-8)
-        k = self.q(p)
-        xr = [-0.05, 1.05]
+            a = next(ax)
+            df[['Loss Ratio↓', 'Loss Ratio↑', 'Marginal LR']].plot(xlim=xlim, ax=a)
+            tidy(a)
 
-        audit = deets.loc[:maxa, :]
+            a = next(ax)
+            df[['Premium↑', 'Loss↑', 'Capital↑', 'Assets↑', 'Risk Margin↑']].plot(xlim=xlim, ax=a)
+            tidy(a)
+            # a.set(aspect=1)
 
-        a = next(ax)
-        a.plot(audit.gS, audit.loss, label='Prem')
-        a.plot(audit.S, audit.loss, label='Loss')
-        a.legend(loc="upper right", frameon=True, prop={'size': 7}, edgecolor=None)
-        a.set(xlim=xr, title='Prem & Loss')
-        a.set(xlabel='Loss = S = Pr(X>a)\nPrem = g(S)', ylabel="Assets, a")
-        tidy2(a, k)
 
-        a = next(ax)
-        m = audit.F - audit.gF
-        a.plot(m, audit.loss, linewidth=2, label='M')
-        a.set(xlim=0, title='Margin, M')
-        a.set(xlabel='M = g(S) - S')
-        tidy2(a, k, m.max() * 1.05 / 4)
+            a = next(ax)
+            _ = df.iloc[100:200, :]['Marginal ROE'].max()
+            avg_roe_up = df.at[a_cal, "ROE↑"]
+            # just get rid of this
+            df.loc[0:self.q(1e-5), 'Marginal ROE'] = np.nan
+            df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE',]].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
+            # df[['ROE↓', 'ROE↑', 'Marginal ROE', 'P:S↓', 'P:S↑']].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
+            a.plot(xlim, [avg_roe_up, avg_roe_up], ":", linewidth=2, alpha=0.75, label='Avg ROE')
+            tidy(a)
+            # a.grid('both','both')
 
-        a = next(ax)
-        a.plot(1 - audit.gS, audit.loss, label='Q')
-        a.set(xlim=xr, title='Equity, Q')
-        a.set(xlabel='Q = 1 - g(S)')
-        tidy2(a, k)
+            title = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
+                    f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
+            f1.suptitle(title)
 
-        a = next(ax)
-        temp = audit.loc[self.q(1e-5):, :]
-        r = (temp.gS - temp.S) / (1 - temp.gS)
-        a.plot(r, temp.loss, linewidth=2, label='ROE')
-        a.set(xlim=0, title='Layer ROE')
-        a.set(xlabel='ROE = M / Q')
-        tidy2(a, k, r.max() * 1.05 / 4)
+            # trinity plots
+            def tidy2(a, k, xloc=0.25):
 
-        a = next(ax)
-        a.plot(audit.S / audit.gS, audit.loss)
-        a.set(xlim=xr, title='Layer LR')
-        a.set(xlabel='LR = S / g(S)')
-        tidy2(a, k)
+                a.xaxis.set_major_locator(MultipleLocator(xloc))
+                a.xaxis.set_minor_locator(MultipleLocator(xloc/5))
+                a.xaxis.set_major_formatter(StrMethodFormatter('{x:.2f}'))
 
-        # title2 = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
-        #         f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
-        # f2.suptitle(title2)
+                n = 4
+                a.yaxis.set_major_locator(MaxNLocator(2*n))
+                a.yaxis.set_minor_locator(MaxNLocator(8*n))
 
-        return Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1, fig2=f2)
+                # gridlines with various options
+                # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+                a.grid(which='major', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='x', c='gainsboro', alpha=0.25, linewidth=0.5)
+                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+
+                # tick marks
+                a.tick_params('both', which='major', labelsize=7, length=4, width=0.75, color='black', direction='out')
+                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
+
+                # line to show where capital lies
+                a.plot([0,1], [k,k], linewidth=1, c='black', label='Capital')
+
+            # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.gridspec.GridSpec.html#matplotlib.gridspec.GridSpec
+            f2, axs = plt.subplots(1, 5, figsize=(8, 3), sharey=True, gridspec_kw = {'wspace':0})  # , 'hspace':0
+
+            ax = iter(axs.flatten())
+
+            maxa = self.q(1-1e-8)
+            k = self.q(p)
+            xr = [-0.05, 1.05]
+
+            audit = deets.loc[:maxa, :]
+
+            a = next(ax)
+            a.plot(audit.gS, audit.loss, label='Prem')
+            a.plot(audit.S, audit.loss, label='Loss')
+            a.legend(loc="upper right", frameon=True, prop={'size': 7}, edgecolor=None)
+            a.set(xlim=xr, title='Prem & Loss')
+            a.set(xlabel='Loss = S = Pr(X>a)\nPrem = g(S)', ylabel="Assets, a")
+            tidy2(a, k)
+
+            a = next(ax)
+            m = audit.F - audit.gF
+            a.plot(m, audit.loss, linewidth=2, label='M')
+            a.set(xlim=0, title='Margin, M', xlabel='M = g(S) - S')
+            tidy2(a, k, m.max() * 1.05 / 4)
+
+            a = next(ax)
+            a.plot(1 - audit.gS, audit.loss, label='Q')
+            a.set(xlim=xr, title='Equity, Q')
+            a.set(xlabel='Q = 1 - g(S)')
+            tidy2(a, k)
+
+            a = next(ax)
+            temp = audit.loc[self.q(1e-5):, :]
+            r = (temp.gS - temp.S) / (1 - temp.gS)
+            a.plot(r, temp.loss, linewidth=2, label='ROE')
+            a.set(xlim=0, title='Layer ROE')
+            a.set(xlabel='ROE = M / Q')
+            tidy2(a, k, r.max() * 1.05 / 4)
+
+            a = next(ax)
+            a.plot(audit.S / audit.gS, audit.loss)
+            a.set(xlim=xr, title='Layer LR')
+            a.set(xlabel='LR = S / g(S)')
+            tidy2(a, k)
+
+            # title2 = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
+            #         f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
+            # f2.suptitle(title2)
+
+        return Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1 if plot else None,
+            fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2, audit_df=audit_df)
 
 
     def top_down(self, distortions, A_or_p):

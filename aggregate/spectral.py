@@ -166,7 +166,8 @@ class Distortion(object):
                 return np.maximum(0, (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
 
         elif self.name == 'clin':
-            # capped linear, needs shape > 1 to make sense...
+            # capped linear, needs shape > 1 to make sense...WHAT, WHY? needs shape >= 1-r0 else
+            # problems at 1
             sl = self.shape
             self.has_mass = (r0 > 0)
             self.mass = r0
@@ -319,7 +320,7 @@ class Distortion(object):
         suptitle_and_tight('Example Distortion Functions')
 
     @staticmethod
-    def distortions_from_params(params, index, r0=0.025, plot=True, axiter=None):
+    def distortions_from_params(params, index, r0=0.025, df=5.5, plot=True, axiter=None, pricing=True, strict=True):
         """
         make set of dist funs and inverses from params, output of port.calibrate_distortions
         params must just have one row for each method and be in the output format of cal_dist
@@ -328,13 +329,13 @@ class Distortion(object):
         :param index:
         :param r0: min rol parameters
         :param params: dataframe such that params[index, :] has a [lep, param] etc.
+        pricing=True, strict=True: which distortions to allow
+        df for t distribution
         :return:
         """
         temp = params.loc[index, :]
         dists = {}
-        # TODO fix Wang-t df hack
-        df = 5.5
-        for dn in Distortion.available_distortions():
+        for dn in Distortion.available_distortions(pricing=pricing, strict=strict):
             param = float(temp.loc[dn, 'param'])
             dists[dn] = Distortion(name=dn, shape=param, r0=r0, df=df)
 
@@ -342,14 +343,15 @@ class Distortion(object):
             axiter = axiter_factory(axiter, len(dists))
             # f, axs = plt.subplots(2, 3, figsize=(8, 6))
             # it = iter(axs.flatten())
-            for dn in Distortion.available_distortions():
+            for dn in Distortion.available_distortions(pricing=pricing, strict=strict):
                 dists[dn].plot(ax=next(axiter))
             try:
                 axiter.tidy()
+                plt.tight_layout()
             except:
                 # fails if axiter is just an iteration of axis elements
+                # assume then that constrained_layout =True so no tight layout
                 pass
-            plt.tight_layout()
 
         return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]
 

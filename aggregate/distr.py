@@ -18,6 +18,7 @@ from scipy.optimize.nonlin import NoConvergence
 import itertools
 from numpy.linalg import inv, pinv, det, matrix_rank
 
+logger = logging.getLogger('agg.main.logger')
 
 class Frequency(object):
     """
@@ -86,7 +87,7 @@ class Frequency(object):
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
-        logging.info(f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
+        logger.info(f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
 
         if self.freq_name == 'fixed':
             def _freq_moms(n):
@@ -305,12 +306,12 @@ class Frequency(object):
                         μ = 1
                         β = ν ** 2
                         params1 = newton_krylov(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000, f_rtol=1e-11)
-                        logging.warning(
+                        logger.warning(
                             f'Frequency.__init__ | {self.freq_name} type Broyden gave large result {params},'
                             f'Newton Krylov {params1}')
                         if np.linalg.norm(params) > np.linalg.norm(params1):
                             params = params1
-                            logging.warning('Frequency.__init__ | using Newton K')
+                            logger.warning('Frequency.__init__ | using Newton K')
                 except NoConvergence as e:
                     print('ERROR: broyden did not converge')
                     print(e)
@@ -348,7 +349,7 @@ class Frequency(object):
                     raise e
 
             # if parameters found...
-            logging.info(f'{self.freq_name} type, params from Broyden {params}')
+            logger.info(f'{self.freq_name} type, params from Broyden {params}')
             if add_sichel:
                 if len(_type) == 1:
                     μ, β = params
@@ -722,7 +723,7 @@ class Aggregate(Frequency):
                           sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
                           sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=None, sev_ps=sev_ps, sev_wt=sev_wt,
                           freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
-        logging.info(
+        logger.info(
             f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
         self.note = note
@@ -780,7 +781,7 @@ class Aggregate(Frequency):
             self.attachment = attachment
             self.limit = limit
             n_components = len(all_arrays)
-            logging.info(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
+            logger.info(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
                          f'{len(sev_a)} sevs = {n_components} componets')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
@@ -800,7 +801,7 @@ class Aggregate(Frequency):
             self.attachment = np.array([i[4] for i in all_arrays])
             self.limit = np.array([i[5] for i in all_arrays])
             n_components = len(all_arrays)
-            logging.info(f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
+            logger.info(f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
                          f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
@@ -1083,7 +1084,7 @@ class Aggregate(Frequency):
 
         if approximation == 'exact':
             if self.n > 100:
-                logging.warning(f'Aggregate.update | warning, claim count {self.n} is high; consider an approximation ')
+                logger.warning(f'Aggregate.update | warning, claim count {self.n} is high; consider an approximation ')
             # assert self.n < 100
             z = ft(self.sev_density, padding, tilt_vector)
             self.ftagg_density = self.mgf(self.n, z)
@@ -1445,7 +1446,7 @@ class Aggregate(Frequency):
             limit_est = self.limit.max() / N
             if limit_est == np.inf:
                 limit_est = 0
-            logging.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
+            logger.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
             return max(moment_est, limit_est)
         else:
             for n in sorted({log2, 16, 13, 10}):
@@ -1837,7 +1838,7 @@ class Severity(ss.rv_continuous):
     Should consider over-riding: sf, **statistics_df** ?munp
 
     TODO issues remain using numerical integration to compute moments for distributions having
-    infinite support and a low standard deviation. See logging for more information in particular
+    infinite support and a low standard deviation. See logger for more information in particular
     cases.
 
     """
@@ -1877,7 +1878,7 @@ class Severity(ss.rv_continuous):
         self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
-        logging.info(
+        logger.info(
             f'Severity.__init__  | creating new Severity {self.sev_name} at {super(Severity, self).__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
         # allows you to define fixed with just xs=1 (no log)
@@ -1892,11 +1893,11 @@ class Severity(ss.rv_continuous):
                 xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
             except ValueError:
                 # for empirical
-                logging.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast')
+                logger.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast')
                 xs = np.array(sev_xs)
                 ps = np.array(sev_ps)
             if not np.isclose(np.sum(ps), 1.0):
-                logging.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
+                logger.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
                               f'{np.sum(ps)}')
             # need to exp_limit distribution
             exp_limit = min(np.min(exp_limit), xs.max())
@@ -2024,7 +2025,7 @@ class Severity(ss.rv_continuous):
                 print(f'WARNING target cv {sev_cv} and achieved cv {acv} not close')
                 # assert (np.isclose(sev_cv, acv))
             # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
-            logging.info(
+            logger.info(
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
                 f'{sev_cv} vs {acv}')
 
@@ -2093,7 +2094,7 @@ class Severity(ss.rv_continuous):
         try:
             ans = newton(f, hint)
         except RuntimeError:
-            logging.error(f'cv_to_shape | error for {self.sev_name}, {cv}')
+            logger.error(f'cv_to_shape | error for {self.sev_name}, {cv}')
             ans = np.inf
             return ans, None
         fz = gen(ans)
@@ -2211,14 +2212,14 @@ class Severity(ss.rv_continuous):
             ex = quad(f, self.attachment, self.detachment, limit=100, full_output=1)
             if len(ex) == 4:  # 'The integral is probably divergent, or slowly convergent.':
                 # TODO just wing it for now
-                logging.warning(
+                logger.warning(
                     f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                 exa = quad(f, self.attachment, median, limit=100, full_output=1)
                 exb = quad(f, median, self.detachment, limit=100, full_output=1)
                 if len(exa) == 4:
-                    logging.warning(f'Severity.moms | left hand split EX^{level} integral returned {exa[-1]}')
+                    logger.warning(f'Severity.moms | left hand split EX^{level} integral returned {exa[-1]}')
                 if len(exb) == 4:
-                    logging.warning(f'Severity.moms | right hand split EX^{level} integral returned {exb[-1]}')
+                    logger.warning(f'Severity.moms | right hand split EX^{level} integral returned {exb[-1]}')
                 ex = (exa[0] + exb[0], exa[1] + exb[1])
             return ex
 
@@ -2231,13 +2232,13 @@ class Severity(ss.rv_continuous):
         if not ((ex1[1] / ex1[0] < eps or ex1[1] < 1e-4) and
                 (ex2[1] / ex2[0] < eps or ex2[1] < 1e-4) and
                 (ex3[1] / ex3[0] < eps or ex3[1] < 1e-6)):
-            logging.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
+            logger.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
                          f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t'
                          f'{ex3[1]/ex3[0]}')
             # raise ValueError(f' Severity.moms | doubtful convergence of integrals, abs errs '
             #                  f'{ex1[1]}, {ex2[1]}, {ex3[1]} rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, '
             #                  f'{ex3[1]/ex3[0]}')
-        # logging.info(f'Severity.moms | GOOD convergence of integrals, abs errs '
+        # logger.info(f'Severity.moms | GOOD convergence of integrals, abs errs '
         #                      f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \
         #  t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t{ex3[1]/ex3[0]}')
 

@@ -9,13 +9,13 @@ __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 
 # imports
-from .param import *
-from .underwriter import *
-from .port import *
-from .distr import *
-from .spectral import *
+from .param import hack_make_lines_from_csv
+from .underwriter import Underwriter
+from .port import Portfolio
+from .distr import Frequency, Severity, Aggregate, CarefulInverse
+from .spectral import Distortion
 from .utils import *
-from .parser import *
+from .parser import UnderwritingLexer, UnderwritingParser
 
 
 # module level doc-string

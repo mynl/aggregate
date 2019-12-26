@@ -217,6 +217,8 @@ import logging
 import numpy as np
 import warnings
 
+logger = logging.getLogger('agg.main.logger')
+
 
 class UnderwritingLexer(Lexer):
 
@@ -300,7 +302,7 @@ class UnderwritingParser(Parser):
             self.log = _print
         else:
             def _print(message):
-                logging.info('UnderwritingParser | ' + message)
+                logger.info('UnderwritingParser | ' + message)
 
             self.log = _print
 

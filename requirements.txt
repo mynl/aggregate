@@ -1,1 +1,3 @@
 sly==0.3
+pypandoc==1.4
+

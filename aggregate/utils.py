@@ -4,8 +4,9 @@ import scipy.stats as ss
 import pandas as pd
 from IPython.core.display import HTML, display
 import logging
+import logging.handlers
 import itertools
-import os
+# import os
 import seaborn as sns
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
@@ -13,16 +14,53 @@ from scipy.optimize.nonlin import NoConvergence
 from io import StringIO
 import re
 from pathlib import Path
-import warnings
+# import warnings
 
 # logging
+# see https://docs.python.org/3.7/howto/logging.html
+# and https://docs.python.org/3.7/howto/logging-cookbook.html
 # LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
-LOGFILE = Path.home() / 'log/aggregate.log'
-logging.basicConfig(filename=LOGFILE,
-                    filemode='w',
-                    format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-                    level=logging.DEBUG)
-logging.info('aggregate_project.__init__ | New Aggregate Session started')
+LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
+RLOGFILE = Path.home() / '.agglog/r.agg.main.logger.log'
+# check it exists
+LOGFILE.parent.mkdir(exist_ok=True, parents=True)
+
+logger = logging.getLogger('agg.main.logger')
+logger.setLevel(logging.DEBUG)
+
+rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=1<<20, backupCount=5)
+rh.setLevel(logging.DEBUG)
+
+# fh = logging.FileHandler(LOGFILE)
+# fh.setLevel(logging.DEBUG)
+fh_formatter = logging.Formatter('%(asctime)s | %(levelname)-10s | %(module)s %(funcName)s (l. %(lineno) 5d) | %(message)s')
+# fh.setFormatter(fh_formatter)
+rh.setFormatter(fh_formatter)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARNING)
+ch_formatter = logging.Formatter('%(asctime)s | %(levelname)-10s | %(module)s %(funcName)s (l. %(lineno) 5d) | %(message)s')
+ch.setFormatter(ch_formatter)
+
+logger.addHandler(rh)
+logger.addHandler(ch)
+# logger.addHandler(fh)
+
+dev_logger = logging.getLogger('agg.dev.logger')
+dev_logger.setLevel(logging.DEBUG)
+# used for messages during development
+sh = logging.StreamHandler()
+# sh.setLevel(logging.DEBUG)
+sh_formatter = logging.Formatter('agg.dev.log @ %(asctime)s | %(levelname)-8s | %(module)-10s %(funcName)s (l. %(lineno)d) | %(message)s')
+sh.setFormatter(sh_formatter)
+dev_logger.addHandler(sh)
+
+# logging.basicConfig(filename=LOGFILE,
+#                     filemode='w',
+#                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+#                     level=logging.DEBUG)
+
+logger.info('aggregate_project.__init__ | New Aggregate Session started')
 
 
 # display
@@ -163,7 +201,7 @@ def sln_fit(m, cv, skew):
         sigma = np.sqrt(np.log(1 + eta ** 2))
         shift = m - cv * m / eta
         if shift > m:
-            logging.warning(f'utils sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
+            logger.warning(f'utils sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
             shift = m - 1e-6
         mu = np.log(m - shift) - sigma ** 2 / 2
         return shift, mu, sigma
@@ -711,11 +749,11 @@ class MomentAggregator(object):
         if np.allclose(var, 0):
             var = 0
         if var < 0:
-            logging.error(f'MomentAggregator._moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
+            logger.error(f'MomentAggregator._moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan
-            logging.error('MomentAggregator._moments_to_mcvsk | encountered zero mean, called with '
+            logger.error('MomentAggregator._moments_to_mcvsk | encountered zero mean, called with '
                           f'{ex1}, {ex2}, {ex3}')
         else:
             cv = sd / m
@@ -1264,4 +1302,15 @@ class Answer(dict):
             for i in zip(self.keys(), [type(v) for v in self.values()])
             ])
 
-
+def log_test():
+    """"
+    Issue logs at each level
+    """
+    print('Issuing five messages...')
+    for l in [logger, dev_logger]:
+        l.debug('A debug message')
+        l.info('A info message')
+        l.warning('A warning message')
+        l.error('A error message')
+        l.critical('A critical message')
+    print('...done')

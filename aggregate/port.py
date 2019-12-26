@@ -13,18 +13,26 @@ A Portfolio represents a collection of Aggregate objects. Applications include
 """
 
 import collections
-import matplotlib.cm as cm
-from scipy import interpolate
-from copy import deepcopy
 import json
+import logging
+from copy import deepcopy
+
+import matplotlib.cm as cm
 import pypandoc
 from IPython.core.display import HTML, display
-from .utils import *
-from .distr import Aggregate
-from .spectral import Distortion
-from .distr import Severity
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter, StrMethodFormatter, FuncFormatter, \
-                               AutoMinorLocator, MaxNLocator, NullFormatter, FixedLocator, FixedFormatter
+    AutoMinorLocator, MaxNLocator, NullFormatter, FixedLocator, FixedFormatter
+from scipy import interpolate
+
+from .distr import Aggregate
+from .distr import Severity
+from .spectral import Distortion
+from .utils import *
+
+logger = logging.getLogger('agg.main.logger')
+# use this one to broadcast to the stderr
+dev_logger = logging.getLogger('agg.dev.logger')
+
 
 class Portfolio(object):
     """
@@ -42,7 +50,7 @@ class Portfolio(object):
         self.name = name
         self.agg_list = []
         self.line_names = []
-        logging.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
+        logger.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
         for spec in spec_list:
@@ -242,9 +250,9 @@ class Portfolio(object):
         d['args'] = args
         d['spec_list'] = [a._spec for a in self.agg_list]
 
-        logging.info(f'Portfolio.json| dummping {self.name} to {stream}')
+        logger.info(f'Portfolio.json| dummping {self.name} to {stream}')
         s = json.dumps(d) # , default_flow_style=False, indent=4)
-        logging.debug(f'Portfolio.json | {s}')
+        logger.debug(f'Portfolio.json | {s}')
         if stream is None:
             return s
         else:
@@ -266,7 +274,7 @@ class Portfolio(object):
 
         with open(filename, mode=mode) as f:
             self.json(stream=f)
-            logging.info(f'Portfolio.save | {self.name} saved to {filename}')
+            logger.info(f'Portfolio.save | {self.name} saved to {filename}')
 
     def __add__(self, other):
         """
@@ -625,7 +633,7 @@ class Portfolio(object):
         :return:
         """
         spec = self.fit(approx_type, output='dict')
-        logging.debug(f'Portfolio.collapse | Collapse created new Portfolio with spec {spec}')
+        logger.debug(f'Portfolio.collapse | Collapse created new Portfolio with spec {spec}')
         return Portfolio(f'Collapsed {self.name}', [spec])
 
     def percentiles(self, pvalues=None):
@@ -770,7 +778,7 @@ class Portfolio(object):
         self.density_df = pd.DataFrame(d, columns=d.keys(), index=xs)
 
         if remove_fuzz:
-            logging.warning(f'CPortfolio.update | Removing fuzz {self.name}')
+            logger.warning(f'CPortfolio.update | Removing fuzz {self.name}')
             eps = 2e-16
             self.density_df.loc[:, self.density_df.select_dtypes(include=['float64']).columns] = \
                 self.density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
@@ -1106,7 +1114,7 @@ class Portfolio(object):
                 ax.set_ylabel(f'Not {line}')
 
         else:
-            logging.error(f'Portfolio.plot | Unknown plot type {kind}')
+            logger.error(f'Portfolio.plot | Unknown plot type {kind}')
             raise ValueError(f'Portfolio.plot unknown plot type {kind}')
 
         if do_tight:
@@ -1203,18 +1211,18 @@ class Portfolio(object):
         if not np.all(self.density_df.p_total >= 0):
             # have negative densities...get rid of them
             first_neg = np.argwhere(self.density_df.p_total < 0).min()
-            logging.warning(
+            logger.warning(
                 f'CPortfolio._add_exa | p_total has a negative value starting at {first_neg}; setting to zero...')
             # TODO what does this all mean?!
             # self.density_df.p_total.iloc[first_neg:] = 0
         sum_p_total = self.density_df.p_total.sum()
-        logging.info(f'CPortfolio._add_exa | {self.name}: sum of p_total is 1 - '
+        logger.info(f'CPortfolio._add_exa | {self.name}: sum of p_total is 1 - '
                      f'{1-sum_p_total:12.8e} NOT RESCALING')
         # self.density_df.p_total /= sum_p_total
         self.density_df['F'] = np.cumsum(self.density_df.p_total)
         self.density_df['S'] = 1 - self.density_df.F
         # get rounding errors, S may not go below zero
-        logging.info(
+        logger.info(
             f'CPortfolio._add_exa | {self.name}: S <= 0 values has length {len(np.argwhere(self.density_df.S <= 0))}')
 
         # E(min(X, a))
@@ -1469,7 +1477,7 @@ class Portfolio(object):
             # truncate at first zero; numpy indexing because values
             S = Splus[:last_non_zero + 1]
             ess_sup = self.density_df.index[last_non_zero + 1]
-            logging.warning(
+            logger.warning(
                 'CPortfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
@@ -1584,7 +1592,7 @@ class Portfolio(object):
             i += 1
 
         if abs(fx) > 1e-5:
-            logging.warning(
+            logger.warning(
                 f'CPortfolio.calibrate_distortion | Questionable convergenge! {name}, target '
                 f'{premium_target} error {fx}, {i} iterations')
 
@@ -1988,7 +1996,7 @@ class Portfolio(object):
         if pricing_g.has_mass:
             mass = pricing_g.mass
             mass *= a_reg_ix
-            logging.info(f'CPortfolio.price | {self.name}, Using mass {mass}')
+            logger.info(f'CPortfolio.price | {self.name}, Using mass {mass}')
         for line in self.line_names:
             # int E(Xi/X| X ge x)S = int d/da exa = exa DOES NOT WORK because uses ge x, and that is pre-computed
             # using P and not Q
@@ -2039,12 +2047,12 @@ class Portfolio(object):
         # for line in self.line_names:
         #     ix = self.density_df.index[ self.density_df.index.get_loc(df.loc[line, 'a_reg'], 'ffill') ]
         #     df.loc[line, 'prDef'] =  np.sum(self.density_df.loc[ix:, f'p_{line}'])
-        logging.info(f'CPortfolio.price | {self.name} portfolio pricing g {pricing_g}')
-        logging.info(f'CPortfolio.price | Capital sufficient to prob {float(F(a_reg)):7.4f}')
-        logging.info(f'CPortfolio.price | Capital quantization error {(a_reg - a_reg_ix) / a_reg:7.5f}')
+        logger.info(f'CPortfolio.price | {self.name} portfolio pricing g {pricing_g}')
+        logger.info(f'CPortfolio.price | Capital sufficient to prob {float(F(a_reg)):7.4f}')
+        logger.info(f'CPortfolio.price | Capital quantization error {(a_reg - a_reg_ix) / a_reg:7.5f}')
         if prem > 0:
-            logging.info(f'CPortfolio.price | Premium calculated as {prem:18,.1f}')
-            logging.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape}')
+            logger.info(f'CPortfolio.price | Premium calculated as {prem:18,.1f}')
+            logger.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape}')
 
         return df, pricing_g
 
@@ -2734,7 +2742,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 ans.append([loss, int1, int2, int3, int3 * loss / a / ptot, ptot, incr, c1, c2, c3, gt, p])
             if incr / gt < 1e-12:
                 if debug:
-                    logging.info(f'incremental change {incr/gt:12.6f}, breaking')
+                    logger.info(f'incremental change {incr/gt:12.6f}, breaking')
                 break
         exlea = self.density_df.loc[a, 'exlea_' + line]
         exgta = self.density_df.loc[a, 'exgta_' + line]
@@ -2835,10 +2843,10 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         # easier tests
         # sum of parts = total
-        logging.info(
+        logger.info(
             f'Portfolio.uat | {self.name} Sum of parts all close to total: '
             f'{np.allclose(a.exag_total, a.exag_sumparts)}')
-        logging.info(
+        logger.info(
             f'Portfolio.uat | {self.name} Sum of parts vs total: '
             f'{np.sum(np.abs(a.exag_total - a.exag_sumparts)):15,.1f}')
 
@@ -2862,15 +2870,15 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             display(test)
 
         if lr_err.errs.abs().max() > 1e-4:
-            logging.error('Portfolio.uat | {self.name} UAT Loss Ratio Error {lr_err.errs.abs().max()}')
+            logger.error('Portfolio.uat | {self.name} UAT Loss Ratio Error {lr_err.errs.abs().max()}')
 
         if overall_test < 1e-7:
-            logging.info(f'Portfolio.uat | {self.name} UAT All good, total error {overall_test:6.4e}')
+            logger.info(f'Portfolio.uat | {self.name} UAT All good, total error {overall_test:6.4e}')
         else:
             s = f'{self.name} UAT total error {overall_test:6.4e}'
-            logging.error(f'Portfolio.uat | {s}')
-            logging.error(f'Portfolio.uat | {s}')
-            logging.error(f'Portfolio.uat | {s}')
+            logger.error(f'Portfolio.uat | {s}')
+            logger.error(f'Portfolio.uat | {s}')
+            logger.error(f'Portfolio.uat | {s}')
 
         return a, p, test, params, dd, table, stacked
 

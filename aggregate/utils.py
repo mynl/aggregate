@@ -20,38 +20,39 @@ from pathlib import Path
 # see https://docs.python.org/3.7/howto/logging.html
 # and https://docs.python.org/3.7/howto/logging-cookbook.html
 # LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
-LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
+# LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
 RLOGFILE = Path.home() / '.agglog/r.agg.main.logger.log'
 # check it exists
-LOGFILE.parent.mkdir(exist_ok=True, parents=True)
+RLOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
-logger = logging.getLogger('agg.main.logger')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger('aggregate') # __name__)
+logger.setLevel(logging.INFO)
 
 rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=1<<20, backupCount=5)
-rh.setLevel(logging.DEBUG)
+rh.setLevel(logging.INFO)
 
 # fh = logging.FileHandler(LOGFILE)
 # fh.setLevel(logging.DEBUG)
-fh_formatter = logging.Formatter('%(asctime)s | %(levelname)-10s | %(module)s %(funcName)s (l. %(lineno) 5d) | %(message)s')
+fh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 # fh.setFormatter(fh_formatter)
 rh.setFormatter(fh_formatter)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
-ch_formatter = logging.Formatter('%(asctime)s | %(levelname)-10s | %(module)s %(funcName)s (l. %(lineno) 5d) | %(message)s')
+ch_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 ch.setFormatter(ch_formatter)
 
 logger.addHandler(rh)
 logger.addHandler(ch)
 # logger.addHandler(fh)
 
-dev_logger = logging.getLogger('agg.dev.logger')
+dev_logger = logging.getLogger('aggdev')
 dev_logger.setLevel(logging.DEBUG)
+# dev_logger.setLevel(logging.DEBUG)
 # used for messages during development
 sh = logging.StreamHandler()
 # sh.setLevel(logging.DEBUG)
-sh_formatter = logging.Formatter('agg.dev.log @ %(asctime)s | %(levelname)-8s | %(module)-10s %(funcName)s (l. %(lineno)d) | %(message)s')
+sh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno)d) | %(message)s')
 sh.setFormatter(sh_formatter)
 dev_logger.addHandler(sh)
 
@@ -64,17 +65,17 @@ logger.info('aggregate_project.__init__ | New Aggregate Session started')
 
 
 # display
-def qd(df, max_rows=10):
-    """
-    generic quick display of data frame df
-    aware of likely column names with appropriate format
-    for each
-    """
-    if max_rows == -1:
-        max_rows = df.shape[0]
-        if max_rows > 1000:
-            max_rows = 1000
-    display(df.head(max_rows).style.format(get_fmts(df)))
+# def qd(df, max_rows=10):
+#     """
+#     generic quick display of data frame df
+#     aware of likely column names with appropriate format
+#     for each
+#     """
+#     if max_rows == -1:
+#         max_rows = df.shape[0]
+#         if max_rows > 1000:
+#             max_rows = 1000
+#     display(df.head(max_rows).style.format(get_fmts(df)))
 
 
 def get_fmts(df):
@@ -873,74 +874,74 @@ class MomentWrangler(object):
         self._factorial = (ex1, ex2 - ex1, ex3 - 3 * ex2 + 2 * ex1)
 
 
-class qd(object):
-    """
-    quick display for dictionaries and Pandas dataframes, with some sensible number defaults
-    experimental
-
-    """
-
-    # Set CSS properties for th elements in dataframe
-    th_props = [
-        ('font-size', '11px'),
-        ('text-align', 'center'),
-        ('font-weight', 'bold'),
-        ('color', '#6d6d6d'),
-        ('background-color', '#f7f7f9')
-    ]
-
-    # Set CSS properties for td elements in dataframe
-    td_props = [
-        ('font-size', '10px'),
-        ('text-align', 'left')
-    ]
-
-    # Set table styles
-    styles = [
-        dict(selector="th", props=th_props),
-        dict(selector="td", props=td_props)
-    ]
-
-    cm = sns.light_palette("green", as_cmap=True)
-
-    def __init__(self, d):
-        self.x = d
-
-    def _repr_html_(self):
-        if isinstance(self.x, dict):
-            return pd.DataFrame(self.x, index=[len(self.x)])._repr_html_()
-        if isinstance(self.x, list) or isinstance(self.x, tuple) and len(self.x) == 2:
-            if isinstance(self.x[1], dict):
-                return f'<h2>{self.x[0]}</h2><br>' + qd(self.x[1])._repr_html_()
-        elif isinstance(self.x, pd.DataFrame):
-            # do a bit of styling
-            num_cols = self.x.select_dtypes(np.number).columns
-            fmt = {}
-            for a, b in zip(self.x.columns, self.x.dtypes):
-                if np.issubdtype(b, np.number):
-                    m, s = self.x[a].agg([np.mean, np.std])
-                    x = np.abs(m) + 3 * s
-                    if abs(x) > self.x[a].max():
-                        x = self.x[a].max()
-                    if x < 10:
-                        fmt[a] = '{:7.3f}'
-                    elif x < 1000:
-                        fmt[a] = '{:7.1f}'
-                    elif x < 10e6:
-                        fmt[a] = '{:12,.1f}'
-                    else:
-                        fmt[a] = '{:12.3e}'
-                else:
-                    fmt[a] = '{:}'
-
-            return (self.x.style
-                    .background_gradient(cmap=cm, subset=num_cols)
-                    .highlight_max(subset=num_cols)
-                    #   .set_caption('This is a custom caption.')
-                    .format(fmt)
-                    .set_table_styles(styles))._repr_html_()
-        else:
-            return repr(self.x)
+# class qd(object):
+#     """
+#     quick display for dictionaries and Pandas dataframes, with some sensible number defaults
+#     experimental
+#
+#     """
+#
+#     # Set CSS properties for th elements in dataframe
+#     th_props = [
+#         ('font-size', '11px'),
+#         ('text-align', 'center'),
+#         ('font-weight', 'bold'),
+#         ('color', '#6d6d6d'),
+#         ('background-color', '#f7f7f9')
+#     ]
+#
+#     # Set CSS properties for td elements in dataframe
+#     td_props = [
+#         ('font-size', '10px'),
+#         ('text-align', 'left')
+#     ]
+#
+#     # Set table styles
+#     styles = [
+#         dict(selector="th", props=th_props),
+#         dict(selector="td", props=td_props)
+#     ]
+#
+#     cm = sns.light_palette("green", as_cmap=True)
+#
+#     def __init__(self, d):
+#         self.x = d
+#
+#     def _repr_html_(self):
+#         if isinstance(self.x, dict):
+#             return pd.DataFrame(self.x, index=[len(self.x)])._repr_html_()
+#         if isinstance(self.x, list) or isinstance(self.x, tuple) and len(self.x) == 2:
+#             if isinstance(self.x[1], dict):
+#                 return f'<h2>{self.x[0]}</h2><br>' + qd(self.x[1])._repr_html_()
+#         elif isinstance(self.x, pd.DataFrame):
+#             # do a bit of styling
+#             num_cols = self.x.select_dtypes(np.number).columns
+#             fmt = {}
+#             for a, b in zip(self.x.columns, self.x.dtypes):
+#                 if np.issubdtype(b, np.number):
+#                     m, s = self.x[a].agg([np.mean, np.std])
+#                     x = np.abs(m) + 3 * s
+#                     if abs(x) > self.x[a].max():
+#                         x = self.x[a].max()
+#                     if x < 10:
+#                         fmt[a] = '{:7.3f}'
+#                     elif x < 1000:
+#                         fmt[a] = '{:7.1f}'
+#                     elif x < 10e6:
+#                         fmt[a] = '{:12,.1f}'
+#                     else:
+#                         fmt[a] = '{:12.3e}'
+#                 else:
+#                     fmt[a] = '{:}'
+#
+#             return (self.x.style
+#                     .background_gradient(cmap=cm, subset=num_cols)
+#                     .highlight_max(subset=num_cols)
+#                     #   .set_caption('This is a custom caption.')
+#                     .format(fmt)
+#                     .set_table_styles(styles))._repr_html_()
+#         else:
+#             return repr(self.x)
 
 
 def xsden_to_meancv(xs, den):
@@ -1307,10 +1308,12 @@ def log_test():
     Issue logs at each level
     """
     print('Issuing five messages...')
-    for l in [logger, dev_logger]:
+    for l, n in zip([logger, dev_logger], ['logger', 'dev_logger']):
+        print(n)
         l.debug('A debug message')
         l.info('A info message')
         l.warning('A warning message')
         l.error('A error message')
         l.critical('A critical message')
+        print(f'...done with {n}')
     print('...done')

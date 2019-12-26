@@ -217,7 +217,7 @@ import logging
 import numpy as np
 import warnings
 
-logger = logging.getLogger('agg.main.logger')
+logger = logging.getLogger('aggregate')
 
 
 class UnderwritingLexer(Lexer):

@@ -112,7 +112,7 @@ from .parser import UnderwritingLexer, UnderwritingParser
 import re
 import warnings
 
-logger = logging.getLogger('agg.main.logger')
+logger = logging.getLogger('aggregate')
 
 class Underwriter(object):
     """

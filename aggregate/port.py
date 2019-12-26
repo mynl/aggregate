@@ -17,6 +17,7 @@ import json
 import logging
 from copy import deepcopy
 
+import numpy as np
 import matplotlib.cm as cm
 import pypandoc
 from IPython.core.display import HTML, display
@@ -27,12 +28,21 @@ from scipy import interpolate
 from .distr import Aggregate
 from .distr import Severity
 from .spectral import Distortion
-from .utils import *
+from .utils import ft, \
+    ift, sln_fit, sgamma_fit, \
+    axiter_factory, AxisManager, html_title, \
+    sensible_jump, suptitle_and_tight, \
+    MomentAggregator, \
+    Answer
 
-logger = logging.getLogger('agg.main.logger')
+logger = logging.getLogger('aggregate')
 # use this one to broadcast to the stderr
-dev_logger = logging.getLogger('agg.dev.logger')
-
+dev_logger = logging.getLogger('aggregate.dev')
+# debug
+# info
+# warning
+# error
+# critical
 
 class Portfolio(object):
     """

@@ -18,7 +18,7 @@ from scipy.optimize.nonlin import NoConvergence
 import itertools
 from numpy.linalg import inv, pinv, det, matrix_rank
 
-logger = logging.getLogger('agg.main.logger')
+logger = logging.getLogger('aggregate')
 
 class Frequency(object):
     """

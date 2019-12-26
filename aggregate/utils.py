@@ -1258,3 +1258,10 @@ class Answer(dict):
         """ List elements """
         return pd.DataFrame(zip(self.keys(),
             [type(v) for v in self.values()]), columns=['Item', 'Type'])
+
+    def __str__(self):
+        return '\n'.join([f'{i[0]:<20s}\t{i[1]}'
+            for i in zip(self.keys(), [type(v) for v in self.values()])
+            ])
+
+

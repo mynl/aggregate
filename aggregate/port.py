@@ -486,6 +486,76 @@ class Portfolio(object):
         #                                           fill_value='extrapolate')
         # return self._tail_var(p)
 
+    def tvar_threshold(self, p):
+        """
+        Find the value pt such that TVaR(pt) = VaR(p) using numerical Newton Raphson
+        """
+        a = self.q(p)
+        def f(p):
+            return self.tvar(p) - a
+        loop = 0
+        p1 = 1 - 2 * (1 - p)
+        fp1 = f(p1)
+        delta = 1e-5
+        while abs(fp1) > 1e-6 and loop < 10:
+            df1 = (f(p1+delta) - fp1) / delta
+            p1 = p1 - fp1 / df1
+            fp1 = f(p1)
+            loop += 1
+        if loop == 10:
+            raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}')
+        return p1
+
+    def equal_risk_var_tvar(self, p, p_t):
+        """
+        solve for equal risk var and tvar: find pv and pt such that sum of
+        individual line VaR/TVaR at pv/pt equals the VaR(p) or TVaR(p_t)
+        """
+        # these two should obviously be the same
+        target_v = self.q(p)
+        target_t = self.tvar(p_t)
+        def fv(p):
+            return sum([float(a.middle_q(p)) for a in self]) - target_v
+        def ft(p):
+            return sum([float(a.tvar(p)) for a in self]) - target_t
+        ans = np.zeros(2)
+        for i, f in enumerate([fv, ft]):
+            p1 = 1 - 2*(1-(p if i==0 else p_t))
+            fp1 = f(p1)
+            loop = 0
+            delta = 1e-5
+            while abs(fp1) > 1e-6 and loop < 10:
+                dfp1 = (f(p1 + delta) - fp1) / delta
+                p1 = p1 - fp1 / dfp1
+                fp1 = f(p1)
+                loop += 1
+            if loop == 10:
+                raise ValueError(f'Trouble finding equal risk {"TVaR" if i else "VaR"} at p={p}')
+            ans[i] = p1
+        return ans
+
+    def merton_perold(self, p):
+        """
+        compute Merton Perold capital allocation at T/VaR(p) capital using VaR as risk measure
+        v = q(p)
+        TODO? Add TVaR MERPER
+        """
+        # figure total assets
+        a = self.q(p)
+        # shorthand abbreviation
+        df = self.density_df
+        loss = df.loss
+        ans = []
+        total = 0
+        for l in self.line_names:
+            F = df[f'ημ_{l}'].cumsum()
+            f = interpolate.interp1d(F, loss)
+            _ = a - f(p)
+            ans.append(_)
+            total += _
+        ans.append(total)
+        return ans
+
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """
         convert into a severity without recomputing
@@ -711,7 +781,7 @@ class Portfolio(object):
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
         percentiles = [0.9, 0.95, 0.99, 0.996, 0.999, 0.9999, 1 - 1e-6]
         self.audit_df = pd.DataFrame(
-            columns=['Sum log', 'EmpMean', 'EmpCV', 'EmpSkew', 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
+            columns=['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
                     ['P' + str(100 * i) for i in percentiles])
         for col in self.line_names_ex:
             sump = np.sum(self.density_df[f'p_{col}'])
@@ -1661,6 +1731,7 @@ class Portfolio(object):
         # add the exag and distorted probs
         df['gS'] = g(df.S)
         df['gF'] = 1 - df.gS
+        # TODO update for ability to prepend 0 in newer numpy
         df['gp_total'] = np.diff(np.hstack((0, df.gF)))
 
         # Impact of mass at zero
@@ -1689,6 +1760,13 @@ class Portfolio(object):
 
         # comparison of total and sum of parts
         # removed lTl and pcttotal (which spent a lot of time removing!) Dec 2019
+        # Dec 2019 added info to compute the total margin and capital allocation by layer
+        # M = marginal margin, T.M = cumulative margin
+        # Q same for capital
+        df['M'] = df.gS - df.S
+        df['Q'] = 1 - df.gS
+        df['ROE'] = df.M / (1 - df.gS)
+        roe_zero = (df.ROE == 0.0)
         for line in self.line_names_ex:
             df[f'exa_{line}_pcttotal'] = df.loc[:, 'exa_' + line] / df.exa_total
             # exag is the premium
@@ -1698,8 +1776,21 @@ class Portfolio(object):
             # df[f'lrlTl_{line}'] = df[f'exa_{line}'] / df[f'prem_lTl_{line}']
             # df.loc[0, f'prem_lTl_{line}'] = 0
             # loss ratio using my allocation
-            df[f'lr_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
-
+            #
+            # TODO check M calcs by doing directly not as diff
+            #
+            df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
+            df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
+            # prepend 1 puts everthing off by one
+            df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], append=0)
+            # careful about where ROE==0
+            df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df.ROE
+            df[f'M.Q_{line}'].iloc[-1] = 0
+            df.loc[roe_zero, f'M.Q_{line}'] = np.nan
+            # fix ROE indexing error
+            # shift up by one
+            df[f'T.Q_{line}'] = np.hstack((0, np.cumsum(df[f'M.Q_{line}']).iloc[:-1]))
+            df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
         # make a convenient audit extract for viewing
         audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^η]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
 
@@ -1780,13 +1871,8 @@ class Portfolio(object):
                 ax.legend(prop={'size': 6})
 
                 ax = next(axiter)
-                df_plot.filter(regex='^lr_').sort_index(axis=1).plot(ax=ax)
+                df_plot.filter(regex='^M.LR_').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('LR: Natural Allocation')
-                ax.legend(prop={'size': 6})
-
-                ax = next(axiter)
-                df_plot.filter(regex='^lrlTl_').sort_index(axis=1).plot(ax=ax)
-                ax.set_title('LR: Prem Like Total Loss')
                 ax.legend(prop={'size': 6})
 
                 if isinstance(axiter, AxisManager):
@@ -1938,18 +2024,18 @@ class Portfolio(object):
         # df.loc['sum', :] = df.filter(regex='^[^t]', axis=0).sum()
         df['lr'] = df.exa / df.exag
         df['profit'] = df.exag - df.exa
-        df.loc['total', 'roe'] = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
+        df.loc['total', 'ROE'] = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
         df.loc['total', 'prDef'] = 1 - float(F(a_reg))
         df['pct_loss'] = df.exa / df.loc['total', 'exa']
         df['pct_prem'] = df.exag / df.loc['total', 'exag']
         # ARB asset allocation: same leverage is silly
         # df['a_reg'] = df.loc['total', 'a_reg'] * df.pct_prem
         # same ROE?? NO
-        # roe = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
-        # df['a_reg'] = df.profit / roe + df.exag
+        # ROE = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
+        # df['a_reg'] = df.profit / ROE + df.exag
         df['lr'] = df.exa / df.exag
         df['levg'] = df.exag / df.a_reg
-        df['roe'] = df.profit / (df.a_reg - df.exag)
+        df['ROE'] = df.profit / (df.a_reg - df.exag)
         # for line in self.line_names:
         #     ix = self.density_df.index[ self.density_df.index.get_loc(df.loc[line, 'a_reg'], 'ffill') ]
         #     df.loc[line, 'prDef'] =  np.sum(self.density_df.loc[ix:, f'p_{line}'])
@@ -1968,7 +2054,10 @@ class Portfolio(object):
         Helpful graphic and summary dataframes from one distortion, loss ratio and p value.
         Starting logic is the similar to calibrate_distortions
 
+
         C:\\\\ConvexRiskLLC\\convexrisk\\notebooks\\Allocation_Functions.ipynb
+
+        Can pass in a pre-calibrated distortion in dname
 
         :param dname: name of distortion
         :param dshape:  if input use dshape and dr0 to make the distortion
@@ -1995,7 +2084,7 @@ class Portfolio(object):
             a_cal = self.q(p)
             exa, p = self.density_df.loc[a_cal, ['exa_total', 'F']]
 
-        if dshape is None:
+        if dshape is None and not isinstance(dname, Distortion):
             # figure distortion from LR or ROE
             if LR is None:
                 assert ROE is not None
@@ -2015,7 +2104,10 @@ class Portfolio(object):
             deets, _ = self.apply_distortion(dist)
         else:
             # specified distortion, fill in
-            dist = Distortion(dname, dshape, dr0, ddf)
+            if isinstance(dname, Distortion):
+                dist = dname
+            else:
+                dist = Distortion(dname, dshape, dr0, ddf)
             deets, _ = self.apply_distortion(dist)
             exag = deets.loc[a_cal, 'exag_total']
             profit = exag - exa
@@ -2099,132 +2191,8 @@ class Portfolio(object):
             df = df.set_index('S(a)', drop=False)
             xlim = [-0.05, 1.05]
 
-        # make the pricing summary dataframe and exhibit
-        ex = deets.loc[[a_cal]].T
-        ex.index = [i.replace('xi_x', 'xi/x').replace('epd_', 'epd:').
-                    replace('ημ_', 'ημ') for i in ex.index]
-        pricing = ex.filter(regex='loss|^p_|g?[S]|exi/xgtag?_.+?$(?<!(sum))|'
-                        'exag?_.+?$(?<!(pcttotal|sumparts))|lr_', axis=0).sort_index()
-        pricing.index = [i if i.find('_')>0 else f'{i}_total' for i in pricing.index]
-        pricing.index = pricing.index.str.split('_', expand=True)
-        pricing.index.set_names(['stat', 'line'], inplace=True)
-        pricing = pricing.sort_index(level=[0,1])
-        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', slice('Atame', 'Dthick')) , :].sum(axis=0)
-        pricing = pricing.sort_index(level=[0,1])
-        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', slice('Atame', 'Dthick')) , :].sum(axis=0)
-        pricing = pricing.sort_index(level=[0,1])
-        for l in self.line_names:
-            pricing.loc[('S',l), :] = \
-                pricing.loc[('exi/xgta', l), :].values *   pricing.loc[('S', 'total'), :].values
-            pricing.loc[('gS',l), :] = \
-                pricing.loc[('exi/xgtag', l), :].values *   pricing.loc[('gS', 'total'), :].values
-            pricing.loc[('loss', l), :] = pricing.loc[('loss', 'total')]
-        pricing = pricing.sort_index(level=[0,1])
-
-        # focus on just the indicated capital level a_cal
-        exhibit = pricing.xs(a_cal, axis=1).unstack(1).T.copy()
-        exhibit['M LR'] = exhibit.S / exhibit.gS
-        exhibit['M ROE'] = (exhibit.gS - exhibit.S) / (1 - exhibit.gS)
-        Q = a_cal - exhibit.at['total', 'exag']
-        roe = (exhibit.at['total', 'exag'] -  exhibit.at['total', 'exa']) / Q
-        exhibit['TQ'] = (exhibit.exag -  exhibit.exa) / roe
-        exhibit['MQ'] = 1 - exhibit.gS
-        exhibit['TM'] = exhibit.TP - exhibit.TL
-        exhibit['T ROE'] = roe
-        exhibit['A'] = a_cal
-        exhibit = exhibit[['A', 'S', 'gS', 'M LR', 'MQ', 'M ROE', 'exi/xgta', 'exi/xgtag', 'exa', 'exag', 'TM', 'lr', 'TQ', 'T ROE' ]]
-        exhibit.columns = ['A', 'MC', 'MR', 'M LR', 'M Q', 'M ROE', 'exi/xgta', 'exi/xgtag', 'TL', 'TP', 'TM' 'T LR', 'TQ', 'T ROE' ]
-
-        # some reasonable traditional metrics
-        def tvar_thresh(p):
-            a = self.q(p)
-            def f(p):
-                return self.tvar(p) - a
-            loop = 0
-            p1 = 1 - 2 * (1 - p)
-            fp1 = f(p1)
-            delta = 1e-5
-            while abs(fp1) > 1e-6 and loop < 10:
-                df1 = (f(p1+delta) - fp1) / delta
-                p1 = p1 - fp1 / df1
-                fp1 = f(p1)
-                loop += 1
-            if loop == 10:
-                raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}')
-            return p1
-        # tvar threshold giving the same assets as p on VaR
-        p_t = tvar_thresh(p)
-        def equal_risk(p, p_t):
-            """
-            solve for equal risk var and tvar
-            """
-            # these two should obviously be the same
-            target_v = self.q(p)
-            target_t = self.tvar(p_t)
-            def fv(p):
-                return sum([float(a.middle_q(p)) for a in self]) - target_v
-            def ft(p):
-                return sum([float(a.tvar(p)) for a in self]) - target_t
-            ans = np.zeros(2)
-            for i, f in enumerate([fv, ft]):
-                p1 = 1 - 2*(1-(p if i==0 else p_t))
-                fp1 = f(p1)
-                loop = 0
-                delta = 1e-5
-                while abs(fp1) > 1e-6 and loop < 10:
-                    dfp1 = (f(p1 + delta) - fp1) / delta
-                    p1 = p1 - fp1 / dfp1
-                    fp1 = f(p1)
-                    loop += 1
-                if loop == 10:
-                    raise ValueError(f'Trouble finding equal risk {"TVaR" if i else "VaR"} at p={p}')
-                ans[i] = p1
-            return ans
-        pv, pt = equal_risk(p, p_t)
-        exhibit['VaR'] = [float(a.middle_q(p)) for a in self] + [self.q(p)]
-        exhibit['TVaR'] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
-        exhibit['ScaledVaR'] = exhibit.VaR
-        exhibit['ScaledTVaR'] = exhibit.TVaR
-        exhibit.loc['total', 'ScaledVaR'] = 0
-        exhibit.loc['total', 'ScaledTVaR'] = 0
-        sumvar = exhibit.ScaledVaR.sum()
-        sumtvar = exhibit.ScaledTVaR.sum()
-        exhibit['ScaledVaR'] = exhibit.ScaledVaR * exhibit.loc['total', 'VaR'] / sumvar
-        exhibit['ScaledTVaR'] = exhibit.ScaledTVaR * exhibit.loc['total', 'TVaR'] / sumtvar
-        exhibit.loc['total', 'ScaledVaR'] = exhibit.loc['total', 'VaR']
-        exhibit.loc['total', 'ScaledTVaR'] = exhibit.loc['total', 'TVaR']
-        exhibit.loc['total', 'VaR'] = sumvar
-        exhibit.loc['total', 'TVaR'] = sumtvar
-        exhibit['EqRiskVaR'] = [float(a.middle_q(pv)) for a in self] + [self.q(p)]
-        exhibit['EqRiskTVaR'] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
-        # EPD and MerPer
-        row = self.density_df.loc[a_cal, :]
-        exhibit['EPD'] = [row.at[f'epd_{0 if l == "total" else 1}_{l}'] for l in self.line_names_ex]
-        def merper(port, l, p, v):
-            """
-            compute merton perold capital at p for line l
-            v = q(p)
-            """
-            if l=='total':
-                a = merper.total
-                merper.total = 0
-                return a
-            df = port.density_df
-            loss = df.loss
-            F = df[f'ημ_{l}'].cumsum()
-            f = interpolate.interp1d(F, loss)
-            a = v - f(p)
-            merper.total += a
-            return a
-        merper.total = 0
-        exhibit['MerPer'] = [merper(self, l, p, a_cal) for l in self.line_names_ex]
-        # subtract the premium to get the actual capital
-        methods =  ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
-        exhibit.loc[:, methods] = exhibit.loc[:, methods].sub(exhibit.TP.values, axis=0)
-        # make a version just focused on comparing ROEs
-        cols = ['ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
-        exhibit2 = exhibit.copy()[['TP', 'TL', 'T LR', 'TQ', 'T ROE'] + cols]
-        exhibit2.loc[:, cols] = (1 / exhibit2[cols]).mul(exhibit2.TP - exhibit2.TL, axis=0)
+        # make the pricing summary DataFrame and exhibit
+        pricing, exhibit, exhibit2, p_t, pv, pt = self.example_factory_exhibits(deets, p, a_cal)
         # other helpful audit values
         audit_df.loc['TVaR@'] = p_t
         audit_df.loc['erVaR'] = pv
@@ -2302,7 +2270,6 @@ class Portfolio(object):
             df[['Premium↑', 'Loss↑', 'Capital↑', 'Assets↑', 'Risk Margin↑']].plot(xlim=xlim, ax=a)
             tidy(a)
             # a.set(aspect=1)
-
 
             a = next(ax)
             _ = df.iloc[100:200, :]['Marginal ROE'].max()
@@ -2396,6 +2363,129 @@ class Portfolio(object):
         return Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1 if plot else None,
             fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2, audit_df=audit_df)
 
+    def example_factory_exhibits(self, data_in, p=0, a=0):
+        """
+        do the work to extract the pricing, exhibit and exhibit 2 DataFrames from deets
+        Can also accept an ans object with an augmented_df element (how to call from outside)
+        POINT: re-run exhibits at different p/a thresholds without recalibrating
+        add relevant items to audit_df
+        a = q(p) if both given; if not both given derived as usual
+        """
+        assert p or a
+        if p and not a:
+            a = self.q(p)
+        if a and not p:
+            p = self.cdf(a)
+        if isinstance(data_in, Answer):
+            deets = data_in.augmented_df
+        else:
+            deets = data_in
+
+        ex = deets.loc[[a]].T
+        ex.index = [i.replace('xi_x', 'xi/x').replace('epd_', 'epd:').
+                    replace('ημ_', 'ημ') for i in ex.index]
+        pricing = ex.filter(regex='loss|^p_|g?[S]|exi/xgtag?_.+?$(?<!(sum))|'
+                        'exag?_.+?$(?<!(pcttotal|sumparts))|LR_', axis=0).sort_index()
+        pricing.index = [i if i.find('_')>0 else f'{i}_total' for i in pricing.index]
+        pricing.index = pricing.index.str.split('_', expand=True)
+        pricing.index.set_names(['stat', 'line'], inplace=True)
+        pricing = pricing.sort_index(level=[0,1])
+        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', slice('Atame', 'Dthick')) , :].sum(axis=0)
+        pricing = pricing.sort_index(level=[0,1])
+        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', slice('Atame', 'Dthick')) , :].sum(axis=0)
+        pricing = pricing.sort_index(level=[0,1])
+        for l in self.line_names:
+            pricing.loc[('S',l), :] = \
+                pricing.loc[('exi/xgta', l), :].values * pricing.loc[('S', 'total'), :].values
+            pricing.loc[('gS',l), :] = \
+                pricing.loc[('exi/xgtag', l), :].values * pricing.loc[('gS', 'total'), :].values
+            pricing.loc[('loss', l), :] = pricing.loc[('loss', 'total')]
+        pricing = pricing.sort_index(level=[0,1])
+
+        # focus on just the indicated capital level a
+        exhibit = pricing.xs(a, axis=1).unstack(1).T.copy()
+        exhibit['M.LR'] = exhibit.S / exhibit.gS
+        # ROE.2 is the total ROE
+        # exhibit['M.ROE.2'] = (exhibit.gS - exhibit.S) / (1 - exhibit.gS)
+        # !!!!!!!!!
+        exhibit['M.Q'] = ex.filter(regex=r'^M\.Q_', axis=0).values
+        exhibit['T.Q'] = ex.filter(regex=r'^T\.Q_', axis=0).values
+        exhibit['T.ROE'] = ex.filter(regex=r'^T\.ROE_', axis=0).values
+        exhibit['M.ROE'] = float(ex.filter(regex='^ROE', axis=0).values)
+        exhibit['T.M'] = ex.filter(regex='^T.M_', axis=0).values
+
+        Q = a - exhibit.at['total', 'exag']
+        roe = (exhibit.at['total', 'exag'] -  exhibit.at['total', 'exa']) / Q
+        # exhibit['T.Q'] = (exhibit.exag -  exhibit.exa) / roe
+        # exhibit['M.Q'] = 1 - exhibit.gS
+        # this is fine...but we have it in T.M
+        # exhibit['T.M.2'] = exhibit.exag - exhibit.exa
+        # exhibit['T.ROE'] = roe
+        exhibit['A'] = a
+        exhibit = exhibit[['A', 'S', 'gS', 'M.LR', 'M.Q', 'M.ROE',   'exi/xgta', 'exi/xgtag', 'exa', 'exag',   'T.M', 'T.LR', 'T.Q', 'T.ROE' ]]
+        exhibit.columns = ['A', 'M.L', 'M.P', 'M.LR', 'M.Q', 'M.ROE', 'exi/xgta', 'exi/xgtag', 'T.L', 'T.P',   'T.M', 'T.LR', 'T.Q', 'T.ROE' ]
+        exhibit['M.M'] = exhibit['M.P'] - exhibit['M.L']
+        exhibit['T.PQ'] = exhibit['T.P'] / exhibit['T.Q']
+
+        # some reasonable traditional metrics
+        # tvar threshold giving the same assets as p on VaR
+        try:
+            p_t = self.tvar_threshold(p)
+        except ValueError as e:
+            print('Error computing p_t threshold for VaR')
+            warnings.warn(str(e))
+            p_t = 0.5
+        try:
+            pv, pt = self.equal_risk_var_tvar(p, p_t)
+        except ValueError as e:
+            print('Error computing p_t threshold for VaR')
+            warnings.warn(str(e))
+            pv = 0.5
+            pt = 0.5
+        try:
+            exhibit['VaR'] = [float(a.middle_q(p)) for a in self] + [self.q(p)]
+            exhibit['TVaR'] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
+            exhibit['ScaledVaR'] = exhibit.VaR
+            exhibit['ScaledTVaR'] = exhibit.TVaR
+            exhibit.loc['total', 'ScaledVaR'] = 0
+            exhibit.loc['total', 'ScaledTVaR'] = 0
+            sumvar = exhibit.ScaledVaR.sum()
+            sumtvar = exhibit.ScaledTVaR.sum()
+            exhibit['ScaledVaR'] = exhibit.ScaledVaR * exhibit.loc['total', 'VaR'] / sumvar
+            exhibit['ScaledTVaR'] = exhibit.ScaledTVaR * exhibit.loc['total', 'TVaR'] / sumtvar
+            exhibit.loc['total', 'ScaledVaR'] = exhibit.loc['total', 'VaR']
+            exhibit.loc['total', 'ScaledTVaR'] = exhibit.loc['total', 'TVaR']
+            exhibit.loc['total', 'VaR'] = sumvar
+            exhibit.loc['total', 'TVaR'] = sumtvar
+            exhibit['EqRiskVaR'] = [float(a.middle_q(pv)) for a in self] + [self.q(p)]
+            exhibit['EqRiskTVaR'] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
+            # MerPer
+            exhibit['MerPer'] = self.merton_perold(p)
+        except ValueError as e:
+            print('Some general out of bounds error on VaRs and TVaRs, setting all equal to zero')
+            warnings.warn(str(e))
+            for c in ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']:
+                if c not in exhibit.columns:
+                    exhibit[c] = 0.0
+                else:
+                    exhibit[c] = -999
+        # EPD
+        row = self.density_df.loc[a, :]
+        exhibit['EPD'] = [row.at[f'epd_{0 if l == "total" else 1}_{l}'] for l in self.line_names_ex]
+        # subtract the premium to get the actual capital
+        methods =  ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
+        exhibit.loc[:, methods] = exhibit.loc[:, methods].sub(exhibit['T.P'].values, axis=0)
+        # make a version just focused on comparing ROEs
+        cols = ['ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
+        exhibit2 = exhibit.copy()[['T.P', 'T.L', 'T.LR', 'T.Q', 'T.ROE'] + cols]
+        exhibit2.loc[:, cols] = (1 / exhibit2[cols]).mul(exhibit2['T.P'] - exhibit2['T.L'], axis=0)
+
+        # return depending on how called
+        if isinstance(data_in, Answer):
+            return Answer(pricing=pricing, exhibit=exhibit, exhibit2=exhibit2)
+            deets = data_in.augmented_df
+        else:
+            return pricing, exhibit, exhibit2, p_t, pv, pt
 
     def top_down(self, distortions, A_or_p):
         """

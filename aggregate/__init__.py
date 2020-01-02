@@ -9,7 +9,7 @@ __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 
 # imports
-# from .param import hack_make_lines_from_csv
+from .param import hack_make_lines_from_csv
 from .underwriter import Underwriter
 from .port import Portfolio
 from .distr import Frequency, Severity, Aggregate, CarefulInverse
@@ -31,7 +31,7 @@ aggregate - a powerful aggregate loss modeling library for Python
 **aggregate** is a Python package providing fast, accurate, and expressive data
 structures designed to make working with probability distributions
 easy and intuitive. Its primary aim is to be an educational tool, allowing
-experimenation with complex, **real world** distributions. It has applications in
+experimentation with complex, **real world** distributions. It has applications in
 insurance, risk management, actuarial science and related areas.
 
 

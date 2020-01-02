@@ -18,6 +18,8 @@ def read(fname):
 
 long_description = read('README.rst')
 
+# agg/*.agg is the parameter and curve files
+
 setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,

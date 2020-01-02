@@ -20,49 +20,42 @@ from pathlib import Path
 # see https://docs.python.org/3.7/howto/logging.html
 # and https://docs.python.org/3.7/howto/logging-cookbook.html
 # LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
-# LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
-RLOGFILE = Path.home() / '.agglog/r.agg.main.logger.log'
+LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
+# RLOGFILE = Path.home() / '.agglog/r.agg.main.logger.log'
 # check it exists
-RLOGFILE.parent.mkdir(exist_ok=True, parents=True)
+LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
-logger = logging.getLogger('aggregate') # __name__)
+# approved method is call (__name__)
+logger = logging.getLogger('aggregate')
 logger.setLevel(logging.INFO)
 
-rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=1<<20, backupCount=5)
+# rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=100000, backupCount=10)
+rh = logging.FileHandler(LOGFILE)
 rh.setLevel(logging.INFO)
+rh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+rh.setFormatter(rh_formatter)
 
-# fh = logging.FileHandler(LOGFILE)
-# fh.setLevel(logging.DEBUG)
-fh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
-# fh.setFormatter(fh_formatter)
-rh.setFormatter(fh_formatter)
 
+# to stderr
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 ch_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 ch.setFormatter(ch_formatter)
 
+# add loggers
 logger.addHandler(rh)
 logger.addHandler(ch)
-# logger.addHandler(fh)
 
+# dev logger to stderr - all levels
+# used for messages during development
 dev_logger = logging.getLogger('aggdev')
 dev_logger.setLevel(logging.DEBUG)
-# dev_logger.setLevel(logging.DEBUG)
-# used for messages during development
 sh = logging.StreamHandler()
-# sh.setLevel(logging.DEBUG)
 sh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno)d) | %(message)s')
 sh.setFormatter(sh_formatter)
 dev_logger.addHandler(sh)
 
-# logging.basicConfig(filename=LOGFILE,
-#                     filemode='w',
-#                     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-#                     level=logging.DEBUG)
-
 logger.info('aggregate_project.__init__ | New Aggregate Session started')
-
 
 # display
 # def qd(df, max_rows=10):
@@ -1302,6 +1295,21 @@ class Answer(dict):
         return '\n'.join([f'{i[0]:<20s}\t{i[1]}'
             for i in zip(self.keys(), [type(v) for v in self.values()])
             ])
+
+    def summary(self):
+        """
+        just print out the dataframes: horz or vertical as appropriate
+        reasonable styling
+        :return:
+        """
+
+        for k, v in self.items():
+            if isinstance(v, pd.core.frame.DataFrame):
+                print(f'\n{k}\n{"="*len(k)}\n')
+                if v.shape[1] > 12:
+                    display(v.head(5).T)
+                else:
+                    display(v.head(10))
 
 def log_test():
     """"

@@ -1236,7 +1236,11 @@ class Portfolio(object):
                     f'{1 - sum_p_total:12.8e} NOT RESCALING')
         # self.density_df.p_total /= sum_p_total
         self.density_df['F'] = np.cumsum(self.density_df.p_total)
-        self.density_df['S'] = 1 - self.density_df.F
+        # and this, ladies and gents, is terrible...
+        # self.density_df['S'] = 1 - self.density_df.F
+        self.density_df['S'] = np.hstack((self.density_df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
+                                            min(self.density_df.p_total.iloc[-1],
+                                                max(0, 1. - (self.density_df.p_total.sum())))))
         # get rounding errors, S may not go below zero
         logger.info(
             f'CPortfolio._add_exa | {self.name}: S <= 0 values has length {len(np.argwhere(self.density_df.S <= 0))}')
@@ -1258,6 +1262,7 @@ class Portfolio(object):
         # find the largest value where exlea_total > loss, which has to be an error
         # 100 bs is a hack, move a little beyond last problem observation
         # from observation looks about right with 1<<16 buckets
+        # TODO What is this crap?
         n_ = self.density_df.shape[0]
         if n_ < 1100:
             mult = 1
@@ -1359,7 +1364,7 @@ class Portfolio(object):
             # unconditional E(X_i/X)
             self.density_df['exi_x_' + col] = np.sum(
                 self.density_df['exeqa_' + col] * self.density_df.p_total / self.density_df.loss)
-            ## DEC 2019 this is a forward sum so it should be cumintegral
+            ## Jan 2020 this is a forward sum so it should be cumintegral
             # original
             temp_xi_x = np.cumsum(self.density_df['exeqa_' + col] * self.density_df.p_total / self.density_df.loss)
             # change
@@ -1382,7 +1387,14 @@ class Portfolio(object):
             self.density_df.loc[self.density_df.exlea_total == 0, 'exi_xlea_ημ_' + col] = 0
             # put value back
             self.density_df.loss.iloc[0] = temp
-            self.density_df['exi_xgta_' + col] = (self.density_df['exi_x_' + col] - temp_xi_x) / self.density_df.S
+            # this is so important we will calculate it directly rather than the old:
+            # self.density_df['exi_xgta_' + col] = (self.density_df['exi_x_' + col] - temp_xi_x) / self.density_df.S
+            # the last value is undefined because we know nothing about what happens beyond our array
+            # above that we need a shift: > second to last value will only involve the last row (the John Major problem)
+            # hence
+            self.density_df['exi_xgta_' + col] = ((self.density_df[f'exeqa_{col}'] / self.density_df.loss *
+                                       self.density_df.p_total).shift(-1)[::-1].cumsum()) / self.density_df.S
+
             self.density_df['exi_xgta_ημ_' + col] = \
                 (self.density_df['exi_x_ημ_' + col] - temp_xi_x_not) / self.density_df.S
             self.density_df['exi_xeqa_' + col] = self.density_df['exeqa_' + col] / self.density_df['loss']
@@ -1787,9 +1799,12 @@ class Portfolio(object):
         # add the exag and distorted probs
         df['gS'] = g(df.S)
         df['gF'] = 1 - df.gS
-        # TODO update for ability to prepend 0 in newer numpy
+        # updated for ability to prepend 0 in newer numpy
         # df['gp_total'] = np.diff(np.hstack((0, df.gF)))
-        df['gp_total'] = np.diff(df.gF, prepend=0)
+        # also checked these two method give the same result:
+        # bit2['gp1'] = -np.diff(bit2.gS, prepend=1)
+        # bit2['gp2'] = np.diff(1 - bit2.gS, prepend=0)
+        df['gp_total'] = -np.diff(df.gS, prepend=1)
 
         # Impact of mass at zero
         # if total has an ess sup < top of computed range then any integral a > ess sup needs to have
@@ -1813,11 +1828,18 @@ class Portfolio(object):
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
             # for <=a cumintegral,  for > a reverse and use cumsum (no step back)
             # UC = unconditional
-            exleaUC = self.cumintegral(self.density_df[f'exeqa_{line}'] * df.gp_total, 1)
+            # old
             #
-            exixgtaUC = np.cumsum(
-                self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
-                df.loc[::-1, 'gp_total'])
+            # exleaUC = self.cumintegral(self.density_df[f'exeqa_{line}'] * df.gp_total, 1)
+            #
+            # correct that increasing integrals need the offset
+            # exleaUC1 = np.cumsum(self.density_df[f'exeqa_{line}'] * df.gp_total)
+            #
+            # old
+            # exixgtaUC = np.cumsum(
+            #    self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
+            #    df.loc[::-1, 'gp_total'])
+            #
             # or shift...NO should be cumsum for gt
             # exixgtaUC1 = self.cumintegral(
             #     self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
@@ -1832,6 +1854,7 @@ class Portfolio(object):
             # pick  up right hand places where S is very small (rounding issues...)
             mass = 0
             if dist.mass:
+                logger.error("You cannot use a distortion with a mass at this time...")
                 # this is John's problem: the last scenario is getting all the weight...
                 # not clear how accurately this is computed numerically
                 # this amount is a
@@ -1861,9 +1884,25 @@ class Portfolio(object):
             # test['w'] = bit / test.a
             # test
             #
-            df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
-            df[f'exleag_{line}'] = exleaUC / df.gF
-            df[f'exi_xgtag_{line}'] = exixgtaUC / df.gS
+            # df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
+            # df[f'exag1_{line}'] = exleaUC1 + exixgtaUC * self.density_df.loss + mass
+            # is this ever used?
+            # df[f'exleag_{line}'] = exleaUC / df.gF
+            # df[f'exleag1_{line}'] = exleaUC1 / df.gF
+            #
+            # again, exi_xgtag is super important, so we will compute it bare bones the same way as exi_xgta
+            # df[f'exi_xgtag_{line}'] = exixgtaUC / df.gS
+            # TODO how do masses factor into this??
+            df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
+                                         df.gp_total).shift(-1)[::-1].cumsum()) / df.gp_total.shift(-1)[::-1].cumsum()
+            # following the Audit Vignette this is the way to go:
+            df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'] * df.gS.shift(1)).cumsum() * self.bs
+
+            # it makes a difference NOT to divivde by df.gS but to compute the actual weights you are using (you mess
+            # around with the last weight)
+            #
+            #
+            #
             # these are all here for debugging...see
             # C:\S\TELOS\spectral_risk_measures_monograph\spreadsheets\[AS_IJW_example.xlsx]
             # df[f'exag1_{line}'] = exleaUC + exixgtaUC1 * self.density_df.loss + mass
@@ -1877,7 +1916,11 @@ class Portfolio(object):
         # sum of parts: careful not to include the total twice!
         df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
         # LEV under distortion g
+        # originally
         df['exag_total'] = self.cumintegral(df['gS'])
+        # revised
+        df['exag_total'] = df.gS.shift(1).cumsum() * self.bs
+        df.loc[0, 'exag_total'] = 0
 
         # comparison of total and sum of parts
         # removed lTl and pcttotal (which spent a lot of time removing!) Dec 2019
@@ -1907,7 +1950,7 @@ class Portfolio(object):
             #
             df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
             df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
-            # prepend 1 puts everything off by one
+            # prepend 1 puts everything off by one; would need to divide by bs to compute derivative (MM per unit vs. bucket)
             df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], append=0)
             # careful about where ROE==0
             df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df.ROE

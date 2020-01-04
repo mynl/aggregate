@@ -19,8 +19,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/aggregate/port.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-4178">
-              <caret line="1754" column="8" selection-start-line="1754" selection-start-column="8" selection-end-line="1754" selection-end-column="8" />
+            <state relative-caret-position="490">
+              <caret line="1853" column="36" selection-start-line="1853" selection-start-column="36" selection-end-line="1853" selection-end-column="36" />
               <folding>
                 <element signature="e#232#250#0" expanded="true" />
               </folding>
@@ -83,6 +83,8 @@
       <find>nonzero</find>
       <find>tame</find>
       <find>thick</find>
+      <find>exi_xgta_sum</find>
+      <find>exi_xgt</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -249,12 +251,12 @@
       <workItem from="1577371284935" duration="26325000" />
       <workItem from="1577614269998" duration="651000" />
       <workItem from="1577635125581" duration="23202000" />
-      <workItem from="1577972460162" duration="14380000" />
+      <workItem from="1577972460162" duration="27515000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="37582000" />
+    <option name="totallyTimeSpent" value="50717000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -267,14 +269,15 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="61" y="-7" width="2195" height="1513" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" show_stripe_button="false" sideWeight="0.53106934" side_tool="true" weight="0.14726508" />
-      <window_info active="true" id="Structure" order="1" sideWeight="0.46875" visible="true" weight="0.14726508" />
-      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.53125" side_tool="true" visible="true" weight="0.14726508" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.4688" visible="true" weight="0.14726508" />
+      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.5312" side_tool="true" visible="true" weight="0.14726508" />
       <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="1" />
       <window_info anchor="bottom" id="Version Control" order="2" weight="0.32947975" />
-      <window_info anchor="bottom" id="Python Console" order="3" visible="true" weight="0.30635837" />
+      <window_info anchor="bottom" id="Python Console" order="3" visible="true" weight="0.09682081" />
       <window_info anchor="bottom" id="Terminal" order="4" />
       <window_info anchor="bottom" id="Event Log" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="6" />
@@ -285,11 +288,11 @@
       <window_info anchor="bottom" id="Inspection" order="11" weight="0.4" />
       <window_info anchor="right" id="SciView" order="0" />
       <window_info anchor="right" id="Database" order="1" />
-      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" sideWeight="0.38854167" side_tool="true" visible="true" weight="0.25899953" />
+      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" sideWeight="0.388" side_tool="true" visible="true" weight="0.25899953" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="3" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="4" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="5" weight="0.25" />
-      <window_info anchor="right" id="TODO" order="6" sideWeight="0.61145836" visible="true" weight="0.25899953" />
+      <window_info anchor="right" id="TODO" order="6" sideWeight="0.612" visible="true" weight="0.25899953" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -372,8 +375,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/port.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-4178">
-          <caret line="1754" column="8" selection-start-line="1754" selection-start-column="8" selection-end-line="1754" selection-end-column="8" />
+        <state relative-caret-position="490">
+          <caret line="1853" column="36" selection-start-line="1853" selection-start-column="36" selection-end-line="1853" selection-end-column="36" />
           <folding>
             <element signature="e#232#250#0" expanded="true" />
           </folding>

@@ -2,7 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
 .idea/
+
 doc//_*//
 
 # C extensions
@@ -130,3 +132,4 @@ doc/_build/html/searchindex.js
 doc/_build/html/tutorial.html
 doc/_build/html/underwriter.html
 doc/_build/html/utilities.html
+.idea/workspace.xml

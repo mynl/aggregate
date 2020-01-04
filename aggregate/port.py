@@ -29,15 +29,13 @@ from matplotlib.ticker import MultipleLocator, StrMethodFormatter, MaxNLocator, 
     FixedFormatter, AutoMinorLocator
 from scipy import interpolate
 
-from .distr import Aggregate
-from .distr import Severity
+from .distr import Aggregate, CarefulInverse, Severity
 from .spectral import Distortion
 from .utils import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
     sensible_jump, suptitle_and_tight, \
-    MomentAggregator, \
-    Answer
+    MomentAggregator, Answer
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -205,8 +203,6 @@ class Portfolio(object):
         s.append(f'Portfolio contains {_n} aggregate component{_s}')
         summary_sl = (slice(None), ['mean', 'cv', 'skew'])
         if self.audit_df is not None:
-            # _df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
-            # another option TODO consider
             _df = pd.concat((self.statistics_df.loc[summary_sl, :],
                              self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
                             sort=True)
@@ -217,11 +213,9 @@ class Portfolio(object):
 
     def __hash__(self):
         """
-        hashging behavior
+        hashing behavior
         :return:
         """
-        # TODO fix
-        # return hash(self.__repr__())
         return hash(repr(self.__dict__))
 
     def __iter__(self):
@@ -250,7 +244,6 @@ class Portfolio(object):
         """
 
         args = dict()
-        # TODO fix is it bs or bs!!
         args["bs"] = self.bs
         args["log2"] = self.log2
         args["padding"] = self.padding
@@ -282,8 +275,6 @@ class Portfolio(object):
         """
         persist to json in filename; if none save to user.json
 
-        TODO: update user list in Examples?
-
         :param filename:
         :param mode: for file open
         :return:
@@ -298,7 +289,7 @@ class Portfolio(object):
 
     def __add__(self, other):
         """
-        Add two portfolio objets INDEPENDENT sum (down road can look for the same severity...)
+        Add two portfolio objects INDEPENDENT sum (down road can look for the same severity...)
 
         TODO same severity!
 
@@ -403,7 +394,7 @@ class Portfolio(object):
             # that q_temp left cts, want right continuous:
             self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
             self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
-            # previously, haha
+            # previously
             # self._linear_quantile_function['upper'] = \
             #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='nearest', bounds_error=False,
             #                          fill_value='extrapolate')
@@ -413,36 +404,10 @@ class Portfolio(object):
             self._linear_quantile_function['lower'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
                                      fill_value='extrapolate')
-            # original
-            # self._linear_quantile_function = \
-            #     interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='nearest', bounds_error=False,
-            #                          fill_value='extrapolate')
-
-
         l = float(self._linear_quantile_function[kind](p))
         # because we are not interpolating the returned value must (should) be in the index...
         assert l in self.density_df.index
         return l
-        # find next nearest index value if not an exact match (this is slightly faster and more robust
-        # than l/bs related math)
-        # l1 = self.density_df.index.get_loc(l, 'bfill')
-        # l1 = self.density_df.index[l1]
-        # return l1
-
-    # def quantile_function(self, kind='linear'):
-    #     """
-    #     return an approximation to the quantile function
-    #     linear is approximation for a continuous (uniform) version of bucketing
-    #     linear does not return an item in the index and is not correct for the discrete bucketing
-    #
-    #     TODO sort out...this isn't right
-    #
-    #     :param kind:
-    #     :return:
-    #     """
-    #     q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind=kind,
-    #                              bounds_error=False, fill_value='extrapolate')
-    #     return q
 
     def cdf(self, x):
         """
@@ -452,7 +417,7 @@ class Portfolio(object):
         :return:
         """
         if self._cdf is None:
-                # Dec 2019: kind='linear' --> kind='previous'
+            # Dec 2019: kind='linear' --> kind='previous'
             self._cdf = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='previous',
                                              bounds_error=False, fill_value='extrapolate')
         return self._cdf(x)
@@ -527,11 +492,12 @@ class Portfolio(object):
 
         _var = self.q(p)
         # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
-        ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p_total', 'loss']].product(axis=1).sum()
+        # if you pick bs to be binary-consistent this error will not occur
+        # ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p_total', 'loss']].product(axis=1).sum()
+        ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
         pip = (self.density_df.loc[_var, 'F'] - p) * _var
         t_var = 1 / (1 - p) * (ex + pip)
         return t_var
-
         # original implementation interpolated
         # if self._tail_var is None:
         #     # make tvar function
@@ -607,11 +573,11 @@ class Portfolio(object):
         ans = []
         total = 0
         for l in self.line_names:
-            F = df[f'ημ_{l}'].cumsum()
-            f = interpolate.interp1d(F, loss)
-            _ = a - f(p)
-            ans.append(_)
-            total += _
+            # use careful_q method leveraging CarefulInverse class
+            f = CarefulInverse.dist_inv1d(loss, df[f'ημ_{l}'])
+            diff = a - f(p)
+            ans.append(diff)
+            total += diff
         ans.append(total)
         return ans
 
@@ -675,16 +641,14 @@ class Portfolio(object):
         """
         returns new Portfolio with the fit
 
-        deprecated...prefer uw(self.fit()) to go through the agg language approach
-
-        TODO: make a version returning an rv_histogram
-
+        TODO: deprecated...prefer uw(self.fit()) to go through the agg language approach
 
         :param approx_type: slognorm | sgamma
         :return:
         """
         spec = self.fit(approx_type, output='dict')
         logger.debug(f'Portfolio.collapse | Collapse created new Portfolio with spec {spec}')
+        logger.warning(f'Portfolio.collapse | Collapse is deprecated; use fit() instead.')
         return Portfolio(f'Collapsed {self.name}', [spec])
 
     def percentiles(self, pvalues=None):
@@ -1506,6 +1470,7 @@ class Portfolio(object):
 
         :param name: name of distortion
         :param r0:   fixed parameter if applicable
+        :param df:  t-distribution degrees of freedom
         :param premium_target: target premium
         :param roe:             or ROE
         :param assets: asset level
@@ -1614,7 +1579,8 @@ class Portfolio(object):
                 return ex - premium_target, ex_prime
         elif name == 'tt':
             # wang-t-t ... issue with df, will set equal to 5.5 per Shaun's paper
-            # finding that is a reasonable level for now TODO sort out!
+            # finding that is a reasonable level; user can input alternative
+            # TODO bivariate solver for t degrees of freedom?
             # param is shape like normal
             t = ss.t(df)
             shape = 0.95  # starting param
@@ -1667,8 +1633,8 @@ class Portfolio(object):
                 f'CPortfolio.calibrate_distortion | Questionable convergenge! {name}, target '
                 f'{premium_target} error {fx}, {i} iterations')
 
-        # build answer (note df is hack for t at the moment TODO)
-        dist = Distortion(name=name, shape=shape, r0=r0, df=5.5)
+        # build answer
+        dist = Distortion(name=name, shape=shape, r0=r0, df=df)
         dist.error = fx
         dist.assets = assets
         dist.premium_target = premium_target
@@ -1822,12 +1788,27 @@ class Portfolio(object):
         df['gS'] = g(df.S)
         df['gF'] = 1 - df.gS
         # TODO update for ability to prepend 0 in newer numpy
-        df['gp_total'] = np.diff(np.hstack((0, df.gF)))
+        # df['gp_total'] = np.diff(np.hstack((0, df.gF)))
+        df['gp_total'] = np.diff(df.gF, prepend=0)
 
         # Impact of mass at zero
         # if total has an ess sup < top of computed range then any integral a > ess sup needs to have
-        # the mass added. The added mass will be the same for
-        mass = 0
+        # the mass added. It only needs to be added to quantities computed as integrals, not g(S(x))
+        # which includes it automatically.
+        # total_mass is the mass for the total line, it will be apportioned below to the individual lines
+        # total_mass  = (mass %) x (ess sup loss), applied when S>0
+        # TODO TODO Audit and check reasonable results!
+        total_mass = 0
+        if dist.mass:
+            S = self.density_df.S
+            # S better be decreasing
+            if not np.alltrue(S.iloc[1:] <= S.iloc[:-1].values):
+                logger.error('S = denstiy_df.S is not non-increasing...carrying on but you should investigate...')
+            idx_ess_sup = S.to_numpy().nonzero()[0][-1]
+            logger.warning(f'Index of ess_sup is {idx_ess_sup}')
+            total_mass = np.zeros_like(S)
+            total_mass[:idx_ess_sup + 1] = dist.mass
+
         for line in self.line_names:
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
             # for <=a cumintegral,  for > a reverse and use cumsum (no step back)
@@ -1842,10 +1823,29 @@ class Portfolio(object):
             #     self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
             #     df.loc[::-1, 'gp_total'], 1)[::-1]
             #
+            # Treatment of Masses
+            # You are integrating down from minus infinity. You need to add the mass at the first
+            # loss level with S>0, or, if S>0 for all x then you add the mass at all levels because
+            # int_x^infty fun = int_F(x)^1 fun + (prob=1) * fun(1) (fun=TVaR)
+            # The mass is (dist.mass x ess sup).
             # if S>0 but flat and there is a mass then need to include loss X g(S(loss)) term!
             # pick  up right hand places where S is very small (rounding issues...)
+            mass = 0
             if dist.mass:
-                mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}']
+                # this is John's problem: the last scenario is getting all the weight...
+                # not clear how accurately this is computed numerically
+                # this amount is a
+                mass = total_mass * self.density_df[f'exi_xeqa{line}'].iloc[idx_ess_sup]
+                logger.warning(f'Individual line={line} weight from portfolio mass = {mass:.5g}')
+                for ii in range(1, max(self.log2 - 4, 0)):
+                    avg_xix = self.density_df[f'exi_xeqa{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
+                    logger.warning(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
+                                   f'is {self.density_df[f"exi_xeqa{line}"].iloc[idx_ess_sup]}:.5g')
+                logger.warning('You want these values all to be consistent!')
+                # old
+                # mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}'] * \
+                #        np.where(self.density_df.S > 0, 1, 0)
+
             # when computed using np.cumsum exixgtaUC is a pd.Series has an index so when it is mult by .loss
             # (which also has an index) it gets re-sorted into ascending order
             # when computed using cumintegral it is a numpy array with no index and so need reversing
@@ -1902,7 +1902,8 @@ class Portfolio(object):
             # df.loc[0, f'prem_lTl_{line}'] = 0
             # loss ratio using my allocation
             #
-            # TODO check M calcs by doing directly not as diff
+            # TODO check M calcs by doing directly not as diff; need * bs when you diff an integral
+            # because you mult by bs when you integrate
             #
             df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
             df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
@@ -2174,7 +2175,7 @@ class Portfolio(object):
         return df, pricing_g
 
     def example_factory(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
-                        p=None, A=None, index='loss', plot=True):
+                        p=None, kind='', A=None, index='loss', plot=True):
         """
         Helpful graphic and summary DataFrames from one distortion, loss ratio and p value.
         Starting logic is the similar to calibrate_distortions.
@@ -2200,6 +2201,7 @@ class Portfolio(object):
         :param LR: otherwise use loss ratio and p or a loss ratio
         :param ROE:
         :param p: p value to determine capital.
+        :param kind: type of VaR, upper or lower
         :param A:
         :param index:  whether to plot against loss or S(x) NOT IMPLEMENTED
         :param plot:
@@ -2220,7 +2222,7 @@ class Portfolio(object):
                 dev_logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
         else:
             # have p
-            a_cal = self.q(p)
+            a_cal = self.q(p, kind)
             exa, p = self.density_df.loc[a_cal, ['exa_total', 'F']]
 
         if dshape is None and not isinstance(dname, Distortion):
@@ -2344,20 +2346,21 @@ class Portfolio(object):
                 """
                 a.legend(frameon=True)  # , loc='upper right')
                 a.set(xlabel='Assets')
-                n = 4
                 # MaxNLocator uses <= n sensible  points
-                a.xaxis.set_minor_locator(AutoMinorLocator(n))
                 # fixed just sets that point
                 a.xaxis.set_major_locator(FixedLocator([a_cal]))
+                ff = f'A={a_cal:,.0f}'
+                # Fixed formatter: just give the points
+                a.xaxis.set_major_formatter(FixedFormatter([ff]))
+
+                n = 6
+                a.xaxis.set_minor_locator(MaxNLocator(n))
+                a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
                 # MultipleLocator uses multiples of give value
                 # a.xaxis.set_minor_locator(MultipleLocator(a_cal / 5))
                 # NullFormatter for no tick marks (default for minor)
                 # a.xaxis.set_major_formatter(NullFormatter())
                 # StrMethodFormatter suitable for .format(), variable must be called x
-                a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
-                ff = f'A={a_cal:,.0f}'
-                # Fixed formatter: just give the points
-                a.xaxis.set_major_formatter(FixedFormatter([ff]))
                 # FuncFormatter also helpful
                 # a.xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: f'{x:,.0f}' if x != a_cal else f'**{x:,.0f}'))
 
@@ -2412,10 +2415,10 @@ class Portfolio(object):
 
             a = next(ax)
             # TODO Mess, tidy up
-            _ = df.iloc[100:200, :]['Marginal ROE'].max()
-            if np.isnan(_):
-                _ = 2.5
-            ylim = [0, _]
+            _temp = df.iloc[100:200, :]['Marginal ROE'].fillna(0).max()
+            if np.isnan(_temp):
+                _temp = 2.5
+            ylim = [0, _temp]
             avg_roe_up = df.at[a_cal, "ROE↑"]
             # just get rid of this
             df.loc[0:self.q(1e-5), 'Marginal ROE'] = np.nan
@@ -2426,7 +2429,7 @@ class Portfolio(object):
             # a.grid('both','both')
 
             title = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
-                    f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
+                f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
             f1.suptitle(title)
 
             # trinity plots
@@ -2455,7 +2458,8 @@ class Portfolio(object):
                 a.plot([0, 1], [k, k], linewidth=1, c='black', label='Capital')
 
             # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.gridspec.GridSpec.html#matplotlib.gridspec.GridSpec
-            f2, axs = plt.subplots(1, 5, figsize=(8, 3), constrained_layout=True, sharey=True) # this tightens up the grid->, gridspec_kw={'wspace': 0})  # , 'hspace':0
+            f2, axs = plt.subplots(1, 5, figsize=(8, 3), constrained_layout=True,
+                                   sharey=True)  # this tightens up the grid->, gridspec_kw={'wspace': 0})  # , 'hspace':0
 
             ax = iter(axs.flatten())
 
@@ -2530,10 +2534,12 @@ class Portfolio(object):
         pricing.index = pricing.index.str.split('_', expand=True)
         pricing.index.set_names(['stat', 'line'], inplace=True)
         pricing = pricing.sort_index(level=[0, 1])
-        # !!! TODO WTF Names!!
-        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', slice('Atame', 'Dthick')), :].sum(axis=0)
+        # !!! TODO WTF Names!! CHECK - does this work?
+        # pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', slice('Atame', 'Dthick')), :].sum(axis=0)
+        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', self.line_names), :].sum(axis=0)
         pricing = pricing.sort_index(level=[0, 1])
-        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', slice('Atame', 'Dthick')), :].sum(axis=0)
+        # pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', slice('Atame', 'Dthick')), :].sum(axis=0)
+        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', self.line_names), :].sum(axis=0)
         pricing = pricing.sort_index(level=[0, 1])
         for l in self.line_names:
             pricing.loc[('S', l), :] = \
@@ -3025,6 +3031,50 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             logger.error(f'Portfolio.uat | {s}')
 
         return a, p, test, params, dd, table, stacked
+
+    def renamer(self, tex=False):
+        """
+        write a sensible renamer for the columns to use thusly:
+
+        self.density_df.rename(columns=renamer)
+
+        :return: dictionary that can be used to rename columns
+        """
+        ans = {}
+
+        # key : (before, after)
+        meta_namer = dict(p_=('', ' density'),
+                          ημ_=('All but ', ' density'),
+                          lev_=('E[', '(a)]'),
+                          exag_=('EQ[', '(a)]'),
+                          exa_=('E[', '(a)]'),
+                          exlea_=('E[', ' | X<=a]'),
+                          exgta_=('E[', ' | X>a]'),
+                          exeqa_=('E[', ' | X=a]'),
+                          e1xi_1gta_=('E[1/', ' 1(X>a)]'),
+                          exi_x_=('E[', '/X]'),
+                          exi_xgta_sum=('Sum of E[Xi/X|X>a]', ''),
+                          exi_xeqa_sum=("Sum of E[Xi/X|X=a]", ''),
+                          exi_xgta_=('E[', '/X | X>a]'),
+                          exi_xeqa_=('E[', '/X | X=a]'),
+                          exi_xlta_=('E[', '/X | X<a]'),
+                          epd_0_=('EPD(', ') stand alone'),
+                          epd_1_=('EPD(', ') within X'),
+                          epd_2_=('EPD(', ') second pri'),
+                          e2pri_=('E[X', '(a) second pri]'),
+                          )
+
+        if not tex:
+            for l in self.density_df.columns:
+                for k, v in meta_namer.items():
+                    d1 = l.find(k)
+                    if d1 >= 0:
+                        d1 += len(k)
+                        b, a = v
+                        ans[l] = f'{b}{l[d1:]}{a}'.replace('total', 'X')
+                        break
+
+        return ans
 
     def cumintegral(self, v, bs_override=0):
         """

@@ -3,13 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/Hack.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/examples/Hack.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/MM_2RMs.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/examples/MM_2RMs.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -17,13 +11,16 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FavoritesManager">
+    <favorites_list name="aggregate_project" />
+  </component>
   <component name="FileEditorManager">
-    <leaf>
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/aggregate/port.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="675">
-              <caret line="2478" column="28" selection-start-line="2478" selection-start-column="28" selection-end-line="2478" selection-end-column="28" />
+            <state relative-caret-position="-5582">
+              <caret line="2176" column="8" selection-start-line="2176" selection-start-column="8" selection-end-line="2176" selection-end-column="8" />
               <folding>
                 <element signature="e#232#250#0" expanded="true" />
               </folding>
@@ -32,9 +29,39 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/aggregate/parser.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-1088">
+              <caret line="37" lean-forward="true" selection-start-line="37" selection-end-line="37" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch.pyx">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="513">
+              <caret line="68" column="6" selection-start-line="68" selection-start-column="6" selection-end-line="68" selection-end-column="6" />
+              <folding>
+                <element signature="e#2#21#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/build/lib/aggregate/distr.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="687">
+              <caret line="1609" selection-start-line="1609" selection-end-line="1612" selection-end-column="33" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="371">
+            <state relative-caret-position="20304">
               <caret line="1284" selection-start-line="1284" selection-end-line="1284" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
@@ -52,6 +79,10 @@
       <find>ylim now set</find>
       <find>set_minor_locator</find>
       <find>minor_loc</find>
+      <find>CarefulIn</find>
+      <find>nonzero</find>
+      <find>tame</find>
+      <find>thick</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -61,6 +92,8 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/aggregate/utils.py" />
+        <option value="$PROJECT_DIR$/build/lib/aggregate/distr.py" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/scratch.pyx" />
         <option value="$PROJECT_DIR$/aggregate/port.py" />
       </list>
     </option>
@@ -77,7 +110,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -94,17 +126,38 @@
               <item name="aggregate_project" type="b2602c69:ProjectViewProjectNode" />
               <item name="aggregate_project" type="462c0819:PsiDirectoryNode" />
               <item name="aggregate" type="462c0819:PsiDirectoryNode" />
+              <item name="distr.py" type="8704e2dd:PyFileNode" />
+            </path>
+            <path>
+              <item name="aggregate_project" type="b2602c69:ProjectViewProjectNode" />
+              <item name="aggregate_project" type="462c0819:PsiDirectoryNode" />
+              <item name="aggregate" type="462c0819:PsiDirectoryNode" />
+              <item name="distr.py" type="8704e2dd:PyFileNode" />
+              <item name="CarefulInverse" type="dd8bbb05:PyElementNode" />
+            </path>
+            <path>
+              <item name="aggregate_project" type="b2602c69:ProjectViewProjectNode" />
+              <item name="aggregate_project" type="462c0819:PsiDirectoryNode" />
+              <item name="aggregate" type="462c0819:PsiDirectoryNode" />
               <item name="port.py" type="8704e2dd:PyFileNode" />
+            </path>
+            <path>
+              <item name="aggregate_project" type="b2602c69:ProjectViewProjectNode" />
+              <item name="aggregate_project" type="462c0819:PsiDirectoryNode" />
+              <item name="aggregate" type="462c0819:PsiDirectoryNode" />
+              <item name="utils.py" type="8704e2dd:PyFileNode" />
             </path>
           </expand>
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="com.intellij.ide.scratch.LRUPopupBuilder$1/New Scratch File" value="Cython" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/../aggregate_extensions_project" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
@@ -129,6 +182,28 @@
     </option>
   </component>
   <component name="RunManager">
+    <configuration name="SMVE_Debug" type="PythonConfigurationType" factoryName="Python">
+      <module name="aggregate_project" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="C:\Users\steve\Anaconda3\envs\smve37\python.exe" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="aggregate_project" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -153,6 +228,7 @@
     </configuration>
   </component>
   <component name="StructureViewFactory">
+    <option name="AUTOSCROLL_FROM_SOURCE" value="true" />
     <option name="ACTIVE_ACTIONS" value=",SHOW_INHERITED,SHOW_FIELDS,ALPHA_COMPARATOR" />
   </component>
   <component name="SvnConfiguration">
@@ -173,23 +249,33 @@
       <workItem from="1577371284935" duration="26325000" />
       <workItem from="1577614269998" duration="651000" />
       <workItem from="1577635125581" duration="23202000" />
+      <workItem from="1577972460162" duration="13775000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="23202000" />
+    <option name="totallyTimeSpent" value="36977000" />
+  </component>
+  <component name="TodoView">
+    <todo-panel id="selected-file">
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+    <todo-panel id="all">
+      <are-packages-shown value="true" />
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
   </component>
   <component name="ToolWindowManager">
     <frame x="61" y="-7" width="2195" height="1513" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info active="true" id="Structure" order="1" sideWeight="0.4696532" visible="true" weight="0.14586255" />
-      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.5303468" side_tool="true" visible="true" weight="0.14586255" />
+      <window_info id="Favorites" order="0" show_stripe_button="false" sideWeight="0.53106934" side_tool="true" weight="0.14726508" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.46875" visible="true" weight="0.14726508" />
+      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.53125" side_tool="true" visible="true" weight="0.14726508" />
       <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="1" />
-      <window_info anchor="bottom" id="Version Control" order="2" />
-      <window_info anchor="bottom" id="Python Console" order="3" />
+      <window_info anchor="bottom" id="Version Control" order="2" weight="0.32947975" />
+      <window_info anchor="bottom" id="Python Console" order="3" visible="true" weight="0.30635837" />
       <window_info anchor="bottom" id="Terminal" order="4" />
       <window_info anchor="bottom" id="Event Log" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="6" />
@@ -198,13 +284,13 @@
       <window_info anchor="bottom" id="Debug" order="9" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="10" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="11" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="12" />
       <window_info anchor="right" id="SciView" order="0" />
       <window_info anchor="right" id="Database" order="1" />
-      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" side_tool="true" visible="true" weight="0.19214587" />
+      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" sideWeight="0.38854167" side_tool="true" visible="true" weight="0.25899953" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="3" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="4" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="5" weight="0.25" />
+      <window_info anchor="right" id="TODO" order="6" sideWeight="0.61145836" visible="true" weight="0.25899953" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -222,7 +308,14 @@
               <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
                 <collection />
               </option>
-              <option name="COLUMN_ORDER" />
+              <option name="COLUMN_ORDER">
+                <list>
+                  <option value="0" />
+                  <option value="1" />
+                  <option value="2" />
+                  <option value="3" />
+                </list>
+              </option>
             </State>
           </value>
         </entry>
@@ -246,7 +339,7 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/aggregate/utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="371">
+        <state relative-caret-position="20304">
           <caret line="1284" selection-start-line="1284" selection-end-line="1284" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
@@ -254,10 +347,34 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/build/lib/aggregate/distr.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="687">
+          <caret line="1609" selection-start-line="1609" selection-end-line="1612" selection-end-column="33" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch.pyx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="513">
+          <caret line="68" column="6" selection-start-line="68" selection-start-column="6" selection-end-line="68" selection-end-column="6" />
+          <folding>
+            <element signature="e#2#21#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/aggregate/parser.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-1088">
+          <caret line="37" lean-forward="true" selection-start-line="37" selection-end-line="37" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/port.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="675">
-          <caret line="2478" column="28" selection-start-line="2478" selection-start-column="28" selection-end-line="2478" selection-end-column="28" />
+        <state relative-caret-position="-5582">
+          <caret line="2176" column="8" selection-start-line="2176" selection-start-column="8" selection-end-line="2176" selection-end-column="8" />
           <folding>
             <element signature="e#232#250#0" expanded="true" />
           </folding>

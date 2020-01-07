@@ -168,9 +168,10 @@ def ift(z, padding, tilt):
         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
     temp = locift(z)
     # unpad
-    temp = temp[0:]
+    # temp = temp[0:]
     if padding != 0:
         temp = temp[0:int(len(temp) / (1 << padding))]
+        print('If these are same change code:', int(len(temp) / (1 << padding)), len(temp) >> padding)
     # untilt
     if tilt is not None:
         temp /= tilt

@@ -5,7 +5,7 @@ __pycache__/
 
 .idea/
 
-doc//_*//
+doc/
 
 # C extensions
 *.so
@@ -106,31 +106,5 @@ venv.bak/
 
 # Sphinx documentation
 2RM*.*
-doc/_build/html/.buildinfo
-doc/_build/html/_modules/aggregate/distr.html
-doc/_build/html/_modules/aggregate/param.html
-doc/_build/html/_modules/aggregate/port.html
-doc/_build/html/_modules/aggregate/spectral.html
-doc/_build/html/_modules/aggregate/utils.html
-doc/_build/html/_modules/index.html
-doc/_build/html/_sources/index.rst.txt
-doc/_build/html/_sources/tutorial.rst.txt
-doc/_build/html/aggregate.html
-doc/_build/html/devel.html
-doc/_build/html/distortion.html
-doc/_build/html/genindex.html
-doc/_build/html/histapp.html
-doc/_build/html/index.html
-doc/_build/html/intro.html
-doc/_build/html/objects.inv
-doc/_build/html/parameters.html
-doc/_build/html/portfolio.html
-doc/_build/html/prob.html
-doc/_build/html/py-modindex.html
-doc/_build/html/search.html
-doc/_build/html/searchindex.js
-doc/_build/html/tutorial.html
-doc/_build/html/underwriter.html
-doc/_build/html/utilities.html
-.idea/workspace.xml
-.idea/workspace.xml
+doc/_build/html/
+

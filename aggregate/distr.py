@@ -20,6 +20,7 @@ from numpy.linalg import inv, pinv, det, matrix_rank
 
 logger = logging.getLogger('aggregate')
 
+
 class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
@@ -87,7 +88,8 @@ class Frequency(object):
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
-        logger.info(f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
+        logger.info(
+            f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
 
         if self.freq_name == 'fixed':
             def _freq_moms(n):
@@ -659,21 +661,26 @@ class Aggregate(Frequency):
             # really should have one of these anyway...
             self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_sev=self.sev_density))
             # remove the fuzz
-            eps = 1.5e-16
-            self.density_df.loc[:, self.density_df.select_dtypes(include=['float64']).columns] = \
-                self.density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
-            self._density_df = self.density_df.set_index('loss', drop=False)
+            eps = 2.5e-16
+            # may not have a severity, remember...
+            self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
+                self._density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+            self._density_df = self._density_df.set_index('loss', drop=False)
             self._density_df['log_p'] = np.log(self._density_df.p)
-            self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
-            self._density_df['F'] = self.density_df.p.cumsum()
-            self._density_df['F_sev'] = self.density_df.p_sev.cumsum()
+            # when no sev this causes a problem
+            if self._density_df.p_sev.dtype == np.dtype('O'):
+                self._density_df['log_p_sev'] = np.nan
+            else:
+                self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
+            self._density_df['F'] = self._density_df.p.cumsum()
+            self._density_df['F_sev'] = self._density_df.p_sev.cumsum()
             self._density_df['S'] = 1 - self._density_df.F
             self._density_df['S_sev'] = 1 - self._density_df.F_sev
             # add LEV,   TVaR to each threshold point...
 
             self._density_df['lev'] = np.hstack((0, self._density_df.S.iloc[:-1])).cumsum() * self.bs
             self._density_df['exa'] = self._density_df['lev']
-            self.density_df['exlea'] = \
+            self._density_df['exlea'] = \
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
             # fix very small values, see port _add_exa
             n_ = self._density_df.shape[0]
@@ -754,6 +761,8 @@ class Aggregate(Frequency):
         self.audit_df = None
         self._careful_q = None
         self._density_df = None
+        self._linear_quantile_function
+        self.q_temp = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
@@ -771,7 +780,7 @@ class Aggregate(Frequency):
             # do not perform the exp / sev product, in this case
             # broadcast all exposure and sev terms together
             exp_el, exp_premium, exp_lr, en, attachment, limit, \
-                sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
+            sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
                 np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit,
                                     sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
             exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
@@ -782,7 +791,7 @@ class Aggregate(Frequency):
             self.limit = limit
             n_components = len(all_arrays)
             logger.info(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
-                         f'{len(sev_a)} sevs = {n_components} componets')
+                        f'{len(sev_a)} sevs = {n_components} componets')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
         else:
@@ -801,8 +810,9 @@ class Aggregate(Frequency):
             self.attachment = np.array([i[4] for i in all_arrays])
             self.limit = np.array([i[5] for i in all_arrays])
             n_components = len(all_arrays)
-            logger.info(f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
-                         f'=  {n_components}')
+            logger.info(
+                f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
+                f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
         # overall freq CV with common mixing TODO this is dubious
@@ -886,7 +896,7 @@ class Aggregate(Frequency):
         # pull out agg statistics_df
         ags = self.statistics_total_df.loc['mixed', :]
         s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severit{'ies' if len(self.sevs)>1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
+            f"{len(self.sevs)} severit{'ies' if len(self.sevs) > 1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
             f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
@@ -1017,7 +1027,8 @@ class Aggregate(Frequency):
 
         :param xs:  range of x values used to discretize
         :param padding: for FFT calculation
-        :param tilt_vector:
+        :param tilt_vector: tilt_vector = np.exp(self.tilt_amount * np.arange(N)), N=2**log2, and
+                tilt_amount * N < 20 recommended
         :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
                 sgamma apply shifted lognormal or shifted gamma approximations.
         :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
@@ -1453,12 +1464,12 @@ class Aggregate(Frequency):
                 rb = self.recommend_bucket(n)
                 if n == log2:
                     rbr = rb
-                print(f'Recommended bucket size with {2**n} buckets: {rb:,.0f}')
+                print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.0f}')
             if self.bs != 0:
                 print(f'Bucket size set with {N} buckets at {self.bs:,.0f}')
             return rbr
 
-    def q(self, p):
+    def q_old(self, p):
         """
         return lowest quantile, appropriate for discrete bucketing.
         quantile guaranteed to be in the index
@@ -1483,6 +1494,42 @@ class Aggregate(Frequency):
         l1 = self.density_df.index[l1]
         return l1
 
+    def q(self, p, kind='lower'):
+        """
+        Exact same code from Portfolio.q
+
+        kind==middle reproduces middle_q
+
+        :param p:
+        :param kind:
+        :return:
+        """
+        if self._linear_quantile_function is None:
+            # revised Dec 2019
+            self._linear_quantile_function = {}
+            self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
+            self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
+            self.q_temp.loc[0, 'loss'] = 0
+            self.q_temp = self.q_temp.sort_index()
+            # that q_temp left cts, want right continuous:
+            self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
+            self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
+            self._linear_quantile_function['upper'] = \
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
+                                     fill_value='extrapolate')
+            self._linear_quantile_function['lower'] = \
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
+                                     fill_value='extrapolate')
+            self._linear_quantile_function['middle'] = \
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='linear', bounds_error=False,
+                                     fill_value='extrapolate')
+        l = float(self._linear_quantile_function[kind](p))
+        # because we are not interpolating the returned value must (should) be in the index...
+        if not (kind == 'middle' or l in self.density_df.index):
+            logger.error(f'Unexpected weirdness in {self.name} quantile...computed {p}th {kind} percentile as {l} '
+                         'which is not in the index but is expected to be.')
+        return l
+
     def middle_q(self, p):
         """
         not as careful as careful q but much better than q
@@ -1492,6 +1539,7 @@ class Aggregate(Frequency):
         :param p:
         :return:
         """
+        logger.warning(f'middle_q has been deprecated...use q(p, kind="middle") instead ')
         if self._middle_q is None:
             temp = self.density_df.groupby('F')[['loss']].agg(np.min)
             temp.loc[1.0, 'loss'] = temp.iloc[-1, :].loss
@@ -1507,7 +1555,7 @@ class Aggregate(Frequency):
         Note this is automatically vectorized and returns and array whereas q isn't.
         It doesn't necessarily return a element of the index.
 
-        Just for reference here is code to illustrate the problem
+        Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb.
 
             uw = agg.Underwriter(create_all=True)
 
@@ -1703,7 +1751,7 @@ class Aggregate(Frequency):
         :return:
         """
         # function not vectorized
-        q = float(self.middle_q(p))
+        q = float(self.q(p, 'middle'))
         l1 = self.density_df.index.get_loc(q, 'bfill')
         q1 = self.density_df.index[l1]
 
@@ -1898,7 +1946,7 @@ class Severity(ss.rv_continuous):
                 ps = np.array(sev_ps)
             if not np.isclose(np.sum(ps), 1.0):
                 logger.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
-                              f'{np.sum(ps)}')
+                             f'{np.sum(ps)}')
             # need to exp_limit distribution
             exp_limit = min(np.min(exp_limit), xs.max())
             if sev_name == 'chistogram':
@@ -1939,9 +1987,9 @@ class Severity(ss.rv_continuous):
         elif not isinstance(sev_name, (str, np.str_)):
             # must be a meta object - replaced in Undewriter.write
             log2 = sev_a
-            bs = sev_b       # if zero it is happy to take whatever....
+            bs = sev_b  # if zero it is happy to take whatever....
             if isinstance(sev_name, Aggregate):
-                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs!=0)):
+                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs != 0)):
                     # recompute
                     sev_name.easy_update(log2, bs)
                 xs = sev_name.xs
@@ -2233,8 +2281,8 @@ class Severity(ss.rv_continuous):
                 (ex2[1] / ex2[0] < eps or ex2[1] < 1e-4) and
                 (ex3[1] / ex3[0] < eps or ex3[1] < 1e-6)):
             logger.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
-                         f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1]/ex1[0]}\t{ex2[1]/ex2[0]}\t'
-                         f'{ex3[1]/ex3[0]}')
+                        f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1] / ex1[0]}\t{ex2[1] / ex2[0]}\t'
+                        f'{ex3[1] / ex3[0]}')
             # raise ValueError(f' Severity.moms | doubtful convergence of integrals, abs errs '
             #                  f'{ex1[1]}, {ex2[1]}, {ex3[1]} rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, '
             #                  f'{ex3[1]/ex3[0]}')
@@ -2301,6 +2349,7 @@ class CarefulInverse(object):
     from SRM_Examples Noise: careful inverse functions
 
     """
+
     @staticmethod
     def make1d(xs, ys, agg_fun=None, kind='linear', **kwargs):
         """

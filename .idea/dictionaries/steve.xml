@@ -2,6 +2,10 @@
   <dictionary name="steve">
     <words>
       <w>axiter</w>
+      <w>dname</w>
+      <w>pcttotal</w>
+      <w>prem</w>
+      <w>sumparts</w>
     </words>
   </dictionary>
 </component>

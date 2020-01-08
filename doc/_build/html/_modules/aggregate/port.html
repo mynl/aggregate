@@ -818,7 +818,7 @@
 
         <span class="c1"># add exa details</span>
         <span class="k">if</span> <span class="n">add_exa</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_add_exa</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_exa</span><span class="p">()</span>
             <span class="c1"># default priority analysis</span>
             <span class="k">if</span> <span class="n">epds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">epds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span>
@@ -1143,7 +1143,7 @@
                     <span class="n">temp</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">c</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">e2a</span><span class="p">[(</span><span class="n">c</span><span class="p">,</span> <span class="n">i</span><span class="p">)](</span><span class="n">e</span><span class="p">),</span> <span class="n">a</span><span class="p">,</span> <span class="n">a2e</span><span class="p">[(</span><span class="n">c</span><span class="p">,</span> <span class="n">i</span><span class="p">)](</span><span class="n">a</span><span class="p">))</span>
         <span class="n">display</span><span class="p">(</span><span class="n">temp</span><span class="o">.</span><span class="n">style</span><span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">_add_exa</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">add_exa</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Use fft to add exa_XXX = E(X_i | X=a) to each dist...obviously kludgy here</span>
 
@@ -1213,18 +1213,18 @@
             <span class="c1"># have negative densities...get rid of them</span>
             <span class="n">first_neg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argwhere</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | p_total has a negative value starting at </span><span class="si">{first_neg}</span><span class="s1">; setting to zero...&#39;</span><span class="p">)</span>
+                <span class="n">f</span><span class="s1">&#39;CPortfolio.add_exa | p_total has a negative value starting at </span><span class="si">{first_neg}</span><span class="s1">; setting to zero...&#39;</span><span class="p">)</span>
             <span class="c1"># TODO what does this all mean?!</span>
             <span class="c1"># self.density_df.p_total.iloc[first_neg:] = 0</span>
         <span class="n">sum_p_total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | </span><span class="si">{self.name}</span><span class="s1">: sum of p_total is 1 - &#39;</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;CPortfolio.add_exa | </span><span class="si">{self.name}</span><span class="s1">: sum of p_total is 1 - &#39;</span>
                      <span class="n">f</span><span class="s1">&#39;{1-sum_p_total:12.8e} NOT RESCALING&#39;</span><span class="p">)</span>
         <span class="c1"># self.density_df.p_total /= sum_p_total</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="p">[</span><span class="s1">&#39;F&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">p_total</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="p">[</span><span class="s1">&#39;S&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">density_df</span><span class="o">.</span><span class="n">F</span>
         <span class="c1"># get rounding errors, S may not go below zero</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="n">f</span><span class="s1">&#39;CPortfolio._add_exa | </span><span class="si">{self.name}</span><span class="s1">: S &lt;= 0 values has length {len(np.argwhere(self.density_df.S &lt;= 0))}&#39;</span><span class="p">)</span>
+            <span class="n">f</span><span class="s1">&#39;CPortfolio.add_exa | </span><span class="si">{self.name}</span><span class="s1">: S &lt;= 0 values has length {len(np.argwhere(self.density_df.S &lt;= 0))}&#39;</span><span class="p">)</span>
 
         <span class="c1"># E(min(X, a))</span>
         <span class="c1"># needs to be shifted down by one for the partial integrals....</span>

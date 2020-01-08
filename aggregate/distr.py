@@ -682,7 +682,7 @@ class Aggregate(Frequency):
             self._density_df['exa'] = self._density_df['lev']
             self._density_df['exlea'] = \
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
-            # fix very small values, see port _add_exa
+            # fix very small values, see port add_exa
             n_ = self._density_df.shape[0]
             if n_ < 1100:
                 mult = 1
@@ -707,6 +707,60 @@ class Aggregate(Frequency):
 
         return self._density_df
 
+    def rescale(self, scale, kind='homog'):
+        """
+        return a rescaled Aggregate object - used to compute derivatives
+
+        all need to be safe mults because of array specification there is an array that is not a numpy array
+
+        TODO have parser return numpy arrays not lists!
+
+        :param scale:  amount of scale
+        :param kind:  homog of inhomog
+
+        :return:
+        """
+        spec = self._spec.copy()
+
+        def safe_scale(sc, x):
+            """
+            if x is a list wrap it
+
+            :param x:
+            :param sc:
+            :return: sc x
+            """
+
+            if type(x) == list:
+                return sc * np.array(x)
+            else:
+                return sc * x
+
+        if kind == 'homog':
+            # do NOT scale en... that is inhomog
+            # do scale EL etc. to keep the count the same
+            spec['exp_el'] = safe_scale(scale, spec['exp_el'])
+            spec['exp_premium'] = safe_scale(scale, spec['exp_premium'])
+            spec['exp_attachment'] = safe_scale(scale, spec['exp_attachment'])
+            spec['exp_limit'] = safe_scale(scale, spec['exp_limit'])
+            spec['sev_loc'] = safe_scale(scale, spec['sev_loc'])
+            # note: scaling the scale takes care of the mean, so do not double count
+            # but also remember the default for scale = 0
+            if spec['sev_scale']:
+                spec['sev_scale'] = safe_scale(scale, spec['sev_scale'])
+            else:
+                spec['sev_mean'] = safe_scale(scale, spec['sev_mean'])
+            if spec['sev_xs']:
+                spec['sev_xs'] = safe_scale(scale, spec['sev_xs'])
+        elif kind == 'inhomog':
+            # just scale up the volume, including en
+            spec['exp_el'] = safe_scale(scale, spec['exp_el'])
+            spec['exp_premium'] = safe_scale(scale, spec['exp_premium'])
+            spec['exp_n'] = safe_scale(scale, spec['exp_n'])
+        else:
+            raise ValueError(f'Inadmissible option {kind} passed to rescale, kind should be homog or inhomog.')
+        return Aggregate(**spec)
+
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1,
@@ -728,7 +782,7 @@ class Aggregate(Frequency):
         self._spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
                           exp_attachment=exp_attachment, exp_limit=exp_limit,
                           sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
-                          sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=None, sev_ps=sev_ps, sev_wt=sev_wt,
+                          sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
                           freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
         logger.info(
             f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')

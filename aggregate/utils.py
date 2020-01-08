@@ -170,8 +170,7 @@ def ift(z, padding, tilt):
     # unpad
     # temp = temp[0:]
     if padding != 0:
-        temp = temp[0:int(len(temp) / (1 << padding))]
-        print('If these are same change code:', int(len(temp) / (1 << padding)), len(temp) >> padding)
+        temp = temp[0:len(temp) >> padding]
     # untilt
     if tilt is not None:
         temp /= tilt
@@ -614,9 +613,9 @@ class MomentAggregator(object):
                 f1, f2, f3 = self.freq_moms(f1)
                 s1, s2, s3 = self.tot_sev_1 / f1, self.tot_sev_2 / f1, self.tot_sev_3 / f1
                 a1, a2, a3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
-                return [f1, f2, f3, *self._moments_to_mcvsk(f1, f2, f3),
-                        s1, s2, s3, *self._moments_to_mcvsk(s1, s2, s3),
-                        a1, a2, a3, *self._moments_to_mcvsk(a1, a2, a3)]
+                return [f1, f2, f3, *self.static_moments_to_mcvsk(f1, f2, f3),
+                        s1, s2, s3, *self.static_moments_to_mcvsk(s1, s2, s3),
+                        a1, a2, a3, *self.static_moments_to_mcvsk(a1, a2, a3)]
             else:
                 # running total, not adjusting freq cv
                 return [self.tot_freq_1, self.tot_freq_2, self.tot_freq_3, *self.moments_to_mcvsk('freq', True),
@@ -668,21 +667,21 @@ class MomentAggregator(object):
 
         if mom_type == 'agg':
             if total:
-                return MomentAggregator._moments_to_mcvsk(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3)
+                return MomentAggregator.static_moments_to_mcvsk(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3)
             else:
-                return MomentAggregator._moments_to_mcvsk(self.agg_1, self.agg_2, self.agg_3)
+                return MomentAggregator.static_moments_to_mcvsk(self.agg_1, self.agg_2, self.agg_3)
         elif mom_type == 'freq':
             if total:
-                return MomentAggregator._moments_to_mcvsk(self.tot_freq_1, self.tot_freq_2, self.tot_freq_3)
+                return MomentAggregator.static_moments_to_mcvsk(self.tot_freq_1, self.tot_freq_2, self.tot_freq_3)
             else:
-                return MomentAggregator._moments_to_mcvsk(self.freq_1, self.freq_2, self.freq_3)
+                return MomentAggregator.static_moments_to_mcvsk(self.freq_1, self.freq_2, self.freq_3)
         elif mom_type == 'sev':
             if total:
-                return MomentAggregator._moments_to_mcvsk(self.tot_sev_1 / self.tot_freq_1,
-                                                          self.tot_sev_2 / self.tot_freq_1,
-                                                          self.tot_sev_3 / self.tot_freq_1)
+                return MomentAggregator.static_moments_to_mcvsk(self.tot_sev_1 / self.tot_freq_1,
+                                                                self.tot_sev_2 / self.tot_freq_1,
+                                                                self.tot_sev_3 / self.tot_freq_1)
             else:
-                return MomentAggregator._moments_to_mcvsk(self.sev_1, self.sev_2, self.sev_3)
+                return MomentAggregator.static_moments_to_mcvsk(self.sev_1, self.sev_2, self.sev_3)
 
     def moments(self, mom_type, total=True):
         """
@@ -729,7 +728,7 @@ class MomentAggregator(object):
         return t1, t2, t3
 
     @staticmethod
-    def _moments_to_mcvsk(ex1, ex2, ex3):
+    def static_moments_to_mcvsk(ex1, ex2, ex3):
         """
         returns mean, cv and skewness from non-central moments
 
@@ -982,7 +981,7 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
         return x
 
     def ma(x):
-        return list(MomentAggregator._moments_to_mcvsk(*x))
+        return list(MomentAggregator.static_moments_to_mcvsk(*x))
 
     def row(ps):
         moms = [(x ** k * ps).sum() for k in (1, 2, 3)]

@@ -1284,7 +1284,11 @@ class Answer(dict):
         return self[item]
 
     def __repr__(self):
-        return super().__repr__()
+        return str(self.list())
+        # return super().__repr__()
+
+    def __str__(self):
+        return self.list()
 
     def list(self):
         """ List elements """

@@ -119,6 +119,7 @@ class Portfolio(object):
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
         self.density_df = None
+        self.augmented_df = None
         self.epd_2_assets = {}
         self.assets_2_epd = {}
         self.priority_capital_df = None
@@ -135,7 +136,7 @@ class Portfolio(object):
         self.ex = 0
         self.last_update = 0
         self.hash_rep_at_last_update = ''
-        self.last_distortion = None
+        self._distortion = None
         self.sev_calc = ''
         self._remove_fuzz = 0
         self.approx_type = ""
@@ -177,6 +178,10 @@ class Portfolio(object):
             s += '\nNOT UPDATED!'
         return s
 
+    @property
+    def distortion(self):
+        return self._distortion
+
     def remove_fuzz(self, df=None, eps=0, force=False, log=''):
         """
         remove fuzz at threshold eps. if not passed use np.finfo(np.float).eps.
@@ -216,7 +221,7 @@ class Portfolio(object):
             s.append(f'"log2": {self.log2}')
             s.append(f'"padding": {self.padding}')
             s.append(f'"tilt_amount": {self.tilt_amount}')
-            s.append(f'"last_distortion": "{self.last_distortion.__repr__()}"')
+            s.append(f'"distortion": "{repr(self._distortion)}"')
             s.append(f'"sev_calc": "{self.sev_calc}"')
             s.append(f'"remove_fuzz": {self._remove_fuzz}')
             s.append(f'"approx_type": "{self.approx_type}"')
@@ -268,7 +273,8 @@ class Portfolio(object):
         Renamed version of the audit dataframe
         :return:
         """
-        return self.audit_df.rename(columns=self.renamer)
+        if self.audit_df is not None:
+            return self.audit_df.rename(columns=self.renamer)
 
     @property
     def density(self):
@@ -276,7 +282,17 @@ class Portfolio(object):
         Renamed version of the density_df dataframe
         :return:
         """
-        return self.density_df.rename(columns=self.renamer)
+        if self.density_df is not None:
+            return self.density_df.rename(columns=self.renamer)
+
+    @property
+    def augmented(self):
+        """
+        Renamed version of the density_df dataframe
+        :return:
+        """
+        if self.augmented_df is not None:
+            return self.augmented_df.rename(columns=self.renamer)
 
     @property
     def statistics(self):
@@ -299,7 +315,7 @@ class Portfolio(object):
         args["log2"] = self.log2
         args["padding"] = self.padding
         args["tilt_amount"] = self.tilt_amount
-        args["last_distortion"] = self.last_distortion.__repr__()
+        args["distortion"] = repr(self._distortion)
         args["sev_calc"] = self.sev_calc
         args["remove_fuzz"] = self._remove_fuzz
         args["approx_type"] = self.approx_type
@@ -1088,7 +1104,7 @@ class Portfolio(object):
 
         # first, need a base
         if distortion:
-            base = self.apply_distortion(distortion)
+            base = self.apply_distortion(distortion, create_augmented=False)
             columns_of_interest.extend(['gS'] + [f'exag_{line}' for line in self.line_names_ex])
         else:
             base = self.density_df
@@ -1148,7 +1164,7 @@ class Portfolio(object):
                 self.add_exa(gradient_df, details=False)
             if distortion is not None:
                 # apply to line + epsilon
-                gradient_df = self.apply_distortion(distortion, None, 0, gradient_df)
+                gradient_df = self.apply_distortion(distortion, data_in=gradient_df, create_augmented=False)
 
             # compute differentials and store answer!
             answer[[(line, i) for i in columns_of_interest]] = (gradient_df[columns_of_interest] -
@@ -1663,11 +1679,7 @@ class Portfolio(object):
             # unconditional E(X_i/X)
             df['exi_x_' + col] = np.sum(
                 df['exeqa_' + col] * df.p_total / df.loss)
-            ## Jan 2020 this is a forward sum so it should be cumintegral
-            # original
             temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
-            # change
-            # temp_xi_x = self.cumintegral(df['exeqa_' + col] * df.p_total / df.loss, 1)
             df['exi_xlea_' + col] = temp_xi_x / df.F
             df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
             # more generally F=0 error:
@@ -1678,8 +1690,6 @@ class Portfolio(object):
             # as above
             temp_xi_x_not = np.cumsum(
                 df['exeqa_ημ_' + col] * df.p_total / df.loss)
-            # temp_xi_x_not = self.cumintegral(
-            #     df['exeqa_ημ_' + col] * df.p_total / df.loss, 1)
             df['exi_xlea_ημ_' + col] = temp_xi_x_not / df.F
             df.loc[0, 'exi_xlea_ημ_' + col] = 0  # df.F=0 at zero
             # more generally F=0 error:
@@ -1705,9 +1715,11 @@ class Portfolio(object):
             # exa_ = E(X_i(a)) = E(X_i | X<= a)F(a) + E(X_i / X| X>a) a S(a)
             #   = exlea F(a) + exixgta * a * S(a)
             # and hence get loss cost for line i
-            df['exa_' + col] = \
-                df['exlea_' + col] * df.F + df.loss * \
-                df.S * df['exi_xgta_' + col]
+            # df['exa_' + col] = \
+            #     df['exlea_' + col] * df.F + df.loss * \
+            #     df.S * df['exi_xgta_' + col]
+            # alt calc using S: validated the same, going with this as a more direct calc
+            df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
             df['exa_ημ_' + col] = \
                 df['exlea_ημ_' + col] * df.F + df.loss * \
                 df.S * df['exi_xgta_ημ_' + col]
@@ -2068,20 +2080,33 @@ class Portfolio(object):
 
         return ans_table, ans_stacked
 
-    def apply_distortion(self, dist, axiter=None, num_plots=0, df_in=None):
+    def apply_distortion(self, dist, axiter=None, plots=None, df_in=None, create_augmented=True):
         """
-        Apply the distortion, make a copy of density_df and append various columns
-        Handy graphic of results
+        Apply the distortion, make a copy of density_df and append various columns to create augmented_df.
 
+        augmented_df depends on the distortion but only includes variables that work for all asset levels, e.g.
 
-        :param dist: CDistortion
+        1. marginal loss, lr, roe etc.
+        2. bottom up totals
+
+        Top down total depend on where the "top" is and do not work in general. They are handled in analyze_distortions
+        where you explicitly provide a top.
+
+        Does not touch density_df: that is independent of distortions
+
+        Optionally produce graphics of results controlled by plots a list containing none or more of:
+
+        1. basic: exag_sumparts, exag_total df.exa_total
+        2. extended: the full original set
+
+        :type create_augmented: object
+        :param dist: agg.Distortion
         :param axiter: axis iterator, if None no plots are returned
-        :param num_plots: =2 plot the sum of parts vs. total plot; =3 go to town
+        :param plots: iterable of plot types
         :param df_in: when called from gradient you want to pass in gradient_df and use that; otherwise use self.density_df
+        :param create_augmented: store the output in self.augmented_df
         :return: density_df with extra columns appended
         """
-        # store for reference
-        self.last_distortion = dist
 
         # initially work will "full precision"
         if df_in is None:
@@ -2100,7 +2125,9 @@ class Portfolio(object):
         # df['F'] = df.p_total.cumsum()
         # df['S'] = 1 - df.F
 
-        # very strangely, THIS HAPPENS, so needs to be corrected...
+        # floating point issues: THIS HAPPENS, so needs to be corrected...
+        if len(df.loc[df.S < 0, 'S'] > 0 ):
+            logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0 )} negative S values being set to zero...")
         df.loc[df.S < 0, 'S'] = 0
 
         # add the exag and distorted probs
@@ -2227,117 +2254,114 @@ class Portfolio(object):
         # df['exag_total'] = self.cumintegral(df['gS'])
         # revised  cumintegral does: v.shift(1, fill_value=0).cumsum() * bs
         df['exag_total'] = df.gS.shift(1, fill_value=0).cumsum() * self.bs
-        df.loc[0, 'exag_total'] = 0
+        # df.loc[0, 'exag_total'] = 0
 
         # comparison of total and sum of parts
-        # removed lTl and pcttotal (which spent a lot of time removing!) Dec 2019
         # Dec 2019 added info to compute the total margin and capital allocation by layer
-        # M = marginal margin, T.M = cumulative margin
-        # Q same for capital
-        #
-        # hummmm all these need to be mult by bucket size, no?
-        #
-        # these are MARGINAL, TOTALs so should really be called M.M_total etc.  (originally M Q, ROE)
-        # do NOT divide by bs because these are per 1 wide layer
+        # [MT].[L LR Q P M]_line: marginal or total (ground-up) loss, loss ratio etc.
+        # do NOT divide MARGINAL versions by bs because they are per 1 wide layer
         df['M.M_total'] = (df.gS - df.S)
         df['M.Q_total'] = (1 - df.gS)
-        df['M.ROE'] = df['M.M_total'] / df['M.Q_total']  # the same for all lines....
-        roe_zero = (df['M.ROE'] == 0.0)
+        # hummmm.aliases, but...?
+        df['M.L_total'] = df['S']
+        df['M.P_total'] = df['gS']
+        df['T.L_total'] = df['exa_total']
+        df['T.P_total'] = df['exag_total']
+
+        # critical insight is the layer ROEs are the same for all lines (law invariance)
+        df['M.ROE_total'] = df['M.M_total'] / df['M.Q_total']
+        # where is the ROE zero? need to handle separately else Q will blow up
+        roe_zero = (df['M.ROE_total'] == 0.0)
         for line in self.line_names_ex:
-            df[f'exa_{line}_pcttotal'] = df.loc[:, 'exa_' + line] / df.exa_total
-            # exag is the premium
-            # df[f'exag_{line}_pcttotal'] = df.loc[:, 'exag_' + line] / df.exag_total
-            # premium like Total loss - this is in the aggregate_project and is an exa allocation (obvioulsy)
-            # df[f'prem_lTl_{line}'] = df.loc[:, f'exa_{line}_pcttotal'] * df.exag_total
-            # df[f'lrlTl_{line}'] = df[f'exa_{line}'] / df[f'prem_lTl_{line}']
-            # df.loc[0, f'prem_lTl_{line}'] = 0
-            # loss ratio using my allocation
-            #
-            # TODO check M calcs by doing directly not as diff; need * bs when you diff an integral
-            # because you mult by bs when you integrate
-            #
+            df[f'exa_{line}_pcttotal'] = df['exa_' + line] / df.exa_total
+            df[f'exag_{line}_pcttotal'] = df['exag_' + line] / df.exag_total
+            # hummm more aliases
+            df[f'T.L_{line}'] = df[f'exa_{line}']
+            df[f'T.P_{line}'] = df[f'exag_{line}']
+            # TOTALs = ground up cumulative sums
+            # exag is the layer (marginal) premium and exa is the layer (marginal) loss
             df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
             df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
-            # prepend 1 puts everything off by one; would need to divide by bs to compute derivative (MM per unit vs. bucket)
+            df.loc[0, f'T.M_{line}'] = 0
+            # MARGINALs
             # MM should be per unit width layer so need to divide by bs
-            df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], append=0) / self.bs
+            # prepend=0 satisfies: if
+            # d['B'] = d.A.cumsum()
+            # d['C'] = np.diff(d.B, prepend=0)
+            # then d.C == d.A, which is what you want.
+            df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], prepend=0) / self.bs
             # careful about where ROE==0
-            df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE']
+            df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE_total']
             df[f'M.Q_{line}'].iloc[-1] = 0
             df.loc[roe_zero, f'M.Q_{line}'] = np.nan
-            # fix ROE indexing error
-            # shift up by one
-            # original
-            # df[f'T.Q_{line}'] = np.hstack((0, np.cumsum(df[f'M.Q_{line}']).iloc[:-1]))
-            # cumulate = integral need "dx" = * bs
-            #
-            # unnecessary shift?
-            # df[f'T.Q_{line}'] = df[f'M.Q_{line}'].shift(1, fill_value=0).cumsum() * self.bs
+            if line != 'total':
+                df[f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
+                df[f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
+            df[f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
+            # for total need to reflect layer width
             df[f'T.Q_{line}'] = df[f'M.Q_{line}'].cumsum() * self.bs
-            # logger.warning(f"Alt calc of cum sum all close test = {np.allclose(alt, df[f'T.Q_{line}'])}")
-            # if not np.allclose(alt, df[f'T.Q_{line}']):
-            #     print(line)
-            #     display(pd.DataFrame(dict(alt=alt, original=df[f'T.Q_{line}'])))
             df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
+            # leverage
+            df[f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
+            df[f'M.PQ_{line}'] = df[f'M.P_{line}'] / df[f'M.Q_{line}']
 
-        # make a convenient audit extract for viewing
-        # helpful regex below
-        # audit = df.filter(regex='^loss|^p_[^η]|^S|^prem|^exag_[^η]|^lr|^z').iloc[0::sensible_jump(len(df), 20), :]
+        if plots and axiter is None:
+            logger.warning('When plotting you must pass an axiter item, an iterator returning axes. '
+                           'Ignoring plot statement.')
+        elif plots:
+            if 'basic' in plots:
+                ax = next(axiter)
+                ax.plot(df.exag_sumparts, label='Sum of Parts')
+                ax.plot(df.exag_total, label='Total')
+                ax.plot(df.exa_total, label='Loss')
+                ax.legend()
+                ax.set_title(f'Mass audit for {dist.name}')
+                ax.legend(loc="upper right")
+                ax.grid()
 
-        if num_plots >= 2:
-            # short run debugger!
-            ax = next(axiter)
-            ax.plot(df.exag_sumparts, label='Sum of Parts')
-            ax.plot(df.exag_total, label='Total')
-            ax.plot(df.exa_total, label='Loss')
-            ax.legend()
-            ax.set_title(f'Mass audit for {dist.name}')
-            ax.legend()
-
-            if num_plots >= 3:
+            if 'extended' in plots:
                 # yet more graphics, but the previous one is the main event
                 # truncate for graphics
-                # 1e-4 arb selected min prob for plot truncation... not significant
-                max_threshold = 1e-5
-                max_x = (df.gS < max_threshold).idxmax()
-                max_x = 80000  # TODO>>>
-                if max_x == 0:
-                    max_x = self.density_df.loss.max()
-                df_plot = df.loc[0:max_x, :]
+                max_x = 1.1 * self.q(1-1e-6)
                 df_plot = df.loc[0:max_x, :]
 
                 ax = next(axiter)
                 df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
                 ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
                 ax.set_title("Densities")
-                ax.legend()
+                ax.legend(loc="upper right")
+                ax.grid()
 
                 ax = next(axiter)
                 df_plot.loc[:, ['p_total', 'gp_total']].plot(ax=ax)
                 ax.set_title("Total Density and Distortion")
-                ax.legend()
+                ax.legend(loc="upper right")
+                ax.grid()
 
                 ax = next(axiter)
                 df_plot.loc[:, ['S', 'gS']].plot(ax=ax)
                 ax.set_title("S, gS")
-                ax.legend()
+                ax.legend(loc="upper right")
+                ax.grid()
 
                 # exi_xlea removed
-                for prefix in ['exa', 'exag', 'exlea', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
+                for prefix in ['exa', 'exag', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
                     # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
-                    ax = next(axiter)  # XXXX??? was (?![n])
-                    df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9_]+$').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{prefix.title()} by line')
-                    ax.legend()
+                    ax = next(axiter)
+                    df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9]+$').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{prefix} by line')
+                    ax.legend(loc="upper left")
+                    ax.grid()
                     if prefix.find('xi_x') > 0:
                         # fix scale for proportions
-                        ax.set_ylim(0, 1.05)
+                        ax.set_ylim(-0.025, 1.025)
 
                 for line in self.line_names:
                     ax = next(axiter)
                     df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
                     ax.set_title(f'{line} EXs')
-                    ax.legend()
+                    ax.legend(loc='lower right')
+                    ax.grid()
 
                 # compare exa with exag for all lines
                 # pno().plot(df_plot.loss, *(df_plot.exa_total, df_plot.exag_total))
@@ -2345,32 +2369,46 @@ class Portfolio(object):
                 for line in self.line_names_ex:
                     ax = next(axiter)
                     df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{line} EL and Transf EL')
-                    ax.legend()
+                    ax.set_title(f'{line} T.L and T.P')
+                    ax.legend(loc='lower right')
+                    ax.grid()
 
                 ax = next(axiter)
-                df_plot.filter(regex='^exa_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
-                ax.set_title('Pct loss')
+                df_plot.filter(regex='^exa_.*_pcttotal$').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('Proportion of loss: T.L_line / T.L_total')
                 ax.set_ylim(0, 1.05)
-                ax.legend()
+                ax.legend(loc='upper left')
+                ax.grid()
 
                 ax = next(axiter)
-                df_plot.filter(regex='^exag_[a-zA-Z0-9_]+_pcttotal').sort_index(axis=1).plot(ax=ax)
-                ax.set_title('Pct premium')
-                ax.set_ylim(0, 1.05)
-                ax.legend()
+                df_plot.filter(regex='^exag_.*_pcttotal$').sort_index(axis=1).plot(ax=ax)
+                ax.set_title('Proportion of premium: T.P_line / T.P_total')
+                # ax.set_ylim(0, 1.05)
+                ax.legend(loc='upper left')
+                ax.grid()
 
                 ax = next(axiter)
                 df_plot.filter(regex='^M.LR_').sort_index(axis=1).plot(ax=ax)
-                ax.set_title('LR: Natural Allocation')
-                ax.legend()
+                ax.set_title('LR with the Natural (constant layer ROE) Allocation')
+                ax.legend(loc='lower right')
+                ax.grid()
 
                 if isinstance(axiter, AxisManager):
                     axiter.tidy()
-                # prefer constrained_layout
-                # plt.tight_layout()
+                else:
+                    f = ax.get_figure()
+                    try:
+                        while 1:
+                            f.delaxes(next(axiter))
+                    except StopIteration:
+                        pass
 
-        return df
+        if create_augmented:
+            self.augmented_df = df
+            # store associated distortion
+            self._distortion = dist
+
+        return Answer(augmented_df=df)
 
     def var_dict(self, p, kind):
         """
@@ -2718,11 +2756,37 @@ class Portfolio(object):
 
         return df, pricing_g
 
-    def example_factory(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
-                        p=None, kind='lower', A=None, index='loss', plot=True):
+    def analyze_distortion(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
+                        p=None, kind='lower', A=None, use_self=False, plot=True, a_max_p=1-1e-8):
         """
-        Helpful graphic and summary DataFrames from one distortion, loss ratio and p value.
-        Starting logic is the similar to calibrate_distortions.
+
+        Graphic and summary DataFrame for one distortion showing results that vary by asset levelm
+        such as increasing or decreasing cumulative premium.
+
+        Characterized by the need to know an asset level, vs. apply_distortion that produced
+        values for all asset levels.
+
+        Returns DataFrame with values upto the input asset level...differentiates from apply_distortion
+        graphics that cover the full range.
+
+        analyze_pricing will then zoom in and only look at one asset level for micro-dynamics...
+
+        Logic of arguments:
+
+            if data_in == 'self' use self.augmented_df; this implies a distortion self.distortion
+
+            else need to build the distortion and apply it
+                if dname is a distortion use it
+                else built one calibrated to input data
+
+            LR/ROE/a/p:
+                if p then a=q(p, kind) else p = MESSY
+                if LR then P and ROE; if ROE then Q to P to LR
+                these are used to calibrate distortion
+
+            A newly made distortion is run through apply_distortion with no plot
+
+        Logic to determine assets similar to calibrate_distortions.
 
         Can pass in a pre-calibrated distortion in dname
 
@@ -2736,6 +2800,18 @@ class Portfolio(object):
                       fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2,
                       audit_df=audit_df)
 
+        Originally `example_factory`.
+
+
+        example_factory_exhibits included:
+
+        do the work to extract the pricing, exhibit and exhibit 2 DataFrames from deets
+        Can also accept an ans object with an augmented_df element (how to call from outside)
+        POINT: re-run exhibits at different p/a thresholds without recalibrating
+        add relevant items to audit_df
+        a = q(p) if both given; if not both given derived as usual
+
+
         Figures show
 
         :param dname: name of distortion
@@ -2747,395 +2823,126 @@ class Portfolio(object):
         :param p: p value to determine capital.
         :param kind: type of VaR, upper or lower
         :param A:
-        :param index:  whether to plot against loss or S(x) NOT IMPLEMENTED
+        :param use_self:  if true use self.augmented and self.distortion...else recompute
         :param plot:
+        :param a_max_p: percentile to use to set the right hand end of plots
         :return: various dataframes in an Answer class object
 
         """
 
-        a = self.q(1 - 1e-8)
-        a0 = self.q(1e-4)
+        # for plotting
+        a_max = self.q(a_max_p)
+        a_min = self.q(1e-4)
 
-        # figure assets a_cal (for calibration) from p or A
-        if p is None:
-            # have A
-            assert A is not None
-            exa, p = self.density_df.loc[A, ['exa_total', 'F']]
-            a_cal = self.q(p)
-            if a_cal != A:
-                dev_logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
-        else:
-            # have p
+        # setup: figure what distortion to use, apply if necessary
+        if use_self:
+            dist = self.distortion
+            # augmented_df was called deets before, FYI
+            augmented_df = self.augmented_df
             a_cal = self.q(p, kind)
-            exa, p = self.density_df.loc[a_cal, ['exa_total', 'F']]
+            exa = self.density_df.loc[a_cal, 'exa_total']
+            exag = augmented_df.loc[a_cal, 'exag_total']
+            K = a_cal - exag
+            LR = exa / exag
+            ROE = (exag - exa) / K
+        else:
+            # figure assets a_cal (for calibration) from p or A
+            if p:
+                # have p
+                a_cal = self.q(p, kind)
+                exa = self.density_df.loc[a_cal, 'exa_total']
+            else:
+                # must have A...must be in index
+                assert A is not None
+                p = self.cdf(A)
+                a_cal = self.q(p)
+                exa = self.density_df.loc[a_cal, 'exa_total']
+                if a_cal != A:
+                    dev_logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
 
-        if dshape is None and not isinstance(dname, Distortion):
-            # figure distortion from LR or ROE
-            if LR is None:
-                assert ROE is not None
-                delta = ROE / (1 + ROE)
-                nu = 1 - delta
-                exag = nu * exa + delta * a_cal
+            if dshape or isinstance(dname, Distortion):
+                # specified distortion, fill in
+                if isinstance(dname, Distortion):
+                    dist = dname
+                else:
+                    dist = Distortion(dname, dshape, dr0, ddf)
+                _x = self.apply_distortion(dist, create_augmented=False)
+                augmented_df = _x.augmented_df
+                exa = self.density_df.loc[a_cal, 'exa_total']
+                exag = augmented_df.loc[a_cal, 'exag_total']
+                profit = exag - exa
+                K = a_cal - exag
+                ROE = profit / K
                 LR = exa / exag
             else:
-                exag = exa / LR
+                # figure distortion from LR or ROE and apply
+                if LR is None:
+                    assert ROE is not None
+                    delta = ROE / (1 + ROE)
+                    nu = 1 - delta
+                    exag = nu * exa + delta * a_cal
+                    LR = exa / exag
+                else:
+                    exag = exa / LR
 
-            profit = exag - exa
-            K = a_cal - exag
-            ROE = profit / K
-            cd = self.calibrate_distortions(LRs=[LR], As=[a_cal], r0=dr0, df=ddf)
-            dd = Distortion.distortions_from_params(cd, (a_cal, LR), plot=False)
-            dist = dd[dname]
-            deets = self.apply_distortion(dist)
-        else:
-            # specified distortion, fill in
-            if isinstance(dname, Distortion):
-                dist = dname
-            else:
-                dist = Distortion(dname, dshape, dr0, ddf)
-            deets = self.apply_distortion(dist)
-            exag = deets.loc[a_cal, 'exag_total']
-            profit = exag - exa
-            K = a_cal - exag
-            ROE = profit / K
-            LR = exa / exag
+                profit = exag - exa
+                K = a_cal - exag
+                ROE = profit / K
+                # was wasteful
+                # cd = self.calibrate_distortions(LRs=[LR], As=[a_cal], r0=dr0, df=ddf)
+                dist = self.calibrate_distortion(dname, r0=dr0, df=ddf, roe=ROE, assets=a_cal)
+                _x = self.apply_distortion(dist, create_augmented=False)
+                augmented_df = _x.augmented_df
 
-        if plot:
-            f_dist, ax = plt.subplots(1, 1)
-            dist.plot(ax=ax)
-        else:
-            f_dist = None
-
+        # deets is now the result of apply_distortion on dist...now turn to the analysis
+        # keeps track of details of calc for Answer
         audit_df = pd.DataFrame(dict(stat=[p, LR, ROE, a_cal, K, dist.name, dist.shape]),
                                 index=['p', 'LR', "ROE", 'a_cal', 'K', 'dname', 'dshape'])
 
-        # we now have consistent set of LR, ROE, a_cal, p, exa, exag all computed
-        g, g_inv = dist.g, dist.g_inv
+        # top down stats: e.g. T.P[a_cal] - T.P and zero above a_cal
+        # these are only going to apply to total...will not bother with by line
+        # call this series V.P with v indicating a down arrow and a letter after and close to T
+        # hack out space
+        for nc in ['L', 'P',  'M', 'Q', 'LR', 'ROE', 'PQ']:
+            augmented_df[f'V.{nc}_total'] = 0
+        augmented_df.loc[0:a_cal, 'V.L_total'] = augmented_df.at[a_cal, 'T.L_total'] - augmented_df.loc[0:a_cal, 'T.L_total']
+        augmented_df.loc[0:a_cal, 'V.P_total'] = augmented_df.at[a_cal, 'T.P_total'] - augmented_df.loc[0:a_cal, 'T.P_total']
+        augmented_df.loc[0:a_cal, 'V.M_total'] = augmented_df.at[a_cal, 'T.M_total'] - augmented_df.loc[0:a_cal, 'T.M_total']
+        augmented_df.loc[0:a_cal, 'V.Q_total'] = augmented_df.at[a_cal, 'T.Q_total'] - augmented_df.loc[0:a_cal, 'T.Q_total']
+        augmented_df.loc[0:a_cal, 'V.LR_total'] = augmented_df.loc[0:a_cal, 'V.L_total'] / augmented_df.loc[0:a_cal, 'V.P_total']
+        augmented_df.loc[0:a_cal, 'V.PQ_total'] = augmented_df.loc[0:a_cal, 'V.P_total'] / augmented_df.loc[0:a_cal, 'V.Q_total']
+        augmented_df.loc[0:a_cal, 'V.ROE_total'] = augmented_df.loc[0:a_cal, 'V.M_total'] / augmented_df.loc[0:a_cal, 'V.Q_total']
 
-        S = deets.S
-        # remember loss is the loss limit 'a', not an amount of loss
-        loss = deets.loss
-        lossa = loss[0:a]
-        Sa = S[0:a]
-        Fa = 1 - Sa
-        gSa = g(Sa)
+        # bottom up calc is already done: it is the T. series in deets
+        # marginal calc also done: M. series
 
-        # top down stats
-        premium_td = np.cumsum(gSa[::-1])[::-1] * self.bs
-        el_td = np.cumsum(Sa[::-1])[::-1] * self.bs
-        # a - lossa is the amount of capital up to lossa, then premium is the amount of premium upto lossa
-        capital_td = (a - lossa) - premium_td
-        lr_td = el_td / premium_td
-        roe_td = (premium_td - el_td) / capital_td
-        leverage_td = premium_td / capital_td
-        risk_margin_td = premium_td - el_td
-        assets_td = capital_td + premium_td
-
-        # bottom up calc
-        # these need to be shifted up: the first element is zero: no premium with no assets
-        premium_bu = (np.cumsum(gSa) * self.bs).shift(1)
-        el_bu = (np.cumsum(Sa) * self.bs).shift(1)
-        capital_bu = lossa - premium_bu
-        lr_bu = el_bu / premium_bu
-        roe_bu = (premium_bu - el_bu) / capital_bu
-        leverage_bu = premium_bu / capital_bu
-        risk_margin_bu = premium_bu - el_bu
-        assets_bu = capital_bu + premium_bu
-
-        # marginal - same td or bu obviously
-        marg_roe = (gSa - Sa) / (1 - gSa)
-        marg_lr = Sa / gSa
-
-        # extract useful columns only
-        # https://regex101.com/r/jN1kL6/1
-        # regex = '^loss|^p_[^η]|^g?(S|F)|exag?_.+?$(?<!(pcttotal|sumparts))|exi_xgtag?_.+?$(?<!(pcttotal|sumparts))'
-        # deets = deets.filter(regex=regex).copy()
-
-        # add various loss ratios
-        # these are already in deets, added by apply_distortion)
-        # for l in self.line_names_ex:
-        #    deets[f'LR_{l}']= deets[f'exa_{l}'] / deets[f'exag_{l}']
-
-        # make really interesting elements for graphing and further analysis
-        # note duplicated columns: different names emphasize different viewpoints
-        df = pd.DataFrame({'F(a)': Fa, 'a': lossa, 'S(a)': Sa, 'g(S(a))': gSa,
-                           'Layer Loss': Sa, 'Layer Prem': gSa, 'Layer Margin': gSa - Sa, 'Layer Capital': 1 - gSa,
-                           'Premium↓': premium_td, r'Loss↓': el_td,
-                           'Capital↓': capital_td, 'Risk Margin↓': risk_margin_td, 'Assets↓': assets_td,
-                           'Loss Ratio↓': lr_td, 'ROE↓': roe_td, 'P:S↓': leverage_td,
-                           'Premium↑': premium_bu, r'Loss↑': el_bu,
-                           'Capital↑': capital_bu, 'Risk Margin↑': risk_margin_bu, 'Assets↑': assets_bu,
-                           'Loss Ratio↑': lr_bu, 'ROE↑': roe_bu, 'P:S↑': leverage_bu,
-                           'Marginal LR': marg_lr, 'Marginal ROE': marg_roe, })
-
-        # adjust the top down ROE to reflect that you start writing at a_cal and not a
-        df['*ROE↓'] = 0
-        df.loc[:a_cal, '*ROE↓'] = (
-                (df.loc[:a_cal, 'Premium↓'] - df.loc[:a_cal, 'Loss↓'] -
-                 (df.loc[a_cal + self.bs, 'Premium↓'] - df.loc[a_cal + self.bs, 'Loss↓'])) /
-                (df.loc[:a_cal, 'Capital↓'] - df.loc[a_cal + self.bs, 'Capital↓'])
-        )
-
-        if index == 'loss':
-            df = df.set_index('a')
-            xlim = [0, a]
-        else:
-            df = df.set_index('S(a)', drop=False)
-            xlim = [-0.05, 1.05]
-
+        #
+        #
+        #
+        # begin example_factor_exhibits work
+        #
         # make the pricing summary DataFrame and exhibit
-        pricing, exhibit, exhibit2, p_t, pv, pt = self.example_factory_exhibits(deets, p, kind, a_cal)
-        # other helpful audit values
-        audit_df.loc['TVaR@'] = p_t
-        audit_df.loc['erVaR'] = pv
-        audit_df.loc['erTVaR'] = pt
-
-        f1 = f2 = None
-        if plot:
-            def tidy(a, y=True):
-                """
-                function to tidy up the graphics
-                """
-                a.legend(frameon=True)  # , loc='upper right')
-                a.set(xlabel='Assets')
-                # MaxNLocator uses <= n sensible  points
-                # fixed just sets that point
-                a.xaxis.set_major_locator(FixedLocator([a_cal]))
-                ff = f'A={a_cal:,.0f}'
-                # Fixed formatter: just give the points
-                a.xaxis.set_major_formatter(FixedFormatter([ff]))
-
-                n = 6
-                a.xaxis.set_minor_locator(MaxNLocator(n))
-                a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
-                # MultipleLocator uses multiples of give value
-                # a.xaxis.set_minor_locator(MultipleLocator(a_cal / 5))
-                # NullFormatter for no tick marks (default for minor)
-                # a.xaxis.set_major_formatter(NullFormatter())
-                # StrMethodFormatter suitable for .format(), variable must be called x
-                # FuncFormatter also helpful
-                # a.xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: f'{x:,.0f}' if x != a_cal else f'**{x:,.0f}'))
-
-                if y:
-                    n = 6
-                    a.yaxis.set_major_locator(MaxNLocator(n))
-                    a.yaxis.set_minor_locator(AutoMinorLocator(4))
-
-                # gridlines with various options
-                # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
-                a.grid(which='major', axis='x', c='cornflowerblue', alpha=1, linewidth=1)
-                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
-                a.grid(which='minor', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
-                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
-
-                # tick marks
-                a.tick_params('x', which='major', labelsize=7, length=10, width=0.75, color='cornflowerblue',
-                              direction='out')
-                a.tick_params('y', which='major', labelsize=7, length=5, width=0.75, color='black', direction='out')
-                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
-
-            # plots
-            # https://matplotlib.org/3.1.1/tutorials/intermediate/constrainedlayout_guide.html?highlight=constrained%20layout
-            f1, axs = plt.subplots(3, 2, figsize=(8, 10), sharex=True, constrained_layout=True)
-            ax = iter(axs.flatten())
-
-            a = next(ax)
-            # df[['S(a)', 'g(S(a))', 'F(a)']].plot(xlim=xlim, ax=a).legend(frameon=False, prop={'size': 4}, loc='upper right')
-            df[['Layer Loss', 'Layer Prem', 'Layer Capital']].plot(xlim=xlim, logy=False, ax=a)
-            tidy(a)
-            a.set(ylim=[-0.05, 1.05])
-
-            a = next(ax)
-            df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=a)  # logy=True, ylim=[1e-6,1], ax=a)
-            # df[['Layer Loss', 'Layer Prem', 'F(a)', 'Layer Capital', 'Layer Margin']].plot(xlim=xlim, logy=False, ax=a).legend(frameon=False, prop={'size': 6}, loc='upper right')
-            tidy(a)
-            a.set(ylim=[-0.05, 1.05])
-
-            a = next(ax)
-            df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=a)
-            tidy(a)
-            # a.set(aspect=1)
-
-            a = next(ax)
-            df[['Loss Ratio↓', 'Loss Ratio↑', 'Marginal LR']].plot(xlim=xlim, ax=a)
-            tidy(a)
-
-            a = next(ax)
-            df[['Premium↑', 'Loss↑', 'Capital↑', 'Assets↑', 'Risk Margin↑']].plot(xlim=xlim, ax=a)
-            tidy(a)
-            # a.set(aspect=1)
-
-            a = next(ax)
-            # TODO Mess, tidy up
-            _temp = df.iloc[100:200, :]['Marginal ROE'].fillna(0).max()
-            if np.isnan(_temp):
-                _temp = 2.5
-            ylim = [0, _temp]
-            avg_roe_up = df.at[a_cal, "ROE↑"]
-            # just get rid of this
-            df.loc[0:self.q(1e-5), 'Marginal ROE'] = np.nan
-            df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE', ]].plot(xlim=xlim, logy=False, ax=a, ylim=ylim)
-            # df[['ROE↓', 'ROE↑', 'Marginal ROE', 'P:S↓', 'P:S↑']].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
-            a.plot(xlim, [avg_roe_up, avg_roe_up], ":", linewidth=2, alpha=0.75, label='Avg ROE')
-            tidy(a)
-            # a.grid('both','both')
-
-            title = f'{self.name} @ {str(dist)}, LR={LR:.3f} and p={p:.3f}\n' \
-                f'Assets={a_cal:,.1f}, ROE↑={avg_roe_up:.3f}'
-            f1.suptitle(title, fontsize='x-large')
-
-            # trinity plots
-            def tidy2(a, k, xloc=0.25):
-
-                a.xaxis.set_major_locator(MultipleLocator(xloc))
-                a.xaxis.set_minor_locator(AutoMinorLocator(4))
-                a.xaxis.set_major_formatter(StrMethodFormatter('{x:.2f}'))
-
-                n = 4
-                a.yaxis.set_major_locator(MaxNLocator(2 * n))
-                a.yaxis.set_minor_locator(AutoMinorLocator(4))
-
-                # gridlines with various options
-                # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
-                a.grid(which='major', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
-                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
-                a.grid(which='minor', axis='x', c='gainsboro', alpha=0.25, linewidth=0.5)
-                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
-
-                # tick marks
-                a.tick_params('both', which='major', labelsize=7, length=4, width=0.75, color='black', direction='out')
-                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
-
-                # line to show where capital lies
-                a.plot([0, 1], [k, k], linewidth=1, c='black', label='Capital')
-
-            # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.gridspec.GridSpec.html#matplotlib.gridspec.GridSpec
-            f2, axs = plt.subplots(1, 5, figsize=(8, 3), constrained_layout=True,
-                                   sharey=True)  # this tightens up the grid->, gridspec_kw={'wspace': 0})  # , 'hspace':0
-
-            ax = iter(axs.flatten())
-
-            maxa = self.q(1 - 1e-8)
-            k = self.q(p)
-            xr = [-0.05, 1.05]
-
-            audit = deets.loc[:maxa, :]
-
-            a = next(ax)
-            a.plot(audit.gS, audit.loss, label='Prem')
-            a.plot(audit.S, audit.loss, label='Loss')
-            a.legend(loc="upper right", frameon=True, edgecolor=None)
-            a.set(xlim=xr, title='Prem & Loss')
-            a.set(xlabel='Loss = S = Pr(X>a)\nPrem = g(S)', ylabel="Assets, a")
-            tidy2(a, k)
-
-            a = next(ax)
-            m = audit.F - audit.gF
-            a.plot(m, audit.loss, linewidth=2, label='M')
-            a.set(xlim=-0.01, title='Margin, M', xlabel='M = g(S) - S')
-            tidy2(a, k, m.max() * 1.05 / 4)
-
-            a = next(ax)
-            a.plot(1 - audit.gS, audit.loss, label='Q')
-            a.set(xlim=xr, title='Equity, Q')
-            a.set(xlabel='Q = 1 - g(S)')
-            tidy2(a, k)
-
-            a = next(ax)
-            temp = audit.loc[self.q(1e-5):, :]
-            r = (temp.gS - temp.S) / (1 - temp.gS)
-            a.plot(r, temp.loss, linewidth=2, label='ROE')
-            a.set(xlim=-0.05, title='Layer ROE')
-            a.set(xlabel='ROE = M / Q')
-            tidy2(a, k, r.max() * 1.05 / 4)
-
-            a = next(ax)
-            a.plot(audit.S / audit.gS, audit.loss)
-            a.set(xlim=xr, title='Layer LR')
-            a.set(xlabel='LR = S / g(S)')
-            tidy2(a, k)
-
-        return Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig_dist=f_dist,
-                      fig_six_up_down=f1, fig_trinity=f2,
-                      pricing=pricing, exhibit=exhibit, roe_compare=exhibit2,
-                      audit_df=audit_df)
-
-    def example_factory_exhibits(self, data_in, p=0., kind='', a=0.):
-        """
-        do the work to extract the pricing, exhibit and exhibit 2 DataFrames from deets
-        Can also accept an ans object with an augmented_df element (how to call from outside)
-        POINT: re-run exhibits at different p/a thresholds without recalibrating
-        add relevant items to audit_df
-        a = q(p) if both given; if not both given derived as usual
-        """
-        assert p or a
-        if p and not a:
-            a = self.q(p, kind)
-        if a and not p:
-            p = self.cdf(a)
-        if isinstance(data_in, Answer):
-            deets = data_in.augmented_df
-        else:
-            deets = data_in
-
+        #
         # shut the style police up:
-        # TODO EVIL interim renaming...
         done = []
-        ex = deets.loc[[a]].T
-        ex.index = [i.replace('xi_x', 'xi/x').replace('epd_', 'epd:').
-                        replace('ημ_', 'ημ') for i in ex.index]
-        pricing = ex.filter(regex='loss|g?[S]|exi/xgtag?_.+?$(?<!(sum))|'
-                                  'exag?_.+?$(?<!(pcttotal|sumparts))|LR_', axis=0).sort_index()
-        pricing.index = [i if i.find('_') > 0 else f'{i}_total' for i in pricing.index]
-        pricing.index = pricing.index.str.split('_', expand=True)
-        pricing.index.set_names(['stat', 'line'], inplace=True)
-        pricing = pricing.sort_index(level=[0, 1])
-        pricing.loc[('exi/xgta', 'total'), :] = pricing.loc[('exi/xgta', self.line_names), :].sum(axis=0)
-        pricing = pricing.sort_index(level=[0, 1])
-        pricing.loc[('exi/xgtag', 'total'), :] = pricing.loc[('exi/xgtag', self.line_names), :].sum(axis=0)
-        pricing = pricing.sort_index(level=[0, 1])
-        # S gS here go on to become M.L and M.P
-        for l in self.line_names:
-            pricing.loc[('S', l), :] = \
-                pricing.loc[('exi/xgta', l), :].values * pricing.loc[('S', 'total'), :].values
-            pricing.loc[('gS', l), :] = \
-                pricing.loc[('exi/xgtag', l), :].values * pricing.loc[('gS', 'total'), :].values
-            pricing.loc[('loss', l), :] = pricing.loc[('loss', 'total')]
-        pricing = pricing.sort_index(level=[0, 1])
 
-        # focus on just the indicated capital level a; pricing is one column
-        # note transpose                           V
-        exhibit = pricing.xs(a, axis=1).unstack(1).T.copy()
-        exhibit['M.LR'] = exhibit.S / exhibit.gS
+        ex = augmented_df.loc[[a_cal]].T
 
-        # ROE.2 is the total ROE
-        # exhibit['M.ROE.2'] = (exhibit.gS - exhibit.S) / (1 - exhibit.gS)
-        # !!!!!!!!! M.total is set first but you want it last...line names better be upper case
-        # filter will return a data frame even if only one column (which is the case here); so use .iloc[:, 0]
-        # to pull out indexed values that can match appropriately
-        def fillout(cn, reg):
-            temp = ex.filter(regex=reg, axis=0).iloc[:, 0]
-            # strip of M.Q_ or M.ROE_ etc.
-            temp.index = [i[1 + len(cn):] for i in temp.index]
-            # match with index
-            exhibit[cn] = temp
+        # purely distortion pricing summary as column with multiindex
 
-        fillout('M.Q', r'^M\.Q_')
-        fillout('T.Q', r'^T\.Q_')
-        fillout('T.ROE', r'^T\.ROE_')
-        fillout('T.M', r'^M\.Q_')
-        # this one is different: single value
-        exhibit['M.ROE'] = float(ex.filter(regex=r'^M\.ROE', axis=0).values)
+        pricing = augmented_df.loc[[a_cal]].T.\
+            filter(regex='^(T|M)\.(L|P|M|Q|LR|ROE|PQ)|exi_xgtag?_[a-zA-Z]+(?<!sum)$', axis=0).copy()
+        pricing.index = pricing.index.str.replace('exi_xgta_(.+)$', r'M_alpha_\1').str. \
+            replace('exi_xgtag_(.+)$', r'M_beta_\1').str. \
+            split('_|\.', expand=True )
+        pricing.index.set_names(['MT', 'stat', 'line'], inplace=True)
+        pricing = pricing.sort_index(level=[0, 1, 2])
 
-        exhibit['A'] = a
-        exhibit = exhibit[
-            ['A', 'S', 'gS', 'M.LR', 'M.Q', 'M.ROE', 'exi/xgta', 'exi/xgtag', 'exa', 'exag', 'T.M', 'T.LR', 'T.Q',
-             'T.ROE']]
-        exhibit.columns = ['A', 'M.L', 'M.P', 'M.LR', 'M.Q', 'M.ROE', 'exi/xgta', 'exi/xgtag', 'T.L', 'T.P', 'T.M',
-                           'T.LR', 'T.Q', 'T.ROE']
-        exhibit['M.M'] = exhibit['M.P'] - exhibit['M.L']
-        exhibit['T.PQ'] = exhibit['T.P'] / exhibit['T.Q']
+        # set up to compare with other approaches
+        exhibit = pricing.unstack(2).copy()
+        exhibit.columns = exhibit.columns.droplevel(level=0)
 
+        exhibit.loc['Assets', :] = a_cal
         # some reasonable traditional metrics
         # tvar threshold giving the same assets as p on VaR
         try:
@@ -3153,28 +2960,30 @@ class Portfolio(object):
             pt = np.nan
         try:
             done = []
-            exhibit['VaR'] = [float(a.q(p, kind)) for a in self] + [self.q(p)]
+            exhibit.loc[('VaR', 'Q'), :] = [float(a.q(p, kind)) for a in self] + [self.q(p, kind)]
             done.append('var')
-            exhibit['TVaR'] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
+            exhibit.loc[('TVaR', 'Q'), :] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
             done.append('tvar')
-            exhibit['ScaledVaR'] = exhibit.VaR
-            exhibit['ScaledTVaR'] = exhibit.TVaR
-            exhibit.loc['total', 'ScaledVaR'] = 0
-            exhibit.loc['total', 'ScaledTVaR'] = 0
-            sumvar = exhibit.ScaledVaR.sum()
-            sumtvar = exhibit.ScaledTVaR.sum()
-            exhibit['ScaledVaR'] = exhibit.ScaledVaR * exhibit.loc['total', 'VaR'] / sumvar
-            exhibit['ScaledTVaR'] = exhibit.ScaledTVaR * exhibit.loc['total', 'TVaR'] / sumtvar
-            exhibit.loc['total', 'ScaledVaR'] = exhibit.loc['total', 'VaR']
-            exhibit.loc['total', 'ScaledTVaR'] = exhibit.loc['total', 'TVaR']
-            exhibit.loc['total', 'VaR'] = sumvar
-            exhibit.loc['total', 'TVaR'] = sumtvar
-            exhibit['EqRiskVaR'] = [float(a.q(pv, kind)) for a in self] + [self.q(p)]
+            exhibit.loc[('ScaledVaR', 'Q'), :] = exhibit.loc[('VaR', 'Q'), :]
+            exhibit.loc[('ScaledTVaR', 'Q'), :] = exhibit.loc[('TVaR', 'Q'), :]
+            exhibit.loc[('ScaledVaR', 'Q'), 'total'] = 0
+            exhibit.loc[('ScaledTVaR', 'Q'), 'total'] = 0
+            sumvar = exhibit.loc[('ScaledVaR', 'Q'), :].sum()
+            sumtvar = exhibit.loc[('ScaledTVaR', 'Q'), :].sum()
+            exhibit.loc[('ScaledVaR', 'Q'), :] = exhibit.loc[('ScaledVaR', 'Q'), :] * \
+                                                 exhibit.at[('VaR', 'Q'), 'total'] / sumvar
+            exhibit.loc[('ScaledTVaR', 'Q'), :] = exhibit.loc[('ScaledTVaR', 'Q'), :] * \
+                                                  exhibit.at[('TVaR', 'Q'), 'total'] / sumtvar
+            exhibit.at[('ScaledVaR', 'Q'), 'total'] = exhibit.at[('VaR', 'Q'), 'total']
+            exhibit.at[('ScaledTVaR', 'Q'), 'total'] = exhibit.at[('TVaR', 'Q'), 'total']
+            exhibit.at[('VaR', 'Q'), 'total'] = sumvar
+            exhibit.at[('TVaR', 'Q'), 'total'] = sumtvar
+            exhibit.loc[('EqRiskVaR', 'Q'), :] = [float(a.q(pv, kind)) for a in self] + [self.q(p)]
             done.append('eqvar')
-            exhibit['EqRiskTVaR'] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
+            exhibit.loc[('EqRiskTVaR', 'Q'), :] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
             done.append('eqtvar')
             # MerPer
-            exhibit['MerPer'] = self.merton_perold(p)
+            exhibit.loc[('MerPer', 'Q'), :] = self.merton_perold(p)
             done.append('merper')
         except Exception as e:
             dev_logger.warning('Some general out of bounds error on VaRs and TVaRs, setting all equal to zero. '
@@ -3186,24 +2995,274 @@ class Portfolio(object):
                     pass
                 else:
                     # put in placeholder
-                    exhibit[c] = np.nan
+                    exhibit.loc[(c, 'Q'), :] = np.nan
         # EPD
-        row = self.density_df.loc[a, :]
-        exhibit['EPD'] = [row.at[f'epd_{0 if l == "total" else 1}_{l}'] for l in self.line_names_ex]
+        row = self.density_df.loc[a_cal, :]
+        exhibit.loc[('T', 'EPD'), :] = [row.at[f'epd_{0 if l == "total" else 1}_{l}'] for l in self.line_names_ex]
+        exhibit = exhibit.sort_index()
         # subtract the premium to get the actual capital
-        methods = ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
-        exhibit.loc[:, methods] = exhibit.loc[:, methods].sub(exhibit['T.P'].values, axis=0)
-        # make a version just focused on comparing ROEs
-        cols = ['ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']
-        exhibit2 = exhibit.copy()[['T.P', 'T.L', 'T.LR', 'T.Q', 'T.ROE'] + cols]
-        exhibit2.loc[:, cols] = (1 / exhibit2[cols]).mul(exhibit2['T.P'] - exhibit2['T.L'], axis=0)
+        try:
+            for m in ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']:
+                # exhibit.loc[('ISA.Q', m), :] = exhibit.loc[('ISA.Q', m), :].sub(exhibit.loc[('T', 'P'), :].values, axis=0)
+                exhibit.loc[(m, 'Q'), :] -= exhibit.loc[('T', 'P'), :].values
+                exhibit.loc[(m, 'P'), :] = exhibit.loc[('T', 'L'), :] + ROE * exhibit.loc[(m, 'Q'), :]
+                exhibit.loc[(m, 'M'), :] = exhibit.loc[(m, 'P'), :] - exhibit.loc[('T', 'L'), :].values
+                exhibit.loc[(m, 'LR'), :] = exhibit.loc[('T', 'L'), :] / exhibit.loc[(m, 'P'), :]
+                exhibit.loc[(m, 'ROE'), :] = exhibit.loc[(m, 'M'), :] / exhibit.loc[(m, 'Q'), :]
+                exhibit.loc[(m, 'PQ'), :] = exhibit.loc[(m, 'P'), :] / exhibit.loc[(m, 'Q'), :]
+        except Exception as e:
+            print(e)
+        exhibit = exhibit.sort_index()
 
-        # return depending on how called
-        if isinstance(data_in, Answer):
-            return Answer(pricing=pricing, exhibit=exhibit, exhibit2=exhibit2)
-            # deets = data_in.augmented_df
-        else:
-            return pricing, exhibit, exhibit2, p_t, pv, pt
+        # other helpful audit values
+        audit_df.loc['TVaR@'] = p_t
+        audit_df.loc['erVaR'] = pv
+        audit_df.loc['erTVaR'] = pt
+
+        #
+        # plotting section
+        #
+        f_6_part = f_trinity = f_8_part = f_distortion = f_close = None
+        if plot:
+            # plot the distortion
+            f_distortion, ax = plt.subplots(1, 1)
+            dist.plot(ax=ax)
+
+            # six part up and down plot
+            def tidy(a, y=True):
+                """
+                function to tidy up the graphics
+                """
+                n = 6
+                a.set(xlabel='Assets')
+                a.xaxis.set_major_locator(FixedLocator([a_cal]))
+                ff = f'A={a_cal:,.0f}'
+                a.xaxis.set_major_formatter(FixedFormatter([ff]))
+                a.xaxis.set_minor_locator(MaxNLocator(n))
+                a.xaxis.set_minor_formatter(StrMethodFormatter('{x:,.0f}'))
+                if y:
+                    a.yaxis.set_major_locator(MaxNLocator(n))
+                    a.yaxis.set_minor_locator(AutoMinorLocator(4))
+                # gridlines with various options
+                # https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+                a.grid(which='major', axis='x', c='cornflowerblue', alpha=1, linewidth=1)
+                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+                # tick marks
+                a.tick_params('x', which='major', labelsize=7, length=10, width=0.75, color='cornflowerblue',
+                              direction='out')
+                a.tick_params('y', which='major', labelsize=7, length=5, width=0.75, color='black',
+                              direction='out')
+                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black',
+                              direction='out')
+
+            # plots
+            f_6_part, axs = plt.subplots(3, 2, figsize=(8, 10), sharex=True, constrained_layout=True)
+            axi = iter(axs.flatten())
+
+            # ONE
+            ax = next(axi)
+            # df[['Layer Loss', 'Layer Prem', 'Layer Capital']]
+            augmented_df.filter(regex='^F|^gS|^S').rename(columns=self.renamer).\
+                plot(xlim=[0, a_max], ylim=[-0.025, 1.025], logy=False, title='F, S, gS: marginal premium and loss', ax=ax)
+            tidy(ax)
+            ax.legend(frameon=True, loc='center right')
+
+            # TWO
+            ax = next(axi)
+            # df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=ax)
+            augmented_df.filter(regex='^M\.[QM]_total').rename(columns=self.renamer). \
+                plot(xlim=[0, a_max], ylim=[-0.05, 1.05], logy=False, title='Marginal Capital and Margin', ax=ax)
+            tidy(ax)
+            ax.legend(frameon=True, loc='center right')
+
+            # THREE
+            ax = next(axi)
+            # df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=ax)
+            augmented_df.filter(regex='^V\.(L|P|Q|M)_total').rename(columns=self.renamer). \
+                plot(xlim=[0, a_max], ylim=[0, a_max], logy=False, title=f'Decreasing LPMQ from {a_cal:.0f}',
+                     ax=ax)
+            (a_cal - augmented_df.loc[:a_cal, 'loss']).plot(ax=ax, label='Assets')
+            tidy(ax)
+            ax.legend(frameon=True, loc='upper right')
+
+            # FOUR
+            ax = next(axi)
+            augmented_df.filter(regex='^(T|V|M)\.LR_total').rename(columns=self.renamer). \
+                plot(xlim=[0, a_cal*1.1], ylim=[-0.05, 1.05], ax=ax, title='Increasing, Decreasing and Marginal LRs')
+            tidy(ax)
+            ax.legend(frameon=True, loc='lower left')
+
+            # FIVE
+            ax = next(axi)
+            augmented_df.filter(regex='^T\.(L|P|Q|M)_total|loss').rename(columns=self.renamer). \
+                plot(xlim=[0, a_max], ylim=[0, a_max], logy=False, title=f'Increasing LPMQ to {a_cal:.0f}',
+                     ax=ax)
+            tidy(ax)
+            ax.legend(frameon=True, loc='upper left')
+
+            # SIX
+            # could include leverage?
+            ax = next(axi)
+            augmented_df.filter(regex='^(M|T|V)\.ROE_(total)?$').rename(columns=self.renamer). \
+                plot(xlim=[0, a_max], # ylim=[-0.05, 1.05],
+                     logy=False, title=f'Increasing, Decreasing and Marginal ROE to {a_cal:.0f}',
+                     ax=ax)
+            # df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE', ]].plot(xlim=xlim, logy=False, ax=ax, ylim=ylim)
+            # df[['ROE↓', 'ROE↑', 'Marginal ROE', 'P:S↓', 'P:S↑']].plot(xlim=xlim, logy=False, ax=a, ylim=[0,_])
+            ax.plot([0, a_max], [ROE, ROE], ":", linewidth=2, alpha=0.75, label='Avg ROE')
+            tidy(ax)
+            ax.legend(loc='upper right')
+
+            title = f'{self.name} with {str(dist)} Distortion\nCalibrated to LR={LR:.3f} and p={p:.3f}, ' \
+                f'Assets={a_cal:,.1f}, ROE={ROE:.3f}'
+            f_6_part.suptitle(title, fontsize='x-large')
+
+            # trinity plots
+            def tidy2(a, k, xloc=0.25):
+                n = 4
+                a.xaxis.set_major_locator(MultipleLocator(xloc))
+                a.xaxis.set_minor_locator(AutoMinorLocator(4))
+                a.xaxis.set_major_formatter(StrMethodFormatter('{x:.2f}'))
+                a.yaxis.set_major_locator(MaxNLocator(2 * n))
+                a.yaxis.set_minor_locator(AutoMinorLocator(4))
+                a.grid(which='major', axis='x', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='major', axis='y', c='lightgrey', alpha=0.5, linewidth=1)
+                a.grid(which='minor', axis='x', c='gainsboro', alpha=0.25, linewidth=0.5)
+                a.grid(which='minor', axis='y', c='gainsboro', alpha=0.25, linewidth=0.5)
+                # tick marks
+                a.tick_params('both', which='major', labelsize=7, length=4, width=0.75, color='black', direction='out')
+                a.tick_params('both', which='minor', labelsize=7, length=2, width=0.5, color='black', direction='out')
+                # line to show where capital lies
+                a.plot([0, 1], [k, k], linewidth=1, c='black', label='Assets')
+
+            f_trinity, axs = plt.subplots(1, 5, figsize=(8, 3), constrained_layout=True, sharey=True)
+            axi = iter(axs.flatten())
+            xr = [-0.05, 1.05]
+
+            audit = augmented_df.loc[:a_max, :]
+
+            # ONE
+            ax = next(axi)
+            ax.plot(audit.gS, audit.loss, label='M.P_total')
+            ax.plot(audit.S, audit.loss, label='M.L_total')
+            ax.set(xlim=xr, title='Marginal Prem & Loss')
+            ax.set(xlabel='Loss = S = Pr(X>a)\nPrem = g(S)', ylabel="Assets, a")
+            tidy2(ax, a_cal)
+            ax.legend(loc="upper right", frameon=True, edgecolor=None)
+
+            # TWO
+            ax = next(axi)
+            m = audit.F - audit.gF
+            ax.plot(m, audit.loss, linewidth=2, label='M')
+            ax.set(xlim=-0.01, title='Marginal Margin', xlabel='M = g(S) - S')
+            tidy2(ax, a_cal, m.max() * 1.05 / 4)
+
+            # THREE
+            ax = next(axi)
+            ax.plot(1 - audit.gS, audit.loss, label='Q')
+            ax.set(xlim=xr, title='Marginal Equity')
+            ax.set(xlabel='Q = 1 - g(S)')
+            tidy2(ax, a_cal)
+
+            # FOUR
+            ax = next(axi)
+            temp = audit.loc[self.q(1e-5):, :]
+            r = (temp.gS - temp.S) / (1 - temp.gS)
+            ax.plot(r, temp.loss, linewidth=2, label='ROE')
+            ax.set(xlim=-0.05, title='Layer ROE')
+            ax.set(xlabel='ROE = M / Q')
+            tidy2(ax, a_cal, r.max() * 1.05 / 4)
+
+            # FIVE
+            ax = next(axi)
+            ax.plot(audit.S / audit.gS, audit.loss)
+            ax.set(xlim=xr, title='Layer LR')
+            ax.set(xlabel='LR = S / g(S)')
+            tidy2(ax, a_cal)
+
+            #
+            #
+            #
+            # from original example_factory_sublines
+            temp = augmented_df.filter(regex='exi_xgtag?_(?!sum)|^S|^gS|^(M|T)\.').copy()
+            renamer = self.renamer
+            augmented_df.index.name = 'Assets a'
+            temp.index.name = 'Assets a'
+
+            f_8_part, axs = plt.subplots(4, 2, figsize=(8, 10), constrained_layout=True, squeeze=False)
+            ax = iter(axs.flatten())
+
+            try:
+                # ONE
+                a = (1 - augmented_df.filter(regex='p_').cumsum()).rename(columns=renamer).sort_index(1). \
+                    plot(ylim=[0, 1], xlim=[0, a_max], title='Survival functions', ax=next(ax))
+                a.grid('b')
+
+                # TWO
+                a = augmented_df.filter(regex='exi_xgtag?').rename(columns=renamer).sort_index(1). \
+                    plot(ylim=[0, 1], xlim=[0, a_max], title=r'$\alpha=E[X_i/X | X>a],\beta=E_Q$ by Line', ax=next(ax))
+                a.grid('b')
+
+                # THREE total margins
+                a = augmented_df.filter(regex=r'^T\.M').rename(columns=renamer).sort_index(1). \
+                    plot(xlim=[0, a_max], title='Total Margins by Line', ax=next(ax))
+                a.grid('b')
+
+                # FOUR marginal margins was dividing by bs end of first line
+                # for some reason the last entry in M.M_total can be problematic.
+                a = (augmented_df.filter(regex=r'^M\.M').rename(columns=renamer).sort_index(1).iloc[:-1, :].
+                     plot(xlim=[0, a_max], title='Marginal Margins by Line', ax=next(ax)))
+                a.grid('b')
+
+                # FIVE
+                a = augmented_df.filter(regex=r'^M\.Q|gF').rename(columns=renamer).sort_index(1). \
+                    plot(xlim=[0, a_max], title='Capital = 1-gS = gF', ax=next(ax))
+                a.grid('b')
+                for _ in a.lines:
+                    if _.get_label() == 'gF':
+                        _.set(linewidth=5, alpha=0.3)
+                # recreate legend because changed lines
+                a.legend()
+
+                # SIX see apply distortion, line 1890 ROE is in augmented_df
+                a = augmented_df.filter(regex='^ROE$|exi_xeqa').rename(columns=renamer).sort_index(1). \
+                    plot(xlim=[0, a_max], title='M.ROE Total and $E[X_i/X | X=a]$ by line', ax=next(ax))
+                a.grid('b')
+
+                # SEVEN improve scale selection
+                a = augmented_df.filter(regex='M\.LR').rename(columns=renamer).sort_index(1). \
+                    plot(ylim=[-.05, 1.5], xlim=[0, a_max], title='Marginal LR',
+                         ax=next(ax))
+                a.grid('b')
+
+                # EIGHT
+                a = augmented_df.filter(regex='T.LR_').rename(columns=renamer).sort_index(1). \
+                    plot(ylim=[-.05, 1.25], xlim=[0, a_max], title='Increasing Total LR by Line',
+                         ax=next(ax))
+                a.grid('b')
+                a.legend(loc='center right')
+            except Exception as e:
+                print('Error', e)
+
+            #
+            # close up of plot 2
+            #
+            bit = augmented_df.query(f'loss < {a_max}').filter(regex='exi_xgtag?_.*(?<!sum)$')
+            f_close, ax = plt.subplots(1, 1, figsize=(8, 5))
+            ax = bit.rename(columns=renamer).plot(ylim=[.1, .5], ax=ax)
+            ax.grid()
+            nl = len(self.line_names)
+            for i, l in enumerate(ax.lines[nl:]):
+                ax.lines[i].set(linewidth=1, linestyle='--')
+                l.set(color=ax.lines[i].get_color(), linewidth=2)
+            ax.legend(loc='upper left')
+
+        return Answer(augmented_df=augmented_df, distortion=dist,
+                      fig_distortion=f_distortion, fig_six_up_down=f_6_part,
+                      fig_trinity=f_trinity, fig_eight=f_8_part, fig_close=f_close,
+                      pricing=pricing, exhibit=exhibit, audit_df=audit_df)
 
     def top_down(self, distortions, A_or_p):
         """
@@ -3219,57 +3278,57 @@ class Portfolio(object):
 
         logger.warning('Portfolio.top_down is deprecated. It has been replaced by Portfolio.example_factory.')
 
-        assert A_or_p > 0
-
-        if A_or_p < 1:
-            # call with one arg and interpret as log
-            A = self.q(A_or_p)
-        else:
-            A = A_or_p
-
-        if isinstance(distortions, dict):
-            list_specs = distortions.values()
-        elif isinstance(distortions, list):
-            list_specs = distortions
-        else:
-            list_specs = [distortions]
-
-        dfs = []
-        for dist in list_specs:
-            g, g_inv = dist.g, dist.g_inv
-
-            S = self.density_df.S
-            loss = self.density_df.loss
-
-            a = A - self.bs  # A-bs for pandas series (includes endpoint), a for numpy indexing; int(A / self.bs)
-            lossa = loss[0:a]
-
-            Sa = S[0:a]
-            Fa = 1 - Sa
-            gSa = g(Sa)
-            premium = np.cumsum(gSa[::-1])[::-1] * self.bs
-            el = np.cumsum(Sa[::-1])[::-1] * self.bs
-            capital = A - lossa - premium
-            risk_margin = premium - el
-            assets = capital + premium
-            marg_roe = (gSa - Sa) / (1 - gSa)
-            lr = el / premium
-            roe = (premium - el) / capital
-            leverage = premium / capital
-            # rp = -np.log(Sa) # return period
-            marg_lr = Sa / gSa
-
-            # sns.set_palette(sns.color_palette("Paired", 4))
-            df = pd.DataFrame({'$F(x)$': Fa, '$x$': lossa, 'Premium': premium, r'$EL=E(X\wedge x)$': el,
-                               'Capital': capital, 'Risk Margin': risk_margin, 'Assets': assets, '$S(x)$': Sa,
-                               '$g(S(x))$': gSa, 'Loss Ratio': lr, 'Marginal LR': marg_lr, 'ROE': roe,
-                               'Marginal ROE': marg_roe, 'P:S levg': leverage})
-            df = df.set_index('$F(x)$', drop=True)
-            df.plot(subplots=True, rot=0, figsize=(14, 4), layout=(-1, 7))
-            suptitle_and_tight(f'{str(dist)}: Statistics for Layer $x$ to $a$ vs. $F(x)$')
-            df['distortion'] = dist.name
-            dfs.append(df)
-        return pd.concat(dfs)
+        # assert A_or_p > 0
+        #
+        # if A_or_p < 1:
+        #     # call with one arg and interpret as log
+        #     A = self.q(A_or_p)
+        # else:
+        #     A = A_or_p
+        #
+        # if isinstance(distortions, dict):
+        #     list_specs = distortions.values()
+        # elif isinstance(distortions, list):
+        #     list_specs = distortions
+        # else:
+        #     list_specs = [distortions]
+        #
+        # dfs = []
+        # for dist in list_specs:
+        #     g, g_inv = dist.g, dist.g_inv
+        #
+        #     S = self.density_df.S
+        #     loss = self.density_df.loss
+        #
+        #     a = A - self.bs  # A-bs for pandas series (includes endpoint), a for numpy indexing; int(A / self.bs)
+        #     lossa = loss[0:a]
+        #
+        #     Sa = S[0:a]
+        #     Fa = 1 - Sa
+        #     gSa = g(Sa)
+        #     premium = np.cumsum(gSa[::-1])[::-1] * self.bs
+        #     el = np.cumsum(Sa[::-1])[::-1] * self.bs
+        #     capital = A - lossa - premium
+        #     risk_margin = premium - el
+        #     assets = capital + premium
+        #     marg_roe = (gSa - Sa) / (1 - gSa)
+        #     lr = el / premium
+        #     roe = (premium - el) / capital
+        #     leverage = premium / capital
+        #     # rp = -np.log(Sa) # return period
+        #     marg_lr = Sa / gSa
+        #
+        #     # sns.set_palette(sns.color_palette("Paired", 4))
+        #     df = pd.DataFrame({'$F(x)$': Fa, '$x$': lossa, 'Premium': premium, r'$EL=E(X\wedge x)$': el,
+        #                        'Capital': capital, 'Risk Margin': risk_margin, 'Assets': assets, '$S(x)$': Sa,
+        #                        '$g(S(x))$': gSa, 'Loss Ratio': lr, 'Marginal LR': marg_lr, 'ROE': roe,
+        #                        'Marginal ROE': marg_roe, 'P:S levg': leverage})
+        #     df = df.set_index('$F(x)$', drop=True)
+        #     df.plot(subplots=True, rot=0, figsize=(14, 4), layout=(-1, 7))
+        #     suptitle_and_tight(f'{str(dist)}: Statistics for Layer $x$ to $a$ vs. $F(x)$')
+        #     df['distortion'] = dist.name
+        #     dfs.append(df)
+        # return pd.concat(dfs)
 
     def analysis_priority(self, asset_spec, output='df'):
         """

@@ -566,8 +566,12 @@ class Underwriter(object):
             for k in self.parser.port_out_dict.keys():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
                 s = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
+                s.program = 'unknown'
                 _update(s, k)
                 rv[k] = s
+            if len(self.parser.port_out_dict) == 1:
+                # only one portfolio so we can set its program
+                s.program = portfolio_program
 
         if len(self.parser.agg_out_dict) > 0 and create_all:
             # new aggs, create them

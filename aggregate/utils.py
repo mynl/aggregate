@@ -14,6 +14,7 @@ from scipy.optimize.nonlin import NoConvergence
 from io import StringIO
 import re
 from pathlib import Path
+
 # import warnings
 
 # logging
@@ -32,14 +33,15 @@ logger.setLevel(logging.INFO)
 # rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=100000, backupCount=10)
 rh = logging.FileHandler(LOGFILE)
 rh.setLevel(logging.INFO)
-rh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+rh_formatter = logging.Formatter(
+    '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 rh.setFormatter(rh_formatter)
-
 
 # to stderr
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
-ch_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+ch_formatter = logging.Formatter(
+    '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 ch.setFormatter(ch_formatter)
 
 # add loggers
@@ -48,14 +50,16 @@ logger.addHandler(ch)
 
 # dev logger to stderr - all levels
 # used for messages during development
-dev_logger = logging.getLogger('aggdev')
-dev_logger.setLevel(logging.DEBUG)
-sh = logging.StreamHandler()
-sh_formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno)d) | %(message)s')
-sh.setFormatter(sh_formatter)
-dev_logger.addHandler(sh)
+# dev_logger = logging.getLogger('aggdev')
+# dev_logger.setLevel(logging.DEBUG)
+# sh = logging.StreamHandler()
+# sh_formatter = logging.Formatter(
+#     '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno)d) | %(message)s')
+# sh.setFormatter(sh_formatter)
+# dev_logger.addHandler(sh)
 
 logger.info('aggregate_project.__init__ | New Aggregate Session started')
+
 
 # display
 # def qd(df, max_rows=10):
@@ -112,7 +116,7 @@ def tidy_agg_program(txt):
     clean = [re.sub(r'[ ]+', ' ', i.strip()) for i in bits]
     sio = StringIO()
     sio.write(clean[0])
-    for agg, exp, sev, sevd, fs, freq in zip(*[clean[i::6] for i in range(1,7)]):
+    for agg, exp, sev, sevd, fs, freq in zip(*[clean[i::6] for i in range(1, 7)]):
         nm, *rest = exp.split(' ')
         sio.write(f'\n\t{agg} {nm:^12s} {float(rest[0]):8.1f} {" ".join(rest[1:]):^20s} '
                   f'{sev} {sevd:^25s} {fs:>8s}   {freq}')
@@ -366,6 +370,86 @@ class AxisManager(object):
             for ax in self.it:
                 self.f.delaxes(ax)
 
+    # methods for a more hands on approach
+    @staticmethod
+    def good_grid(n):
+        """
+        Good layout for n plots
+        :param n:
+        :return:
+        """
+        basic = {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 2), 5: (2, 3), 6: (2, 3), 7: (2, 4),
+                 8: (2, 4), 9: (3, 3), 10: (4, 3), 11: (4, 3), 12: (4, 3), 13: (5, 3), 14: (5, 3),
+                 15: (5, 3), 16: (4, 4), 17: (5, 4), 18: (5, 4), 19: (5, 4), 20: (5, 4)}
+
+        if n <= 20:
+            r, c = basic[n]
+        else:
+            c = 4
+            r = n // c
+            if r * c < n:
+                r += 1
+        return r, c
+
+    @staticmethod
+    def size_figure(r, c, aspect=1.5):
+        """
+        reasonable figure size for n plots
+        :param r:
+        :param c:
+        :param aspect:
+        :return:
+        """
+        w = min(6, 8 / c)
+        h = w / aspect
+        tw = w * c
+        th = h * r
+        if th > 10.5:
+            tw = 10.5 / th * tw
+            th = 10.5
+        return tw, th
+
+    @staticmethod
+    def make_fig(n, aspect=1.5, **kwargs):
+        """
+        make the figure and iterator
+        :param n:
+        :param aspect:
+        :return:
+        """
+
+        r, c = AxisManager.good_grid(n)
+        w, h = AxisManager.size_figure(r, c, aspect)
+
+        f, axs = plt.subplots(r, c, figsize=(w, h), constrained_layout=True, squeeze=False, **kwargs)
+        axi = iter(axs.flatten())
+        return f, axs, axi
+
+    @staticmethod
+    def print_fig(n, aspect=1.5):
+        """
+        printout code...to insert (TODO copy to clipboard!)
+        :param n:
+        :param aspect:
+        :return:
+        """
+        r, c = AxisManager.good_grid(n)
+        w, h = AxisManager.size_figure(r, c, aspect)
+
+        l1 = f"f, axs = plt.subplots({r}, {c}, figsize=({w}, {h}), constrained_layout=True, squeeze=False)"
+        l2 = "axi = iter(axs.flatten())"
+        return '\n'.join([l1, l2])
+
+    @staticmethod
+    def tidy_up(f, ax):
+        """
+        delete unused frames out of a figure
+        :param ax:
+        :return:
+        """
+        for a in ax:
+            f.delaxes(a)
+
 
 def lognorm_lev(mu, sigma, n, limit):
     """
@@ -403,6 +487,7 @@ def html_title(txt, n=1, title_case=True):
         display(HTML('<h{:}> {:}'.format(n, txt.replace("_", " ").title())))
     else:
         display(HTML('<h{:}> {:}'.format(n, txt.replace("_", " "))))
+
 
 def sensible_jump(n, desired_rows=20):
     """
@@ -653,7 +738,6 @@ class MomentAggregator(object):
                f1 * s2 + (f2 - f1) * s1 ** 2, \
                f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
 
-
     def moments_to_mcvsk(self, mom_type, total=True):
         """
         convert noncentral moments into mean, cv and skewness
@@ -748,7 +832,7 @@ class MomentAggregator(object):
         if m == 0:
             cv = np.nan
             logger.error('MomentAggregator._moments_to_mcvsk | encountered zero mean, called with '
-                          f'{ex1}, {ex2}, {ex3}')
+                         f'{ex1}, {ex2}, {ex3}')
         else:
             cv = sd / m
         if sd == 0:
@@ -766,7 +850,7 @@ class MomentAggregator(object):
         """
 
         return [i + j for i, j in itertools.product(['freq', 'sev', 'agg'], [f'_{i}' for i in range(1, 4)] +
-                                                        ['_m', '_cv', '_skew'])]
+                                                    ['_m', '_cv', '_skew'])]
 
     def stats_series(self, name, limit, pvalue, remix):
         """
@@ -780,9 +864,9 @@ class MomentAggregator(object):
         :return:
         """
         # TODO: needs to be closer link to column_names()
-        idx = pd.MultiIndex.from_arrays([['freq']*6 + ['sev'] * 6 + ['agg']*8,
-             (['ex1', 'ex2', 'ex3'] + ['mean', 'cv', 'skew']) * 3 + ['limit', 'P99.9e']],
-             names=['component', 'measure'])
+        idx = pd.MultiIndex.from_arrays([['freq'] * 6 + ['sev'] * 6 + ['agg'] * 8,
+                                         (['ex1', 'ex2', 'ex3'] + ['mean', 'cv', 'skew']) * 3 + ['limit', 'P99.9e']],
+                                        names=['component', 'measure'])
         all_stats = self.get_fsa_stats(total=True, remix=remix)
         p999e = estimate_agg_percentile(*all_stats[15:18], pvalue)
         return pd.Series([*all_stats, limit, p999e], name=name, index=idx)
@@ -948,13 +1032,14 @@ def xsden_to_meancv(xs, den):
     :return:
     """
     ex1 = np.sum(xs * den)
-    ex2 = np.sum(xs**2 * den)
+    ex2 = np.sum(xs ** 2 * den)
     sd = np.sqrt(ex2 - ex1 ** 2)
     if ex1 != 0:
         cv = sd / ex1
     else:
         cv = np.nan
     return ex1, cv
+
 
 def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     """
@@ -1099,9 +1184,9 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     ans.loc[(dist, 'empirical'), :] = row(pois_pascal)
     # moments for the PP are different can't use noncentral__nmoms_from_mixing_moms
     g = κ * λ * (
-                2 * c ** 2 * κ ** 2 + 3 * c * κ ** 2 * λ + 3 * c * κ ** 2 + 3 * c * κ + κ ** 2 * λ ** 2 + 3 * κ ** 2 * λ + κ ** 2 + 3 * κ * λ + 3 * κ + 1)
+            2 * c ** 2 * κ ** 2 + 3 * c * κ ** 2 * λ + 3 * c * κ ** 2 + 3 * c * κ + κ ** 2 * λ ** 2 + 3 * κ ** 2 * λ + κ ** 2 + 3 * κ * λ + 3 * κ + 1)
     g2 = n * (
-                2 * c ** 2 * κ ** 2 + 3 * c * n * κ + 3 * c * κ ** 2 + 3 * c * κ + n ** 2 + 3 * n * κ + 3 * n + κ ** 2 + 3 * κ + 1)
+            2 * c ** 2 * κ ** 2 + 3 * c * n * κ + 3 * c * κ ** 2 + 3 * c * κ + n ** 2 + 3 * n * κ + 3 * n + κ ** 2 + 3 * κ + 1)
     assert np.allclose(g, g2)
     temp = [λ * κ, n * (κ * (1 + c + λ) + 1), g]
     ans.loc[(dist, 'theoretical'), :] = temp + ma(temp) + [
@@ -1122,11 +1207,11 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
         # G = f + G'; E(G') = 1 - f, SD(G) = SD(G') = ν, skew(G') = skew(G)
         # a = ((1 - f) / ν) ** 2
         # FWIW θ = ν / (1 - f)  # (1 - f) / a
-        target = np.array([1, ν, 2 * ν / (1 - f)])   # / np.sqrt(a)])
+        target = np.array([1, ν, 2 * ν / (1 - f)])  # / np.sqrt(a)])
     elif sichel_case == 'ig':
         # match shifted IG moments
         # μ = (ν / (1 - f)) ** 2
-        target = np.array([1, ν, 3.0 * ν / (1 - f)])   # np.sqrt(μ)])
+        target = np.array([1, ν, 3.0 * ν / (1 - f)])  # np.sqrt(μ)])
     elif sichel_case == '':
         # input lambda, match mean = 1 and cv (input)
         pass
@@ -1143,6 +1228,7 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
             λ = -0.5
         μ = 1
         β = ν ** 2
+
         def f(arrIn):
             """
             calibration function to match target mean, cv and skewness (keeps the scale about the same)
@@ -1154,16 +1240,16 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
             μ = np.exp(μ)
             β = np.exp(β)
             ex1, ex2, ex3 = np.array([μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)])
-            sd = np.sqrt(ex2 - ex1*ex1)
-            skew = (ex3 - 3 * ex2 * ex1 + 2 * ex1 ** 3) / (sd**3)
+            sd = np.sqrt(ex2 - ex1 * ex1)
+            skew = (ex3 - 3 * ex2 * ex1 + 2 * ex1 ** 3) / (sd ** 3)
             return np.array([ex1, sd, skew]) - target
 
         try:
             params1 = broyden2(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000,
                                f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
             params2 = newton_krylov(f, (np.log(μ), np.log(β), λ), verbose=False, iter=10000,
-                              f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
-            if np.sum((params1-params2)**2) > 0.05:
+                                    f_rtol=1e-11)  # , f_rtol=1e-9)  , line_search='wolfe'
+            if np.sum((params1 - params2) ** 2) > 0.05:
                 print(f'Broyden {params1}\nNewton K {params2}')
                 m1 = np.sum(np.abs(params1))
                 m2 = np.sum(np.abs(params2))
@@ -1189,6 +1275,7 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
         μ = 1
         β = ν ** 2
         target = np.array([1, ν])
+
         def f(arrIn):
             """
             calibration function to match target mean = 1 and cv
@@ -1232,8 +1319,8 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
         sichel = defuzz(sichel)
         ans.loc[(dist, 'empirical'), :] = row(sichel)
         mw = MomentWrangler()
-        junk = [μ**r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)]
-        g = junk[2]   # non central G
+        junk = [μ ** r * kv(λ + r, μ / β) / kv(λ, μ / β) for r in (1, 2, 3)]
+        g = junk[2]  # non central G
         temp = noncentral_n_moms_from_mixing_moms(n, c, g)
         print('Noncentral N from mixing moms            ', temp)
         mw.factorial = junk
@@ -1293,12 +1380,19 @@ class Answer(dict):
     def list(self):
         """ List elements """
         return pd.DataFrame(zip(self.keys(),
-            [type(v) for v in self.values()]), columns=['Item', 'Type'])
+                                [self.nice(v) for v in self.values()]), columns=['Item', 'Type'])
 
     def __str__(self):
         return '\n'.join([f'{i[0]:<20s}\t{i[1]}'
-            for i in zip(self.keys(), [type(v) for v in self.values()])
-            ])
+                          for i in zip(self.keys(), [self.nice(v) for v in self.values()])
+                          ])
+    @staticmethod
+    def nice(x):
+        """ return a nice rep of x """
+        if type(v) in [str, float, int]:
+            return v
+        else:
+            return type(v)
 
     def summary(self):
         """
@@ -1309,18 +1403,19 @@ class Answer(dict):
 
         for k, v in self.items():
             if isinstance(v, pd.core.frame.DataFrame):
-                print(f'\n{k}\n{"="*len(k)}\n')
+                print(f'\n{k}\n{"=" * len(k)}\n')
                 if v.shape[1] > 12:
                     display(v.head(5).T)
                 else:
                     display(v.head(10))
+
 
 def log_test():
     """"
     Issue logs at each level
     """
     print('Issuing five messages...')
-    for l, n in zip([logger, dev_logger], ['logger', 'dev_logger']):
+    for l, n in zip([logger], ['logger']):
         print(n)
         l.debug('A debug message')
         l.info('A info message')
@@ -1329,3 +1424,11 @@ def log_test():
         l.critical('A critical message')
         print(f'...done with {n}')
     print('...done')
+
+
+def subsets(x):
+    """
+    all non empty subsets of x, an interable
+    """
+    return list(itertools.chain.from_iterable(
+        itertools.combinations(x, n) for n in range(len(x) + 1)))[1:]

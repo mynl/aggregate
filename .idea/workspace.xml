@@ -3,7 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/underwriter.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/underwriter.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/utils.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -16,11 +19,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/port.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="463">
-              <caret line="2937" column="36" selection-start-line="2937" selection-start-column="36" selection-end-line="2937" selection-end-column="36" />
+            <state relative-caret-position="1171">
+              <caret line="146" column="13" selection-start-line="146" selection-start-column="13" selection-end-line="146" selection-end-column="13" />
               <folding>
                 <element signature="e#232#250#0" expanded="true" />
               </folding>
@@ -28,11 +31,20 @@
           </provider>
         </entry>
       </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/aggregate/underwriter.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="813">
+              <caret line="575" column="45" lean-forward="true" selection-start-line="575" selection-start-column="45" selection-end-line="575" selection-end-column="45" />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="733">
-              <caret line="1282" column="32" lean-forward="true" selection-start-line="1282" selection-start-column="32" selection-end-line="1282" selection-end-column="32" />
+            <state relative-caret-position="589">
+              <caret line="1375" lean-forward="true" selection-start-line="1375" selection-end-line="1375" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -41,10 +53,22 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/aggregate/__init__.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="368">
+              <caret line="23" lean-forward="true" selection-start-line="23" selection-end-line="23" />
+              <folding>
+                <element signature="e#278#321#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/aggregate/distr.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="855">
-              <caret line="736" column="29" lean-forward="true" selection-start-line="736" selection-start-column="29" selection-end-line="736" selection-end-column="29" />
+            <state relative-caret-position="320">
+              <caret line="20" column="36" selection-start-line="20" selection-start-column="36" selection-end-line="20" selection-end-column="36" />
               <folding>
                 <element signature="e#0#24#0" expanded="true" />
               </folding>
@@ -55,7 +79,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/debug.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="800">
+            <state relative-caret-position="640">
               <caret line="40" selection-start-line="40" selection-end-line="40" />
               <folding>
                 <element signature="e#69#79#0" expanded="true" />
@@ -75,14 +99,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>self.den</find>
-      <find>tilt_vec</find>
-      <find>middle_q</find>
-      <find>if these are</find>
-      <find>If these are</find>
-      <find>shifte</find>
-      <find>_add_exa</find>
-      <find>audit</find>
       <find>If these</find>
       <find>e2pri_</find>
       <find>eps</find>
@@ -105,6 +121,14 @@
       <find>Var</find>
       <find>a_max_p</find>
       <find>marg_</find>
+      <find>print</find>
+      <find>example_factory_sublines</find>
+      <find>EqRisk</find>
+      <find>dev_lo</find>
+      <find>exi_xgta</find>
+      <find>extra_columns</find>
+      <find>dev_logger</find>
+      <find>exlea</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -118,12 +142,14 @@
         <option value="$PROJECT_DIR$/test/debug.py" />
         <option value="$PROJECT_DIR$/debug.py" />
         <option value="$PROJECT_DIR$/aggregate/distr.py" />
+        <option value="$PROJECT_DIR$/aggregate/__init__.py" />
         <option value="$PROJECT_DIR$/aggregate/utils.py" />
         <option value="$PROJECT_DIR$/aggregate/port.py" />
+        <option value="$PROJECT_DIR$/aggregate/underwriter.py" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds">
+  <component name="ProjectFrameBounds" extendedState="6">
     <option name="x" value="124" />
     <option name="width" value="3026" />
     <option name="height" value="3010" />
@@ -134,6 +160,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -150,7 +177,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -233,7 +259,7 @@
   </component>
   <component name="StructureViewFactory">
     <option name="AUTOSCROLL_FROM_SOURCE" value="true" />
-    <option name="ACTIVE_ACTIONS" value=",SHOW_INHERITED,ALPHA_COMPARATOR" />
+    <option name="ACTIVE_ACTIONS" value=",SHOW_INHERITED,ALPHA_COMPARATOR,SHOW_FIELDS" />
   </component>
   <component name="SvnConfiguration">
     <configuration />
@@ -253,12 +279,13 @@
       <workItem from="1577371284935" duration="26325000" />
       <workItem from="1577614269998" duration="651000" />
       <workItem from="1577635125581" duration="23202000" />
-      <workItem from="1577972460162" duration="156333000" />
+      <workItem from="1577972460162" duration="157166000" />
+      <workItem from="1578750656409" duration="34948000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="179535000" />
+    <option name="totallyTimeSpent" value="215316000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -270,12 +297,12 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="62" y="0" width="1513" height="1505" extended-state="0" />
+    <frame x="61" y="-7" width="2195" height="1513" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" show_stripe_button="false" sideWeight="0.53106934" side_tool="true" weight="0.14726508" />
-      <window_info active="true" id="Structure" order="1" sideWeight="0.60549134" visible="true" weight="0.20041181" />
-      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.39450866" side_tool="true" weight="0.15521272" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.6047688" visible="true" weight="0.13651238" />
+      <window_info content_ui="combo" id="Project" order="2" sideWeight="0.39523122" side_tool="true" visible="true" weight="0.13651238" />
       <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="1" />
       <window_info anchor="bottom" id="Version Control" order="2" weight="0.32875723" />
@@ -289,12 +316,12 @@
       <window_info anchor="bottom" id="Inspection" order="10" weight="0.4" />
       <window_info anchor="right" id="SciView" order="0" sideWeight="0.90805787" weight="0.34455353" />
       <window_info anchor="right" id="Database" order="1" />
-      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" sideWeight="0.50072676" side_tool="true" visible="true" weight="0.25669184" />
+      <window_info anchor="right" x="0" y="0" width="276" height="1305" id="Documentation" order="2" sideWeight="0.50145346" side_tool="true" weight="0.25621414" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="3" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="4" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="5" weight="0.25" />
       <window_info anchor="right" id="TODO" order="6" sideWeight="0.61157024" weight="0.25899953" />
-      <window_info anchor="right" id="Find" order="7" sideWeight="0.49927327" visible="true" weight="0.25669184" />
+      <window_info anchor="right" id="Find" order="7" sideWeight="0.4985465" visible="true" weight="0.25666198" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -362,9 +389,19 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/aggregate/distr.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="320">
+          <caret line="20" column="36" selection-start-line="20" selection-start-column="36" selection-end-line="20" selection-end-column="36" />
+          <folding>
+            <element signature="e#0#24#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/debug.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="800">
+        <state relative-caret-position="640">
           <caret line="40" selection-start-line="40" selection-end-line="40" />
           <folding>
             <element signature="e#69#79#0" expanded="true" />
@@ -372,20 +409,20 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/aggregate/distr.py">
+    <entry file="file://$PROJECT_DIR$/aggregate/__init__.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="855">
-          <caret line="736" column="29" lean-forward="true" selection-start-line="736" selection-start-column="29" selection-end-line="736" selection-end-column="29" />
+        <state relative-caret-position="368">
+          <caret line="23" lean-forward="true" selection-start-line="23" selection-end-line="23" />
           <folding>
-            <element signature="e#0#24#0" expanded="true" />
+            <element signature="e#278#321#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="733">
-          <caret line="1282" column="32" lean-forward="true" selection-start-line="1282" selection-start-column="32" selection-end-line="1282" selection-end-column="32" />
+        <state relative-caret-position="589">
+          <caret line="1375" lean-forward="true" selection-start-line="1375" selection-end-line="1375" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>
@@ -394,11 +431,18 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/aggregate/port.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="463">
-          <caret line="2937" column="36" selection-start-line="2937" selection-start-column="36" selection-end-line="2937" selection-end-column="36" />
+        <state relative-caret-position="1171">
+          <caret line="146" column="13" selection-start-line="146" selection-start-column="13" selection-end-line="146" selection-end-column="13" />
           <folding>
             <element signature="e#232#250#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/aggregate/underwriter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="813">
+          <caret line="575" column="45" lean-forward="true" selection-start-line="575" selection-start-column="45" selection-end-line="575" selection-end-column="45" />
         </state>
       </provider>
     </entry>

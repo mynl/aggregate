@@ -36,14 +36,12 @@ from .utils import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
     sensible_jump, suptitle_and_tight, \
-    MomentAggregator, Answer
+    MomentAggregator, Answer, subsets
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
 
 logger = logging.getLogger('aggregate')
-# use this one to broadcast to the stderr
-dev_logger = logging.getLogger('aggregate.dev')
 
 
 # debug
@@ -145,6 +143,8 @@ class Portfolio(object):
         # for storing the info about the quantile function
         self.q_temp = None
         self._renamer = None
+        # if created by uw it stores the program here
+        self.program = ''
 
     def __str__(self):
         """
@@ -446,7 +446,11 @@ class Portfolio(object):
                 f, axs = plt.subplots(1, 2, figsize=(8, 3.75), constrained_layout=True)
                 ax = axs.flatten()
                 a = temp['err'].abs().plot(logy=True, title=f'Exeqa Sum Error', ax=ax[1], **kwargs)
+                a.plot(self.density_df.loss, self.density_df.p_total, label='p_total')
+                a.plot(self.density_df.loss, self.density_df.p_total * temp.err, label='prob wtd err')
                 a.grid('b')
+                a.legend(loc='lower left')
+
                 if 'xlim' in kwargs:
                     kwargs['ylim'] = kwargs['xlim']
                 temp.filter(regex='exeqa_.*(?<!total)$|sum').plot(title='exeqa and sum of parts', ax=ax[0],
@@ -604,11 +608,11 @@ class Portfolio(object):
         #                                           fill_value='extrapolate')
         # return self._tail_var(p)
 
-    def tvar_threshold(self, p):
+    def tvar_threshold(self, p, kind):
         """
         Find the value pt such that TVaR(pt) = VaR(p) using numerical Newton Raphson
         """
-        a = self.q(p)
+        a = self.q(p, kind)
 
         def f(p):
             return self.tvar(p) - a
@@ -1102,9 +1106,10 @@ class Portfolio(object):
         columns_p_only = ['loss'] + [f'p_{line}' for line in self.line_names_ex] + \
                          [f'ημ_{line}' for line in self.line_names]
 
-        # first, need a base
+        # first, need a base and add exag to coi
         if distortion:
-            base = self.apply_distortion(distortion, create_augmented=False)
+            _x = self.apply_distortion(distortion, create_augmented=False)
+            base = _x.augmented_df
             columns_of_interest.extend(['gS'] + [f'exag_{line}' for line in self.line_names_ex])
         else:
             base = self.density_df
@@ -1141,8 +1146,8 @@ class Portfolio(object):
             adj_factor[np.logical_and(base_line_ft == 0, adjust_line_ft == 0)] = 0
             n_and = np.sum(np.logical_and(base_line_ft == 0, adjust_line_ft == 0))
             n_or = np.sum(np.logical_or(base_line_ft == 0, adjust_line_ft == 0))
-            dev_logger.warning(f'SAME? And={n_and} Or={n_or}; Zeros in fft(line) and '
-                               'fft(line + epsilon for {adjust_line}.')
+            logger.warning(f'SAME? And={n_and} Or={n_or}; Zeros in fft(line) and '
+                           'fft(line + epsilon for {adjust_line}.')
             for line in self.line_names:
                 if line == adjust_line:
                     # nothing changes, adjust_line not in not adjust_line it doesn't need to change
@@ -1164,9 +1169,15 @@ class Portfolio(object):
                 self.add_exa(gradient_df, details=False)
             if distortion is not None:
                 # apply to line + epsilon
-                gradient_df = self.apply_distortion(distortion, data_in=gradient_df, create_augmented=False)
+                gradient_df = self.apply_distortion(distortion, df_in=gradient_df, create_augmented=False).augmented_df
 
             # compute differentials and store answer!
+            # print(columns_of_interest)
+            # print([(line, i) for i in columns_of_interest])
+            # print(type(gradient_df))
+            # temp0 = gradient_df[columns_of_interest]
+            # temp1 = base[columns_of_interest]
+            # temp2 = (temp0 - temp1) / dx
             answer[[(line, i) for i in columns_of_interest]] = (gradient_df[columns_of_interest] -
                                                                 base[columns_of_interest]) / dx
 
@@ -1578,7 +1589,8 @@ class Portfolio(object):
             loss_max = 0
         else:
             loss_max += mult * bs
-        df.loc[0:loss_max, 'exlea_total'] = 0
+        # try nan in place of 0             V
+        df.loc[0:loss_max, 'exlea_total'] = np.nan
         # df.loc[df.F < 2 * cut_eps, 'exlea_total'] = df.loc[
         #     df.F < 2*cut_eps, 'loss']
 
@@ -1682,7 +1694,7 @@ class Portfolio(object):
             temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
             df['exi_xlea_' + col] = temp_xi_x / df.F
             df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
-            # more generally F=0 error:
+            # more generally F=0 error:                      V
             df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
             # not version
             df['exi_x_ημ_' + col] = np.sum(
@@ -1789,7 +1801,8 @@ class Portfolio(object):
                 interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
                                      fill_value='extrapolate'))
 
-    def calibrate_distortion(self, name, r0=0.0, df=5.5, premium_target=0.0, roe=0.0, assets=0.0, p=0.0, S_column='S'):
+    def calibrate_distortion(self, name, r0=0.0, df=5.5, premium_target=0.0,
+                             roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S'):
         """
         Find transform to hit a premium target given assets of ``assets``.
         Fills in the values in ``g_spec`` and returns params and diagnostics...so
@@ -1812,7 +1825,7 @@ class Portfolio(object):
         if S_column == 'S':
             if assets == 0:
                 assert (p > 0)
-                assets = self.q(p)
+                assets = self.q(p, kind)
 
             # figure premium target
             if premium_target == 0:
@@ -1968,7 +1981,7 @@ class Portfolio(object):
         dist.premium_target = premium_target
         return dist
 
-    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, r0=0.03, df=5.5, strict=True):
+    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5, strict=True):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
@@ -1992,7 +2005,7 @@ class Portfolio(object):
             if Ps is None:
                 raise ValueError('Must specify assets or quantile probabilities')
             else:
-                As = [self.q(p) for p in Ps]
+                As = [self.q(p, kind) for p in Ps]
         for a in As:
             exa, S = self.density_df.loc[a, ['exa_total', 'S']]
             if ROEs is not None:
@@ -2016,7 +2029,7 @@ class Portfolio(object):
                                                   dist.shape, dist.error]
         return ans
 
-    def apply_distortions(self, dist_dict, As=None, Ps=None, axiter=None, num_plots=1):
+    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
         show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
@@ -2029,7 +2042,7 @@ class Portfolio(object):
         """
         ans = []
         if As is None:
-            As = np.array([float(self.q(p)) for p in Ps])
+            As = np.array([float(self.q(p, kind)) for p in Ps])
 
         if num_plots == 2 and axiter is None:
             axiter = axiter_factory(None, len(dist_dict))
@@ -2039,7 +2052,8 @@ class Portfolio(object):
             pass
 
         for g in dist_dict.values():
-            df = self.apply_distortion(g, axiter, num_plots)
+            _x = self.apply_distortion(g, axiter, num_plots)
+            df = _x.augmented_df
             # extract range of S values
             temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
@@ -2080,7 +2094,7 @@ class Portfolio(object):
 
         return ans_table, ans_stacked
 
-    def apply_distortion(self, dist, axiter=None, plots=None, df_in=None, create_augmented=True):
+    def apply_distortion(self, dist, plots=None, df_in=None, create_augmented=True):
         """
         Apply the distortion, make a copy of density_df and append various columns to create augmented_df.
 
@@ -2126,8 +2140,8 @@ class Portfolio(object):
         # df['S'] = 1 - df.F
 
         # floating point issues: THIS HAPPENS, so needs to be corrected...
-        if len(df.loc[df.S < 0, 'S'] > 0 ):
-            logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0 )} negative S values being set to zero...")
+        if len(df.loc[df.S < 0, 'S'] > 0):
+            logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0)} negative S values being set to zero...")
         df.loc[df.S < 0, 'S'] = 0
 
         # add the exag and distorted probs
@@ -2138,6 +2152,13 @@ class Portfolio(object):
         # also checked these two method give the same result:
         # bit2['gp1'] = -np.diff(bit2.gS, prepend=1)
         # bit2['gp2'] = np.diff(1 - bit2.gS, prepend=0)
+        # validated using grt.test_df(): this is correct
+        # t = grt.test_df(20,2)
+        # t.A = t.A / t.A.sum()
+        #
+        # t['B'] = t.A.shift(-1, fill_value=0)[::-1].cumsum()
+        # t['C'] = -np.diff(t.B, prepend=1)
+        # t
         df['gp_total'] = -np.diff(df.gS, prepend=1)
 
         # Impact of mass at zero
@@ -2227,11 +2248,19 @@ class Portfolio(object):
             # again, exi_xgtag is super important, so we will compute it bare bones the same way as exi_xgta
             # df[f'exi_xgtag_{line}'] = exixgtaUC / df.gS
             # TODO how do masses factor into this??
+            #
+            #
+            # df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
+            #                             df.gp_total).shift(-1)[::-1].cumsum()) / df.gp_total.shift(-1)[::-1].cumsum()
+            # exa uses S in the denominator...and actually checking values there is a difference between the sum and gS
             df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
-                                        df.gp_total).shift(-1)[::-1].cumsum()) / df.gp_total.shift(-1)[::-1].cumsum()
+                                        df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
+            #
+            #
             # following the Audit Vignette this is the way to go:
             df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'] * df.gS.shift(1)).cumsum() * self.bs
-
+            # maybe sometime you want this unchecked item?
+            # df[f'exleag_1{line}'] = np.cumsum( df[f'exeqa_{line}'] * df.p_total )
             # it makes a difference NOT to divivde by df.gS but to compute the actual weights you are using (you mess
             # around with the last weight)
             #
@@ -2265,8 +2294,8 @@ class Portfolio(object):
         # hummmm.aliases, but...?
         df['M.L_total'] = df['S']
         df['M.P_total'] = df['gS']
-        df['T.L_total'] = df['exa_total']
-        df['T.P_total'] = df['exag_total']
+        # df['T.L_total'] = df['exa_total']
+        # df['T.P_total'] = df['exag_total']
 
         # critical insight is the layer ROEs are the same for all lines (law invariance)
         df['M.ROE_total'] = df['M.M_total'] / df['M.Q_total']
@@ -2294,23 +2323,36 @@ class Portfolio(object):
             df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE_total']
             df[f'M.Q_{line}'].iloc[-1] = 0
             df.loc[roe_zero, f'M.Q_{line}'] = np.nan
+            # WHAT IS THE LATER AT ZERO? Should it have a price? What is that price?
+            # TL and TP at zero are both 1
             if line != 'total':
                 df[f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
                 df[f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
             df[f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
-            # for total need to reflect layer width
+            # for total need to reflect layer width...
             df[f'T.Q_{line}'] = df[f'M.Q_{line}'].cumsum() * self.bs
             df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
             # leverage
             df[f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
             df[f'M.PQ_{line}'] = df[f'M.P_{line}'] / df[f'M.Q_{line}']
 
-        if plots and axiter is None:
-            logger.warning('When plotting you must pass an axiter item, an iterator returning axes. '
-                           'Ignoring plot statement.')
-        elif plots:
+        # in order to undo some numerical issues, things will slightly not add up
+        # but that appears to be a numerical issue around the calc of exag
+        # TODO investiage why exag calc less accurate than exa calc
+        df['T.L_total'] = df['exa_total']
+        df['T.P_total'] = df['exag_total']
+        df['T.Q_total'] = df.loss - df['exag_total']
+        df['T.M_total'] = df['exag_total'] - df['exa_total']
+        df['T.PQ_total'] = df['T.P_total'] / df['T.Q_total']
+        df['T.LR_total'] = df['T.L_total'] / df['T.P_total']
+        df['T.ROE_total'] = df['T.M_total'] / df['T.Q_total']
+
+        f_distortion = f_byline = f_bylineg = f_exas = None
+        if plots == 'all':
+            plots = ['basic', 'extended']
+        if plots:
             if 'basic' in plots:
-                ax = next(axiter)
+                f_distortion, ax = plt.subplots(1, 1, figsize=(4, 4))
                 ax.plot(df.exag_sumparts, label='Sum of Parts')
                 ax.plot(df.exag_total, label='Total')
                 ax.plot(df.exa_total, label='Loss')
@@ -2322,8 +2364,10 @@ class Portfolio(object):
             if 'extended' in plots:
                 # yet more graphics, but the previous one is the main event
                 # truncate for graphics
-                max_x = 1.1 * self.q(1-1e-6)
+                max_x = 1.1 * self.q(1 - 1e-6)
                 df_plot = df.loc[0:max_x, :]
+
+                f_exas, axs, axiter = AxisManager.make_fig(12, sharex=True)
 
                 ax = next(axiter)
                 df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
@@ -2356,23 +2400,6 @@ class Portfolio(object):
                         # fix scale for proportions
                         ax.set_ylim(-0.025, 1.025)
 
-                for line in self.line_names:
-                    ax = next(axiter)
-                    df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{line} EXs')
-                    ax.legend(loc='lower right')
-                    ax.grid()
-
-                # compare exa with exag for all lines
-                # pno().plot(df_plot.loss, *(df_plot.exa_total, df_plot.exag_total))
-                # ax.set_title("exa and exag Total")
-                for line in self.line_names_ex:
-                    ax = next(axiter)
-                    df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{line} T.L and T.P')
-                    ax.legend(loc='lower right')
-                    ax.grid()
-
                 ax = next(axiter)
                 df_plot.filter(regex='^exa_.*_pcttotal$').sort_index(axis=1).plot(ax=ax)
                 ax.set_title('Proportion of loss: T.L_line / T.L_total')
@@ -2393,22 +2420,36 @@ class Portfolio(object):
                 ax.legend(loc='lower right')
                 ax.grid()
 
-                if isinstance(axiter, AxisManager):
-                    axiter.tidy()
-                else:
-                    f = ax.get_figure()
-                    try:
-                        while 1:
-                            f.delaxes(next(axiter))
-                    except StopIteration:
-                        pass
+                # by line plots
+                nl = len(self.line_names_ex)
+                f_byline, axs, axiter = AxisManager.make_fig(nl)
+                for line in self.line_names:
+                    ax = next(axiter)
+                    df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{line} EXs')
+                    # ?
+                    ax.set(ylim=[0, self.q(0.999, 'lower')])
+                    ax.legend(loc='upper left')
+                    ax.grid()
+                AxisManager.tidy_up(f_byline, axiter)
+
+                # compare exa with exag for all lines
+                f_bylineg, axs, axiter = AxisManager.make_fig(nl)
+                for line in self.line_names_ex:
+                    ax = next(axiter)
+                    df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
+                    ax.set_title(f'{line} T.L and T.P')
+                    ax.legend(loc='lower right')
+                    ax.grid()
+                AxisManager.tidy_up(f_bylineg, axiter)
 
         if create_augmented:
             self.augmented_df = df
             # store associated distortion
             self._distortion = dist
 
-        return Answer(augmented_df=df)
+        return Answer(augmented_df=df,
+                      f_distortion=f_distortion, f_byline=f_byline, f_bylineg=f_bylineg, f_exas=f_exas)
 
     def var_dict(self, p, kind):
         """
@@ -2456,7 +2497,7 @@ class Portfolio(object):
             kind = 'lower'
             ql = self.q(p, 'lower')
             qu = self.q(p, 'upper')
-            dev_logger.warning(
+            logger.warning(
                 f'Input a={a} to gamma; computed p={p:.8g}, lower and upper quantiles are {ql:.8g} and {qu:.8g}')
 
         # alter in place or return a copy? For now return a copy...
@@ -2559,7 +2600,6 @@ class Portfolio(object):
                 for l in ax3.lines:
                     ls = l.get_label().split(' ')
                     col_by_line[ls[0]] = l.get_color()
-                print(col_by_line)
                 l_loc = dict(zip(axs.flatten(), ['upper right', 'lower left', 'upper right']))
                 ax3.set(ylim=[0, 1.005], title=f'Survival Functions up to p={self.cdf(three_plot_xlim):.1%} Loss')
                 for ax in axs.flatten():
@@ -2578,8 +2618,8 @@ class Portfolio(object):
                                 # stand alone=> dashed line, color is lns[-2]
                                 line.set(linestyle='--')
                             if lns[0] in col_by_line:
-                                line.set(color= col_by_line[lns[0]])
-                            elif  lns[1] in col_by_line:
+                                line.set(color=col_by_line[lns[0]])
+                            elif lns[1] in col_by_line:
                                 line.set(color=col_by_line[lns[1]])
                         # update legend to reflect line style changes
                         ax.legend(loc=l_loc[ax])
@@ -2757,7 +2797,7 @@ class Portfolio(object):
         return df, pricing_g
 
     def analyze_distortion(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
-                        p=None, kind='lower', A=None, use_self=False, plot=True, a_max_p=1-1e-8):
+                           p=None, kind='lower', A=None, use_self=False, plot=True, a_max_p=1 - 1e-8):
         """
 
         Graphic and summary DataFrame for one distortion showing results that vary by asset levelm
@@ -2858,7 +2898,7 @@ class Portfolio(object):
                 a_cal = self.q(p)
                 exa = self.density_df.loc[a_cal, 'exa_total']
                 if a_cal != A:
-                    dev_logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
+                    logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
 
             if dshape or isinstance(dname, Distortion):
                 # specified distortion, fill in
@@ -2903,15 +2943,22 @@ class Portfolio(object):
         # these are only going to apply to total...will not bother with by line
         # call this series V.P with v indicating a down arrow and a letter after and close to T
         # hack out space
-        for nc in ['L', 'P',  'M', 'Q', 'LR', 'ROE', 'PQ']:
+        for nc in ['L', 'P', 'M', 'Q', 'LR', 'ROE', 'PQ']:
             augmented_df[f'V.{nc}_total'] = 0
-        augmented_df.loc[0:a_cal, 'V.L_total'] = augmented_df.at[a_cal, 'T.L_total'] - augmented_df.loc[0:a_cal, 'T.L_total']
-        augmented_df.loc[0:a_cal, 'V.P_total'] = augmented_df.at[a_cal, 'T.P_total'] - augmented_df.loc[0:a_cal, 'T.P_total']
-        augmented_df.loc[0:a_cal, 'V.M_total'] = augmented_df.at[a_cal, 'T.M_total'] - augmented_df.loc[0:a_cal, 'T.M_total']
-        augmented_df.loc[0:a_cal, 'V.Q_total'] = augmented_df.at[a_cal, 'T.Q_total'] - augmented_df.loc[0:a_cal, 'T.Q_total']
-        augmented_df.loc[0:a_cal, 'V.LR_total'] = augmented_df.loc[0:a_cal, 'V.L_total'] / augmented_df.loc[0:a_cal, 'V.P_total']
-        augmented_df.loc[0:a_cal, 'V.PQ_total'] = augmented_df.loc[0:a_cal, 'V.P_total'] / augmented_df.loc[0:a_cal, 'V.Q_total']
-        augmented_df.loc[0:a_cal, 'V.ROE_total'] = augmented_df.loc[0:a_cal, 'V.M_total'] / augmented_df.loc[0:a_cal, 'V.Q_total']
+        augmented_df.loc[0:a_cal, 'V.L_total'] = augmented_df.at[a_cal, 'T.L_total'] - augmented_df.loc[0:a_cal,
+                                                                                       'T.L_total']
+        augmented_df.loc[0:a_cal, 'V.P_total'] = augmented_df.at[a_cal, 'T.P_total'] - augmented_df.loc[0:a_cal,
+                                                                                       'T.P_total']
+        augmented_df.loc[0:a_cal, 'V.M_total'] = augmented_df.at[a_cal, 'T.M_total'] - augmented_df.loc[0:a_cal,
+                                                                                       'T.M_total']
+        augmented_df.loc[0:a_cal, 'V.Q_total'] = augmented_df.at[a_cal, 'T.Q_total'] - augmented_df.loc[0:a_cal,
+                                                                                       'T.Q_total']
+        augmented_df.loc[0:a_cal, 'V.LR_total'] = augmented_df.loc[0:a_cal, 'V.L_total'] / augmented_df.loc[0:a_cal,
+                                                                                           'V.P_total']
+        augmented_df.loc[0:a_cal, 'V.PQ_total'] = augmented_df.loc[0:a_cal, 'V.P_total'] / augmented_df.loc[0:a_cal,
+                                                                                           'V.Q_total']
+        augmented_df.loc[0:a_cal, 'V.ROE_total'] = augmented_df.loc[0:a_cal, 'V.M_total'] / augmented_df.loc[0:a_cal,
+                                                                                            'V.Q_total']
 
         # bottom up calc is already done: it is the T. series in deets
         # marginal calc also done: M. series
@@ -2930,11 +2977,11 @@ class Portfolio(object):
 
         # purely distortion pricing summary as column with multiindex
 
-        pricing = augmented_df.loc[[a_cal]].T.\
+        pricing = augmented_df.loc[[a_cal]].T. \
             filter(regex='^(T|M)\.(L|P|M|Q|LR|ROE|PQ)|exi_xgtag?_[a-zA-Z]+(?<!sum)$', axis=0).copy()
         pricing.index = pricing.index.str.replace('exi_xgta_(.+)$', r'M_alpha_\1').str. \
             replace('exi_xgtag_(.+)$', r'M_beta_\1').str. \
-            split('_|\.', expand=True )
+            split('_|\.', expand=True)
         pricing.index.set_names(['MT', 'stat', 'line'], inplace=True)
         pricing = pricing.sort_index(level=[0, 1, 2])
 
@@ -2946,15 +2993,15 @@ class Portfolio(object):
         # some reasonable traditional metrics
         # tvar threshold giving the same assets as p on VaR
         try:
-            p_t = self.tvar_threshold(p)
+            p_t = self.tvar_threshold(p, kind)
         except ValueError as e:
-            dev_logger.warning(f'Error computing p_t threshold for VaR at p={p}')
+            logger.warning(f'Error computing p_t threshold for VaR at p={p}')
             logger.warning(str(e))
             p_t = np.nan
         try:
             pv, pt = self.equal_risk_var_tvar(p, p_t)
         except (ZeroDivisionError, ValueError) as e:
-            dev_logger.warning(f'Error computing pv, pt equal_risk_var_tvar for VaR, p={p}, kind={kind}, p_t={p_t}')
+            logger.warning(f'Error computing pv, pt equal_risk_var_tvar for VaR, p={p}, kind={kind}, p_t={p_t}')
             logger.warning(str(e))
             pv = np.nan
             pt = np.nan
@@ -2986,8 +3033,8 @@ class Portfolio(object):
             exhibit.loc[('MerPer', 'Q'), :] = self.merton_perold(p)
             done.append('merper')
         except Exception as e:
-            dev_logger.warning('Some general out of bounds error on VaRs and TVaRs, setting all equal to zero. '
-                               f'Last completed steps {done[-1] if len(done) else "none"}, out of var, tvar, eqvar, eqtvar merper. ')
+            logger.warning('Some general out of bounds error on VaRs and TVaRs, setting all equal to zero. '
+                           f'Last completed steps {done[-1] if len(done) else "none"}, out of var, tvar, eqvar, eqtvar merper. ')
             logger.warning(f'The built in warning is type {type(e)} saying {e}')
             for c in ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']:
                 if c.lower() in done:
@@ -3005,6 +3052,7 @@ class Portfolio(object):
             for m in ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer']:
                 # exhibit.loc[('ISA.Q', m), :] = exhibit.loc[('ISA.Q', m), :].sub(exhibit.loc[('T', 'P'), :].values, axis=0)
                 exhibit.loc[(m, 'Q'), :] -= exhibit.loc[('T', 'P'), :].values
+                exhibit.loc[(m, 'L'), :] = exhibit.loc[('T', 'L'), :]
                 exhibit.loc[(m, 'P'), :] = exhibit.loc[('T', 'L'), :] + ROE * exhibit.loc[(m, 'Q'), :]
                 exhibit.loc[(m, 'M'), :] = exhibit.loc[(m, 'P'), :] - exhibit.loc[('T', 'L'), :].values
                 exhibit.loc[(m, 'LR'), :] = exhibit.loc[('T', 'L'), :] / exhibit.loc[(m, 'P'), :]
@@ -3018,6 +3066,8 @@ class Portfolio(object):
         audit_df.loc['TVaR@'] = p_t
         audit_df.loc['erVaR'] = pv
         audit_df.loc['erTVaR'] = pt
+        audit_df.loc['a'] = a_cal
+        audit_df.loc['kind'] = kind
 
         #
         # plotting section
@@ -3064,8 +3114,9 @@ class Portfolio(object):
             # ONE
             ax = next(axi)
             # df[['Layer Loss', 'Layer Prem', 'Layer Capital']]
-            augmented_df.filter(regex='^F|^gS|^S').rename(columns=self.renamer).\
-                plot(xlim=[0, a_max], ylim=[-0.025, 1.025], logy=False, title='F, S, gS: marginal premium and loss', ax=ax)
+            augmented_df.filter(regex='^F|^gS|^S').rename(columns=self.renamer). \
+                plot(xlim=[0, a_max], ylim=[-0.025, 1.025], logy=False, title='F, S, gS: marginal premium and loss',
+                     ax=ax)
             tidy(ax)
             ax.legend(frameon=True, loc='center right')
 
@@ -3090,7 +3141,7 @@ class Portfolio(object):
             # FOUR
             ax = next(axi)
             augmented_df.filter(regex='^(T|V|M)\.LR_total').rename(columns=self.renamer). \
-                plot(xlim=[0, a_cal*1.1], ylim=[-0.05, 1.05], ax=ax, title='Increasing, Decreasing and Marginal LRs')
+                plot(xlim=[0, a_cal * 1.1], ylim=[-0.05, 1.05], ax=ax, title='Increasing, Decreasing and Marginal LRs')
             tidy(ax)
             ax.legend(frameon=True, loc='lower left')
 
@@ -3106,7 +3157,7 @@ class Portfolio(object):
             # could include leverage?
             ax = next(axi)
             augmented_df.filter(regex='^(M|T|V)\.ROE_(total)?$').rename(columns=self.renamer). \
-                plot(xlim=[0, a_max], # ylim=[-0.05, 1.05],
+                plot(xlim=[0, a_max],  # ylim=[-0.05, 1.05],
                      logy=False, title=f'Increasing, Decreasing and Marginal ROE to {a_cal:.0f}',
                      ax=ax)
             # df[['ROE↓', '*ROE↓', 'ROE↑', 'Marginal ROE', ]].plot(xlim=xlim, logy=False, ax=ax, ylim=ylim)
@@ -3251,7 +3302,7 @@ class Portfolio(object):
             #
             bit = augmented_df.query(f'loss < {a_max}').filter(regex='exi_xgtag?_.*(?<!sum)$')
             f_close, ax = plt.subplots(1, 1, figsize=(8, 5))
-            ax = bit.rename(columns=renamer).plot(ylim=[.1, .5], ax=ax)
+            ax = bit.rename(columns=renamer).plot(ylim=[-0.025, 1.025], ax=ax)
             ax.grid()
             nl = len(self.line_names)
             for i, l in enumerate(ax.lines[nl:]):
@@ -3711,11 +3762,11 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             # augmented df items
             # TODO FIND where this is introduced and remove it!!
             for l in self.line_names_ex:
-                self._renamer[f'exag_{l}'] = f'E[{l}(a)]'
-                self._renamer[f'exi_xgtag_{l}'] = f'β=E[{l}/X | X>a]'
-                self._renamer[f'exi_xleag_{l}'] = f'E[{l}/X | X<=a]'
+                self._renamer[f'exag_{l}'] = f'EQ[{l}(a)]'
+                self._renamer[f'exi_xgtag_{l}'] = f'β=EQ[{l}/X | X>a]'
+                self._renamer[f'exi_xleag_{l}'] = f'EQ[{l}/X | X<=a]'
                 self._renamer[f'e1xi_1gta_{l}'] = f'E[{l}/X 1(X >a)]'
-            self._renamer['exag_sumparts'] = 'Sum of E[Xi(a)]'
+            self._renamer['exag_sumparts'] = 'Sum of EQ[Xi(a)]'
 
             # more post-processing items
             for pre, m1 in zip(['M', 'T'], ['Marginal', 'Total']):
@@ -3744,125 +3795,125 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         return self._renamer
 
-    def example_factory_sublines(self, data_in, xlim=0):
-        """
-        plausible plots for the specified example and a summary table
-
-        data_in is augmented_df or Answer object coming out of example_factory
-
-        example_factor is total; these exhibits look at subplots...
-
-        The line names must be of the form [A-Z]anything and identified by the capital letter
-
-        was agg extensions.plot_example
-
-        :param data_in: result of running self.apply_distortion()
-        :param xlim:         for plots
-        :return:
-        """
-
-        if isinstance(data_in, Answer):
-            augmented_df = data_in.augmented_df
-        else:
-            augmented_df = data_in
-
-        temp = augmented_df.filter(regex='exi_xgtag?_(?!sum)|^S|^gS|^(M|T)\.').copy()
-        # add extra stats
-        # you have:
-        # ['M.M_Atame', 'M.M_Dthick', 'M.M_total',
-        #  'M.Q_Atame', 'M.Q_Dthick', 'M.Q_total',
-        #  'M.ROE', 'S',
-        #  'T.LR_Atame', 'T.LR_Dthick', 'T.LR_total',
-        #  'T.M_Atame', 'T.M_Dthick', 'T.M_total',
-        #  'T.Q_Atame', 'T.Q_Dthick', 'T.Q_total',
-        #  'T.ROE_Atame', 'T.ROE_Dthick', 'T.ROE_total',
-        #  'exi_xgta_Atame', 'exi_xgta_Dthick',
-        #  'exi_xgtag_Atame', 'exi_xgtag_Dthick',
-        #  'gS']
-
-        # temp['M.LR'] = temp['M.L'] / temp['M.P']
-        # temp['M.ROE'] = (temp['M.P'] - temp['M.L']) / (1 - temp['M.P'])
-        # temp['M.M'] = temp['M.P'] - temp['M.L']
-        for l in self.line_names_ex:
-            if l != 'total':
-                temp[f'M.L_{l}'] = temp[f'exi_xgta_{l}'] * temp.S
-                temp[f'M.P_{l}'] = temp[f'exi_xgtag_{l}'] * temp.gS
-                # temp[f'M.M.{l}'] = temp[f'exi_xgtag_{l}'] * temp['M.P'] - temp[f'exi_xgta_{l}'] * temp['M.L']
-                temp[f'beta/alpha.{l}'] = temp[f'exi_xgtag_{l}'] / temp[f'exi_xgta_{l}']
-            else:
-                temp[f'M.L_{l}'] = temp.S
-                temp[f'M.P_{l}'] = temp.gS
-                # temp[f'M.M.{l}'] = temp['M.P'] - temp['M.L']
-            temp[f'M.LR_{l}'] = temp[f'M.L_{l}'] / temp[f'M.P_{l}']
-            # should be zero:
-            temp[f'Chk L+M=p_{l}'] = temp[f'M.P_{l}'] - temp[f'M.L_{l}'] - temp[f'M.M_{l}']
-
-        renamer = self.renamer.copy()
-        # want to recast these now too...(special)
-        renamer.update({'S': 'M.L total', 'gS': 'M.P total'})
-        augmented_df.index.name = 'Assets a'
-        temp.index.name = 'Assets a'
-        if xlim == 0:
-            xlim = self.q(1 - 1e-5)
-
-        f, axs = plt.subplots(4, 2, figsize=(8, 10), constrained_layout=True, squeeze=False)
-        ax = iter(axs.flatten())
-
-        # ONE
-        a = (1 - augmented_df.filter(regex='p_').cumsum()).rename(columns=renamer).sort_index(1). \
-            plot(ylim=[0, 1], xlim=[0, xlim], title='Survival functions', ax=next(ax))
-        a.grid('b')
-
-        # TWO
-        a = augmented_df.filter(regex='exi_xgtag?').rename(columns=renamer).sort_index(1). \
-            plot(ylim=[0, 1], xlim=[0, xlim], title=r'$\alpha=E[X_i/X | X>a],\beta=E_Q$ by Line', ax=next(ax))
-        a.grid('b')
-
-        # THREE total margins
-        a = augmented_df.filter(regex=r'^T\.M').rename(columns=renamer).sort_index(1). \
-            plot(xlim=[0, xlim], title='Total Margins by Line', ax=next(ax))
-        a.grid('b')
-
-        # FOUR marginal margins was dividing by bs end of first line
-        # for some reason the last entry in M.M_total can be problematic.
-        a = (augmented_df.filter(regex=r'^M\.M').rename(columns=renamer).sort_index(1).iloc[:-1, :].
-             plot(xlim=[0, xlim], title='Marginal Margins by Line', ax=next(ax)))
-        a.grid('b')
-
-        # FIVE
-        a = augmented_df.filter(regex=r'^M\.Q|gF').rename(columns=renamer).sort_index(1). \
-            plot(xlim=[0, xlim], title='Capital = 1-gS = F!', ax=next(ax))
-        a.grid('b')
-        for _ in a.lines:
-            if _.get_label() == 'gF':
-                _.set(linewidth=5, alpha=0.3)
-        # recreate legend because changed lines
-        a.legend()
-
-        # SIX see apply distortion, line 1890 ROE is in augmented_df
-        a = augmented_df.filter(regex='^ROE$|exi_xeqa').rename(columns=renamer).sort_index(1). \
-            plot(xlim=[0, xlim], title='M.ROE Total and $E[X_i/X | X=a]$ by line', ax=next(ax))
-        a.grid('b')
-
-        # SEVEN improve scale selection
-        a = temp.filter(regex='beta/alpha\.|M\.LR').rename(columns=renamer).sort_index(1). \
-            plot(ylim=[-.05, 1.5], xlim=[0, xlim], title='Alpha, Beta and Marginal LR',
-                 ax=next(ax))
-        a.grid('b')
-
-        # EIGHT
-        a = augmented_df.filter(regex='LR').rename(columns=renamer).sort_index(1). \
-            plot(ylim=[-.05, 1.25], xlim=[0, xlim], title='Total ↑LR by Line',
-                 ax=next(ax))
-        a.grid('b')
-
-        # return
-        if isinstance(data_in, Answer):
-            data_in['subline_summary'] = temp
-            data_in['fig_eight_plots'] = f
-        else:
-            data_in = Answer(summary=temp, fig_eight_by_line=f)
-        return data_in
+    # def example_factory_sublines(self, data_in, xlim=0):
+    #     """
+    #     plausible plots for the specified example and a summary table
+    #
+    #     data_in is augmented_df or Answer object coming out of example_factory
+    #
+    #     example_factor is total; these exhibits look at subplots...
+    #
+    #     The line names must be of the form [A-Z]anything and identified by the capital letter
+    #
+    #     was agg extensions.plot_example
+    #
+    #     :param data_in: result of running self.apply_distortion()
+    #     :param xlim:         for plots
+    #     :return:
+    #     """
+    #
+    #     if isinstance(data_in, Answer):
+    #         augmented_df = data_in.augmented_df
+    #     else:
+    #         augmented_df = data_in
+    #
+    #     temp = augmented_df.filter(regex='exi_xgtag?_(?!sum)|^S|^gS|^(M|T)\.').copy()
+    #     # add extra stats
+    #     # you have:
+    #     # ['M.M_Atame', 'M.M_Dthick', 'M.M_total',
+    #     #  'M.Q_Atame', 'M.Q_Dthick', 'M.Q_total',
+    #     #  'M.ROE', 'S',
+    #     #  'T.LR_Atame', 'T.LR_Dthick', 'T.LR_total',
+    #     #  'T.M_Atame', 'T.M_Dthick', 'T.M_total',
+    #     #  'T.Q_Atame', 'T.Q_Dthick', 'T.Q_total',
+    #     #  'T.ROE_Atame', 'T.ROE_Dthick', 'T.ROE_total',
+    #     #  'exi_xgta_Atame', 'exi_xgta_Dthick',
+    #     #  'exi_xgtag_Atame', 'exi_xgtag_Dthick',
+    #     #  'gS']
+    #
+    #     # temp['M.LR'] = temp['M.L'] / temp['M.P']
+    #     # temp['M.ROE'] = (temp['M.P'] - temp['M.L']) / (1 - temp['M.P'])
+    #     # temp['M.M'] = temp['M.P'] - temp['M.L']
+    #     for l in self.line_names_ex:
+    #         if l != 'total':
+    #             temp[f'M.L_{l}'] = temp[f'exi_xgta_{l}'] * temp.S
+    #             temp[f'M.P_{l}'] = temp[f'exi_xgtag_{l}'] * temp.gS
+    #             # temp[f'M.M.{l}'] = temp[f'exi_xgtag_{l}'] * temp['M.P'] - temp[f'exi_xgta_{l}'] * temp['M.L']
+    #             temp[f'beta/alpha.{l}'] = temp[f'exi_xgtag_{l}'] / temp[f'exi_xgta_{l}']
+    #         else:
+    #             temp[f'M.L_{l}'] = temp.S
+    #             temp[f'M.P_{l}'] = temp.gS
+    #             # temp[f'M.M.{l}'] = temp['M.P'] - temp['M.L']
+    #         temp[f'M.LR_{l}'] = temp[f'M.L_{l}'] / temp[f'M.P_{l}']
+    #         # should be zero:
+    #         temp[f'Chk L+M=p_{l}'] = temp[f'M.P_{l}'] - temp[f'M.L_{l}'] - temp[f'M.M_{l}']
+    #
+    #     renamer = self.renamer.copy()
+    #     # want to recast these now too...(special)
+    #     renamer.update({'S': 'M.L total', 'gS': 'M.P total'})
+    #     augmented_df.index.name = 'Assets a'
+    #     temp.index.name = 'Assets a'
+    #     if xlim == 0:
+    #         xlim = self.q(1 - 1e-5)
+    #
+    #     f, axs = plt.subplots(4, 2, figsize=(8, 10), constrained_layout=True, squeeze=False)
+    #     ax = iter(axs.flatten())
+    #
+    #     # ONE
+    #     a = (1 - augmented_df.filter(regex='p_').cumsum()).rename(columns=renamer).sort_index(1). \
+    #         plot(ylim=[0, 1], xlim=[0, xlim], title='Survival functions', ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # TWO
+    #     a = augmented_df.filter(regex='exi_xgtag?').rename(columns=renamer).sort_index(1). \
+    #         plot(ylim=[0, 1], xlim=[0, xlim], title=r'$\alpha=E[X_i/X | X>a],\beta=E_Q$ by Line', ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # THREE total margins
+    #     a = augmented_df.filter(regex=r'^T\.M').rename(columns=renamer).sort_index(1). \
+    #         plot(xlim=[0, xlim], title='Total Margins by Line', ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # FOUR marginal margins was dividing by bs end of first line
+    #     # for some reason the last entry in M.M_total can be problematic.
+    #     a = (augmented_df.filter(regex=r'^M\.M').rename(columns=renamer).sort_index(1).iloc[:-1, :].
+    #          plot(xlim=[0, xlim], title='Marginal Margins by Line', ax=next(ax)))
+    #     a.grid('b')
+    #
+    #     # FIVE
+    #     a = augmented_df.filter(regex=r'^M\.Q|gF').rename(columns=renamer).sort_index(1). \
+    #         plot(xlim=[0, xlim], title='Capital = 1-gS = F!', ax=next(ax))
+    #     a.grid('b')
+    #     for _ in a.lines:
+    #         if _.get_label() == 'gF':
+    #             _.set(linewidth=5, alpha=0.3)
+    #     # recreate legend because changed lines
+    #     a.legend()
+    #
+    #     # SIX see apply distortion, line 1890 ROE is in augmented_df
+    #     a = augmented_df.filter(regex='^ROE$|exi_xeqa').rename(columns=renamer).sort_index(1). \
+    #         plot(xlim=[0, xlim], title='M.ROE Total and $E[X_i/X | X=a]$ by line', ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # SEVEN improve scale selection
+    #     a = temp.filter(regex='beta/alpha\.|M\.LR').rename(columns=renamer).sort_index(1). \
+    #         plot(ylim=[-.05, 1.5], xlim=[0, xlim], title='Alpha, Beta and Marginal LR',
+    #              ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # EIGHT
+    #     a = augmented_df.filter(regex='LR').rename(columns=renamer).sort_index(1). \
+    #         plot(ylim=[-.05, 1.25], xlim=[0, xlim], title='Total ↑LR by Line',
+    #              ax=next(ax))
+    #     a.grid('b')
+    #
+    #     # return
+    #     if isinstance(data_in, Answer):
+    #         data_in['subline_summary'] = temp
+    #         data_in['fig_eight_plots'] = f
+    #     else:
+    #         data_in = Answer(summary=temp, fig_eight_by_line=f)
+    #     return data_in
 
     def cumintegral(self, v, bs_override=0):
         """
@@ -3879,7 +3930,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             bs = self.bs
 
         if type(v) == np.ndarray:
-            logger.warning('CALLING cumintegral on a numpy array!!\n'*5)
+            logger.warning('CALLING cumintegral on a numpy array!!\n' * 5)
             return np.hstack((0, v[:-1])).cumsum() * bs
         else:
             # was consistently (and obviously) the same
@@ -3922,3 +3973,49 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         df = pd.read_excel(ffn, sheet_name=sheet_name, **kwargs)
         df = df.dropna(axis=1, how='all')
         return Portfolio.from_DataFrame(name, df)
+
+    @staticmethod
+    def from_dict_of_aggs(prefix, agg_dict, sub_ports=None, uw=None, bs=0, log2=0,
+                          padding=2, **kwargs):
+        """
+        Create a portfolio from any iterable with values aggregate code snippets
+
+        e.g.  agg_dict = {label: agg_snippet }
+
+        will create all the portfolios specified in subsets, or all if subsets=='all'
+
+        labels for subports are concat of keys in agg_dict, so recommend you use A:, B: etc.
+        as the snippet names.  Portfolio names are prefix_[concat element names]
+
+        agg_snippet is line agg blah without the tab or newline
+
+        :param prefix:
+        :param agg_dict:
+        :param sub_ports:
+        :param bs, log2, padding, kwargs: passed through to update; update if bs * log2 > 0
+        :return:
+        """
+
+        agg_names = list(agg_dict.keys())
+
+        # holder for created portfolios
+        ports = Answer()
+        if sub_ports == 'all':
+            sub_ports = subsets(agg_names)
+
+        for sub_port in sub_ports:
+            name = ''.join(sub_port)
+            if prefix != '':
+                name = f'{prefix}_{name}'
+            pgm = f'port {name}\n'
+            for l in agg_names:
+                if l in sub_port:
+                    pgm += f'\t{agg_dict[l]}\n'
+            if uw:
+                ports[name] = uw(pgm)
+            else:
+                ports[name] = pgm
+            if uw and bs * log2 > 0:
+                ports[name].update(bs=bs, log2=log2, padding=padding, **kwargs)
+
+        return ports

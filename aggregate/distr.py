@@ -745,8 +745,8 @@ class Aggregate(Frequency):
             spec['exp_limit'] = safe_scale(scale, spec['exp_limit'])
             spec['sev_loc'] = safe_scale(scale, spec['sev_loc'])
             # note: scaling the scale takes care of the mean, so do not double count
-            # but also remember the default for scale = 0
-            if spec['sev_scale']:
+            # default is 0. Can't ask if array is...but if array have to deal with it
+            if (type(spec['sev_scale']) not in (int, float)) or spec['sev_scale']:
                 spec['sev_scale'] = safe_scale(scale, spec['sev_scale'])
             else:
                 spec['sev_mean'] = safe_scale(scale, spec['sev_mean'])
@@ -1151,9 +1151,18 @@ class Aggregate(Frequency):
             if self.n > 100:
                 logger.warning(f'Aggregate.update | warning, claim count {self.n} is high; consider an approximation ')
             # assert self.n < 100
-            z = ft(self.sev_density, padding, tilt_vector)
-            self.ftagg_density = self.mgf(self.n, z)
-            self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+            if self.n == 0:
+                # for dynamics it is helpful to have a zero risk return zero appropriately
+                # z = ft(self.sev_density, padding, tilt_vector)
+                self.agg_density = np.zeros_like(self.xs)
+                self.agg_density[0] = 1
+                # extreme idleness...but need to make sure it is the right shape and type
+                self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+            else:
+                # usual calculation...this is where the magic happens!
+                z = ft(self.sev_density, padding, tilt_vector)
+                self.ftagg_density = self.mgf(self.n, z)
+                self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
         else:
             # regardless of request if skew == 0 have to use normal
             if self.agg_skew == 0:
@@ -1571,11 +1580,13 @@ class Aggregate(Frequency):
             self._linear_quantile_function['upper'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
                                      fill_value='extrapolate')
+            # Jan 2020 see note in Portfolio: changed previous to next
             self._linear_quantile_function['lower'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
                                      fill_value='extrapolate')
+            # changed to loss_s
             self._linear_quantile_function['middle'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='linear', bounds_error=False,
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
                                      fill_value='extrapolate')
         l = float(self._linear_quantile_function[kind](p))
         # because we are not interpolating the returned value must (should) be in the index...

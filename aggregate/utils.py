@@ -410,7 +410,7 @@ class AxisManager(object):
         return tw, th
 
     @staticmethod
-    def make_fig(n, aspect=1.5, **kwargs):
+    def make_figure(n, aspect=1.5, **kwargs):
         """
         make the figure and iterator
         :param n:
@@ -827,11 +827,11 @@ class MomentAggregator(object):
         if np.allclose(var, 0):
             var = 0
         if var < 0:
-            logger.error(f'MomentAggregator._moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
+            logger.error(f'MomentAggregator.static_moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan
-            logger.error('MomentAggregator._moments_to_mcvsk | encountered zero mean, called with '
+            logger.warning('MomentAggregator.static_moments_to_mcvsk | encountered zero mean, called with '
                          f'{ex1}, {ex2}, {ex3}')
         else:
             cv = sd / m
@@ -1389,10 +1389,10 @@ class Answer(dict):
     @staticmethod
     def nice(x):
         """ return a nice rep of x """
-        if type(v) in [str, float, int]:
-            return v
+        if type(x) in [str, float, int]:
+            return x
         else:
-            return type(v)
+            return type(x)
 
     def summary(self):
         """

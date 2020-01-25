@@ -492,19 +492,37 @@ class Portfolio(object):
             self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
             self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
             self.q_temp.loc[0, 'loss'] = 0
+            # revised Jan 2020
+            # F           loss        loss_s
+            # 0.000000    0.0         0.0
+            # 0.667617    0.0         4500.0
+            # a value here is  V   and ^ which is the same: correct
+            # 0.815977    4500.0      5500.0
+            # 0.937361	  5500.0   	  9000.0
+            # upper and lower only differ at exact values of F where lower is loss and upper is loss_s
+            # in between must take the next value for lower and the previous value for next to get the same answer
             self.q_temp = self.q_temp.sort_index()
             # that q_temp left cts, want right continuous:
             self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
             self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
             # create interp functions
+            # old
+            # self._linear_quantile_function['upper'] = \
+            #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
+            #                          fill_value='extrapolate')
+            # self._linear_quantile_function['lower'] = \
+            #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
+            #                          fill_value='extrapolate')
+            # revised
             self._linear_quantile_function['upper'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
                                      fill_value='extrapolate')
             self._linear_quantile_function['lower'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
                                      fill_value='extrapolate')
+            # change to using loss_s
             self._linear_quantile_function['middle'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='linear', bounds_error=False,
+                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
                                      fill_value='extrapolate')
         l = float(self._linear_quantile_function[kind](p))
         # because we are not interpolating the returned value must (should) be in the index...
@@ -659,8 +677,9 @@ class Portfolio(object):
                 p1 = p1 - fp1 / dfp1
                 fp1 = f(p1)
                 loop += 1
-            if loop == 10:
-                raise ValueError(f'Trouble finding equal risk {"TVaR" if i else "VaR"} at p_v={p_v}, p_t={p_t}')
+            if loop == 100:
+                raise ValueError(f'Trouble finding equal risk {"TVaR" if i else "VaR"} at p_v={p_v}, p_t={p_t}. '
+                                 'No convergence after 100 iterations. ')
             ans[i] = p1
         return ans
 
@@ -679,6 +698,7 @@ class Portfolio(object):
         total = 0
         for l in self.line_names:
             # use careful_q method leveraging CarefulInverse class
+            # TODO this is very slow; replace with same logic used in port.q
             f = CarefulInverse.dist_inv1d(loss, df[f'ημ_{l}'])
             diff = a - f(p)
             ans.append(diff)
@@ -936,7 +956,7 @@ class Portfolio(object):
         if add_exa:
             self.add_exa(self.density_df, details=True)
             # default priority analysis
-            logger.warning('Adding EPDs in Portfolio.update')
+            logger.info('Adding EPDs in Portfolio.update')
             if epds is None:
                 epds = np.hstack(
                     [np.linspace(0.5, 0.1, 4, endpoint=False)] +
@@ -1146,7 +1166,8 @@ class Portfolio(object):
             adj_factor[np.logical_and(base_line_ft == 0, adjust_line_ft == 0)] = 0
             n_and = np.sum(np.logical_and(base_line_ft == 0, adjust_line_ft == 0))
             n_or = np.sum(np.logical_or(base_line_ft == 0, adjust_line_ft == 0))
-            logger.warning(f'SAME? And={n_and} Or={n_or}; Zeros in fft(line) and '
+            # TODO sort this out...often not actually the same...
+            logger.info(f'SAME? And={n_and} Or={n_or}; Zeros in fft(line) and '
                            'fft(line + epsilon for {adjust_line}.')
             for line in self.line_names:
                 if line == adjust_line:
@@ -1601,8 +1622,7 @@ class Portfolio(object):
         df.loc[:, 'epd_0_total'] = \
             np.maximum(0, (df.loc[:, 'e_total'] - df.loc[:, 'lev_total'])) / \
             df.loc[:, 'e_total']
-        df['exgta_total'] = df.loss + (
-                df.e_total - df.exa_total) / df.S
+        df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
         df['exeqa_total'] = df.loss  # E(X | X=a) = a(!) included for symmetry was exa
 
         # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
@@ -1616,6 +1636,9 @@ class Portfolio(object):
 
         def loc_ift(x):
             return ift(x, 1, None)
+
+        # where is S=0
+        Seq0 = (df.S==0)
 
         for col in self.line_names:
             # ### Additional Variables
@@ -1716,9 +1739,13 @@ class Portfolio(object):
             df['exi_xgta_' + col] = ((df[f'exeqa_{col}'] / df.loss *
                                       df.p_total).shift(-1)[
                                      ::-1].cumsum()) / df.S
+            # need this NOT to be nan otherwise exa won't come out correctly
+            df.loc[Seq0, 'exi_xgta_' + col] = 0.
 
             df['exi_xgta_ημ_' + col] = \
                 (df['exi_x_ημ_' + col] - temp_xi_x_not) / df.S
+            # as above
+            df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
             df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
             df.loc[0, 'exi_xeqa_' + col] = 0
             df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
@@ -2146,6 +2173,7 @@ class Portfolio(object):
 
         # add the exag and distorted probs
         df['gS'] = g(df.S)
+        gSeq0 = (df.gS == 0)
         df['gF'] = 1 - df.gS
         # updated for ability to prepend 0 in newer numpy
         # df['gp_total'] = np.diff(np.hstack((0, df.gF)))
@@ -2255,10 +2283,14 @@ class Portfolio(object):
             # exa uses S in the denominator...and actually checking values there is a difference between the sum and gS
             df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
                                         df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
+            # need these to be zero so nan's do not propogate
+            df.loc[gSeq0, 'exi_xgtag_' + line] = 0.
             #
             #
             # following the Audit Vignette this is the way to go:
-            df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'] * df.gS.shift(1)).cumsum() * self.bs
+            # in fact, need to shift both down? (prev just gS, but int beta g...integrands on same
+            # basis
+            df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
             # maybe sometime you want this unchecked item?
             # df[f'exleag_1{line}'] = np.cumsum( df[f'exeqa_{line}'] * df.p_total )
             # it makes a difference NOT to divivde by df.gS but to compute the actual weights you are using (you mess
@@ -2289,6 +2321,7 @@ class Portfolio(object):
         # Dec 2019 added info to compute the total margin and capital allocation by layer
         # [MT].[L LR Q P M]_line: marginal or total (ground-up) loss, loss ratio etc.
         # do NOT divide MARGINAL versions by bs because they are per 1 wide layer
+        # df['lookslikemmtotalxx'] = (df.gS - df.S)
         df['M.M_total'] = (df.gS - df.S)
         df['M.Q_total'] = (1 - df.gS)
         # hummmm.aliases, but...?
@@ -2296,7 +2329,6 @@ class Portfolio(object):
         df['M.P_total'] = df['gS']
         # df['T.L_total'] = df['exa_total']
         # df['T.P_total'] = df['exag_total']
-
         # critical insight is the layer ROEs are the same for all lines (law invariance)
         df['M.ROE_total'] = df['M.M_total'] / df['M.Q_total']
         # where is the ROE zero? need to handle separately else Q will blow up
@@ -2307,6 +2339,7 @@ class Portfolio(object):
             # hummm more aliases
             df[f'T.L_{line}'] = df[f'exa_{line}']
             df[f'T.P_{line}'] = df[f'exag_{line}']
+            df.loc[0, f'T.P_{line}'] = 0
             # TOTALs = ground up cumulative sums
             # exag is the layer (marginal) premium and exa is the layer (marginal) loss
             df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
@@ -2318,19 +2351,26 @@ class Portfolio(object):
             # d['B'] = d.A.cumsum()
             # d['C'] = np.diff(d.B, prepend=0)
             # then d.C == d.A, which is what you want.
-            df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], prepend=0) / self.bs
+            # note this overwrites M.M_total set above
+            # T.M starts at zero, by previous line and sense: no assets ==> no prem or loss
+            # old
+            # df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], prepend=0) / self.bs
+            # new:
+            df[f'M.M_{line}'] = df[f'T.M_{line}'].diff().shift(-1) / self.bs
             # careful about where ROE==0
             df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE_total']
             df[f'M.Q_{line}'].iloc[-1] = 0
             df.loc[roe_zero, f'M.Q_{line}'] = np.nan
-            # WHAT IS THE LATER AT ZERO? Should it have a price? What is that price?
+            # WHAT IS THE LAYER AT ZERO? Should it have a price? What is that price?
             # TL and TP at zero are both 1
             if line != 'total':
                 df[f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
                 df[f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
             df[f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
             # for total need to reflect layer width...
-            df[f'T.Q_{line}'] = df[f'M.Q_{line}'].cumsum() * self.bs
+            # Jan 2020 added shift down
+            df[f'T.Q_{line}'] = df[f'M.Q_{line}'].shift(1).cumsum() * self.bs
+            df.loc[0, f'T.Q_{line}'] = 0
             df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
             # leverage
             df[f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
@@ -2367,7 +2407,7 @@ class Portfolio(object):
                 max_x = 1.1 * self.q(1 - 1e-6)
                 df_plot = df.loc[0:max_x, :]
 
-                f_exas, axs, axiter = AxisManager.make_fig(12, sharex=True)
+                f_exas, axs, axiter = AxisManager.make_figure(12, sharex=True)
 
                 ax = next(axiter)
                 df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
@@ -2422,7 +2462,7 @@ class Portfolio(object):
 
                 # by line plots
                 nl = len(self.line_names_ex)
-                f_byline, axs, axiter = AxisManager.make_fig(nl)
+                f_byline, axs, axiter = AxisManager.make_figure(nl)
                 for line in self.line_names:
                     ax = next(axiter)
                     df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
@@ -2434,7 +2474,7 @@ class Portfolio(object):
                 AxisManager.tidy_up(f_byline, axiter)
 
                 # compare exa with exag for all lines
-                f_bylineg, axs, axiter = AxisManager.make_fig(nl)
+                f_bylineg, axs, axiter = AxisManager.make_figure(nl)
                 for line in self.line_names_ex:
                     ax = next(axiter)
                     df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)

@@ -23,13 +23,15 @@ class Distortion(object):
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'tvar', 'convex')
     _has_mass_ = ('ly', 'clin', 'lep')
+    _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Layer Equiv",
+                    "Lin Yield", "Capped Line", "Dual Mom", "Tail VaR", "Convex Env")
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Dual Moment", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'tvar', 'convex')
     _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1, 3,  0.75)
     _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8, 6,  0.95)
-    _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
+    _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
 
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):
@@ -277,11 +279,11 @@ class Distortion(object):
         if ax is None:
             ax = plt.gca()
 
-        ax.plot(xs, y1, **kwargs)
-        ax.plot(xs, y2, **kwargs)
+        ax.plot(xs, y1, label='$g$', **kwargs)
+        ax.plot(xs, y2, label='$g^{-1}$', **kwargs)
         ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
         if self.name == 'convex':
-            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], 'o')
+            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], 'x')
         ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set(title=str(self), aspect='equal')
         return ax

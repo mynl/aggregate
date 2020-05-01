@@ -129,13 +129,13 @@ class Underwriter(object):
 
     data_types = ['portfolio', 'aggregate', 'severity']
 
-    def __init__(self, dir_name="", name='Rory', databases=None, glob=None, store_mode=True, update=False,
+    def __init__(self, dir_name="", name='Rory', databases=[], glob=None, store_mode=True, update=False,
                  verbose=False, log2=10, debug=False, create_all=False):
         """
 
         :param dir_name:
         :param name:
-        :param databases:
+        :param databases: set equal to None to load the default databases. Faster to load without them.
         :param glob: reference, e.g. to globals(), used to resolve meta.XX references
         :param store_mode: add newly created aggregates to the database?
         :param update:

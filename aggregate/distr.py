@@ -813,9 +813,9 @@ class Aggregate(Frequency):
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
+        self.verbose_audit_df = None
         self._careful_q = None
         self._density_df = None
-        self._linear_quantile_function
         self.q_temp = None
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
@@ -1217,7 +1217,7 @@ class Aggregate(Frequency):
         # invalidate stored functions
         self.nearest_quantile_function = None
         self._cdf = None
-        return verbose_audit_df
+        self.verbose_audit_df = verbose_audit_df
 
     def emp_stats(self):
         """

@@ -3,10 +3,12 @@
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/distr.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/distr.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/.~frequency_distributions.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/spectral.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/spectral.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/underwriter.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/underwriter.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -26,6 +28,7 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="JupyterTrust" id="5d0fcaa5-2b63-4164-90bf-3767d0c12fb8" />
   <component name="ProjectId" id="1VV4WTzaxcqPw20wkm6rLgd26d4" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -37,7 +40,7 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="com.intellij.ide.scratch.LRUPopupBuilder$1/New Scratch File" value="Cython" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../spectral_risk_measures_monograph/Python" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
@@ -140,7 +143,17 @@
       <workItem from="1579113114071" duration="2062000" />
       <workItem from="1579190464101" duration="13591000" />
       <workItem from="1579705979901" duration="599000" />
-      <workItem from="1579878656442" duration="8736000" />
+      <workItem from="1579878656442" duration="8827000" />
+      <workItem from="1580138531489" duration="599000" />
+      <workItem from="1580149288642" duration="668000" />
+      <workItem from="1583163372279" duration="956000" />
+      <workItem from="1583252757414" duration="836000" />
+      <workItem from="1584110424713" duration="598000" />
+      <workItem from="1584204415802" duration="5619000" />
+      <workItem from="1585149918130" duration="635000" />
+      <workItem from="1586188087393" duration="1449000" />
+      <workItem from="1586784982058" duration="24899000" />
+      <workItem from="1587907290350" duration="8394000" />
     </task>
     <servers />
   </component>
@@ -175,9 +188,13 @@
     </option>
   </component>
   <component name="WindowStateProjectService">
-    <state x="532" y="269" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog" timestamp="1579018681917">
-      <screen x="80" y="0" width="1540" height="1080" />
+    <state x="615" y="406" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1587907657977">
+      <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state x="532" y="269" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog/80.0.1540.1080/-1796.0.1796.1080@80.0.1540.1080" timestamp="1579018681917" />
+    <state x="615" y="406" key="#com.intellij.execution.impl.EditConfigurationsDialog/67.0.2183.1500@67.0.2183.1500" timestamp="1587907657977" />
+    <state x="940" y="506" key="FileChooserDialogImpl" timestamp="1587907296247">
+      <screen x="67" y="0" width="2183" height="1500" />
+    </state>
+    <state x="940" y="506" key="FileChooserDialogImpl/67.0.2183.1500@67.0.2183.1500" timestamp="1587907296247" />
   </component>
 </project>

@@ -145,6 +145,7 @@ class Portfolio(object):
         self._renamer = None
         # if created by uw it stores the program here
         self.program = ''
+        self.audit_percentiles = [.9, .95, .99, .995, .999, .9999, 1 - 1e-6]
 
     def __str__(self):
         """
@@ -928,10 +929,10 @@ class Portfolio(object):
         theoretical_stats = self.statistics_df.T.filter(regex='agg')
         theoretical_stats.columns = ['EX1', 'EX2', 'EX3', 'Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
-        percentiles = [0.9, 0.95, 0.99, 0.996, 0.999, 0.9999, 1 - 1e-6]
+        # self.audit_percentiles = [0.9, 0.95, 0.99, 0.995, 0.996, 0.999, 0.9999, 1 - 1e-6]
         self.audit_df = pd.DataFrame(
-            columns=['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
-                    ['P' + str(100 * i) for i in percentiles])
+            columns=['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', "EmpKurt", 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
+                    ['P' + str(100 * i) for i in self.audit_percentiles])
         for col in self.line_names_ex:
             sump = np.sum(self.density_df[f'p_{col}'])
             t = self.density_df[f'p_{col}'] * self.density_df['loss']
@@ -940,12 +941,16 @@ class Portfolio(object):
             ex2 = np.sum(t)
             t *= self.density_df['loss']
             ex3 = np.sum(t)
+            t *= self.density_df['loss']
+            ex4 = np.sum(t)
             m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
-            ps = np.zeros((len(percentiles)))
+            # empirical kurtosis
+            kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
+            ps = np.zeros((len(self.audit_percentiles)))
             temp = self.density_df[f'p_{col}'].cumsum()
-            for i, p in enumerate(percentiles):
+            for i, p in enumerate(self.audit_percentiles):
                 ps[i] = (temp > p).idxmax()
-            newrow = [sump, m, cv, s, ex1, ex2, ex3] + list(ps)
+            newrow = [sump, m, cv, s, kurt, ex1, ex2, ex3] + list(ps)
             self.audit_df.loc[col, :] = newrow
         self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
         self.audit_df['MeanErr'] = self.audit_df['EmpMean'] / self.audit_df['Mean'] - 1
@@ -1136,7 +1141,7 @@ class Portfolio(object):
 
         # and then a holder for the answer
         answer = pd.DataFrame(index=pd.Index(xs, name='loss'),
-                              columns=pd.MultiIndex.from_arrays(((), ()), names=('variable', 'line')))
+                              columns=pd.MultiIndex.from_arrays(((), ()), names=('partial_wrt', 'line')))
         answer.columns.name = 'derivatives'
 
         # the exact same as add exa; same padding no tilt
@@ -1168,7 +1173,7 @@ class Portfolio(object):
             n_or = np.sum(np.logical_or(base_line_ft == 0, adjust_line_ft == 0))
             # TODO sort this out...often not actually the same...
             logger.info(f'SAME? And={n_and} Or={n_or}; Zeros in fft(line) and '
-                           'fft(line + epsilon for {adjust_line}.')
+                        'fft(line + epsilon for {adjust_line}.')
             for line in self.line_names:
                 if line == adjust_line:
                     # nothing changes, adjust_line not in not adjust_line it doesn't need to change
@@ -1561,7 +1566,7 @@ class Portfolio(object):
         # sum of p_total is so important...we will rescale it...
         if not np.all(df.p_total >= 0):
             # have negative densities...get rid of them
-            first_neg = np.argwhere(df.p_total < 0).min()
+            first_neg = np.argwhere((df.p_total < 0).to_numpy()).min()
             logger.warning(
                 f'CPortfolio.add_exa | p_total has a negative value starting at {first_neg}; NOT setting to zero...')
             # TODO what does this all mean?!
@@ -1578,7 +1583,7 @@ class Portfolio(object):
                                  max(0, 1. - (df.p_total.sum())))))
         # get rounding errors, S may not go below zero
         logger.info(
-            f'CPortfolio.add_exa | {self.name}: S <= 0 values has length {len(np.argwhere(df.S <= 0))}')
+            f'CPortfolio.add_exa | {self.name}: S <= 0 values has length {len(np.argwhere((df.S <= 0).to_numpy()))}')
 
         # E(min(X, a))
         # needs to be shifted down by one for the partial integrals....
@@ -1638,7 +1643,7 @@ class Portfolio(object):
             return ift(x, 1, None)
 
         # where is S=0
-        Seq0 = (df.S==0)
+        Seq0 = (df.S == 0)
 
         for col in self.line_names:
             # ### Additional Variables
@@ -1741,10 +1746,12 @@ class Portfolio(object):
                                      ::-1].cumsum()) / df.S
             # need this NOT to be nan otherwise exa won't come out correctly
             df.loc[Seq0, 'exi_xgta_' + col] = 0.
-
-            df['exi_xgta_ημ_' + col] = \
-                (df['exi_x_ημ_' + col] - temp_xi_x_not) / df.S
-            # as above
+            # df['exi_xgta_ημ_' + col] = \
+            #     (df['exi_x_ημ_' + col] - temp_xi_x_not) / df.S
+            # as for line
+            df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
+                                         df.p_total).shift(-1)[
+                                        ::-1].cumsum()) / df.S
             df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
             df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
             df.loc[0, 'exi_xeqa_' + col] = 0
@@ -1757,11 +1764,12 @@ class Portfolio(object):
             # df['exa_' + col] = \
             #     df['exlea_' + col] * df.F + df.loss * \
             #     df.S * df['exi_xgta_' + col]
+            # df['exa_ημ_' + col] = \
+            #     df['exlea_ημ_' + col] * df.F + df.loss * \
+            #     df.S * df['exi_xgta_ημ_' + col]
             # alt calc using S: validated the same, going with this as a more direct calc
             df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-            df['exa_ημ_' + col] = \
-                df['exlea_ημ_' + col] * df.F + df.loss * \
-                df.S * df['exi_xgta_ημ_' + col]
+            df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
 
             # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
             df[f'e1xi_1gta_{col}'] = (df[f'p_{col}'] * index_inv).iloc[::-1].cumsum()
@@ -2008,7 +2016,8 @@ class Portfolio(object):
         dist.premium_target = premium_target
         return dist
 
-    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5, strict=True):
+    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
+                              strict=True, return_distortions=False):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
@@ -2022,12 +2031,14 @@ class Portfolio(object):
         :param df: for tt
         :param strict: if True only use distortions with no mass at zero, otherwise
                         use anything reasonable for pricing
+        :param return_distortions: return the created distortions
         :return:
         """
         ans = pd.DataFrame(
             columns=['$a$', 'LR', '$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$', 'Levg', '$K$',
                      'ROE', 'param', 'error', 'method'], dtype=np.float)
         ans = ans.set_index(['$a$', 'LR', 'method'], drop=True)
+        dists = {}
         if As is None:
             if Ps is None:
                 raise ValueError('Must specify assets or quantile probabilities')
@@ -2052,9 +2063,13 @@ class Portfolio(object):
                 nu = 1 - delta
                 for dname in Distortion.available_distortions(pricing=True, strict=strict):
                     dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a)
+                    dists[dname] = dist
                     ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
                                                   dist.shape, dist.error]
-        return ans
+        if return_distortions:
+            return ans, dists
+        else:
+            return ans
 
     def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1):
         """
@@ -2283,14 +2298,18 @@ class Portfolio(object):
             # exa uses S in the denominator...and actually checking values there is a difference between the sum and gS
             df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
                                         df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
+            df['exi_xgtag_ημ_' + line] = ((df[f'exeqa_ημ_{line}'] / df.loss *
+                                        df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
             # need these to be zero so nan's do not propogate
             df.loc[gSeq0, 'exi_xgtag_' + line] = 0.
+            df.loc[gSeq0, 'exi_xgtag_ημ_' + line] = 0.
             #
             #
             # following the Audit Vignette this is the way to go:
             # in fact, need to shift both down? (prev just gS, but int beta g...integrands on same
             # basis
             df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
+            df[f'exag_ημ_{line}'] = (df[f'exi_xgtag_ημ_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
             # maybe sometime you want this unchecked item?
             # df[f'exleag_1{line}'] = np.cumsum( df[f'exeqa_{line}'] * df.p_total )
             # it makes a difference NOT to divivde by df.gS but to compute the actual weights you are using (you mess
@@ -3207,7 +3226,7 @@ class Portfolio(object):
             ax.legend(loc='upper right')
 
             title = f'{self.name} with {str(dist)} Distortion\nCalibrated to LR={LR:.3f} and p={p:.3f}, ' \
-                f'Assets={a_cal:,.1f}, ROE={ROE:.3f}'
+                    f'Assets={a_cal:,.1f}, ROE={ROE:.3f}'
             f_6_part.suptitle(title, fontsize='x-large')
 
             # trinity plots
@@ -3788,7 +3807,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             for l in self.density_df.columns:
                 if re.search('^ημ_', l):
                     # nu_line -> not line density
-                    self._renamer[l] = re.sub('^ημ_([A-Za-z\-_.,]+)', r'not \1 density', l)
+                    self._renamer[l] = re.sub('^ημ_([0-9A-Za-z\-_.,]+)', r'not \1 density', l)
                 else:
                     l0 = l.replace('ημ_', 'not ')
                     for k, v in meta_namer.items():

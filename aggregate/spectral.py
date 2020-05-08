@@ -24,14 +24,14 @@ class Distortion(object):
     _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'tvar', 'convex')
     _has_mass_ = ('ly', 'clin', 'lep')
     _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Layer Equiv",
-                    "Lin Yield", "Capped Line", "Dual Mom", "Tail VaR", "Convex Env")
+                    "Lin Yield", "Capped Linear", "Dual Mom", "Tail VaR", "Convex Env")
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Dual Moment", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'tvar', 'convex')
     _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1, 3,  0.75)
     _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8, 6,  0.95)
-    _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
+    _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
 
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):

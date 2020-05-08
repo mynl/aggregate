@@ -674,11 +674,11 @@ class Aggregate(Frequency):
                 self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
             self._density_df['F'] = self._density_df.p.cumsum()
             self._density_df['F_sev'] = self._density_df.p_sev.cumsum()
-            self._density_df['S'] = 1 - self._density_df.F
-            self._density_df['S_sev'] = 1 - self._density_df.F_sev
+            # remember...better way to compute
+            self._density_df['S'] = self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
+            self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=0)[::-1].cumsum()
             # add LEV,   TVaR to each threshold point...
-
-            self._density_df['lev'] = np.hstack((0, self._density_df.S.iloc[:-1])).cumsum() * self.bs
+            self._density_df['lev'] = self._density_df.S.shift(1, fill_value=0).cumsum() * self.bs
             self._density_df['exa'] = self._density_df['lev']
             self._density_df['exlea'] = \
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
@@ -1218,6 +1218,83 @@ class Aggregate(Frequency):
         self.nearest_quantile_function = None
         self._cdf = None
         self.verbose_audit_df = verbose_audit_df
+
+    def update_efficiently(self, xs, padding=1, approximation='exact', sev_calc='discrete',
+               discretization_calc='survival'):
+        """
+        Compute the density with absolute minimum overhead. Called by port.update_efficiently
+        Started with code for update and removed frills
+        No tilting!
+        :param xs:  range of x values used to discretize
+        :param padding: for FFT calculation
+        :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
+                sgamma apply shifted lognormal or shifted gamma approximations.
+        :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
+        :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
+        :return:
+        """
+
+        r = 0
+        self.xs = xs
+        self.bs = xs[1]
+        self.log2 = int(np.log(len(xs)) / np.log(2))
+        tilt_vector = None
+
+        # make the severity vector: a claim count weighted average of the severities
+        if approximation == 'exact':
+            wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
+            self.sev_density = np.zeros_like(xs)
+            beds = self.discretize(sev_calc, discretization_calc)
+            for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
+                self.sev_density += temp * w
+
+        if approximation == 'exact':
+            if self.n == 0:
+                # for dynamics it is helpful to have a zero risk return zero appropriately
+                # z = ft(self.sev_density, padding, tilt_vector)
+                self.agg_density = np.zeros_like(self.xs)
+                self.agg_density[0] = 1
+                # extreme idleness...but need to make sure it is the right shape and type
+                self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+            else:
+                # usual calculation...this is where the magic happens!
+                z = ft(self.sev_density, padding, tilt_vector)
+                self.ftagg_density = self.mgf(self.n, z)
+                self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+        else:
+            # regardless of request if skew == 0 have to use normal
+            if self.agg_skew == 0:
+                self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)
+            elif approximation == 'slognorm':
+                shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
+                self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+            elif approximation == 'sgamma':
+                shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
+                self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
+            else:
+                raise ValueError(f'Invalid approximation {approximation} option passed to CAgg density. '
+                                 'Allowable options are: exact | slogorm | sgamma')
+
+            ps = self.fzapprox.pdf(xs)
+            self.agg_density = ps / np.sum(ps)
+            self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+
+        # invalidate stored functions
+        self.nearest_quantile_function = None
+        self._cdf = None
+        self.verbose_audit_df = None
+
+    def levs(self, dist):
+        """
+        Apply distortion and compute lev and levg on a stand alone basis
+
+
+        :param dist:
+        :return:
+        """
+        ser = self.agg_density
+
+
 
     def emp_stats(self):
         """

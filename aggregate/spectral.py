@@ -230,6 +230,9 @@ class Distortion(object):
 
         self.g = g
         self.g_inv = g_inv
+        def g_dual(x):
+            return 1 - self.g(x)
+        self.g_dual = g_dual
 
     def __str__(self):
         """

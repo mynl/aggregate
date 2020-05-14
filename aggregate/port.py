@@ -723,7 +723,7 @@ class Portfolio(object):
         if self.density_df is None:
             raise ValueError('Must update prior to converting to severity')
         return Severity(sev_name=self, sev_a=self.log2, sev_b=self.bs,
-                        exp_attachment=attachment, exp_limit=limit, conditional=conditional)
+                        exp_attachment=attachment, exp_limit=limit, sev_conditional=conditional)
 
     def fit(self, approx_type='slognorm', output='agg'):
         """
@@ -2735,7 +2735,7 @@ class Portfolio(object):
     def gamma(self, a=None, p=None, kind='', plot=False, compute_stand_alone=False, three_plot_xlim=-1,
               ylim_zoom=(1, 1e3), extreme_var=1 - 2e-8):
         """
-        Return the vector gamma_a(x), the conditional layer effectiveness given assets a.
+        Return the vector gamma_a(x), the sev_conditional layer effectiveness given assets a.
         Assets specified by percentile level and type (you need a in the index too hard to guess?)
         gamma can be created with no base and no calibration - it does not depend on a distortion.
         It only depends on total losses.

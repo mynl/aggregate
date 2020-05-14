@@ -53,7 +53,8 @@ The ```agg``` Language Grammar:
     snumber             	:: NUMBER
                         	 | MINUS NUMBER %prec UMINUS
 
-    sev                 	:: sev PLUS numbers
+    sev                 	:: sev UNCONDITIONAL
+                             | sev PLUS numbers
                         	 | sev MINUS numbers
                         	 | numbers TIMES sev
                         	 | ids numbers CV numbers weights
@@ -231,7 +232,7 @@ class UnderwritingLexer(Lexer):
               MIXED, FREQ
               }
     ignore = ' \t,\\:\\(\\)|'
-    literals = {'[', ']'}
+    literals = {'[', ']', '!'}
 
     # per manual, need to list longer tokens before shorter ones
     # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
@@ -264,6 +265,7 @@ class UnderwritingLexer(Lexer):
     # ID['on'] = SEV
     ID['agg'] = AGG
     ID['port'] = PORT
+    # ID['!'] = UNCONDITIONAL
 
     @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
     def NUMBER(self, t):
@@ -449,6 +451,13 @@ class UnderwritingParser(Parser):
     #     return { 'freq_name': 'poisson'}
 
     # severity term ============================================
+    @_('sev "!"')
+    def sev(self, p):
+        self.log(f'setting conditional flag on severity to False (this is unusual behaviour, '
+                  'usually want conditional severity)')
+        p.sev['sev_conditional'] = False
+        return p.sev
+
     @_('sev PLUS numbers')
     def sev(self, p):
         self.log(f'resolving sev PLUS numbers to sev {p.numbers}')

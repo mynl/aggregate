@@ -763,7 +763,7 @@ class Aggregate(Frequency):
 
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, sev_wt=1,
+                 sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True,
                  freq_name='', freq_a=0, freq_b=0, note=''):
 
         # assert np.allclose(np.sum(sev_wt), 1)
@@ -783,6 +783,7 @@ class Aggregate(Frequency):
                           exp_attachment=exp_attachment, exp_limit=exp_limit,
                           sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
                           sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
+                          sev_conditional=sev_conditional,
                           freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
         logger.info(
             f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
@@ -877,7 +878,7 @@ class Aggregate(Frequency):
         for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
             # XXXX TODO WARNING: note sev_xs and sev_ps are NOT broadcast
-            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, True)
+            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, sev_conditional)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
             # input claim count trumps input loss
@@ -2034,7 +2035,7 @@ class Severity(ss.rv_continuous):
     """
 
     def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=0, sev_b=0,
-                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, conditional=True, name='', note=''):
+                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_conditional=True, name='', note=''):
         """
 
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
@@ -2048,7 +2049,7 @@ class Severity(ss.rv_continuous):
         :param sev_scale:
         :param sev_xs: for fixed or histogram classes
         :param sev_ps:
-        :param conditional: conditional or unconditional; for severities use conditional
+        :param sev_conditional: conditional or unconditional; for severities use conditional
         """
 
         from .port import Portfolio
@@ -2062,7 +2063,7 @@ class Severity(ss.rv_continuous):
         self.fz = None
         self.pattach = 0
         self.pdetach = 0
-        self.conditional = conditional
+        self.conditional = sev_conditional
         self.sev_name = sev_name
         self.name = name
         self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'

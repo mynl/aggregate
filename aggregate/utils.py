@@ -251,6 +251,37 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     return max(pn, pl, pg, m * (1 + ss.norm.isf(1 - p) * cv))
 
 
+def round_bucket(bs):
+    """
+    compute a decent rounded bucket from an input float bs
+
+    if bs > 1 round to 2, 5, 10,
+
+    if bs < 1 find the smallest power of two greater than 1/bs
+
+    """
+
+    if bs >= 1:
+        # rounded bs
+        rbs = np.round(bs, 0)
+        if rbs == 1:
+            return 2.0
+        elif rbs <= 5:
+            return 5.0
+        elif rbs <= 10:
+            return 10.0
+        else:
+            return 10 * round_bucket(bs / 10)
+
+    if bs < 1:
+        # inverse bs
+        bsi = 1 / bs
+        nbs = 1
+        while nbs < bsi:
+            nbs <<= 1
+        nbs >>= 1
+        return 1. / nbs
+
 # axis management
 def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     """

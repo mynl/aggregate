@@ -209,6 +209,7 @@ class Distortion(object):
             p = self.shape
             q = 1 / p
             self.has_mass = False
+
             def g(x):
                 return 1 - (1 - x)**p
 

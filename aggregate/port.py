@@ -36,7 +36,7 @@ from .utils import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
     sensible_jump, suptitle_and_tight, \
-    MomentAggregator, Answer, subsets
+    MomentAggregator, Answer, subsets, round_bucket
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -143,6 +143,7 @@ class Portfolio(object):
         # for storing the info about the quantile function
         self.q_temp = None
         self._renamer = None
+        self._line_renamer = None
         # if created by uw it stores the program here
         self.program = ''
         self.audit_percentiles = [.9, .95, .99, .995, .999, .9999, 1 - 1e-6]
@@ -277,7 +278,7 @@ class Portfolio(object):
         :return:
         """
         if self.audit_df is not None:
-            return self.audit_df.rename(columns=self.renamer)
+            return self.audit_df.rename(columns=self.renamer, index=self.line_renamer).T
 
     @property
     def density(self):
@@ -823,6 +824,10 @@ class Portfolio(object):
         df['bs20'] = df['bs10'] / 1024
         df.loc['total', :] = df.sum()
         return df
+
+    def best_bucket(self, log2=16):
+        bs = sum([a.recommend_bucket(log2) for a in self])
+        return round_bucket(bs)
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', padding=1, tilt_amount=0, epds=None,
@@ -4060,7 +4065,77 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             self._renamer['S_total'] = f'{self.name} total survival'
             self._renamer[f'gamma_{self.name}_total'] = f"γ {self.name} total"
 
+        # for enhanced exhibits --- these are a bit specialized!
+        self._renamer = dict(mv="$\\mathit{MVL}(a)$??")
+        for orig in self.line_names_ex:
+            l = self.line_renamer.get(orig, orig).replace('$', '')
+            if orig == 'total':
+                self._renamer[f'S'] = f"$S_{{{l}}}(a)$"
+            else:
+                self._renamer[f'S_{orig}'] = f"$S_{{{l}}}(a)$"
+            self._renamer[f'lev_{orig}'] = f"$E[{l}\\wedge a]$"
+            self._renamer[f'levg_{orig}'] = f"$\\rho({l}\\wedge a)$"
+            self._renamer[f'exa_{orig}'] = f"$E[{l}(a)]$"
+            self._renamer[f'exag_{orig}'] = f"$\\rho({l}\\subseteq X^c\\wedge a)$"
+            self._renamer[f'ro_da_{orig}'] = "$\\Delta a_{ro}$"
+            self._renamer[f'ro_dmv_{orig}'] = "$\\Delta \\mathit{MVL}_{ro}(a)$"
+            self._renamer[f'ro_eva_{orig}'] = "$\\mathit{EGL}_{ro}(a)$"
+            self._renamer[f'gc_da_{orig}'] = "$\\Delta a_{gc}$"
+            self._renamer[f'gc_dmv_{orig}'] = "$\\Delta \\mathit{MVL}_{gc}(a)$"
+            self._renamer[f'gc_eva_{orig}'] = "$\\mathit{EGL}_{gc}(a)$"
+
         return self._renamer
+
+    @property
+    def line_renamer(self):
+        """
+        plausible defaults for nicer looking names
+        replaces . or : with space and capitalizes (generally don't use . because it messes with
+          analyze distortion....
+        leaves : alone
+        converts X1 to tex
+        converts XM1 to tex with minus (for reserves)
+        :return:
+        """
+        def rename(ln):
+            # guesser ...
+            if ln == 'total':
+                return 'Total'
+            if ln.find('.') > 0:
+                return ln.replace('.', ' ').title()
+            if ln.find(':') > 0:
+                return ln.replace(':', ' ').title()
+            # numbered lines
+            ln = re.sub('([A-Z])m([0-9]+)', r'$\1_{-\2}$', ln)
+            ln = re.sub('([A-Z])([0-9]+)', r'$\1_{\2}$', ln)
+            return ln
+
+        if self._line_renamer is None:
+            self._line_renamer = { ln: rename(ln) for ln in self.line_names_ex}
+
+        return self._line_renamer
+
+    def set_a_p(self, a, p):
+        """
+        sort out arguments for assets and prob level and make them consistent
+        neither => set defaults
+        a only set p
+        p only set a
+        both do nothing
+
+        """
+        if a==0 and p==0:
+            p = 0.995
+            a = self.q(p)
+            # click it to the index
+            p = self.cdf(a)
+        elif a:
+            p = self.cdf(a)
+        elif p:
+            a = self.q(p)
+            # click it to the index
+            p = self.cdf(a)
+        return a, float(p)
 
     # def example_factory_sublines(self, data_in, xlim=0):
     #     """

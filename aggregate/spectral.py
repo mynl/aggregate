@@ -191,7 +191,7 @@ class Distortion(object):
             self.mass = d
 
             def g(x):
-                return np.minimum(1, d + (1 - d) * x + spread * np.sqrt(x * (1 - x)))
+                return np.where(x == 0, 0, np.minimum(1, d + (1 - d) * x + spread * np.sqrt(x * (1 - x))))
 
             spread2 = spread ** 2
             a = (1 - d) ** 2 + spread2

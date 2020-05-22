@@ -3,41 +3,37 @@
 # common header for smve37
 import sys
 
-import aggregate as agg
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import pandas as pd
-import itertools
-from importlib import reload
-import logging
-import inspect
-import re
+sys.path.append('c:\\s\\telos\\spectral_risk_measures_monograph\\\Python')
+
+from common_header import *
+import common_scripts as cs
+
 
 pd.set_option('display.max_rows', 500)
 
-# set up logs
-aggdevlog = logging.getLogger('aggdev.log')
-log = logging.getLogger('aggregate')
-log.setLevel(logging.WARNING)
-
-plt.rcParams.update({'font.size': 7})
-
-uw = agg.Underwriter(create_all=False, update=False)
 
 def run_test():
+    # rt = "tense"
+    rt = "relaxed"
+    # either way need the mass_hints
+    mh = pd.Series([1,0], index=['X:expon', 'Y:uniform'])
 
-    port = uw('''port Test1
-        agg A  8 claims sev lognorm 10 cv 1 poisson
-        agg B 80 claims sev lognorm 1 cv 0.1 poisson
-    ''')
+    if rt == 'relaxed':
 
-    port.update(bs=1 / 32, log2=13, remove_fuzz=True, add_exa=True, padding=2)
+        port = cs.RelaxedPortfolio('''
+    
+        port ISA
+            agg X:expon 1 claim sev 1 * expon fixed
+            agg Y:uniform 1 claim sev 3 * uniform fixed
+    
+        ''', log2=10, bs=1/64, padding=2)
 
-    port.audits()
-    plt.show()
+        a, p = port.set_a_p(0, 0.995)
+        port.calibrate_distortions(Ps=[p], ROEs=[.12], strict=False)
+        print(port.dist_ans)
+        ans2 = port.apply_distortion(port.dists['clin'], mass_hints=mh)
 
-    ans = port.gradient()
+    ans = port.analyze_distortion('clin', A=a, ROE=0.12, plot=True, mass_hints=mh)
 
 if __name__ == '__main__':
     run_test()

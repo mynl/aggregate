@@ -2068,7 +2068,7 @@ class Portfolio(object):
         :param p:
         :param kind:
         :param S_column: column of density_df to use for calibration (allows routine to be used in other contexts; if
-                so used must input a premium_target directly).
+                so used must input a premium_target directly. If assets they are used; else max assets used
         :return:
         """
 
@@ -2085,8 +2085,9 @@ class Portfolio(object):
                 el = self.density_df.loc[assets, 'exa_total']
                 premium_target = (el + roe * assets) / (1 + roe)
         else:
-            # no need for roe, set assets = max loss and let code trim it
-            assets = self.density_df.loss.iloc[-1]
+            # if assets not entered, calibrating to unlimited premium; set assets = max loss and let code trim it
+            if assets == 0:
+                assets = self.density_df.loss.iloc[-1]
 
         # extract S and trim it: we are doing int from zero to assets
         # integration including ENDpoint is

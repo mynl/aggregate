@@ -238,7 +238,7 @@ class UnderwritingLexer(Lexer):
     # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
-    FREQ = r'binomial|poisson|bernoulli|pascal|fixed'
+    FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
     ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'
@@ -430,7 +430,7 @@ class UnderwritingParser(Parser):
     @_('FREQ')
     def freq(self, p):
         self.log(f'resolving named frequency distribution {p.FREQ} to freq')
-        if p.FREQ not in ('poisson', 'bernoulli', 'fixed'):
+        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric'):
             warnings.warn(f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli or fixed')
         return {'freq_name': p.FREQ}
 

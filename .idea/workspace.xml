@@ -3,9 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/distr.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/distr.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/parser.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/spectral.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/spectral.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/debug.py" beforeDir="false" afterPath="$PROJECT_DIR$/debug.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,6 +59,9 @@
       <module name="aggregate_project" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="C:\Users\steve\Anaconda3\envs\smve37\python.exe" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="false" />
@@ -149,7 +153,9 @@
       <workItem from="1586784982058" duration="24899000" />
       <workItem from="1587907290350" duration="20031000" />
       <workItem from="1588800866706" duration="6332000" />
-      <workItem from="1589231920126" duration="60847000" />
+      <workItem from="1589231920126" duration="61446000" />
+      <workItem from="1591393348451" duration="9554000" />
+      <workItem from="1591623589067" duration="20014000" />
     </task>
     <servers />
   </component>
@@ -192,38 +198,38 @@
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
     <state x="940" y="506" key="FileChooserDialogImpl/67.0.2183.1500@67.0.2183.1500" timestamp="1587907296247" />
-    <state width="2140" height="532" key="GridCell.Tab.0.bottom" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.0.bottom" timestamp="1590370540594">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.0.center" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.0.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
+    <state width="2140" height="532" key="GridCell.Tab.0.center" timestamp="1590370540594">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.0.left" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.0.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
+    <state width="2140" height="532" key="GridCell.Tab.0.left" timestamp="1590370540593">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.0.right" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.0.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540593" />
+    <state width="2140" height="532" key="GridCell.Tab.0.right" timestamp="1590370540594">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.1.bottom" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.0.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
+    <state width="2140" height="532" key="GridCell.Tab.1.bottom" timestamp="1590370540595">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.1.center" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.1.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
+    <state width="2140" height="532" key="GridCell.Tab.1.center" timestamp="1590370540595">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.1.left" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.1.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
+    <state width="2140" height="532" key="GridCell.Tab.1.left" timestamp="1590370540594">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
-    <state width="2140" height="532" key="GridCell.Tab.1.right" timestamp="1590008087766">
+    <state width="2140" height="532" key="GridCell.Tab.1.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
+    <state width="2140" height="532" key="GridCell.Tab.1.right" timestamp="1590370540595">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590008087766" />
+    <state width="2140" height="532" key="GridCell.Tab.1.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
     <state x="661" y="393" key="SettingsEditor" timestamp="1589985892320">
       <screen x="67" y="0" width="2183" height="1500" />
     </state>

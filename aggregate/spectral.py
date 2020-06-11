@@ -23,14 +23,15 @@ class Distortion(object):
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'tvar', 'convex')
     _has_mass_ = ('ly', 'clin', 'lep')
-    _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Layer Equiv",
+    _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Lev Equiv",
                     "Lin Yield", "Capped Linear", "Dual Mom", "Tail VaR", "Convex Env")
-    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Layer Equivalent Pricing",
+    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Leverage Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Dual Moment", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'tvar', 'convex')
     _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1, 3,  0.75)
     _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8, 6,  0.95)
+    # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
 
     @classmethod
@@ -181,7 +182,7 @@ class Distortion(object):
                 return np.where(x <= self.r0, 0, (x - self.r0) / sl)
 
         elif self.name == 'lep':
-            # layer equivalent pricing
+            # leverage equivalent pricing
             # self.r0 = risk free/financing and r = risk charge (the solved parameter)
             r = self.shape
             delta = r / (1 + r)

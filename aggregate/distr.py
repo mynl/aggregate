@@ -37,6 +37,7 @@ class Frequency(object):
     * ``bernoulli``: exp_en interpreted as a probability, must be < 1
     * ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
     * ``poisson``: Poisson(freq_a)
+    * ``poisson``: geometric(freq_a)
     * ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
       claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
       number of claimants per claim (or claims per occurrence). Hence the Poisson component
@@ -83,6 +84,9 @@ class Frequency(object):
         """
         creates the mgf and moment function
 
+        moment function(n) returns EN, EN^2, EN^3 when EN=n
+
+        mgf(n, z) is the mgf evaluated at log(z) when EN=n
 
         """
         self.freq_name = freq_name
@@ -137,6 +141,20 @@ class Frequency(object):
 
             def mgf(n, z):
                 return np.exp(n * (z - 1))
+
+        elif self.freq_name == 'geometric' and self.freq_a == 0:
+            # as for poisson, single parameter
+            # https://mathworld.wolfram.com/GeometricDistribution.html and Wikipedia
+            # e.g. tester: agg =uw('agg GEOM 3 claims sev dhistogram xps [1] [1] geometric')
+            def _freq_moms(n):
+                p = 1 / (n + 1)
+                freq_2 = (2 - p) * (1 - p) / p**2
+                freq_3 = (1 - p) * (6 + (p - 6) * p) / p**3
+                return n, freq_2, freq_3
+
+            def mgf(n, z):
+                p = 1 / (n + 1)
+                return p / (1 - (1 - p) * z)
 
         elif self.freq_name == 'pascal':
             # solve for local c to hit overall c=ν^2 value input
@@ -659,6 +677,8 @@ class Aggregate(Frequency):
         """
         if self._density_df is None:
             # really should have one of these anyway...
+            if self.agg_density is None:
+                raise ValueError('Update Aggregate before asking for density_df')
             self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_sev=self.sev_density))
             # remove the fuzz
             eps = 2.5e-16
@@ -735,7 +755,8 @@ class Aggregate(Frequency):
                 return sc * np.array(x)
             else:
                 return sc * x
-
+        nm = spec['name']
+        spec['name'] = f'{nm}:{kind}:{scale}'
         if kind == 'homog':
             # do NOT scale en... that is inhomog
             # do scale EL etc. to keep the count the same
@@ -756,7 +777,7 @@ class Aggregate(Frequency):
             # just scale up the volume, including en
             spec['exp_el'] = safe_scale(scale, spec['exp_el'])
             spec['exp_premium'] = safe_scale(scale, spec['exp_premium'])
-            spec['exp_n'] = safe_scale(scale, spec['exp_n'])
+            spec['exp_en'] = safe_scale(scale, spec['exp_en'])
         else:
             raise ValueError(f'Inadmissible option {kind} passed to rescale, kind should be homog or inhomog.')
         return Aggregate(**spec)
@@ -1328,6 +1349,89 @@ class Aggregate(Frequency):
         df.loc['cv', 'theory'] = self.statistics_total_df.loc['Agg', 'agg_cv']  # report_ser[('agg', 'cv')]
         df['err'] = df['numeric'] / df['theory'] - 1
         return df
+
+    def apply_distortion(self, dist):
+        """
+        apply distortion to the aggregate density and append as exag column to density_df
+
+        :param dist:
+        :return:
+        """
+        if self.agg_density is None:
+            logger.warning(f'You must update before applying a distortion ')
+            return
+
+        S = self.density_df.S
+        # some dist return np others don't this converts to numpy...
+        gS = np.array(dist.g(S))
+        self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
+
+    def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
+        """
+        return the CL function relating surplus to eventual probability of ruin
+
+        Assumes frequency is Poisson
+
+        rho = prem / loss - 1 is the margin-to-loss ratio
+
+        cap = cap severity at cap - replace severity with X | X <= cap
+        excess = replace severit with X | X > cap (i.e. no shifting)
+        stop_loss = apply stop loss reinsurance to cap, so  X > stop_loss replaced with Pr(X > stop_loss) mass
+
+        Embrechts, Kluppelberg, Mikosch 1.2 Page 28 Formula 1.11
+
+        returns ruin vector as pd.Series and a function to lookup (no interpolation if kind==index; else interp) capitals
+
+        """
+
+        if self.sev_density is None:
+            raise ValueError("Must recalc first!")
+
+        bit = self.density_df.p_sev.copy()
+        if cap:
+            idx = np.searchsorted(bit.index, cap, 'right')
+            bit.iloc[idx:] = 0
+            bit = bit / bit.sum()
+        elif excess:
+            # excess may not be in the index...
+            idx = np.searchsorted(bit.index, excess, 'right')
+            bit.iloc[:idx] = 0
+            bit = bit / bit.sum()
+        elif stop_loss:
+            idx = np.searchsorted(bit.index, stop_loss, 'left')
+            xsprob = bit.iloc[idx+1:].sum()
+            bit.iloc[idx] += xsprob
+            bit.iloc[idx+1:] = 0
+        mean = np.sum(bit * bit.index)
+
+        # integrated F function
+        fi = bit.shift(-1, fill_value=0)[::-1].cumsum()[::-1].cumsum() * self.bs / mean
+        # difference = probability density
+        dfi = np.diff(fi, prepend=0)
+        # use loc FFT, with wrapping
+        fz = ft(dfi, padding, None)
+        mfz = 1 / (1 - fz / (1+rho))
+        f = ift(mfz, padding, None)
+        f = np.real(f) * rho / (1+rho)
+        f = np.cumsum(f)
+        ruin = pd.Series(1-f, index=bit.index)
+
+        if kind == 'index':
+            def find_u(p):
+                idx = len(ruin) - ruin[::-1].searchsorted(p, 'left')
+                return ruin.index[idx]
+        else:
+            def find_u(p):
+                below = len(ruin) - ruin[::-1].searchsorted(p, 'left')
+                above = below - 1
+                q_below = ruin.index[below]
+                q_above = ruin.index[above]
+                p_below = ruin.iloc[below]
+                p_above = ruin.iloc[above]
+                q = q_below + (p-p_below) / (p_above - p_below) * (q_above - q_below)
+                return q
+
+        return ruin, find_u, mean, dfi # , ruin2
 
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name=""):
         """

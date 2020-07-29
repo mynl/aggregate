@@ -4,5 +4,7 @@ pandas
 numpy
 matplotlib
 sly==0.3
-pypandoc==1.4
-
+pypandoc
+sphinx>=1.4
+ipykernel
+nbsphinx

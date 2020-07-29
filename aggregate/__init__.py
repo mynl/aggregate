@@ -2,9 +2,9 @@
 
 __docformat__ = 'restructuredtext'
 __author__ = "Stephen J. Mildenhall"
-__copyright__ = "Copyright 2018-2019, Convex Risk LLC"
+__copyright__ = "Copyright 2018-2020, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
-__version__ = "0.7.7"
+__version__ = "0.7.10"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 

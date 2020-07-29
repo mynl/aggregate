@@ -66,7 +66,8 @@ class Portfolio(object):
         self.name = name
         self.agg_list = []
         self.line_names = []
-        logger.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
+        logger.info(f'Portfolio.__init__| creating new Portfolio {self.name}')
+        # logger.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
         for spec in spec_list:
@@ -215,8 +216,11 @@ class Portfolio(object):
         :return:
         """
         # return str(self.to_dict())
-
-        s = [super(Portfolio, self).__repr__(), f"{{ 'name': '{self.name}'"]
+        # this messes up when port = self has been enhanced...
+        if isinstance(self, Portfolio):
+            s = [super(Portfolio, self).__repr__(), f"{{ 'name': '{self.name}'"]
+        else:
+            s = [f'Non-Portfolio (enhanced) object {{ "name": "{self.name}"']
         agg_list = [str({k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys})
                     for a in self.agg_list]
         s.append(f"'spec': [{', '.join(agg_list)}]")
@@ -836,8 +840,8 @@ class Portfolio(object):
         return round_bucket(bs)
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
-               sev_calc='discrete', discretization_calc='survival', padding=1, tilt_amount=0, epds=None,
-               trim_df=True, verbose=False, add_exa=True):
+               sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
+               trim_df=False, verbose=False, add_exa=True):
         """
         create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
@@ -855,6 +859,7 @@ class Portfolio(object):
         :param remove_fuzz: remove machine noise elements from FFT
         :param sev_calc: how to calculate the severity, discrete (point masses as xs) or continuous (uniform between xs points)
         :param discretization_calc:  survival or distribution (accurate on right or left tails)
+        :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
         :param padding: for fft 1 = double, 2 = quadruple
         :param tilt_amount: for tiling methodology - see notes on density for suggested parameters
         :param epds: epd points for priority analysis; if None-> sensible defaults
@@ -909,7 +914,7 @@ class Portfolio(object):
             raw_nm = agg.name
             nm = f'p_{agg.name}'
             _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
-                            sev_calc, discretization_calc, verbose=verbose)
+                            sev_calc, discretization_calc, normalize, verbose=verbose)
             if verbose:
                 display(_a)
             ft_line_density[raw_nm] = agg.ftagg_density
@@ -1009,7 +1014,7 @@ class Portfolio(object):
         self._cdf = None
 
     def update_efficiently(self, log2, bs, approx_freq_ge=100, approx_type='slognorm',
-                           sev_calc='discrete', discretization_calc='survival', padding=1):
+                           sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1):
         """
         runs stripped down versions of update and add_exa - bare bones
         code copied from those routines and cleaned for comments etc.
@@ -1049,7 +1054,7 @@ class Portfolio(object):
             raw_nm = agg.name
             nm = f'p_{agg.name}'
             _a = agg.update_efficiently(xs, self.padding, 'exact' if agg.n < approx_freq_ge else approx_type,
-                                        sev_calc, discretization_calc)
+                                        sev_calc, discretization_calc, normalize)
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
             if ft_all is None:
@@ -1781,9 +1786,9 @@ class Portfolio(object):
         # sum of p_total is so important...we will rescale it...
         if not np.all(df.p_total >= 0):
             # have negative densities...get rid of them
-            first_neg = np.argwhere((df.p_total < 0).to_numpy()).min()
+            first_neg = df.query('p_total < 0')  #  np.argwhere((df.p_total < 0).to_numpy()).min()
             logger.warning(
-                f'CPortfolio.add_exa | p_total has a negative value starting at {first_neg}; NOT setting to zero...')
+                f'CPortfolio.add_exa | p_total has a negative value starting at {first_neg.head()}; NOT setting to zero...')
             # TODO what does this all mean?!
             # df.p_total.iloc[first_neg:] = 0
         sum_p_total = df.p_total.sum()
@@ -2357,7 +2362,8 @@ class Portfolio(object):
 
         return ans_table, ans_stacked
 
-    def apply_distortion(self, dist, plots=None, df_in=None, create_augmented=True, mass_hints=None):
+    def apply_distortion(self, dist, plots=None, df_in=None, create_augmented=True, mass_hints=None,
+                         S_calculation='forwards'):
         """
         Apply the distortion, make a copy of density_df and append various columns to create augmented_df.
 
@@ -2409,6 +2415,8 @@ class Portfolio(object):
                 self.estimate_exi_x(). Mass hints needs to have a get-item method so that mass_hints[line] is the hint
                 for line. e.g. it can be a dictionary or pandas Series indexed by line names. mass_hints must sum to
                 1 over all lines. Total line obviously excluded.
+        :param S_calculation: if forwards, recompute S summing p_total forwards...this gets the tail right; the old method was
+                backwards, which does not change S
         :return: density_df with extra columns appended
         """
 
@@ -2417,6 +2425,13 @@ class Portfolio(object):
             df = self.density_df.copy()
         else:
             df = df_in
+
+        # PREVIOUSLY: did not make this adjustment because loss of resolution on small S values
+        # however, it doesn't work well for very thick tailed distributions, hence intro of S_calculation
+        # July 2020 (COVID-Trump madness) try this instead
+        if S_calculation == 'forwards':
+            logger.warning('Using updated S_forwards calculation in apply_distortion! ')
+            df['S'] = 1 - df.p_total.cumsum()
 
         # make g and ginv and other interpolation functions
         g, g_inv = dist.g, dist.g_inv
@@ -2462,13 +2477,20 @@ class Portfolio(object):
         # figure out where to truncate df (which turns into augmented_df)
         lnp = '|'.join(self.line_names)
         exeqa_err = np.abs(
-            (df.filter(regex=f'exeqa_({lnp})(?<!total)$').sum(axis=1) - df.loss) / df.loss)
+            (df.filter(regex=f'exeqa_({lnp})').sum(axis=1) - df.loss) / df.loss)
         exeqa_err.iloc[0] = 0
-        idx = np.argmax(exeqa_err > 1e-4)
-        df = df.iloc[:idx, :]
+        # print(exeqa_err)
+        idx = int(exeqa_err[exeqa_err < 1e-4].index[-1] / self.bs + 1)
+        # idx = np.argmax(exeqa_err > 1e-4)
+        if idx:
+            # if exeqa_err > 1e-4 is empty, np.argmax returns zero...do not want to truncate at zero in that case
+            df = df.iloc[:idx, :]
         # where S==0, which should be empty set
         gSeq0 = (df.gS == 0)
-        print(f'Truncating augmented_df at idx={idx}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+        if idx:
+            print(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+        else:
+            print(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
 
         # this should now apply in ALL mass situations...
         total_mass = 0
@@ -2824,12 +2846,13 @@ class Portfolio(object):
     def gamma(self, a=None, p=None, kind='', plot=False, compute_stand_alone=False, three_plot_xlim=-1,
               ylim_zoom=(1, 1e3), extreme_var=1 - 2e-8):
         """
-        Return the vector gamma_a(x), the sev_conditional layer effectiveness given assets a.
+        Return the vector gamma_a(x), the conditional layer effectiveness given assets a.
         Assets specified by percentile level and type (you need a in the index too hard to guess?)
         gamma can be created with no base and no calibration - it does not depend on a distortion.
         It only depends on total losses.
-        It does NOT vary by line - because of equal priority.
-        a must be in index?
+
+        Returns the total and by layer versions, see
+        "Main Result for Conditional Layer Effectiveness; Piano Diagram" in OneNote
 
         Originally in aggregate_extensions...but only involves one portfolio so should be in agg
         Note that you need upper and lower q's in aggs now too.
@@ -2874,7 +2897,12 @@ class Portfolio(object):
         # exeqa is closest to the raw output...
         # there maybe an INDEX ISSUE with add_exa...there are cumsums there that should be cumintegrals..
         # exeqa_total = loss of course...
+        # ?!! WTF surely this
         temp[f'exi_x1gta_{ln}'] = np.cumsum((temp[f'loss'] * temp.p_total / temp.loss)[::-1]) * self.bs
+        # equals this temp.S?!
+        s_ = np.cumsum(temp.p_total[::-1]) * self.bs
+        print('TEMP: the following should be close: ', np.allclose(s_[::-1], temp[f'exi_x1gta_{ln}']),
+                np.allclose(temp[f'exi_x1gta_{ln}'], temp.S * self.bs))
         #                               this V 1.0 is exi_x for total
         temp[gam_name] = np.cumsum((min_xa * 1.0 * temp.p_total)[::-1]) / \
                          (temp[f'exi_x1gta_{ln}']) * self.bs
@@ -2986,7 +3014,7 @@ class Portfolio(object):
         return Answer(augmented_df=temp.sort_index(axis=1), fig_gamma=spl, base=self.name,
                       fig_gamma_three_part=f, assets=a, p=p, kind=kind)
 
-    def price(self, reg_g, pricing_g=None):
+    def price(self, reg_g, pricing_g=None, method='apply_distortion'):
         """
         Price using regulatory and pricing g functions
             Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
@@ -2994,7 +3022,7 @@ class Portfolio(object):
 
             regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
 
-            * if input < 1 it is a number interpreted as a p value and used to deterine VaR capital
+            * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
             * if input > 1 it is a directly input  capital number
             * d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value a distortion used directly
 
@@ -3007,6 +3035,7 @@ class Portfolio(object):
         :param reg_g: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
         :param pricing_g: spec or CDistortion class or lr= or roe =; must have name= to define spec; if CDist that is
                           used
+        :param method: apply_distortion or quick; if quick does an (unaudited) calc here; ad returns more info
         :return:
         """
 
@@ -3019,6 +3048,7 @@ class Portfolio(object):
         # figure regulatory assets; applied to unlimited losses
         a_reg_ix = 0
         a_reg = 0
+        # note here that a distortion passes through...
         if isinstance(reg_g, float) or isinstance(reg_g, int):
             if reg_g > 1:
                 a_reg = reg_g
@@ -3037,6 +3067,11 @@ class Portfolio(object):
                     self.density_df.index.get_loc(a_reg, 'ffill'), 0]
             else:
                 reg_g = Distortion(**reg_g)
+        elif isinstance(reg_g, Distortion):
+            if reg_g.name == 'tvar':
+                a_reg = self.tvar(reg_g.shape)
+                a_reg_ix = self.density_df.iloc[
+                    self.density_df.index.get_loc(a_reg, 'ffill'), 0]
         if a_reg == 0:
             # still need to figure capital
             assert (isinstance(reg_g, Distortion))
@@ -3068,87 +3103,102 @@ class Portfolio(object):
             else:
                 pricing_g = Distortion(**pricing_g)
 
-        # create pricing distortion functions
-        g_pri, g_pri_inv = pricing_g.g, pricing_g.g_inv
+        if method == 'apply_distortion':
+            ans_ad = self.apply_distortion(pricing_g, create_augmented=False)
+            aug_row = ans_ad.augmented_df.loc[a_reg_ix, :]
 
-        # apply pricing distortion to create pricing probs
-        # pgS = g_pri(self.density_df.S)
-        # pgp_total = -np.diff(np.hstack((0, pgS)))  # adjusted incremental probabilities
+            # holder for the answer
+            df = pd.DataFrame(columns=['line', 'a_reg', 'exa', 'exag', 'margin', 'equity'], dtype=float)
+            df.columns.name = 'statistic'
+            df = df.set_index('line', drop=True)
 
-        # holder for the answer
-        df = pd.DataFrame(columns=['line', 'a_reg', 'exa', 'exag'], dtype=float)
-        df.columns.name = 'statistic'
-        df = df.set_index('line', drop=True)
+            for line in self.line_names_ex:
+                df.loc[line, :] = [a_reg_ix, aug_row[f'exa_{line}'], aug_row[f'exag_{line}'],
+                                   aug_row[f'T.M_{line}'], aug_row[f'T.Q_{line}']]
 
-        # E_Q((X \wedge a)E(X_i/X|X))
-        # W = np.minimum(self.density_df.loss, a_reg_ix)
-        # loop through lines and add details
-        # the Q measure
-        # some g's will return numpy (all except ph in fact return numpy arrays)
-        gS = pd.Series(g_pri(self.density_df.S), index=self.density_df.index)
-        # make this into a pandas series so the indexing works the same (otherwise it is an np object)
-        gp_total = -pd.Series(np.diff(np.hstack((1, gS))), index=self.density_df.index)
-        mass = 0
-        if pricing_g.has_mass:
-            mass = pricing_g.mass
-            mass *= a_reg_ix
-            logger.info(f'CPortfolio.price | {self.name}, Using mass {mass}')
-        for line in self.line_names:
-            # int E(Xi/X| X ge x)S = int d/da exa = exa DOES NOT WORK because uses ge x, and that is pre-computed
-            # using P and not Q
-            # AND have issue of weight at zero applying a capacity charge ??
-            # up to a_reg
-            # remember loc on df includes RHS
-            exag1 = np.sum(self.density_df.loc[0:a_reg_ix - self.bs, f'exeqa_{line}'] *
-                           gp_total.loc[0:a_reg_ix - self.bs])
-            # note: exi_xeqa = exeqa / loss
-            exag2 = np.sum(self.density_df.loc[a_reg_ix:, f'exeqa_{line}'] /
-                           self.density_df.loss.loc[a_reg_ix:] * gp_total.loc[a_reg_ix:]) * a_reg_ix
-            exag = exag1 + exag2
-            if mass > 0:
-                # need average EX_i_X for large X, which is tough to compute
-                lim_xi_x = self.density_df.loc[a_reg_ix, f'exi_xeqa_{line}']
-                exag += lim_xi_x * mass
-            # exag = np.sum(W * self.density_df[f'exi_xeqa_{line}'] * pgp_total)
+            df['lr'] = df.exa / df.exag
+            df['profit'] = df.exag - df.exa  # duplicate
+            # df.loc['total', 'ROE'] = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
+            df.loc['total', 'prDef'] = 1 - float(F(a_reg))
+            df['pct_loss'] = df.exa / df.loc['total', 'exa']
+            df['pct_prem'] = df.exag / df.loc['total', 'exag']
+            df['PQ'] = df.exag / df.equity
+            df['ROE'] = df.profit / df.equity
+
+        else:
+            # the original method
+            # create pricing distortion functions
+            g_pri, g_pri_inv = pricing_g.g, pricing_g.g_inv
+
+            # apply pricing distortion to create pricing probs
+            # pgS = g_pri(self.density_df.S)
+            # pgp_total = -np.diff(np.hstack((0, pgS)))  # adjusted incremental probabilities
+
+            # holder for the answer
+            df = pd.DataFrame(columns=['line', 'a_reg', 'exa', 'exag'], dtype=float)
+            df.columns.name = 'statistic'
+            df = df.set_index('line', drop=True)
+
+            # E_Q((X \wedge a)E(X_i/X|X))
+            # W = np.minimum(self.density_df.loss, a_reg_ix)
+            # loop through lines and add details
+            # the Q measure
+            # some g's will return numpy (all except ph in fact return numpy arrays)
+            gS = pd.Series(g_pri(self.density_df.S), index=self.density_df.index)
+            # make this into a pandas series so the indexing works the same (otherwise it is an np object)
+            gp_total = -pd.Series(np.diff(np.hstack((1, gS))), index=self.density_df.index)
+            mass = 0
+            if pricing_g.has_mass:
+                mass = pricing_g.mass
+                mass *= a_reg_ix
+                logger.info(f'CPortfolio.price | {self.name}, Using mass {mass}')
+            for line in self.line_names:
+                # int E(Xi/X| X ge x)S = int d/da exa = exa DOES NOT WORK because uses ge x, and that is pre-computed
+                # using P and not Q
+                # AND have issue of weight at zero applying a capacity charge ??
+                # up to a_reg
+                # remember loc on df includes RHS
+                exag1 = np.sum(self.density_df.loc[0:a_reg_ix - self.bs, f'exeqa_{line}'] *
+                               gp_total.loc[0:a_reg_ix - self.bs])
+                # note: exi_xeqa = exeqa / loss
+                exag2 = np.sum(self.density_df.loc[a_reg_ix:, f'exeqa_{line}'] /
+                               self.density_df.loss.loc[a_reg_ix:] * gp_total.loc[a_reg_ix:]) * a_reg_ix
+                exag = exag1 + exag2
+                if mass > 0:
+                    # need average EX_i_X for large X, which is tough to compute
+                    lim_xi_x = self.density_df.loc[a_reg_ix, f'exi_xeqa_{line}']
+                    exag += lim_xi_x * mass
+                # exag = np.sum(W * self.density_df[f'exi_xeqa_{line}'] * pgp_total)
+                df.loc[line, :] = [a_reg_ix, row[f'exa_{line}'], exag]
+
+            # total
+            line = 'total'
+            # if the g fun is degenerate you have the problem of capacity charge
+            # so int density does not work. have to use int S
+            # apply_distortion uses df['exag_total'] = cumintegral(df['gS'], self.bs)
+            # which is the same since it shifts forward
+            # old
+            # exag = np.sum(g_pri(self.density_df.loc[self.bs:a_reg_ix, 'S'])) * self.bs
+            # new
+            exag = np.sum(g_pri(self.density_df.loc[0:a_reg_ix - self.bs, 'S'])) * self.bs
+            assert (np.isclose(exag, np.sum(gS.loc[0:a_reg_ix - self.bs]) * self.bs))
             df.loc[line, :] = [a_reg_ix, row[f'exa_{line}'], exag]
 
-        # total
-        line = 'total'
-        # if the g fun is degenerate you have the problem of capacity charge
-        # so int density does not work. have to use int S
-        # apply_distortion uses df['exag_total'] = cumintegral(df['gS'], self.bs)
-        # which is the same since it shifts forward
-        # old
-        # exag = np.sum(g_pri(self.density_df.loc[self.bs:a_reg_ix, 'S'])) * self.bs
-        # new
-        exag = np.sum(g_pri(self.density_df.loc[0:a_reg_ix - self.bs, 'S'])) * self.bs
-        assert (np.isclose(exag, np.sum(gS.loc[0:a_reg_ix - self.bs]) * self.bs))
-        df.loc[line, :] = [a_reg_ix, row[f'exa_{line}'], exag]
-
-        # df.loc['sum', :] = df.filter(regex='^[^t]', axis=0).sum()
-        df['lr'] = df.exa / df.exag
-        df['profit'] = df.exag - df.exa
-        df.loc['total', 'ROE'] = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
-        df.loc['total', 'prDef'] = 1 - float(F(a_reg))
-        df['pct_loss'] = df.exa / df.loc['total', 'exa']
-        df['pct_prem'] = df.exag / df.loc['total', 'exag']
-        # ARB asset allocation: same leverage is silly
-        # df['a_reg'] = df.loc['total', 'a_reg'] * df.pct_prem
-        # same ROE?? NO
-        # ROE = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
-        # df['a_reg'] = df.profit / ROE + df.exag
-        df['lr'] = df.exa / df.exag
-        df['levg'] = df.exag / df.a_reg
-        df['ROE'] = df.profit / (df.a_reg - df.exag)
-        # for line in self.line_names:
-        #     ix = self.density_df.index[ self.density_df.index.get_loc(df.loc[line, 'a_reg'], 'ffill') ]
-        #     df.loc[line, 'prDef'] =  np.sum(self.density_df.loc[ix:, f'p_{line}'])
-        logger.info(f'CPortfolio.price | {self.name} portfolio pricing g {pricing_g}')
-        logger.info(f'CPortfolio.price | Capital sufficient to prob {float(F(a_reg)):7.4f}')
-        logger.info(f'CPortfolio.price | Capital quantization error {(a_reg - a_reg_ix) / a_reg:7.5f}')
-        if prem > 0:
-            logger.info(f'CPortfolio.price | Premium calculated as {prem:18,.1f}')
-            logger.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape}')
+            # df.loc['sum', :] = df.filter(regex='^[^t]', axis=0).sum()
+            df['lr'] = df.exa / df.exag
+            df['profit'] = df.exag - df.exa
+            df.loc['total', 'ROE'] = df.loc['total', 'profit'] / (df.loc['total', 'a_reg'] - df.loc['total', 'exag'])
+            df.loc['total', 'prDef'] = 1 - float(F(a_reg))
+            df['pct_loss'] = df.exa / df.loc['total', 'exa']
+            df['pct_prem'] = df.exag / df.loc['total', 'exag']
+            df['PQ'] = df.exag / df.a_reg
+            df['ROE'] = df.profit / (df.a_reg - df.exag)
+            # logger.info(f'CPortfolio.price | {self.name} portfolio pricing g {pricing_g}')
+            # logger.info(f'CPortfolio.price | Capital sufficient to prob {float(F(a_reg)):7.4f}')
+            # logger.info(f'CPortfolio.price | Capital quantization error {(a_reg - a_reg_ix) / a_reg:7.5f}')
+            # if prem > 0:
+            #     logger.info(f'CPortfolio.price | Premium calculated as {prem:18,.1f}')
+            #     logger.info(f'CPortfolio.price | Pricing distortion shape calculated as {pricing_g.shape}')
 
         return df, pricing_g
 
@@ -4242,7 +4292,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             self._renamer[f'gamma_{self.name}_total'] = f"γ {self.name} total"
 
         # for enhanced exhibits --- these are a bit specialized!
-        self._renamer = dict(mv="$\\mathit{MVL}(a)$??")
+        self._renamer['mv'] = "$\\mathit{MVL}(a)$??"
         for orig in self.line_names_ex:
             l = self.line_renamer.get(orig, orig).replace('$', '')
             if orig == 'total':

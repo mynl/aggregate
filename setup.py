@@ -9,7 +9,8 @@ import os
 
 tests_require = ['unittest', 'sly']
 install_requires = [
-    'sly>=0.3'
+    'pypandoc',
+    'sly==0.3'
 ]
 
 def read(fname):
@@ -24,7 +25,7 @@ setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version="0.7.7",
+      version="0.7.10",
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",
@@ -44,6 +45,6 @@ setup(name="aggregate",
           'Intended Audience :: Financial and Insurance Industry',
           'Intended Audience :: Education'
       ],
-      project_urls={"Documentation": 'http://www.mynl.com/aggregate_project/',
+      project_urls={"Documentation": 'https://aggregate.readthedocs.io/en/latest/',
                     "Source Code": "https://github.com/mynl/aggregate_project"}
       )

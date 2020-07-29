@@ -1026,7 +1026,7 @@ class Aggregate(Frequency):
     #     """
     #     return str(self.spec)
 
-    def discretize(self, sev_calc, discretization_calc='survival'):
+    def discretize(self, sev_calc, discretization_calc, normalize):
         """
         Continuous is used when you think of the resulting distribution as continuous across the buckets
         (which we generally don't). We use the discretized distribution as though it is fully discrete
@@ -1039,22 +1039,28 @@ class Aggregate(Frequency):
         other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
         the probabilities short. We opt here for the latter and rescale
 
-        :param sev_calc:  continuous or discrete or raw (for...)
-        :param discretization_calc:  survival, distribution or both
+        defaults: discrete, survival, True
+
+        :param sev_calc:  continuous or discrete or raw (for...);
+        and method becomes discrete otherwise
+        :param discretization_calc:  survival, distribution or both; in addition
+        the method then becomes survival
+        :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
+        when dealing with thick tailed distributions it can be helpful to turn it off.
         :return:
         """
 
         if sev_calc == 'continuous':
-            # adj_xs = np.hstack((self.xs, np.inf))  # undesirable mass at the end
             adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
         elif sev_calc == 'discrete':
-            # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))  # as above
+            # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
+            # mass at the end undesirable. can be put in with reinsurance layer in spec
             adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
         elif sev_calc == 'raw':
             adj_xs = self.xs
         else:
             raise ValueError(
-                f'Invalid parameter {sev_calc} passed to double_diff; options are raw, discrete or histogram')
+                f'Invalid parameter {sev_calc} passed to discretize; options are raw, discrete, continuous, inf or double.')
 
         # bed = bucketed empirical distribution
         beds = []
@@ -1062,16 +1068,20 @@ class Aggregate(Frequency):
             if discretization_calc == 'both':
                 # see comments: we rescale each severity...
                 appx = np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
-                beds.append(appx / np.sum(appx))
             elif discretization_calc == 'survival':
                 appx = -np.diff(fz.sf(adj_xs))
-                beds.append(appx / np.sum(appx))
+                # beds.append(appx / np.sum(appx))
             elif discretization_calc == 'distribution':
                 appx = np.diff(fz.cdf(adj_xs))
-                beds.append(appx / np.sum(appx))
+                # beds.append(appx / np.sum(appx))
             else:
                 raise ValueError(
                     f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
+            if normalize:
+                beds.append(appx / np.sum(appx))
+            else:
+                beds.append(appx)
+
 
         return beds
 
@@ -1097,7 +1107,7 @@ class Aggregate(Frequency):
         return self.update(xs, **kwargs)
 
     def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
-               discretization_calc='survival', force_severity=False, verbose=False):
+               discretization_calc='survival', normalize=True, force_severity=False, verbose=False):
         """
         Compute the density
 
@@ -1109,6 +1119,7 @@ class Aggregate(Frequency):
                 sgamma apply shifted lognormal or shifted gamma approximations.
         :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
         :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
+        :param normalize: normalize severity to 1.0
         :param force_severity: make severities even if using approximation, for plotting
         :param verbose: make partial plots and return details of all moments by limit profile or
                 severity mixture component.
@@ -1133,7 +1144,7 @@ class Aggregate(Frequency):
         if approximation == 'exact' or force_severity:
             wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
-            beds = self.discretize(sev_calc, discretization_calc)
+            beds = self.discretize(sev_calc, discretization_calc, normalize)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
                 self.sev_density += temp * w
                 if verbose:
@@ -1242,7 +1253,7 @@ class Aggregate(Frequency):
         self.verbose_audit_df = verbose_audit_df
 
     def update_efficiently(self, xs, padding=1, approximation='exact', sev_calc='discrete',
-               discretization_calc='survival'):
+               discretization_calc='survival', normalize=True):
         """
         Compute the density with absolute minimum overhead. Called by port.update_efficiently
         Started with code for update and removed frills
@@ -1266,7 +1277,7 @@ class Aggregate(Frequency):
         if approximation == 'exact':
             wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
-            beds = self.discretize(sev_calc, discretization_calc)
+            beds = self.discretize(sev_calc, discretization_calc, normalize)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
                 self.sev_density += temp * w
 
@@ -1366,7 +1377,7 @@ class Aggregate(Frequency):
         gS = np.array(dist.g(S))
         self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
 
-    def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
+    def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=0):
         """
         return the CL function relating surplus to eventual probability of ruin
 
@@ -1997,14 +2008,22 @@ class Aggregate(Frequency):
         :param p:
         :return:
         """
-        # function not vectorized
-        q = float(self.q(p, 'middle'))
-        l1 = self.density_df.index.get_loc(q, 'bfill')
-        q1 = self.density_df.index[l1]
+        # match Portfolio method
+        _var = self.q(p)
+        ex = self.density_df.loc[_var + self.bs:, ['p', 'loss']].product(axis=1).sum()
+        pip = (self.density_df.loc[_var, 'F'] - p) * _var
+        t_var = 1 / (1 - p) * (ex + pip)
+        return t_var
 
-        i1 = np.trapz(self.density_df.loc[q1:, 'S'], dx=self.bs)
-        i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
-        return q + (i1 + i2) / (1 - p)
+        # original version
+        # function not vectorized
+        # q = float(self.q(p, 'middle'))
+        # l1 = self.density_df.index.get_loc(q, 'bfill')
+        # q1 = self.density_df.index[l1]
+        #
+        # i1 = np.trapz(self.density_df.loc[q1:, 'S'], dx=self.bs)
+        # i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
+        # return q + (i1 + i2) / (1 - p)
 
     def cdf(self, x):
         """

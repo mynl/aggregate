@@ -489,7 +489,7 @@ class UnderwritingParser(Parser):
             # but if there is a mean it handles the scaling and setting scale will
             # confuse the distribution maker
             p.sev['sev_scale'] = p.numbers
-        # if there is a location it needs to scale too
+        # if there is a location it needs to scale too --- that's a curious choice!
         if 'sev_loc' in p.sev:
             p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(p.sev['sev_loc'])
             p.sev['sev_loc'] *= p.numbers

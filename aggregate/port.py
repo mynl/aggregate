@@ -2430,7 +2430,7 @@ class Portfolio(object):
         # however, it doesn't work well for very thick tailed distributions, hence intro of S_calculation
         # July 2020 (COVID-Trump madness) try this instead
         if S_calculation == 'forwards':
-            logger.warning('Using updated S_forwards calculation in apply_distortion! ')
+            # logger.warning('Using updated S_forwards calculation in apply_distortion! ')
             df['S'] = 1 - df.p_total.cumsum()
 
         # make g and ginv and other interpolation functions

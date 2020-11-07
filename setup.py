@@ -6,12 +6,18 @@
 
 from setuptools import setup
 import os
+from time import time
 
 tests_require = ['unittest', 'sly']
 install_requires = [
     'pypandoc',
-    'sly==0.3'
+    'sly==0.3',
+    'scipy',
+    'seaborn',
+    'matplotlib',
+    'numpy'
 ]
+
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
@@ -19,13 +25,33 @@ def read(fname):
 
 long_description = read('README.rst')
 
+
+def version_number():
+    with open('version_number.md', 'r') as f:
+        t = f.read()
+    lt = t.split('\n')
+    last_update = float(lt[1])
+    # updates at least one hour apart
+    if time() - last_update > 60 * 60:
+        s = lt[0].strip().split('.')
+        n = int(s[-1])
+        s[-1] = str(n+1)
+        t = '.'.join(s)
+        with open('version_number.md', 'w') as f:
+            f.write(f'{t}\n{time()}')
+            print(f'Updated version number to {t}')
+    else:
+        t = lt[0].strip()
+        print('No change')
+    return t
+
 # agg/*.agg is the parameter and curve files
 
 setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version="0.7.10",
+      version=version_number(),
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",

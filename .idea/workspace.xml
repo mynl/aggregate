@@ -3,20 +3,16 @@
   <component name="ChangeListManager">
     <list default="true" id="a8a80d4d-b016-4e6c-a235-974329ccac42" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/aggregate/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/distr.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/distr.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aggregate/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/parser.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/aggregate/port.py" beforeDir="false" afterPath="$PROJECT_DIR$/aggregate/port.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/conf.py" beforeDir="false" afterPath="$PROJECT_DIR$/doc/conf.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/freq_and_broadcasting.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/test/freq_and_broadcasting.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
-  </component>
-  <component name="FavoritesManager">
-    <favorites_list name="aggregate_project" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -32,7 +28,6 @@
   <component name="ProjectId" id="1VV4WTzaxcqPw20wkm6rLgd26d4" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showExcludedFiles" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
@@ -102,22 +97,7 @@
       <method v="2" />
     </configuration>
   </component>
-  <component name="ServiceViewManager">
-    <option name="viewStates">
-      <list>
-        <serviceView>
-          <treeState>
-            <expand />
-            <select />
-          </treeState>
-        </serviceView>
-      </list>
-    </option>
-  </component>
-  <component name="StructureViewFactory">
-    <option name="AUTOSCROLL_FROM_SOURCE" value="true" />
-    <option name="ACTIVE_ACTIONS" value=",SHOW_INHERITED,ALPHA_COMPARATOR" />
-  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="project-level" UseSingleDictionary="true" transferred="true" />
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -162,21 +142,23 @@
       <workItem from="1593380273477" duration="3443000" />
       <workItem from="1593987032931" duration="10370000" />
       <workItem from="1595103765170" duration="16785000" />
-      <workItem from="1595770949897" duration="8436000" />
+      <workItem from="1595770949897" duration="9032000" />
+      <workItem from="1596134120386" duration="606000" />
+      <workItem from="1598454052582" duration="1146000" />
+      <workItem from="1603913016770" duration="2036000" />
+      <workItem from="1604120250117" duration="3110000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="1" />
+    <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
           <value>
-            <State>
-              <option name="COLUMN_ORDER" />
-            </State>
+            <State />
           </value>
         </entry>
       </map>
@@ -195,62 +177,17 @@
         </entry>
       </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="615" y="406" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1590007530377">
-      <screen x="67" y="0" width="2183" height="1500" />
+    <state x="943" y="505" key="FileChooserDialogImpl" timestamp="1603913035080">
+      <screen x="74" y="0" width="2176" height="1500" />
     </state>
-    <state x="615" y="406" key="#com.intellij.execution.impl.EditConfigurationsDialog/67.0.2183.1500@67.0.2183.1500" timestamp="1590007530377" />
-    <state x="941" y="506" key="FileChooserDialogImpl" timestamp="1595106597796">
-      <screen x="68" y="0" width="2182" height="1500" />
+    <state x="943" y="505" key="FileChooserDialogImpl/74.0.2176.1500/4562.0.2498.1440@74.0.2176.1500" timestamp="1603913035080" />
+    <state x="872" y="482" width="579" height="534" key="find.popup" timestamp="1603938504892">
+      <screen x="74" y="0" width="2176" height="1500" />
     </state>
-    <state x="940" y="506" key="FileChooserDialogImpl/67.0.2183.1500@67.0.2183.1500" timestamp="1587907296247" />
-    <state x="941" y="506" key="FileChooserDialogImpl/68.0.2182.1500/4562.0.2498.1440@68.0.2182.1500" timestamp="1595106597796" />
-    <state width="2140" height="532" key="GridCell.Tab.0.bottom" timestamp="1590370540594">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
-    <state width="2140" height="532" key="GridCell.Tab.0.center" timestamp="1590370540594">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
-    <state width="2140" height="532" key="GridCell.Tab.0.left" timestamp="1590370540593">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540593" />
-    <state width="2140" height="532" key="GridCell.Tab.0.right" timestamp="1590370540594">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.0.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
-    <state width="2140" height="532" key="GridCell.Tab.1.bottom" timestamp="1590370540595">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.bottom/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
-    <state width="2140" height="532" key="GridCell.Tab.1.center" timestamp="1590370540595">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.center/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
-    <state width="2140" height="532" key="GridCell.Tab.1.left" timestamp="1590370540594">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.left/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540594" />
-    <state width="2140" height="532" key="GridCell.Tab.1.right" timestamp="1590370540595">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="2140" height="532" key="GridCell.Tab.1.right/67.0.2183.1500@67.0.2183.1500" timestamp="1590370540595" />
-    <state x="661" y="393" key="SettingsEditor" timestamp="1589985892320">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state x="661" y="393" key="SettingsEditor/67.0.2183.1500@67.0.2183.1500" timestamp="1589985892320" />
-    <state width="498" height="446" key="SwitcherDM" timestamp="1589991377294">
-      <screen x="67" y="0" width="2183" height="1500" />
-    </state>
-    <state width="498" height="446" key="SwitcherDM/67.0.2183.1500@67.0.2183.1500" timestamp="1589991377294" />
-    <state x="5425" y="329" width="769" height="651" key="search.everywhere.popup" timestamp="1595183991094">
-      <screen x="4562" y="0" width="2498" height="1440" />
-    </state>
-    <state x="821" y="343" width="672" height="678" key="search.everywhere.popup/67.0.2183.1500@67.0.2183.1500" timestamp="1589981207746" />
-    <state x="5425" y="329" width="769" height="651" key="search.everywhere.popup/68.0.2182.1500/4562.0.2498.1440@4562.0.2498.1440" timestamp="1595183991094" />
+    <state x="872" y="482" width="579" height="534" key="find.popup/74.0.2176.1500/4562.0.2498.1440@74.0.2176.1500" timestamp="1603938504892" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

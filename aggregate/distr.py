@@ -807,7 +807,7 @@ class Aggregate(Frequency):
                           sev_conditional=sev_conditional,
                           freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
         logger.info(
-            f'Aggregate.__init__ | creating new Aggregate {self.name} at {super(Aggregate, self).__repr__()}')
+            f'Aggregate.__init__ | creating new Aggregate {self.name}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
         self.note = note
         self.sev_density = None
@@ -2543,12 +2543,15 @@ class Severity(ss.rv_continuous):
 
         # quad returns abs error
         eps = 1e-5
-        if not ((ex1[1] / ex1[0] < eps or ex1[1] < 1e-4) and
-                (ex2[1] / ex2[0] < eps or ex2[1] < 1e-4) and
-                (ex3[1] / ex3[0] < eps or ex3[1] < 1e-6)):
-            logger.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
-                        f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1] / ex1[0]}\t{ex2[1] / ex2[0]}\t'
-                        f'{ex3[1] / ex3[0]}')
+        try:
+            if not ((ex1[1] / ex1[0] < eps or ex1[1] < 1e-4) and
+                    (ex2[1] / ex2[0] < eps or ex2[1] < 1e-4) and
+                    (ex3[1] / ex3[0] < eps or ex3[1] < 1e-6)):
+                logger.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs '
+                            f'\t{ex1[1]}\t{ex2[1]}\t{ex3[1]} \trel errors \t{ex1[1] / ex1[0]}\t{ex2[1] / ex2[0]}\t'
+                            f'{ex3[1] / ex3[0]}')
+        except ZeroDivisionError:
+            logger.info(f'Severity.moms | **DOUBTFUL** convergence of integrals, abs errs, zero means {ex1[0]}, {ex2[0]}, {ex2[0]}.')
             # raise ValueError(f' Severity.moms | doubtful convergence of integrals, abs errs '
             #                  f'{ex1[1]}, {ex2[1]}, {ex3[1]} rel errors {ex1[1]/ex1[0]}, {ex2[1]/ex2[0]}, '
             #                  f'{ex3[1]/ex3[0]}')

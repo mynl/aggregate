@@ -68,7 +68,7 @@ author = 'Stephen J. Mildenhall'
 version = '0.7'
 # The full version, including alpha/beta/rc tags.
 def get_version():
-    with open('c:\\s\\telos\\python\\aggregate_project\\version_number.md', 'r') as f:
+    with open('./version_number.md', 'r') as f:
             t = f.read()
     lt = t.split('\n')
     return lt[0]

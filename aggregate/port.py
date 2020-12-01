@@ -66,8 +66,8 @@ class Portfolio(object):
         self.name = name
         self.agg_list = []
         self.line_names = []
-        logger.info(f'Portfolio.__init__| creating new Portfolio {self.name}')
-        # logger.info(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
+        logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name}')
+        # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
         for spec in spec_list:
@@ -85,7 +85,7 @@ class Portfolio(object):
                 try:
                     a = uw(spec)
                 except e:
-                    print(f'Item {spec} not found in your underwriter')
+                    logger.error(f'Item {spec} not found in your underwriter')
                     raise e
                 agg_name = a.name
             elif isinstance(spec, tuple):
@@ -206,7 +206,7 @@ class Portfolio(object):
             eps = np.finfo(np.float).eps
 
         if self._remove_fuzz or force:
-            logger.info(f'CPortfolio.remove_fuzz | Removing fuzz from {self.name} dataframe, caller {log}')
+            logger.debug(f'CPortfolio.remove_fuzz | Removing fuzz from {self.name} dataframe, caller {log}')
             df.loc[:, df.select_dtypes(include=['float64']).columns] = \
                 df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
 
@@ -338,7 +338,7 @@ class Portfolio(object):
         d['args'] = args
         d['spec_list'] = [a._spec for a in self.agg_list]
 
-        logger.info(f'Portfolio.json| dummping {self.name} to {stream}')
+        logger.debug(f'Portfolio.json| dummping {self.name} to {stream}')
         s = json.dumps(d)  # , default_flow_style=False, indent=4)
         logger.debug(f'Portfolio.json | {s}')
         if stream is None:
@@ -360,7 +360,7 @@ class Portfolio(object):
 
         with open(filename, mode=mode) as f:
             self.json(stream=f)
-            logger.info(f'Portfolio.save | {self.name} saved to {filename}')
+            logger.debug(f'Portfolio.save | {self.name} saved to {filename}')
 
     def __add__(self, other):
         """
@@ -431,6 +431,16 @@ class Portfolio(object):
             d['frequency']['n'] *= other
 
         return Portfolio(f'Sum of {other} copies of {self.name}', new_spec)
+
+    def snap(self, x):
+        """
+        snap value x to the index of density_df
+
+        :param x:
+        :return:
+        """
+        ix = self.density_df.index.get_loc(x, 'nearest')
+        return self.density_df.iat[ix, 0]
 
     def audits(self, kind='all', **kwargs):
         """
@@ -596,7 +606,7 @@ class Portfolio(object):
         """
         return self.q(p)
 
-    def tvar(self, p):
+    def tvar(self, p, kind='interp'):
         """
         Compute the tail value at risk at threshold p
 
@@ -614,25 +624,25 @@ class Portfolio(object):
 
 
         :param p:
+        :param kind:  'interp' = interpolate exgta_total;  'tail' tail integral, 'body' NYI - (ex - body integral)/(1-p)+v
         :return:
         """
         assert self.density_df is not None
 
-        _var = self.q(p)
-        # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
-        # if you pick bs to be binary-consistent this error will not occur
-        # ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p_total', 'loss']].product(axis=1).sum()
-        ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
-        pip = (self.density_df.loc[_var, 'F'] - p) * _var
-        t_var = 1 / (1 - p) * (ex + pip)
-        return t_var
-        # original implementation interpolated
-        # if self._tail_var is None:
-        #     # make tvar function
-        #     self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
-        #                                           kind='linear', bounds_error=False,
-        #                                           fill_value='extrapolate')
-        # return self._tail_var(p)
+        if kind=='tail':
+            _var = self.q(p)
+            ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
+            pip = (self.density_df.loc[_var, 'F'] - p) * _var
+            t_var = 1 / (1 - p) * (ex + pip)
+            return t_var
+        else:
+            # original implementation interpolated
+            if self._tail_var is None:
+                # make tvar function
+                self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
+                                                      kind='linear', bounds_error=False,
+                                                      fill_value='extrapolate')
+            return float(self._tail_var(p))
 
     def tvar_threshold(self, p, kind):
         """
@@ -882,7 +892,7 @@ class Portfolio(object):
         self.discretization_calc = discretization_calc
 
         if self.hash_rep_at_last_update == hash(self):
-            print(f'Nothing has changed since last update at {self.last_update}')
+            logger.warning(f'Nothing has changed since last update at {self.last_update}')
             return
 
         ft_line_density = {}
@@ -979,7 +989,7 @@ class Portfolio(object):
         if add_exa:
             self.add_exa(self.density_df, details=True)
             # default priority analysis
-            logger.info('Adding EPDs in Portfolio.update')
+            logger.debug('Adding EPDs in Portfolio.update')
             if epds is None:
                 epds = np.hstack(
                     [np.linspace(0.5, 0.1, 4, endpoint=False)] +
@@ -1585,7 +1595,7 @@ class Portfolio(object):
             temp = D.filter(regex='^exa_[^η]')
             # need to check exa actually computed
             if temp.shape[1] == 0:
-                print('Update exa before audit plot')
+                logger.error('Update exa before audit plot')
                 return
 
             ax = axiter.grid(1)
@@ -2394,8 +2404,7 @@ class Portfolio(object):
         To do so requires an estimate of E[X_i/X | X=sup loss or infty], which is hard because the estimates tend to
         become unstable in the right tail and we only have estimates upto the largest modeled value, not actually
         infinity. In order to circumvent this difficulty introduce the mass_hint variable where you specifically
-        input estimates of the values. mass_hint is optional. Make a estimate_exi_x function to come up with plausible
-        estimates that are used if no hint is given.
+        input estimates of the values. mass_hint is optional.
 
         Note that if the largest loss really is infinite then exag will be infinite when there is a mass.
 
@@ -2412,7 +2421,7 @@ class Portfolio(object):
         :param df_in: when called from gradient you want to pass in gradient_df and use that; otherwise use self.density_df
         :param create_augmented: store the output in self.augmented_df
         :param mass_hints: hints for values of E[X_i/X | X=x] as x --> infty (optional; if not entered estimated using
-                self.estimate_exi_x(). Mass hints needs to have a get-item method so that mass_hints[line] is the hint
+                last reliable value. Mass hints needs to have a get-item method so that mass_hints[line] is the hint
                 for line. e.g. it can be a dictionary or pandas Series indexed by line names. mass_hints must sum to
                 1 over all lines. Total line obviously excluded.
         :param S_calculation: if forwards, recompute S summing p_total forwards...this gets the tail right; the old method was
@@ -2476,21 +2485,29 @@ class Portfolio(object):
 
         # figure out where to truncate df (which turns into augmented_df)
         lnp = '|'.join(self.line_names)
+        # in discrete distributions there are "gaps" of impossible values; do not want to worry about these
+        idx_pne0 = df.query(' p_total > 0 ').index
         exeqa_err = np.abs(
-            (df.filter(regex=f'exeqa_({lnp})').sum(axis=1) - df.loss) / df.loss)
+            (df.loc[idx_pne0].filter(regex=f'exeqa_({lnp})').sum(axis=1) - df.loc[idx_pne0].loss) /
+            df.loc[idx_pne0].loss)
         exeqa_err.iloc[0] = 0
         # print(exeqa_err)
+        # +1 because when you iloc you lose the last element (two code lines down)
         idx = int(exeqa_err[exeqa_err < 1e-4].index[-1] / self.bs + 1)
         # idx = np.argmax(exeqa_err > 1e-4)
+        logger.info(f'index of max reliable value= {idx}')
         if idx:
             # if exeqa_err > 1e-4 is empty, np.argmax returns zero...do not want to truncate at zero in that case
             df = df.iloc[:idx, :]
         # where S==0, which should be empty set
         gSeq0 = (df.gS == 0)
+        logger.info(f'S==0 values: {df.gS.loc[gSeq0]}')
         if idx:
-            print(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+            logger.info(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+            # print(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
         else:
-            print(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+            logger.info(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
+            # print(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
 
         # this should now apply in ALL mass situations...
         total_mass = 0
@@ -2499,28 +2516,35 @@ class Portfolio(object):
             # S better be decreasing
             if not np.alltrue(S.iloc[1:] <= S.iloc[:-1].values):
                 logger.error('S = density_df.S is not non-increasing...carrying on but you should investigate...')
-            idx_ess_sup = S.to_numpy().nonzero()[0][-1]
-            logger.warning(f'Index of ess_sup is {idx_ess_sup}')
-            print(f'Index of ess_sup is {idx_ess_sup}')
+            # index where S>0 implies NEXT row must have p_total > 0 (since that will be the S value)
+            # hence need to add one here
+            idx_ess_sup = S.to_numpy().nonzero()[0][-1] + 1
+            logger.info(f'Index of ess_sup is {idx_ess_sup}')
+            # print(f'Index of ess_sup is {idx_ess_sup}')
             total_mass = np.zeros_like(S)
             # locations and amount of mass to be added to computation of exi_xgtag below...
-            total_mass[:idx_ess_sup + 1] = dist.mass
-            print(total_mass)
+            # was + 1, removed...   v
+            total_mass[:idx_ess_sup   ] = dist.mass
+            logger.info(f'total_mass vector = {total_mass}')
+            # print(f'total_mass vector = {total_mass}')
 
         if dist.mass and mass_hints is None:
+            logger.warning('No mass_hints given...estimating...')
             mass_hints = pd.Series(index=self.line_names)
             for line in self.line_names:
-                logger.warning(f'Individual line={line}')
-                print(f'Individual line={line}')
+                # logger.warning(f'Individual line={line}')
+                # print(f'Individual line={line}')
                 mass_hints[line] = df[f'exi_xeqa_{line}'].iloc[-1]
-                for ii in range(1, max(self.log2 - 4, 0)):
+                for ii in range(1, min(4, max(self.log2 - 8, 0))):
                     avg_xix = df[f'exi_xeqa_{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
-                    logger.warning(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
-                                   f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]:.5g}')
-                    print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
-                                   f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]:.5g}')
-                logger.warning('You want these values all to be consistent!')
-            print(f'Estimated mass_hints is {mass_hints}')
+                    logger.info(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last trusted '
+                                   f'is {mass_hints[line]:.5g}')
+                                   # f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]:.5g}')
+                    # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
+                    #                f'is {mass_hints[line]:.5g}')
+                logger.info('Generally, you want these values to be consistent, except for discrete distributions.')
+            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()}')
+            # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
         for line in self.line_names:
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
@@ -2608,18 +2632,23 @@ class Portfolio(object):
                 # only need to add masses up to this point - an issue for bounded variables
                 # mass = total_mass * self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup]
                 # TODO Is indexing added so it aligns with what it is added to?
-                mass = total_mass * mass_hints[line]
-                ημ_mass = total_mass * (np.sum(mass_hints) - mass_hints[line])
+                if np.allclose(1.0, df.gp_total.sum()):
+                    logger.info('gp_total sums to 1, mass accounted for in gp_total; no further adjustment needed')
+                    mass = ημ_mass = 0.
+                else:
+                    mass = total_mass * mass_hints[line]
+                    ημ_mass = total_mass * (np.sum(mass_hints) - mass_hints[line])
+                    logger.info(f'gp_total  < 0, setting {line} mass = {mass}')
             # original
             # df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
             #             df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
             # df['exi_xgtag_ημ_' + line] = ((df[f'exeqa_ημ_{line}'] / df.loss *
             #                                df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
-            df['exi_xgtag_' + line] = \
+            df.loc[:, 'exi_xgtag_' + line] = \
                 ((df[f'exeqa_{line}'] / df.loss * df.gp_total).shift(-1)[::-1].cumsum() + mass) / df.gS
-            df['exi_xgtag_ημ_' + line] = \
+            df.loc[:, 'exi_xgtag_ημ_' + line] = \
                 ((df[f'exeqa_ημ_{line}'] / df.loss * df.gp_total).shift(-1)[::-1].cumsum() + ημ_mass) / df.gS
-            # need these to be zero so nan's do not propogate
+            # need these to be zero so nan's do not propagate
             df.loc[gSeq0, 'exi_xgtag_' + line] = 0.
             df.loc[gSeq0, 'exi_xgtag_ημ_' + line] = 0.
             #
@@ -2627,8 +2656,14 @@ class Portfolio(object):
             # following the Audit Vignette this is the way to go:
             # in fact, need to shift both down because cumint (prev just gS, but int beta g...integrands on same
             # basis
-            df[f'exag_{line}'] = (df[f'exi_xgtag_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
-            df[f'exag_ημ_{line}'] = (df[f'exi_xgtag_ημ_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
+            # df.loc[:, f'exag_{line}'] = (df[f'exi_xgtag_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
+            # df.loc[:, f'exag_ημ_{line}'] = (df[f'exi_xgtag_ημ_{line}'].shift(1) * df.gS.shift(1)).cumsum() * self.bs
+            # np.allclose(
+            #    (df[f'exi_xgtag_{line}'].shift(1, fill_value=0) * df.gS.shift(1, fill_value=0)).cumsum() * self.bs,
+            #     (df[f'exi_xgtag_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs)
+            # Doh
+            df.loc[:, f'exag_{line}'] = (df[f'exi_xgtag_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs
+            df.loc[:, f'exag_ημ_{line}'] = (df[f'exi_xgtag_ημ_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs
             # maybe sometime you want this unchecked item?
             # df[f'exleag_1{line}'] = np.cumsum( df[f'exeqa_{line}'] * df.p_total )
             # it makes a difference NOT to divivde by df.gS but to compute the actual weights you are using (you mess
@@ -2647,12 +2682,12 @@ class Portfolio(object):
             # df[f'RAW_{line}'] = self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] * \
             #     df.loc[::-1, 'gp_total']
         # sum of parts: careful not to include the total twice!
-        df['exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
+        df.loc[:, 'exag_sumparts'] = df.filter(regex='^exag_[^η]').sum(axis=1)
         # LEV under distortion g
         # originally
         # df['exag_total'] = self.cumintegral(df['gS'])
         # revised  cumintegral does: v.shift(1, fill_value=0).cumsum() * bs
-        df['exag_total'] = df.gS.shift(1, fill_value=0).cumsum() * self.bs
+        df.loc[:, 'exag_total'] = df.gS.shift(1, fill_value=0).cumsum() * self.bs
         # df.loc[0, 'exag_total'] = 0
 
         # comparison of total and sum of parts
@@ -2660,28 +2695,35 @@ class Portfolio(object):
         # [MT].[L LR Q P M]_line: marginal or total (ground-up) loss, loss ratio etc.
         # do NOT divide MARGINAL versions by bs because they are per 1 wide layer
         # df['lookslikemmtotalxx'] = (df.gS - df.S)
-        df['M.M_total'] = (df.gS - df.S)
-        df['M.Q_total'] = (1 - df.gS)
+        df.loc[:, 'M.M_total'] = (df.gS - df.S)
+        df.loc[:, 'M.Q_total'] = (1 - df.gS)
         # hummmm.aliases, but...?
-        df['M.L_total'] = df['S']
-        df['M.P_total'] = df['gS']
+        df.loc[:, 'M.L_total'] = df['S']
+        df.loc[:, 'M.P_total'] = df['gS']
         # df['T.L_total'] = df['exa_total']
         # df['T.P_total'] = df['exag_total']
-        # critical insight is the layer ROEs are the same for all lines (law invariance)
-        df['M.ROE_total'] = df['M.M_total'] / df['M.Q_total']
+        # critical insight is the layer ROEs are the same for all lines by law invariance
+        # lhopital's rule estimate of g'(1) = ROE(1)
+        # this could blow up...  TODO extend Distortion class to return gprime1
+        ϵ = 1e-10
+        gprime1 = (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
+        df.loc[:, 'M.ROE_total'] = np.where(df['M.Q_total']!=0,
+                                            df['M.M_total'] / df['M.Q_total'],
+                                            gprime1)
         # where is the ROE zero? need to handle separately else Q will blow up
         roe_zero = (df['M.ROE_total'] == 0.0)
+        # print(f"g'(0)={gprime1:.5f}\nroe zero vector {roe_zero}")
         for line in self.line_names_ex:
-            df[f'exa_{line}_pcttotal'] = df['exa_' + line] / df.exa_total
-            df[f'exag_{line}_pcttotal'] = df['exag_' + line] / df.exag_total
+            df.loc[:, f'exa_{line}_pcttotal'] = df['exa_' + line] / df.exa_total
+            df.loc[:, f'exag_{line}_pcttotal'] = df['exag_' + line] / df.exag_total
             # hummm more aliases
-            df[f'T.L_{line}'] = df[f'exa_{line}']
-            df[f'T.P_{line}'] = df[f'exag_{line}']
+            df.loc[:, f'T.L_{line}'] = df[f'exa_{line}']
+            df.loc[:, f'T.P_{line}'] = df[f'exag_{line}']
             df.loc[0, f'T.P_{line}'] = 0
             # TOTALs = ground up cumulative sums
             # exag is the layer (marginal) premium and exa is the layer (marginal) loss
-            df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
-            df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
+            df.loc[:, f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
+            df.loc[:, f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
             df.loc[0, f'T.M_{line}'] = 0
             # MARGINALs
             # MM should be per unit width layer so need to divide by bs
@@ -2694,36 +2736,36 @@ class Portfolio(object):
             # old
             # df[f'M.M_{line}'] = np.diff(df[f'T.M_{line}'], prepend=0) / self.bs
             # new:
-            df[f'M.M_{line}'] = df[f'T.M_{line}'].diff().shift(-1) / self.bs
+            df.loc[:, f'M.M_{line}'] = df[f'T.M_{line}'].diff().shift(-1) / self.bs
             # careful about where ROE==0
-            df[f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE_total']
-            df[f'M.Q_{line}'].iloc[-1] = 0
+            df.loc[:, f'M.Q_{line}'] = df[f'M.M_{line}'] / df['M.ROE_total']
+            df.loc[:, f'M.Q_{line}'].iloc[-1] = 0
             df.loc[roe_zero, f'M.Q_{line}'] = np.nan
             # WHAT IS THE LAYER AT ZERO? Should it have a price? What is that price?
             # TL and TP at zero are both 1
             if line != 'total':
-                df[f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
-                df[f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
-            df[f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
+                df.loc[:, f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
+                df.loc[:, f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
+            df.loc[:, f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
             # for total need to reflect layer width...
             # Jan 2020 added shift down
-            df[f'T.Q_{line}'] = df[f'M.Q_{line}'].shift(1).cumsum() * self.bs
+            df.loc[:, f'T.Q_{line}'] = df[f'M.Q_{line}'].shift(1).cumsum() * self.bs
             df.loc[0, f'T.Q_{line}'] = 0
-            df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
+            df.loc[:, f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
             # leverage
-            df[f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
-            df[f'M.PQ_{line}'] = df[f'M.P_{line}'] / df[f'M.Q_{line}']
+            df.loc[:, f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
+            df.loc[:, f'M.PQ_{line}'] = df[f'M.P_{line}'] / df[f'M.Q_{line}']
 
         # in order to undo some numerical issues, things will slightly not add up
         # but that appears to be a numerical issue around the calc of exag
         # TODO investiage why exag calc less accurate than exa calc
-        df['T.L_total'] = df['exa_total']
-        df['T.P_total'] = df['exag_total']
-        df['T.Q_total'] = df.loss - df['exag_total']
-        df['T.M_total'] = df['exag_total'] - df['exa_total']
-        df['T.PQ_total'] = df['T.P_total'] / df['T.Q_total']
-        df['T.LR_total'] = df['T.L_total'] / df['T.P_total']
-        df['T.ROE_total'] = df['T.M_total'] / df['T.Q_total']
+        df.loc[:, 'T.L_total'] = df['exa_total']
+        df.loc[:, 'T.P_total'] = df['exag_total']
+        df.loc[:, 'T.Q_total'] = df.loss - df['exag_total']
+        df.loc[:, 'T.M_total'] = df['exag_total'] - df['exa_total']
+        df.loc[:, 'T.PQ_total'] = df['T.P_total'] / df['T.Q_total']
+        df.loc[:, 'T.LR_total'] = df['T.L_total'] / df['T.P_total']
+        df.loc[:, 'T.ROE_total'] = df['T.M_total'] / df['T.Q_total']
 
         f_distortion = f_byline = f_bylineg = f_exas = None
         if plots == 'all':
@@ -2901,7 +2943,8 @@ class Portfolio(object):
         temp[f'exi_x1gta_{ln}'] = np.cumsum((temp[f'loss'] * temp.p_total / temp.loss)[::-1]) * self.bs
         # equals this temp.S?!
         s_ = np.cumsum(temp.p_total[::-1]) * self.bs
-        print('TEMP: the following should be close: ', np.allclose(s_[::-1], temp[f'exi_x1gta_{ln}']),
+        # TODO: sort out computation of exi_x1gta_
+        logger.crtical('TEMP: the following should be close: ', np.allclose(s_[::-1], temp[f'exi_x1gta_{ln}']),
                 np.allclose(temp[f'exi_x1gta_{ln}'], temp.S * self.bs))
         #                               this V 1.0 is exi_x for total
         temp[gam_name] = np.cumsum((min_xa * 1.0 * temp.p_total)[::-1]) / \
@@ -3218,7 +3261,6 @@ class Portfolio(object):
         """
 
         a, p = self.set_a_p(a, p)
-        print(a,p)
         dfs = []
         ans = Answer()
         for k in dist_list:
@@ -3312,7 +3354,7 @@ class Portfolio(object):
         :param plot:
         :param a_max_p: percentile to use to set the right hand end of plots
         :param add_comps: add old-fashioned method comparables (included =True as default to make backwards comp.
-        :param mass_hints: for analyze_distortion
+        :param mass_hints: for apply_distortion
         :return: various dataframes in an Answer class object
 
         """
@@ -3345,7 +3387,7 @@ class Portfolio(object):
                 a_cal = self.q(p)
                 exa = self.density_df.loc[a_cal, 'exa_total']
                 if a_cal != A:
-                    logger.warning(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
+                    logger.info(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
 
             if dshape or isinstance(dname, Distortion):
                 # specified distortion, fill in
@@ -3431,7 +3473,7 @@ class Portfolio(object):
         exhibit = exhibit.sort_index()
         ans = Answer(augmented_df=augmented_df, distortion=dist, audit_df=audit_df, pricing=pricing, exhibit=exhibit)
         if add_comps:
-            logger.warning('Adding comps...')
+            logger.debug('Adding comps...')
             ans = self.analyze_distortion_add_comps(ans, a_cal, p, kind, ROE)
         if plot:
             ans = self.analyze_distortion_plots(ans, dist, a_cal, p, a_max, ROE, LR)
@@ -3460,7 +3502,7 @@ class Portfolio(object):
         done = []
         # some reasonable traditional metrics
         # tvar threshold giving the same assets as p on VaR
-        print(f'In analyze_distortion_comps p={p} and a_cal={a_cal}')
+        logger.debug(f'In analyze_distortion_comps p={p} and a_cal={a_cal}')
         try:
             p_t = self.tvar_threshold(p, kind)
         except ValueError as e:
@@ -3532,7 +3574,7 @@ class Portfolio(object):
                 exhibit.loc[(m, 'ROE'), :] = exhibit.loc[(m, 'M'), :] / exhibit.loc[(m, 'Q'), :]
                 exhibit.loc[(m, 'PQ'), :] = exhibit.loc[(m, 'P'), :] / exhibit.loc[(m, 'Q'), :]
         except Exception as e:
-            print(f'Exception at the last step... {e}')
+            logger.error(f'Exception at the last step... {e}')
         # print(ans.distortion.name)
         # display(exhibit)
         ans.audit_df.loc['TVaR@'] = p_t
@@ -3656,7 +3698,7 @@ class Portfolio(object):
                     f'Assets={a_cal:,.1f}, ROE={ROE:.3f}'
             f_6_part.suptitle(title, fontsize='x-large')
         except Exception as e:
-            print(f'Formatting error in last plot...\n{e}\n...continuing')
+            logger.error(f'Formatting error in last plot...\n{e}\n...continuing')
 
         # trinity plots
         def tidy2(a, k, xloc=0.25):
@@ -3729,7 +3771,7 @@ class Portfolio(object):
             plots_done.append(5)
 
         except Exception as e:
-            print(f'Plotting error in trinity plots\n{e}\nPlots done {plots_done}\n...continuing')
+            logger.error(f'Plotting error in trinity plots\n{e}\nPlots done {plots_done}\n...continuing')
 
         #
         #
@@ -3793,7 +3835,7 @@ class Portfolio(object):
             a.grid('b')
             a.legend(loc='center right')
         except Exception as e:
-            print('Error', e)
+            logger.error('Error', e)
 
         #
         # close up of plot 2
@@ -4038,13 +4080,13 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 int3 = a / loss * np.sum(xs[s3] * pline[s3] * notline[s3r])
                 ptot = np.sum(pline[s3] * notline[s3r])
             except ValueError as e:
-                print(e)
-                print(f"Value error: loss={loss}, loss/b={loss / self.bs}, c1={c1}, c1/b={c1 / self.bs}")
-                print(f"n_loss {n_loss},  n_c {n_c}, n_c1 {n_c1}")
-                print(f'la={la}, lb={lb}, lc={lc}, ld={ld}')
-                print('ONE:', *map(len, [xs[s1], pline[s1], notline[s1r]]))
-                print('TWO:', *map(len, [pline[s2], notline[s2r]]))
-                print('THR:', *map(len, [xs[s3], pline[s3], notline[s3r]]))
+                logger.error(e)
+                logger.error(f"Value error: loss={loss}, loss/b={loss / self.bs}, c1={c1}, c1/b={c1 / self.bs}")
+                logger.error(f"n_loss {n_loss},  n_c {n_c}, n_c1 {n_c1}")
+                logger.error(f'la={la}, lb={lb}, lc={lc}, ld={ld}')
+                logger.error('ONE:', *map(len, [xs[s1], pline[s1], notline[s1r]]))
+                logger.error('TWO:', *map(len, [pline[s2], notline[s2r]]))
+                logger.error('THR:', *map(len, [xs[s3], pline[s3], notline[s3r]]))
                 err_count += 1
                 if err_count > 3:
                     break

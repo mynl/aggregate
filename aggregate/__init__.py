@@ -19,7 +19,7 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     axiter_factory, AxisManager, lognorm_lev, html_title, \
     sensible_jump, suptitle_and_tight, insurability_triangle, \
     read_log, MomentAggregator, MomentWrangler, xsden_to_meancv, \
-    frequency_examples, Answer, log_test, subsets
+    frequency_examples, Answer, log_test, subsets, LOGFILE
 from .parser import UnderwritingLexer, UnderwritingParser
 
 
@@ -33,6 +33,5 @@ structures designed to make working with probability distributions
 easy and intuitive. Its primary aim is to be an educational tool, allowing
 experimentation with complex, **real world** distributions. It has applications in
 insurance, risk management, actuarial science and related areas.
-
 
 """

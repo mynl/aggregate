@@ -237,7 +237,7 @@ class UnderwritingLexer(Lexer):
     # per manual, need to list longer tokens before shorter ones
     # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
+    BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_:~]*'
     FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
@@ -300,13 +300,10 @@ class UnderwritingParser(Parser):
         if debug:
             def _print(message):
                 print(message)
-
-            self.log = _print
         else:
             def _print(message):
-                logger.info('UnderwritingParser | ' + message)
-
-            self.log = _print
+                logger.debug('UnderwritingParser | ' + message)
+        self.log = _print
 
     def reset(self):
         # TODO Add sev_xs and sev_ps !!
@@ -722,7 +719,7 @@ class UnderwritingParser(Parser):
 
     @_('builtin_aggregate_dist')
     def builtin_aggregate(self, p):
-        self.log('builtin_aggregate_dist becomese builtin_aggregate')
+        self.log('builtin_aggregate_dist becomes builtin_aggregate')
         return p.builtin_aggregate_dist
 
     @_('BUILTINID')

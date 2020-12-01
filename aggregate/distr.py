@@ -16,7 +16,9 @@ from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 import itertools
-from numpy.linalg import inv, pinv, det, matrix_rank
+from numpy.linalg import inv  # , pinv, det, matrix_rank
+# from types import MethodType
+# from scipy.special import ndtri  # inverse normal - this actually does the work
 
 logger = logging.getLogger('aggregate')
 
@@ -92,7 +94,7 @@ class Frequency(object):
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
-        logger.info(
+        logger.debug(
             f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
 
         if self.freq_name == 'fixed':
@@ -369,7 +371,7 @@ class Frequency(object):
                     raise e
 
             # if parameters found...
-            logger.info(f'{self.freq_name} type, params from Broyden {params}')
+            logger.debug(f'{self.freq_name} type, params from Broyden {params}')
             if add_sichel:
                 if len(_type) == 1:
                     μ, β = params
@@ -806,32 +808,27 @@ class Aggregate(Frequency):
                           sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
                           sev_conditional=sev_conditional,
                           freq_name=freq_name, freq_a=freq_a, freq_b=freq_b, note=note)
-        logger.info(
+        logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
-        self.note = note
-        self.sev_density = None
-        self.ftagg_density = None
-        self.agg_density = None
         self.xs = None
+        self.bs = 0
+        self.log2 = 0
+        self.note = note
+        self.en = None  # this is for a sublayer e.g. for limit profile
+        self.n = 0  # this is total frequency
+        self.attachment = None
+        self.limit = None
+        self.agg_density = None
+        self.sev_density = None
+        self.dh_agg_density = None
+        self.dh_sev_density = None
+        self.ftagg_density = None
         self.fzapprox = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._linear_quantile_function = None
         self._cdf = None
         self._pdf = None
-        self.en = None  # this is for a sublayer e.g. for limit profile
-        self.n = 0  # this is total frequency
-        self.attachment = None
-        self.limit = None
-        self.sev_density = None
-        self.fzapprox = None
-        self.agg_density = None
-        self.ftagg_density = None
-        self.xs = None
-        self.bs = 0
-        self.log2 = 0
-        self.dh_agg_density = None
-        self.dh_sev_density = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
@@ -866,7 +863,7 @@ class Aggregate(Frequency):
             self.attachment = attachment
             self.limit = limit
             n_components = len(all_arrays)
-            logger.info(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
+            logger.debug(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
                         f'{len(sev_a)} sevs = {n_components} componets')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
@@ -886,7 +883,7 @@ class Aggregate(Frequency):
             self.attachment = np.array([i[4] for i in all_arrays])
             self.limit = np.array([i[5] for i in all_arrays])
             n_components = len(all_arrays)
-            logger.info(
+            logger.debug(
                 f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
                 f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
@@ -1713,7 +1710,7 @@ class Aggregate(Frequency):
             limit_est = self.limit.max() / N
             if limit_est == np.inf:
                 limit_est = 0
-            logger.info(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
+            logger.debug(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
             return max(moment_est, limit_est)
         else:
             for n in sorted({log2, 16, 13, 10}):
@@ -2192,7 +2189,7 @@ class Severity(ss.rv_continuous):
         self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
-        logger.info(
+        logger.debug(
             f'Severity.__init__  | creating new Severity {self.sev_name} at {super(Severity, self).__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
         # allows you to define fixed with just xs=1 (no log)
@@ -2251,7 +2248,7 @@ class Severity(ss.rv_continuous):
             self.fz = sev_name
 
         elif not isinstance(sev_name, (str, np.str_)):
-            # must be a meta object - replaced in Undewriter.write
+            # must be a meta object - replaced in Underwriter.write
             log2 = sev_a
             bs = sev_b  # if zero it is happy to take whatever....
             if isinstance(sev_name, Aggregate):
@@ -2339,7 +2336,7 @@ class Severity(ss.rv_continuous):
                 print(f'WARNING target cv {sev_cv} and achieved cv {acv} not close')
                 # assert (np.isclose(sev_cv, acv))
             # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
-            logger.info(
+            logger.debug(
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
                 f'{sev_cv} vs {acv}')
 
@@ -2506,7 +2503,7 @@ class Severity(ss.rv_continuous):
         print('wow, called munp')
         pass
 
-    def moms(self):
+    def old_moms(self):
         """
         moms method
         remember have to use integral of survival function otherwise quad can fail to "see" the distribution
@@ -2569,6 +2566,134 @@ class Severity(ss.rv_continuous):
             ex3 /= self.pattach
 
         return ex1, ex2, ex3
+
+    def moms(self):
+        """
+        revised moments for Severity class. Trying to compute moments of
+
+            X(a,d) = min(d, (X-a)+)
+
+        ==> E[X(a,d)^n] = int_a^d (x-a)^n f(x) dx + (d-a)^n S(d).
+
+        Let x = q(p), F(x) = p, f(x)dx = dp.
+
+        E[X(a,d)^n] = int_{F(a)}^{F(d)} (q(p)-a)^n dp + (d-a)^n S(d)
+
+        The base is to compute int_{F(a)}^{F(d)} q(p)^n dp. These are exi below. They are then adjusted to create
+        the moments needed.
+
+        # tests examples
+        def test(mu, sigma, a, y):
+            global moms
+            import types
+            # analytic with no layer attachment
+            fz = ss.lognorm(sigma, scale=np.exp(mu))
+            tv = np.array([np.exp(k*mu + k * k * sigma**2/2) for k in range(1,4)])
+
+            # old method
+            s = agg.Severity('lognorm', sev_a=sigma, sev_scale=np.exp(mu), exp_attachment=a, exp_limit=y)
+            est = np.array(s.old_moms())
+
+            # swap out moment routine
+            setattr(s, moms.__name__, types.MethodType(moms, s))
+            ans = np.array(s.moms())
+
+            # summarize and report
+            sg = f'Example: mu={mu}  sigma={sigma}  a={a}  y={y}'
+            print(f'{sg}\n{"="*len(sg)}')
+            print(pd.DataFrame({'new_ans' : ans, 'old_ans': est, 'err': ans/est-1, 'no_la_analytic' : tv}))
+
+
+        test(8.7, .5, 0, np.inf)
+        test(8.7, 2.5, 0, np.inf)
+        test(8.7, 2.5, 10e6, 200e6)
+
+        Example: mu=8.7  sigma=0.5  a=0  y=inf
+        ======================================
+                new_ans       old_ans           err  no_la_analytic
+        0  6.802191e+03  6.802191e+03  3.918843e-11    6.802191e+03
+        1  5.941160e+07  5.941160e+07  3.161149e-09    5.941160e+07
+        2  6.662961e+11  6.662961e+11  2.377354e-08    6.662961e+11
+
+        Example: mu=8.7  sigma=2.5  a=0  y=inf [here OLD METHOD WAS POOR]
+        ======================================
+                new_ans       old_ans           err  no_la_analytic
+        0  1.366256e+05  1.366257e+05 -6.942541e-08    1.366257e+05
+        1  9.663487e+12  1.124575e+11  8.493016e+01    9.669522e+12
+        2  2.720128e+23  7.597127e+19  3.579469e+03    3.545017e+23
+
+        Example: mu=8.7  sigma=2.5  a=10000000.0  y=200000000.0
+        =======================================================
+                new_ans       old_ans           err  no_la_analytic
+        0  1.692484e+07  1.692484e+07  2.620126e-14    1.366257e+05
+        1  1.180294e+15  1.180294e+15  5.242473e-13    9.669522e+12
+        2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
+
+        """
+        def safe_integrate(f, lower, upper, level):
+            """ remember, you are integrating Survival funciton """
+
+            argkw  = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
+            ex = quad(f, lower, upper, **argkw)
+            if len(ex) == 4 or ex[0]==np.inf:  # 'The integral is probably divergent, or slowly convergent.':
+                msg = ex[-1].replace("\n", " ") if ex[-1]==str else "no message"
+                logger.warning(
+                    f'Severity.moms | ansr={ex[0]}, message {msg} ->')
+                ϵ = 0.001
+                if lower == 0 and upper > ϵ:
+                    logger.warning(
+                    f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
+                    exa = quad(f, 1e-16, ϵ, **argkw)
+                    exb = quad(f, ϵ, upper, **argkw)
+                    if len(exa) == 4:
+                        msg = exa[-1].replace("\n", " ")
+                        logger.warning(f'Severity.moms | [ϵ, 0.01] split EX^{level} integral returned {msg}')
+                    if len(exb) == 4:
+                        msg = exb[-1].replace("\n", " ")
+                        logger.warning(f'Severity.moms | [ϵ, 1] split EX^{level} integral returned {msg}')
+                    ex = (exa[0] + exb[0], exa[1] + exb[1])
+            ex = ex[0]
+            return ex
+
+        # we integrate isf not q, so upper and lower are swapped
+        if self.attachment == 0:
+            upper = 1
+        else:
+            upper = self.fz.sf(self.attachment)
+        if self.detachment == np.inf:
+            lower = 0
+        else:
+            lower = self.fz.sf(self.detachment)
+
+        # compute moments
+        ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
+        ex2 = safe_integrate(lambda x: self.fz.isf(x)**2, lower, upper, 2)
+        ex3 = safe_integrate(lambda x: self.fz.isf(x)**3, lower, upper, 3)
+
+        # adjust
+        dma = self.detachment - self.attachment
+        uml = upper - lower
+        a = self.attachment
+        if a > 0:
+            ex1a = ex1 - a * uml
+            ex2a = ex2 - 2 * a * ex1 + a**2 * uml
+            ex3a = ex3 - 3 * a * ex2 + 3 * a**2 * ex1 - a**3 * uml
+        else:
+            ex1a = ex1
+            ex2a = ex2
+            ex3a = ex3
+
+        if self.detachment < np.inf:
+            ex1a += dma * lower
+            ex2a += dma**2 * lower
+            ex3a += dma**3 * lower
+
+        if self.conditional:
+            ex1a /= self.pattach
+            ex2a /= self.pattach
+            ex3a /= self.pattach
+
+        return ex1a, ex2a, ex3a
 
     def plot(self, N=100, axiter=None):
         """

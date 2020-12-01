@@ -188,15 +188,15 @@ class Underwriter(object):
         # much less fancy version:
         obj = self.portfolio.get(item, None)
         if obj is not None:
-            logger.info(f'Underwriter.__getitem__ | found {item} of type port')
+            logger.debug(f'Underwriter.__getitem__ | found {item} of type port')
             return 'port', obj
         obj = self.aggregate.get(item, None)
         if obj is not None:
-            logger.info(f'Underwriter.__getitem__ | found {item} of type agg')
+            logger.debug(f'Underwriter.__getitem__ | found {item} of type agg')
             return 'agg', obj
         obj = self.severity.get(item, None)
         if obj is not None:
-            logger.info(f'Underwriter.__getitem__ | found {item} of type sev')
+            logger.debug(f'Underwriter.__getitem__ | found {item} of type sev')
             return 'sev', obj
         raise LookupError(f'Item {item} not found in any database')
         # old, clever, generic, unreadable, unnecessary generality
@@ -355,7 +355,7 @@ class Underwriter(object):
                         print(f'Object {obj_name} passed as a proto-severity cannot be found')
                         raise e
                     a['sev_name'] = obj
-                    logger.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
+                    logger.debug(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
                                  f'replaced with object {obj.name} from glob')
 
         if output == 'spec':
@@ -397,7 +397,7 @@ class Underwriter(object):
                 return
 
         elif output == 'df' or output.lower() == 'dataframe':
-            logger.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
+            logger.debug(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
             ans = {}
             if len(self.parser.sev_out_dict) > 0:
                 for v in self.parser.sev_out_dict.values():
@@ -502,7 +502,7 @@ class Underwriter(object):
                         logger.warning('Underwriter.write | nonsensical options bs > 0 and log2 = 0')
                         _bs = bs
                         _log2 = 10
-                logger.info(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
+                logger.debug(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
                 s.update(log2=_log2, bs=_bs, verbose=verbose, add_exa=add_exa, **kwargs)
 
         # first see if it is a built in object
@@ -513,9 +513,9 @@ class Underwriter(object):
             _type, obj = self.__getitem__(portfolio_program)
         except LookupError:
             lookup_success = False
-            logger.info(f'underwriter.write | object {portfolio_program[:500]} not found, will process as program')
+            logger.debug(f'underwriter.write | object not found, will process as program') # : {portfolio_program[:500]}...')
         if lookup_success:
-            logger.info(f'underwriter.write | object {portfolio_program[:500]} found, returning object...')
+            logger.debug(f'underwriter.write | object found, returning object') # : {portfolio_program[:500]}...')
             if _type == 'agg':
                 # TODO, sure this isn't the solution to the double name problem....
                 _name = obj.get('name', portfolio_program)
@@ -542,10 +542,10 @@ class Underwriter(object):
 
         # if globs replace all meta objects with a lookup object
         if self.glob is not None:
-            logger.info(f'Underwriter.write | Resolving globals')
+            logger.debug(f'Underwriter.write | Resolving globals')
             for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
                 if a['sev_name'][0:4] == 'meta':
-                    logger.info(f'Underwriter.write | Resolving {a["sev_name"]}')
+                    logger.debug(f'Underwriter.write | Resolving {a["sev_name"]}')
                     obj_name = a['sev_name'][5:]
                     try:
                         obj = self.glob[obj_name]
@@ -553,9 +553,9 @@ class Underwriter(object):
                         print(f'Object {obj_name} passed as a proto-severity cannot be found')
                         raise e
                     a['sev_name'] = obj
-                    logger.info(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
+                    logger.debug(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
                                  f'replaced with object {obj.name} from glob')
-            logger.info(f'Underwriter.write | Done resolving globals')
+            logger.debug(f'Underwriter.write | Done resolving globals')
 
         # create objects
         # 2019-11: create all objects not just the portfolios if create_all==True
@@ -596,11 +596,11 @@ class Underwriter(object):
 
         # report on what has been done
         if rv is None:
-            print('WARNING: Program did not contain any output...')
-            logger.warning(f'Underwriter.write | Program {portfolio_program} did not contain any output')
+            # print('WARNING: Program did not contain any output...')
+            logger.warning(f'Underwriter.write | Program did not contain any output')
         else:
             if len(rv):
-                logger.info(f'Underwriter.write | Program created {len(rv)} objects and '
+                logger.debug(f'Underwriter.write | Program created {len(rv)} objects and '
                              f'defined {len(self.parser.port_out_dict)} Portfolio(s), '
                              f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
                              f'{len(self.parser.sev_out_dict)} Severity(ies)')
@@ -646,7 +646,7 @@ class Underwriter(object):
         print('write_test deprecated...use parse_portfolio_porgram with output="dict".')
         raise RuntimeError
         # TODO once sure you don't need this delete!
-        # logger.info(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
+        # logger.debug(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
         # self._runner(portfolio_program)
         # ans = {}
         # if len(self.parser.sev_out_dict) > 0:
@@ -717,16 +717,16 @@ class Underwriter(object):
             if len(self.parser.sev_out_dict) > 0:
                 # for k, v in self.parser.sev_out_dict.items():
                 self.severity.update(self.parser.sev_out_dict)  # [k] = v
-                logger.info(f'Underwriter._runner | saving {self.parser.sev_out_dict.keys()} severity/ies')
+                logger.debug(f'Underwriter._runner | saving {self.parser.sev_out_dict.keys()} severity/ies')
             if len(self.parser.agg_out_dict) > 0:
                 # for k, v in self.parser.agg_out_dict.items():
                 #     self.aggregate[k] = v
                 self.aggregate.update(self.parser.agg_out_dict)
-                logger.info(f'Underwriter._runner | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
+                logger.debug(f'Underwriter._runner | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
             if len(self.parser.port_out_dict) > 0:
                 for k, v in self.parser.port_out_dict.items():
                     # v is a list of aggregate names, these have all been added to the database...
-                    logger.info(f'Underwriter._runner | saving {k} portfolio')
+                    logger.debug(f'Underwriter._runner | saving {k} portfolio')
                     self.portfolio[k] = {'spec': v['spec'], 'arg_dict': {}}
                     # self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
         # can we still do something like this?
@@ -769,7 +769,7 @@ class Underwriter(object):
         except LookupError as e:
             print(f'ERROR id {expected_type}.{uw_id} not found')
             raise e
-        logger.info(f'UnderwritingParser._safe_lookup | retrieved {uw_id} as type {found_type}')
+        logger.debug(f'UnderwritingParser._safe_lookup | retrieved {uw_id} as type {found_type}')
         if found_type != expected_type:
             raise ValueError(f'Error: type of {uw_id} is  {found_type}, not expected {expected_type}')
         return found_dict.copy()
@@ -830,6 +830,6 @@ class Underwriter(object):
 #             else:
 #                 sio.write('\t' * tab_level + f'{ks}\t{v:20,.1f}\n')
 #         else:
-#             # logger.info(f'Uknown type {type(v)} to dict_2_string')
+#             # logger.debug(f'Uknown type {type(v)} to dict_2_string')
 #             sio.write('\t' * tab_level + ks + '\t' + str(v) + '\n')
 #     return sio.getvalue()

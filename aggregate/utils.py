@@ -20,59 +20,32 @@ from pathlib import Path
 # logging
 # see https://docs.python.org/3.7/howto/logging.html
 # and https://docs.python.org/3.7/howto/logging-cookbook.html
-# LOGFILE = os.path.join(os.path.split(__file__)[0], 'aggregate.log')
 LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
-# RLOGFILE = Path.home() / '.agglog/r.agg.main.logger.log'
-# check it exists
 LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
 # approved method is call (__name__)
 logger = logging.getLogger('aggregate')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
-# rh = logging.handlers.RotatingFileHandler(RLOGFILE, maxBytes=100000, backupCount=10)
 rh = logging.FileHandler(LOGFILE)
-rh.setLevel(logging.INFO)
+rh.setLevel(logging.DEBUG)
 rh_formatter = logging.Formatter(
     '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 rh.setFormatter(rh_formatter)
 
 # to stderr
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
+ch.setLevel(logging.INFO)
 ch_formatter = logging.Formatter(
-    '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+    '%(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
 ch.setFormatter(ch_formatter)
 
 # add loggers
 logger.addHandler(rh)
 logger.addHandler(ch)
 
-# dev logger to stderr - all levels
-# used for messages during development
-# dev_logger = logging.getLogger('aggdev')
-# dev_logger.setLevel(logging.DEBUG)
-# sh = logging.StreamHandler()
-# sh_formatter = logging.Formatter(
-#     '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno)d) | %(message)s')
-# sh.setFormatter(sh_formatter)
-# dev_logger.addHandler(sh)
-
-logger.info('aggregate_project.__init__ | New Aggregate Session started')
-
-
-# display
-# def qd(df, max_rows=10):
-#     """
-#     generic quick display of data frame df
-#     aware of likely column names with appropriate format
-#     for each
-#     """
-#     if max_rows == -1:
-#         max_rows = df.shape[0]
-#         if max_rows > 1000:
-#             max_rows = 1000
-#     display(df.head(max_rows).style.format(get_fmts(df)))
+# kick off message
+logger.debug('aggregate_project.__init__ | New Aggregate Session started')
 
 
 def get_fmts(df):
@@ -629,7 +602,8 @@ class MomentAggregator(object):
 
     Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
 
-    :param freq_moms: function of one variable returning first three noncentral moments of the underlying frequency distribution
+    :param freq_moms: function of one variable returning first three noncentral moments of the underlying
+            frequency distribution
 
     """
     __slots__ = ['freq_1', 'freq_2', 'freq_3', 'sev_1', 'sev_2', 'sev_3', 'agg_1', 'agg_2', 'agg_3',

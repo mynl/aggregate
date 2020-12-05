@@ -888,14 +888,14 @@ class Aggregate(Frequency):
                 f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
-        # overall freq CV with common mixing TODO this is dubious
+        # overall freq CV with common mixing
         mix_cv = self.freq_a
         # counter to label components
         r = 0
         # perform looping creation of severity distribution
         for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
-            # XXXX TODO WARNING: note sev_xs and sev_ps are NOT broadcast
+            # WARNING: note sev_xs and sev_ps are NOT broadcast
             self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, sev_conditional)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
@@ -1919,19 +1919,21 @@ class Aggregate(Frequency):
     def careful_tvar(self, p):
         """
         compute a very careful tvar...this may be very slow...
-        TODO SORT OUT...this does not work well
+        ..this does not work well
         :param p:
         :return:
         """
-        if isinstance(p, np.ndarray):
-            ans = np.zeros_like(p)
-            for j, pv in enumerate(p):
-                i = quad(self.careful_q, pv, 1)
-                ans[j] = i[0] / (1 - pv)
-            return ans
-        else:
-            i = quad(self.careful_q, p, 1)
-            return i[0] / (1 - p)
+        logger.critical('careful_tvar deprecated, use tvar instead')
+        return self.tvar(p)
+        # if isinstance(p, np.ndarray):
+        #     ans = np.zeros_like(p)
+        #     for j, pv in enumerate(p):
+        #         i = quad(self.careful_q, pv, 1)
+        #         ans[j] = i[0] / (1 - pv)
+        #     return ans
+        # else:
+        #     i = quad(self.careful_q, p, 1)
+        #     return i[0] / (1 - p)
 
     def var(self, p):
         """
@@ -1972,12 +1974,6 @@ class Aggregate(Frequency):
     #         _ = self.q(p)
     #
     #     _var = self.q(p)
-    #
-    #     # evil floating point issue here... this is XXXX TODO kludge because 13 is not generally applicable
-    #     ex = self.density_df.loc[np.round(_var + self.bs, 13):, ['p', 'loss']].product(axis=1).sum()
-    #     pip = (self.density_df.loc[_var, 'F'] - p) * _var
-    #     t_var = 1 / (1 - p) * (ex + pip)
-    #     return t_var
 
     def tvar(self, p):
         """
@@ -2305,7 +2301,8 @@ class Severity(ss.rv_continuous):
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
         else:
             # distributions with one shape parameter
-            if sev_a == 0:  # TODO figuring 0 is invalid shape...
+            # TODO assumes 0 is an invalide shape parameter....
+            if sev_a == 0:
                 sev_a, _ = self.cv_to_shape(sev_cv)
             if sev_scale == 0 and sev_mean > 0:
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
@@ -2514,7 +2511,7 @@ class Severity(ss.rv_continuous):
 
         # if self.sev1 is not None:
         #     # precomputed (fixed and (c|d)histogram classes
-        #     # TODO ignores layer and attach...
+        #     ignores layer and attach...
         #     return self.sev1, self.sev2, self.sev3
 
         median = self.fz.isf(0.5)
@@ -2522,7 +2519,7 @@ class Severity(ss.rv_continuous):
         def safe_integrate(f, level):
             ex = quad(f, self.attachment, self.detachment, limit=100, full_output=1)
             if len(ex) == 4:  # 'The integral is probably divergent, or slowly convergent.':
-                # TODO just wing it for now
+                # just wing it for now
                 logger.warning(
                     f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                 exa = quad(f, self.attachment, median, limit=100, full_output=1)

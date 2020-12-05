@@ -19,7 +19,8 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     axiter_factory, AxisManager, lognorm_lev, html_title, \
     sensible_jump, suptitle_and_tight, insurability_triangle, \
     read_log, MomentAggregator, MomentWrangler, xsden_to_meancv, \
-    frequency_examples, Answer, log_test, subsets, LOGFILE
+    frequency_examples, Answer, log_test, subsets, LOGFILE, \
+    start_timer, report_time, stop_timer
 from .parser import UnderwritingLexer, UnderwritingParser
 
 

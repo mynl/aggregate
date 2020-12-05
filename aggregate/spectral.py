@@ -21,16 +21,16 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'tvar', 'convex')
-    _has_mass_ = ('ly', 'clin', 'lep')
+    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'convex')
+    _has_mass_ = ('ly', 'clin', 'lep', 'roe')
     _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Lev Equiv",
-                    "Lin Yield", "Capped Linear", "Dual Mom", "Tail VaR", "Convex Env")
+                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", "Convex Env")
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Leverage Equivalent Pricing",
-                    "Linear Yield", "Capped Linear", "Dual Moment", "Tail VaR", "Convex Envelope")
+                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", "Convex Envelope")
     # TODO fix examples!
-    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'tvar', 'convex')
-    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1, 3,  0.75)
-    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8, 6,  0.95)
+    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'roe', 'tvar',  'convex')
+    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1,     3,    1/9,   0.75)
+    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8,     6,    1/4,   0.95)
     # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
 
@@ -169,7 +169,7 @@ class Distortion(object):
                 return np.maximum(0, (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
 
         elif self.name == 'clin':
-            # capped linear, needs shape > 1 to make sense...WHAT, WHY? needs shape >= 1-r0 else
+            # capped linear, needs shape > 1 to make sense...needs shape >= 1-r0 else
             # problems at 1
             sl = self.shape
             self.has_mass = (r0 > 0)
@@ -180,6 +180,21 @@ class Distortion(object):
 
             def g_inv(x):
                 return np.where(x <= self.r0, 0, (x - self.r0) / sl)
+
+        elif self.name == 'roe':
+            # constant roe = capped linear with shape = 1/(1+r), r0=r/(1+r)
+            # r = target roe
+            r = self.shape
+            v = 1 / (1 + r)
+            d = 1 - v
+            self.has_mass = (d > 0)
+            self.mass = d
+
+            def g(x):
+                return np.where(x == 0, 0, np.minimum(1, d + v * x))
+
+            def g_inv(x):
+                return np.where(x <= d, 0, (x - d) / v)
 
         elif self.name == 'lep':
             # leverage equivalent pricing
@@ -243,9 +258,9 @@ class Distortion(object):
         :return:
         """
         if isinstance(self.shape, str):
-            s = f'{self._distortion_names_[self.name]}\n{self.shape}'
+            s = f'{self._distortion_names_[self.name]}, {self.shape}'
         else:
-            s = f'{self._distortion_names_[self.name]}\n{self.shape:.3f}'
+            s = f'{self._distortion_names_[self.name]}, {self.shape:.3f}'
         if self.has_mass:
             s += f', {self.r0:.3f}'
         if self.name == 'tt':
@@ -262,7 +277,6 @@ class Distortion(object):
             s += ')'
         return s
 
-    # noinspection PyUnusedLocal
     def plot(self, xs=None, n=101, both=True, ax=None, **kwargs):
         """
         quick plot of the distortion

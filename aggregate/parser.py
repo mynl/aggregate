@@ -477,7 +477,6 @@ class UnderwritingParser(Parser):
             p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_mean', 0))
             p.sev['sev_mean'] *= p.numbers
         # only scale scale if there is a scale (otherwise you double count)
-        # TODO OK? sev_scale...
         if 'sev_scale' in p.sev:
             p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(p.sev.get('sev_scale', 0))
             p.sev['sev_scale'] *= p.numbers

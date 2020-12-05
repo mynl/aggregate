@@ -14,6 +14,8 @@ from scipy.optimize.nonlin import NoConvergence
 from io import StringIO
 import re
 from pathlib import Path
+from time import time_ns
+
 
 # import warnings
 
@@ -27,25 +29,50 @@ LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 logger = logging.getLogger('aggregate')
 logger.setLevel(logging.DEBUG)
 
-rh = logging.FileHandler(LOGFILE)
-rh.setLevel(logging.DEBUG)
-rh_formatter = logging.Formatter(
-    '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
-rh.setFormatter(rh_formatter)
+if len(logger.handlers) == 0:
+    # otherwise they proliferate whenever module is loaded...
+    rh = logging.FileHandler(LOGFILE)
+    rh.setLevel(logging.DEBUG)
+    rh_formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+    rh.setFormatter(rh_formatter)
 
-# to stderr
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ch_formatter = logging.Formatter(
-    '%(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
-ch.setFormatter(ch_formatter)
+    # to stderr
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch_formatter = logging.Formatter(
+        '%(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+    ch.setFormatter(ch_formatter)
 
-# add loggers
-logger.addHandler(rh)
-logger.addHandler(ch)
+    # add loggers
+    logger.addHandler(rh)
+    logger.addHandler(ch)
 
 # kick off message
 logger.debug('aggregate_project.__init__ | New Aggregate Session started')
+
+
+last_time = first_time = 0
+timer_active = False
+
+def start_timer():
+    global last_time, first_time, timer_active
+    last_time = time_ns()
+    first_time = last_time
+    timer_active = True
+
+
+def report_time(msg):
+    global last_time, timer_active
+    if timer_active:
+        t = time_ns()
+        logger.log(logging.INFO+1, f'{(t - last_time)/1e9:.6f} | {(t - first_time)/1e9:10.6f} | {msg}')
+        last_time = t
+
+
+def stop_timer():
+    global timer_active
+    timer_active = False
 
 
 def get_fmts(df):
@@ -376,7 +403,7 @@ class AxisManager(object):
 
     # methods for a more hands on approach
     @staticmethod
-    def good_grid(n):
+    def good_grid(n, c=4):
         """
         Good layout for n plots
         :param n:
@@ -389,7 +416,6 @@ class AxisManager(object):
         if n <= 20:
             r, c = basic[n]
         else:
-            c = 4
             r = n // c
             if r * c < n:
                 r += 1

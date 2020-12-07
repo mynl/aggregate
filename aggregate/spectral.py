@@ -33,6 +33,12 @@ class Distortion(object):
     _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8,     6,    1/4,   0.95)
     # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
+    renamer = _distortion_names_
+
+    # @property
+    # @staticmethod
+    # def renamer():
+    #     return _distortion_names_
 
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):
@@ -234,6 +240,8 @@ class Distortion(object):
 
         elif self.name == 'convex':
             self.has_mass = False
+            # use shape for number of points in calibrating data set
+            self.shape = f'on {len(df):d} points'
             hull = ConvexHull(df[[col_x, col_y]])
             knots = list(set(hull.simplices.flatten()))
             g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
@@ -284,7 +292,7 @@ class Distortion(object):
         :param ax:
         :param xs:
         :param n:  length of vector is no xs
-        :param both: ignored for now. just do both
+        :param both: True: plot g and ginv and add decorations, if False just g and no trimmings
         :param kwargs:  passed to plot
         :return:
         """
@@ -299,12 +307,14 @@ class Distortion(object):
             ax = plt.gca()
 
         ax.plot(xs, y1, label='$g$', **kwargs)
-        ax.plot(xs, y2, label='$g^{-1}$', **kwargs)
-        ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+        if both:
+            ax.plot(xs, y2, label='$g^{-1}$', **kwargs)
+            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
         if self.name == 'convex':
-            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], 'x')
-        ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
-        ax.set(title=str(self), aspect='equal')
+            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], '.')
+        if both:
+            ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
+            ax.set(title=str(self), aspect='equal')
         return ax
 
     @classmethod

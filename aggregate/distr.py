@@ -1372,6 +1372,7 @@ class Aggregate(Frequency):
         S = self.density_df.S
         # some dist return np others don't this converts to numpy...
         gS = np.array(dist.g(S))
+
         self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
 
     def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=0):

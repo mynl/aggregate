@@ -285,7 +285,7 @@ class Distortion(object):
             s += ')'
         return s
 
-    def plot(self, xs=None, n=101, both=True, ax=None, **kwargs):
+    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, **kwargs):
         """
         quick plot of the distortion
 
@@ -306,12 +306,16 @@ class Distortion(object):
         if ax is None:
             ax = plt.gca()
 
-        ax.plot(xs, y1, label='$g$', **kwargs)
+        ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
         if both:
-            ax.plot(xs, y2, label='$g^{-1}$', **kwargs)
-            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
-        if self.name == 'convex':
-            ax.plot(self.df.loc[:, self.col_x], self.df.loc[:, self.col_y], '.')
+            ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
+        ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+        if self.name == 'convex' and plot_points:
+            if len(self.df) > 50:
+                alpha = .35
+            else:
+                alpha = 0.6
+            ax.plot(self.df[self.col_x], self.df[self.col_y], '.', c="C2", alpha=alpha)
         if both:
             ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
             ax.set(title=str(self), aspect='equal')
@@ -429,3 +433,35 @@ class Distortion(object):
 
         else:
             raise ValueError(f'Inadmissible value {source} passed to convex_example, expected yield or cat')
+
+    @staticmethod
+    def resample_distortion(data, proportion, samples):
+        """
+        make a distortion by resampling, fitting, and averaging from data
+
+        data has columns EL and Spread
+
+        :param data:
+        :param proportion:
+        :param samples:
+        :return:
+        """
+
+        df = pd.DataFrame(index=np.linspace(0,1,10001), dtype=np.float)
+
+        for i in range(samples):
+            rebit = data.sample(frac=proportion, replace=False)
+            rebit.loc[-1] = [0, 0, 0]
+            rebit.loc[len(rebit)+1] = [1, 1, 1]
+            d = Distortion('convex', 0, df=rebit, col_x='EL', col_y='Spread')
+            df[i] = d.g(df.index)
+
+        df['avg'] = df.mean(axis=1)
+        df2 =df['avg'].copy()
+        df2.index.name = 's'
+        df2 = df2.reset_index(drop=False)
+
+        d = Distortion('convex', 0, df=df2, col_x='s', col_y='avg')
+
+        return d
+

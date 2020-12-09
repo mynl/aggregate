@@ -32,12 +32,12 @@ from matplotlib.ticker import MultipleLocator, StrMethodFormatter, MaxNLocator, 
 from scipy import interpolate
 import re
 from pathlib import Path
-from .distr import Aggregate, CarefulInverse, Severity
+from .distr import Aggregate, Severity
 from .spectral import Distortion
 from .utils import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
-    sensible_jump, suptitle_and_tight, \
+    suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, report_time
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
@@ -150,7 +150,7 @@ class Portfolio(object):
         self._tm_renamer = None
         # if created by uw it stores the program here
         self.program = ''
-        self.audit_percentiles = [.9, .95, .99, .995, .999, .9999, 1 - 1e-6]
+        self.audit_percentiles = [.9, .95, .99, .996, .999, .9999, 1 - 1e-6]
         self.dists = None
         self.dist_ans = None
 
@@ -4521,6 +4521,10 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             self._tm_renamer.update({ f'exag_{l}' : f'T.P_{l}' for l in self.line_names_ex})
 
         return self._tm_renamer
+
+    @property
+    def stat_renamer(self):
+        return dict('')
     def set_a_p(self, a, p):
         """
         sort out arguments for assets and prob level and make them consistent

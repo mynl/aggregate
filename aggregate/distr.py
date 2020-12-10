@@ -825,6 +825,8 @@ class Aggregate(Frequency):
         self.dh_sev_density = None
         self.ftagg_density = None
         self.fzapprox = None
+        self._tail_var = None
+        self._inverse_tail_var = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._linear_quantile_function = None
         self._cdf = None
@@ -1976,7 +1978,7 @@ class Aggregate(Frequency):
     #
     #     _var = self.q(p)
 
-    def tvar(self, p):
+    def tvar(self, p, kind='interp'):
         """
         Compute the tail value at risk at threshold p
 
@@ -2000,14 +2002,42 @@ class Aggregate(Frequency):
         between q and q1 approx as a trapezoid too.
 
         :param p:
+        :param kind:
         :return:
         """
         # match Portfolio method
-        _var = self.q(p)
-        ex = self.density_df.loc[_var + self.bs:, ['p', 'loss']].product(axis=1).sum()
-        pip = (self.density_df.loc[_var, 'F'] - p) * _var
-        t_var = 1 / (1 - p) * (ex + pip)
-        return t_var
+        assert self.density_df is not None
+
+        if kind=='tail':
+            _var = self.q(p)
+            ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
+            pip = (self.density_df.loc[_var, 'F'] - p) * _var
+            t_var = 1 / (1 - p) * (ex + pip)
+            return t_var
+        elif kind=='interp':
+            # original implementation interpolated
+            if self._tail_var is None:
+                # make tvar function
+                self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta,
+                                                      kind='linear', bounds_error=False,
+                                                      fill_value='extrapolate')
+            if type(p) in [float, np.float]:
+                return float(self._tail_var(p))
+            else:
+                return self._tail_var(p)
+        elif kind=='inverse':
+            if self._inverse_tail_var is None:
+                # make tvar function
+                self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta, self.density_df.F,
+                                                      kind='linear', bounds_error=False,
+                                                      fill_value='extrapolate')
+            if type(p) in [int, np.int, float, np.float]:
+                return float(self._inverse_tail_var(p))
+            else:
+                return self._inverse_tail_var(p)
+        else:
+            raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default) or tail')
+
 
         # original version
         # function not vectorized

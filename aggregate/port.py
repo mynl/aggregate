@@ -132,6 +132,7 @@ class Portfolio(object):
         self._cdf = None
         self._pdf = None
         self._tail_var = None
+        self._inverse_tail_var = None
         self.bs = 0
         self.log2 = 0
         self.ex = 0
@@ -625,6 +626,7 @@ class Portfolio(object):
 
         :param p:
         :param kind:  'interp' = interpolate exgta_total;  'tail' tail integral, 'body' NYI - (ex - body integral)/(1-p)+v
+        'inverse' from capital to p using interp method
         :return:
         """
         assert self.density_df is not None
@@ -635,14 +637,29 @@ class Portfolio(object):
             pip = (self.density_df.loc[_var, 'F'] - p) * _var
             t_var = 1 / (1 - p) * (ex + pip)
             return t_var
-        else:
+        elif kind=='interp':
             # original implementation interpolated
             if self._tail_var is None:
                 # make tvar function
                 self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
                                                       kind='linear', bounds_error=False,
                                                       fill_value='extrapolate')
-            return float(self._tail_var(p))
+            if type(p) in [float, np.float]:
+                return float(self._tail_var(p))
+            else:
+                return self._tail_var(p)
+        elif kind=='inverse':
+            if self._inverse_tail_var is None:
+                # make tvar function
+                self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta_total, self.density_df.F,
+                                                      kind='linear', bounds_error=False,
+                                                      fill_value='extrapolate')
+            if type(p) in [int, np.int, float, np.float]:
+                return float(self._inverse_tail_var(p))
+            else:
+                return self._inverse_tail_var(p)
+        else:
+            raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default), inverse, or tail')
 
     def tvar_threshold(self, p, kind):
         """
@@ -1129,12 +1146,12 @@ class Portfolio(object):
         sum_p_total = df.p_total.sum()
 
         df['F'] = np.cumsum(df.p_total)
-        df['S'] = np.hstack((df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
-                             min(df.p_total.iloc[-1],
-                                 max(0, 1. - (df.p_total.sum())))))
+        df['S'] =  \
+            df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
 
         # E(min(X, a))
-        df['exa_total'] = self.cumintegral(df['S'])
+        # df['exa_total'] = self.cumintegral(df['S'])
+        df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
         df['lev_total'] = df['exa_total']
 
         df['exlea_total'] = \
@@ -1179,10 +1196,11 @@ class Portfolio(object):
                                 loc_ft(df['p_' + col]))) / df.p_total
             df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
             stemp = 1 - df['p_' + col].cumsum()
-            df['lev_' + col] = self.cumintegral(stemp)
+            # df['lev_' + col] = self.cumintegral(stemp)
+            df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
 
             stemp = 1 - df['ημ_' + col].cumsum()
-            df['lev_ημ_' + col] = self.cumintegral(stemp)
+            df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
 
             # EX_i | X<= a; temp is used in le and gt calcs
             temp = np.cumsum(df['exeqa_' + col] * df.p_total)
@@ -1825,11 +1843,17 @@ class Portfolio(object):
                     f'{1 - sum_p_total:12.8e} NOT RESCALING')
         # df.p_total /= sum_p_total
         df['F'] = np.cumsum(df.p_total)
-        # and this, ladies and gents, is terrible...
+        # this method is terrible because you lose precision for very small values of S
         # df['S'] = 1 - df.F
+        # old method
         df['S'] = np.hstack((df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
                              min(df.p_total.iloc[-1],
                                  max(0, 1. - (df.p_total.sum())))))
+        # which was ugly and not quite right because the it ended  ... pn plast  vs  pn+plast, plast
+        # Dec 2020
+        df['S'] =  \
+            df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+
         # get rounding errors, S may not go below zero
         logger.info(
             f'Portfolio.add_exa | {self.name}: S <= 0 values has length {len(np.argwhere((df.S <= 0).to_numpy()))}')
@@ -1838,7 +1862,8 @@ class Portfolio(object):
         # needs to be shifted down by one for the partial integrals....
         # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'S'].cumsum())))
         # df['exa_total'] = temp * bs
-        df['exa_total'] = self.cumintegral(df['S'])
+        # df['exa_total'] = self.cumintegral(df['S'])
+        df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
         df['lev_total'] = df['exa_total']
 
         # $E(X\wedge a)=\int_0^a tf(t)dt + aS(a)$ therefore exlea
@@ -1937,14 +1962,14 @@ class Portfolio(object):
             stemp = 1 - df['p_' + col].cumsum()
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
             # df['lev_' + col] = temp * bs
-            df['lev_' + col] = self.cumintegral(stemp)
+            df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
             if details:
                 df['e2pri_' + col] = \
                     np.real(loc_ift(loc_ft(df['lev_' + col]) * loc_ft(df['ημ_' + col])))
             stemp = 1 - df['ημ_' + col].cumsum()
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
             # df['lev_ημ_' + col] = temp * bs
-            df['lev_ημ_' + col] = self.cumintegral(stemp)
+            df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
 
             # EX_i | X<= a; temp is used in le and gt calcs
             temp = np.cumsum(df['exeqa_' + col] * df.p_total)
@@ -2484,7 +2509,7 @@ class Portfolio(object):
 
         # PREVIOUSLY: did not make this adjustment because loss of resolution on small S values
         # however, it doesn't work well for very thick tailed distributions, hence intro of S_calculation
-        # July 2020 (COVID-Trump madness) try this instead
+        # July 2020 (during COVID-Trump madness) try this instead
         if S_calculation == 'forwards':
             logger.info('Using updated S_forwards calculation in apply_distortion! ')
             df['S'] = 1 - df.p_total.cumsum()
@@ -4669,29 +4694,29 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     #         data_in = Answer(summary=temp, fig_eight_by_line=f)
     #     return data_in
 
-    def cumintegral(self, v, bs_override=0):
-        """
-        cumulative integral of v with buckets size bs
-
-        :param bs_override:
-        :param v:
-        :return:
-        """
-
-        if bs_override != 0:
-            bs = bs_override
-        else:
-            bs = self.bs
-
-        if type(v) == np.ndarray:
-            logger.warning('CALLING cumintegral on a numpy array!!\n' * 5)
-            return np.hstack((0, v[:-1])).cumsum() * bs
-        else:
-            # was consistently (and obviously) the same
-            # t1 = np.hstack((0, v.values[:-1])).cumsum() * bs
-            # t2 = v.shift(1, fill_value=0).cumsum() * bs
-            # logger.warning(f'Alternative cumintegral allclose={np.allclose(t1, t2)}')
-            return v.shift(1, fill_value=0).cumsum() * bs
+    # def cumintegral(self, v, bs_override=0):
+    #     """
+    #     cumulative integral of v with buckets size bs
+    #
+    #     :param bs_override:
+    #     :param v:
+    #     :return:
+    #     """
+    #
+    #     if bs_override != 0:
+    #         bs = bs_override
+    #     else:
+    #         bs = self.bs
+    #
+    #     if type(v) == np.ndarray:
+    #         logger.warning('CALLING cumintegral on a numpy array!!\n' * 5)
+    #         return np.hstack((0, v[:-1])).cumsum() * bs
+    #     else:
+    #         # was consistently (and obviously) the same
+    #         # t1 = np.hstack((0, v.values[:-1])).cumsum() * bs
+    #         # t2 = v.shift(1, fill_value=0).cumsum() * bs
+    #         # logger.warning(f'Alternative cumintegral allclose={np.allclose(t1, t2)}')
+    #         return v.shift(1, fill_value=0).cumsum() * bs
 
     @staticmethod
     def from_DataFrame(name, df):

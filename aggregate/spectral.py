@@ -21,12 +21,12 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'convex')
+    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar', 'convex')
     _has_mass_ = ('ly', 'clin', 'lep', 'roe')
     _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Lev Equiv",
-                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", "Convex Env")
+                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", 'Wtd TVaR' "Convex Env")
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Leverage Equivalent Pricing",
-                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", "Convex Envelope")
+                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", 'Weighted TVaR', "Convex Envelope")
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'roe', 'tvar',  'convex')
     _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1,     3,    1/9,   0.75)
@@ -51,9 +51,9 @@ class Distortion(object):
         """
 
         if pricing and strict:
-            return tuple((i for i in cls._available_distortions_[:-2] if i not in cls._has_mass_))
+            return tuple((i for i in cls._available_distortions_[:-3] if i not in cls._has_mass_))
         elif pricing:
-            return cls._available_distortions_[:-2]
+            return cls._available_distortions_[:-3]
         else:
             return cls._available_distortions_
 
@@ -238,6 +238,23 @@ class Distortion(object):
             def g_inv(y):
                 return 1 - (1 - y)**q
 
+        elif self.name == 'wtdtvar':
+            # weighted tvar, df = p0 <p1, shape = weight on p1
+            try:
+                self.has_mass = False
+                p0, p1 = df
+                w = shape
+                print(self.name, p0, p1, w)
+                assert p0 < p1
+                pt = (1 - p1) / (1 - p0) * (1 - w) + w
+                s = np.array([0.,  1-p1, 1-p0, 1.])
+                gs = np.array([0.,   pt,   1., 1.])
+                g = interp1d(s, gs, kind='linear')
+                g_inv = interp1d(gs, s, kind='linear')
+            except:
+                raise ValueError('Inadmissible parameters to Distortion for wtdtvar'
+                                 'pass shape=wt for p1 and df=[p0, p1]')
+
         elif self.name == 'convex':
             self.has_mass = False
             # use shape for number of points in calibrating data set
@@ -273,6 +290,8 @@ class Distortion(object):
             s += f', {self.r0:.3f}'
         if self.name == 'tt':
             s += f', {self.df:.2f}'
+        if self.name == 'wtdtvar':
+            s += f', ({self.df[1]:.3f}/{self.df[0]:.3f})'
         return s
 
     def __repr__(self):

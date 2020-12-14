@@ -814,6 +814,7 @@ class Aggregate(Frequency):
         self.xs = None
         self.bs = 0
         self.log2 = 0
+        self.ex = 0
         self.note = note
         self.en = None  # this is for a sublayer e.g. for limit profile
         self.n = 0  # this is total frequency
@@ -1228,6 +1229,7 @@ class Aggregate(Frequency):
         self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
         _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
         self.audit_df.loc['mixed', 'emp_agg_1'] = _m
+        self.ex = _m
         self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
 
         if verbose:
@@ -2018,9 +2020,11 @@ class Aggregate(Frequency):
             # original implementation interpolated
             if self._tail_var is None:
                 # make tvar function
+                sup = (self.density_df.p[::-1]>0).idxmax()
+                if sup == self.density_df.index[-1]: sup = np.inf
                 self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta,
                                                       kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
+                                                      fill_value=(self.ex, sup))
             if type(p) in [float, np.float]:
                 return float(self._tail_var(p))
             else:

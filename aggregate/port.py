@@ -26,6 +26,7 @@ import pandas as pd
 from pandas.io.formats.format import EngFormatter
 import pypandoc
 import scipy.stats as ss
+from scipy.interpolate import interp1d
 from IPython.core.display import HTML, display
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter, MaxNLocator, FixedLocator, \
     FixedFormatter, AutoMinorLocator
@@ -641,9 +642,11 @@ class Portfolio(object):
             # original implementation interpolated
             if self._tail_var is None:
                 # make tvar function
+                sup = (self.density_df.p_total[::-1]>0).idxmax()
+                if sup == self.density_df.index[-1]: sup = np.inf
                 self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
                                                       kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
+                                                      fill_value=(self.ex, sup))
             if type(p) in [float, np.float]:
                 return float(self._tail_var(p))
             else:
@@ -1846,9 +1849,9 @@ class Portfolio(object):
         # this method is terrible because you lose precision for very small values of S
         # df['S'] = 1 - df.F
         # old method
-        df['S'] = np.hstack((df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
-                             min(df.p_total.iloc[-1],
-                                 max(0, 1. - (df.p_total.sum())))))
+        # df['S'] = np.hstack((df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
+        #                      min(df.p_total.iloc[-1],
+        #                          max(0, 1. - (df.p_total.sum())))))
         # which was ugly and not quite right because the it ended  ... pn plast  vs  pn+plast, plast
         # Dec 2020
         df['S'] =  \
@@ -2119,7 +2122,7 @@ class Portfolio(object):
                 interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
                                      fill_value='extrapolate'))
 
-    def calibrate_distortion(self, name, r0=0.0, df=5.5, premium_target=0.0,
+    def calibrate_distortion(self, name, r0=0.0, df=[0.0, .9], premium_target=0.0,
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S'):
         """
         Find transform to hit a premium target given assets of ``assets``.
@@ -2291,13 +2294,37 @@ class Portfolio(object):
                 ex = np.sum(trho) * self.bs
                 ex_prime = np.sum(temp * lS) * self.bs
                 return ex - premium_target, ex_prime
+        elif name == 'tvar':
+            # handle with built in function that has inverse
+            pass
+        elif name == 'wtdtvar':
+            # weighted tvar with fixed p parameters
+            shape = 0.5  # starting parameter
+            S = S[S < 1]
+            p0, p1 = df
+            s = np.array([0., 1-p1, 1-p0, 1.])
+
+            def f(w):
+                pt = (1 - p1) / (1 - p0) * (1 - w) + w
+                gs = np.array([0.,  pt,   1., 1.])
+                g = interp1d(s, gs, kind='linear')
+                trho = g(S)
+                ex = np.sum(trho) * self.bs
+                ex_prime = (np.sum(np.minimum(S / (1 - p1), 1) - np.minimum(S / (1 - p0), 1))) * self.bs
+                return ex - premium_target, ex_prime
         else:
             raise ValueError(f'calibrate_distortion not implemented for {name}')
 
-        # numerical solve except for roe when premium is known
-        if name == 'roe' and el and premium_target:
+        # numerical solve except for tvar, and roe when premium is known
+        if name == 'roe':
+            assert el and premium_target
             r = (premium_target - el) / (assets - premium_target)
             shape = r
+            r0 = 0
+            fx = 0
+        elif name == 'tvar':
+            assert premium_target
+            shape = self.tvar(premium_target, 'inverse')
             r0 = 0
             fx = 0
         else:
@@ -2373,11 +2400,7 @@ class Portfolio(object):
         # very helpful to keep these...
         self.dist_ans = ans
         self.dists = dists
-        if return_distortions:
-            logger.warning('Get rid of usage of return_distortions!! Now available as member dfs')
-            return ans, dists
-        else:
-            return ans
+        return ans
 
     def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1):
         """
@@ -2572,7 +2595,7 @@ class Portfolio(object):
         if idx:
             # if exeqa_err > 1e-4 is empty, np.argmax returns zero...do not want to truncate at zero in that case
             df = df.iloc[:idx]
-        # where S==0, which should be empty set
+        # where gS==0, which should be empty set
         gSeq0 = (df.gS == 0)
         logger.info(f'S==0 values: {df.gS.loc[gSeq0]}')
         if idx:

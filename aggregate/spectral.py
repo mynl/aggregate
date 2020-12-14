@@ -12,7 +12,7 @@ from scipy.spatial import ConvexHull
 from io import StringIO
 import pandas as pd
 from . utils import axiter_factory, suptitle_and_tight
-
+from textwrap import fill
 
 class Distortion(object):
     """
@@ -21,16 +21,17 @@ class Distortion(object):
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar', 'convex')
+    _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar', 'convex', 'tt')
     _has_mass_ = ('ly', 'clin', 'lep', 'roe')
-    _med_names_ = ("Prop Hzrd", "Wang", 'Wang-tt', 'Capd Loglin', "Lev Equiv",
-                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", 'Wtd TVaR' "Convex Env")
-    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Wang-tt', 'Capped Loglinear', "Leverage Equivalent Pricing",
-                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", 'Weighted TVaR', "Convex Envelope")
+    _med_names_ = ("Prop Hzrd", "Wang", 'Capd Loglin', "Lev Equiv",
+                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", 'Wtd TVaR', "Convex Env", 'Wang-tt')
+    _long_names_ = ("Proportional Hazard", "Wang-normal", 'Capped Loglinear', "Leverage Equivalent Pricing",
+                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", 'Weighted TVaR',
+                    "Convex Envelope", 'Wang-tt')
     # TODO fix examples!
-    # _available_distortions_ = ('ph', 'wang', 'tt', 'cll', 'lep',  'ly', 'clin', 'dual', 'roe', 'tvar',  'convex')
-    _eg_param_1_ =              (.9,     1,     1,     .9,    0.25,  0.9,   1.1,     3,    1/9,   0.75)
-    _eg_param_2_ =              (.5,     2,     2,     .8,    0.35,  1.5,   1.8,     6,    1/4,   0.95)
+    # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar,  'convex')
+    _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,    .1,    0.15,     .15)
+    _eg_param_2_ =              (.5,     .75,     .5,    0.5,   1.5,   1.8,     3,    .25,    0.5,      .5)
     # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
     renamer = _distortion_names_
@@ -51,9 +52,9 @@ class Distortion(object):
         """
 
         if pricing and strict:
-            return tuple((i for i in cls._available_distortions_[:-3] if i not in cls._has_mass_))
+            return tuple((i for i in cls._available_distortions_[:-4] if i not in cls._has_mass_))
         elif pricing:
-            return cls._available_distortions_[:-3]
+            return cls._available_distortions_[:-2]
         else:
             return cls._available_distortions_
 
@@ -244,7 +245,7 @@ class Distortion(object):
                 self.has_mass = False
                 p0, p1 = df
                 w = shape
-                print(self.name, p0, p1, w)
+                # print(self.name, p0, p1, w)
                 assert p0 < p1
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
                 s = np.array([0.,  1-p1, 1-p0, 1.])
@@ -304,7 +305,7 @@ class Distortion(object):
             s += ')'
         return s
 
-    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, **kwargs):
+    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', **kwargs):
         """
         quick plot of the distortion
 
@@ -312,9 +313,12 @@ class Distortion(object):
         :param xs:
         :param n:  length of vector is no xs
         :param both: True: plot g and ginv and add decorations, if False just g and no trimmings
+        :param scale: linear as usual or return plots -log(gs)  vs -logs and inverts both scales
         :param kwargs:  passed to plot
         :return:
         """
+
+        assert scale in ['linear', 'return']
 
         if xs is None:
             xs = np.linspace(0, 1, n)
@@ -325,53 +329,72 @@ class Distortion(object):
         if ax is None:
             ax = plt.gca()
 
-        ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
-        if both:
-            ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
-        ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
-        if self.name == 'convex' and plot_points:
+        if scale=='linear':
+            ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
+            if both:
+                ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
+            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+        elif scale=='return':
+            ax.plot(1/xs, 1/y1, c='C0', label='$g$', **kwargs)
+            if both:
+                ax.plot(1/xs, 1/y2, c='C1', label='$g^{-1}$', **kwargs)
+            ax.set(xscale='log', yscale='log', xlim=[2000, 1], ylim=[2000, 1])
+            ax.plot(1/xs, 1/xs, lw=0.5, color='black', alpha=0.5)
+
+        if self.name == 'convex' and plot_points and scale=='linear':
             if len(self.df) > 50:
                 alpha = .35
             else:
                 alpha = 0.6
             ax.plot(self.df[self.col_x], self.df[self.col_y], '.', c="C2", alpha=alpha)
+
         if both:
             ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
-            ax.set(title=str(self), aspect='equal')
+            ax.set(title=fill(str(self), 20), aspect='equal')
         return ax
 
     @classmethod
-    def test(cls, r0=0.05):
+    def test(cls, r0=0.035, df=[0.0, .9]):
         """
         tester: make some nice plots
-        TODO add new distortions and fix df for tt
 
         :return:
         """
 
-        axiter = axiter_factory(None, 18, figsize=(10, 10 * 4 / 5))
+        f0, axs0 = plt.subplots(2, 11, figsize=(22, 4), constrained_layout=True, sharex=True, sharey=True)
+        f1, axs1 = plt.subplots(2, 11, figsize=(22, 4), constrained_layout=True, sharex=True, sharey=True)
+        axiter0 = iter(axs0.flat)
+        axiter1 = iter(axs1.flat)
 
         xs = np.linspace(0, 1, 1001)
 
         # zip stops at the shorter of the vectors, so this does not include convex (must be listed last)
         # added df for the t; everyone else can ignore it
-        for name, shape in zip(cls._available_distortions_, cls._eg_param_1_):
-            dist = Distortion(name, shape, r0, df=4)
-            dist.plot(xs, ax=next(axiter))
+        # rank by order on large lsoses...
+        for axiter, scale in zip([axiter0, axiter1], ['linear', 'return']):
+            for name, shape in zip(cls._available_distortions_, cls._eg_param_1_):
+                dist = Distortion(name, shape, r0, df=df)
+                dist.plot(xs, ax=next(axiter), scale=scale)
 
-        dist = Distortion.convex_example('bond')
-        dist.plot(xs, ax=next(axiter))
+            dist = Distortion.convex_example('bond')
+            dist.plot(xs, ax=next(axiter), scale=scale)
 
-        dist = Distortion.convex_example('cat')
-        dist.plot(xs, ax=next(axiter))
+            # order will look better like this
+            for name, shape in zip(cls._available_distortions_, cls._eg_param_2_):
+                dist = Distortion(name, shape, r0, df=df)
+                dist.plot(xs, ax=next(axiter), scale=scale)
 
-        # order will look better like this
-        for name, shape in zip(cls._available_distortions_, cls._eg_param_2_):
-            dist = Distortion(name, shape, r0, df=2)
-            dist.plot(xs, ax=next(axiter))
+            dist = Distortion.convex_example('cat')
+            dist.plot(xs, ax=next(axiter), scale=scale)
 
-        axiter.tidy()
-        suptitle_and_tight('Example Distortion Functions')
+        # tidy up
+        for ax in axiter0:
+            f.delaxes(ax)
+        for ax in axiter1:
+            f.delaxes(ax)
+
+        f0.suptitle('Example Distortion Functions - Linear Scale')
+        f1.suptitle('Example Distortion Functions - Return Scale')
 
     @staticmethod
     def distortions_from_params(params, index, r0=0.025, df=5.5, plot=True, axiter=None, pricing=True, strict=True):

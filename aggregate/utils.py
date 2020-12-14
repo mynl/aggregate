@@ -34,14 +34,14 @@ if len(logger.handlers) == 0:
     rh = logging.FileHandler(LOGFILE)
     rh.setLevel(logging.DEBUG)
     rh_formatter = logging.Formatter(
-        '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+        '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
     rh.setFormatter(rh_formatter)
 
     # to stderr
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch_formatter = logging.Formatter(
-        '%(name)s | %(levelname)-10s | %(funcName)s (l. %(lineno) 5d) | %(message)s')
+        '%(name)s | %(levelname)-10s | %(funcName)-20cd s (l. %(lineno) 5d) | %(message)s')
     ch.setFormatter(ch_formatter)
 
     # add loggers

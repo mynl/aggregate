@@ -16,7 +16,6 @@ import re
 from pathlib import Path
 from time import time_ns
 
-
 # import warnings
 
 # logging
@@ -41,8 +40,9 @@ if len(logger.handlers) == 0:
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch_formatter = logging.Formatter(
-        '%(name)s | %(levelname)-10s | %(funcName)-20cd s (l. %(lineno) 5d) | %(message)s')
+        '%(levelname)-10s | %(funcName)-12s: %(message)s')
     ch.setFormatter(ch_formatter)
+        # '%(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
 
     # add loggers
     logger.addHandler(rh)

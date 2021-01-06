@@ -22,7 +22,6 @@ from numpy.linalg import inv  # , pinv, det, matrix_rank
 
 logger = logging.getLogger('aggregate')
 
-
 class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
@@ -681,7 +680,9 @@ class Aggregate(Frequency):
             # really should have one of these anyway...
             if self.agg_density is None:
                 raise ValueError('Update Aggregate before asking for density_df')
-            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_sev=self.sev_density))
+            # really convenient to have p=p_total to be consistent with Portfolio objects
+            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_total=self.agg_density,
+                                                 p_sev=self.sev_density))
             # remove the fuzz
             eps = 2.5e-16
             # may not have a severity, remember...

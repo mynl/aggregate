@@ -9,7 +9,7 @@ from IPython.core.display import display
 # from ruamel import yaml
 
 
-def hack_make_lines_from_csv(fn='../../../data/DIRECT_IEE.csv', do_save=False):
+def hack_make_lines_from_csv(fn='../../data/DIRECT_IEE.csv', do_save=False):
     """
     placeholder
     make industry lines from IEE extract

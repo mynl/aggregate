@@ -13,6 +13,9 @@ from io import StringIO
 import pandas as pd
 from . utils import axiter_factory, suptitle_and_tight
 from textwrap import fill
+import logging
+
+logger = logging.getLogger('aggregate')
 
 class Distortion(object):
     """
@@ -58,7 +61,7 @@ class Distortion(object):
         else:
             return cls._available_distortions_
 
-    def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y=''):
+    def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y='', display_name=''):
         """
         create new distortion
 
@@ -89,6 +92,7 @@ class Distortion(object):
         :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize or df for t
         :param col_x:
         :param col_y:
+        :param display_name: over-ride name, useful for parameterized convex fix distributions
         """
         self.name = name
         self.shape = shape
@@ -101,6 +105,7 @@ class Distortion(object):
         self.df = df
         self.col_x = col_x
         self.col_y = col_y
+        self.display_name = display_name
 
         # now make g and g_inv
         if self.name == 'ph':
@@ -257,15 +262,28 @@ class Distortion(object):
                                  'pass shape=wt for p1 and df=[p0, p1]')
 
         elif self.name == 'convex':
+            # convex envelope and general interpolation
             self.has_mass = False
             # use shape for number of points in calibrating data set
             self.shape = f'on {len(df):d} points'
-            hull = ConvexHull(df[[col_x, col_y]])
-            knots = list(set(hull.simplices.flatten()))
-            g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
-                         df.iloc[knots, df.columns.get_loc(col_y)], kind='linear')
-            g_inv = interp1d(df.iloc[knots, df.columns.get_loc(col_y)],
-                         df.iloc[knots, df.columns.get_loc(col_x)], kind='linear')
+            if not (0 in df[col_x].values and 1 in df[col_x].values):
+                # painful...always want 0 and 1 there...but don't know what other columns in df
+                # logger.debug('df does not contain s=0/1...adding')
+                df = df[[col_x, col_y]].copy().reset_index(drop=True)
+                df.loc[len(df)] = (0,0)
+                df.loc[len(df)] = (1,1)
+                df = df.sort_values(col_x)
+            if len(df) > 2:
+                hull = ConvexHull(df[[col_x, col_y]])
+                knots = list(set(hull.simplices.flatten()))
+                g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
+                             df.iloc[knots, df.columns.get_loc(col_y)], kind='linear')
+                g_inv = interp1d(df.iloc[knots, df.columns.get_loc(col_y)],
+                             df.iloc[knots, df.columns.get_loc(col_x)], kind='linear')
+            else:
+                df = df.sort_values(col_x)
+                g = interp1d(df[col_x], df[col_y], kind='linear')
+                g_inv = interp1d(df[col_y], df[col_x], kind='linear')
         else:
             raise ValueError(
                 "Incorrect spec passed to Distortion; implemented g types are ph, wang, tvar, "
@@ -283,7 +301,10 @@ class Distortion(object):
 
         :return:
         """
-        if isinstance(self.shape, str):
+        if self.display_name != '':
+            s = self.display_name
+            return s
+        elif isinstance(self.shape, str):
             s = f'{self._distortion_names_[self.name]}, {self.shape}'
         else:
             s = f'{self._distortion_names_[self.name]}, {self.shape:.3f}'
@@ -305,7 +326,7 @@ class Distortion(object):
             s += ')'
         return s
 
-    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', **kwargs):
+    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', c=None, **kwargs):
         """
         quick plot of the distortion
 
@@ -324,33 +345,42 @@ class Distortion(object):
             xs = np.linspace(0, 1, n)
 
         y1 = self.g(xs)
-        y2 = self.g_inv(xs)
+        if both:
+            y2 = self.g_inv(xs)
 
         if ax is None:
             ax = plt.gca()
 
-        if scale=='linear':
+        if scale == 'linear':
             ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
             if both:
                 ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
             ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
-        elif scale=='return':
-            ax.plot(1/xs, 1/y1, c='C0', label='$g$', **kwargs)
+        elif scale == 'return':
+            ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
             if both:
-                ax.plot(1/xs, 1/y2, c='C1', label='$g^{-1}$', **kwargs)
-            ax.set(xscale='log', yscale='log', xlim=[2000, 1], ylim=[2000, 1])
-            ax.plot(1/xs, 1/xs, lw=0.5, color='black', alpha=0.5)
+                ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
+            ax.set(xscale='log', yscale='log', xlim=[1/2000, 1], ylim=[1/2000, 1])
+            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
 
-        if self.name == 'convex' and plot_points and scale=='linear':
+        if self.name == 'convex' and plot_points:
             if len(self.df) > 50:
                 alpha = .35
-            else:
+            elif len(self.df) > 20:
                 alpha = 0.6
-            ax.plot(self.df[self.col_x], self.df[self.col_y], '.', c="C2", alpha=alpha)
+            else:
+                alpha = 1
+            if c is None:
+                c = 'C2'
+            if scale == 'linear':
+                ax.scatter(x=self.df[self.col_x], y=self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
+            elif scale == 'return':
+                ax.scatter(x=1/self.df[self.col_x], y=1/self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
 
-        if both:
-            ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
-            ax.set(title=fill(str(self), 20), aspect='equal')
+        ax.grid(linewidth='0.25')
+
+        ax.set(title=fill(str(self), 20), aspect='equal')
+
         return ax
 
     @classmethod
@@ -477,24 +507,29 @@ class Distortion(object):
             raise ValueError(f'Inadmissible value {source} passed to convex_example, expected yield or cat')
 
     @staticmethod
-    def resample_distortion(data, proportion, samples):
+    def bagged_distortion(data, proportion, samples, display_name="", random_state=None):
         """
-        make a distortion by resampling, fitting, and averaging from data
+        make a distortion by bootstrap aggregation (Bagging) resampling, taking the convex envelope,
+        and averaging from data
 
-        data has columns EL and Spread
+        Each sample uses proportion of the data
+
+        data has columns just two columns: EL and Spread
 
         :param data:
-        :param proportion:
-        :param samples:
+        :param proportion: proportion of data for each sample
+        :param samples: number of resamples
+        :param display_name: display_name of created distortion
+        :param random_state: for pd.sample....ensures reproducibility
         :return:
         """
 
         df = pd.DataFrame(index=np.linspace(0,1,10001), dtype=np.float)
 
         for i in range(samples):
-            rebit = data.sample(frac=proportion, replace=False)
-            rebit.loc[-1] = [0, 0, 0]
-            rebit.loc[len(rebit)+1] = [1, 1, 1]
+            rebit = data.sample(frac=proportion, replace=False, random_state=random_state)
+            rebit.loc[-1] = [0, 0]
+            rebit.loc[max(rebit.index)+1] = [1, 1]
             d = Distortion('convex', 0, df=rebit, col_x='EL', col_y='Spread')
             df[i] = d.g(df.index)
 
@@ -503,7 +538,81 @@ class Distortion(object):
         df2.index.name = 's'
         df2 = df2.reset_index(drop=False)
 
-        d = Distortion('convex', 0, df=df2, col_x='s', col_y='avg')
+        d = Distortion('convex', 0, df=df2, col_x='s', col_y='avg', display_name=display_name)
 
         return d
+
+    @staticmethod
+    def average_distortion(data, display_name, n=201, el_col='EL', spread_col='Spread'):
+        """
+        create average distortion from (s, g(s)) pairs. Each point defines a wtdTVaR with
+        p=s and p=1 points
+
+        :param data:
+        :param display_name:
+        :param n: number of s values (between 0 and max(EL), 1 is added
+        :param el_col:   column containing EL
+        :param spread_col: column containing Spread
+        :return:
+        """
+
+        els = data[el_col]
+        spreads = data[spread_col]
+        max_el = els.max()
+        s = np.hstack((np.linspace(0, max_el, n), 1))
+        ans = np.zeros((len(s), len(data)))
+        for i, el, spread in zip(range(len(data)), els, spreads):
+            p = 1 - el
+            w = (spread - el) / (1 - el)
+            d = Distortion('wtdtvar', w, df=[0,p])
+            ans[:, i] = d.g(s)
+
+        df = pd.DataFrame({'s': s, 'gs': np.mean(ans, 1)})
+        dout = Distortion('convex', None, df=df, col_x='s', col_y='gs', display_name=display_name)
+        return dout
+
+    @staticmethod
+    def wtd_tvar(ps, wts, display_name='', details=False):
+        """
+        a careful version of wtd tvar with knots at ps and wts
+
+        :param ps:
+        :param wts:
+        :param display_name:
+        :param details:
+        :return:
+        """
+
+        # evaluate at 0, 1 and all the knot points
+        ps0 = np.array(ps)
+        s = np.array(sorted(set((0.,1.)).union(1-ps0)))
+        s = s.reshape(len(s), 1)
+
+        wts = np.array(wts).reshape(len(wts), 1)
+        if np.sum(wts) != 1:
+            wts = wts / np.sum(wts)
+        ps = np.array(ps).reshape(1, len(ps))
+
+        gs = np.where(ps == 1, 1, np.minimum(s / (1 - ps), 1)) @ wts
+
+        d = Distortion.s_gs_distortion(s, gs, display_name)
+        if details:
+            return d, s, gs
+        else:
+            return d
+
+    @staticmethod
+    def s_gs_distortion(s, gs, display_name=''):
+        """
+        make a convex envelope distortion from {s, g(s)} points
+
+        :param s: iterable (can be converted into numpy.array
+        :param gs:
+        :param display_name:
+        :return:
+        """
+        s = np.array(s)
+        gs = np.array(gs)
+        return Distortion('convex', None, df=pd.DataFrame({'s': s.flat, 'gs': gs.flat}),
+                          col_x='s', col_y='gs', display_name=display_name)
 

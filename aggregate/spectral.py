@@ -94,7 +94,7 @@ class Distortion(object):
         :param col_y:
         :param display_name: over-ride name, useful for parameterized convex fix distributions
         """
-        self.name = name
+        self._name = name
         self.shape = shape
         self.r0 = r0
         # when created by calibrate distortions extra info put here
@@ -108,7 +108,7 @@ class Distortion(object):
         self.display_name = display_name
 
         # now make g and g_inv
-        if self.name == 'ph':
+        if self._name == 'ph':
             rho = self.shape
             rhoinv = 1.0 / rho
             self.has_mass = False
@@ -120,7 +120,7 @@ class Distortion(object):
             def g_inv(x):
                 return x ** rhoinv
 
-        elif self.name == 'wang':
+        elif self._name == 'wang':
             lam = self.shape
             n = ss.norm()
             self.has_mass = False
@@ -131,7 +131,7 @@ class Distortion(object):
             def g_inv(x):
                 return n.cdf(n.ppf(x) - lam)
 
-        elif self.name == 'tt':
+        elif self._name == 'tt':
             lam = self.shape
             t = ss.t(self.df)
             self.has_mass = False
@@ -142,7 +142,7 @@ class Distortion(object):
             def g_inv(x):
                 return t.cdf(t.ppf(x) - lam)
 
-        elif self.name == 'cll':
+        elif self._name == 'cll':
             # capped log linear
             b = self.shape
             binv = 1 / b
@@ -156,7 +156,7 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x < 1, np.minimum(1, (x / ea) ** binv), 1)
 
-        elif self.name == 'tvar':
+        elif self._name == 'tvar':
             p = self.shape
             alpha = 1 / (1 - p)
             self.has_mass = False
@@ -167,7 +167,7 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x < 1, x * (1 - p), 1)
 
-        elif self.name == 'ly':
+        elif self._name == 'ly':
             # linear yield
             # r0 = occupancy; rk = consumption specified in list shape parameter
             rk = self.shape
@@ -180,7 +180,7 @@ class Distortion(object):
             def g_inv(x):
                 return np.maximum(0, (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
 
-        elif self.name == 'clin':
+        elif self._name == 'clin':
             # capped linear, needs shape > 1 to make sense...needs shape >= 1-r0 else
             # problems at 1
             sl = self.shape
@@ -193,7 +193,7 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x <= self.r0, 0, (x - self.r0) / sl)
 
-        elif self.name == 'roe':
+        elif self._name == 'roe':
             # constant roe = capped linear with shape = 1/(1+r), r0=r/(1+r)
             # r = target roe
             r = self.shape
@@ -208,7 +208,7 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x <= d, 0, (x - d) / v)
 
-        elif self.name == 'lep':
+        elif self._name == 'lep':
             # leverage equivalent pricing
             # self.r0 = risk free/financing and r = risk charge (the solved parameter)
             r = self.shape
@@ -232,7 +232,7 @@ class Distortion(object):
                 u = (mb - rad) / (2 * a)
                 return np.where(y < d, 0, np.maximum(0, u))
 
-        elif self.name == 'dual':
+        elif self._name == 'dual':
             # dual moment
             p = self.shape
             q = 1 / p
@@ -244,13 +244,13 @@ class Distortion(object):
             def g_inv(y):
                 return 1 - (1 - y)**q
 
-        elif self.name == 'wtdtvar':
+        elif self._name == 'wtdtvar':
             # weighted tvar, df = p0 <p1, shape = weight on p1
             try:
                 self.has_mass = False
                 p0, p1 = df
                 w = shape
-                # print(self.name, p0, p1, w)
+                # print(self._name, p0, p1, w)
                 assert p0 < p1
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
                 s = np.array([0.,  1-p1, 1-p0, 1.])
@@ -261,7 +261,7 @@ class Distortion(object):
                 raise ValueError('Inadmissible parameters to Distortion for wtdtvar'
                                  'pass shape=wt for p1 and df=[p0, p1]')
 
-        elif self.name == 'convex':
+        elif self._name == 'convex':
             # convex envelope and general interpolation
             self.has_mass = False
             # use shape for number of points in calibrating data set
@@ -305,14 +305,14 @@ class Distortion(object):
             s = self.display_name
             return s
         elif isinstance(self.shape, str):
-            s = f'{self._distortion_names_[self.name]}, {self.shape}'
+            s = f'{self._distortion_names_[self._name]}, {self.shape}'
         else:
-            s = f'{self._distortion_names_[self.name]}, {self.shape:.3f}'
+            s = f'{self._distortion_names_[self._name]}, {self.shape:.3f}'
         if self.has_mass:
             s += f', {self.r0:.3f}'
-        if self.name == 'tt':
+        if self._name == 'tt':
             s += f', {self.df:.2f}'
-        if self.name == 'wtdtvar':
+        if self._name == 'wtdtvar':
             s += f', ({self.df[1]:.3f}/{self.df[0]:.3f})'
         return s
 
@@ -320,11 +320,19 @@ class Distortion(object):
         s = f'{self.name} ({self.shape}'
         if self.has_mass:
             s += f', {self.r0})'
-        elif self.name == 'tt':
+        elif self._name == 'tt':
             s += f', {self.df:.2f})'
         else:
             s += ')'
         return s
+
+    @property
+    def name(self):
+        return self.display_name if self.display_name != '' else self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
 
     def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', c=None, **kwargs):
         """
@@ -363,7 +371,7 @@ class Distortion(object):
             ax.set(xscale='log', yscale='log', xlim=[1/2000, 1], ylim=[1/2000, 1])
             ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
 
-        if self.name == 'convex' and plot_points:
+        if self._name == 'convex' and plot_points:
             if len(self.df) > 50:
                 alpha = .35
             elif len(self.df) > 20:

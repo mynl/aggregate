@@ -1674,7 +1674,7 @@ class Aggregate(Frequency):
             axiter.tidy()
             suptitle_and_tight(f'Aggregate {self.name}')
 
-    def report(self, report_list='quick'):
+    def report(self, report_list='statistics'):
         """
         statistics, quick or audit reports
 
@@ -1701,7 +1701,7 @@ class Aggregate(Frequency):
             else:
                 df = self.statistics_df
             html_title(f'{self.name} Statistics Report', 1)
-            display(df)
+            return df.T
 
     def recommend_bucket(self, log2=10, verbose=False):
         """

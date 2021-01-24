@@ -2123,7 +2123,8 @@ class Portfolio(object):
                                      fill_value='extrapolate'))
 
     def calibrate_distortion(self, name, r0=0.0, df=[0.0, .9], premium_target=0.0,
-                             roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S'):
+                             roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
+                             S_calc='revised'):
         """
         Find transform to hit a premium target given assets of ``assets``.
         Fills in the values in ``g_spec`` and returns params and diagnostics...so
@@ -2144,6 +2145,8 @@ class Portfolio(object):
         """
 
         # figure assets
+        assert S_calc in ('original', 'revised')
+
         if S_column == 'S':
             if assets == 0:
                 assert (p > 0)
@@ -2163,7 +2166,11 @@ class Portfolio(object):
 
         # extract S and trim it: we are doing int from zero to assets
         # integration including ENDpoint is
-        Splus = self.density_df.loc[0:assets, S_column].values
+        if S_calc == 'original':
+            Splus = self.density_df.loc[0:assets, S_column].values
+        else:
+            Splus = (1 - self.density_df.loc[0:assets, 'p_total'].cumsum()).values
+
         last_non_zero = np.argwhere(Splus)
         ess_sup = 0
         if len(last_non_zero) == 0:
@@ -2181,7 +2188,11 @@ class Portfolio(object):
                 'Portfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
-            S = self.density_df.loc[0:assets - self.bs, S_column].values
+            # this calc sidesteps the Splus created above....
+            if S_calc == 'original':
+                S = self.density_df.loc[0:assets - self.bs, S_column].values
+            else:
+                S = (1 - self.density_df.loc[0:assets - self.bs, 'p_total'].cumsum()).values
 
         # now all S values should be greater than zero  and it is decreasing
         assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
@@ -2334,7 +2345,6 @@ class Portfolio(object):
                 shape = shape - fx / fxp
                 fx, fxp = f(shape)
                 i += 1
-
             if abs(fx) > 1e-5:
                 logger.warning(
                     f'Portfolio.calibrate_distortion | Questionable convergenge! {name}, target '
@@ -2348,7 +2358,7 @@ class Portfolio(object):
         return dist
 
     def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
-                              strict=True, return_distortions=False):
+                              strict=True, S_calc='revised'):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
@@ -2393,7 +2403,7 @@ class Portfolio(object):
                 delta = iota / (1 + iota)
                 nu = 1 - delta
                 for dname in Distortion.available_distortions(pricing=True, strict=strict):
-                    dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a)
+                    dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a, S_calc=S_calc)
                     dists[dname] = dist
                     ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
                                                   dist.shape, dist.error]
@@ -3540,8 +3550,13 @@ class Portfolio(object):
         audit_df.loc['kind'] = kind
 
         # make the pricing summary DataFrame and exhibit: this just contains info about dist
+        # in non-efficient the renamer and existing columns collide and you get duplicates
+        # transpose turns into rows...
         pricing = augmented_df.rename(columns=self.tm_renamer).loc[[a_cal]].T. \
-                    filter(regex='^(T)\.(L|P|M|Q)', axis=0).copy()
+                    filter(regex='^(T)\.(L|P|M|Q)_', axis=0).copy()
+        pricing = pricing.loc[~pricing.index.duplicated()]
+        # put in exact Q rather than add up the parts...more accurate
+        pricing.at['T.Q_total', a_cal] = a_cal - exag
         pricing.index = pricing.index.str.split('_|\.', expand=True)
         pricing = pricing.sort_index()
         pricing = pd.concat((pricing,
@@ -3550,11 +3565,12 @@ class Portfolio(object):
                              pricing.xs(('T', 'M'), drop_level=False).rename(index={'M':'ROE'}) / pricing.xs(('T', 'Q')).to_numpy()
                             ))
         pricing.index.set_names(['Method', 'stat', 'line'], inplace=True)
-        pricing=pricing.sort_index()
+        pricing = pricing.sort_index()
         # make nicer exhibit
         exhibit = pricing.unstack(2).copy()
         exhibit.columns = exhibit.columns.droplevel(level=0)
         exhibit.loc[('T', 'a'), :] = exhibit.loc[('T', 'P'), :] + exhibit.loc[('T', 'Q'), :]
+        exhibit.loc[('T', 'a'), :] = exhibit.loc[('T', 'a'), :] * a_cal / exhibit.at[('T', 'a'), 'total']
         ans = Answer(augmented_df=augmented_df, distortion=dist, audit_df=audit_df, pricing=pricing, exhibit=exhibit)
         if add_comps:
             logger.debug('Adding comps...')

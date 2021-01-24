@@ -565,7 +565,7 @@ class UnderwritingParser(Parser):
         else:
             return self._safe_lookup(p.builtinids)
 
-    # layer terms, optoinal ===================================
+    # layer terms, optional ===================================
     @_('numbers XS numbers')
     def layers(self, p):
         self.log(f'resolving numbers XS numbers to layers {p[0]} xs {p[2]}')

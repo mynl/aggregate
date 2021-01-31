@@ -305,9 +305,9 @@ class Distortion(object):
             s = self.display_name
             return s
         elif isinstance(self.shape, str):
-            s = f'{self._distortion_names_[self._name]}, {self.shape}'
+            s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape}'
         else:
-            s = f'{self._distortion_names_[self._name]}, {self.shape:.3f}'
+            s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape:.3f}'
         if self.has_mass:
             s += f', {self.r0:.3f}'
         if self._name == 'tt':

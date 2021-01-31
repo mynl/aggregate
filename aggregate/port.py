@@ -612,6 +612,8 @@ class Portfolio(object):
         """
         Compute the tail value at risk at threshold p
 
+        Really this function returns ES
+
         Definition 2.6 (Tail mean and Expected Shortfall)
         Assume E[X−] < ∞. Then
         x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
@@ -632,26 +634,40 @@ class Portfolio(object):
         """
         assert self.density_df is not None
 
-        if kind=='tail':
+        if kind == 'tail':
             _var = self.q(p)
             ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
             pip = (self.density_df.loc[_var, 'F'] - p) * _var
             t_var = 1 / (1 - p) * (ex + pip)
             return t_var
-        elif kind=='interp':
+        elif kind == 'interp':
             # original implementation interpolated
             if self._tail_var is None:
                 # make tvar function
-                sup = (self.density_df.p_total[::-1]>0).idxmax()
-                if sup == self.density_df.index[-1]: sup = np.inf
-                self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta_total,
-                                                      kind='linear', bounds_error=False,
-                                                      fill_value=(self.ex, sup))
+                sup = (self.density_df.p_total[::-1] > 0).idxmax()
+                if sup == self.density_df.index[-1]:
+                    sup = np.inf
+                    _x = self.density_df.F
+                    _y = self.density_df.exgta_total
+                else:
+                    _x = self.density_df.F.values[:self.density_df.index.get_loc(sup)]
+                    _y = self.density_df.exgta_total.values[:self.density_df.index.get_loc(sup)]
+                p0 = self.density_df.at[0, 'F']
+                if p0 > 0:
+                    ps = np.linspace(0, p0, 200, endpoint=False)
+                    tempx = np.hstack((ps, _x))
+                    tempy = np.hstack((self.ex / (1-ps), _y))
+                    self._tail_var = interpolate.interp1d(tempx, tempy,
+                                  kind='linear', bounds_error=False,
+                                  fill_value=(self.ex, sup))
+                else:
+                    self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
+                                                          fill_value=(self.ex, sup))
             if type(p) in [float, np.float]:
                 return float(self._tail_var(p))
             else:
                 return self._tail_var(p)
-        elif kind=='inverse':
+        elif kind == 'inverse':
             if self._inverse_tail_var is None:
                 # make tvar function
                 self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta_total, self.density_df.F,
@@ -2124,7 +2140,7 @@ class Portfolio(object):
 
     def calibrate_distortion(self, name, r0=0.0, df=[0.0, .9], premium_target=0.0,
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
-                             S_calc='revised'):
+                             S_calc='cumsum'):
         """
         Find transform to hit a premium target given assets of ``assets``.
         Fills in the values in ``g_spec`` and returns params and diagnostics...so
@@ -2145,7 +2161,7 @@ class Portfolio(object):
         """
 
         # figure assets
-        assert S_calc in ('original', 'revised')
+        assert S_calc in ('S', 'cumsum')
 
         if S_column == 'S':
             if assets == 0:
@@ -2166,7 +2182,7 @@ class Portfolio(object):
 
         # extract S and trim it: we are doing int from zero to assets
         # integration including ENDpoint is
-        if S_calc == 'original':
+        if S_calc == 'S':
             Splus = self.density_df.loc[0:assets, S_column].values
         else:
             Splus = (1 - self.density_df.loc[0:assets, 'p_total'].cumsum()).values
@@ -2293,11 +2309,10 @@ class Portfolio(object):
                 return ex - premium_target, ex_prime
         elif name == 'dual':
             # dual moment
+            # be careful about partial at s=1
             shape = 2.0  # starting parameter
-            S = S[S < 1]
             lS = -np.log(1 - S)  # prob a bunch of zeros...
-
-            # lS[0] = 0  # ??
+            lS[S == 1] = 0
 
             def f(rho):
                 temp = (1 - S) ** rho
@@ -2306,12 +2321,18 @@ class Portfolio(object):
                 ex_prime = np.sum(temp * lS) * self.bs
                 return ex - premium_target, ex_prime
         elif name == 'tvar':
-            # handle with built in function that has inverse
-            pass
+            # tvar
+            shape = 0.9   # starting parameter
+            def f(rho):
+                temp = np.where(S <= 1-rho, S / (1 - rho), 1)
+                temp2 = np.where(S <= 1-rho, S / (1 - rho)**2, 1)
+                ex = np.sum(temp) * self.bs
+                ex_prime = np.sum(temp2) * self.bs
+                return ex - premium_target, ex_prime
+
         elif name == 'wtdtvar':
             # weighted tvar with fixed p parameters
             shape = 0.5  # starting parameter
-            S = S[S < 1]
             p0, p1 = df
             s = np.array([0., 1-p1, 1-p0, 1.])
 
@@ -2333,22 +2354,22 @@ class Portfolio(object):
             shape = r
             r0 = 0
             fx = 0
-        elif name == 'tvar':
-            assert premium_target
-            shape = self.tvar(premium_target, 'inverse')
-            r0 = 0
-            fx = 0
         else:
             i = 0
             fx, fxp = f(shape)
-            while abs(fx) > 1e-5 and i < 20:
+            # print(premium_target)
+            # print('dist    iter       error            shape          deriv')
+            max_iter = 200 if name == 'tvar' else 50
+            while abs(fx) > 1e-5 and i < max_iter:
+                # print(f'{name}\t{i: 3d}\t{fx: 8.3f}\t{shape:8.3f}\t{fxp:8.3f}')
                 shape = shape - fx / fxp
                 fx, fxp = f(shape)
                 i += 1
+            # print(f'{name}\t{i: 3d}\t{fx+premium_target: 8.3f}\t{shape:8.3f}\t{fxp:8.3f}\n\n')
             if abs(fx) > 1e-5:
                 logger.warning(
                     f'Portfolio.calibrate_distortion | Questionable convergenge! {name}, target '
-                f'{premium_target} error {fx}, {i} iterations')
+                    f'{premium_target} error {fx}, {i} iterations')
 
         # build answer
         dist = Distortion(name=name, shape=shape, r0=r0, df=df)
@@ -2358,7 +2379,7 @@ class Portfolio(object):
         return dist
 
     def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
-                              strict=True, S_calc='revised'):
+                              strict=True, S_calc='cumsum'):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
@@ -2531,6 +2552,7 @@ class Portfolio(object):
                 1 over all lines. Total line obviously excluded.
         :param S_calculation: if forwards, recompute S summing p_total forwards...this gets the tail right; the old method was
                 backwards, which does not change S
+        :param efficient: just compute the bar minimum and return
         :return: density_df with extra columns appended
         """
 
@@ -2544,7 +2566,7 @@ class Portfolio(object):
         # however, it doesn't work well for very thick tailed distributions, hence intro of S_calculation
         # July 2020 (during COVID-Trump madness) try this instead
         if S_calculation == 'forwards':
-            logger.info('Using updated S_forwards calculation in apply_distortion! ')
+            logger.debug('Using updated S_forwards calculation in apply_distortion! ')
             df['S'] = 1 - df.p_total.cumsum()
 
         # make g and ginv and other interpolation functions
@@ -2601,18 +2623,18 @@ class Portfolio(object):
         # +1 because when you iloc you lose the last element (two code lines down)
         idx = int(exeqa_err[exeqa_err < 1e-4].index[-1] / self.bs + 1)
         # idx = np.argmax(exeqa_err > 1e-4)
-        logger.info(f'index of max reliable value= {idx}')
+        logger.debug(f'index of max reliable value = {idx}')
         if idx:
             # if exeqa_err > 1e-4 is empty, np.argmax returns zero...do not want to truncate at zero in that case
             df = df.iloc[:idx]
         # where gS==0, which should be empty set
         gSeq0 = (df.gS == 0)
-        logger.info(f'S==0 values: {df.gS.loc[gSeq0]}')
+        logger.debug(f'S==0 values: {df.gS.loc[gSeq0]}')
         if idx:
-            logger.info(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}, len(S==0) = {np.sum(gSeq0)} elements')
+            logger.debug(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}, len(S==0) = {np.sum(gSeq0)} elements')
             # print(f'Truncating augmented_df at idx={idx}, loss={idx*self.bs}\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
         else:
-            logger.info(f'augmented_df not truncated (no exeqa error), len(S==0) = {np.sum(gSeq0)} elements')
+            logger.debug(f'augmented_df not truncated (no exeqa error), len(S==0) = {np.sum(gSeq0)} elements')
             # print(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
 
         # S better be decreasing
@@ -2646,12 +2668,12 @@ class Portfolio(object):
                 mass_hints[line] = df[f'exi_xeqa_{line}'].iloc[-1]
                 for ii in range(1, min(4, max(self.log2 - 8, 0))):
                     avg_xix = df[f'exi_xeqa_{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
-                    logger.info(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last trusted '
+                    logger.debug(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last trusted '
                                    f'is {mass_hints[line]:.5g}')
                                    # f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]:.5g}')
                     # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
                     #                f'is {mass_hints[line]:.5g}')
-                logger.info('Generally, you want these values to be consistent, except for discrete distributions.')
+                logger.debug('Generally, you want these values to be consistent, except for discrete distributions.')
             logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()}')
             # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
@@ -2842,6 +2864,8 @@ class Portfolio(object):
                 df[f'T.Q_{line}'] = mq_l.shift(1).cumsum() * self.bs
                 df.loc[0, f'T.Q_{line}'] = 0
 
+            if create_augmented:
+                self.augmented_df = df
             return Answer(augmented_df=df)
 
         # sum of parts: careful not to include the total twice!
@@ -3370,7 +3394,7 @@ class Portfolio(object):
 
         return Answer(pricing_df=df, dist=g)
 
-    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True):
+    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None):
         """
         run analyze_distortion on self.dists
 
@@ -3385,18 +3409,26 @@ class Portfolio(object):
         a, p = self.set_a_p(a, p)
         dfs = []
         ans = Answer()
+        if augmented_dfs is None:
+            augmented_dfs = {}
+        ans['augmented_dfs'] = augmented_dfs
         for k, d in self.dists.items():
-            logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
-            if len(dfs) == 0:
-                # first distortion...add the comps...these are same for all dists
-                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=True, mass_hints=mass_hints,
-                                                 efficient=efficient)
+            if augmented_dfs is not None and k in augmented_dfs:
+                use_self = True
+                self.augmented_df = augmented_dfs[k]
+                logger.info(f'Found {k} in provided augmented_dfs...')
             else:
-                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=False, mass_hints=mass_hints,
-                                                 efficient=efficient)
+                use_self = False
+                logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
+            # first distortion...add the comps...these are same for all dists
+            ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=len(dfs) == 0, mass_hints=mass_hints,
+                                             efficient=efficient, use_self=use_self)
             dfs.append(ad_ans.exhibit)
             ans[f'{k}_exhibit'] = ad_ans.exhibit
             ans[f'{k}_pricing'] = ad_ans.pricing
+            if not efficient and k not in augmented_dfs:
+                # remember, augmented_dfs is part of ans
+                augmented_dfs[k] = ad_ans.augmented_df
         ans['comp_df'] = pd.concat(dfs).sort_index()
         return ans
 
@@ -3456,7 +3488,6 @@ class Portfolio(object):
         add relevant items to audit_df
         a = q(p) if both given; if not both given derived as usual
 
-
         Figures show
 
         :param dname: name of distortion
@@ -3482,9 +3513,14 @@ class Portfolio(object):
 
         # setup: figure what distortion to use, apply if necessary
         if use_self:
-            dist = self.distortion
             # augmented_df was called deets before, FYI
             augmented_df = self.augmented_df
+            if type(dname) == str:
+                dist = self.dists[dname]
+            elif isinstance(dname, Distortion):
+                pass
+            else:
+                raise ValueError(f'Unexpected dname={dname} passed to analyze_distortion')
             a_cal = self.q(p, kind)
             exa = self.density_df.loc[a_cal, 'exa_total']
             exag = augmented_df.loc[a_cal, 'exag_total']
@@ -3560,9 +3596,9 @@ class Portfolio(object):
         pricing.index = pricing.index.str.split('_|\.', expand=True)
         pricing = pricing.sort_index()
         pricing = pd.concat((pricing,
-                             pricing.xs(('T','P'), drop_level=False).rename(index={'P':'PQ'}) / pricing.xs(('T', 'Q')).to_numpy(),
-                             pricing.xs(('T', 'L'), drop_level=False).rename(index={'L':'LR'}) / pricing.xs(('T', 'P')).to_numpy(),
-                             pricing.xs(('T', 'M'), drop_level=False).rename(index={'M':'ROE'}) / pricing.xs(('T', 'Q')).to_numpy()
+                             pricing.xs(('T','P'), drop_level=False).rename(index={'P': 'PQ'}) / pricing.xs(('T', 'Q')).to_numpy(),
+                             pricing.xs(('T', 'L'), drop_level=False).rename(index={'L': 'LR'}) / pricing.xs(('T', 'P')).to_numpy(),
+                             pricing.xs(('T', 'M'), drop_level=False).rename(index={'M': 'ROE'}) / pricing.xs(('T', 'Q')).to_numpy()
                             ))
         pricing.index.set_names(['Method', 'stat', 'line'], inplace=True)
         pricing = pricing.sort_index()
@@ -3629,7 +3665,7 @@ class Portfolio(object):
 
         exhibit = ans.exhibit.copy()
         total_margin = exhibit.at[('T', 'M'), 'total']
-        logger.info(f'Total margin = {total_margin}')
+        logger.debug(f'Total margin = {total_margin}')
         # shut the style police up:
         done = []
         # some reasonable traditional metrics
@@ -3691,7 +3727,7 @@ class Portfolio(object):
             # print(done)
             # epd and scaled epd methods at 1-p threshold
             vd = self.var_dict(pe, kind='epd', total='total')
-            logger.info(f'Computing EPD at {pe:.3%} threshold, total = {vd["total"]}')
+            logger.debug(f'Computing EPD at {pe:.3%} threshold, total = {vd["total"]}')
             exhibit.loc[('EPD', 'Q'), :] = vd.values()
             exhibit.loc[('EPD', 'Q'), 'total'] = 0.
             exhibit.loc[('ScaledEPD', 'Q'), :] = exhibit.loc[('EPD', 'Q'), :] * vd['total'] / \

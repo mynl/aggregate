@@ -1366,7 +1366,7 @@ class Aggregate(Frequency):
     def apply_distortion(self, dist):
         """
         apply distortion to the aggregate density and append as exag column to density_df
-
+        TODO: implement original and revised calculation method
         :param dist:
         :return:
         """
@@ -2011,26 +2011,40 @@ class Aggregate(Frequency):
         # match Portfolio method
         assert self.density_df is not None
 
-        if kind=='tail':
+        if kind == 'tail':
             _var = self.q(p)
             ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
             pip = (self.density_df.loc[_var, 'F'] - p) * _var
             t_var = 1 / (1 - p) * (ex + pip)
             return t_var
-        elif kind=='interp':
+        elif kind == 'interp':
             # original implementation interpolated
             if self._tail_var is None:
                 # make tvar function
-                sup = (self.density_df.p[::-1]>0).idxmax()
-                if sup == self.density_df.index[-1]: sup = np.inf
-                self._tail_var = interpolate.interp1d(self.density_df.F, self.density_df.exgta,
-                                                      kind='linear', bounds_error=False,
-                                                      fill_value=(self.ex, sup))
+                sup = (self.density_df.p_total[::-1] > 0).idxmax()
+                if sup == self.density_df.index[-1]:
+                    sup = np.inf
+                    _x = self.density_df.F
+                    _y = self.density_df.exgta
+                else:
+                    _x = self.density_df.F.values[:self.density_df.index.get_loc(sup)]
+                    _y = self.density_df.exgta.values[:self.density_df.index.get_loc(sup)]
+                p0 = self.density_df.at[0, 'F']
+                if p0 > 0:
+                    ps = np.linspace(0, p0, 200, endpoint=False)
+                    tempx = np.hstack((ps, _x))
+                    tempy = np.hstack((self.ex / (1-ps), _y))
+                    self._tail_var = interpolate.interp1d(tempx, tempy,
+                                  kind='linear', bounds_error=False,
+                                  fill_value=(self.ex, sup))
+                else:
+                    self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
+                                                          fill_value=(self.ex, sup))
             if type(p) in [float, np.float]:
                 return float(self._tail_var(p))
             else:
                 return self._tail_var(p)
-        elif kind=='inverse':
+        elif kind == 'inverse':
             if self._inverse_tail_var is None:
                 # make tvar function
                 self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta, self.density_df.F,
@@ -2269,7 +2283,8 @@ class Severity(ss.rv_continuous):
                 self.sev1 = np.sum(xs * ps)
                 self.sev2 = np.sum(xs ** 2 * ps)
                 self.sev3 = np.sum(xs ** 3 * ps)
-                xss = np.sort(np.hstack((xs - 1e-5, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
+                # binary consistent
+                xss = np.sort(np.hstack((xs - 2**-14, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
                 self.fz = ss.rv_histogram((pss, xss))
             else:

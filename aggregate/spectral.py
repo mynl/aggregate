@@ -247,11 +247,11 @@ class Distortion(object):
         elif self._name == 'wtdtvar':
             # weighted tvar, df = p0 <p1, shape = weight on p1
             try:
-                self.has_mass = False
                 p0, p1 = df
-                w = shape
-                # print(self._name, p0, p1, w)
                 assert p0 < p1
+                w = shape
+                self.has_mass = p1 == 1
+                self.mass = w
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
                 s = np.array([0.,  1-p1, 1-p0, 1.])
                 gs = np.array([0.,   pt,   1., 1.])
@@ -308,12 +308,14 @@ class Distortion(object):
             s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape}'
         else:
             s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape:.3f}'
-        if self.has_mass:
-            s += f', {self.r0:.3f}'
         if self._name == 'tt':
             s += f', {self.df:.2f}'
         if self._name == 'wtdtvar':
-            s += f', ({self.df[1]:.3f}/{self.df[0]:.3f})'
+            s += f', ({self.df[0]:.3f}/{self.df[1]:.3f})'
+        elif self.has_mass:
+            # don't show the mass for wtdtvar
+            s += f', {self.r0:.3f}'
+
         return s
 
     def __repr__(self):

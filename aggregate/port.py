@@ -2674,7 +2674,7 @@ class Portfolio(object):
                     # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
                     #                f'is {mass_hints[line]:.5g}')
                 logger.debug('Generally, you want these values to be consistent, except for discrete distributions.')
-            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()}')
+            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}')
             # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
         report_time('apply_distortion - refob completed')

@@ -278,6 +278,8 @@ class Portfolio(object):
         :param item:
         :return:
         """
+        if type(item) == str:
+            return self.agg_list[self.line_names.index(item)]
         return self.agg_list[item]
 
     @property
@@ -760,7 +762,7 @@ class Portfolio(object):
         """
         compute Merton Perold capital allocation at VaR(p) capital using VaR as risk measure
         v = q(p)
-        TODO TVaR version of MERPER?
+        TODO TVaR version of Merton Perold
         """
         # figure total assets
         a = self.q(p, kind)
@@ -906,7 +908,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, verbose=False, add_exa=True):
+               trim_df=False, verbose=False, add_exa=True, aggregate_cession_function=None):
         """
         create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
@@ -932,6 +934,8 @@ class Portfolio(object):
         :param verbose: level of output
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
         epd info
+        :param aggregate_cession_function: function of Portfolio object that adjusts individual line densities; applied
+        after line aggs created but before creating not-lines;  actual statistics do not reflect impact.
         :return:
         """
 
@@ -984,6 +988,8 @@ class Portfolio(object):
                             sev_calc, discretization_calc, normalize, verbose=verbose)
             if verbose:
                 display(_a)
+            if aggregate_cession_function is not None:
+                aggregate_cession_function(agg, self.padding, tilt_vector)
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
             if ft_all is None:
@@ -2674,7 +2680,8 @@ class Portfolio(object):
                     # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
                     #                f'is {mass_hints[line]:.5g}')
                 logger.debug('Generally, you want these values to be consistent, except for discrete distributions.')
-            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}')
+            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}'
+                           f' mass {dist.mass} {dist}')
             # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
         report_time('apply_distortion - refob completed')
@@ -3089,18 +3096,18 @@ class Portfolio(object):
             d = {a.name: a.tvar(p) for a in self.agg_list}
             d['total'] = self.tvar(p)
         elif kind=='epd':
-            if p > 0.9:
+            if p >= 0.7:
                 p = 1 - p
-                logger.warning(f'Illogical value of p={p} passed for epd; using {1-p}')
+                logger.debug(f'Illogical value of p={1-p:.5g} passed for epd; using {p:.5g}')
             d = {ln: float(self.epd_2_assets[(ln, 0)](p)) for ln in self.line_names_ex }
         else:
             d = {a.name: a.q(p, kind) for a in self.agg_list}
             d['total'] = self.q(p, kind)
-        if total!='total':
+        if total != 'total':
             d[self.name] = d['total']
             del d['total']
         if snap and kind in ['tvar', 'epd']:
-            d = {k : self.snap(v) for k, v in d.items()}
+            d = {k: self.snap(v) for k, v in d.items()}
         return d
 
     def gamma(self, a=None, p=None, kind='lower', compute_stand_alone=False, axs=None, plot_mode='return'):
@@ -3394,7 +3401,8 @@ class Portfolio(object):
 
         return Answer(pricing_df=df, dist=g)
 
-    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None):
+    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None,
+                            regex=''):
         """
         run analyze_distortion on self.dists
 
@@ -3403,8 +3411,11 @@ class Portfolio(object):
         :param efficient:
         :param mass_hints:
         :param kind:
+        :param regex: regex to match name of distortion to apply
         :return:
+
         """
+        import re
 
         a, p = self.set_a_p(a, p)
         dfs = []
@@ -3413,22 +3424,23 @@ class Portfolio(object):
             augmented_dfs = {}
         ans['augmented_dfs'] = augmented_dfs
         for k, d in self.dists.items():
-            if augmented_dfs is not None and k in augmented_dfs:
-                use_self = True
-                self.augmented_df = augmented_dfs[k]
-                logger.info(f'Found {k} in provided augmented_dfs...')
-            else:
-                use_self = False
-                logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
-            # first distortion...add the comps...these are same for all dists
-            ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=len(dfs) == 0, mass_hints=mass_hints,
-                                             efficient=efficient, use_self=use_self)
-            dfs.append(ad_ans.exhibit)
-            ans[f'{k}_exhibit'] = ad_ans.exhibit
-            ans[f'{k}_pricing'] = ad_ans.pricing
-            if not efficient and k not in augmented_dfs:
-                # remember, augmented_dfs is part of ans
-                augmented_dfs[k] = ad_ans.augmented_df
+            if regex == '' or re.match(regex, k):
+                if augmented_dfs is not None and k in augmented_dfs:
+                    use_self = True
+                    self.augmented_df = augmented_dfs[k]
+                    logger.info(f'Found {k} in provided augmented_dfs...')
+                else:
+                    use_self = False
+                    logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
+                # first distortion...add the comps...these are same for all dists
+                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=len(dfs) == 0, mass_hints=mass_hints,
+                                                 efficient=efficient, use_self=use_self)
+                dfs.append(ad_ans.exhibit)
+                ans[f'{k}_exhibit'] = ad_ans.exhibit
+                ans[f'{k}_pricing'] = ad_ans.pricing
+                if not efficient and k not in augmented_dfs:
+                    # remember, augmented_dfs is part of ans
+                    augmented_dfs[k] = ad_ans.augmented_df
         ans['comp_df'] = pd.concat(dfs).sort_index()
         return ans
 
@@ -3593,6 +3605,7 @@ class Portfolio(object):
         pricing = pricing.loc[~pricing.index.duplicated()]
         # put in exact Q rather than add up the parts...more accurate
         pricing.at['T.Q_total', a_cal] = a_cal - exag
+        # TODO EVIL! this reorders the lines and so messes up when port has lines not in alpha order
         pricing.index = pricing.index.str.split('_|\.', expand=True)
         pricing = pricing.sort_index()
         pricing = pd.concat((pricing,
@@ -3692,9 +3705,12 @@ class Portfolio(object):
             pe = p_e = 1 - p
         try:
             done = []
-            exhibit.loc[('VaR', 'Q'), :] = [float(a.q(p, kind)) for a in self] + [self.q(p, kind)]
+            temp = exhibit.loc[('T', 'L'), :]
+            exhibit.loc[('EL', 'Q'), :] = temp / temp['total'] * a_cal
+            done.append('EL')
+            exhibit.loc[('VaR', 'Q'), self.line_names_ex] = [float(a.q(p, kind)) for a in self] + [self.q(p, kind)]
             done.append('var')
-            exhibit.loc[('TVaR', 'Q'), :] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
+            exhibit.loc[('TVaR', 'Q'), self.line_names_ex] = [float(a.tvar(p_t)) for a in self] + [self.tvar(p_t)]
             done.append('tvar')
             # print(done)
             exhibit.loc[('ScaledVaR', 'Q'), :] = exhibit.loc[('VaR', 'Q'), :]
@@ -3712,29 +3728,29 @@ class Portfolio(object):
             # these are NOT additive
             exhibit.at[('VaR', 'Q'), 'total'] = sumvar
             exhibit.at[('TVaR', 'Q'), 'total'] = sumtvar
-            exhibit.loc[('EqRiskVaR', 'Q'), :] = [float(a.q(pv, kind)) for a in self] + [self.q(p)]
+            exhibit.loc[('EqRiskVaR', 'Q'), self.line_names_ex] = [float(a.q(pv, kind)) for a in self] + [self.q(p)]
             done.append('eqvar')
             # print(done)
-            exhibit.loc[('EqRiskTVaR', 'Q'), :] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
+            exhibit.loc[('EqRiskTVaR', 'Q'), self.line_names_ex] = [float(a.tvar(pt)) for a in self] + [self.tvar(p_t)]
             done.append('eqtvar')
             # print(done)
-            exhibit.loc[('MerPer', 'Q'), :] = self.merton_perold(p)
+            exhibit.loc[('MerPer', 'Q'), self.line_names_ex] = self.merton_perold(p)
             done.append('merper')
             # print(done)
             # co-tvar at threshold to match capital
-            exhibit.loc[('coTVaR', 'Q'), :] = self.cotvar(p_t)
+            exhibit.loc[('coTVaR', 'Q'), self.line_names_ex] = self.cotvar(p_t)
             done.append('cotvar')
             # print(done)
             # epd and scaled epd methods at 1-p threshold
             vd = self.var_dict(pe, kind='epd', total='total')
             logger.debug(f'Computing EPD at {pe:.3%} threshold, total = {vd["total"]}')
-            exhibit.loc[('EPD', 'Q'), :] = vd.values()
+            exhibit.loc[('EPD', 'Q'), vd.keys()] = vd.values()
             exhibit.loc[('EPD', 'Q'), 'total'] = 0.
             exhibit.loc[('ScaledEPD', 'Q'), :] = exhibit.loc[('EPD', 'Q'), :] * vd['total'] / \
                                                   exhibit.loc[('EPD', 'Q')].sum()
             exhibit.loc[('ScaledEPD', 'Q'), 'total'] = vd['total']
             exhibit.loc[('EPD', 'Q'), 'total'] = exhibit.loc[('EPD', 'Q')].iloc[:-1].sum()
-            exhibit.loc[('EqRiskEPD', 'Q'), :] = [float( self.epd_2_assets[(l, 0)](p_e) )
+            exhibit.loc[('EqRiskEPD', 'Q'), self.line_names_ex] = [float( self.epd_2_assets[(l, 0)](p_e) )
                                                     for l in self.line_names] + \
                                                  [float(self.epd_2_assets[('total',0)](pe))]
             done.append('epd')
@@ -3742,10 +3758,9 @@ class Portfolio(object):
             # covariance = percent of variance allocation
             # qi = Li + Mi + Qi = Li + vi M + vi M / ROE = li + viM(1+1/ROE) = Li + vi M/d, d=ROE/(1+ROE)
             d = ROE / (1 + ROE)
-            vars = self.audit_df['EmpEX2'] - self.audit_df['EmpEX1']**2
-            vars = vars / vars.iloc[-1]
-            exhibit.loc[('covar', 'Q'), :] = exhibit.loc[('T', 'L'), :].to_numpy() +  vars.to_numpy() * \
-                                            total_margin / d
+            vars_ = self.audit_df['EmpEX2'] - self.audit_df['EmpEX1']**2
+            vars_ = vars_ / vars_.iloc[-1]
+            exhibit.loc[('covar', 'Q'), :] = exhibit.loc[('T', 'L'), :] + vars_ * total_margin / d
             done.append('covar')
         except Exception as e:
             logger.warning('Some general out of bounds error on VaRs and TVaRs, setting all equal to zero. '
@@ -3763,7 +3778,7 @@ class Portfolio(object):
         exhibit = exhibit.sort_index()
         # subtract the premium to get the actual capital
         try:
-            for m in ['VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer', 'coTVaR',
+            for m in ['EL', 'VaR', 'TVaR', 'ScaledVaR', 'ScaledTVaR', 'EqRiskVaR', 'EqRiskTVaR', 'MerPer', 'coTVaR',
                       'EPD', 'ScaledEPD', 'EqRiskEPD', 'covar']:
                 # Q as computed above gives assets not equity...so adjust
                 # usual calculus: P = (L + ra)/(1+r); Q = a-P, remember Q above is a (sorry)
@@ -4625,6 +4640,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     @property
     def stat_renamer(self):
         return dict('')
+
     def set_a_p(self, a, p):
         """
         sort out arguments for assets and prob level and make them consistent
@@ -4806,7 +4822,8 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         :return:
         """
         # ...and this is why we love pandas so much
-        spec_list = [g.dropna(axis=1).to_dict(orient='list') for n, g in df.groupby('name')]
+        spec_list = [g.dropna(axis=1).to_dict(orient='records') for n, g in df.groupby('name')]
+        spec_list = [i[0] for i in spec_list]
         return Portfolio(name, spec_list)
 
     @staticmethod
@@ -4816,6 +4833,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         works via a Pandas dataframe; kwargs passed through to pd.read_excel
         drops all blank columns (mostly for auditing purposes)
+        delegates to from_dataFrame
 
 
         :param name:

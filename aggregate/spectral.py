@@ -250,8 +250,8 @@ class Distortion(object):
                 p0, p1 = df
                 assert p0 < p1
                 w = shape
-                self.has_mass = p1 == 1
-                self.mass = w
+                self.has_mass = (p1 == 1)
+                self.mass = w if p1 == 1 else 0
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
                 s = np.array([0.,  1-p1, 1-p0, 1.])
                 gs = np.array([0.,   pt,   1., 1.])
@@ -263,6 +263,7 @@ class Distortion(object):
 
         elif self._name == 'convex':
             # convex envelope and general interpolation
+            # NOT ALLOWED to have a mass...
             self.has_mass = False
             # use shape for number of points in calibrating data set
             self.shape = f'on {len(df):d} points'

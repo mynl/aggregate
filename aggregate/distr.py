@@ -2687,6 +2687,7 @@ class Severity(ss.rv_continuous):
                 msg = ex[-1].replace("\n", " ") if ex[-1]==str else "no message"
                 logger.warning(
                     f'Severity.moms | ansr={ex[0]}, message {msg} ->')
+                # this is too slow...and we don't really use it...
                 ϵ = 0.001
                 if lower == 0 and upper > ϵ:
                     logger.warning(
@@ -2713,10 +2714,15 @@ class Severity(ss.rv_continuous):
         else:
             lower = self.fz.sf(self.detachment)
 
-        # compute moments
-        ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-        ex2 = safe_integrate(lambda x: self.fz.isf(x)**2, lower, upper, 2)
-        ex3 = safe_integrate(lambda x: self.fz.isf(x)**3, lower, upper, 3)
+        # compute moments: histograms are tricky to integrate and we know the answer already...so
+        if self.attachment == 0 and self.detachment == np.inf and self.sev_name.endswith('histogram'):
+            ex1 = self.sev1
+            ex2 = self.sev2
+            ex3 = self.sev3
+        else:
+            ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
+            ex2 = safe_integrate(lambda x: self.fz.isf(x)**2, lower, upper, 2)
+            ex3 = safe_integrate(lambda x: self.fz.isf(x)**3, lower, upper, 3)
 
         # adjust
         dma = self.detachment - self.attachment

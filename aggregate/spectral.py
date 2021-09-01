@@ -278,13 +278,17 @@ class Distortion(object):
                 hull = ConvexHull(df[[col_x, col_y]])
                 knots = list(set(hull.simplices.flatten()))
                 g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
-                             df.iloc[knots, df.columns.get_loc(col_y)], kind='linear')
+                             df.iloc[knots, df.columns.get_loc(col_y)], kind='linear',
+                             bounds_error=False, fill_value=(0,1))
                 g_inv = interp1d(df.iloc[knots, df.columns.get_loc(col_y)],
-                             df.iloc[knots, df.columns.get_loc(col_x)], kind='linear')
+                             df.iloc[knots, df.columns.get_loc(col_x)], kind='linear',
+                             bounds_error=False, fill_value=(0,1))
             else:
                 df = df.sort_values(col_x)
-                g = interp1d(df[col_x], df[col_y], kind='linear')
-                g_inv = interp1d(df[col_y], df[col_x], kind='linear')
+                g = interp1d(df[col_x], df[col_y], kind='linear',
+                             bounds_error=False, fill_value=(0,1))
+                g_inv = interp1d(df[col_y], df[col_x], kind='linear',
+                             bounds_error=False, fill_value=(0,1))
         else:
             raise ValueError(
                 "Incorrect spec passed to Distortion; implemented g types are ph, wang, tvar, "

@@ -1082,9 +1082,17 @@ class Aggregate(Frequency):
                 beds.append(appx / np.sum(appx))
             else:
                 beds.append(appx)
-
-
         return beds
+
+    def snap(self, x):
+        """
+        snap value x to the index of density_df
+
+        :param x:
+        :return:
+        """
+        ix = self.density_df.index.get_loc(x, 'nearest')
+        return self.density_df.iat[ix, 0]
 
     def easy_update(self, log2=13, bs=0, **kwargs):
         """
@@ -1378,6 +1386,7 @@ class Aggregate(Frequency):
         # some dist return np others don't this converts to numpy...
         gS = np.array(dist.g(S))
 
+        self.density_df['gS'] = gS
         self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
 
     def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=0):
@@ -1394,7 +1403,10 @@ class Aggregate(Frequency):
 
         Embrechts, Kluppelberg, Mikosch 1.2 Page 28 Formula 1.11
 
-        returns ruin vector as pd.Series and a function to lookup (no interpolation if kind==index; else interp) capitals
+        Pollaczeck-Khinchine Capital
+
+        returns ruin vector as pd.Series
+            function to lookup (no interpolation if kind==index; else interp) capitals
 
         """
 
@@ -1788,7 +1800,7 @@ class Aggregate(Frequency):
         # because we are not interpolating the returned value must (should) be in the index...
         if not (kind == 'middle' or l in self.density_df.index):
             logger.error(f'Unexpected weirdness in {self.name} quantile...computed {p}th {kind} percentile as {l} '
-                         'which is not in the index but is expected to be.')
+                         'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
         return l
 
     def middle_q(self, p):

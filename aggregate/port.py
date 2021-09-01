@@ -3677,6 +3677,7 @@ class Portfolio(object):
         """
 
         exhibit = ans.exhibit.copy()
+        # display(exhibit)
         total_margin = exhibit.at[('T', 'M'), 'total']
         logger.debug(f'Total margin = {total_margin}')
         # shut the style police up:
@@ -3704,7 +3705,6 @@ class Portfolio(object):
             logger.warning(f'Error {e} calibrating EPDs')
             pe = p_e = 1 - p
         try:
-            done = []
             temp = exhibit.loc[('T', 'L'), :]
             exhibit.loc[('EL', 'Q'), :] = temp / temp['total'] * a_cal
             done.append('EL')

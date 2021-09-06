@@ -2495,10 +2495,11 @@ class Portfolio(object):
 
         # by line columns=method x capital
         if num_plots >= 1:
-            sns.catplot(x='line', y='value', row='return', col='method', height=2.5, kind='bar',
-                        data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
-            sns.catplot(x='method', y='value', row='return', col='line', height=2.5, kind='bar',
-                        data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
+            raise ValueError('dropped seaborn')
+            # sns.catplot(x='line', y='value', row='return', col='method', height=2.5, kind='bar',
+            #             data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
+            # sns.catplot(x='method', y='value', row='return', col='line', height=2.5, kind='bar',
+            #             data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
             # sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
             #                data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
 

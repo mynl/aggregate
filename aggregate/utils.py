@@ -7,7 +7,7 @@ import logging
 import logging.handlers
 import itertools
 # import os
-import seaborn as sns
+# import seaborn as sns
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
@@ -1380,8 +1380,10 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
                  ['poisson', 'delaporte', 'shifted_pig', 'sichel'],
                  ]:
         # keep the same colors
-        pal = [sns.color_palette("Paired", 7)[i] for i in [all_dist.index(j) for j in vars]]
-        df[vars].plot(kind='line', ax=next(axiter), color=pal)
+        # FIX TODO
+        print('FIX palette')
+        # pal = [sns.color_palette("Paired", 7)[i] for i in [all_dist.index(j) for j in vars]]
+        df[vars].plot(kind='line', ax=next(axiter)) #, color=pal)
         axiter.ax.set_xlim(0, 4 * n)
         df[vars].plot(kind='line', logy=True, ax=next(axiter), legend=None, color=pal)
     axiter.tidy()

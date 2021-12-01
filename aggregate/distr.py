@@ -828,6 +828,7 @@ class Aggregate(Frequency):
         self.ftagg_density = None
         self.fzapprox = None
         self._tail_var = None
+        self._tail_var2 = None
         self._inverse_tail_var = None
         self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._linear_quantile_function = None
@@ -2024,8 +2025,16 @@ class Aggregate(Frequency):
         assert self.density_df is not None
 
         if kind == 'tail':
+            # original
+            # _var = self.q(p)
+            # ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
+            # pip = (self.density_df.loc[_var, 'F'] - p) * _var
+            # t_var_old = 1 / (1 - p) * (ex + pip)
+            # revised
+            if self._tail_var2 is None:
+                self._tail_var2 = self.density_df[['p_total', 'loss']].product(axis=1).iloc[::-1].cumsum().iloc[::-1]
             _var = self.q(p)
-            ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
+            ex = self._tail_var2.loc[_var + self.bs]
             pip = (self.density_df.loc[_var, 'F'] - p) * _var
             t_var = 1 / (1 - p) * (ex + pip)
             return t_var
@@ -2041,7 +2050,7 @@ class Aggregate(Frequency):
                 else:
                     _x = self.density_df.F.values[:self.density_df.index.get_loc(sup)]
                     _y = self.density_df.exgta.values[:self.density_df.index.get_loc(sup)]
-                p0 = self.density_df.at[0, 'F']
+                p0 = self.density_df.at[0.0, 'F']
                 if p0 > 0:
                     ps = np.linspace(0, p0, 200, endpoint=False)
                     tempx = np.hstack((ps, _x))

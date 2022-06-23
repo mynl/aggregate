@@ -19,34 +19,35 @@ from time import time_ns
 # import warnings
 
 # logging
+# June 2022 got rid of file logging
 # see https://docs.python.org/3.7/howto/logging.html
 # and https://docs.python.org/3.7/howto/logging-cookbook.html
-LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
-LOGFILE.parent.mkdir(exist_ok=True, parents=True)
+# LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
+# LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
 # approved method is call (__name__)
 logger = logging.getLogger('aggregate')
 logger.setLevel(logging.DEBUG)
 
-if len(logger.handlers) == 0:
-    # otherwise they proliferate whenever module is loaded...
-    rh = logging.FileHandler(LOGFILE)
-    rh.setLevel(logging.DEBUG)
-    rh_formatter = logging.Formatter(
-        '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
-    rh.setFormatter(rh_formatter)
-
-    # to stderr
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch_formatter = logging.Formatter(
-        '%(levelname)-10s | %(funcName)-12s: %(message)s')
-    ch.setFormatter(ch_formatter)
-        # '%(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
-
-    # add loggers
-    logger.addHandler(rh)
-    logger.addHandler(ch)
+# if len(logger.handlers) == 0:
+#     # otherwise they proliferate whenever module is loaded...
+#     # rh = logging.FileHandler(LOGFILE, 'w', 'utf-8')
+#     # rh.setLevel(logging.DEBUG)
+#     # rh_formatter = logging.Formatter(
+#     #     '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
+#     # rh.setFormatter(rh_formatter)
+#
+#     # to stderr
+#     ch = logging.StreamHandler()
+#     ch.setLevel(logging.INFO)
+#     ch_formatter = logging.Formatter(
+#         '%(levelname)-10s | %(funcName)-12s: %(message)s')
+#     ch.setFormatter(ch_formatter)
+#         # '%(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
+#
+#     # add loggers
+#     # logger.addHandler(rh)
+#     logger.addHandler(ch)
 
 # kick off message
 logger.debug('aggregate_project.__init__ | New Aggregate Session started')
@@ -54,6 +55,7 @@ logger.debug('aggregate_project.__init__ | New Aggregate Session started')
 
 last_time = first_time = 0
 timer_active = False
+
 
 def start_timer():
     global last_time, first_time, timer_active

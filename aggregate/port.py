@@ -2216,7 +2216,7 @@ class Portfolio(object):
             # truncate at first zero; numpy indexing because values
             S = Splus[:last_non_zero + 1]
             ess_sup = self.density_df.index[last_non_zero + 1]
-            logger.warning(
+            logger.info(
                 'Portfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
@@ -2405,11 +2405,13 @@ class Portfolio(object):
         :param ROEs: ROEs override LRs
         :param As:  Assets or probs given
         :param Ps: probability levels for quantiles
+        :param kind:
         :param r0: for distortions that have a min ROL
         :param df: for tt
-        :param strict: if True only use distortions with no mass at zero, otherwise
+        :param strict: if=='ordered' then use the book nice ordering else
+                       if True only use distortions with no mass at zero, otherwise
                         use anything reasonable for pricing
-        :param return_distortions: return the created distortions
+        :param S_calc:
         :return:
         """
         ans = pd.DataFrame(
@@ -2439,7 +2441,12 @@ class Portfolio(object):
                 iota = profit / K
                 delta = iota / (1 + iota)
                 nu = 1 - delta
-                for dname in Distortion.available_distortions(pricing=True, strict=strict):
+                if strict == 'ordered':
+                    d_list = ['roe', 'ph', 'wang', 'dual', 'tvar']
+                else:
+                    d_list = Distortion.available_distortions(pricing=True, strict=strict)
+
+                for dname in d_list:
                     dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a, S_calc=S_calc)
                     dists[dname] = dist
                     ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
@@ -2454,6 +2461,8 @@ class Portfolio(object):
         Apply a list of distortions, summarize pricing and produce graphical output
         show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
 
+        :param axiter:
+        :param kind:
         :param dist_dict: dictionary of Distortion objects
         :param As: input asset levels to consider OR
         :param Ps: input probs (near 1) converted to assets using ``self.q()``
@@ -2472,10 +2481,14 @@ class Portfolio(object):
             pass
 
         for g in dist_dict.values():
-            _x = self.apply_distortion(g, axiter, num_plots)
+            _x = self.apply_distortion(g) #, axiter, num_plots)
             df = _x.augmented_df
             # extract range of S values
-            temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
+            if As[0] in df.index:
+                temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
+            else:
+                logger.error(f'NOT ERROR, FYI: {As} not in index...max value is {max(df.index)}...selecing that!')
+                temp = df.iloc[[-1], :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name
@@ -3460,7 +3473,7 @@ class Portfolio(object):
                            a_max_p=1-1e-8, add_comps=True, mass_hints=None, efficient=True):
         """
 
-        Graphic and summary DataFrame for one distortion showing results that vary by asset levelm
+        Graphic and summary DataFrame for one distortion showing results that vary by asset level.
         such as increasing or decreasing cumulative premium.
 
         Characterized by the need to know an asset level, vs. apply_distortion that produced
@@ -3541,7 +3554,7 @@ class Portfolio(object):
             if type(dname) == str:
                 dist = self.dists[dname]
             elif isinstance(dname, Distortion):
-                pass
+                dist = dname
             else:
                 raise ValueError(f'Unexpected dname={dname} passed to analyze_distortion')
             a_cal = self.q(p, kind)

@@ -57,7 +57,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'aggregate'
-copyright = '2018-29 Convex Risk LLC'
+copyright = '2018-22 Convex Risk LLC'
 author = 'Stephen J. Mildenhall'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -65,7 +65,7 @@ author = 'Stephen J. Mildenhall'
 # built documents.
 #
 # The short X.Y version.
-version = '0.7'
+version = '0.95'
 # The full version, including alpha/beta/rc tags.
 def get_version():
     with open('../version_number.md', 'r') as f:

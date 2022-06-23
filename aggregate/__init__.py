@@ -2,9 +2,9 @@
 
 __docformat__ = 'restructuredtext'
 __author__ = "Stephen J. Mildenhall"
-__copyright__ = "Copyright 2018-2020, Convex Risk LLC"
+__copyright__ = "Copyright 2018-2022, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
-__version__ = "0.8.14"
+__version__ = "0.9.2"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 
@@ -19,8 +19,8 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     axiter_factory, AxisManager, lognorm_lev, html_title, \
     sensible_jump, suptitle_and_tight, insurability_triangle, \
     read_log, MomentAggregator, MomentWrangler, xsden_to_meancv, \
-    frequency_examples, Answer, log_test, subsets, LOGFILE, \
-    start_timer, report_time, stop_timer
+    frequency_examples, Answer, log_test, subsets, \
+    start_timer, report_time, stop_timer, round_bucket
 from .parser import UnderwritingLexer, UnderwritingParser
 
 

@@ -7,7 +7,7 @@ import logging
 import json
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
-    MomentAggregator, xsden_to_meancv
+    MomentAggregator, xsden_to_meancv, round_bucket
 from .spectral import Distortion
 from scipy import interpolate
 from scipy.optimize import newton
@@ -1107,7 +1107,7 @@ class Aggregate(Frequency):
         """
         # guess bucket and update
         if bs == 0:
-            bs = self.recommend_bucket(log2)
+            bs = round_bucket(self.recommend_bucket(log2))
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
             if self.n > 100:
@@ -1186,9 +1186,9 @@ class Aggregate(Frequency):
                                                   self.sev_density.sum(),
                                                   np.sum(wts), np.sum(np.where(np.isinf(self.sev_density), 1, 0)),
                                                   self.sev_density.max(), np.nan, self.sev_density.min()]
-        if force_severity:
-            # only asking for severity (used by plot)
-            return
+        # if force_severity:
+        #     # only asking for severity (used by plot)
+        #     return
 
         if approximation == 'exact':
             if self.n > 100:

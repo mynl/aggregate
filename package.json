@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "vis-graph3d": "^6.0.2"
+  }
+}

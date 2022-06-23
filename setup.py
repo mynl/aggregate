@@ -4,6 +4,10 @@
 # pip freeze > file to list installed packages
 # pip install -r requirements.txt to install
 
+# May 2022 to upload manually: twine upload dist/aggregate-0.9*.*
+# enter user name and pword (mildenhall) (py... password! not Github)
+
+
 from setuptools import setup
 import os
 from time import time
@@ -51,7 +55,7 @@ setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version=version_number(),
+      version='0.9.2',
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",
@@ -71,6 +75,6 @@ setup(name="aggregate",
           'Intended Audience :: Financial and Insurance Industry',
           'Intended Audience :: Education'
       ],
-      project_urls={"Documentation": 'https://aggregate.readthedocs.io/en/latest/',
+      project_urls={"Documentation": 'https://www.mynl.com/aggregate/',
                     "Source Code": "https://github.com/mynl/aggregate_project"}
       )

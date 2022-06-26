@@ -19,6 +19,7 @@ from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 import itertools
+from collections import namedtuple
 from numpy.linalg import inv  # , pinv, det, matrix_rank
 # from types import MethodType
 # from scipy.special import ndtri  # inverse normal - this actually does the work
@@ -951,6 +952,11 @@ class Aggregate(Frequency):
             elif _lr > 0:
                 _pr = _el / _lr
 
+            # for empirical freq claim count entered as -1
+            if _en < 0:
+                _en = np.sum(self.freq_a * self.freq_b)
+                _el = _en * sev1
+
             # scale for the mix - OK because we have split the exposure and severity components
             _pr *= _swt
             _el *= _swt
@@ -1018,8 +1024,8 @@ class Aggregate(Frequency):
     def _repr_html_(self):
         s = [f'<h3>Aggregate object: {self.name}</h3>']
         s.append(f'Claim count {self.n:0,.2f}, {self.freq_name} distribution<br>')
-        _n = len(self.statistics_df)
-        if _n == 1:
+        n = len(self.statistics_df)
+        if n == 1:
             sv = self.sevs[0]
             if sv.limit == np.inf and sv.attachment == 0:
                 _la = 'unlimited'
@@ -1027,42 +1033,11 @@ class Aggregate(Frequency):
                 _la = f'{sv.limit} xs {sv.attachment}'
             s.append(f'Severity{sv.long_name} distribution, {_la}<br>')
         else:
-            s.append(f'Severity with {_n} components<br>')
+            s.append(f'Severity with {n} components<br>')
         if self.bs > 0:
             s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}')
-        st = self.statistics_total_df.loc['mixed', :]
-        sev_m = st.sev_m
-        sev_cv = st.sev_cv
-        sev_skew = st.sev_skew
-        n_m = st.freq_m
-        n_cv = st.freq_cv
-        a_m = st.agg_m
-        a_cv = st.agg_cv
-        _df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                            'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
-                           index=['Sev', 'Freq', 'Agg'])
-        _df.index.name = 'X'
-        if self.audit_df is not None:
-            esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
-            esev_cv = self.audit_df.loc['mixed', 'emp_sev_cv']
-            ea_m = self.audit_df.loc['mixed', 'emp_agg_1']
-            ea_cv = self.audit_df.loc['mixed', 'emp_agg_cv']
-            _df.loc['Sev', 'Est E(X)'] = esev_m
-            _df.loc['Agg', 'Est E(X)'] = ea_m
-            _df.loc[:, 'Err E(X)'] = _df['Est E(X)'] / _df['E(X)'] - 1
-            _df.loc['Sev', 'Est CV(X)'] = esev_cv
-            _df.loc['Agg', 'Est CV(X)'] = ea_cv
-            _df.loc[:, 'Err CV(X)'] = _df['Est CV(X)'] / _df['CV(X)'] - 1
-            _df = _df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
-        _df = _df.fillna('')
-        return '\n'.join(s) + _df._repr_html_()
-
-    # def __repr__(self):
-    #     """
-    #     Goal unmbiguous
-    #     :return: MUST return a string
-    #     """
-    #     return str(self.spec)
+        df = self.describe()
+        return '\n'.join(s) + df.to_html()
 
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
@@ -1159,7 +1134,8 @@ class Aggregate(Frequency):
         Pre-0.9.3....does not have reinsurance features.
 
         0.9.3 removed verbose option: it just makes plots you can get with .plot
-        0.9.3: want multi-way switch for force_sev ?
+        0.9.3: multi-way switch force_severity: if "yes" then update exists after sev comp (eg for plot).
+        else if True create severity and perform an update.
 
         Quick simple test with log2=13 update took 5.69 ms and _eff took 2.11 ms. So quicker
         but not an issue unless you are doing many!
@@ -1186,7 +1162,7 @@ class Aggregate(Frequency):
         self.log2 = int(np.log(len(xs)) / np.log(2))
 
         # make the severity vector: a claim count weighted average of the severities
-        if approximation == 'exact' or force_severity is not None:
+        if approximation == 'exact' or force_severity:
             wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
             self.sev_density = np.zeros_like(xs)
             beds = self.discretize(sev_calc, discretization_calc, normalize)
@@ -1199,11 +1175,11 @@ class Aggregate(Frequency):
 
         # deal with per occ reinsurance
         if self.occ_reins is not None:
-            logger.log(35, 'Applying occurrence reinsurance.')
+            logger.info('Applying occurrence reinsurance.')
             if self.sev_gross is not None:
                 # make the function an involution...
                 self.sev_density = self.sev_gross
-            self.debug = self.apply_occ_reins(debug)
+            self.occ_reins_df = self.apply_occ_reins(debug)
 
         if approximation == 'exact':
             if self.n > 100:
@@ -1330,7 +1306,6 @@ class Aggregate(Frequency):
         self._cdf = None
         self.verbose_audit_df = None
 
-
     def apply_occ_reins(self, debug=False):
         """
         Apply the occ reins
@@ -1416,40 +1391,6 @@ class Aggregate(Frequency):
 
         return occ_reins_df
 
-        return occ_reins_df
-
-    def emp_stats(self):
-        """
-        report_ser on empirical statistics_df - useful when investigating dh transformations.
-
-        :return:
-        """
-
-        ex = np.sum(self.xs * self.agg_density)
-        ex2 = np.sum(self.xs ** 2 * self.agg_density)
-        # ex3 = np.sum(self.xs**3 * self.agg_density)
-        v = ex2 - ex * ex
-        sd = np.sqrt(v)
-        cv = sd / ex
-        s1 = pd.Series([ex, sd, cv], index=['mean', 'sd', 'cv'])
-        if self.dh_sev_density is not None:
-            ex = np.sum(self.xs * self.dh_agg_density)
-            ex2 = np.sum(self.xs ** 2 * self.dh_agg_density)
-            # ex3 = np.sum(self.xs**3 * self.dh_agg_density)
-            v = ex2 - ex * ex
-            sd = np.sqrt(v)
-            cv = sd / ex
-            s2 = pd.Series([ex, sd, cv], index=['mean', 'sd', 'cv'])
-            df = pd.DataFrame({'numeric': s1, self.beta_name: s2})
-        else:
-            df = pd.DataFrame(s1, columns=['numeric'])
-        df.loc['mean', 'theory'] = self.statistics_total_df.loc['Agg', 'agg1']
-        df.loc['sd', 'theory'] = np.sqrt(self.statistics_total_df.loc['Agg', 'agg2'] -
-                                         self.statistics_total_df.loc['Agg', 'agg1'] ** 2)
-        df.loc['cv', 'theory'] = self.statistics_total_df.loc['Agg', 'agg_cv']  # report_ser[('agg', 'cv')]
-        df['err'] = df['numeric'] / df['theory'] - 1
-        return df
-
     def apply_distortion(self, dist):
         """
         apply distortion to the aggregate density and append as exag column to density_df
@@ -1490,7 +1431,7 @@ class Aggregate(Frequency):
         """
 
         if self.sev_density is None:
-            raise ValueError("Must recalc first!")
+            raise ValueError("Must recalc before computing Cramer Lundberg distribution.")
 
         bit = self.density_df.p_sev.copy()
         if cap:
@@ -1624,7 +1565,7 @@ class Aggregate(Frequency):
         """
 
         if self.agg_density is None:
-            print('Cannot plot before update')
+            raise ValueError('Cannot plot before update')
             return
         if self.sev_density is None:
             self.update(self.xs, 1, None, sev_calc='discrete', force_severity='yes')
@@ -1782,13 +1723,13 @@ class Aggregate(Frequency):
                 df = df.sort_index()
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
                 df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
-                axd['A'].set(xlim=[-0.5, mx+1], title='Probability mass functions')
+                axd['A'].set(xlim=[-mx/25, mx+1], title='Probability mass functions')
                 axd['A'].legend()
                 axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
                 # for discrete plot F next
                 df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
                 df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
-                axd['B'].set(xlim=[-0.5, mx+1], title='Distribution functions')
+                axd['B'].set(xlim=[-mx/25, mx+1], title='Distribution functions')
                 axd['B'].legend()
                 axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
 
@@ -1796,28 +1737,33 @@ class Aggregate(Frequency):
                 ax=axd['C']
                 ax.plot(df.F, df.loss, drawstyle='steps-pre', lw=2, label='Aggregate')
                 ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
-                ax.set(xlim=[-0.025, 1.025], ylim=[-0.5, mx+1], title='Lee diagram')
+                ax.set(xlim=[-0.025, 1.025], ylim=[-mx/25, mx+1], title='Lee diagram')
                 ax.legend()
             else:
                 # continuous
                 df = self.density_df
-                df.p_total.plot(ax=axd['A'], lw=2, label='Aggregate')
-                df.p_sev.plot(ax=axd['A'],  lw=1, label='Severity')
-                axd['A'].set(xlim=[-0.5, self.q(.999)+0.5], title='Probability density')
-                axd['A'].legend()
+                mx = self.q(.999) + 0.5
+                xlim = self.limits(stat='range', kind='linear')
+                xlim2 = self.limits(stat='range', kind='log')
+
+                ax = axd['A']
+                df.p_total.plot(ax=ax, lw=2, label='Aggregate')
+                df.p_sev.plot(ax=ax,  lw=1, label='Severity')
+                ax.set(xlim=xlim, title='Probability density')
+                ax.legend()
 
                 df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
                 df.p_sev.plot(ax=axd['B'],  lw=1, label='Severity')
-                axd['B'].set(xlim=[-0.5, self.q(.999)+0.5], title='Log density', yscale='log')
+                axd['B'].set(xlim=xlim2, title='Log density', yscale='log')
                 axd['B'].legend()
 
-                ax=axd['C']
+                ax = axd['C']
                 ax.plot(df.F, df.loss, lw=2, label='Aggregate')
                 ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
-                ax.set(xlim=[-0.025, 1.025], ylim=[-0.5, self.q(0.999)], title='Lee (quantile) plot')
+                ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Lee (quantile) plot')
                 ax.legend()
 
-    def limits(self, kind):
+    def limits(self, stat='range', kind='linear', zero_mass='include'):
         """
         Suggest sensible plotting limits for kind=range, density, ..
 
@@ -1825,15 +1771,36 @@ class Aggregate(Frequency):
 
         Called by ploting routines. Single point of failure!
 
-        :param kind:
+        :param stat:  range or density
+        :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)
+        :param zero_mass:  include exclude, for densities
         :return:
         """
-        if kind=='range':
-            pass
-        elif kind=='density':
-            pass
+        # fudge l/r factors
+        def f(x):
+            fl, fr = 0.02, 1.02
+            return [-fl * x, fr * x]
+        # lower bound for log plots
+        eps = 1e-16
+
+        if stat == 'range':
+            if kind == 'linear':
+                return f(self.q(0.999))
+            else:
+                # wider range for log density plots
+                return f(self.q(0.99999))
+        elif stat == 'density':
+            mx = self.agg_density.max()
+            mxx0 = self.agg_density[1:].max()
+            if kind == 'linear':
+                if zero_mass == 'include':
+                    return f(mx)
+                else:
+                    return f(mxx0)
+            else:
+                return [eps, mx * 1.5]
         else:
-            raise ValueError(f'Inadmissible kind passsed, expected range or density.')
+            raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
     def report(self, report_list='audit'):
         """
@@ -1873,8 +1840,36 @@ class Aggregate(Frequency):
             return df.T
 
     def describe(self):
-        """ everything should have a desribe... """
-        return self.report('audit')
+        """
+        Theoretic and empirical stats. Used in _repr_html_.
+
+        """
+        st = self.statistics_total_df.loc['mixed', :]
+        sev_m = st.sev_m
+        sev_cv = st.sev_cv
+        sev_skew = st.sev_skew
+        n_m = st.freq_m
+        n_cv = st.freq_cv
+        a_m = st.agg_m
+        a_cv = st.agg_cv
+        df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
+                            'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
+                           index=['Sev', 'Freq', 'Agg'])
+        df.index.name = 'X'
+        if self.audit_df is not None:
+            esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
+            esev_cv = self.audit_df.loc['mixed', 'emp_sev_cv']
+            ea_m = self.audit_df.loc['mixed', 'emp_agg_1']
+            ea_cv = self.audit_df.loc['mixed', 'emp_agg_cv']
+            df.loc['Sev', 'Est E(X)'] = esev_m
+            df.loc['Agg', 'Est E(X)'] = ea_m
+            df.loc[:, 'Err E(X)'] = df['Est E(X)'] / df['E(X)'] - 1
+            df.loc['Sev', 'Est CV(X)'] = esev_cv
+            df.loc['Agg', 'Est CV(X)'] = ea_cv
+            df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
+            df = df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+        df = df.fillna('')
+        return df
 
     def recommend_bucket(self, log2=10, verbose=False):
         """
@@ -2209,18 +2204,29 @@ class Aggregate(Frequency):
         """
         return json.dumps(self._spec)
 
-    def entropy_fit(self, n_const, tol=1e-10, verbose=False):
+    def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """
         Find the max entropy fit to the aggregate based on n_moments fit
-        n_moments must include 0 powers (so for two moments enter 3)
+        The constant is added (sum of probabilities constraint), for two
+        moments there are n_const = 3 constrains.
 
         Based on discussions with and R code from Jon Evans
 
-        :param n_const: number of moments to match, including 0 for sum of probs
+        Run ::
+
+            ans = obj.entropy_fit(2)
+            ans['ans_df'].plot()
+
+        to compare the fits.
+
+        :param n_moments: number of moments to match
         :param tol:
         :param verbose:
         :return:
         """
+        # sum of probs constraint
+        n_constraints = n_moments + 1
+
         # don't want to mess up the object...
         xs = self.xs.copy()
         p = self.agg_density.copy()
@@ -2229,13 +2235,13 @@ class Aggregate(Frequency):
         p = p / np.sum(p)
         p1 = p.copy()
 
-        mtargets = np.zeros(n_const)
-        for i in range(n_const):
+        mtargets = np.zeros(n_constraints)
+        for i in range(n_constraints):
             mtargets[i] = np.sum(p)
             p *= xs
 
-        parm1 = np.zeros(n_const)
-        x = np.array([xs ** i for i in range(n_const)])
+        parm1 = np.zeros(n_constraints)
+        x = np.array([xs ** i for i in range(n_constraints)])
 
         probs = np.exp(-x.T @ parm1)
         machieved = x @ probs
@@ -2261,6 +2267,90 @@ class Aggregate(Frequency):
         ans = ans.set_index('xs')
         return dict(params=parm1, machieved=machieved, mtargets=mtargets, ans_df=ans)
 
+    def var_dict(self, p, kind='lower', snap=False):
+        """
+        make a dictionary of value at risks for the line, mirrors Portfolio.var_dict.
+        Here is just marshalls calls to the appropriate var or tvar function
+
+        No epd. Allows the price function to run consistently with Portfolio version.
+
+        Example:
+
+            for p, arg in zip([.996, .996, .996, .985, .01], ['var', 'lower', 'upper', 'tvar', 'epd']):
+                print(port.var_dict(p, arg,  snap=True))
+
+        :param p:
+        :param kind: var (defaults to lower), upper, lower, tvar
+        :param snap: snap tvars to index
+        :return:
+        """
+        if kind == 'var': kind = 'lower'
+        if kind == 'tvar':
+            d = {self.name: self.tvar(p)}
+        else:
+            d = {self.name: self.q(p, kind)}
+        if snap and kind == 'tvar':
+            d = {self.name: self.snap(d[self.name])}
+        return d
+
+    def price(self, p, g, kind='var'):
+        """
+        Price using regulatory and pricing g functions, mirroring Portfolio.price.
+        Unlike Portfolio, cannot calibrate. Applying specified Distortions only.
+        If calibration is needed, embed Aggregate in a one-line Portfolio object.
+
+            Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
+            the regulatory distortion
+
+            regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
+
+            * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
+            * if input > 1 it is a directly input  capital number
+            * d dictionary: Distortion; spec { name = dist name | var, shape=p value a distortion used directly
+
+            ``pricing_g`` is  { name = ph|wang and shape=}, if shape (lr or roe not allowed; require calibration).
+
+            if ly it must include ro in spec
+
+        :param p: a distortion function spec or just a number; if >1 assets, if <1 a prob converted to quantile
+        :param kind: var lower upper tvar
+        :param g:  pricing distortion function
+        :return:
+        """
+
+        # figure regulatory assets; applied to unlimited losses
+        vd = self.var_dict(p, kind, snap=True)
+        a_reg = vd[self.name]
+
+        # figure pricing distortion
+        if isinstance(g, Distortion):
+            # just use it
+            pass
+        else:
+            # Distortion spec as dict
+            g = Distortion(**g)
+
+        self.apply_distortion(g)
+        aug_row = self.density_df.loc[a_reg]
+
+        # holder for the answer
+        df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
+        df.columns.name = 'statistic'
+        df = df.set_index('line', drop=True)
+
+        el = aug_row['exa']
+        P = aug_row['exag']
+        M = P - el
+        Q = a_reg - P
+
+        df.loc[self.name, :] = [el, P, M, Q]
+        df['a'] = a_reg
+        df['LR'] = df.L / df.P
+        df['PQ'] = df.P / df.Q
+        df['ROE'] = df.M / df.Q
+        # ap = namedtuple('AggregatePricing', ['df', 'distortion'])
+        # return ap(df, g)  # kinda dumb...
+        return df
 
 
 class Severity(ss.rv_continuous):
@@ -2437,7 +2527,7 @@ class Severity(ss.rv_continuous):
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
         else:
             # distributions with one shape parameter
-            # TODO assumes 0 is an invalide shape parameter....
+            # TODO assumes 0 is an invalid shape parameter....
             if sev_a == 0:
                 sev_a, _ = self.cv_to_shape(sev_cv)
             if sev_scale == 0 and sev_mean > 0:
@@ -2785,7 +2875,6 @@ class Severity(ss.rv_continuous):
         :return:
         """
 
-        ps = np.linspace(0, 1, N, endpoint=False)
         xs = np.linspace(0, self._isf(1e-4), N)
         xs2 = np.linspace(0, self._isf(1e-12), N)
 
@@ -2812,7 +2901,6 @@ class Severity(ss.rv_continuous):
 
         ax = axd['D']
         ax.plot(ys, xs, drawstyle=ds, lw=1)
-        # ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='blue', alpha=0.5)
         ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability p (or ω)', xlim=[-0.025, 1.025])
 
 

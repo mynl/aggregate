@@ -262,29 +262,51 @@ def round_bucket(bs):
 
     if bs < 1 find the smallest power of two greater than 1/bs
 
-    """
+    Test cases:
 
-    if bs >= 1:
-        # rounded bs
+        test_cases = [1, 1.1, 2, 2.5, 4, 5, 5.5, 8.7, 9.9, 10, 13, 15, 20, 50, 100, 99, 101, 200, 250, 400, 457,
+                        500, 750, 1000, 2412, 12323, 57000, 119000, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21]
+        for i in test_cases:
+            print(i, round_bucket(i))
+        for i in test_cases:
+            print(1/i, round_bucket(1/i))
+            
+    """
+    if bs == 1:
+        return bs
+
+    if bs > 1:
+        # rounded bs, to an integer
         rbs = np.round(bs, 0)
         if rbs == 1:
             return 2.0
+        elif rbs == 2:
+            return 2
         elif rbs <= 5:
             return 5.0
         elif rbs <= 10:
             return 10.0
         else:
-            return 10 * round_bucket(bs / 10)
+            rbs = np.round(bs, -int(np.log(bs) / np.log(10)))
+            if rbs < bs:
+                rbs *= 2
+            return rbs
 
     if bs < 1:
         # inverse bs
-        bsi = 1 / bs
-        nbs = 1
-        while nbs < bsi:
-            nbs <<= 1
-        nbs >>= 1
-        return 1. / nbs
-
+        # originally
+        # bsi = 1 / bs
+        # nbs = 1
+        # while nbs < bsi:
+        #     nbs <<= 1
+        # nbs >>= 1
+        # return 1. / nbs
+        # same answer but ? clearer and slightly quicker
+        x = 1. / bs
+        x = bin(int(x))
+        x = '0b1' + "0" * (len(x) -3)
+        x = int(x[2:], 2)
+        return 1./ x
 
 def make_ceder_netter(reins_list, debug=False):
     """
@@ -1013,76 +1035,6 @@ class MomentWrangler(object):
         self._factorial = (ex1, ex2 - ex1, ex3 - 3 * ex2 + 2 * ex1)
 
 
-# class qd(object):
-#     """
-#     quick display for dictionaries and Pandas dataframes, with some sensible number defaults
-#     experimental
-#
-#     """
-#
-#     # Set CSS properties for th elements in dataframe
-#     th_props = [
-#         ('font-size', '11px'),
-#         ('text-align', 'center'),
-#         ('font-weight', 'bold'),
-#         ('color', '#6d6d6d'),
-#         ('background-color', '#f7f7f9')
-#     ]
-#
-#     # Set CSS properties for td elements in dataframe
-#     td_props = [
-#         ('font-size', '10px'),
-#         ('text-align', 'left')
-#     ]
-#
-#     # Set table styles
-#     styles = [
-#         dict(selector="th", props=th_props),
-#         dict(selector="td", props=td_props)
-#     ]
-#
-#     cm = sns.light_palette("green", as_cmap=True)
-#
-#     def __init__(self, d):
-#         self.x = d
-#
-#     def _repr_html_(self):
-#         if isinstance(self.x, dict):
-#             return pd.DataFrame(self.x, index=[len(self.x)])._repr_html_()
-#         if isinstance(self.x, list) or isinstance(self.x, tuple) and len(self.x) == 2:
-#             if isinstance(self.x[1], dict):
-#                 return f'<h2>{self.x[0]}</h2><br>' + qd(self.x[1])._repr_html_()
-#         elif isinstance(self.x, pd.DataFrame):
-#             # do a bit of styling
-#             num_cols = self.x.select_dtypes(np.number).columns
-#             fmt = {}
-#             for a, b in zip(self.x.columns, self.x.dtypes):
-#                 if np.issubdtype(b, np.number):
-#                     m, s = self.x[a].agg([np.mean, np.std])
-#                     x = np.abs(m) + 3 * s
-#                     if abs(x) > self.x[a].max():
-#                         x = self.x[a].max()
-#                     if x < 10:
-#                         fmt[a] = '{:7.3f}'
-#                     elif x < 1000:
-#                         fmt[a] = '{:7.1f}'
-#                     elif x < 10e6:
-#                         fmt[a] = '{:12,.1f}'
-#                     else:
-#                         fmt[a] = '{:12.3e}'
-#                 else:
-#                     fmt[a] = '{:}'
-#
-#             return (self.x.style
-#                     .background_gradient(cmap=cm, subset=num_cols)
-#                     .highlight_max(subset=num_cols)
-#                     #   .set_caption('This is a custom caption.')
-#                     .format(fmt)
-#                     .set_table_styles(styles))._repr_html_()
-#         else:
-#             return repr(self.x)
-
-
 def xsden_to_meancv(xs, den):
     """
     compute mean and cv from xs and density
@@ -1109,6 +1061,8 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
     calculations.
 
     sichel_case = gamma | ig | ''
+
+    Sample call: df, ans = frequency_examples(n=100, ν=0.45, f=0.5, κ=1.25, sichel_case='', log2=16, xmax=2500)
 
     n = E(N) = expected claim count
     ν = CV(mixing) = asymptotic CV of any compound aggregate whose severity has a second moment
@@ -1416,13 +1370,14 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
         # pal = [sns.color_palette("Paired", 7)[i] for i in [all_dist.index(j) for j in vars]]
         df[vars].plot(kind='line', ax=next(axiter)) #, color=pal)
         axiter.ax.set_xlim(0, 4 * n)
-        df[vars].plot(kind='line', logy=True, ax=next(axiter), legend=None, color=pal)
+        df[vars].plot(kind='line', logy=True, ax=next(axiter), legend=None) # , color='virdis')
     axiter.tidy()
     display(ans.unstack())
     return df, ans
 
 
 class Answer(dict):
+    # TODO replace with collections.namedtuple? Or at least, stop using it!
     def __init__(self, **kwargs):
         """
         Generic answer wrapping class with plotting

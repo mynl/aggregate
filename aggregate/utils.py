@@ -11,6 +11,7 @@ import itertools
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
+from scipy.interpolate import interp1d
 from io import StringIO
 import re
 from pathlib import Path
@@ -284,6 +285,34 @@ def round_bucket(bs):
         nbs >>= 1
         return 1. / nbs
 
+
+def make_ceder_netter(reins_list, debug=False):
+    """
+    Build the netter and ceder functions. It is applied to occ_reins and agg_reins,
+    so should be stand-alone.
+    """
+    h = 0
+    base = 0
+    xs = [0]
+    ys = [0]
+    for (p, y, a) in reins_list:
+        if a > base:
+            xs.append(a)
+            ys.append(h)
+        h += p
+        xs.append(a + y)
+        ys.append(h)
+        base += (a + y)
+    xs.append(np.inf)
+    ys.append(h)
+    ceder = interp1d(xs, ys)
+    netter = lambda x: x - ceder(x)
+    if debug:
+        return ceder, netter, xs, ys
+    else:
+        return ceder, netter
+
+
 # axis management
 def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     """
@@ -543,7 +572,7 @@ def suptitle_and_tight(title, **kwargs):
     :return:
     """
     plt.suptitle(title, **kwargs)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    # plt.tight_layout(rect=[0, 0, 1, 0.96])
 
 
 # general nonsense

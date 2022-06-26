@@ -114,6 +114,52 @@ import warnings
 
 logger = logging.getLogger('aggregate')
 
+_uw = None
+
+def build(program, update=True, bs=0, log2=13, padding=1, **kwargs):
+    """
+    Convenience function to make work easy for the user. Hide uw, updating etc.
+
+    :param program:
+    :param bs:
+    :param log2:
+    :param padding:
+    :param kwargs: passed to update
+    :return:
+    """
+    global _uw
+
+    # tamper down the logging
+    logger.setLevel(30)
+
+    if _uw is None:
+        _uw = Underwriter(create_all=True, update=False)
+
+    if program in ['underwriter', 'uw']:
+        return _uw
+
+    # make stuff
+    out = _uw(program)
+
+    if isinstance(out, dict):
+        pass
+    elif isinstance(out, Aggregate) and update is True:
+        d = out.spec
+        if d['sev_name'] == 'dhistogram':
+            bs = 1
+            # how big??
+            log2 = 8
+        out.easy_update(log2=log2, bs=bs, padding=padding, **kwargs)
+    elif isinstance(out, Severity):
+        # there is no updating for severities
+        pass
+
+    else:
+        pass
+
+    return out
+
+
 class Underwriter(object):
     """
     The underwriter class constructs real world examples from stored and user input Lines and Accounts.

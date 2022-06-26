@@ -30,7 +30,7 @@ wheels/
 MANIFEST
 doc
 node_modules/*
-
+aggregate/frozen_0.9.2/*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

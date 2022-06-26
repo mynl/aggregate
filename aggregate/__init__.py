@@ -10,7 +10,7 @@ __status__ = "alpha"
 
 # imports
 from .param import hack_make_lines_from_csv
-from .underwriter import Underwriter
+from .underwriter import Underwriter, build
 from .port import Portfolio
 from .distr import Frequency, Severity, Aggregate, CarefulInverse
 from .spectral import Distortion
@@ -20,7 +20,8 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     sensible_jump, suptitle_and_tight, insurability_triangle, \
     read_log, MomentAggregator, MomentWrangler, xsden_to_meancv, \
     frequency_examples, Answer, log_test, subsets, \
-    start_timer, report_time, stop_timer, round_bucket
+    start_timer, report_time, stop_timer, round_bucket, \
+    make_ceder_netter
 from .parser import UnderwritingLexer, UnderwritingParser
 
 

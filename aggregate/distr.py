@@ -9,7 +9,7 @@ import logging
 import json
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
-    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter
+    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler
 from .spectral import Distortion
 from scipy import interpolate
 from scipy.optimize import newton
@@ -21,10 +21,12 @@ from scipy.interpolate import interp1d
 import itertools
 from collections import namedtuple
 from numpy.linalg import inv  # , pinv, det, matrix_rank
+
 # from types import MethodType
 # from scipy.special import ndtri  # inverse normal - this actually does the work
 
 logger = logging.getLogger('aggregate')
+
 
 class Frequency(object):
     """
@@ -153,8 +155,8 @@ class Frequency(object):
             # e.g. tester: agg =uw('agg GEOM 3 claims sev dhistogram xps [1] [1] geometric')
             def _freq_moms(n):
                 p = 1 / (n + 1)
-                freq_2 = (2 - p) * (1 - p) / p**2
-                freq_3 = (1 - p) * (6 + (p - 6) * p) / p**3
+                freq_2 = (2 - p) * (1 - p) / p ** 2
+                freq_3 = (1 - p) * (6 + (p - 6) * p) / p ** 3
                 return n, freq_2, freq_3
 
             def mgf(n, z):
@@ -190,8 +192,8 @@ class Frequency(object):
             def _freq_moms(n):
                 # independent of n, it will be -1
                 en = np.sum(self.freq_a * self.freq_b)
-                en2 = np.sum(self.freq_a**2 * self.freq_b)
-                en3 = np.sum(self.freq_a**3 * self.freq_b)
+                en2 = np.sum(self.freq_a ** 2 * self.freq_b)
+                en3 = np.sum(self.freq_a ** 3 * self.freq_b)
                 return en, en2, en3
 
             def mgf(n, z):
@@ -749,6 +751,80 @@ class Aggregate(Frequency):
 
         return self._density_df
 
+    @property
+    def reins_audit_df(self):
+        """
+        create and return the _density_df data frame
+        read only property...though if you write d = a.density_df you can obviously edit d...
+        :return:
+        """
+        if self._reins_audit_df is None:
+            # really should have one of these anyway...
+            if self.agg_density is None:
+                raise ValueError('Update Aggregate before asking for density_df')
+
+            ans = []
+            keys = []
+            if self.occ_reins is not None:
+                ans.append(self._reins_audit_df_work(kind='occ'))
+                keys.append('occ')
+            if self.agg_reins is not None:
+                ans.append(self._reins_audit_df_work(kind='agg'))
+                keys.append('agg')
+
+            if len(ans):
+               self._reins_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
+
+        return self._reins_audit_df
+
+    def _reins_audit_df_work(self, kind='occ'):
+        """
+        Apply each re layer separetely and aggregate loss and other stats
+
+        """
+        ans = []
+        assert self.sev_density is not None
+
+        # TODO what about agg?
+        if self.sev_gross_density is None:
+            self.sev_gross_density = self.sev_density
+
+        reins = self.occ_reins if kind == 'occ' else self.agg_reins
+
+        for (s, y, a) in reins:
+            c, n, df = self._apply_reins_work([(s,a,a)], self.sev_gross_density, False)
+            ans.append(df)
+
+        if kind == 'occ':
+            ans.append(self.occ_reins_df)
+        else:
+            ans.append(self.agg_reins_df)
+
+        df = pd.concat(ans, keys=reins + [('all', np.inf, 'gup')], names=['share', 'limit', 'attach', 'loss'])
+        # subset and reindex
+        df = df.filter(regex='^(F|p)')
+        df.columns = df.columns.str.split('_', expand=True)
+        df = df.sort_index(axis=1)
+
+        # summarize
+        def f(bit):
+            # summary function to compute stats
+            xs = bit.index.levels[3]
+            xs2 = xs * xs
+            xs3 = xs2 * xs
+
+            def g(p):
+                ex = np.sum(xs * p)
+                ex2 = np.sum(xs2 * p)
+                ex3 = np.sum(xs3 * p)
+                mw = MomentWrangler()
+                mw.noncentral = (ex, ex2, ex3)
+                return mw.stats
+
+            return bit['p'].apply(g)
+
+        return df.groupby(level=(0,1,2)).apply(f).unstack(-1).sort_index(level='attach')
+
     def rescale(self, scale, kind='homog'):
         """
         return a rescaled Aggregate object - used to compute derivatives
@@ -777,6 +853,7 @@ class Aggregate(Frequency):
                 return sc * np.array(x)
             else:
                 return sc * x
+
         nm = spec['name']
         spec['name'] = f'{nm}:{kind}:{scale}'
         if kind == 'homog':
@@ -865,18 +942,21 @@ class Aggregate(Frequency):
         self.verbose_audit_df = None
         self._careful_q = None
         self._density_df = None
+        self._reins_audit_df = None
         self.q_temp = None
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
-        self.agg_reins = agg_reins
-        self.agg_kind = agg_kind
         self.occ_netter = None
         self.occ_ceder = None
+        self.occ_reins_df = None
+        self.agg_reins = agg_reins
+        self.agg_kind = agg_kind
         self.agg_netter = None
         self.agg_ceder = None
-        self.sev_ceded = None
-        self.sev_net = None
-        self.sev_gross = None
+        self.agg_reins_df = None
+        self.sev_ceded_density = None
+        self.sev_net_density = None
+        self.sev_gross_density = None
 
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
@@ -906,7 +986,7 @@ class Aggregate(Frequency):
             self.limit = limit
             n_components = len(all_arrays)
             logger.debug(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
-                        f'{len(sev_a)} sevs = {n_components} componets')
+                         f'{len(sev_a)} sevs = {n_components} componets')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
         else:
@@ -1174,12 +1254,13 @@ class Aggregate(Frequency):
             return
 
         # deal with per occ reinsurance
+        # TODO issues with force_severity = False.... get rid of that option entirely?
         if self.occ_reins is not None:
             logger.info('Applying occurrence reinsurance.')
-            if self.sev_gross is not None:
+            if self.sev_gross_density is not None:
                 # make the function an involution...
-                self.sev_density = self.sev_gross
-            self.occ_reins_df = self.apply_occ_reins(debug)
+                self.sev_density = self.sev_gross_density
+            self.apply_occ_reins(debug)
 
         if approximation == 'exact':
             if self.n > 100:
@@ -1220,7 +1301,10 @@ class Aggregate(Frequency):
             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
 
         # make a suitable audit_df
-        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_m', 'agg_cv', 'agg_skew']
+        # originally...irritating no freq cv or sev cv
+        # cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_m', 'agg_cv', 'agg_skew']
+        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'freq_cv', 'freq_skew',
+                'sev_1', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
         self.audit_df = pd.concat((self.statistics_df[cols],
                                    self.statistics_total_df.loc[['mixed'], cols]),
                                   axis=0)
@@ -1242,7 +1326,7 @@ class Aggregate(Frequency):
         self._cdf = None
 
     def update_efficiently(self, xs, padding=1, approximation='exact', sev_calc='discrete',
-               discretization_calc='survival', normalize=True):
+                           discretization_calc='survival', normalize=True):
         """
         Compute the density with absolute minimum overhead. Called by port.update_efficiently
         Started with code for update and removed frills
@@ -1306,10 +1390,88 @@ class Aggregate(Frequency):
         self._cdf = None
         self.verbose_audit_df = None
 
+    def _apply_reins_work(self, reins_list, base_density, debug):
+        """
+        Actually do the work. Called by apply_reins and reins_audit_df.
+        Only needs self to get limits, which it must guess without q (not computed
+        at this stage). Does not need to know if occ or agg reins,
+        only that the correct base_density is supplied.
+
+        :param reins_list:
+        :param kind: occ or agg, for debug plotting
+        :param debug:
+        :return: ceder, netter,
+        """
+        ans = make_ceder_netter(reins_list, debug)
+        if debug:
+            # debug xs and ys are the knot points of the interpolation function; good for plotting
+            ceder, netter, xs, ys = ans
+        else:
+            ceder, netter = ans
+        # assemble df for answers
+        reins_df = pd.DataFrame({'loss': self.xs, 'p_subject': base_density,
+                                 'F_subject': base_density.cumsum()}).set_index('loss', drop=False)
+        reins_df['loss_net'] = netter(reins_df.loss)
+        reins_df['loss_ceded'] = ceder(reins_df.loss)
+        # summarized n and c
+        sn = reins_df.groupby('loss_net').p_subject.sum()
+        sc = reins_df.groupby('loss_ceded').p_subject.sum()
+        # -100: this value should never appear. use big value to make it obvious
+        netter_interp = interp1d(sn.index, sn.cumsum(), fill_value=(-100, 1), bounds_error=False)
+        ceder_interp = interp1d(sc.index, sc.cumsum(), fill_value=(-100, 1), bounds_error=False)
+        reins_df['F_net'] = netter_interp(reins_df.loss)
+        reins_df['F_ceded'] = ceder_interp(reins_df.loss)
+        reins_df['p_net'] = np.diff(reins_df.F_net, prepend=0)
+        reins_df['p_ceded'] = np.diff(reins_df.F_ceded, prepend=0)
+
+        if debug is False:
+            return ceder, netter, reins_df
+
+        # quick debug; need to know kind=occ|agg here
+        f = plt.figure(constrained_layout=True, figsize=(12, 9))
+        axd = f.subplot_mosaic('AB\nCD')
+        xlim = self.limits()
+        # scale??
+        x = np.linspace(0, xlim[1], 201)
+        y = ceder(x)
+        n = x - y
+        nxs = netter(xs)
+
+        ax = axd['A']
+        ax.plot(xs, ys, 'o')
+        ax.plot(x, y)
+        ax.plot(x, x, lw=.5, c='C7')
+        ax.set(aspect='equal', xlim=xlim, ylim=xlim,
+               xlabel='Subject', ylabel='Ceded',
+               title=f'Subject and ceded\nMax ceded loss {y[-1]:,.1f}')
+
+        ax = axd['B']
+        ax.plot(xs, nxs, 'o')
+        ax.plot(x, n)
+        ax.plot(x, x, lw=.5, c='C7')
+        ax.set(aspect='equal', ylim=xlim,
+               xlabel='Subject', ylabel='Net',
+               title=f'Subject and net\nMax net loss {n[-1]:,.1f}')
+
+        ax = axd['C']
+        sn.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='net')
+        sc.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='ceded')
+        reins_df.filter(regex='F').plot(xlim=xlim, ax=ax)
+        ax.set(title=f'Subject, net and ceded\ndistributions')
+        ax.legend()
+
+        ax = axd['D']
+        reins_df.filter(regex='p_').plot(xlim=xlim, drawstyle='steps-post', ax=ax)
+        ax.set(title=f'Subject, net and ceded\ndensities')
+        ax.legend()
+
+        return ceder, netter, reins_df
+
     def apply_occ_reins(self, debug=False):
         """
-        Apply the occ reins
-        Makes sev_gross, sev_net and sev_ceded, and updates sev_density to the requested view.
+        Apply the occ whole reins structure and save output
+        For by layer detail create reins_audit_df
+        Makes sev_gross_density, sev_net_density and sev_ceded_density, and updates sev_density to the requested view.
 
         Treatment in stats?
 
@@ -1319,77 +1481,18 @@ class Aggregate(Frequency):
         if self.occ_reins is None:
             return
 
-        ans = make_ceder_netter(self.occ_reins, debug)
-        if debug:
-            # debug xs and ys are the knot points of the interpolation function; good for plotting
-            self.occ_ceder, self.occ_netter, xs, ys = ans
-        else:
-            self.occ_ceder, self.occ_netter = ans
-        # assemble df for answers
-        occ_reins_df = pd.DataFrame({'loss': self.xs, 'p_sev': self.sev_density,
-                                     'F_gross': self.sev_density.cumsum()}).set_index('loss', drop=False)
-        occ_reins_df['loss_net'] = self.occ_netter(occ_reins_df.loss)
-        occ_reins_df['loss_ceded'] = self.occ_ceder(occ_reins_df.loss)
-        # summarized n and c
-        sn = occ_reins_df.groupby('loss_net').p_sev.sum()
-        sc = occ_reins_df.groupby('loss_ceded').p_sev.sum()
-        # -100: this value should never appear. use big value to make it obvious
-        netter_interp = interp1d(sn.index, sn.cumsum(), fill_value=(-100, 1), bounds_error=False)
-        ceder_interp = interp1d(sc.index, sc.cumsum(), fill_value=(-100, 1), bounds_error=False)
-        occ_reins_df['F_net'] = netter_interp(occ_reins_df.loss)
-        occ_reins_df['F_ceded'] = ceder_interp(occ_reins_df.loss)
-        occ_reins_df['p_net'] = np.diff(occ_reins_df.F_net, prepend=0)
-        occ_reins_df['p_ceded'] = np.diff(occ_reins_df.F_ceded, prepend=0)
-
-        self.sev_gross = self.sev_density
-        self.sev_net = occ_reins_df['p_net']
-        self.sev_ceded = occ_reins_df['p_ceded']
+        occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
+        # store stuff
+        self.occ_reins_df = occ_reins_df
+        self.sev_gross_density = self.sev_density
+        self.sev_net_density = occ_reins_df['p_net']
+        self.sev_ceded_density = occ_reins_df['p_ceded']
         if self.occ_kind == 'ceded to':
-            self.sev_density = self.sev_net
+            self.sev_density = self.sev_net_density
         elif self.occ_kind == 'net of':
-            self.sev_density = self.sev_ceded
+            self.sev_density = self.sev_ceded_density
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
-
-        if debug is False:
-            return
-
-        # quick debug
-        f = plt.figure(constrained_layout=True, figsize=(12,9))
-        axd = f.subplot_mosaic('AB\nCD')
-        xlim = [0, 105] # [0, self.q(0.999)]
-        # scale??
-        x = np.linspace(0, 100, 122)
-        y = self.occ_ceder(x)
-        n = x - y
-        nxs = self.occ_netter(xs)
-
-        ax = axd['A']
-        ax.plot(xs, ys, 'o')
-        ax.plot(x, y)
-        ax.plot(x, x, lw=.5)
-        ax.set(aspect='equal', xlim=xlim, ylim=xlim, title=f'Gross and ceded\nMax ceded loss {y[-1]:,.1f}')
-
-        ax = axd['B']
-        ax.plot(xs, nxs, 'o')
-        ax.plot(x, n)
-        ax.plot(x,x, lw=.5)
-        ax.set(aspect='equal', ylim=ax.get_xlim(), title=f'Gross and net\nMax net loss {n[-1]:,.1f}')
-
-        ax = axd['C']
-        sn.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='net')
-        sc.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='ceded')
-        occ_reins_df.filter(regex='F').plot(xlim=[0,110], ax=ax)
-        # occ_reins_df.filter(regex='F').plot(xlim=[0,110], ax=ax, label='total')
-        ax.set(xlim=xlim, title=f'Gross, net and ceded\ndistributions')
-        ax.legend()
-
-        ax = axd['D']
-        occ_reins_df.filter(regex='p_').plot(xlim=[0,110], drawstyle='steps-post', ax=ax)
-        ax.set(xlim=xlim, title=f'Gross, net and ceded\ndensities')
-        ax.legend()
-
-        return occ_reins_df
 
     def apply_distortion(self, dist):
         """
@@ -1445,9 +1548,9 @@ class Aggregate(Frequency):
             bit = bit / bit.sum()
         elif stop_loss:
             idx = np.searchsorted(bit.index, stop_loss, 'left')
-            xsprob = bit.iloc[idx+1:].sum()
+            xsprob = bit.iloc[idx + 1:].sum()
             bit.iloc[idx] += xsprob
-            bit.iloc[idx+1:] = 0
+            bit.iloc[idx + 1:] = 0
         mean = np.sum(bit * bit.index)
 
         # integrated F function
@@ -1456,11 +1559,11 @@ class Aggregate(Frequency):
         dfi = np.diff(fi, prepend=0)
         # use loc FFT, with wrapping
         fz = ft(dfi, padding, None)
-        mfz = 1 / (1 - fz / (1+rho))
+        mfz = 1 / (1 - fz / (1 + rho))
         f = ift(mfz, padding, None)
-        f = np.real(f) * rho / (1+rho)
+        f = np.real(f) * rho / (1 + rho)
         f = np.cumsum(f)
-        ruin = pd.Series(1-f, index=bit.index)
+        ruin = pd.Series(1 - f, index=bit.index)
 
         if kind == 'index':
             def find_u(p):
@@ -1474,10 +1577,10 @@ class Aggregate(Frequency):
                 q_above = ruin.index[above]
                 p_below = ruin.iloc[below]
                 p_above = ruin.iloc[above]
-                q = q_below + (p-p_below) / (p_above - p_below) * (q_above - q_below)
+                q = q_below + (p - p_below) / (p_above - p_below) * (q_above - q_below)
                 return q
 
-        return ruin, find_u, mean, dfi # , ruin2
+        return ruin, find_u, mean, dfi  # , ruin2
 
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name=""):
         """
@@ -1548,7 +1651,7 @@ class Aggregate(Frequency):
             raise ValueError('Must use compound Poisson for DH density')
         self.beta_name = beta_name
 
-    def plot(self, kind='quick', axiter=None, aspect=1, figsize=(10,3)):
+    def plot(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
         """
         plot computed density and aggregate
 
@@ -1723,21 +1826,21 @@ class Aggregate(Frequency):
                 df = df.sort_index()
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
                 df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
-                axd['A'].set(xlim=[-mx/25, mx+1], title='Probability mass functions')
+                axd['A'].set(xlim=[-mx / 25, mx + 1], title='Probability mass functions')
                 axd['A'].legend()
                 axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
                 # for discrete plot F next
                 df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
                 df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
-                axd['B'].set(xlim=[-mx/25, mx+1], title='Distribution functions')
+                axd['B'].set(xlim=[-mx / 25, mx + 1], title='Distribution functions')
                 axd['B'].legend()
                 axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
 
                 # for Lee diagrams
-                ax=axd['C']
+                ax = axd['C']
                 ax.plot(df.F, df.loss, drawstyle='steps-pre', lw=2, label='Aggregate')
                 ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
-                ax.set(xlim=[-0.025, 1.025], ylim=[-mx/25, mx+1], title='Lee diagram')
+                ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Lee diagram')
                 ax.legend()
             else:
                 # continuous
@@ -1748,12 +1851,12 @@ class Aggregate(Frequency):
 
                 ax = axd['A']
                 df.p_total.plot(ax=ax, lw=2, label='Aggregate')
-                df.p_sev.plot(ax=ax,  lw=1, label='Severity')
+                df.p_sev.plot(ax=ax, lw=1, label='Severity')
                 ax.set(xlim=xlim, title='Probability density')
                 ax.legend()
 
                 df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
-                df.p_sev.plot(ax=axd['B'],  lw=1, label='Severity')
+                df.p_sev.plot(ax=axd['B'], lw=1, label='Severity')
                 axd['B'].set(xlim=xlim2, title='Log density', yscale='log')
                 axd['B'].legend()
 
@@ -1771,17 +1874,28 @@ class Aggregate(Frequency):
 
         Called by ploting routines. Single point of failure!
 
+        Must work without q function when not computed (apply_reins_work for
+        occ reins...uses report_ser instead).
+
         :param stat:  range or density
         :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)
         :param zero_mass:  include exclude, for densities
         :return:
         """
+
         # fudge l/r factors
         def f(x):
             fl, fr = 0.02, 1.02
             return [-fl * x, fr * x]
+
         # lower bound for log plots
         eps = 1e-16
+
+        # if not computed
+        # GOTCH: if you call q and it fails because not agg_density then q is set to {}
+        # which is not None
+        if self.agg_density is None:
+            return f(self.report_ser[('agg', 'P99.9e')])
 
         if stat == 'range':
             if kind == 'linear':
@@ -1800,6 +1914,7 @@ class Aggregate(Frequency):
             else:
                 return [eps, mx * 1.5]
         else:
+            # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
     def report(self, report_list='audit'):
@@ -1823,13 +1938,15 @@ class Aggregate(Frequency):
                 html_title(f'{self.name} Audit Report', 1, False)
                 # massaged version of original audit_df
                 df = self.audit_df.T.copy()
+                # put empirical beside model for easier viewing
                 df['empirical'] = np.nan
-                df.loc[['sev_1', 'agg_m', 'agg_cv'], 'empirical'] = df.loc[['emp_sev_1', 'emp_agg_1', 'emp_agg_cv'], 'mixed'].values
+                df.loc[['sev_1', 'sev_cv', 'agg_m', 'agg_cv'], 'empirical'] = \
+                    df.loc[['emp_sev_1', 'emp_sev_cv', 'emp_agg_1', 'emp_agg_cv'], 'mixed'].values
                 df = df.iloc[:-4].fillna('')
                 if df.shape[1] == 3:
                     # only one sev, don't show extra sev column
                     df = df.iloc[:, 1:]
-                display(df.style.format(lambda x: x if type(x)==str else f'{x:,.3f}'))
+                display(df.style.format(lambda x: x if type(x) == str else f'{x:,.3f}'))
 
         if 'statistics' in report_list:
             if len(self.statistics_df) > 1:
@@ -1853,8 +1970,8 @@ class Aggregate(Frequency):
         a_m = st.agg_m
         a_cv = st.agg_cv
         df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                            'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
-                           index=['Sev', 'Freq', 'Agg'])
+                           'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
+                          index=['Sev', 'Freq', 'Agg'])
         df.index.name = 'X'
         if self.audit_df is not None:
             esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
@@ -1933,25 +2050,30 @@ class Aggregate(Frequency):
         """
         if self._linear_quantile_function is None:
             # revised Dec 2019
-            self._linear_quantile_function = {}
-            self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
-            self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
-            self.q_temp.loc[0, 'loss'] = 0
-            self.q_temp = self.q_temp.sort_index()
-            # that q_temp left cts, want right continuous:
-            self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
-            self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
-            self._linear_quantile_function['upper'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
-                                     fill_value='extrapolate')
-            # Jan 2020 see note in Portfolio: changed previous to next
-            self._linear_quantile_function['lower'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
-                                     fill_value='extrapolate')
-            # changed to loss_s
-            self._linear_quantile_function['middle'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
-                                     fill_value='extrapolate')
+            try:
+                self._linear_quantile_function = {}
+                self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
+                self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
+                self.q_temp.loc[0, 'loss'] = 0
+                self.q_temp = self.q_temp.sort_index()
+                # that q_temp left cts, want right continuous:
+                self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
+                self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
+                self._linear_quantile_function['upper'] = \
+                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
+                                         fill_value='extrapolate')
+                # Jan 2020 see note in Portfolio: changed previous to next
+                self._linear_quantile_function['lower'] = \
+                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
+                                         fill_value='extrapolate')
+                # changed to loss_s
+                self._linear_quantile_function['middle'] = \
+                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
+                                         fill_value='extrapolate')
+            except Exception as e:
+                # if fails reset in case this code is within a try .... except block
+                self._linear_quantile_function = None
+                raise e
         l = float(self._linear_quantile_function[kind](p))
         # because we are not interpolating the returned value must (should) be in the index...
         if not (kind == 'middle' or l in self.density_df.index):
@@ -2131,10 +2253,10 @@ class Aggregate(Frequency):
                 if p0 > 0:
                     ps = np.linspace(0, p0, 200, endpoint=False)
                     tempx = np.hstack((ps, _x))
-                    tempy = np.hstack((self.ex / (1-ps), _y))
+                    tempy = np.hstack((self.ex / (1 - ps), _y))
                     self._tail_var = interpolate.interp1d(tempx, tempy,
-                                  kind='linear', bounds_error=False,
-                                  fill_value=(self.ex, sup))
+                                                          kind='linear', bounds_error=False,
+                                                          fill_value=(self.ex, sup))
                 else:
                     self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
                                                           fill_value=(self.ex, sup))
@@ -2146,8 +2268,8 @@ class Aggregate(Frequency):
             if self._inverse_tail_var is None:
                 # make tvar function
                 self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta, self.density_df.F,
-                                                      kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
+                                                              kind='linear', bounds_error=False,
+                                                              fill_value='extrapolate')
             if type(p) in [int, np.int, float, np.float]:
                 return float(self._inverse_tail_var(p))
             else:
@@ -2459,7 +2581,7 @@ class Severity(ss.rv_continuous):
                 self.sev2 = np.sum(xs ** 2 * ps)
                 self.sev3 = np.sum(xs ** 3 * ps)
                 # binary consistent
-                xss = np.sort(np.hstack((xs - 2**-14, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
+                xss = np.sort(np.hstack((xs - 2 ** -14, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
                 self.fz = ss.rv_histogram((pss, xss))
             else:
@@ -2792,20 +2914,21 @@ class Severity(ss.rv_continuous):
         2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
 
         """
+
         def safe_integrate(f, lower, upper, level):
             """ remember, you are integrating Survival funciton """
 
             argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
             ex = quad(f, lower, upper, **argkw)
-            if len(ex) == 4 or ex[0]==np.inf:  # 'The integral is probably divergent, or slowly convergent.':
-                msg = ex[-1].replace("\n", " ") if ex[-1]==str else "no message"
+            if len(ex) == 4 or ex[0] == np.inf:  # 'The integral is probably divergent, or slowly convergent.':
+                msg = ex[-1].replace("\n", " ") if ex[-1] == str else "no message"
                 logger.warning(
                     f'Severity.moms | ansr={ex[0]}, message {msg} ->')
                 # this is too slow...and we don't really use it...
                 ϵ = 0.001
                 if lower == 0 and upper > ϵ:
                     logger.warning(
-                    f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
+                        f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                     exa = quad(f, 1e-16, ϵ, **argkw)
                     exb = quad(f, ϵ, upper, **argkw)
                     if len(exa) == 4:
@@ -2835,8 +2958,8 @@ class Severity(ss.rv_continuous):
             ex3 = self.sev3
         else:
             ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-            ex2 = safe_integrate(lambda x: self.fz.isf(x)**2, lower, upper, 2)
-            ex3 = safe_integrate(lambda x: self.fz.isf(x)**3, lower, upper, 3)
+            ex2 = safe_integrate(lambda x: self.fz.isf(x) ** 2, lower, upper, 2)
+            ex3 = safe_integrate(lambda x: self.fz.isf(x) ** 3, lower, upper, 3)
 
         # adjust
         dma = self.detachment - self.attachment
@@ -2844,8 +2967,8 @@ class Severity(ss.rv_continuous):
         a = self.attachment
         if a > 0:
             ex1a = ex1 - a * uml
-            ex2a = ex2 - 2 * a * ex1 + a**2 * uml
-            ex3a = ex3 - 3 * a * ex2 + 3 * a**2 * ex1 - a**3 * uml
+            ex2a = ex2 - 2 * a * ex1 + a ** 2 * uml
+            ex3a = ex3 - 3 * a * ex2 + 3 * a ** 2 * ex1 - a ** 3 * uml
         else:
             ex1a = ex1
             ex2a = ex2
@@ -2853,8 +2976,8 @@ class Severity(ss.rv_continuous):
 
         if self.detachment < np.inf:
             ex1a += dma * lower
-            ex2a += dma**2 * lower
-            ex3a += dma**3 * lower
+            ex2a += dma ** 2 * lower
+            ex3a += dma ** 3 * lower
 
         if self.conditional:
             ex1a /= self.pattach
@@ -2863,7 +2986,7 @@ class Severity(ss.rv_continuous):
 
         return ex1a, ex2a, ex3a
 
-    def plot(self, N=100, figsize=(12,3)):
+    def plot(self, N=100, figsize=(12, 3)):
         """
         quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
@@ -2892,7 +3015,7 @@ class Severity(ss.rv_continuous):
         ax = axd['B']
         ys2 = self._pdf(xs2)
         ax.plot(xs2, ys2, drawstyle=ds, lw=1)
-        ax.set(title='Log density', xlabel='Loss', yscale='log', ylim=[1e-14, 2*yl[1]])
+        ax.set(title='Log density', xlabel='Loss', yscale='log', ylim=[1e-14, 2 * yl[1]])
 
         ax = axd['C']
         ys = self._cdf(xs)

@@ -1,6 +1,7 @@
 @ECHO OFF
 
-call makerst
+REM to this by hand
+REM call makerst
 
 REM pushd stores the current directory and sets the cwd to its argument
 REM perent i is the i-th argument

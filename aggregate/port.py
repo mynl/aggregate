@@ -918,7 +918,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, verbose=False, add_exa=True, aggregate_cession_function=None):
+               trim_df=False, add_exa=True, aggregate_cession_function=None):
         """
         create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
@@ -941,7 +941,6 @@ class Portfolio(object):
         :param tilt_amount: for tiling methodology - see notes on density for suggested parameters
         :param epds: epd points for priority analysis; if None-> sensible defaults
         :param trim_df: remove unnecessary columns from density_df before returning
-        :param verbose: level of output
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
         epd info
         :param aggregate_cession_function: function of Portfolio object that adjusts individual line densities; applied
@@ -995,11 +994,10 @@ class Portfolio(object):
             raw_nm = agg.name
             nm = f'p_{agg.name}'
             _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
-                            sev_calc, discretization_calc, normalize, verbose=verbose)
-            if verbose:
-                display(_a)
-            if aggregate_cession_function is not None:
-                aggregate_cession_function(agg, self.padding, tilt_vector)
+                            sev_calc, discretization_calc, normalize)
+            # update here
+            # if aggregate_cession_function is not None:
+            #     aggregate_cession_function(agg, self.padding, tilt_vector)
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
             if ft_all is None:
@@ -1386,7 +1384,7 @@ class Portfolio(object):
             agg = base_agg.rescale(delta, kind)
             new_aggs[base_agg.name] = agg
             _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < self.approx_freq_ge else self.approx_type,
-                            self.sev_calc, self.discretization_calc, verbose=False)
+                            self.sev_calc, self.discretization_calc)
             agg_epsilon_df[f'p_{agg.name}'] = agg.agg_density
             # the total with the line incremented
             agg_epsilon_df[f'p_total_{agg.name}'] = \

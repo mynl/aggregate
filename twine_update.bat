@@ -1,1 +1,1 @@
-twine upload dist/aggregate-0.9.2.*
+twine upload dist/aggregate-0.9.3.*

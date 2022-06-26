@@ -19,7 +19,7 @@ Table of Contents
    :maxdepth: 2
 
    01_Intro
-   02_history_applications.rst
+   02_history_applications
    03_Basic_Examples.ipynb
    04_Prob_Risk_Thy
    05_Freq_Dist
@@ -30,6 +30,5 @@ Table of Contents
    underwriter
    parser
    utils
-   param
 
 

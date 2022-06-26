@@ -176,7 +176,7 @@ class Underwriter(object):
     data_types = ['portfolio', 'aggregate', 'severity']
 
     def __init__(self, dir_name="", name='Rory', databases=[], glob=None, store_mode=True, update=False,
-                 verbose=False, log2=10, debug=False, create_all=False):
+                 log2=10, debug=False, create_all=False):
         """
 
         :param dir_name:
@@ -185,7 +185,6 @@ class Underwriter(object):
         :param glob: reference, e.g. to globals(), used to resolve meta.XX references
         :param store_mode: add newly created aggregates to the database?
         :param update:
-        :param verbose:
         :param log2:
         :param debug: run parser in debug mode
         :param create_all: by default write only creates portfolios.
@@ -196,7 +195,6 @@ class Underwriter(object):
         self.update = update
         self.log2 = log2
         self.debug = debug
-        self.verbose = verbose  # for update
         self.glob = glob
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
@@ -262,7 +260,7 @@ class Underwriter(object):
             s.append(', '.join([k for k in sorted(getattr(self, what).keys())]))
             s.append('<br>')
         s.append(f'<h3>Settings</h3>')
-        for k in ['update', 'log2', 'store_mode', 'verbose', 'last_spec', 'create_all']:
+        for k in ['update', 'log2', 'store_mode', 'last_spec', 'create_all']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
@@ -493,7 +491,6 @@ class Underwriter(object):
 
         * bs
         * log2
-        * verbose
         * update overrides class default
         * add_exa should port.add_exa add the exa related columns to the output?
         * create_all: create all objects, default just portfolios. You generally
@@ -520,11 +517,6 @@ class Underwriter(object):
                 del kwargs['bs']
             else:
                 bs = 0
-            if 'verbose' in kwargs:
-                verbose = kwargs.get('verbose')
-                del kwargs['verbose']
-            else:
-                verbose = self.verbose
             if 'add_exa' in kwargs:
                 add_exa = kwargs.get('add_exa')
                 del kwargs['add_exa']
@@ -549,7 +541,7 @@ class Underwriter(object):
                         _bs = bs
                         _log2 = 10
                 logger.debug(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
-                s.update(log2=_log2, bs=_bs, verbose=verbose, add_exa=add_exa, **kwargs)
+                s.update(log2=_log2, bs=_bs, add_exa=add_exa, **kwargs)
 
         # first see if it is a built in object
         lookup_success = True
@@ -627,7 +619,7 @@ class Underwriter(object):
                 # TODO FIX this clusterfuck
                 s = Aggregate(k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
                 if update:
-                    s.easy_update(self.log2, verbose=verbose)
+                    s.easy_update(self.log2)
                 rv[k] = s
 
         if len(self.parser.sev_out_dict) > 0 and create_all:
@@ -662,7 +654,6 @@ class Underwriter(object):
 
         :param file_name:
         :param update:
-        :param verbose:
         :param log2:
         :param bs:
         :param kwargs:

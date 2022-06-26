@@ -114,7 +114,7 @@ component-by-component to get an approximation vector to the function
 approximation :math:`\text{a}` of :math:`A` from :math:`\hat{\text{a}}`!
 See Wang for more details.
 
-Similar tricks are possible in two dimensions—see Press et al. and Homer
+Similar tricks are possible in two dimensions—see Press et al. and Homer
 and Clark for a discussion.
 
 The FFT allows us to use the following very simple method to

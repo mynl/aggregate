@@ -53,7 +53,7 @@ logger.setLevel(logging.DEBUG)
 # kick off message
 logger.debug('aggregate_project.__init__ | New Aggregate Session started')
 
-
+# TODO take out timer stuff
 last_time = first_time = 0
 timer_active = False
 
@@ -270,7 +270,7 @@ def round_bucket(bs):
             print(i, round_bucket(i))
         for i in test_cases:
             print(1/i, round_bucket(1/i))
-            
+
     """
     if bs == 1:
         return bs
@@ -312,6 +312,7 @@ def make_ceder_netter(reins_list, debug=False):
     """
     Build the netter and ceder functions. It is applied to occ_reins and agg_reins,
     so should be stand-alone.
+    TODO deal with infinity!; limit is inf then share = 1 as percentage not currency amount
     """
     h = 0
     base = 0
@@ -595,81 +596,6 @@ def suptitle_and_tight(title, **kwargs):
     """
     plt.suptitle(title, **kwargs)
     # plt.tight_layout(rect=[0, 0, 1, 0.96])
-
-
-# general nonsense
-def insurability_triangle(figsize=(10, 3)):
-    """
-    Illustrate the insurability triangle...
-
-    ::
-
-        λ = A / L
-        ROE = (P-L) / (A - P) = (P/L - 1) / (A/L - P/L)
-            = (1/LR - 1) / (λ - 1/LR) = (1 - LR) / (λLR - 1)
-
-    Hence
-
-    ::
-
-        δ = ROE / (1 + ROE) = (1 - LR) / [LR (λ - 1)]
-
-    :return:
-    """
-    f, axs = plt.subplots(1, 3, figsize=figsize)
-    it = iter(axs.flatten())
-    λs = [1.5, 2, 3, 5, 10, 25, 50, 100]
-    # up to user to manage colors
-    # sns.set_palette(sns.cubehelix_palette(len(λs)))
-
-    LR = np.linspace(0, 1, 101)
-    plt.sca(next(it))
-    for λ in λs:
-        δ = (1 - LR) / LR / (λ - 1)
-        plt.plot(LR, δ, label=f'λ={λ}')
-    plt.legend()
-    plt.ylim(0, 1)
-    plt.xlabel('Loss Ratio')
-    plt.ylabel('δ Investor Discount Rate')
-    plt.title('Profitability vs. Loss Ratio \nBy PML to EL Ratio')
-
-    LR = np.linspace(0, 1, 101)
-    plt.sca(next(it))
-    for λ in λs:
-        levg = np.where(λ * LR > 1, 1 / (λ * LR - 1), 4)  # hide the discontinuity
-        plt.plot(LR, levg, label=f'λ={λ}')
-    # plt.legend()
-    plt.ylim(0, 3)
-    plt.xlabel('Loss Ratio')
-    plt.ylabel('Premium to Surplus Ratio')
-    plt.title('Premium to Surplus Ratio vs. Loss Ratio \nBy PML to EL Ratio')
-
-    δ = np.linspace(0.0, 0.3, 301)
-    plt.sca(next(it))
-    for λ in λs:
-        LR = 1 / (1 + δ * (λ - 1))
-        plt.plot(δ, LR, label=f'λ={λ}')
-    # plt.legend()
-    plt.ylim(0, 1)
-    plt.ylabel('Loss Ratio')
-    plt.xlabel('Investor Discount Rate')
-    plt.title('Loss Ratio vs. Investor Discount Rate \nBy PML to EL Ratio')
-
-
-def read_log():
-    """
-    read and return the log file
-
-    :return:
-    """
-
-    df = pd.read_csv(LOGFILE, sep='|', header=0, names=['datetime', 'context', 'type', 'routine', 'log'],
-                     parse_dates=[0])
-    for c in df.select_dtypes(object):
-        df[c] = df[c].str.strip()
-    df = df.dropna()
-    df = df.set_index('datetime')
-    return df
 
 
 class MomentAggregator(object):

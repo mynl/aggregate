@@ -39,7 +39,8 @@ from .utils import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
-    MomentAggregator, Answer, subsets, round_bucket, report_time
+    MomentAggregator, Answer, subsets, round_bucket, \
+    report_time
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -87,7 +88,7 @@ class Portfolio(object):
                     raise ValueError(f'Must pass valid Underwriter instance to create aggs by name')
                 try:
                     a = uw(spec)
-                except e:
+                except Exception as e:
                     logger.error(f'Item {spec} not found in your underwriter')
                     raise e
                 agg_name = a.name
@@ -765,7 +766,7 @@ class Portfolio(object):
             fp1 = f(p1)
             loop += 1
         if loop == 100:
-            raise ValueError(f'Trouble finding equal risk EPD at pe={pe}. No convergence after 100 iterations. ')
+            raise ValueError(f'Trouble finding equal risk EPD at pe={p1}. No convergence after 100 iterations. ')
         return p1
 
     def merton_perold(self, p, kind='lower'):
@@ -918,7 +919,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, add_exa=True, aggregate_cession_function=None):
+               trim_df=False, add_exa=True):
         """
         create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
@@ -927,6 +928,12 @@ class Portfolio(object):
         (ASTIN 1999)
         tilt x numbuck < 20 is recommended log. 210
         num buckets and max loss from bucket size
+
+        Aggregate reinsurance in parser has replaced the aggregate_cession_function (a function of a Portfolio object
+        that adjusts individual line densities; applied after line aggs created but before creating not-lines;
+        actual statistics do not reflect impact.) Agg re by unit is now applied in the Aggregate object.
+
+        TODO: consider aggregate covers at the portfolio level...Where in parse - at the top!
 
 
         :param log2:
@@ -943,8 +950,7 @@ class Portfolio(object):
         :param trim_df: remove unnecessary columns from density_df before returning
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
         epd info
-        :param aggregate_cession_function: function of Portfolio object that adjusts individual line densities; applied
-        after line aggs created but before creating not-lines;  actual statistics do not reflect impact.
+
         :return:
         """
 
@@ -993,11 +999,15 @@ class Portfolio(object):
         for agg in self.agg_list:
             raw_nm = agg.name
             nm = f'p_{agg.name}'
-            _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
+            agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
                             sev_calc, discretization_calc, normalize)
-            # update here
+            # update for grammar based aggregate reinsurance...which, doh!, lives in the agg object!!
             # if aggregate_cession_function is not None:
             #     aggregate_cession_function(agg, self.padding, tilt_vector)
+            # this work uses agg._apply_reins_work and mirrors the function apply_occ_reins
+            if agg.agg_reins is not None:
+                agg.apply_agg_reins(False, self.padding, tilt_vector)
+
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
             if ft_all is None:
@@ -3399,7 +3409,7 @@ class Portfolio(object):
                 # given roe, figure premium
                 roe = g['roe']
                 delta = roe / (1 + roe)
-                prem = row['exa_total'] + delta * (a - row['exa_total'])
+                prem = row['exa_total'] + delta * (a_reg - row['exa_total'])
             if prem > 0:
                 g = self.calibrate_distortion(name=g['name'], premium_target=prem, assets=a_reg)
             else:

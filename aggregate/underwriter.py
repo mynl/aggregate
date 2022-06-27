@@ -110,54 +110,9 @@ from .utils import html_title
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
 import re
-import warnings
+# import warnings
 
 logger = logging.getLogger('aggregate')
-
-_uw = None
-
-def build(program, update=True, bs=0, log2=13, padding=1, **kwargs):
-    """
-    Convenience function to make work easy for the user. Hide uw, updating etc.
-
-    :param program:
-    :param bs:
-    :param log2:
-    :param padding:
-    :param kwargs: passed to update
-    :return:
-    """
-    global _uw
-
-    # tamper down the logging
-    logger.setLevel(30)
-
-    if _uw is None:
-        _uw = Underwriter(create_all=True, update=False)
-
-    if program in ['underwriter', 'uw']:
-        return _uw
-
-    # make stuff
-    out = _uw(program)
-
-    if isinstance(out, dict):
-        pass
-    elif isinstance(out, Aggregate) and update is True:
-        d = out.spec
-        if d['sev_name'] == 'dhistogram':
-            bs = 1
-            # how big??
-            log2 = 8
-        out.easy_update(log2=log2, bs=bs, padding=padding, **kwargs)
-    elif isinstance(out, Severity):
-        # there is no updating for severities
-        pass
-
-    else:
-        pass
-
-    return out
 
 
 class Underwriter(object):
@@ -523,7 +478,7 @@ class Underwriter(object):
             else:
                 add_exa = False
 
-        # function to handle update madness, use in either script or lookup updats for ports
+        # function to handle update madness, use in either script or lookup updates for ports
         def _update(s, k):
             if update:
                 if bs > 0 and log2 > 0:
@@ -544,20 +499,16 @@ class Underwriter(object):
                 s.update(log2=_log2, bs=_bs, add_exa=add_exa, **kwargs)
 
         # first see if it is a built in object
-        lookup_success = True
         _type = ''
         obj = None
         try:
             _type, obj = self.__getitem__(portfolio_program)
         except LookupError:
-            lookup_success = False
-            logger.debug(f'underwriter.write | object not found, will process as program') # : {portfolio_program[:500]}...')
-        if lookup_success:
-            logger.debug(f'underwriter.write | object found, returning object') # : {portfolio_program[:500]}...')
+            logger.debug(f'underwriter.write | object not found, will process as program')
+        else:
+            logger.debug(f'underwriter.write | object found, returning object')
             if _type == 'agg':
-                # TODO, sure this isn't the solution to the double name problem....
-                _name = obj.get('name', portfolio_program)
-                obj = Aggregate(_name, **{k: v for k, v in obj.items() if k != 'name'})
+                obj = Aggregate(**obj)
                 if update:
                     obj.easy_update(log2, bs)
                 return obj
@@ -572,13 +523,14 @@ class Underwriter(object):
                 return Severity(**obj)
             else:
                 ValueError(f'Cannot build {_type} objects')
+            print('NEVER GET HERE??? '*10)
             return obj
 
         # if you fall through to here then the portfolio_program did not refer to a built in object
         # run the program
         self._runner(portfolio_program)
 
-        # if globs replace all meta objects with a lookup object
+        # if globs, replace all meta objects with a lookup object
         if self.glob is not None:
             logger.debug(f'Underwriter.write | Resolving globals')
             for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
@@ -588,7 +540,7 @@ class Underwriter(object):
                     try:
                         obj = self.glob[obj_name]
                     except NameError as e:
-                        print(f'Object {obj_name} passed as a proto-severity cannot be found')
+                        print(f'Object {obj_name} passed as a meta object cannot be found in glob.')
                         raise e
                     a['sev_name'] = obj
                     logger.debug(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
@@ -597,6 +549,7 @@ class Underwriter(object):
 
         # create objects
         # 2019-11: create all objects not just the portfolios if create_all==True
+        # rv = return values
         rv = None
         if len(self.parser.port_out_dict) > 0:
             # create ports
@@ -643,6 +596,7 @@ class Underwriter(object):
                              f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
                              f'{len(self.parser.sev_out_dict)} Severity(ies)')
             if len(rv) == 1:
+                # dict, pop the last (only) element
                 rv = rv.popitem()[1]
 
         # return created objects
@@ -663,41 +617,6 @@ class Underwriter(object):
             portfolio_program = f.read()
         return self.write(portfolio_program, **kwargs)
 
-    def write_test(self, portfolio_program):
-        """
-        write programs in testing mode
-
-        dictionary definitions are added to uw but no objects are created
-
-        returns data frame description of added severity/aggregate/portfolios
-
-        the dataframe of aggregates can be used to create a portfolio (with all the aggregates) by calling
-
-        ```Portfolio.from_DataFrame(name df)```
-
-        TODO rationalize with parse_portfolio_program
-
-        :param portfolio_program:
-        :return: dictionary with keys sev agg port and assoicated dataframes
-        """
-        print('write_test deprecated...use parse_portfolio_porgram with output="dict".')
-        raise RuntimeError
-        # TODO once sure you don't need this delete!
-        # logger.debug(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
-        # self._runner(portfolio_program)
-        # ans = {}
-        # if len(self.parser.sev_out_dict) > 0:
-        #     for v in self.parser.sev_out_dict.values():
-        #         Underwriter._add_defaults(v, 'sev')
-        #     ans['sev'] = pd.DataFrame(list(self.parser.sev_out_dict.values()), index=self.parser.sev_out_dict.keys())
-        # if len(self.parser.agg_out_dict) > 0:
-        #     for v in self.parser.agg_out_dict.values():
-        #         Underwriter._add_defaults(v)
-        #     ans['agg'] = pd.DataFrame(list(self.parser.agg_out_dict.values()), index=self.parser.agg_out_dict.keys())
-        # if len(self.parser.port_out_dict) > 0:
-        #     ans['port'] = pd.DataFrame(list(self.parser.port_out_dict.values()), index=self.parser.port_out_dict.keys())
-        # return ans
-
     def _runner(self, portfolio_program):
         """
         preprocessing:
@@ -715,8 +634,9 @@ class Underwriter(object):
         """
         # Preprocess ---------------------------------------------------------------------
         # handle \n in vectors; first item is outside, then inside... (multidimensional??)
-        # remove coments # xxx
-        portfolio_program = re.sub(r'\s*#[^\n]*\n', r'\n', portfolio_program)
+        # remove comments // xxx
+        # Can't have comments with # used for location shift
+        portfolio_program = re.sub(r'\s*//[^\n]*\n', r'\n', portfolio_program)
         out_in = re.split(r'\[|\]', portfolio_program)
         assert len(out_in) % 2  # must be odd
         odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
@@ -774,7 +694,9 @@ class Underwriter(object):
     def _add_defaults(dict_, kind='agg'):
         """
         add default values to dict_ Leave existing values unchanged
-
+        Used for outputing to a data frame, where you want all columns completed
+        TODO consider if really needed. If so, add the new reinsurance arguments!
+        TODO: use dict.update??!
         :param dict_:
         :return:
         """
@@ -811,62 +733,56 @@ class Underwriter(object):
             raise ValueError(f'Error: type of {uw_id} is  {found_type}, not expected {expected_type}')
         return found_dict.copy()
 
+
+class Build(object):
+    uw = Underwriter(create_all=True)
+
     @staticmethod
-    def obj_to_agg(obj):
+    def build(program, update=True, bs=0, log2=13, padding=1, **kwargs):
         """
-        convert an object into an agg language specification, used for saving
-        :param obj: a dictionary, Aggregate, Severity or Portfolio object
+        Convenience function to make work easy for the user. Hide uw, updating etc.
+
+        :param program:
+        :param bs:
+        :param log2:
+        :param padding:
+        :param kwargs: passed to update
         :return:
         """
-        pass
+        # tamper down the logging
+        logger.setLevel(30)
 
-# def dict_2_string(type_name, dict_in, tab_level=0, sio=None):
-#     """
-#     nice formating for str function
-#
-#     :param type_name:
-#     :param dict_in:
-#     :param tab_level:
-#     :param sio:
-#     :return:
-#     """
-#
-#     if sio is None:
-#         sio = StringIO()
-#
-#     keys = sorted(dict_in.keys())
-#     if 'name' in keys:
-#         # which it should always be
-#         nm = dict_in['name']
-#         sio.write(nm + '\n' + '=' * len(nm) + '\n')
-#         keys.pop(keys.index('name'))
-#
-#     sio.write(f'{"type":<20s}{type_name}\n')
-#
-#     for k in keys:
-#         v = dict_in[k]
-#         ks = '\t' * max(0, tab_level - 1) + f'{str(k):<20s}'
-#         if type(v) == dict:
-#             # sio.write('\t' * tab_level + ks + '\n')
-#             dict_2_string(type(v), v, tab_level + 1, sio)
-#         elif isinstance(v, str):
-#             if len(v) > 30:
-#                 sio.write('\t' * tab_level + ks + '\n' + indent(fill(v, 30), ' ' * (4 * tab_level + 20)))
-#             elif len(v) > 0:
-#                 sio.write('\t' * tab_level + ks + v)
-#             sio.write('\n')
-#         elif isinstance(v, collections.Iterable):
-#             sio.write('\t' * tab_level + ks + '\n')
-#             for vv in v:
-#                 sio.write('\t' * (tab_level + 1) + str(vv) + '\n')
-#         elif type(v) == int:
-#             sio.write('\t' * tab_level + f'{ks}\t{v:20d}\n')
-#         elif type(v) == float:
-#             if abs(v) < 100:
-#                 sio.write('\t' * tab_level + f'{ks}\t{v:20.5f}\n')
-#             else:
-#                 sio.write('\t' * tab_level + f'{ks}\t{v:20,.1f}\n')
-#         else:
-#             # logger.debug(f'Uknown type {type(v)} to dict_2_string')
-#             sio.write('\t' * tab_level + ks + '\t' + str(v) + '\n')
-#     return sio.getvalue()
+        if program in ['underwriter', 'uw']:
+            return Build.uw
+
+        # make stuff
+        out = Build.uw(program)
+
+        if isinstance(out, dict):
+            pass
+        elif isinstance(out, Aggregate) and update is True:
+            d = out.spec
+            if d['sev_name'] == 'dhistogram':
+                bs = 1
+                # how big?
+                if d['freq_name'] == 'fixed':
+                    max_loss = np.max(d['sev_xs']) * d['exp_en']
+                else:
+                    max_loss = np.max(d['sev_xs']) * d['exp_en'] * 2
+                # bins are 0b111
+                log2 = len(bin(int(max_loss))) - 1
+                logger.info(f'Discrete input, using bs=1 and log2={log2}')
+            out.easy_update(log2=log2, bs=bs, padding=padding, **kwargs)
+        elif isinstance(out, Severity):
+            # there is no updating for severities
+            pass
+
+        else:
+            pass
+
+        return out
+
+    __call__ = build
+
+# exported item
+build = Build()

@@ -691,6 +691,18 @@ class Aggregate(Frequency):
         return self._spec
 
     @property
+    def meta(self):
+        """
+        All relevant info
+
+        :return:
+        """
+        if self._meta is None:
+            self._meta = {'type': type(self), 'spec': self._spec, 'bs': self.bs, 'log2': self.log2,
+                          'sevs': len(self.sevs)}
+        return self._meta
+
+    @property
     def density_df(self):
         """
         create and return the _density_df data frame
@@ -943,6 +955,7 @@ class Aggregate(Frequency):
         self._careful_q = None
         self._density_df = None
         self._reins_audit_df = None
+        self._meta = None
         self.q_temp = None
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
@@ -957,6 +970,9 @@ class Aggregate(Frequency):
         self.sev_ceded_density = None
         self.sev_net_density = None
         self.sev_gross_density = None
+        self.agg_ceded_density = None
+        self.agg_net_density = None
+        self.agg_gross_density = None
 
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
@@ -1235,6 +1251,7 @@ class Aggregate(Frequency):
         :return:
         """
         self._density_df = None  # invalidate
+        self._meta = None
 
         self.xs = xs
         self.bs = xs[1]
@@ -1279,6 +1296,10 @@ class Aggregate(Frequency):
                 z = ft(self.sev_density, padding, tilt_vector)
                 self.ftagg_density = self.mgf(self.n, z)
                 self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+
+                # NOW have to apply agg reinsurance to this line
+                self.apply_agg_reins(debug)
+
         else:
             # regardless of request if skew == 0 have to use normal
             # must check there is no per occ reinsurance... it won't work
@@ -1299,6 +1320,8 @@ class Aggregate(Frequency):
             ps = self.fzapprox.pdf(xs)
             self.agg_density = ps / np.sum(ps)
             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+            # can still apply aggregate in this mode
+            self.apply_agg_reins(debug)
 
         # make a suitable audit_df
         # originally...irritating no freq cv or sev cv
@@ -1469,7 +1492,7 @@ class Aggregate(Frequency):
 
     def apply_occ_reins(self, debug=False):
         """
-        Apply the occ whole reins structure and save output
+        Apply the entire occ reins structure and save output
         For by layer detail create reins_audit_df
         Makes sev_gross_density, sev_net_density and sev_ceded_density, and updates sev_density to the requested view.
 
@@ -1493,6 +1516,51 @@ class Aggregate(Frequency):
             self.sev_density = self.sev_ceded_density
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
+
+    def apply_agg_reins(self, debug=False, padding=1, tilt_vector=None):
+        """
+        Apply the entire agg reins structure and save output
+        For by layer detail create reins_audit_df
+        Makes sev_gross_density, sev_net_density and sev_ceded_density, and updates sev_density to the requested view.
+
+        Treatment in stats?
+
+        :return:
+        """
+        # generic function makes netter and ceder functions
+        if self.agg_reins is None:
+            return
+        logger.info(f'Applying aggregate reinsurance for {self.name}')
+        # aggregate moments (lose f x sev view) are computed after this step, so no adjustment needed there
+        # agg: no way to make total = f x sev
+        # initial empirical moments
+        _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
+
+        agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
+        # store stuff
+        self.agg_reins_df = agg_reins_df
+        self.agg_gross_density = self.agg_density
+        self.agg_net_density = agg_reins_df['p_net']
+        self.agg_ceded_density = agg_reins_df['p_ceded']
+        if self.agg_kind == 'ceded to':
+            self.agg_density = self.agg_net_density
+        elif self.agg_kind == 'net of':
+            self.agg_density = self.agg_ceded_density
+        else:
+            raise ValueError(f'Unexpected kind of agg reinsurace, {self.agg_kind}')
+
+        # update ft of agg
+        self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+
+        # see impact on moments
+        _m2, _cv2 = xsden_to_meancv(self.xs, self.agg_density)
+        # self.audit_df.loc['mixed', 'emp_agg_1'] = _m
+        # old_m = self.ex
+        self.ex = _m2
+        # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
+        logger.log(35,
+            f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
+            f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
 
     def apply_distortion(self, dist):
         """
@@ -2608,7 +2676,7 @@ class Severity(ss.rv_continuous):
                 xs = sev_name.density_df.loss.values
                 ps = sev_name.density_df.p_total.values
             else:
-                raise ValueError(f'Object {sev_name} passed as a proto-severity type {type(obj)}'
+                raise ValueError(f'Object {sev_name} passed as a proto-severity type but'
                                  f' only Aggregate, Portfolio and Severity objects allowed')
             # will make as a combo discrete/continuous histogram
             # nail the bucket at zero and use a continuous approx +/- bs/2 around each other bucket

@@ -175,7 +175,7 @@ def make_netter(port, line_name, re_attach, re_detach):
             agg_dist.ftagg_density = agg.ft(
                 agg_dist.agg_density, padding, tilt_vector)
 
-            # adjust the aggregate moments (loose f x sev view)
+            # adjust the aggregate moments (lose f x sev view)
             _m, _cv = agg.xsden_to_meancv(agg_dist.xs, agg_dist.agg_density)
             agg_dist.audit_df.loc['mixed', 'emp_agg_1'] = _m
             old_m = agg_dist.ex

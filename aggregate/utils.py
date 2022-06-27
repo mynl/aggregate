@@ -308,6 +308,7 @@ def round_bucket(bs):
         x = int(x[2:], 2)
         return 1./ x
 
+
 def make_ceder_netter(reins_list, debug=False):
     """
     Build the netter and ceder functions. It is applied to occ_reins and agg_reins,

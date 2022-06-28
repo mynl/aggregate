@@ -364,7 +364,7 @@ class Portfolio(object):
         :return:
         """
         if filename == "":
-            filename = Path.home()  / 'agg/user.json'
+            filename = Path.home() / 'agg/user.json'
             filename.parent.mkdir(parents=True, exist_ok=True)
 
         with filename.open(mode=mode, encoding='utf-8') as f:

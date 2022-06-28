@@ -35,109 +35,120 @@ The ```agg``` Language Grammar:
 
 ::
 
-answer              	::= sev_out
-                    	 | agg_out
-                    	 | port_out
-                    	 | expr
+answer                  ::= sev_out
+                         | agg_out
+                         | port_out
+                         | expr
 
-port_out            	::= port_name note agg_list
+port_out                ::= port_name note agg_list
 
-agg_list            	::= agg_list agg_out
-                    	 | agg_out
+agg_list                ::= agg_list agg_out
+                         | agg_out
 
-agg_out             	::= agg_name builtin_aggregate note
-                    	 | agg_name exposures layers SEV sev occ_reins freq agg_reins note
+agg_out                 ::= agg_name builtin_aggregate note
+                         | agg_name exposures layers SEV sev occ_reins freq agg_reins note
+                         | agg_name exposures layers dsev occ_reins freq agg_reins note
+                         | agg_name dfreq dsev occ_reins note
 
-sev_out             	::= sev_out sev_name sev note
-                    	 | sev_name sev note
+sev_out                 ::= sev_out sev_name sev note
+                         | sev_name sev note
 
-freq                	::= MIXED ID expr expr
-                    	 | MIXED ID expr
-                    	 | EMPIRICAL numbers numbers
-                    	 | FREQ expr expr
-                    	 | FREQ expr
-                    	 | FREQ
+freq                    ::= MIXED ID expr expr
+                         | MIXED ID expr
+                         | EMPIRICAL doutcomes dprobs
+                         | FREQ expr expr
+                         | FREQ expr
+                         | FREQ
 
-agg_reins           	::= NET OF reins_list AGGREGATE
-                    	 | CEDED TO reins_list AGGREGATE
-                    	 | 
+agg_reins               ::= NET OF reins_list AGGREGATE
+                         | CEDED TO reins_list AGGREGATE
+                         |
 
-occ_reins           	::= NET OF reins_list OCCURRENCE
-                    	 | CEDED TO reins_list OCCURRENCE
-                    	 | 
+occ_reins               ::= NET OF reins_list OCCURRENCE
+                         | CEDED TO reins_list OCCURRENCE
+                         |
 
-reins_list          	::= reins_list AND reins_clause
-                    	 | reins_clause
+reins_list              ::= reins_list AND reins_clause
+                         | reins_clause
 
-reins_clause        	::= expr XS expr
-                    	 | expr SHARE_OF expr XS expr
-                    	 | expr PART_OF expr XS expr
+reins_clause            ::= expr XS expr
+                         | expr SHARE_OF expr XS expr
+                         | expr PART_OF expr XS expr
 
-sev                 	::= sev "!"
-                    	 | sev LOCATION_ADD numbers
-                    	 | numbers SCALE_MULTIPLY sev
-                    	 | ids numbers CV numbers weights
-                    	 | ids numbers weights
-                    	 | ids numbers numbers weights
-                    	 | ids xps
-                    	 | CONSTANT expr
-                    	 | builtinids numbers numbers
-                    	 | builtinids
+sev                     ::= sev "!"
+                         | sev LOCATION_ADD numbers
+                         | numbers SCALE_MULTIPLY sev
+                         | ids numbers CV numbers weights
+                         | ids numbers weights
+                         | ids numbers numbers weights
+                         | ids xps
+                         | CONSTANT expr
+                         | builtinids numbers numbers
+                         | builtinids
 
-xps                 	::= XPS numbers numbers
-                    	 | 
+xps                     ::= XPS doutcomes dprobs
+                         |
 
-weights             	::= WEIGHTS EQUAL_WEIGHT expr
-                    	 | WEIGHTS numbers
-                    	 | 
+dsev                    ::= DSEV doutcomes dprobs
 
-layers              	::= numbers XS numbers
-                    	 | 
+dfreq                   ::= DFREQ doutcomes dprobs
 
-note                	::= NOTE
-                    	 | 
+doutcomes               ::= "[" numberl "]"
 
-exposures           	::= SPECIFIED CLAIMS
-                    	 | numbers CLAIMS
-                    	 | numbers LOSS
-                    	 | numbers PREMIUM AT numbers LR
+dprobs                  ::= "[" numberl "]"
+                         |
 
-builtinids          	::= BUILTINID
+weights                 ::= WEIGHTS EQUAL_WEIGHT expr
+                         | WEIGHTS numbers
+                         |
 
-ids                 	::= "[" idl "]"
-                    	 | ID
+layers                  ::= numbers XS numbers
+                         |
 
-idl                 	::= idl ID
-                    	 | ID
+note                    ::= NOTE
+                         |
 
-builtin_aggregate   	::= builtin_aggregate_dist TIMES expr
-                    	 | expr TIMES builtin_aggregate_dist
-                    	 | builtin_aggregate_dist
+exposures               ::= SPECIFIED CLAIMS
+                         | numbers CLAIMS
+                         | numbers LOSS
+                         | numbers PREMIUM AT numbers LR
 
-builtin_aggregate_dist	::= BUILTINID
+builtinids              ::= BUILTINID
 
-sev_name            	::= SEV ID
+ids                     ::= "[" idl "]"
+                         | ID
 
-agg_name            	::= AGG ID
+idl                     ::= idl ID
+                         | ID
 
-port_name           	::= PORT ID
+builtin_aggregate       ::= builtin_aggregate_dist TIMES expr
+                         | expr TIMES builtin_aggregate_dist
+                         | builtin_aggregate_dist
 
-numbers             	::= "[" numberl "]"
-                    	 | expr
+builtin_aggregate_dist  ::= BUILTINID
 
-numberl             	::= numberl expr
-                    	 | expr
+sev_name                ::= SEV ID
 
-expr                	::= expr PLUS expr
-                    	 | expr MINUS expr
-                    	 | expr TIMES expr
-                    	 | expr DIVIDE expr
-                    	 | expr EXPONENT expr
-                    	 | "(" expr ")"
-                    	 | EXP "(" expr ")"
-                    	 | expr PERCENT
-                    	 | INFINITY
-                    	 | NUMBER
+agg_name                ::= AGG ID
+
+port_name               ::= PORT ID
+
+numbers                 ::= "[" numberl "]"
+                         | expr
+
+numberl                 ::= numberl expr
+                         | expr
+
+expr                    ::= expr PLUS expr
+                         | expr MINUS expr
+                         | expr TIMES expr
+                         | expr DIVIDE expr
+                         | expr EXPONENT expr
+                         | "(" expr ")"
+                         | EXP "(" expr ")"
+                         | expr PERCENT
+                         | INFINITY
+                         | NUMBER
 
 
 FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
@@ -164,7 +175,11 @@ CONSTANT                ::= 'constant'
 
 CV                      ::= 'cv'
 
-EMPIRICAL               ::= 'empirical'
+DFREQ                   ::= 'dfreq'
+
+DSEV                    ::= 'dsev'
+
+EMPIRICAL               ::= 'empirical|nps'
 
 EXP                     ::= 'exp'
 
@@ -340,7 +355,8 @@ class UnderwritingLexer(Lexer):
               MIXED, FREQ, EMPIRICAL,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
               AND, PERCENT,
-              EXPONENT, EXP
+              EXPONENT, EXP,
+              DFREQ, DSEV
               }
 
     ignore = ' \t,\\:|'
@@ -371,6 +387,10 @@ class UnderwritingLexer(Lexer):
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
+
+    ID['dfreq'] = DFREQ
+    ID['dsev'] = DSEV
+
     # when using an empirical freq the claim count is specified
     # must use "specified claims" ... sets e_n = -1
     # ID['part'] = PART
@@ -424,7 +444,7 @@ class UnderwritingLexer(Lexer):
 
 
 class UnderwritingParser(Parser):
-    # debugfile = 'c:\\temp\\parser.out'
+    debugfile = 'c:\\temp\\parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
         ('left', LOCATION_ADD),
@@ -546,6 +566,41 @@ class UnderwritingParser(Parser):
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
         return p.agg_name
 
+    # separate treatment of dsev forbids 3 @ dsev # 4; that is also not handled for xps sevs
+    # though it does parse. But with this separate treatment you do not need the sev keyword
+    # if sev <-- dsev then in use you'd need sev dsev [1] which is no net gain.
+
+    @_('agg_name exposures layers dsev occ_reins freq agg_reins note')
+    def agg_out(self, p):
+        self.logger(
+            f'agg_out <-- agg_name exposures layers dsev occ_reins freq agg_reins note', p)
+        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.exposures, **p.layers, **p.dsev,
+                                         **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
+        return p.agg_name
+
+    # AMBIGUOUS: net of 3 x 2 ?? occ or agg? and dfreq [1 2] [2 4], is 2 4 the probs
+    # or the start of exposure layering.
+    # at_('agg_name dfreq layers SEV sev occ_reins agg_reins note')
+    # to the general with dfreq use specified claims and put freq term at the end.
+    # for reinstatements modeing with occ re may be useful, hence could have the
+    # following but doesn't seem worth it. Encourage specified
+    # at_('agg_name dfreq SEV sev occ_reins note')
+    # DEF agg_out(self, p):
+    #     self.logger(
+    #         f'agg_out <-- agg_name dfreq layers SEV sev occ_reins agg_reins note', p)
+    #     self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.dfreq,  **p.sev,
+    #                                      **p.occ_reins, **p.agg_reins, 'note': p.note}
+    #     return p.agg_name
+
+    # as above, can't have layers and can't have occ and agg without a split
+    @_('agg_name dfreq dsev occ_reins note')
+    def agg_out(self, p):
+        self.logger(
+            f'agg_out <-- agg_name dfreq dsev occ_reins note', p)
+        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.dfreq, **p.dsev,
+                                         **p.occ_reins, 'note': p.note}
+        return p.agg_name
+
     # building severities ======================================
     @_('sev_out sev_name sev note')
     def sev_out(self, p):
@@ -579,14 +634,16 @@ class UnderwritingParser(Parser):
             f'freq <-- MIXED ID expr', p)
         return {'freq_name': p.ID, 'freq_a': p.expr}
 
-    @_('EMPIRICAL numbers numbers')
+    @_('EMPIRICAL doutcomes dprobs')
     def freq(self, p):
-        self.logger(f'freq <-- EMPIRICAL numbers numbers', p)
+        self.logger(f'freq <-- EMPIRICAL doutcomes dprobs', p)
         # nps discrete given severity...
-        a = self._check_vectorizable(p.numbers0)
-        a = np.array(a, dtype=int)
-        b = self._check_vectorizable(p.numbers1)
-        return {'freq_name': 'empirical', 'freq_a': a, 'freq_b': b}
+        a = np.array(p.doutcomes, dtype=int)
+        if len(p.dprobs) == 0:
+            ps = np.ones_like(a) / len(a)
+        else:
+            ps = p.dprobs
+        return {'freq_name': 'empirical', 'freq_a': a, 'freq_b': ps}
 
     @_('FREQ expr expr')
     def freq(self, p):
@@ -776,16 +833,63 @@ class UnderwritingParser(Parser):
         # syntactic sugar to specify a constant severity
         return {'sev_name': 'dhistogram', 'sev_xs': [p.expr], 'sev_ps': [1]}
 
-    @_('XPS numbers numbers')
+    # @_('XPS numbers numbers')
+    # def xps(self, p):
+    #     self.logger(
+    #         f'xps <-- XPS numbers numbers', p)
+    #     return {'sev_xs':  p[1], 'sev_ps':  p[2]}
+
+    @_('XPS doutcomes dprobs')
     def xps(self, p):
-        self.logger(
-            f'xps <-- XPS numbers numbers', p)
-        return {'sev_xs':  p[1], 'sev_ps':  p[2]}
+        self.logger('xps <-- XPS doutcomes dprobs', p)
+        if len(p.dprobs) == 0:
+            ps = np.ones_like(p.doutcomes) / len(p.doutcomes)
+        else:
+            ps = p.dprobs
+        return {'sev_xs':  p.doutcomes, 'sev_ps':  ps}
 
     @_('')
     def xps(self, p):
         self.logger('xps <-- missing xps term', p)
         return {}
+
+    @_('DSEV doutcomes dprobs')
+    def dsev(self, p):
+        self.logger('dsev <-- DSEV doutcomes dprobs', p)
+        # need to check probs has been populated
+        if len(p.dprobs) == 0:
+            ps = np.ones_like(p.doutcomes) / len(p.doutcomes)
+        else:
+            ps = p.dprobs
+        return {'sev_name': 'dhistogram', 'sev_xs': p.doutcomes, 'sev_ps': ps}
+
+    @_('DFREQ doutcomes dprobs')
+    def dfreq(self, p):
+        self.logger('dfreq <-- DFREQ doutcomes dprobs', p)
+        # need to check probs has been populated
+        if len(p.dprobs) == 0:
+            b = np.ones_like(p.doutcomes) / len(p.doutcomes)
+        else:
+            b = p.dprobs
+        return {'freq_name': 'empirical', 'freq_a': p.doutcomes, 'freq_b': b, 'exp_en': -1}
+
+    # never valid for this to be a single number not in []
+    @_('"[" numberl "]"')
+    def doutcomes(self, p):
+        self.logger('doutcomes <-- [numberl]', p)
+        a = self._check_vectorizable(p.numberl)
+        return a
+
+    @_('"[" numberl "]"')
+    def dprobs(self, p):
+        self.logger('dprobs <-- [numberl]', p)
+        a = self._check_vectorizable(p.numberl)
+        return a
+
+    @_('')
+    def dprobs(self, p):
+        self.logger('dprobs <-- missing dprobs term', p)
+        return []
 
     @_('WEIGHTS EQUAL_WEIGHT expr')
     def weights(self, p):
@@ -917,7 +1021,8 @@ class UnderwritingParser(Parser):
     @_('builtin_aggregate_dist TIMES expr')
     def builtin_aggregate(self, p):
         """  inhomogeneous change of scale """
-        self.logger(f'builtin_aggregate <-- builtin_aggregate_dist TIMES expr', p)
+        self.logger(
+            f'builtin_aggregate <-- builtin_aggregate_dist TIMES expr', p)
         bid = p.builtin_aggregate_dist
         bid['exp_en'] = bid.get('exp_en', 0) * p.expr
         bid['exp_el'] = bid.get('exp_el', 0) * p.expr
@@ -927,7 +1032,8 @@ class UnderwritingParser(Parser):
     @_('expr TIMES builtin_aggregate_dist')
     def builtin_aggregate(self, p):
         """homogeneous change of scale """
-        self.logger(f'builtin_aggregate <-- expr TIMES builtin_aggregate_dist', p)
+        self.logger(
+            f'builtin_aggregate <-- expr TIMES builtin_aggregate_dist', p)
         # bid = built_in_dict, want to be careful not to add scale too much
         bid = p.builtin_aggregate_dist  # ? does this need copying. if so do in safelookup!
         if 'sev_mean' in bid:
@@ -983,7 +1089,8 @@ class UnderwritingParser(Parser):
 
     @_('numberl expr')
     def numberl(self, p):
-        self.logger(f'numberl <-- numberl expr (adding {p.expr} to list {p.numberl})', p)
+        self.logger(
+            f'numberl <-- numberl expr (adding {p.expr} to list {p.numberl})', p)
         p.numberl.append(p.expr)
         return p.numberl
 
@@ -1067,14 +1174,17 @@ class UnderwritingParser(Parser):
 
 
 def safelookup(val):
+    """ for debugging """
     s = f'LOOKUP {val}'
     return {'sev_name': 'BUILTIN', 'sev_a': val}
+
 
 def run_tests(where='', debug=False):
     """
     Run a bunch of tests
     """
-    df = pd.read_csv('C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv', index_col=0)
+    df = pd.read_csv(
+        'C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv', index_col=0)
     if where != '':
         df = df.loc[df.index.str.match(where)]
 
@@ -1120,6 +1230,7 @@ def run_tests(where='', debug=False):
             print('No errors reported')
         return errs, ans
 
+
 def run_one(v):
     """
     run single test in debug mode, you enter id as k and program as v
@@ -1134,9 +1245,9 @@ def run_one(v):
     try:
         x = parser.parse(lexer.tokenize(v))
     except ValueError as e:
-        print('!!!!!!!!!!!!!!!!!!!!!!!!'*4)
+        print('!!!!!!!!!!!!!!!!!!!!!!!!' * 4)
         print('!!!!!!! Value Error !!!!' * 4)
-        print('!!!!!!!!!!!!!!!!!!!!!!!!'*4)
+        print('!!!!!!!!!!!!!!!!!!!!!!!!' * 4)
         x = e
     if x is not None:
         pp(x)
@@ -1144,13 +1255,10 @@ def run_one(v):
         pp(parser.agg_out_dict[k])
 
 
-if __name__ == '__main__':
-    # print the grammar and add to this file as part of docstring
-    # TODO fix comments!
-
-    # may need to put an extra indent for rst to work properly
-    # eg %run agg_parser.py to run in Jupyter
-
+def grammar(add_to_doc=False):
+    '''
+    write the grammar at the top of the file as a docstring
+    '''
     start_string = '''Language Specification
 ----------------------
 
@@ -1215,6 +1323,10 @@ CONSTANT                ::= 'constant'
 
 CV                      ::= 'cv'
 
+DFREQ                   ::= 'dfreq'
+
+DSEV                    ::= 'dsev'
+
 EMPIRICAL               ::= 'empirical|nps'
 
 EXP                     ::= 'exp'
@@ -1273,8 +1385,18 @@ LOCATION_ADD            ::= "#"
     s += lang_words
     print(s)
     # actually put into this file (uncomment)
-    st = txt.find(start_string) + len(start_string)
-    end = txt.find(end_string)
-    txt = txt[0:st] + s + txt[end:]
-    with open(__file__, 'w') as f:
-        f.write(txt)
+    if add_to_doc is True:
+        st = txt.find(start_string) + len(start_string)
+        end = txt.find(end_string)
+        txt = txt[0:st] + s + txt[end:]
+        with open(__file__, 'w') as f:
+            f.write(txt)
+
+
+if __name__ == '__main__':
+    # print the grammar and add to this file as part of docstring
+    # TODO fix comments!
+
+    # may need to put an extra indent for rst to work properly
+    # eg %run agg_parser.py to run in Jupyter
+    grammar(add_to_doc=True)

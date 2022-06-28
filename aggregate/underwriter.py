@@ -198,12 +198,6 @@ class Underwriter(object):
             logger.debug(f'Underwriter.__getitem__ | found {item} of type sev')
             return 'sev', obj
         raise LookupError(f'Item {item} not found in any database')
-        # old, clever, generic, unreadable, unnecessary generality
-        # for k in self.databases.keys():
-        #     if item in self.__getattribute__(k).keys():
-        #         # stip the s off the name: Books to Book etc.
-        #         return k, self.__getattribute__(k)[item]
-        # raise LookupError
 
     def _repr_html_(self):
         s = [f'<h1>Underwriter {self.name}</h1>']
@@ -436,7 +430,7 @@ class Underwriter(object):
             port MY_PORTFOLIO
                 agg Line1 20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
                 agg Line2 10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
-                agg Line 3100  premium at 0.4 3 x 2 sev 4 * lognormal 3 cv 0.8 fixed 1
+                agg Line 3100  premium at 0.4 3 x 2 sev 4 @ lognormal 3 cv 0.8 fixed 1
 
         The indents are required...
 
@@ -726,7 +720,7 @@ class Underwriter(object):
             # lookup in Underwriter
             found_type, found_dict = self[uw_id]
         except LookupError as e:
-            print(f'ERROR id {expected_type}.{uw_id} not found')
+            logger.error(f'ERROR id {expected_type}.{uw_id} not found')
             raise e
         logger.debug(f'UnderwritingParser._safe_lookup | retrieved {uw_id} as type {found_type}')
         if found_type != expected_type:
@@ -737,8 +731,20 @@ class Underwriter(object):
 class Build(object):
     uw = Underwriter(create_all=True)
 
-    @staticmethod
-    def build(program, update=True, bs=0, log2=13, padding=1, **kwargs):
+    @classmethod
+    def parse(cls, program):
+        return cls.uw.parse_portfolio_program(program)
+
+    @classmethod
+    def list(cls):
+        return cls.uw.list()
+
+    @classmethod
+    def describe(cls, item_type=''):
+        return cls.uw.describe(item_type, pretty_print=True)
+
+    @classmethod
+    def build(cls, program, update=True, bs=0, log2=13, padding=1, **kwargs):
         """
         Convenience function to make work easy for the user. Hide uw, updating etc.
 
@@ -753,10 +759,10 @@ class Build(object):
         logger.setLevel(30)
 
         if program in ['underwriter', 'uw']:
-            return Build.uw
+            return cls.uw
 
         # make stuff
-        out = Build.uw(program)
+        out = cls.uw(program)
 
         if isinstance(out, dict):
             pass

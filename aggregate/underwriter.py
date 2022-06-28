@@ -110,7 +110,7 @@ from .utils import html_title
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
 import re
-# import warnings
+from inspect import signature
 
 logger = logging.getLogger('aggregate')
 
@@ -169,7 +169,7 @@ class Underwriter(object):
             with open(os.path.join(self.dir_name, fn), 'r') as f:
                 program = f.read()
             # read in, parse, save to sev/agg/port dictionaries
-            self._runner(program)
+            self.preprocess_and_parse_program(program)
         # set desired store_mode
         self.store_mode = store_mode
         self.create_all = create_all
@@ -246,60 +246,42 @@ class Underwriter(object):
         """
         sers = dict()
         for k in Underwriter.data_types:
-            d = sorted(list(self.__getattribute__(k).keys()))
+            # d = sorted(list(self.__getattribute__(k).keys()))
+            d = sorted(list(getattr(self, k).keys()))
             sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
         df = pd.DataFrame(data=sers)
-        # df.index.name = 'No.'
         df = df.fillna('')
         return df
 
-    def describe(self, item_type='', pretty_print=False):
+    def describe(self, item_types=''):
         """
-        more informative version of list
+        More informative version of list
         Pull notes for type items
+
+        TODO: enhance!
 
         :return:
         """
 
-        def deal_with_sequences(x):
-            """
-            pandas can't have a field set as a sequence
-            need to check if x is a sequence and if so return something suitable...
-
-            :param x:
-            :return:
-            """
-            if isinstance(x, Iterable):
-                return str(x)
-            else:
-                return x
-
-        df = pd.DataFrame(columns=['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b',
-                                   'EN', 'Freq_a',
-                                   'ELoss', 'Notes'])
+        cols =     ['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b', 'EN', 'Freq_a', 'ELoss', 'Notes']
+        # what they are actually called
+        cols_agg = ['sev_name', 'sev_mean', 'sev_a', 'sev_b', 'exp_en', 'freq_a', 'exp_el', 'note']
+        defaults = [       '',          0,       0,       0,        0,        0 ,       0,      '']
+        df = pd.DataFrame(columns=cols)
         df = df.set_index('Name')
-        df['ELoss'] = np.maximum(df.ELoss, df.ESev * df.EN)
-        if item_type == '':
-            item_type = Underwriter.data_types
+
+        if item_types == '':
+            # all item types
+            item_types = Underwriter.data_types
         else:
-            item_type = [item_type.lower()]
-        for k in item_type:  # self.databases.keys():
-            for kk, vv in self.__getattribute__(k).items():
-                _data_fields = [vv.get('sev_name', ''), vv.get('sev_mean', 0), vv.get('sev_a', 0),
-                                vv.get('sev_b', 0), vv.get('exp_en', 0), vv.get('freq_a', 0),
-                                vv.get('exp_el', 0), vv.get('note', '')]
-                try:
-                    df.loc[kk, :] = [k] + _data_fields
-                except ValueError as e:
-                    if e.args[0] == "setting an array element with a sequence":
-                        df.loc[kk, :] = [k] + list(map(deal_with_sequences, _data_fields))
-                    else:
-                        raise e
+            item_types = [item_types.lower()]
+
+        for item_type in item_types:
+            for obj_name, obj_values in getattr(self, item_type).items():
+                data_fields = [ obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
+                df.loc[obj_name, :] = [item_type] + data_fields
+
         df = df.fillna('')
-        if pretty_print:
-            for t, egs in df.groupby('Type'):
-                html_title(t, 2)
-                display(egs.style)
         return df
 
     def parse_portfolio_program(self, portfolio_program, output='spec'):
@@ -334,7 +316,7 @@ class Underwriter(object):
         :return:
         """
 
-        self._runner(portfolio_program)
+        self.preprocess_and_parse_program(portfolio_program)
 
         # if globs replace all meta objects with a lookup object
         # copy from code below FRAGILE
@@ -394,12 +376,12 @@ class Underwriter(object):
             ans = {}
             if len(self.parser.sev_out_dict) > 0:
                 for v in self.parser.sev_out_dict.values():
-                    Underwriter._add_defaults(v, 'sev')
+                    Underwriter.add_defaults(v, 'sev')
                 ans['sev'] = pd.DataFrame(list(self.parser.sev_out_dict.values()),
                                           index=self.parser.sev_out_dict.keys())
             if len(self.parser.agg_out_dict) > 0:
                 for v in self.parser.agg_out_dict.values():
-                    Underwriter._add_defaults(v)
+                    Underwriter.add_defaults(v)
                 ans['agg'] = pd.DataFrame(list(self.parser.agg_out_dict.values()),
                                           index=self.parser.agg_out_dict.keys())
             if len(self.parser.port_out_dict) > 0:
@@ -522,7 +504,7 @@ class Underwriter(object):
 
         # if you fall through to here then the portfolio_program did not refer to a built in object
         # run the program
-        self._runner(portfolio_program)
+        self.preprocess_and_parse_program(portfolio_program)
 
         # if globs, replace all meta objects with a lookup object
         if self.glob is not None:
@@ -611,7 +593,7 @@ class Underwriter(object):
             portfolio_program = f.read()
         return self.write(portfolio_program, **kwargs)
 
-    def _runner(self, portfolio_program):
+    def preprocess_and_parse_program(self, portfolio_program):
         """
         preprocessing:
             remove \n in [] (vectors) e.g. put by f{np.linspace} TODO only works for 1d vectors
@@ -668,16 +650,16 @@ class Underwriter(object):
             if len(self.parser.sev_out_dict) > 0:
                 # for k, v in self.parser.sev_out_dict.items():
                 self.severity.update(self.parser.sev_out_dict)  # [k] = v
-                logger.debug(f'Underwriter._runner | saving {self.parser.sev_out_dict.keys()} severity/ies')
+                logger.debug(f'Underwriter.preprocess_and_parse_program | saving {self.parser.sev_out_dict.keys()} severity/ies')
             if len(self.parser.agg_out_dict) > 0:
                 # for k, v in self.parser.agg_out_dict.items():
                 #     self.aggregate[k] = v
                 self.aggregate.update(self.parser.agg_out_dict)
-                logger.debug(f'Underwriter._runner | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
+                logger.debug(f'Underwriter.preprocess_and_parse_program | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
             if len(self.parser.port_out_dict) > 0:
                 for k, v in self.parser.port_out_dict.items():
                     # v is a list of aggregate names, these have all been added to the database...
-                    logger.debug(f'Underwriter._runner | saving {k} portfolio')
+                    logger.debug(f'Underwriter.preprocess_and_parse_program | saving {k} portfolio')
                     self.portfolio[k] = {'spec': v['spec'], 'arg_dict': {}}
                     # self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
         # can we still do something like this?
@@ -685,26 +667,34 @@ class Underwriter(object):
         return
 
     @staticmethod
-    def _add_defaults(dict_, kind='agg'):
+    def add_defaults(dict_in, kind='agg'):
         """
-        add default values to dict_ Leave existing values unchanged
-        Used for outputing to a data frame, where you want all columns completed
-        TODO consider if really needed. If so, add the new reinsurance arguments!
-        TODO: use dict.update??!
-        :param dict_:
+        add default values to dict_inin. Leave existing values unchanged
+        Used to output to a data frame, where you want all columns completed
+        :param dict_in:
         :return:
         """
-        defaults = dict(name="", exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                        sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_scale=0, sev_loc=0, sev_wt=1,
-                        freq_name='poisson', freq_a=0, freq_b=0)
+
+        print('running add_defaults\n' * 10 )
+
+        # use inspect to get the defaults
+        # obtain signature
+        sig = signature(Aggregate.__init__)
+
+        # self and name --> bound signature
+        bs = sig.bind(None, '')
+        bs.apply_defaults()
+        # remove self
+        bs.arguments.pop('self')
+        defaults = bs.arguments
+
         if kind == 'agg':
-            for k, v in defaults.items():
-                if k not in dict_:
-                    dict_[k] = v
+            defaults.update(dict_in)
+
         elif kind == 'sev':
             for k, v in defaults.items():
-                if k[0:3] == 'sev' and k not in dict_ and k != 'sev_wt':
-                    dict_[k] = v
+                if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
+                    dict_in[k] = v
 
     def _safe_lookup(self, full_uw_id):
         """

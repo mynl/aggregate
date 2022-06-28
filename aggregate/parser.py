@@ -35,120 +35,120 @@ The ```agg``` Language Grammar:
 
 ::
 
-answer                  ::= sev_out
-                         | agg_out
-                         | port_out
-                         | expr
+answer              	::= sev_out
+                    	 | agg_out
+                    	 | port_out
+                    	 | expr
 
-port_out                ::= port_name note agg_list
+port_out            	::= port_name note agg_list
 
-agg_list                ::= agg_list agg_out
-                         | agg_out
+agg_list            	::= agg_list agg_out
+                    	 | agg_out
 
-agg_out                 ::= agg_name builtin_aggregate note
-                         | agg_name exposures layers SEV sev occ_reins freq agg_reins note
-                         | agg_name exposures layers dsev occ_reins freq agg_reins note
-                         | agg_name dfreq dsev occ_reins note
+agg_out             	::= agg_name builtin_aggregate note
+                    	 | agg_name exposures layers SEV sev occ_reins freq agg_reins note
+                    	 | agg_name exposures layers dsev occ_reins freq agg_reins note
+                    	 | agg_name dfreq dsev occ_reins note
 
-sev_out                 ::= sev_out sev_name sev note
-                         | sev_name sev note
+sev_out             	::= sev_out sev_name sev note
+                    	 | sev_name sev note
 
-freq                    ::= MIXED ID expr expr
-                         | MIXED ID expr
-                         | EMPIRICAL doutcomes dprobs
-                         | FREQ expr expr
-                         | FREQ expr
-                         | FREQ
+freq                	::= MIXED ID expr expr
+                    	 | MIXED ID expr
+                    	 | EMPIRICAL doutcomes dprobs
+                    	 | FREQ expr expr
+                    	 | FREQ expr
+                    	 | FREQ
 
-agg_reins               ::= NET OF reins_list AGGREGATE
-                         | CEDED TO reins_list AGGREGATE
-                         |
+agg_reins           	::= NET OF reins_list AGGREGATE
+                    	 | CEDED TO reins_list AGGREGATE
+                    	 | 
 
-occ_reins               ::= NET OF reins_list OCCURRENCE
-                         | CEDED TO reins_list OCCURRENCE
-                         |
+occ_reins           	::= NET OF reins_list OCCURRENCE
+                    	 | CEDED TO reins_list OCCURRENCE
+                    	 | 
 
-reins_list              ::= reins_list AND reins_clause
-                         | reins_clause
+reins_list          	::= reins_list AND reins_clause
+                    	 | reins_clause
 
-reins_clause            ::= expr XS expr
-                         | expr SHARE_OF expr XS expr
-                         | expr PART_OF expr XS expr
+reins_clause        	::= expr XS expr
+                    	 | expr SHARE_OF expr XS expr
+                    	 | expr PART_OF expr XS expr
 
-sev                     ::= sev "!"
-                         | sev LOCATION_ADD numbers
-                         | numbers SCALE_MULTIPLY sev
-                         | ids numbers CV numbers weights
-                         | ids numbers weights
-                         | ids numbers numbers weights
-                         | ids xps
-                         | CONSTANT expr
-                         | builtinids numbers numbers
-                         | builtinids
+sev                 	::= sev "!"
+                    	 | sev LOCATION_ADD numbers
+                    	 | numbers SCALE_MULTIPLY sev
+                    	 | ids numbers CV numbers weights
+                    	 | ids numbers weights
+                    	 | ids numbers numbers weights
+                    	 | ids xps
+                    	 | CONSTANT expr
+                    	 | builtinids numbers numbers
+                    	 | builtinids
 
-xps                     ::= XPS doutcomes dprobs
-                         |
+xps                 	::= XPS doutcomes dprobs
+                    	 | 
 
-dsev                    ::= DSEV doutcomes dprobs
+dsev                	::= DSEV doutcomes dprobs
 
-dfreq                   ::= DFREQ doutcomes dprobs
+dfreq               	::= DFREQ doutcomes dprobs
 
-doutcomes               ::= "[" numberl "]"
+doutcomes           	::= "[" numberl "]"
 
-dprobs                  ::= "[" numberl "]"
-                         |
+dprobs              	::= "[" numberl "]"
+                    	 | 
 
-weights                 ::= WEIGHTS EQUAL_WEIGHT expr
-                         | WEIGHTS numbers
-                         |
+weights             	::= WEIGHTS EQUAL_WEIGHT expr
+                    	 | WEIGHTS numbers
+                    	 | 
 
-layers                  ::= numbers XS numbers
-                         |
+layers              	::= numbers XS numbers
+                    	 | 
 
-note                    ::= NOTE
-                         |
+note                	::= NOTE
+                    	 | 
 
-exposures               ::= SPECIFIED CLAIMS
-                         | numbers CLAIMS
-                         | numbers LOSS
-                         | numbers PREMIUM AT numbers LR
+exposures           	::= SPECIFIED CLAIMS
+                    	 | numbers CLAIMS
+                    	 | numbers LOSS
+                    	 | numbers PREMIUM AT numbers LR
 
-builtinids              ::= BUILTINID
+builtinids          	::= BUILTINID
 
-ids                     ::= "[" idl "]"
-                         | ID
+ids                 	::= "[" idl "]"
+                    	 | ID
 
-idl                     ::= idl ID
-                         | ID
+idl                 	::= idl ID
+                    	 | ID
 
-builtin_aggregate       ::= builtin_aggregate_dist TIMES expr
-                         | expr TIMES builtin_aggregate_dist
-                         | builtin_aggregate_dist
+builtin_aggregate   	::= builtin_aggregate_dist TIMES expr
+                    	 | expr TIMES builtin_aggregate_dist
+                    	 | builtin_aggregate_dist
 
-builtin_aggregate_dist  ::= BUILTINID
+builtin_aggregate_dist	::= BUILTINID
 
-sev_name                ::= SEV ID
+sev_name            	::= SEV ID
 
-agg_name                ::= AGG ID
+agg_name            	::= AGG ID
 
-port_name               ::= PORT ID
+port_name           	::= PORT ID
 
-numbers                 ::= "[" numberl "]"
-                         | expr
+numbers             	::= "[" numberl "]"
+                    	 | expr
 
-numberl                 ::= numberl expr
-                         | expr
+numberl             	::= numberl expr
+                    	 | expr
 
-expr                    ::= expr PLUS expr
-                         | expr MINUS expr
-                         | expr TIMES expr
-                         | expr DIVIDE expr
-                         | expr EXPONENT expr
-                         | "(" expr ")"
-                         | EXP "(" expr ")"
-                         | expr PERCENT
-                         | INFINITY
-                         | NUMBER
+expr                	::= expr PLUS expr
+                    	 | expr MINUS expr
+                    	 | expr TIMES expr
+                    	 | expr DIVIDE expr
+                    	 | expr EXPONENT expr
+                    	 | "(" expr ")"
+                    	 | EXP "(" expr ")"
+                    	 | expr PERCENT
+                    	 | INFINITY
+                    	 | NUMBER
 
 
 FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'

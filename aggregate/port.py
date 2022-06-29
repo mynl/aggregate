@@ -954,8 +954,14 @@ class Portfolio(object):
         :return:
         """
 
+        if log2 <= 0:
+            raise ValueError('log2 must be >= 0')
         self.log2 = log2
-        self.bs = bs
+        if bs == 0:
+            self.bs = self.best_bucket(log2)
+            logger.info(f'bs=0 enterered, setting bs={bs:.6g} using self.best_bucket rounded to binary fraction.')
+        else:
+            self.bs = bs
         self.padding = padding
         self.tilt_amount = tilt_amount
         self.approx_type = approx_type

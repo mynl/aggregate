@@ -1,16 +1,14 @@
-import scipy.stats as ss
-import numpy as np
-from matplotlib import pyplot as plt
-import matplotlib.ticker as ticker
-from scipy.integrate import quad
-import pandas as pd
 import collections
-import logging
 import json
-from .utils import sln_fit, sgamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
-    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler
-from .spectral import Distortion
+import inspect
+import itertools
+import logging
+import matplotlib.ticker as ticker
+from matplotlib import pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy.integrate import quad
+import scipy.stats as ss
 from scipy import interpolate
 from scipy.optimize import newton
 from IPython.core.display import display
@@ -18,7 +16,11 @@ from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
-import itertools
+
+from .utils import sln_fit, sgamma_fit, ft, ift, \
+    axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
+    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler
+from .spectral import Distortion
 from collections import namedtuple
 from numpy.linalg import inv  # , pinv, det, matrix_rank
 
@@ -677,9 +679,11 @@ class Aggregate(Frequency):
         :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
     """
 
+    # TODO must be able to automate this with inspect
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
-                      'sev_wt', 'freq_name', 'freq_a', 'freq_b', 'note']
+                      'sev_wt', 'occ_kind', 'occ_reins', 'freq_name', 'freq_a', 'freq_b',
+                      'agg_kind', 'agg_reins', 'note']
 
     @property
     def spec(self):
@@ -691,16 +695,14 @@ class Aggregate(Frequency):
         return self._spec
 
     @property
-    def meta(self):
+    def spec_ex(self):
         """
         All relevant info
 
         :return:
         """
-        if self._meta is None:
-            self._meta = {'type': type(self), 'spec': self._spec, 'bs': self.bs, 'log2': self.log2,
-                          'sevs': len(self.sevs)}
-        return self._meta
+        return {'type': type(self), 'spec': self.spec, 'bs': self.bs, 'log2': self.log2,
+                'sevs': len(self.sevs)}
 
     @property
     def density_df(self):
@@ -785,7 +787,7 @@ class Aggregate(Frequency):
                 keys.append('agg')
 
             if len(ans):
-               self._reins_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
+                self._reins_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
 
         return self._reins_audit_df
 
@@ -804,7 +806,7 @@ class Aggregate(Frequency):
         reins = self.occ_reins if kind == 'occ' else self.agg_reins
 
         for (s, y, a) in reins:
-            c, n, df = self._apply_reins_work([(s,a,a)], self.sev_gross_density, False)
+            c, n, df = self._apply_reins_work([(s, a, a)], self.sev_gross_density, False)
             ans.append(df)
 
         if kind == 'occ':
@@ -835,7 +837,7 @@ class Aggregate(Frequency):
 
             return bit['p'].apply(g)
 
-        return df.groupby(level=(0,1,2)).apply(f).unstack(-1).sort_index(level='attach')
+        return df.groupby(level=(0, 1, 2)).apply(f).unstack(-1).sort_index(level='attach')
 
     def rescale(self, scale, kind='homog'):
         """
@@ -914,15 +916,21 @@ class Aggregate(Frequency):
         # class variables
         self.name = get_value(name)
         # for persistence, save the raw called spec... (except lookups have been replaced...)
-        # TODO want to use the trick with setting properties so that if they are altered spec gets alterned...
-        self._spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-                          exp_attachment=exp_attachment, exp_limit=exp_limit,
-                          sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
-                          sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-                          sev_conditional=sev_conditional,
-                          occ_reins=occ_reins, occ_kind=occ_kind,
-                          freq_name=freq_name, freq_a=freq_a, freq_b=freq_b,
-                          agg_reins=agg_reins, agg_kind=agg_kind, note=note)
+        # TODO want to use the trick with setting properties so that if they are altered spec gets altered...
+        # self._spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
+        #                   exp_attachment=exp_attachment, exp_limit=exp_limit,
+        #                   sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
+        #                   sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
+        #                   sev_conditional=sev_conditional,
+        #                   occ_reins=occ_reins, occ_kind=occ_kind,
+        #                   freq_name=freq_name, freq_a=freq_a, freq_b=freq_b,
+        #                   agg_reins=agg_reins, agg_kind=agg_kind, note=note)
+        # using inspect, more robust
+        frame = inspect.currentframe()
+        self._spec = inspect.getargvalues(frame).locals
+        for n in ['frame', 'get_value', 'self']:
+            if n in self._spec: self._spec.pop(n)
+
         logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
@@ -955,7 +963,6 @@ class Aggregate(Frequency):
         self._careful_q = None
         self._density_df = None
         self._reins_audit_df = None
-        self._meta = None
         self.q_temp = None
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
@@ -1251,7 +1258,6 @@ class Aggregate(Frequency):
         :return:
         """
         self._density_df = None  # invalidate
-        self._meta = None
 
         self.xs = xs
         self.bs = xs[1]
@@ -1559,8 +1565,8 @@ class Aggregate(Frequency):
         self.ex = _m2
         # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
         logger.log(35,
-            f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
-            f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
+                   f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
+                   f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
 
     def apply_distortion(self, dist):
         """

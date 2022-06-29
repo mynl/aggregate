@@ -101,42 +101,46 @@ Etc. etc.
 
 import os
 import numpy as np
-from IPython.core.display import display
+# from IPython.core.display import display
+# from collections import Iterable
+# from .utils import html_title
 import logging
 import pandas as pd
-from collections import Iterable
-from .port import Portfolio
-from .utils import html_title
-from .distr import Aggregate, Severity
-from .parser import UnderwritingLexer, UnderwritingParser
+from pathlib import Path
 import re
 from inspect import signature
+
+from .port import Portfolio
+from .distr import Aggregate, Severity
+from .parser import UnderwritingLexer, UnderwritingParser
 
 logger = logging.getLogger('aggregate')
 
 
 class Underwriter(object):
     """
-    The underwriter class constructs real world examples from stored and user input Lines and Accounts.
-    Whereas Examples only produces simple Portfolios and Books, the Underwriter class is more flexible.
+    The ``Underwriter`` class manages the creation of Aggregate and Portfolio objects, and
+    maintains a database of standard Severity (curves) and Aggregate (unit or line level) objects.
+    The ``Underwriter`` knows about all the business that is written!
 
-    Handles persistence
-    Is interface into program parser
-    Handles safe lookup from database for parser
-
-    Persisitence to and from agg files
+    * Handles persistence to and from agg files
+    * Is interface into program parser
+    * Handles safe lookup from database for parser
 
     """
 
     data_types = ['portfolio', 'aggregate', 'severity']
 
-    def __init__(self, dir_name="", name='Rory', databases=[], glob=None, store_mode=True, update=False,
+    def __init__(self, name='Rory', databases=None, glob=None, store_mode=True, update=False,
                  log2=10, debug=False, create_all=False):
         """
 
         :param dir_name:
         :param name:
-        :param databases: set equal to None to load the default databases. Faster to load without them.
+        :param databases: if None: nothing loaded; if 'default' or 'default' in databases load the installed
+        databases; if 'site' or site in databases, load all site databases (home() / agg, which
+        is created it it does not exist); other entires treated as db names in home() / agg are then loaded.
+        Databases not in site directory must be fully qualified path names.
         :param glob: reference, e.g. to globals(), used to resolve meta.XX references
         :param store_mode: add newly created aggregates to the database?
         :param update:
@@ -148,31 +152,67 @@ class Underwriter(object):
         self.last_spec = None
         self.name = name
         self.update = update
+        if log2 <= 0:
+            raise ValueError('log2 must be > 0. The number of buckets used equals 2**log2.')
         self.log2 = log2
         self.debug = debug
         self.glob = glob
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
-        # otherwise these are hidden from pyCharm....
+        # stop pyCharm complaining
         self.severity = {}
         self.aggregate = {}
         self.portfolio = {}
-        if databases is None:
-            databases = ['site.agg', 'user.agg']
-        self.dir_name = dir_name
-        if self.dir_name == '':
-            self.dir_name = os.path.split(__file__)[0]
-            self.dir_name = os.path.join(self.dir_name, 'agg')
+
+        if databases == 'all':
+            databases = ['default', 'site']
+        elif type(databases) == str:
+            databases = [databases]
+        default_dir = Path(__file__).parent / 'agg'
+        site_dir = Path.home() / 'aggregate'
+
+        # TODO Useful?
+        self.dir_name = site_dir
+        if self.dir_name.exists() is False:
+            # check site dir exists
+            self.dir_name.mkdir(parents=True, exist_ok=True)
+
         # make sure all database entries are stored:
         self.store_mode = True
+        if databases is None:
+            # nothing to do
+            databases = []
+
+        if 'default' in databases:
+            databases.remove('default')
+            for fn in default_dir.glob('*.agg'):
+                self._read_db(fn)
+
+        if 'site' in databases:
+            databases.remove('site')
+            databases += list(site_dir.glob('*.agg'))
+
         for fn in databases:
-            with open(os.path.join(self.dir_name, fn), 'r') as f:
-                program = f.read()
-            # read in, parse, save to sev/agg/port dictionaries
-            self.preprocess_and_parse_program(program)
+            if Path(fn).exists():
+                self._read_db(fn)
+            elif (site_dir / fn).exists():
+                self._read_db(site_dir / fn)
+            else:
+                logger.warning(f'Database {fn} not found. Ignoring.')
+
         # set desired store_mode
         self.store_mode = store_mode
         self.create_all = create_all
+
+    def _read_db(self, db_path):
+        if not isinstance(db_path, Path):
+            db_path = Path(db_path)
+        try:
+            program = db_path.read_test(encoding='utf-8')
+        except FileNotFoundError:
+            logger.warning(f'Requested database {db_path.name} not found. Ignoring.')
+        # read in, parse, save to sev/agg/port dictionaries
+        self.preprocess_and_parse_program(program)
 
     def __getitem__(self, item):
         """
@@ -213,22 +253,6 @@ class Underwriter(object):
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
-    # this is evil: it passes unknown things through to write...
-    # def __getattr__(self, item):
-    #     """
-    #     handles self.item and returns an appropriate object
-    #
-    #     :param item:
-    #     :return:
-    #     """
-    #     # print(f'Underwriter.__getattr__({item}) called')
-    #     if item[0] == '_':
-    #         # deal with the _ipython_canary_method_should_not_exist_
-    #         # print('bailing')
-    #         return
-    #     else:
-    #         return self.write(item)
-
     def __call__(self, portfolio_program, **kwargs):
         """
         make the Underwriter object callable; pass through to write
@@ -255,18 +279,17 @@ class Underwriter(object):
 
     def describe(self, item_types=''):
         """
-        More informative version of list
-        Pull notes for type items
+        More informative version of list including notes.
 
         TODO: enhance!
 
         :return:
         """
 
-        cols =     ['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b', 'EN', 'Freq_a', 'ELoss', 'Notes']
+        cols = ['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b', 'EN', 'Freq_a', 'ELoss', 'Notes']
         # what they are actually called
         cols_agg = ['sev_name', 'sev_mean', 'sev_a', 'sev_b', 'exp_en', 'freq_a', 'exp_el', 'note']
-        defaults = [       '',          0,       0,       0,        0,        0 ,       0,      '']
+        defaults = ['', 0, 0, 0, 0, 0, 0, '']
         df = pd.DataFrame(columns=cols)
         df = df.set_index('Name')
 
@@ -278,7 +301,7 @@ class Underwriter(object):
 
         for item_type in item_types:
             for obj_name, obj_values in getattr(self, item_type).items():
-                data_fields = [ obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
+                data_fields = [obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
                 df.loc[obj_name, :] = [item_type] + data_fields
 
         df = df.fillna('')
@@ -368,7 +391,7 @@ class Underwriter(object):
 
             else:
                 logger.warning(f'Underwriter.parse_portfolio_program | program has no Portfolio outputs. '
-                                'Nothing returned. ')
+                               'Nothing returned. ')
                 return
 
         elif output == 'df' or output.lower() == 'dataframe':
@@ -393,7 +416,7 @@ class Underwriter(object):
             raise ValueError(f'Inadmissible output type {output}  passed to parse_portfolio_program. '
                              'Expecting spec or df/dataframe.')
 
-    def write(self, portfolio_program, **kwargs):
+    def write(self, portfolio_program, log2=0, bs=0, **kwargs):
         """
         Write a natural language program. Write carries out the following steps.
 
@@ -437,44 +460,10 @@ class Underwriter(object):
         # out of kwargs
         create_all = kwargs.get('create_all', self.create_all)
         update = kwargs.get('update', self.update)
-        if update:
-            if 'log2' in kwargs:
-                log2 = kwargs.get('log2')
-                del kwargs['log2']
-            else:
-                log2 = self.log2
-            if 'bs' in kwargs:
-                bs = kwargs.get('bs')
-                del kwargs['bs']
-            else:
-                bs = 0
-            if 'add_exa' in kwargs:
-                add_exa = kwargs.get('add_exa')
-                del kwargs['add_exa']
-            else:
-                add_exa = False
+        if update is True and log2 == 0:
+            log2 = self.log2
 
-        # function to handle update madness, use in either script or lookup updates for ports
-        def _update(s, k):
-            if update:
-                if bs > 0 and log2 > 0:
-                    _bs = bs
-                    _log2 = log2
-                else:
-                    if bs == 0:  # and log2 > 0
-                        # for log2 = 10
-                        _bs = s.recommend_bucket().iloc[-1, 0]
-                        _log2 = log2  # which must be > 0
-                        # adjust bucket size for new actual log2
-                        _bs *= 2 ** (10 - _log2)
-                    else:  # bs > 0 and log2 = 0 which doesn't really make sense...
-                        logger.warning('Underwriter.write | nonsensical options bs > 0 and log2 = 0')
-                        _bs = bs
-                        _log2 = 10
-                logger.debug(f"Underwriter.write | updating Portfolio {k} log2={_log2}, bs={_bs}")
-                s.update(log2=_log2, bs=_bs, add_exa=add_exa, **kwargs)
-
-        # first see if it is a built in object
+        # first see if portfolio_program refers to a built-in object
         _type = ''
         obj = None
         try:
@@ -491,7 +480,9 @@ class Underwriter(object):
             elif _type == 'port':
                 # actually make the object
                 obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
-                _update(obj, portfolio_program)
+                if update is True:
+                    obj.update(log2=log2, bs=bs, **kwargs)
+                    logger.debug(f"Underwriter.write | updating Portfolio {portfolio_program} log2={log2}, bs={bs}")
                 return obj
             elif _type == 'sev':
                 if 'sev_wt' in obj:
@@ -499,7 +490,7 @@ class Underwriter(object):
                 return Severity(**obj)
             else:
                 ValueError(f'Cannot build {_type} objects')
-            print('NEVER GET HERE??? '*10)
+            print('NEVER GET HERE??? ' * 10)
             return obj
 
         # if you fall through to here then the portfolio_program did not refer to a built in object
@@ -532,24 +523,25 @@ class Underwriter(object):
             rv = {}
             for k in self.parser.port_out_dict.keys():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
-                s = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
-                s.program = 'unknown'
-                _update(s, k)
-                rv[k] = s
+                obj = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
+                obj.program = 'unknown'
+                if update is True:
+                    obj.update(log2=log2, bs=bs, **kwargs)
+                    logger.debug(f"Underwriter.write | updating Portfolio {obj.name} log2={log2}, bs={bs}")
+                rv[k] = obj
             if len(self.parser.port_out_dict) == 1:
                 # only one portfolio so we can set its program
-                s.program = portfolio_program
+                obj.program = portfolio_program
 
         if len(self.parser.agg_out_dict) > 0 and create_all:
             # new aggs, create them
             if rv is None:
                 rv = {}
             for k, v in self.parser.agg_out_dict.items():
-                # TODO FIX this clusterfuck
-                s = Aggregate(k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
+                obj = Aggregate(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
                 if update:
-                    s.easy_update(self.log2)
-                rv[k] = s
+                    obj.easy_update(log2)
+                rv[k] = obj
 
         if len(self.parser.sev_out_dict) > 0 and create_all:
             # new sevs, create them
@@ -558,8 +550,9 @@ class Underwriter(object):
             for v in self.parser.sev_out_dict.values():
                 if 'sev_wt' in v:
                     del v['sev_wt']
-                s = Severity(**v)
-                rv[f'sev_{s.__repr__()[38:54]}'] = s
+                obj = Severity(**v)
+                # TODO: wow, that's a weirdly specific subindex...WHY?
+                rv[f'sev_{obj.__repr__()[38:54]}'] = obj
 
         # report on what has been done
         if rv is None:
@@ -567,10 +560,10 @@ class Underwriter(object):
             logger.warning(f'Underwriter.write | Program did not contain any output')
         else:
             if len(rv):
-                logger.debug(f'Underwriter.write | Program created {len(rv)} objects and '
-                             f'defined {len(self.parser.port_out_dict)} Portfolio(s), '
-                             f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
-                             f'{len(self.parser.sev_out_dict)} Severity(ies)')
+                logger.info(f'Underwriter.write | Program created {len(rv)} objects and '
+                            f'defined {len(self.parser.port_out_dict)} Portfolio(s), '
+                            f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
+                            f'{len(self.parser.sev_out_dict)} Severity(ies)')
             if len(rv) == 1:
                 # dict, pop the last (only) element
                 rv = rv.popitem()[1]
@@ -578,20 +571,19 @@ class Underwriter(object):
         # return created objects
         return rv
 
-    def write_from_file(self, file_name, **kwargs):
+    def write_from_file(self, file_name, log2=0, bs=0, update=False, **kwargs):
         """
         read program from file. delegates to write
 
         :param file_name:
-        :param update:
         :param log2:
         :param bs:
+        :param update:
         :param kwargs:
         :return:
         """
-        with open(file_name, 'r', encoding='utf-8') as f:
-            portfolio_program = f.read()
-        return self.write(portfolio_program, **kwargs)
+        portfolio_program = Path(file_name).read_text(encoding='utf-8')
+        return self.write(portfolio_program, log2=log2, bs=bs, update=update, **kwargs)
 
     def preprocess_and_parse_program(self, portfolio_program):
         """
@@ -644,18 +636,20 @@ class Underwriter(object):
                     print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
 
-        # Post process -------------------------------------------------------------------
+        # Postprocess --------------------------------------------------------------------
         if self.store_mode:
             # could do this with a loop and getattr but it is too hard to read, so go easy route
             if len(self.parser.sev_out_dict) > 0:
                 # for k, v in self.parser.sev_out_dict.items():
                 self.severity.update(self.parser.sev_out_dict)  # [k] = v
-                logger.debug(f'Underwriter.preprocess_and_parse_program | saving {self.parser.sev_out_dict.keys()} severity/ies')
+                logger.debug(
+                    f'Underwriter.preprocess_and_parse_program | saving {self.parser.sev_out_dict.keys()} severity/ies')
             if len(self.parser.agg_out_dict) > 0:
                 # for k, v in self.parser.agg_out_dict.items():
                 #     self.aggregate[k] = v
                 self.aggregate.update(self.parser.agg_out_dict)
-                logger.debug(f'Underwriter.preprocess_and_parse_program | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
+                logger.debug(
+                    f'Underwriter.preprocess_and_parse_program | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
             if len(self.parser.port_out_dict) > 0:
                 for k, v in self.parser.port_out_dict.items():
                     # v is a list of aggregate names, these have all been added to the database...
@@ -671,11 +665,13 @@ class Underwriter(object):
         """
         add default values to dict_inin. Leave existing values unchanged
         Used to output to a data frame, where you want all columns completed
+
         :param dict_in:
+        :param kind:
         :return:
         """
 
-        print('running add_defaults\n' * 10 )
+        print('running add_defaults\n' * 10)
 
         # use inspect to get the defaults
         # obtain signature
@@ -779,6 +775,7 @@ class Build(object):
         return out
 
     __call__ = build
+
 
 # exported item
 build = Build()

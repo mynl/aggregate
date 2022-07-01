@@ -1206,7 +1206,7 @@ class Aggregate(Frequency):
         ix = self.density_df.index.get_loc(x, 'nearest')
         return self.density_df.iat[ix, 0]
 
-    def easy_update(self, log2=13, bs=0, **kwargs):
+    def update(self, log2=13, bs=0, **kwargs):
         """
         Convenience function, delegates to update. Avoids having to pass xs.
 
@@ -1225,9 +1225,12 @@ class Aggregate(Frequency):
                 kwargs['approximation'] = 'slognorm'
             else:
                 kwargs['approximation'] = 'exact'
-        return self.update(xs, **kwargs)
+        return self.update_work(xs, **kwargs)
 
-    def update(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
+    # for backwards compatibility
+    easy_update = update
+
+    def update_work(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
         Compute the density
@@ -1701,7 +1704,7 @@ class Aggregate(Frequency):
         """
         if self.agg_density is None:
             # update
-            self.update(xs, padding, tilt_vector, 'exact')
+            self.update_work(xs, padding, tilt_vector, 'exact')
         if isinstance(beta, Distortion):
             # passed in a distortion function
             beta_name = beta.name
@@ -1742,7 +1745,7 @@ class Aggregate(Frequency):
             raise ValueError('Cannot plot before update')
             return
         if self.sev_density is None:
-            self.update(self.xs, 1, None, sev_calc='discrete', force_severity='yes')
+            self.update_work(self.xs, 1, None, sev_calc='discrete', force_severity='yes')
 
         set_tight = (axiter is None)
 
@@ -3057,6 +3060,16 @@ class Severity(ss.rv_continuous):
             ex3a /= self.pattach
 
         return ex1a, ex2a, ex3a
+
+    def update(self, log2=0, bs=0, **kwargs):
+        """
+        This is a convenience function so that update can be called on any kind of object.
+        :param log2:
+        :param bs:
+        :param kwargs:
+        :return:
+        """
+        pass
 
     def plot(self, N=100, figsize=(12, 3)):
         """

@@ -123,11 +123,17 @@ class Underwriter(object):
     * Is interface into program parser
     * Handles safe lookup from database for parser
 
+    Objects have a kind (agg, port, or sev) and a name. E.g. agg MyAgg ... has kind agg and name MyAgg.
+    They have a representation as a program. When the program is interpreted it produces a string spec
+    that can be used to create the object. The static method factory can create any object from the
+    (kind, name, spec, program) quartet, though, strictly, program is not needed.
+
+    The underwriter knowledge is stored in a dataframe indexed by kind and name with columns
+    spec and program.
+
     """
 
-    data_types = ['port', 'agg', 'sev']
-
-    def __init__(self, name='Rory', databases=None, glob=None, store_mode=True, update=False,
+    def __init__(self, databases=None, glob=None, store_mode=True, update=False,
                  log2=10, debug=False, create_all=False):
         """
 
@@ -145,8 +151,6 @@ class Underwriter(object):
         :param create_all: by default write only creates portfolios.
         """
 
-        self.last_spec = None
-        self.name = name
         self.update = update
         if log2 <= 0:
             raise ValueError('log2 must be > 0. The number of buckets used equals 2**log2.')
@@ -157,11 +161,8 @@ class Underwriter(object):
         self.parser = UnderwritingParser(self._safe_lookup, debug)
         # stop pyCharm complaining
         # knowledge - accounts and line known to the underwriter
-        self._knowledge = {}
-        # self.severity = {}
-        # self.aggregate = {}
-        # self.portfolio = {}
-
+        self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
+            ['kind', 'name'])
         if databases == 'all':
             databases = ['default', 'site']
         elif type(databases) == str:
@@ -216,6 +217,9 @@ class Underwriter(object):
         """
         handles self[item]
 
+        item = 'Name' for all objects called Name
+        item = ("kind", "name") for object of kind kind called name
+
         subscriptable: try user portfolios, b/in portfolios, line, severity
         to access specifically use severity or line methods
 
@@ -223,21 +227,36 @@ class Underwriter(object):
         :return:
         """
         # much less fancy version:
-        for kind in self.data_types:
-            obj = self._knowledge.get((kind, item), None)
-            if obj is not None:
-                logger.debug(f'Underwriter.__getitem__ | found {item} of type {kind}')
-                return kind, obj
-        raise LookupError(f'Item {item} not found in any database')
+        if not isinstance(item, (str, tuple)):
+            raise ValueError(f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
+
+        try:
+            if type(item) == str:
+                rows = self._knowledge.xs(item, axis=0, level=1, drop_level=False)
+            elif type(item) == tuple:
+                # return a dataframe
+                rows = self.loc[[item]]
+        except KeyError:
+            raise KeyError(f'Item {item} not found.')
+        except TypeError:
+            # TODO fix this "TypeError: unhashable type: 'slice'"
+            logger.error(f'getitem type error issue....looking for {item}')
+        else:
+            if len(rows) == 1:
+                kind, name, spec, prog = rows.reset_index().iloc[0]
+                return kind, name, spec, prog
+            else:
+                raise KeyError(f'Multiple objects matching {item} found. Returning them all.')
 
     def _repr_html_(self):
         s = [f'<h1>Underwriter Knowledge</h1>',
-             f'Underwriter {self.name} has knowledge of {len(self._knowledge)} portfolios, '
-             f'aggregate units, and severities:<br>']
-        s.append(', '.join([f'{n} ({k})' for (k, n), v in
-                            sorted(self._knowledge.items())]))
-        s.append(f'<h3>Settings</h3>')
-        for k in ['name', 'update', 'log2', 'store_mode', 'last_spec', 'create_all']:
+             f'The underwriter knowledge contains {len(self._knowledge)} items.'
+             '<br>',
+             self.knowledge.to_html(),
+             f'<h3>Settings</h3>']
+        # s.append(', '.join([f'{n} ({k})' for (k, n), v in
+        #                     sorted(self._knowledge.items())]))
+        for k in ['log2', 'update', 'store_mode', 'create_all']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
@@ -250,6 +269,34 @@ class Underwriter(object):
         """
         return self.write(portfolio_program, **kwargs)
 
+    def factory(self, kind, name, spec, program):
+        """
+        Create object of kind from spec, a dictionary.
+        Creating from uw obviously needs the uw, so this is NOT a staticmethod!
+
+        :param kind:
+        :param name:
+        :param spec:
+        :return:
+        """
+
+        if kind == 'agg':
+            obj = Aggregate(**spec)
+            obj.program = program
+        elif kind == 'port':
+            # actually make the object; spec = list of aggs
+            obj = Portfolio(name, spec, uw=self)
+            # # actually make the object previous code...
+            # obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
+        elif kind == 'sev':
+            if 'sev_wt' in spec:
+                spec = spec.copy()
+                del spec['sev_wt']
+            obj = Severity(**spec)
+        else:
+            ValueError(f'Cannot build {kind} objects')
+        return obj
+
     @property
     def knowledge(self):
         """
@@ -257,28 +304,38 @@ class Underwriter(object):
 
         :return:
         """
-        df = pd.DataFrame(self._knowledge.values(),
-                          columns=['program'],
-                          index=pd.MultiIndex.from_tuples(self._knowledge.keys(),
-                                                          names=['kind', 'name']))
-        return df
+        return self._knowledge[['program']].style.set_table_styles([
+            {
+                'selector': 'td',
+                'props': 'text-align: left'},
+            {
+                'selector': 'th.col_heading',
+                'props': 'text-align: center;'
+            },
+            {
+                'selector': '.row_heading',
+                'props': 'text-align: left;'
+            }
+        ])
 
     def list(self):
         """
-        list all available databases
+        List summary of the knowledge
 
         :return:
         """
-        sers = dict()
-        for k in Underwriter.data_types:
-            # d = sorted(list(self.__getattribute__(k).keys()))
-            d = sorted(list(getattr(self, k).keys()))
-            sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
-        df = pd.DataFrame(data=sers)
-        df = df.fillna('')
-        return df
+        raise NotImplementedError('NYI')
+        return
+        # sers = dict()
+        # for k in Underwriter.data_types:
+        #     # d = sorted(list(self.__getattribute__(k).keys()))
+        #     d = sorted(list(getattr(self, k).keys()))
+        #     sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
+        # df = pd.DataFrame(data=sers)
+        # df = df.fillna('')
+        # return df
 
-    def describe(self, item_types=''):
+    def describe(self, kinds=None):
         """
         More informative version of list including notes.
 
@@ -294,128 +351,14 @@ class Underwriter(object):
         df = pd.DataFrame(columns=cols)
         df = df.set_index('Name')
 
-        if item_types == '':
-            # all item types
-            item_types = Underwriter.data_types
-        else:
-            item_types = [item_types.lower()]
-
-        for item_type in item_types:
-            for obj_name, obj_values in getattr(self, item_type).items():
-                data_fields = [obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
-                df.loc[obj_name, :] = [item_type] + data_fields
-
-        df = df.fillna('')
-        return df
-
-    def parse_portfolio_program(self, portfolio_program, output='spec'):
-        """
-        Utility routine to parse the program and return the spec suitable to pass to Portfolio to
-        create the object.
-        Initially just for a single portfolio program (which it checks!)
-        No argument of default conniptions
-
-        To write program in testing mode use output='df':
-
-        * dictionary definitions are added to uw but no objects are created
-        * returns data frame description of added severity/aggregate/portfolios
-        * the dataframe of aggregates can be used to create a portfolio (with all the aggregates) by calling
-
-        ```Portfolio.from_DataFrame(name df)```
-
-        To parse and get dictionary definitions use output='spec'.
-        Aggregate and severity objects are also returned though they could be
-        accessed directly using wu['name']. May be convenient...we'll see.
-
-        Output has form that an Aggregate can be created from Aggregate(**x['name'])
-        etc. which is a bit easier than uw['name'] which returns the type.
-
-        TODO make more robust
-
-        :param portfolio_program:
-        :param output:  'spec' output a spec (assumes only one portfolio),
-                        or a dictionary {name: spec_list} if multiple
-                        'df' or 'dataframe' output as pandas data frame
-                        'dict' output as dictionary of pandas data frames (old write_test output)
-        :return:
-        """
-
-        self.interpret_program(portfolio_program)
-
-        # if globs replace all meta objects with a lookup object
-        # copy from code below FRAGILE
-        if self.glob is not None:
-            for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
-                if a['sev_name'][0:4] == 'meta':
-                    obj_name = a['sev_name'][5:]
-                    try:
-                        obj = self.glob[obj_name]
-                    except NameError as e:
-                        print(f'Object {obj_name} passed as a proto-severity cannot be found')
-                        raise e
-                    a['sev_name'] = obj
-                    logger.debug(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
-                                 f'replaced with object {obj.name} from glob')
-
-        if output == 'spec':
-            # expecting a single portfolio for this simple function
-            # create the spec list string
-            if len(self.parser.port_out_dict) == 1:
-                # this behaviour to ensure backwards compatibility
-                nm = ""
-                spec_list = None
-                for nm in self.parser.port_out_dict.keys():
-                    # remember the spec comes back as a list of aggs that have been entered into the uw
-                    # self[v] = ('agg', dictionary def) of the agg component v of the portfolio
-                    spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
-                return nm, spec_list
-
-            elif len(self.parser.port_out_dict) > 1 or \
-                    len(self.parser.agg_out_dict) or len(self.parser.sev_out_dict):
-                # return dictionary: {pf_name : { name: pf_name, spec_list : [list] }}
-                # so that you can call Portfolio(*output[pf_name]) to create pf_name
-                # notes are dropped...
-                ans = {}
-                for nm in self.parser.port_out_dict.keys():
-                    # remember the spec comes back as a list of aggs that have been entered into the uw
-                    # self[v] = ('agg', dictionary def) of the agg component v of the portfolio
-                    spec_list = [self[v][1] for v in self.portfolio[nm]['spec']]
-                    ans[nm] = dict(name=nm, spec_list=spec_list)
-
-                for nm in self.parser.agg_out_dict.keys():
-                    ans[nm] = self.aggregate[nm]
-
-                for nm in self.parser.sev_out_dict.keys():
-                    ans[nm] = self.severity[nm]
-
-                return ans
-
-            else:
-                logger.warning(f'Underwriter.parse_portfolio_program | program has no Portfolio outputs. '
-                               'Nothing returned. ')
-                return
-
-        elif output == 'df' or output.lower() == 'dataframe':
-            logger.debug(f'Runner.write_test | Executing program\n{portfolio_program[:500]}\n\n')
-            ans = {}
-            if len(self.parser.sev_out_dict) > 0:
-                for v in self.parser.sev_out_dict.values():
-                    Underwriter.add_defaults(v, 'sev')
-                ans['sev'] = pd.DataFrame(list(self.parser.sev_out_dict.values()),
-                                          index=self.parser.sev_out_dict.keys())
-            if len(self.parser.agg_out_dict) > 0:
-                for v in self.parser.agg_out_dict.values():
-                    Underwriter.add_defaults(v)
-                ans['agg'] = pd.DataFrame(list(self.parser.agg_out_dict.values()),
-                                          index=self.parser.agg_out_dict.keys())
-            if len(self.parser.port_out_dict) > 0:
-                ans['port'] = pd.DataFrame(list(self.parser.port_out_dict.values()),
-                                           index=self.parser.port_out_dict.keys())
-            return ans
-
-        else:
-            raise ValueError(f'Inadmissible output type {output}  passed to parse_portfolio_program. '
-                             'Expecting spec or df/dataframe.')
+        for (kind, name), (spec, program) in self._knowledge.iterrows():
+            pass
+            # for obj_name, obj_values in getattr(self, item_type).items():
+            #     data_fields = [obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
+            #     df.loc[obj_name, :] = [item_type] + data_fields
+        return None
+        # df = df.fillna('')
+        # return df
 
     def write(self, portfolio_program, log2=0, bs=0, **kwargs):
         """
@@ -475,54 +418,37 @@ class Underwriter(object):
             log2 = self.log2
 
         # first see if portfolio_program refers to a built-in object
-        kind = ''
-        obj = None
         try:
-            kind, obj = self.__getitem__(portfolio_program)
-        except LookupError:
-            logger.debug(f'underwriter.write | object not found, will process as program')
+            kind, name, spec, program = self[portfolio_program]  # calls __getitem__
+        except (LookupError, TypeError):
+            logger.debug(f'underwriter.write | object not found, processing as a program.')
         else:
-            logger.debug(f'underwriter.write | object found, returning object')
-            if kind == 'agg':
-                obj = Aggregate(**obj)
-                if update:
-                    obj.easy_update(log2, bs)
-                return obj
-            elif kind == 'port':
-                # actually make the object
-                obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
-                if update is True:
-                    obj.update(log2=log2, bs=bs, **kwargs)
-                    logger.debug(f"Underwriter.write | updating Portfolio {portfolio_program} log2={log2}, bs={bs}")
-                return obj
-            elif kind == 'sev':
-                if 'sev_wt' in obj:
-                    del obj['sev_wt']
-                return Severity(**obj)
-            else:
-                ValueError(f'Cannot build {kind} objects')
-            print('NEVER GET HERE??? ' * 10)
+            logger.debug(f'underwriter.write | {kind} object found.')
+            obj = self.factory(kind, name, spec, program)
+            if update:
+                obj.update(log2, bs, **kwargs)
             return obj
 
-        # if you fall through to here then the portfolio_program did not refer to a built in object
-        # run the program
-        self.interpret_program(portfolio_program)
+        # if you fall through to here then the portfolio_program did not refer to a built-in object
+        # run the program, get the interpreter return value, irv
+        irv = self.interpret_program(portfolio_program)
 
         # if globs, replace all meta objects with a lookup object
+        # TODO what are use cases? Is juice worth the squeeze?
         if self.glob is not None:
             logger.debug(f'Underwriter.write | Resolving globals')
-            for (k, n), v in self.parser.out_dict.items():
-                if k in ['sev', 'agg']:
-                    if v['sev_name'][0:4] == 'meta':
-                        logger.debug(f'Underwriter.write | Resolving {v["sev_name"]}')
-                        obj_name = v['sev_name'][5:]
+            for (kind, name), (spec, program) in self.parser.out_dict.items():
+                if kind in ['sev', 'agg']:
+                    if spec['sev_name'][0:4] == 'meta':
+                        logger.debug(f'Underwriter.write | Resolving {spec["sev_name"]}')
+                        obj_name = spec['sev_name'][5:]
                         try:
                             obj = self.glob[obj_name]
                         except NameError as e:
                             print(f'Object {obj_name} passed as a meta object cannot be found in glob.')
                             raise e
-                        v['sev_name'] = obj
-                        logger.debug(f'Underwriter.write | {v["sev_name"]} ({k} reference to {obj_name} '
+                        spec['sev_name'] = obj
+                        logger.debug(f'Underwriter.write | {spec["sev_name"]} ({kind} reference to {obj_name} '
                                      f'replaced with object {obj.name} from glob.')
             logger.debug(f'Underwriter.write | Done resolving globals')
 
@@ -530,36 +456,20 @@ class Underwriter(object):
         # 2019-11: create all objects not just the portfolios if create_all==True
         # rv = return values
         rv = None
-        if len(self.parser.out_dict) > 0:
+        if len(irv) > 0:
             # create ports
             rv = {}
             # parser.out_dict is indexed by (kind, name) and contains the defining dictionary
             # PrettyPrinter().pprint(self.parser.out_dict)
-            for (kind, name), v in self. parser.out_dict.items():
+            for (kind, name), (spec, program) in irv.items():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
-                if kind == 'port':
-                    obj = Portfolio(name, v) #  [self[v][1] for v in self.portfolio[k]['spec']])
-                    if update is True:
-                        obj.update(log2=log2, bs=bs, **kwargs)
-                        logger.debug(f"Underwriter.write | updating Portfolio {obj.name} log2={log2}, bs={bs}")
+                if create_all:
+                    obj = self.factory(kind, name, spec, program)
+                    if update:
+                        obj.update(log2, bs, **kwargs)
                     rv[(kind, name)] = obj
-                elif kind == 'agg':
-                    if create_all is True:
-                        if rv is None:
-                            rv = {}
-                        obj = Aggregate(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
-                        if update:
-                            obj.easy_update(log2)
-                        rv[(kind, name)] = obj
-                elif kind == 'sev':
-                    if create_all is True:
-                        if rv is None:
-                            rv = {}
-                        # this gets added by the parser but is not wanted! 
-                        if 'sev_wt' in v:
-                            del v['sev_wt']
-                        obj = Severity(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
-                        rv[(kind, name)] = obj
+                else:
+                    rv[(kind, name)] = (spec, program)
 
         # report on what has been done
         if rv is None:
@@ -631,9 +541,9 @@ class Underwriter(object):
                              f', adding to rv'))
                 # if in store_mode, add the program to uw dictionaries
                 if self.store_mode:
-                    self._knowledge[(kind, name)] = program_line
-                else:
-                    rv[name] = (kind, self.parser.out_dict[(kind, name)])
+                    logger.info(f'Added {kind}, {name}, {program_line[:20]} to knowledge.')
+                    self._knowledge.loc[(kind, name), :] = [self.parser.out_dict[(kind, name)], program_line]
+                rv[(kind, name)] = (self.parser.out_dict[(kind, name)], program_line)
         return rv
 
     @staticmethod
@@ -668,33 +578,32 @@ class Underwriter(object):
                 if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
                     dict_in[k] = v
 
-    def _safe_lookup(self, full_uw_id):
+    def _safe_lookup(self, buildinid):
         """
         lookup uw_id in uw of expected type and merge safely into self.arg_dict
         delete name and note if appropriate
 
-        :param full_uw_id:  type.name format
+        :param buildinid:  a string in kind.name format
         :return:
         """
 
-        expected_type, uw_id = full_uw_id.split('.')
+        kind, name = buildinid.split('.')
         try:
             # lookup in Underwriter
-            found_type, found_dict = self[uw_id]
+            found_kind, found_name, spec, program = self[name]
         except LookupError as e:
-            logger.error(f'ERROR id {expected_type}.{uw_id} not found')
+            logger.error(f'ERROR id {kind}.{name} not found in the knowledge.')
             raise e
-        logger.debug(f'UnderwritingParser._safe_lookup | retrieved {uw_id} as type {found_type}')
-        if found_type != expected_type:
-            raise ValueError(f'Error: type of {uw_id} is  {found_type}, not expected {expected_type}')
-        return found_dict.copy()
+        logger.debug(f'UnderwritingParser._safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
+        if found_kind != kind:
+            raise ValueError(f'Error: type of {name} is  {found_kind}, not expected {kind}')
+        return spec
 
 
 def safelookup(val):
     """ for debugging """
     s = f'LOOKUP {val}'
     return {'sev_name': 'BUILTIN', 'sev_a': val}
-
 
 
 class Build(object):
@@ -760,7 +669,8 @@ class Build(object):
     __call__ = build
 
     @staticmethod
-    def interpreter_test(where='', filename='C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv'):
+    def interpreter_test(where='',
+                         filename='C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv'):
         """
         Run a suite of test programs. For detailed analysis, run_one.
 
@@ -812,7 +722,7 @@ class Build(object):
         lexer = UnderwritingLexer()
         parser = UnderwritingParser(safelookup, True)
         print(f'Interpret one test\n{v}')
-        print('='*len(v))
+        print('=' * len(v))
         v1 = lexer.preprocess(v)
         if len(v1) > 1:
             logger.error('Input program contains more than one entry. Only interpreting the first...interpret_**one**')

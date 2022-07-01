@@ -1005,7 +1005,7 @@ class Portfolio(object):
         for agg in self.agg_list:
             raw_nm = agg.name
             nm = f'p_{agg.name}'
-            agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
+            agg.update_work(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
                             sev_calc, discretization_calc, normalize)
             # update for grammar based aggregate reinsurance...which, doh!, lives in the agg object!!
             # if aggregate_cession_function is not None:
@@ -1399,7 +1399,7 @@ class Portfolio(object):
         for base_agg in self.agg_list:
             agg = base_agg.rescale(delta, kind)
             new_aggs[base_agg.name] = agg
-            _a = agg.update(xs, self.padding, tilt_vector, 'exact' if agg.n < self.approx_freq_ge else self.approx_type,
+            _a = agg.update_work(xs, self.padding, tilt_vector, 'exact' if agg.n < self.approx_freq_ge else self.approx_type,
                             self.sev_calc, self.discretization_calc)
             agg_epsilon_df[f'p_{agg.name}'] = agg.agg_density
             # the total with the line incremented
@@ -4926,6 +4926,6 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             else:
                 ports[name] = pgm
             if uw and bs * log2 > 0:
-                ports[name].update(bs=bs, log2=log2, padding=padding, **kwargs)
+                ports[name].update(log2=log2, bs=bs, padding=padding, **kwargs)
 
         return ports

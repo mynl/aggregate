@@ -21,13 +21,9 @@ from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler
 from .spectral import Distortion
-from collections import namedtuple
-from numpy.linalg import inv  # , pinv, det, matrix_rank
+from numpy.linalg import inv
 
-# from types import MethodType
-# from scipy.special import ndtri  # inverse normal - this actually does the work
-
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger(__name__)
 
 
 class Frequency(object):
@@ -939,8 +935,9 @@ class Aggregate(Frequency):
         self.log2 = 0
         self.ex = 0
         self.note = note
-        self.en = None  # this is for a sublayer e.g. for limit profile
-        self.n = 0  # this is total frequency
+        self.program = ''  # can be set externally
+        self.en = None     # this is for a sublayer e.g. for limit profile
+        self.n = 0         # this is total frequency
         self.attachment = None
         self.limit = None
         self.agg_density = None
@@ -1517,9 +1514,9 @@ class Aggregate(Frequency):
         self.sev_net_density = occ_reins_df['p_net']
         self.sev_ceded_density = occ_reins_df['p_ceded']
         if self.occ_kind == 'ceded to':
-            self.sev_density = self.sev_net_density
-        elif self.occ_kind == 'net of':
             self.sev_density = self.sev_ceded_density
+        elif self.occ_kind == 'net of':
+            self.sev_density = self.sev_net_density
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
 
@@ -2594,6 +2591,7 @@ class Severity(ss.rv_continuous):
         ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
         # I think this is preferred now, but these are the same (probably...)
         # super().__init__(name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        self.program = ''    # may be set externally
         self.limit = exp_limit
         self.attachment = exp_attachment
         self.detachment = exp_limit + exp_attachment

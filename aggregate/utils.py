@@ -6,18 +6,13 @@ from IPython.core.display import HTML, display
 import logging
 import logging.handlers
 import itertools
-# import os
-# import seaborn as sns
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 from io import StringIO
 import re
-from pathlib import Path
 from time import time_ns
-
-# import warnings
 
 # logging
 # June 2022 got rid of file logging
@@ -27,7 +22,7 @@ from time import time_ns
 # LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
 # approved method is call (__name__)
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # if len(logger.handlers) == 0:

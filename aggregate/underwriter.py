@@ -99,22 +99,18 @@ Etc. etc.
 
 """
 
-import os
 import numpy as np
-# from IPython.core.display import display
-# from collections import Iterable
-# from .utils import html_title
 import logging
 import pandas as pd
 from pathlib import Path
-import re
 from inspect import signature
+from pprint import PrettyPrinter
 
 from .port import Portfolio
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
 
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger(__name__)
 
 
 class Underwriter(object):
@@ -129,7 +125,7 @@ class Underwriter(object):
 
     """
 
-    data_types = ['portfolio', 'aggregate', 'severity']
+    data_types = ['port', 'agg', 'sev']
 
     def __init__(self, name='Rory', databases=None, glob=None, store_mode=True, update=False,
                  log2=10, debug=False, create_all=False):
@@ -142,7 +138,7 @@ class Underwriter(object):
         is created it it does not exist); other entires treated as db names in home() / agg are then loaded.
         Databases not in site directory must be fully qualified path names.
         :param glob: reference, e.g. to globals(), used to resolve meta.XX references
-        :param store_mode: add newly created aggregates to the database?
+        :param store_mode: add newly created aggregates to the uw knowledge?
         :param update:
         :param log2:
         :param debug: run parser in debug mode
@@ -160,9 +156,11 @@ class Underwriter(object):
         self.lexer = UnderwritingLexer()
         self.parser = UnderwritingParser(self._safe_lookup, debug)
         # stop pyCharm complaining
-        self.severity = {}
-        self.aggregate = {}
-        self.portfolio = {}
+        # knowledge - accounts and line known to the underwriter
+        self._knowledge = {}
+        # self.severity = {}
+        # self.aggregate = {}
+        # self.portfolio = {}
 
         if databases == 'all':
             databases = ['default', 'site']
@@ -212,7 +210,7 @@ class Underwriter(object):
         except FileNotFoundError:
             logger.warning(f'Requested database {db_path.name} not found. Ignoring.')
         # read in, parse, save to sev/agg/port dictionaries
-        self.preprocess_and_parse_program(program)
+        self.interpret_program(program)
 
     def __getitem__(self, item):
         """
@@ -225,31 +223,21 @@ class Underwriter(object):
         :return:
         """
         # much less fancy version:
-        obj = self.portfolio.get(item, None)
-        if obj is not None:
-            logger.debug(f'Underwriter.__getitem__ | found {item} of type port')
-            return 'port', obj
-        obj = self.aggregate.get(item, None)
-        if obj is not None:
-            logger.debug(f'Underwriter.__getitem__ | found {item} of type agg')
-            return 'agg', obj
-        obj = self.severity.get(item, None)
-        if obj is not None:
-            logger.debug(f'Underwriter.__getitem__ | found {item} of type sev')
-            return 'sev', obj
+        for kind in self.data_types:
+            obj = self._knowledge.get((kind, item), None)
+            if obj is not None:
+                logger.debug(f'Underwriter.__getitem__ | found {item} of type {kind}')
+                return kind, obj
         raise LookupError(f'Item {item} not found in any database')
 
     def _repr_html_(self):
-        s = [f'<h1>Underwriter {self.name}</h1>']
-        s.append(
-            f'Underwriter expert in all classes including {len(self.severity)} severities, {len(self.aggregate)} aggregates'
-            f' and {len(self.portfolio)} portfolios<br>')
-        for what in ['severity', 'aggregate', 'portfolio']:
-            s.append(f'<b>{what.title()}</b>: ')
-            s.append(', '.join([k for k in sorted(getattr(self, what).keys())]))
-            s.append('<br>')
+        s = [f'<h1>Underwriter Knowledge</h1>',
+             f'Underwriter {self.name} has knowledge of {len(self._knowledge)} portfolios, '
+             f'aggregate units, and severities:<br>']
+        s.append(', '.join([f'{n} ({k})' for (k, n), v in
+                            sorted(self._knowledge.items())]))
         s.append(f'<h3>Settings</h3>')
-        for k in ['update', 'log2', 'store_mode', 'last_spec', 'create_all']:
+        for k in ['name', 'update', 'log2', 'store_mode', 'last_spec', 'create_all']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
@@ -261,6 +249,19 @@ class Underwriter(object):
         :return:
         """
         return self.write(portfolio_program, **kwargs)
+
+    @property
+    def knowledge(self):
+        """
+        Return the knowledge as a nice dataframe
+
+        :return:
+        """
+        df = pd.DataFrame(self._knowledge.values(),
+                          columns=['program'],
+                          index=pd.MultiIndex.from_tuples(self._knowledge.keys(),
+                                                          names=['kind', 'name']))
+        return df
 
     def list(self):
         """
@@ -339,7 +340,7 @@ class Underwriter(object):
         :return:
         """
 
-        self.preprocess_and_parse_program(portfolio_program)
+        self.interpret_program(portfolio_program)
 
         # if globs replace all meta objects with a lookup object
         # copy from code below FRAGILE
@@ -458,101 +459,107 @@ class Underwriter(object):
         # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
-        create_all = kwargs.get('create_all', self.create_all)
-        update = kwargs.get('update', self.update)
+        if 'create_all' in kwargs:
+            create_all = kwargs['create_all']
+            del kwargs['create_all']
+        else:
+            create_all = self.create_all
+
+        if 'update' in kwargs:
+            update = kwargs['update']
+            del kwargs['update']
+        else:
+            update = self.update
+
         if update is True and log2 == 0:
             log2 = self.log2
 
         # first see if portfolio_program refers to a built-in object
-        _type = ''
+        kind = ''
         obj = None
         try:
-            _type, obj = self.__getitem__(portfolio_program)
+            kind, obj = self.__getitem__(portfolio_program)
         except LookupError:
             logger.debug(f'underwriter.write | object not found, will process as program')
         else:
             logger.debug(f'underwriter.write | object found, returning object')
-            if _type == 'agg':
+            if kind == 'agg':
                 obj = Aggregate(**obj)
                 if update:
                     obj.easy_update(log2, bs)
                 return obj
-            elif _type == 'port':
+            elif kind == 'port':
                 # actually make the object
                 obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
                 if update is True:
                     obj.update(log2=log2, bs=bs, **kwargs)
                     logger.debug(f"Underwriter.write | updating Portfolio {portfolio_program} log2={log2}, bs={bs}")
                 return obj
-            elif _type == 'sev':
+            elif kind == 'sev':
                 if 'sev_wt' in obj:
                     del obj['sev_wt']
                 return Severity(**obj)
             else:
-                ValueError(f'Cannot build {_type} objects')
+                ValueError(f'Cannot build {kind} objects')
             print('NEVER GET HERE??? ' * 10)
             return obj
 
         # if you fall through to here then the portfolio_program did not refer to a built in object
         # run the program
-        self.preprocess_and_parse_program(portfolio_program)
+        self.interpret_program(portfolio_program)
 
         # if globs, replace all meta objects with a lookup object
         if self.glob is not None:
             logger.debug(f'Underwriter.write | Resolving globals')
-            for a in list(self.parser.agg_out_dict.values()) + list(self.parser.sev_out_dict.values()):
-                if a['sev_name'][0:4] == 'meta':
-                    logger.debug(f'Underwriter.write | Resolving {a["sev_name"]}')
-                    obj_name = a['sev_name'][5:]
-                    try:
-                        obj = self.glob[obj_name]
-                    except NameError as e:
-                        print(f'Object {obj_name} passed as a meta object cannot be found in glob.')
-                        raise e
-                    a['sev_name'] = obj
-                    logger.debug(f'Underwriter.write | {a["sev_name"]} ({type(a)} reference to {obj_name} '
-                                 f'replaced with object {obj.name} from glob')
+            for (k, n), v in self.parser.out_dict.items():
+                if k in ['sev', 'agg']:
+                    if v['sev_name'][0:4] == 'meta':
+                        logger.debug(f'Underwriter.write | Resolving {v["sev_name"]}')
+                        obj_name = v['sev_name'][5:]
+                        try:
+                            obj = self.glob[obj_name]
+                        except NameError as e:
+                            print(f'Object {obj_name} passed as a meta object cannot be found in glob.')
+                            raise e
+                        v['sev_name'] = obj
+                        logger.debug(f'Underwriter.write | {v["sev_name"]} ({k} reference to {obj_name} '
+                                     f'replaced with object {obj.name} from glob.')
             logger.debug(f'Underwriter.write | Done resolving globals')
 
         # create objects
         # 2019-11: create all objects not just the portfolios if create_all==True
         # rv = return values
         rv = None
-        if len(self.parser.port_out_dict) > 0:
+        if len(self.parser.out_dict) > 0:
             # create ports
             rv = {}
-            for k in self.parser.port_out_dict.keys():
+            # parser.out_dict is indexed by (kind, name) and contains the defining dictionary
+            # PrettyPrinter().pprint(self.parser.out_dict)
+            for (kind, name), v in self. parser.out_dict.items():
                 # remember the spec comes back as a list of aggs that have been entered into the uw
-                obj = Portfolio(k, [self[v][1] for v in self.portfolio[k]['spec']])
-                obj.program = 'unknown'
-                if update is True:
-                    obj.update(log2=log2, bs=bs, **kwargs)
-                    logger.debug(f"Underwriter.write | updating Portfolio {obj.name} log2={log2}, bs={bs}")
-                rv[k] = obj
-            if len(self.parser.port_out_dict) == 1:
-                # only one portfolio so we can set its program
-                obj.program = portfolio_program
-
-        if len(self.parser.agg_out_dict) > 0 and create_all:
-            # new aggs, create them
-            if rv is None:
-                rv = {}
-            for k, v in self.parser.agg_out_dict.items():
-                obj = Aggregate(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
-                if update:
-                    obj.easy_update(log2)
-                rv[k] = obj
-
-        if len(self.parser.sev_out_dict) > 0 and create_all:
-            # new sevs, create them
-            if rv is None:
-                rv = {}
-            for v in self.parser.sev_out_dict.values():
-                if 'sev_wt' in v:
-                    del v['sev_wt']
-                obj = Severity(**v)
-                # TODO: wow, that's a weirdly specific subindex...WHY?
-                rv[f'sev_{obj.__repr__()[38:54]}'] = obj
+                if kind == 'port':
+                    obj = Portfolio(name, v) #  [self[v][1] for v in self.portfolio[k]['spec']])
+                    if update is True:
+                        obj.update(log2=log2, bs=bs, **kwargs)
+                        logger.debug(f"Underwriter.write | updating Portfolio {obj.name} log2={log2}, bs={bs}")
+                    rv[(kind, name)] = obj
+                elif kind == 'agg':
+                    if create_all is True:
+                        if rv is None:
+                            rv = {}
+                        obj = Aggregate(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
+                        if update:
+                            obj.easy_update(log2)
+                        rv[(kind, name)] = obj
+                elif kind == 'sev':
+                    if create_all is True:
+                        if rv is None:
+                            rv = {}
+                        # this gets added by the parser but is not wanted! 
+                        if 'sev_wt' in v:
+                            del v['sev_wt']
+                        obj = Severity(**v)  # k, **{kk: vv for kk, vv in v.items() if kk != 'name'})
+                        rv[(kind, name)] = obj
 
         # report on what has been done
         if rv is None:
@@ -560,10 +567,7 @@ class Underwriter(object):
             logger.warning(f'Underwriter.write | Program did not contain any output')
         else:
             if len(rv):
-                logger.info(f'Underwriter.write | Program created {len(rv)} objects and '
-                            f'defined {len(self.parser.port_out_dict)} Portfolio(s), '
-                            f'{len(self.parser.agg_out_dict)} Aggregate(s), and '
-                            f'{len(self.parser.sev_out_dict)} Severity(ies)')
+                logger.info(f'Underwriter.write | Program created {len(rv)} objects.')
             if len(rv) == 1:
                 # dict, pop the last (only) element
                 rv = rv.popitem()[1]
@@ -585,80 +589,52 @@ class Underwriter(object):
         portfolio_program = Path(file_name).read_text(encoding='utf-8')
         return self.write(portfolio_program, log2=log2, bs=bs, update=update, **kwargs)
 
-    def preprocess_and_parse_program(self, portfolio_program):
+    def interpret_program(self, portfolio_program):
         """
-        preprocessing:
-            remove \n in [] (vectors) e.g. put by f{np.linspace} TODO only works for 1d vectors
-            ; mapped to newline
-            backslash (line continuation) mapped to space
-            split on newlines
-            parse one line at a time
-            PIPE format no longer supported
+        Preprocess and then parse one line at a time.
 
-        error handling and piping through parser
+        Error handling through parser.
+
+        Old parse_portfolio_program replaced with build.interpret_one and interpret_test,
+        and running write with
 
         :param portfolio_program:
         :return:
         """
-        # Preprocess ---------------------------------------------------------------------
-        # handle \n in vectors; first item is outside, then inside... (multidimensional??)
-        # remove comments // xxx
-        # Can't have comments with # used for location shift
-        portfolio_program = re.sub(r'\s*//[^\n]*\n', r'\n', portfolio_program)
-        out_in = re.split(r'\[|\]', portfolio_program)
-        assert len(out_in) % 2  # must be odd
-        odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
-        even = out_in[0::2]  # otherwise pass through
-        # reassemble
-        portfolio_program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
-        # other preprocessing: line continuation; \n\t or \n____ to space (for port indents),
-        # ; to new line, split on new line
-        portfolio_program = [i.strip() for i in portfolio_program.replace('\\\n', ' ').
-            replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n').
-            split('\n') if len(i.strip()) > 0]
 
-        # Parse      ---------------------------------------------------------------------
+        # Preprocess ---------------------------------------------------------------------
+        portfolio_program = UnderwritingLexer.preprocess(portfolio_program)
+
+        # Parse and Postprocess-----------------------------------------------------------
+        rv = {}
         self.parser.reset()
         for program_line in portfolio_program:
-            # print(program_line)
+            logger.debug(program_line)
+            # preprocessor only returns lines of length > 0
             try:
-                if len(program_line) > 0:
-                    self.parser.parse(self.lexer.tokenize(program_line))
+                # parser returns the type and name of the object
+                kind, name = self.parser.parse(self.lexer.tokenize(program_line))
             except ValueError as e:
                 if isinstance(e.args[0], str):
-                    print(e)
+                    logger.error(e)
                     raise e
                 else:
                     t = e.args[0].type
                     v = e.args[0].value
                     i = e.args[0].index
                     txt2 = program_line[0:i] + f'>>>' + program_line[i:]
-                    print(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    logger.error(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
-
-        # Postprocess --------------------------------------------------------------------
-        if self.store_mode:
-            # could do this with a loop and getattr but it is too hard to read, so go easy route
-            if len(self.parser.sev_out_dict) > 0:
-                # for k, v in self.parser.sev_out_dict.items():
-                self.severity.update(self.parser.sev_out_dict)  # [k] = v
-                logger.debug(
-                    f'Underwriter.preprocess_and_parse_program | saving {self.parser.sev_out_dict.keys()} severity/ies')
-            if len(self.parser.agg_out_dict) > 0:
-                # for k, v in self.parser.agg_out_dict.items():
-                #     self.aggregate[k] = v
-                self.aggregate.update(self.parser.agg_out_dict)
-                logger.debug(
-                    f'Underwriter.preprocess_and_parse_program | saving {self.parser.agg_out_dict.keys()} aggregate(s)')
-            if len(self.parser.port_out_dict) > 0:
-                for k, v in self.parser.port_out_dict.items():
-                    # v is a list of aggregate names, these have all been added to the database...
-                    logger.debug(f'Underwriter.preprocess_and_parse_program | saving {k} portfolio')
-                    self.portfolio[k] = {'spec': v['spec'], 'arg_dict': {}}
-                    # self.portfolio[k] = {'spec': [self.aggregate[_a] for _a in v], 'arg_dict': {}}
-        # can we still do something like this?
-        #     self.parser.arg_dict['note'] = txt
-        return
+            else:
+                logger.info(f'{kind} object {name} parsed successfully' +
+                            (f', adding to uw object' if self.store_mode else
+                             f', adding to rv'))
+                # if in store_mode, add the program to uw dictionaries
+                if self.store_mode:
+                    self._knowledge[(kind, name)] = program_line
+                else:
+                    rv[name] = (kind, self.parser.out_dict[(kind, name)])
+        return rv
 
     @staticmethod
     def add_defaults(dict_in, kind='agg'):
@@ -712,6 +688,13 @@ class Underwriter(object):
         if found_type != expected_type:
             raise ValueError(f'Error: type of {uw_id} is  {found_type}, not expected {expected_type}')
         return found_dict.copy()
+
+
+def safelookup(val):
+    """ for debugging """
+    s = f'LOOKUP {val}'
+    return {'sev_name': 'BUILTIN', 'sev_a': val}
+
 
 
 class Build(object):
@@ -775,6 +758,77 @@ class Build(object):
         return out
 
     __call__ = build
+
+    @staticmethod
+    def interpreter_test(where='', filename='C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv'):
+        """
+        Run a suite of test programs. For detailed analysis, run_one.
+
+        """
+        df = pd.read_csv(filename, index_col=0)
+        if where != '':
+            df = df.loc[df.index.str.match(where)]
+
+        lexer = UnderwritingLexer()
+        parser = UnderwritingParser(safelookup, False)
+        ans = {}
+        errs = 0
+        no_errs = 0
+        # detect non-trivial change
+        f = lambda x, y: '' if x.replace(' ', '') == y.replace(' ', '').replace('\t', '') else y
+        for k, v in df.iterrows():
+            parser.reset()
+            v_in = v[0]
+            v = lexer.preprocess(v_in)
+            if len(v) == 1:
+                v = v[0]
+                try:
+                    kind, obj = parser.parse(lexer.tokenize(v))
+                except (ValueError, TypeError) as e:
+                    kind = 'error'
+                    obj = str(e)
+                    errs += 1
+                else:
+                    no_errs += 1
+                ans[k] = [kind, obj, v, f(v, v_in)]
+            elif len(v) > 1:
+                logger.info(f'{v_in} preprocesses to {len(v)} lines; not processing.')
+                ans[k] = ['multiline', None, v, v_in]
+            else:
+                logger.info(f'{v_in} preprocesses to a blank line; ignoring.')
+                ans[k] = ['blank', None, v, v_in]
+
+        print((f'No errors reported.\n' if errs == 0 else f'{errs} errors reported.\n') +
+              f'{no_errs} programs parsed successfully.')
+        df_out = pd.DataFrame(ans, index=['type', 'name', 'program', 'raw_input']).T
+        display(df_out)
+        return df_out, errs, ans
+
+    @staticmethod
+    def interpret_one(v):
+        """
+        Interpret single test in debug mode.
+        """
+        lexer = UnderwritingLexer()
+        parser = UnderwritingParser(safelookup, True)
+        print(f'Interpret one test\n{v}')
+        print('='*len(v))
+        v1 = lexer.preprocess(v)
+        if len(v1) > 1:
+            logger.error('Input program contains more than one entry. Only interpreting the first...interpret_**one**')
+        v1 = v1[0]
+        if v1 != v:
+            print(f'Preprocessed input:\n{v1}')
+        parser.reset()
+        try:
+            kind, name = parser.parse(lexer.tokenize(v1))
+        except ValueError as e:
+            print('!!!!!!! Value Error !!!!!!!' * 4)
+            raise e
+
+        pp = PrettyPrinter().pprint
+        print(f'\nFound {kind} object {name}')
+        pp(parser.out_dict[(kind, name)])
 
 
 # exported item

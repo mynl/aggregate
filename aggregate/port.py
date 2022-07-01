@@ -45,7 +45,7 @@ from .utils import ft, \
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
 
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger(__name__)
 
 
 # debug

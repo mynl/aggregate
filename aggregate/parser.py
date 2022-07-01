@@ -336,9 +336,8 @@ from sly import Lexer, Parser
 import sly
 import logging
 import numpy as np
-import warnings
 from numpy import exp
-import pandas as pd
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -442,9 +441,46 @@ class UnderwritingLexer(Lexer):
         print(f"Illegal character '{t.value[0]:s}'")
         self.index += 1
 
+    @staticmethod
+    def preprocess(program):
+        """
+        Separate preprocessor step so it can be called separately.
+
+        preprocessing:
+            remove // comments, through end of line
+            remove \n in [] (vectors) e.g. put by f{np.linspace} TODO only works for 1d vectors
+            ; mapped to newline
+            backslash (line continuation) mapped to space
+            split on newlines
+
+        :param program:
+        :return:
+        """
+
+        # handle \n in vectors; first item is outside, then inside... (multidimensional??)
+        out_in = re.split(r'\[|\]', program)
+        assert len(out_in) % 2  # must be odd
+        odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
+        even = out_in[0::2]  # otherwise pass through
+        # reassemble
+        program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
+
+        # remove comments C++-style // xxx (can't have comments with # used for location shift)
+        # must replace comments before changing other \ns
+        program = re.sub(r'//[^\n]*$', r'\n', program, flags=re.MULTILINE)
+
+        #  preprocessing: line continuation; \n\t or \n____ to space (for port agg element indents),
+        # ; to new line, split on new line
+        program = program.replace('\\\n', ' '). replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n')
+
+        # split program into lines, only accept len > 0
+        program = [i.strip() for i in program.split('\n') if len(i.strip()) > 0]
+        return program
+
 
 class UnderwritingParser(Parser):
-    debugfile = 'c:\\temp\\parser.out'
+    # uncomment to write detailed grammar rules
+    # debugfile = 'c:\\temp\\parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
         ('left', LOCATION_ADD),
@@ -459,10 +495,7 @@ class UnderwritingParser(Parser):
 
     def __init__(self, safe_lookup_function, debug=False):
         self.debug = debug
-        self.arg_dict = None
-        self.sev_out_dict = None
-        self.agg_out_dict = None
-        self.port_out_dict = None
+        self.out_dict = None
         self.reset()
         # instance of uw class to look up severities
         self._safe_lookup = safe_lookup_function
@@ -486,9 +519,7 @@ class UnderwritingParser(Parser):
 
     def reset(self):
         # TODO Add sev_xs and sev_ps !!
-        self.sev_out_dict = {}
-        self.agg_out_dict = {}
-        self.port_out_dict = {}
+        self.out_dict = {}
 
     @staticmethod
     def _check_vectorizable(value):
@@ -506,31 +537,31 @@ class UnderwritingParser(Parser):
     def answer(self, p):
         self.logger(
             f'answer <-- sev_out, created severity {p.sev_out}', p)
-        return p.sev_out
+        return 'sev', p.sev_out
 
     @_('agg_out')
     def answer(self, p):
         self.logger(
             f'answer <-- agg_out, created aggregate {p.agg_out}', p)
-        return self.agg_out_dict[p.agg_out]
+        return 'agg', p.agg_out
 
     @_('port_out')
     def answer(self, p):
         self.logger(f'answer <-- port_out, created portfolio {p.port_out} '
-                    f'with {len(self.port_out_dict[p.port_out]["spec"])} aggregates', p)
-        return p.port_out
+                    f'with {len(self.out_dict[("port", p.port_out)]["spec"])} aggregates', p)
+        return 'port', p.port_out
 
     @_('expr')
     def answer(self, p):
         self.logger(f'answer <-- expr {p.expr} ', p)
-        return p.expr
+        return 'expr', p.expr
 
     # building portfolios =======================================
     @_('port_name note agg_list')
     def port_out(self, p):
         self.logger(
             f'port_out <-- port_name note agg_list', p)
-        self.port_out_dict[p.port_name] = {'spec': p.agg_list, 'note': p.note}
+        self.out_dict[("port", p.port_name)] = {'spec': p.agg_list, 'note': p.note}
         return p.port_name
 
     @_('agg_list agg_out')
@@ -554,7 +585,7 @@ class UnderwritingParser(Parser):
         if 'name' in p.builtin_aggregate:
             # otherwise will overwrite the agg name
             del p.builtin_aggregate['name']
-        self.agg_out_dict[p.agg_name] = {
+        self.out_dict[("agg", p.agg_name)] = {
             'name': p.agg_name, **p.builtin_aggregate, 'note': p.note}
         return p.agg_name
 
@@ -562,7 +593,7 @@ class UnderwritingParser(Parser):
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- agg_name exposures layers SEV sev occ_reins freq agg_reins note', p)
-        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.exposures, **p.layers, **p.sev,
+        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.exposures, **p.layers, **p.sev,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
         return p.agg_name
 
@@ -574,7 +605,7 @@ class UnderwritingParser(Parser):
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- agg_name exposures layers dsev occ_reins freq agg_reins note', p)
-        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.exposures, **p.layers, **p.dsev,
+        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.exposures, **p.layers, **p.dsev,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
         return p.agg_name
 
@@ -588,7 +619,7 @@ class UnderwritingParser(Parser):
     # DEF agg_out(self, p):
     #     self.logger(
     #         f'agg_out <-- agg_name dfreq layers SEV sev occ_reins agg_reins note', p)
-    #     self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.dfreq,  **p.sev,
+    #     self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.dfreq,  **p.sev,
     #                                      **p.occ_reins, **p.agg_reins, 'note': p.note}
     #     return p.agg_name
 
@@ -597,7 +628,7 @@ class UnderwritingParser(Parser):
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- agg_name dfreq dsev occ_reins note', p)
-        self.agg_out_dict[p.agg_name] = {'name': p.agg_name, **p.dfreq, **p.dsev,
+        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.dfreq, **p.dsev,
                                          **p.occ_reins, 'note': p.note}
         return p.agg_name
 
@@ -607,14 +638,16 @@ class UnderwritingParser(Parser):
         self.logger(
             f'sev_out <-- sev_out sev_name sev note', p)
         p.sev['note'] = p.note
-        self.sev_out_dict[p.sev_name] = p.sev
+        self.out_dict[("sev", p.sev_name)] = p.sev
+        return 'sev', p.sev_name
 
     @_('sev_name sev note')
     def sev_out(self, p):
         self.logger(
             f'sev_out <-- sev_name sev note ', p)
         p.sev['note'] = p.note
-        self.sev_out_dict[p.sev_name] = p.sev
+        self.out_dict[("sev", p.sev_name)] = p.sev
+        return p.sev_name
 
     # frequency term ==========================================
     # for all frequency distributions claim count is determined by exposure / severity
@@ -650,7 +683,7 @@ class UnderwritingParser(Parser):
         self.logger(
             f'freq <-- FREQ expr expr', p)
         if p.FREQ != 'pascal':
-            warnings.warn(
+            logger.warn(
                 f'Illogical choice of frequency {p.FREQ}, expected pascal')
         return {'freq_name': p.FREQ, 'freq_a': p[1], 'freq_b': p[2]}
 
@@ -660,7 +693,7 @@ class UnderwritingParser(Parser):
         self.logger(
             f'freq <-- FREQ expr', p)
         if p.FREQ != 'binomial':
-            warnings.warn(
+            logger.warn(
                 f'Illogical choice of frequency {p.FREQ}, expected binomial')
         return {'freq_name': p.FREQ, 'freq_a': p.expr}
 
@@ -1171,88 +1204,6 @@ class UnderwritingParser(Parser):
             raise ValueError(p)
         else:
             raise ValueError('Unexpected end of file')
-
-
-def safelookup(val):
-    """ for debugging """
-    s = f'LOOKUP {val}'
-    return {'sev_name': 'BUILTIN', 'sev_a': val}
-
-
-def run_tests(where='', debug=False):
-    """
-    Run a bunch of tests
-    """
-    df = pd.read_csv(
-        'C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv', index_col=0)
-    if where != '':
-        df = df.loc[df.index.str.match(where)]
-
-    lexer = UnderwritingLexer()
-    parser = UnderwritingParser(safelookup, debug)
-    from pprint import PrettyPrinter
-    pp = PrettyPrinter().pprint
-    ans = {}
-    errs = []
-    if debug is True:
-        for k, v in df.iterrows():
-            v = v[0]
-            print(v)
-            print('='*len(v))
-
-            parser.reset()
-            try:
-                x = parser.parse(lexer.tokenize(v))
-            except ValueError as e:
-                print('!!!!!!!!!!!!!!!!!!!!!!!!'*4)
-                print('!!!!!!! Value Error !!!!' * 4)
-                print('!!!!!!!!!!!!!!!!!!!!!!!!'*4)
-                x = e
-            if x is not None:
-                pp(x)
-            else:
-                pp(parser.agg_out_dict[k])
-        return errs, ans
-    else:
-        for k, v in df.iterrows():
-            parser.reset()
-            x = None
-            v = v[0]
-            try:
-                x = parser.parse(lexer.tokenize(v))
-            except (ValueError, TypeError) as e:
-                errs.append([k, type(e)])
-            ans[k] = x
-        if len(errs) > 0:
-            print(f'Errors reported:')
-            pp(errs)
-        else:
-            print('No errors reported')
-        return errs, ans
-
-
-def run_one(v):
-    """
-    run single test in debug mode, you enter id as k and program as v
-    """
-    lexer = UnderwritingLexer()
-    parser = UnderwritingParser(safelookup, True)
-    from pprint import PrettyPrinter
-    pp = PrettyPrinter().pprint
-    print(v)
-    print('='*len(v))
-    parser.reset()
-    try:
-        x = parser.parse(lexer.tokenize(v))
-    except ValueError as e:
-        print('!!!!!!!!!!!!!!!!!!!!!!!!' * 4)
-        print('!!!!!!! Value Error !!!!' * 4)
-        print('!!!!!!!!!!!!!!!!!!!!!!!!' * 4)
-        x = e
-    if x is not None:
-        pp(x)
-    else:
-        pp(parser.agg_out_dict[k])
 
 
 def grammar(add_to_doc=False):

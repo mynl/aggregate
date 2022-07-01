@@ -11,11 +11,11 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from io import StringIO
 import pandas as pd
-from . utils import axiter_factory, suptitle_and_tight
+from . utils import axiter_factory
 from textwrap import fill
 import logging
 
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger(__name__)
 
 class Distortion(object):
     """

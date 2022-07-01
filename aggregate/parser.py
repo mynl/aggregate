@@ -344,7 +344,7 @@ logger = logging.getLogger(__name__)
 
 class UnderwritingLexer(Lexer):
 
-    tokens = {ID, BUILTINID, NOTE,
+    tokens = {ID, AGG_BUILTIN, SEV_BUILTIN, PORT_BUILTIN, META_BUILTIN, NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
               PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
@@ -364,7 +364,10 @@ class UnderwritingLexer(Lexer):
     # per manual, need to list longer tokens before shorter ones
     # simple but effective notes
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    AGG_BUILTIN = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    SEV_BUILTIN = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    META_BUILTIN = r'meta\.[a-zA-Z][a-zA-Z0-9_:~]*'
     FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.

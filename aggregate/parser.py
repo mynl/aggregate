@@ -40,18 +40,20 @@ answer              	::= sev_out
                     	 | port_out
                     	 | expr
 
-port_out            	::= port_name note agg_list
+port_out            	::= PORT name note agg_list
 
 agg_list            	::= agg_list agg_out
                     	 | agg_out
 
-agg_out             	::= agg_name builtin_aggregate note
-                    	 | agg_name exposures layers SEV sev occ_reins freq agg_reins note
-                    	 | agg_name exposures layers dsev occ_reins freq agg_reins note
-                    	 | agg_name dfreq dsev occ_reins note
+agg_out             	::= AGG name builtin_agg note
+                    	 | AGG name exposures layers SEV sev occ_reins freq agg_reins note
+                    	 | AGG name exposures layers builtin_sev occ_reins freq agg_reins note
+                    	 | AGG name exposures layers dsev occ_reins freq agg_reins note
+                    	 | AGG name dfreq dsev occ_reins note
+                    	 | builtin_agg agg_reins note
 
-sev_out             	::= sev_out sev_name sev note
-                    	 | sev_name sev note
+sev_out             	::= SEV name sev note
+                    	 | SEV name dsev note
 
 freq                	::= MIXED ID expr expr
                     	 | MIXED ID expr
@@ -78,13 +80,12 @@ reins_clause        	::= expr XS expr
 sev                 	::= sev "!"
                     	 | sev LOCATION_ADD numbers
                     	 | numbers SCALE_MULTIPLY sev
+                    	 | builtin_sev
                     	 | ids numbers CV numbers weights
                     	 | ids numbers weights
                     	 | ids numbers numbers weights
                     	 | ids xps
                     	 | CONSTANT expr
-                    	 | builtinids numbers numbers
-                    	 | builtinids
 
 xps                 	::= XPS doutcomes dprobs
                     	 | 
@@ -113,25 +114,20 @@ exposures           	::= SPECIFIED CLAIMS
                     	 | numbers LOSS
                     	 | numbers PREMIUM AT numbers LR
 
-builtinids          	::= BUILTINID
-
 ids                 	::= "[" idl "]"
                     	 | ID
 
 idl                 	::= idl ID
                     	 | ID
 
-builtin_aggregate   	::= builtin_aggregate_dist TIMES expr
-                    	 | expr TIMES builtin_aggregate_dist
-                    	 | builtin_aggregate_dist
+builtin_agg         	::= expr TIMES builtin_agg
+                    	 | expr SCALE_MULTIPLY builtin_agg
+                    	 | builtin_agg LOCATION_ADD expr
+                    	 | BUILTIN_AGG
 
-builtin_aggregate_dist	::= BUILTINID
+builtin_sev         	::= BUILTIN_SEV
 
-sev_name            	::= SEV ID
-
-agg_name            	::= AGG ID
-
-port_name           	::= PORT ID
+name                	::= ID
 
 numbers             	::= "[" numberl "]"
                     	 | expr
@@ -344,7 +340,7 @@ logger = logging.getLogger(__name__)
 
 class UnderwritingLexer(Lexer):
 
-    tokens = {ID, AGG_BUILTIN, SEV_BUILTIN, PORT_BUILTIN, META_BUILTIN, NOTE,
+    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
               PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
@@ -364,10 +360,9 @@ class UnderwritingLexer(Lexer):
     # per manual, need to list longer tokens before shorter ones
     # simple but effective notes
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    AGG_BUILTIN = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    SEV_BUILTIN = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    META_BUILTIN = r'meta\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    # PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
     FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
@@ -483,7 +478,7 @@ class UnderwritingLexer(Lexer):
 
 class UnderwritingParser(Parser):
     # uncomment to write detailed grammar rules
-    # debugfile = 'c:\\temp\\parser.out'
+    debugfile = 'c:\\temp\\parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
         ('left', LOCATION_ADD),
@@ -501,7 +496,7 @@ class UnderwritingParser(Parser):
         self.out_dict = None
         self.reset()
         # instance of uw class to look up severities
-        self._safe_lookup = safe_lookup_function
+        self.safe_lookup = safe_lookup_function
 
     def logger(self, msg, p):
         if self.debug is False:
@@ -560,12 +555,13 @@ class UnderwritingParser(Parser):
         return 'expr', p.expr
 
     # building portfolios =======================================
-    @_('port_name note agg_list')
+    @_('PORT name note agg_list')
     def port_out(self, p):
         self.logger(
-            f'port_out <-- port_name note agg_list', p)
-        self.out_dict[("port", p.port_name)] = {'spec': p.agg_list, 'note': p.note}
-        return p.port_name
+            f'port_out <-- PORT name note agg_list', p)
+        self.out_dict[("port", p.name)] = {'spec': p.agg_list, 'note': p.note}
+        # print([self.out_dict[('agg', i)] for i in p.agg_list])
+        return p.name
 
     @_('agg_list agg_out')
     def agg_list(self, p):
@@ -581,40 +577,46 @@ class UnderwritingParser(Parser):
         return [p.agg_out]
 
     # building aggregates ========================================
-    @_('agg_name builtin_aggregate note')
+    @_('AGG name builtin_agg note')
     def agg_out(self, p):
+        # for use when you change the agg and need a new name
         self.logger(
-            f'agg_out <-- agg_name builtin_aggregate note', p)
-        if 'name' in p.builtin_aggregate:
-            # otherwise will overwrite the agg name
-            del p.builtin_aggregate['name']
-        self.out_dict[("agg", p.agg_name)] = {
-            'name': p.agg_name, **p.builtin_aggregate, 'note': p.note}
-        return p.agg_name
+            f'agg_out <-- AGG name builtin_aggregate note', p)
+        self.out_dict[("agg", p.name)] = {
+            'name': p.name, **p.builtin_agg, 'note': p.note}
+        return p.name
 
-    @_('agg_name exposures layers SEV sev occ_reins freq agg_reins note')
+    @_('AGG name exposures layers SEV sev occ_reins freq agg_reins note')
     def agg_out(self, p):
         self.logger(
-            f'agg_out <-- agg_name exposures layers SEV sev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.exposures, **p.layers, **p.sev,
+            f'agg_out <-- AGG name exposures layers SEV sev occ_reins freq agg_reins note', p)
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.sev,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-        return p.agg_name
+        return p.name
+
+    @_('AGG name exposures layers builtin_sev occ_reins freq agg_reins note')
+    def agg_out(self, p):
+        self.logger(
+            f'agg_out <-- AGG name exposures layers builtin_sev occ_reins freq agg_reins note', p)
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.builtin_sev,
+                                         **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
+        return p.name
 
     # separate treatment of dsev forbids 3 @ dsev # 4; that is also not handled for xps sevs
     # though it does parse. But with this separate treatment you do not need the sev keyword
     # if sev <-- dsev then in use you'd need sev dsev [1] which is no net gain.
 
-    @_('agg_name exposures layers dsev occ_reins freq agg_reins note')
+    @_('AGG name exposures layers dsev occ_reins freq agg_reins note')
     def agg_out(self, p):
         self.logger(
-            f'agg_out <-- agg_name exposures layers dsev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.exposures, **p.layers, **p.dsev,
+            f'agg_out <-- AGG name exposures layers dsev occ_reins freq agg_reins note', p)
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.dsev,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-        return p.agg_name
+        return p.name
 
     # AMBIGUOUS: net of 3 x 2 ?? occ or agg? and dfreq [1 2] [2 4], is 2 4 the probs
     # or the start of exposure layering.
-    # at_('agg_name dfreq layers SEV sev occ_reins agg_reins note')
+    # at_('name dfreq layers SEV sev occ_reins agg_reins note')
     # to the general with dfreq use specified claims and put freq term at the end.
     # for reinstatements modeing with occ re may be useful, hence could have the
     # following but doesn't seem worth it. Encourage specified
@@ -627,30 +629,49 @@ class UnderwritingParser(Parser):
     #     return p.agg_name
 
     # as above, can't have layers and can't have occ and agg without a split
-    @_('agg_name dfreq dsev occ_reins note')
+    @_('AGG name dfreq dsev occ_reins note')
     def agg_out(self, p):
         self.logger(
-            f'agg_out <-- agg_name dfreq dsev occ_reins note', p)
-        self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.dfreq, **p.dsev,
+            f'agg_out <-- AGG name dfreq dsev occ_reins note', p)
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.dsev,
                                          **p.occ_reins, 'note': p.note}
-        return p.agg_name
+        return p.name
+
+    @_('builtin_agg agg_reins note')
+    def agg_out(self, p):
+        # no change to the built in agg, allows agg.A as a legitimate agg (called A)
+        self.logger(
+            f'agg_out <-- builtin_agg agg_reins note', p)
+        # print(p.builtin_agg)
+        self.out_dict[("agg", p.builtin_agg['name'])] = {**p.builtin_agg, **p.agg_reins, 'note': p.note}
+        return p.builtin_agg['name']
 
     # building severities ======================================
-    @_('sev_out sev_name sev note')
-    def sev_out(self, p):
-        self.logger(
-            f'sev_out <-- sev_out sev_name sev note', p)
-        p.sev['note'] = p.note
-        self.out_dict[("sev", p.sev_name)] = p.sev
-        return 'sev', p.sev_name
+    # @_('SEV name sev_name sev note')
+    # def sev_out(self, p):
+    #     self.logger(
+    #         f'sev_out <-- sev_out sev_name sev note', p)
+    #     p.sev['note'] = p.note
+    #     self.out_dict[("sev", p.sev_name)] = p.sev
+    #     return 'sev', p.sev_name
 
-    @_('sev_name sev note')
+    @_('SEV name sev note')
     def sev_out(self, p):
         self.logger(
-            f'sev_out <-- sev_name sev note ', p)
+            f'sev_out <-- sev ID sev note ', p)
+        p.sev['name'] = p.name
         p.sev['note'] = p.note
-        self.out_dict[("sev", p.sev_name)] = p.sev
-        return p.sev_name
+        self.out_dict[("sev", p.name)] = p.sev
+        return p.name
+
+    @_('SEV name dsev note')
+    def sev_out(self, p):
+        self.logger(
+            f'sev_out <-- sev ID dsev note ', p)
+        p.dsev['name'] = p.name
+        p.dsev['note'] = p.note
+        self.out_dict[("sev", p.name)] = p.dsev
+        return p.name
 
     # frequency term ==========================================
     # for all frequency distributions claim count is determined by exposure / severity
@@ -800,19 +821,13 @@ class UnderwritingParser(Parser):
 
     @_('sev LOCATION_ADD numbers')
     def sev(self, p):
+        # will need to use ugly sev LOCATION_ADD -number
         self.logger(f'sev <-- sev LOCATION_ADD numbers', p)
         p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
             p.sev.get('sev_loc', 0))
         p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
         p.sev['sev_loc'] += p.numbers
         return p.sev
-
-    # must be sev LOCATION_ADD -number
-    # @_('sev MINUS numbers')
-    # def sev(self, p):
-    #     self.logger(f'sev <-- sev MINUS numbers', p)
-    #     p.sev['sev_loc'] = p.sev.get('sev_loc', 0) - p.numbers
-    #     return p.sev
 
     @_('numbers SCALE_MULTIPLY sev')
     def sev(self, p):
@@ -822,7 +837,7 @@ class UnderwritingParser(Parser):
             p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(
                 p.sev.get('sev_mean', 0))
             p.sev['sev_mean'] *= p.numbers
-        # only scale scale if there is a scale (otherwise you double count)
+        # only scale if there is a scale (otherwise you double count)
         if 'sev_scale' in p.sev:
             p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(
                 p.sev.get('sev_scale', 0))
@@ -838,6 +853,18 @@ class UnderwritingParser(Parser):
                 p.sev['sev_loc'])
             p.sev['sev_loc'] *= p.numbers
         return p.sev
+
+    @_('builtin_sev')
+    def sev(self, p):
+        # allow sev.NAME to become a sev
+        self.logger('sev <-- builtin_sev', p)
+        if 'name' in p.builtin_sev:
+            # print('NAME IS HERE...', p.builtin_sev)
+            del p.builtin_sev['name']
+        else:
+            # print('WHY IS NAME NOT HERE?', p.builtin_sev)
+            pass
+        return p.builtin_sev
 
     @_('ids numbers CV numbers weights')
     def sev(self, p):
@@ -868,12 +895,6 @@ class UnderwritingParser(Parser):
         self.logger(f'sev <-- CONSTANT expr', p)
         # syntactic sugar to specify a constant severity
         return {'sev_name': 'dhistogram', 'sev_xs': [p.expr], 'sev_ps': [1]}
-
-    # @_('XPS numbers numbers')
-    # def xps(self, p):
-    #     self.logger(
-    #         f'xps <-- XPS numbers numbers', p)
-    #     return {'sev_xs':  p[1], 'sev_ps':  p[2]}
 
     @_('XPS doutcomes dprobs')
     def xps(self, p):
@@ -943,32 +964,32 @@ class UnderwritingParser(Parser):
         self.logger('weights <-- missing weights term', p)
         return 1
 
-    @_('builtinids numbers numbers')
-    def sev(self, p):
-        self.logger(
-            f'sev <-- builtinds numbers numbers (log2={p[1]}, bs={p[2]})', p)
-        requested_type = p.builtinids.split('.')[0]
-        if requested_type == "meta":
-            return {'sev_name': p.builtinids, 'sev_a': p[1], 'sev_b': p[2]}
-        else:
-            raise ValueError(
-                f'Only meta type can be used with arguments, not {p.builtinids}')
-
-    @_('builtinids')
-    def sev(self, p):
-        self.logger(f'sev <-- builtinds', p)
-        # look up ID in uw
-        # it is not accepetable to ask for an agg or port here; they need to be accessed through
-        # meta. E.g. if you request and agg it will overwrite other (freq) variables defined
-        # in the script...
-        requested_type = p.builtinids.split('.')[0]
-        if requested_type not in ("sev", "meta"):
-            raise ValueError(
-                f'built in type must be sev or meta, not {p.builtinids}')
-        if requested_type == 'meta':
-            return {'sev_name': p.builtinids}
-        else:
-            return self._safe_lookup(p.builtinids)
+    # @_('builtinids numbers numbers')
+    # def sev(self, p):
+    #     self.logger(
+    #         f'sev <-- builtinds numbers numbers (log2={p[1]}, bs={p[2]})', p)
+    #     requested_type = p.builtinids.split('.')[0]
+    #     if requested_type == "meta":
+    #         return {'sev_name': p.builtinids, 'sev_a': p[1], 'sev_b': p[2]}
+    #     else:
+    #         raise ValueError(
+    #             f'Only meta type can be used with arguments, not {p.builtinids}')
+    #
+    # @_('builtinids')
+    # def sev(self, p):
+    #     self.logger(f'sev <-- builtinds', p)
+    #     # look up ID in uw
+    #     # it is not accepetable to ask for an agg or port here; they need to be accessed through
+    #     # meta. E.g. if you request and agg it will overwrite other (freq) variables defined
+    #     # in the script...
+    #     requested_type = p.builtinids.split('.')[0]
+    #     if requested_type not in ("sev", "meta"):
+    #         raise ValueError(
+    #             f'built in type must be sev or meta, not {p.builtinids}')
+    #     if requested_type == 'meta':
+    #         return {'sev_name': p.builtinids}
+    #     else:
+    #         return self.safe_lookup(p.builtinids)
 
     # layer terms, optional ===================================
     @_('numbers XS numbers')
@@ -1018,16 +1039,10 @@ class UnderwritingParser(Parser):
             f'exposures <-- numbers PREMIUM AT numbers LR', p)
         return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
 
-    # @_('numbers PREMIUM AT numbers')
-    # def exposures(self, p):
-    #     self.logger(
-    #         f'resolving numbers PREMIUM AT numbers to exposures {p[0]} at {p[3]}', p)
-    #     return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
-
-    @_('BUILTINID')
-    def builtinids(self, p):
-        self.logger(f'buildinids <-- BUILTINID', p)
-        return p.BUILTINID  # will always be treated as a list
+    # @_('BUILTINID')
+    # def builtinids(self, p):
+    #     self.logger(f'buildinids <-- BUILTINID', p)
+    #     return p.BUILTINID  # will always be treated as a list
 
     @_('"[" idl "]"')
     def ids(self, p):
@@ -1054,24 +1069,25 @@ class UnderwritingParser(Parser):
         return p.ID
 
     # elements made from named portfolios ========================
-    @_('builtin_aggregate_dist TIMES expr')
-    def builtin_aggregate(self, p):
+    @_('expr TIMES builtin_agg')
+    def builtin_agg(self, p):
         """  inhomogeneous change of scale """
         self.logger(
-            f'builtin_aggregate <-- builtin_aggregate_dist TIMES expr', p)
-        bid = p.builtin_aggregate_dist
+            f'builtin_aggregate <-- builtin_agg TIMES expr', p)
+        bid = p.builtin_agg.copy()
+        bid['name'] += '_i_scaled'
         bid['exp_en'] = bid.get('exp_en', 0) * p.expr
         bid['exp_el'] = bid.get('exp_el', 0) * p.expr
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
         return bid
 
-    @_('expr TIMES builtin_aggregate_dist')
-    def builtin_aggregate(self, p):
+    @_('expr SCALE_MULTIPLY builtin_agg')
+    def builtin_agg(self, p):
         """homogeneous change of scale """
-        self.logger(
-            f'builtin_aggregate <-- expr TIMES builtin_aggregate_dist', p)
+        self.logger('builtin_agg <-- expr TIMES builtin_agg', p)
         # bid = built_in_dict, want to be careful not to add scale too much
-        bid = p.builtin_aggregate_dist  # ? does this need copying. if so do in safelookup!
+        bid = p.builtin_agg.copy()
+        bid['name'] += '_h_scaled'
         if 'sev_mean' in bid:
             bid['sev_mean'] = bid['sev_mean'] * p.expr
         if 'sev_scale' in bid:
@@ -1084,38 +1100,72 @@ class UnderwritingParser(Parser):
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
         return bid
 
-    @_('builtin_aggregate_dist')
-    def builtin_aggregate(self, p):
-        self.logger('builtin_aggregate <-- builtin_aggregate_dist', p)
-        return p.builtin_aggregate_dist
+    @_('builtin_agg LOCATION_ADD expr')
+    def builtin_agg(self, p):
+        """
+        translation
+        :param p:
+        :return:
+        """
+        self.logger('builtin_agg <-- builtin_agg LOCATION_ADD expr', p)
+        # bid = built_in_dict, want to be careful not to add scale too much
+        bid = p.builtin_agg.copy()
+        bid['name'] += '_translated'
+        if 'sev_loc' in bid:
+            bid['sev_loc'] += p.expr
+        else:
+            bid['sev_loc'] = p.expr
+        return bid
 
-    @_('BUILTINID')
-    def builtin_aggregate_dist(self, p):
+    @_('BUILTIN_AGG')
+    def builtin_agg(self, p):
         # ensure lookup only happens here
-        self.logger(f'builtin_aggregate_dist <-- BUILTINID', p)
-        built_in_dict = self._safe_lookup(p.BUILTINID)
+        self.logger(f'builtin_agg <-- AGG_BUILTIN', p)
+        built_in_dict = self.safe_lookup(p.BUILTIN_AGG)
         return built_in_dict
 
+    @_('BUILTIN_SEV')
+    def builtin_sev(self, p):
+        # ensure lookup only happens here
+        # unlike aggs, will never just say sev.A
+        # but, can allow  agg A 1 claim sev.B and for that need to distinguish from a sev
+        self.logger(f'builtin_agg <-- SEV_BUILTIN ({p.BUILTIN_SEV})', p)
+        built_in_dict = self.safe_lookup(p.BUILTIN_SEV)
+        return built_in_dict
+
+    # @_('BUILTIN_PORT')
+    # def builtin_port(self, p):
+    #     # ensure lookup only happens here
+    #     self.logger(f'builtin_agg <-- PORT_BUILTIN', p)
+    #     built_in_dict = self.safe_lookup(p.PORT_BUILTIN)
+    #     return built_in_dict
+
+
     # ids =========================================================
-    @_('SEV ID')
-    def sev_name(self, p):
-        self.logger(f'sev_name <-- SEV ID', p)
+    @_('ID')
+    def name(self, p):
+        self.logger(f'name <-- ID = {p.ID}', p)
         return p.ID
-
-    @_('AGG ID')
-    def agg_name(self, p):
-        self.logger(f'agg_name <-- AGG ID', p)
-        # return {'name': p.ID}
-        if p.ID.find('_') >= 0:
-            raise ValueError(f'agg names cannot include _, you entered  {p.ID}. '
-                             '(sev and port object names can include _.)')
-        return p.ID
-
-    @_('PORT ID')
-    def port_name(self, p):
-        self.logger(f'port_name <-- PORT ID', p)
-        # return {'name': p.ID}
-        return p.ID
+    
+    # @_('SEV ID')
+    # def sev_name(self, p):
+    #     self.logger(f'sev_name <-- SEV ID', p)
+    #     return p.ID
+    # 
+    # @_('AGG ID')
+    # def agg_name(self, p):
+    #     self.logger(f'agg_name <-- AGG ID', p)
+    #     # return {'name': p.ID}
+    #     if p.ID.find('_') >= 0:
+    #         raise ValueError(f'agg names cannot include _, you entered  {p.ID}. '
+    #                          '(sev and port object names can include _.)')
+    #     return p.ID
+    # 
+    # @_('PORT ID')
+    # def port_name(self, p):
+    #     self.logger(f'port_name <-- PORT ID', p)
+    #     # return {'name': p.ID}
+    #     return p.ID
 
     # vectors of numbers
     @_('"[" numberl "]"')

@@ -594,7 +594,7 @@ class Underwriter(object):
 
 
 class Build(object):
-    uw = Underwriter(create_all=True)
+    uw = Underwriter(create_all=True, update=False)
 
     @classmethod
     def parse(cls, program):
@@ -621,8 +621,6 @@ class Build(object):
         :param kwargs: passed to update
         :return:
         """
-        # tamper down the logging
-        logger.setLevel(30)
 
         if program in ['underwriter', 'uw']:
             return cls.uw
@@ -639,9 +637,12 @@ class Build(object):
                 # how big?
                 if d['freq_name'] == 'fixed':
                     max_loss = np.max(d['sev_xs']) * d['exp_en']
+                elif d['freq_name'] == 'empirical':
+                    max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
                 else:
-                    max_loss = np.max(d['sev_xs']) * d['exp_en'] * 2
-                # bins are 0b111
+                    # normal approx on count
+                    max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en']**0.5)
+                # binaries are 0b111... len-2 * 2 is len - 1
                 log2 = len(bin(int(max_loss))) - 1
                 logger.info(f'Discrete input, using bs=1 and log2={log2}')
             try:
@@ -653,7 +654,9 @@ class Build(object):
         elif isinstance(out, Severity):
             # there is no updating for severities
             pass
-
+        elif isinstance(out, Portfolio):
+            # figure stuff
+            pass
         else:
             pass
 

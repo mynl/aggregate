@@ -1549,9 +1549,9 @@ class Aggregate(Frequency):
         self.agg_net_density = agg_reins_df['p_net']
         self.agg_ceded_density = agg_reins_df['p_ceded']
         if self.agg_kind == 'ceded to':
-            self.agg_density = self.agg_net_density
-        elif self.agg_kind == 'net of':
             self.agg_density = self.agg_ceded_density
+        elif self.agg_kind == 'net of':
+            self.agg_density = self.agg_net_density
         else:
             raise ValueError(f'Unexpected kind of agg reinsurace, {self.agg_kind}')
 
@@ -1892,7 +1892,9 @@ class Aggregate(Frequency):
 
             if self.bs == 1:
                 mx = self.q(1)
-                span = mx // 6
+                span = mx / 6
+                if span > 1:
+                    span = mx // 6
 
                 df = self.density_df[['p_total', 'p_sev', 'F', 'loss']].copy()
                 df['sevF'] = df.p_sev.cumsum()

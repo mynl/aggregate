@@ -334,8 +334,10 @@ import logging
 import numpy as np
 from numpy import exp
 import re
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+DEBUGFILE = 'c:\\temp\\parser.out'
 
 
 class UnderwritingLexer(Lexer):
@@ -518,6 +520,34 @@ class UnderwritingParser(Parser):
     def reset(self):
         # TODO Add sev_xs and sev_ps !!
         self.out_dict = {}
+
+    @staticmethod
+    def enhance_debugfile(f_out=''):
+        """
+        Put links in the parser.out debug file, if DEBUGFILE != ''
+
+        :param f_out: Path or filename of output. If "" then DEBUGFILE.html used.
+        :return:
+        """
+
+        if DEBUGFILE == '':
+            return
+
+        if f_out == '':
+            f_out = Path(DEBUGFILE + '.html')
+        else:
+            f_out = Path(fn)
+
+        txt = Path(DEBUGFILE).read_text(encoding='utf-8')
+        txt = txt.replace('Grammar:\n', '<h1>Grammar:</h1>\n\n<pre>\n').replace('->', '<-')
+        txt = re.sub(r'^Rule ([0-9]+)', r'<div id="rule_\1" />Rule \1', txt, flags=re.MULTILINE)
+        txt = re.sub(r'^state ([0-9]+)$', r'<div id="state_\1" /><b>state \1</b>', txt, flags=re.MULTILINE)
+        txt = re.sub(r'^    \(([0-9]+)\) ', r'    <a href="#rule_\1">Rule (\1)</a> ', txt, flags=re.MULTILINE)
+        txt = re.sub(r'go to state ([0-9]+)', r'go to <a href="#state_\1">state (\1)</a>', txt, flags=re.MULTILINE)
+        txt = re.sub(r'using rule ([0-9]+)', r'using <a href="#rule_\1">rule (\1)</a>', txt, flags=re.MULTILINE)
+        txt = re.sub(r'in state ([0-9]+)', r'in <a href="#state_\1">state (\1)</a>', txt, flags=re.MULTILINE)
+
+        f_out.write_text(txt + '\n</pre>', encoding='utf-8')
 
     @staticmethod
     def _check_vectorizable(value):

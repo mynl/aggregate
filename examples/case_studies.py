@@ -3,6 +3,9 @@ COPIED FROM WEBSITE/PricingInsuranceRisk
 JUNE 26 2022
 For hacking and planned integration into aggregate
 
+NO BACKWARD COMPATIBILITY REQUIREMENT... though ability to generate book examples a plus
+
+(PIR version came from spectral risk mono/Python ... which came from the ipynb exhibit creator)
 
 Note and To Do
 
@@ -20,17 +23,22 @@ import sys
 # sys.path.append("c:\\s\\telos\\python")
 from pathlib import Path
 
-if str(Path.home()) == 'C:\\Users\\steve':
-    sys.path.append("c:\\s\\telos\\python\\aggregate_project")
+# if str(Path.home()) == 'C:\\Users\\steve':
+#     sys.path.append("c:\\s\\telos\\python\\aggregate_project")
 
 import aggregate as agg
-from aggregate import Aggregate, Portfolio, round_bucket
+# importing like this makes isinstance work better
+from aggregate.distr import Aggregate
+from aggregate.port import Portfolio
+from aggregate.utils import round_bucket
 import argparse
 from collections import OrderedDict
 from cycler import cycler
 from datetime import datetime
+from flask import render_template
 import hashlib
 from itertools import product
+from jinja2 import Environment, FileSystemLoader
 import json
 import logging
 import matplotlib.pyplot as plt
@@ -237,7 +245,7 @@ class CaseStudy(object):
                    'coTVaR', 'covar']
     _non_add_ = ['EL', 'VaR', 'TVaR', 'EPD', 'MerPer', ]
     _cases_ = None
-    _case_database_ = 'static/cases/case_spec.csv'
+    _case_database_ = Path.home() / 'aggregate/cases/case_spec.csv'
 
     @classmethod
     def _check_cases(cls):
@@ -252,12 +260,6 @@ class CaseStudy(object):
     @classmethod
     def _reset(cls):
         cls._cases_ = None
-
-    @classmethod
-    def factory(cls, case_id):
-        cls._check_cases()
-        case_spec = dict(cls._cases_.loc[case_id])
-        return CaseStudy(case_id, **case_spec)
 
     @classmethod
     def case_list(cls):
@@ -321,7 +323,7 @@ class CaseStudy(object):
 
         TODO later...parse the note!
 
-        @param program:
+        :param program:
         @return:
         """
 
@@ -340,50 +342,19 @@ class CaseStudy(object):
                     + str(e))
         return program
 
-    def __init__(self, case_id, case_name, case_description, a_name, b_name, a_distribution, b_distribution,
-                 re_line, re_type, re_limit, re_attach, reg_p, roe, d2tc,
-                 f_book, f_discrete, f_monochrome, f_roe_fix, f_blend_fix, f_blend_extend,
-                 _bs, _log2, _padding):
+    def __init__(self):
         """
-        Create CaseStudy option.
+        Create an empty CaseStudy.
 
-        option_id = tame, cnc, hs, discrete, or a custom name that must be allowable as a directory name.
-        portfolio_function(option_id, flags): function to create the portfolios and return all relevant variables
+        Use various factory options to actually populate.
 
-        flags
-            EQUAL for discrete, use 9+1 and 10+0
-            BOOK  for book black and white graphics (default is color)
-            ROE_FIX use approx to roe_d with no mass
-            BLEND_FIX use different blend distortion, requires d2tc, debt to total capital
-
-        d2tc = debt to total capital limit, for better blend distortion
-
-        @param case_id:
-        @param case_name:
-        @param case_description:
-        @param a_name:
-        @param b_name:
-        @param a_distribution:
-        @param b_distribution:
-        @param re_line:
-        @param re_type:
-        @param re_limit:
-        @param re_attach:
-        @param reg_p:
-        @param roe:
-        @param d2tc:
-        @param f_book:       if true case is an original book study; else newly created
-        @param f_discrete:   if true use discrete exhibiits
-        @param f_monochrome: if true use monochrome graphs and exhibits to match book
-        @param f_roe_fix:    if true apply roe fix
-        @param f_blend_fix:
-        @param f_blend_extend: use extend method to calibrate blend
-        @param _bs:
-        @param _log2:
-        @param _padding:
         """
 
         # variables set in other functions
+        self.blend_d = None
+        self.roe_d = None
+        self.dist_dict = None
+
         self.tab13_1 = None
         self.sop = None
         self.lrs = None
@@ -406,6 +377,144 @@ class CaseStudy(object):
         self.boundss = None
         self.ad_compss = None
 
+        self.case_id = ""
+        self.case_name = ""
+        self.case_description = ""
+        self.a_name = ""
+        self.b_name = ""
+        self.a_distribution = ""
+        self.b_distribution = ""
+        self.b_distribution_gross = ""
+        self.b_distribution_net = ""
+        self.re_line = ""
+        self.re_type = ""
+        self.re_limit = 0.
+        self.re_attach = 0.
+        self.re_attach_p = 0.
+        self.re_detach = 0.
+        self.re_detach_p = 0.
+        self.reg_p = 0.
+        self.roe = 0.
+        self.d2tc = 0.
+        self.f_book = False
+        self.f_discrete = False
+        self.f_monochrome = False
+        self.f_roe_fix = False
+        self.f_blend_fix = False
+        self.f_blend_extend = False
+        self.bs = 0.
+        self.log2 = 0
+        self.padding = 1
+        self.case_number = None
+
+        # graphics defaults
+        self.fw = 3.5 * 1.333
+        self.fh = 3.5
+        color_mode = 'color'
+        cycle_mode = 'c'
+        self.smfig = FigureManager(cycle=cycle_mode, color_mode=color_mode, font_size=10, legend_font='small',
+                                   default_figsize=(self.fw, self.fh))
+        self.colormap = 'viridis'
+        self.figure_bg_color = 'aliceblue'
+        plt.rcParams["axes.facecolor"] = 'lightsteelblue'
+        plt.rc('legend', fc='lightsteelblue', ec='lightsteelblue')
+
+        # discounting and return
+        self.v = 0.
+        self.d = 0.
+        self.gross = None
+        self.net = None
+        self.ports = None
+        self.pricings = None
+        self.re_descriptor = ''
+        self.re_summary = None
+
+        # graphics and presentation
+        self.show = True
+        self.figtype = 'png'
+
+        # output related
+        self.cache_base = Path.home() / 'aggregate/cases'
+        self.cache_base.mkdir(exist_ok=True)
+        self.cache_dir = None
+
+    def factory_book(self, case_id):
+        """
+        Create case from case_id.
+        :param case_id:
+        :return:
+        """
+        self._check_cases()
+        case_spec = dict(self._cases_.loc[case_id])
+        # handle book specific options here to make factory_work as generic as possible
+        # :param f_book:       if true case is an original book study; else newly created
+        # :param f_discrete:   if true use discrete exhibiits
+        # :param f_monochrome: if true use monochrome graphs and exhibits to match book
+        # :param f_roe_fix:    if true apply roe fix
+        # :param f_blend_fix:
+        # :param f_blend_extend: use extend method to calibrate blend
+
+        self.f_book = case_spec['f_book']
+        self.f_monochrome = case_spec['f_monochrome']
+        self.f_roe_fix = case_spec['f_roe_fix']
+        self.f_blend_fix = case_spec['f_blend_fix']
+        self.f_blend_extend = case_spec['f_blend_extend']
+
+        # graphics, override defaults
+        self.fw = 4.5
+        self.fh = 3.25
+        color_mode = 'mono' if self.f_monochrome else 'color'
+        cycle_mode = 's' if self.f_monochrome else 'c'
+        self.smfig = FigureManager(cycle=cycle_mode, color_mode=color_mode, font_size=10, legend_font='small',
+                                   default_figsize=(self.fw, self.fh))
+        self.colormap = 'Greys' if color_mode == 'mono' else 'viridis'
+
+        # plotting options
+        if self.f_monochrome:
+            plt.rcParams["axes.facecolor"] = 'white'
+            plt.rc('legend', fc='white', ec='lightgrey')
+            plt.rcParams['figure.facecolor'] = 'white'
+
+        return self.factory_book_work(case_id, **case_spec)
+
+    def factory_book_work(self, case_id, case_name, case_description, a_name, b_name, a_distribution, b_distribution,
+                     re_line, re_type, re_limit, re_attach, reg_p, roe, d2tc,
+                     f_discrete, _bs, _log2, _padding, **kwargs):
+        """
+        Create CaseStudy from case_id and all arguments, book style case_study spec
+
+        option_id = tame, cnc, hs, discrete, or a custom name that must be allowable as a directory name.
+        portfolio_function(option_id, flags): function to create the portfolios and return all relevant variables
+
+        flags
+            EQUAL for discrete, use 9+1 and 10+0
+            BOOK  for book black and white graphics (default is color)
+            ROE_FIX use approx to roe_d with no mass
+            BLEND_FIX use different blend distortion, requires d2tc, debt to total capital
+
+        d2tc = debt to total capital limit, for better blend distortion
+
+        NOTE: kwargs allows unused args to be passed through harmlessly
+
+        :param case_id:
+        :param case_name:
+        :param case_description:
+        :param a_name:
+        :param b_name:
+        :param a_distribution:
+        :param b_distribution:
+        :param re_line:
+        :param re_type:
+        :param re_limit:
+        :param re_attach:
+        :param reg_p:
+        :param roe:
+        :param d2tc:
+        :param _bs:
+        :param _log2:
+        :param _padding:
+        """
+
         self.case_id = case_id  # originally option_id
         self.case_name = case_name
         self.case_description = case_description
@@ -420,12 +529,8 @@ class CaseStudy(object):
         self.reg_p = reg_p
         self.roe = roe
         self.d2tc = d2tc
-        self.f_book = f_book
         self.f_discrete = f_discrete
-        self.f_monochrome = f_monochrome
-        self.f_roe_fix = f_roe_fix
-        self.f_blend_fix = f_blend_fix
-        self.f_blend_extend = f_blend_extend
+
         try:
             self.bs = float(_bs)
         except (TypeError, ValueError):
@@ -442,32 +547,7 @@ class CaseStudy(object):
         # standard exhibit, get number for exhibits
         self.case_number = {'tame': 0, 'cnc': 1, 'hs': 2}.get(self.case_id, 0)
 
-        # graphics
-        self.fw = 4.5
-        self.fh = 3.25
-        color_mode = 'mono' if self.f_monochrome else 'color'
-        cycle_mode = 's' if self.f_monochrome else 'c'
-        self.smfig = FigureManager(cycle=cycle_mode, color_mode=color_mode, font_size=10, legend_font='small',
-                                   default_figsize=(self.fw, self.fh))
-        self.colormap = 'Greys' if color_mode == 'mono' else 'viridis'
-
-        # plotting options
-        if self.f_monochrome:
-            plt.rcParams["axes.facecolor"] = 'white'
-            plt.rc('legend', fc='white', ec='lightgrey')
-            plt.rcParams['figure.facecolor'] = 'white'
-        else:
-            self.figure_bg_color = 'aliceblue'
-            plt.rcParams["axes.facecolor"] = 'lightsteelblue'
-            plt.rc('legend', fc='lightsteelblue', ec='lightsteelblue')
-
-        # real work: create portfolios. Includes various special cases to match the book (e.g. discrete pricing calibration)
-        # self.gross, self.net, self.re_line, self.re_type, \
-        #     self.re_attach, self.re_attach_p, \
-        #     self.re_detach, self.re_detach_p, self.roe, \
-        #     self.v, self.d, self.ports, self.reg_p, \
-        #     self.pricings = portfolio_function(option_id, flags=flags)
-        uw = agg.Underwriter(create_all=False)
+        uw = agg.Underwriter(create_all=False, update=False)
         self.v = 1 / (1 + self.roe)
         self.d = 1 - self.v
 
@@ -475,14 +555,18 @@ class CaseStudy(object):
         self.a_distribution = self.parse_program(a_distribution, a_name)
         self.b_distribution = self.parse_program(b_distribution, b_name)
 
-         # units roughly millions
-        self.gross = uw(f'''
+        # units roughly millions
+        # new style output from uw key (kind, name) output (obj or spec, program)
+        out = uw(f'''
 
 port Gross_{self.case_id}
     {self.a_distribution}
     {self.b_distribution}
 
 ''')
+        # pick out the object
+        self.gross, gross_program = out[('port', f'Gross_{self.case_id}')]
+        self.gross.program = gross_program
         # sort out better bucket
         if self.bs == 0 or np.isnan(self.bs):
             bs = self.gross.recommend_bucket().loc['total', f'bs{self.log2}']
@@ -492,8 +576,8 @@ port Gross_{self.case_id}
         if self.bs == 0:
             # TensePortfolio estimates the bs if 0 is passed in
             self.bs = self.gross.bs
-        self.net = uw(self.gross.program.replace('Gross', 'Net'))
 
+        # figure the reinsurance
         if self.re_attach <= 1:
             self.re_attach_p = self.re_attach
             self.re_attach = self.gross[self.re_line].q(1 - self.re_attach)
@@ -508,7 +592,12 @@ port Gross_{self.case_id}
             self.re_detach = self.re_attach + self.re_limit
             self.re_detach_p = self.gross[self.re_line].sf(self.re_detach)
 
-        make_net_portfolio(self.net, self.re_line, self.re_attach, self.re_detach, self.bs, self.log2)
+        net_program = gross_program + f' aggregate net of {self.re_limit} xs {self.re_attach}'
+        net_program = net_program.replace('Gross', 'Net')
+        out = uw(net_program)
+        self.net, net_program = out[('port', f'Net_{self.case_id}')]
+        self.net.program = net_program
+        self.net.update(log2=self.log2, bs=self.bs)
         enhance_portfolio(self.net)
 
         self.ports = OrderedDict(gross=self.gross, net=self.net)
@@ -523,20 +612,6 @@ port Gross_{self.case_id}
             'Reinsured Line', 'Reinsurance Type', 'Attachment Probability', 'Attachment', 'Exhaustion Probability',
             'Limit'], columns=[self.case_id])
         self.re_summary.index.name = 'item'
-
-        # graphcis and presentation
-        self.show = True
-        self.figtype = 'png'
-
-        # self.dir_name = self.case_id
-        # rest of this can be replaced with a lookup from the database
-
-        if str(Path.home()) == 'C:\\Users\\steve':
-            self.cache_base = Path(f'C:\\S\\Websites\\pricinginsurancerisk')
-        else:
-            self.cache_base = Path.home() / 'pricinginsurancerisk'
-        self.cache_dir = self.cache_base / f'static/cases/{self.case_id}'
-        self.cache_dir.mkdir(exist_ok=True)
 
         # cap table needs pricing_summary
         self.make_audit_exhibits()
@@ -562,6 +637,144 @@ port Gross_{self.case_id}
             self.roe_d = agg.Distortion('roe', self.roe, display_name='roe')
         self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
 
+        self.cache_dir = self.cache_base / f'{self.case_id}'
+        self.cache_dir.mkdir(exist_ok=True)
+
+    def factory_work(self, case_id, case_name, case_description,
+                     a_distribution, b_distribution_gross, b_distribution_net,
+                     reg_p, roe, d2tc,
+                     f_discrete, _bs, _log2, _padding):
+        """
+        TODO: a_distribution s/b a_program?
+        
+        Create CaseStudy from case_id and all arguments in generic format with explicit reinsurance.
+        re_line='B' required.
+
+        option_id = tame, cnc, hs, discrete, or a custom name that must be allowable as a directory name.
+        portfolio_function(option_id, flags): function to create the portfolios and return all relevant variables
+
+        flags
+            EQUAL for discrete, use 9+1 and 10+0
+            BOOK  for book black and white graphics (default is color)
+            ROE_FIX use approx to roe_d with no mass
+            BLEND_FIX use different blend distortion, requires d2tc, debt to total capital
+
+        d2tc = debt to total capital limit, for better blend distortion
+
+        kwargs allows unused args to be passed through harmlessly
+
+        :param case_id:
+        :param case_name:
+        :param case_description:
+        :param a_name:
+        :param b_name:
+        :param a_distribution:
+        :param b_distribution:
+        :param re_line:
+        :param re_type:
+        :param re_limit:
+        :param re_attach:
+        :param reg_p:
+        :param roe:
+        :param d2tc:
+        :param _bs:
+        :param _log2:
+        :param _padding:
+        """
+
+        self.case_id = case_id  # originally option_id
+        self.case_name = case_name
+        self.case_description = case_description
+        # programs
+        self.a_distribution = a_distribution
+        self.b_distribution_gross = b_distribution_gross
+        self.b_distribution_net = b_distribution_net
+        # derivable
+        self.a_name = a_distribution.split(' ')[1]
+        self.b_name = b_distribution_gross.split(' ')[1]
+        self.re_line = self.b_name
+
+        self.reg_p = reg_p
+        self.roe = roe
+        self.v = 1 / (1 + self.roe)
+        self.d = 1 - self.v
+        self.d2tc = d2tc
+        self.f_discrete = f_discrete
+
+        # TODO: weird, what was the point of this? 
+        try:
+            self.bs = float(_bs)
+        except (TypeError, ValueError):
+            self.bs = 0
+        try:
+            self.log2 = int(_log2)
+        except (TypeError, ValueError):
+            self.log2 = 13
+        try:
+            self.padding = int(_padding)
+        except (TypeError, ValueError):
+            self.padding = 1
+
+        # standard exhibit, get number for exhibits
+        self.case_number = 0
+
+        # uw = agg.Underwriter(create_all=False, update=False)
+        # new style output from uw key (kind, name) output (obj or spec, program)
+        self.gross = Portfolio('Gross', [self.a_distribution, self.b_distribution_gross])
+
+        # sort out better bucket
+        if self.bs == 0 or np.isnan(self.bs):
+            self.bs = self.gross.best_bucket(self.log2)
+        self.gross = TensePortfolio(self.gross, log2=self.log2, bs=self.bs, padding=self.padding,
+                                    ROE=self.roe, p=self.reg_p)
+
+        self.net = Portfolio('Net', [self.a_distribution, self.b_distribution_net])
+        self.net.update(log2=self.log2, bs=self.bs)
+        enhance_portfolio(self.net)
+        self.ports = OrderedDict(gross=self.gross, net=self.net)
+
+        self.pricings = OrderedDict()
+        self.pricings['gross'] = pricing(self.gross, reg_p, roe)
+        self.pricings['net'] = pricing(self.net, reg_p, roe)
+
+        # are these used?
+        self.re_type = self.net.reinsurance_kinds()
+        self.re_limit = 1e20
+        self.re_attach = 1e20
+        self.re_descriptor = self.net.reinsurance_description(kind='both')
+        self.re_summary = pd.DataFrame([self.re_line, self.re_type, self.re_attach_p, self.re_attach, self.re_detach_p,
+                                        self.re_detach - self.re_attach], index=[
+            'Reinsured Line', 'Reinsurance Type', 'Attachment Probability', 'Attachment', 'Exhaustion Probability',
+            'Limit'], columns=[self.case_id])
+        self.re_summary.index.name = 'item'
+
+        # cap table needs pricing_summary
+        self.make_audit_exhibits()
+
+        # the common distortions
+        if self.f_blend_fix:
+            logger.warning('Applying blend fix.')
+            # need ot make the cap table
+            self.make_cap_table()
+            try:
+                self.blend_d = self.make_blend()
+            except ValueError as e:
+                logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
+                self.blend_d = self.make_blend(mode='book')
+                self.f_blend_fix = False
+        else:
+            self.blend_d = self.make_blend()
+
+        if self.f_roe_fix:
+            logger.warning('applying ROE fix.')
+            self.roe_d = self.approx_roe(e=1e-10)
+        else:
+            self.roe_d = agg.Distortion('roe', self.roe, display_name='roe')
+        self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
+
+        self.cache_dir = self.cache_base / f'{self.case_id}'
+        self.cache_dir.mkdir(exist_ok=True)
+
     def __repr__(self):
         return f'''Case Study object {self.case_id} @ {self.cache_dir} ({super().__repr__()})
 Portfolios: {self.gross.name} (EL={self.gross.ex:.2f}) and {self.net.name} ({self.net.ex:.2f}).
@@ -573,7 +786,7 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         """
         All updating and exhibit generation. No output. For use with command line.
 
-        @param self:
+        :param self:
         @return:
         """
 
@@ -593,13 +806,13 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         process_memory()
         self.show_extended_graphs()
         process_memory()
-        logger.log(35, f'{case_id} completed!')
+        logger.log(35, f'{self.case_id} completed!')
 
     def approx_roe(self, e=1e-15):
         """
         Make an approx to roe distortion with no mass
 
-        @param e:
+        :param e:
         @return:
         """
         aroe = pd.DataFrame({'col_x': [0, e, 1], 'col_y': [0, self.v * e + self.d, 1]})
@@ -754,11 +967,11 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         additional_properties is a list of selector, property pairs
         E.g. [(col-list, dict-of-properties)]
 
-        @param exhibit_id:
-        @param df:
-        @param caption:
-        @param ff:
-        @param save:
+        :param exhibit_id:
+        :param df:
+        :param caption:
+        :param ff:
+        :param save:
         @return:
         """
         cell_hover = {  # for row hover use <tr> instead of <td>
@@ -1008,7 +1221,7 @@ shows the impact of diversification.
 
         handles creation (unlike exhibits....?)
 
-        @param arvv:
+        :param arvv:
         @return:
         """
 
@@ -1667,7 +1880,7 @@ shows the impact of diversification.
 
         This is different for discrete distributions.
 
-        @param self:
+        :param self:
         @return:
         """
 
@@ -3185,11 +3398,14 @@ def RelaxedPortfolio(port_or_prog, log2=13, bs=0, padding=2, approx_freq_ge=100)
     from common_scripts.py
 
     """
-
     if type(port_or_prog) == str:
         # program
         uw = agg.Underwriter(create_all=False)
-        port = uw(port_or_prog)
+        # new style return
+        out = uw(port_or_prog)
+        # TODO: sort out
+        print(out, 'FIGURE OUT WHAT TO DO'*4)
+        raise ValueError('asdf')
     else:
         port = port_or_prog
 
@@ -3454,7 +3670,6 @@ def enhance_portfolio(port, force=False):
 
     force = do even if exist...force an update
     """
-
     if not force and getattr(port, 'distortion_information', None) is not None:
         # port has exhibit methods enabled
         return
@@ -3465,7 +3680,8 @@ def enhance_portfolio(port, force=False):
 
         def add_method(func):
             setattr(port, func.__name__, func)
-    elif isinstance(port, (agg.Portfolio, agg.port.Portfolio)):
+
+    elif isinstance(port, Portfolio):
         # set for just one instance
         logging.info(f'Enhancing just this Portfolio instance, called {port.name}')
 
@@ -3474,6 +3690,7 @@ def enhance_portfolio(port, force=False):
 
         def add_method(func):
             setattr(port, func.__name__, types.MethodType(func, port))
+
     else:
         raise ValueError(f'Item of type {type(port)} unexpected passed to add_enhanced_exhibit_methods. '
                          'Expecting agg.Portfolio class or an instance.')
@@ -5672,9 +5889,9 @@ def run_case_in_background(case_id, logLevel=30):
     Run a case and produce all the exhibits in the background.
     Log the output and stderr info to a file
 
-    @param case_id:
-    @param base_file:
-    @param logLevel:
+    :param case_id:
+    :param base_file:
+    :param logLevel:
     @return:
     """
 
@@ -5691,6 +5908,138 @@ def run_case_in_background(case_id, logLevel=30):
     f_err = sterr.open('w', encoding='utf=8')
     p = Popen(args, stdout=f_out, stderr=f_err, text=True, encoding='utf-8')
     return p, stout, sterr
+
+
+
+class ManualRenderResults():
+
+    APPNAME = 'Pricing Insurance Risk'
+
+    def __init__(self):
+        """
+        Create local HTML page for the results datasets. Relies on pricinginsurancerisk templates.
+
+        """
+        self.env = Environment(loader=FileSystemLoader(Path.home() / 'S/websites/pricinginsurancerisk/templates'), autoescape=(['html', 'xml']))
+        # not surprisingly, this doesn't work...will need to package...
+        # self.env = Environment(loader=FileSystemLoader('https://www.pricinginsurancerisk.com/templates'), autoescape=(['html', 'xml']))
+
+    @staticmethod
+    def now():
+        return 'Created {date:%Y-%m-%d %H:%M:%S.%f}'.format(date=datetime.now()).rstrip('0')
+
+    @staticmethod
+    def format_name(n):
+        """
+        case_flags
+        """
+        ns = n.split('_')
+        case_study_names = {'cnc': 'Cat/Noncat', 'hs': "Hurricane/Severe Convective Storm", 'Discrete': "Simple Discrete Example", 'tame': "Tame"}
+        n = case_study_names.get(ns[0], ns[0].title())
+        other = {'roe': '(ROE fixed)', 'equal': "(10 in two ways)", 'ccocblend': ' CCoC blend calibration', 'extendblend': 'Extend blend calibration' }
+        ans = [n]
+        for i in ns[1:]:
+            ans.append(other.get(i, i.title()))
+        return ' '.join(ans)
+
+    @staticmethod
+    def get_menu_items(base_dir0, page):
+        p = base_dir0.glob('*')
+        pp = [(i, i.stat().st_mtime) for i in p]
+        links = []
+        for i, (pth, _) in enumerate(sorted(pp, key=lambda x: x[1], reverse=True)):
+            links.append(f'<a {"" if i < 3 else "class=dropdown-item"} '
+                         f'class ="text-white" href="/{page}?case={pth.name}" > {ManualRenderResults.format_name(pth.name)} < / a > \n')
+        return links
+
+    def render_exhibits_work(self, case_id):
+        page = 'results'
+
+        base_dir0 = Path.home() / 'aggregate/cases'
+        base_dir = base_dir0 / case_id
+
+        if base_dir.exists() is False:
+            raise ValueError('{case_id} directory not found')
+
+        case_description = CaseStudy.case(case_id)['case_description']
+
+        args = {}
+        exhibits = list('ABCDEFGHIJKLMNOPQRSUVWXY')
+        exhibits.extend(['T_gross', 'T_net'])
+        for t in exhibits:
+            p = base_dir / f'{t}.html'
+            if p.exists():
+                args[t] = p.read_text(encoding='utf-8')
+            else:
+                args[t] = f'</p>Placeholder for Exhibit {t}.</p>'
+
+        # menu bar items
+        links = self.get_menu_items(base_dir0, page)
+        template = self.env.get_template('results.html')
+        return template.render(title=self.APPNAME,
+                               case_name=self.format_name(case_id),
+                               case_id=case_id,
+                               case_description=case_description,
+                               og_meta={},
+                               page=page,
+                               subpage='results',
+                               links=links,
+                               **args,
+                               timestamp=self.now(),
+                               request_method='MANUAL',
+                               requestor_id='ALSO MANUAL')
+
+    def render_extended_work(self, case_id):
+        page = 'extended'
+
+        base_dir0 = Path.home() / 'aggregate/cases'
+        base_dir = base_dir0 / case_id
+
+        base_dir = base_dir0 / case_id
+        if base_dir.exists() is False:
+            raise ValueError('{case_id} directory not found')
+
+        # this is the actual content
+        blobs = []
+        for p in sorted(base_dir.glob('Z*.html')):
+            blobs.append(p.read_text(encoding='utf-8'))
+
+        # menu bar items
+        links = self.get_menu_items(base_dir0, page)
+        template = self.env.get_template('results_extended.html')
+        return template.render(title=self.APPNAME,
+                               case_name=self.format_name(case_id),
+                               case_id=case_id,
+                               og_meta={},
+                               page=page,
+                               subpage='extended',
+                               links=links,
+                               blobs=blobs,
+                               timestamp=self.now(),
+                               request_method='MANUAL',
+                               requestor_id='ALSO MANUAL')
+
+
+    @staticmethod
+    def rebase(case_id, h):
+        h = h.replace('/static', 'static')
+        h = h.replace('static\\cases\\', '')
+        h = h.replace(f'src="/{case_id}', f'src="{case_id}')
+        return h
+
+    def render(self, case_id='cnc'):
+        h = self.render_exhibits_work(case_id)
+        # rebase directories
+        h = self.rebase(case_id, h)
+        p = Path.home() / f'aggregate/cases/{case_id}_book.html'
+        p.write_text(h, encoding='utf-8')
+
+        h1 = self.render_extended_work(case_id)
+        h1 = self.rebase(case_id, h1)
+        p1 = Path.home() / f'aggregate/cases/{case_id}_extended.html'
+        p1.write_text(h1, encoding='utf-8')
+
+        return p, p1
 
 
 # command line related

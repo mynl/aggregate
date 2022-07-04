@@ -40,7 +40,7 @@ from .utils import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    report_time
+    report_time, make_mosaic_figure
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -157,6 +157,7 @@ class Portfolio(object):
         self.audit_percentiles = [.9, .95, .99, .996, .999, .9999, 1 - 1e-6]
         self.dists = None
         self.dist_ans = None
+        self.figure = None
 
     def __str__(self):
         """
@@ -914,13 +915,22 @@ class Portfolio(object):
         return df
 
     def best_bucket(self, log2=16):
+        """
+        Recommend the best bucket.
+        TODO: Is this really the best approach?!
+
+        :param log2:
+        :return:
+        """
         bs = sum([a.recommend_bucket(log2) for a in self])
         return round_bucket(bs)
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, add_exa=True):
+               trim_df=False, add_exa=True, debug=False):
         """
+        TODO: currently debug doesn't do anything...
+
         create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
 
@@ -1560,7 +1570,91 @@ class Portfolio(object):
                     else:
                         html_title(f'Report {r} not generated', 2)
 
-    def plot(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
+    def limits(self, stat='range', kind='linear', zero_mass='include'):
+        """
+        Suggest sensible plotting limits for kind=range, density, .. (same as Aggregate).
+
+        Should optionally return a locator for plots?
+
+        Called by ploting routines. Single point of failure!
+
+        Must work without q function when not computed (apply_reins_work for
+        occ reins...uses report_ser instead).
+
+        :param stat:  range or density or logy (for log density/survival function...ensure consistency)
+        :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)
+        :param zero_mass:  include exclude, for densities
+        :return:
+        """
+        # fudge l/r factors
+        def f(x):
+            fl, fr = 0.02, 1.02
+            return [-fl * x, fr * x]
+
+        # lower bound for log plots
+        eps = 1e-16
+
+        # if not computed have no business asking for limits
+        assert self.density_df is not None
+
+        if stat == 'range':
+            if kind == 'linear':
+                return f(self.q(0.999))
+            else:
+                # wider range for log density plots
+                return f(self.q(1 - 1e-10))
+        elif stat == 'density':
+            mx = self.density_df.p_total.max()
+            mxx0 = self.density_df.p_total[1:].max()
+            if kind == 'linear':
+                if zero_mass == 'include':
+                    return f(mx)
+                else:
+                    return f(mxx0)
+            else:
+                return [eps, mx * 1.5]
+        elif stat == 'logy':
+            mx = min(1, self.density_df.filter(regex='p_[A-Za-z]').max().max())
+            return [1e-12, mx * 2]
+        else:
+            # if you fall through to here, wrong args
+            raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
+
+    def plot(self, axd=None):
+        """
+        Defualt plot of density, survival functions (linear and log)
+
+        :param axi:
+        :param line: lines to use, defaults to all
+        :param p:   for graphics audit, x-axis scale has maximum q(p)
+        :param c:   collateral amount
+        :param a:   asset amount
+        :param axiter: optional, pass in to use existing ``axiter``
+        :param figsize: arguments passed to axis_factory if no axiter
+        :param height:
+        :param aspect:
+        :param kwargs: passed to pandas plot routines
+        :return:
+        """
+
+        if axd is None:
+            self.figure, axd = make_mosaic_figure('AB')
+
+        ax = axd['A']
+        xl = self.limits(zero_mass='exclude')
+        self.density_df.filter(regex='p_[a-zA-Z]').plot(ax=ax, xlim=xl)
+        ax.set(xlabel='Loss', ylabel='Density')
+
+        ax = axd['B']
+        xl = self.limits(kind='log')
+        yl = self.limits(stat='logy')
+        self.density_df.filter(regex='p_[a-zA-Z]').plot(ax=ax, logy=True, xlim=xl, ylim=yl)
+        ax.set(xlabel='Loss', ylabel='Log density')
+
+        # ax = axd['C']
+        # self.density_df.filter(regex='p_[a-zA-Z]')[::-1].cumsum().plot(ax=ax, xlim=xl, logy=True)
+
+    def plot_old(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
              aspect=1, **kwargs):
         """
         kind = density

@@ -6,6 +6,7 @@ import logging
 import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
 import numpy as np
+from numpy.linalg import inv
 import pandas as pd
 from scipy.integrate import quad
 import scipy.stats as ss
@@ -19,9 +20,9 @@ from scipy.interpolate import interp1d
 
 from .utils import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
-    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler
+    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
+    make_mosaic_figure, nice_multiple, style_df
 from .spectral import Distortion
-from numpy.linalg import inv
 
 logger = logging.getLogger(__name__)
 
@@ -789,7 +790,7 @@ class Aggregate(Frequency):
 
     def _reins_audit_df_work(self, kind='occ'):
         """
-        Apply each re layer separetely and aggregate loss and other stats
+        Apply each re layer separately and aggregate loss and other stats
 
         """
         ans = []
@@ -802,7 +803,7 @@ class Aggregate(Frequency):
         reins = self.occ_reins if kind == 'occ' else self.agg_reins
 
         for (s, y, a) in reins:
-            c, n, df = self._apply_reins_work([(s, a, a)], self.sev_gross_density, False)
+            c, n, df = self._apply_reins_work([(s, y, a)], self.sev_gross_density, False)
             ans.append(df)
 
         if kind == 'occ':
@@ -902,6 +903,8 @@ class Aggregate(Frequency):
         # assert np.allclose(np.sum(sev_wt), 1)
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
+
+        self.figure = None
 
         def get_value(v):
             if isinstance(v, list):
@@ -1206,13 +1209,14 @@ class Aggregate(Frequency):
         ix = self.density_df.index.get_loc(x, 'nearest')
         return self.density_df.iat[ix, 0]
 
-    def update(self, log2=13, bs=0, **kwargs):
+    def update(self, log2=13, bs=0, debug=False, **kwargs):
         """
         Convenience function, delegates to update. Avoids having to pass xs.
 
 
         :param log2:
         :param bs:
+        :param debug:
         :param kwargs:  passed through to update
         :return:
         """
@@ -1225,7 +1229,7 @@ class Aggregate(Frequency):
                 kwargs['approximation'] = 'slognorm'
             else:
                 kwargs['approximation'] = 'exact'
-        return self.update_work(xs, **kwargs)
+        return self.update_work(xs, debug=debug, **kwargs)
 
     # for backwards compatibility
     easy_update = update
@@ -1258,6 +1262,7 @@ class Aggregate(Frequency):
         :return:
         """
         self._density_df = None  # invalidate
+        self._linear_quantile_function = None
 
         self.xs = xs
         self.bs = xs[1]
@@ -1419,7 +1424,7 @@ class Aggregate(Frequency):
         self._cdf = None
         self.verbose_audit_df = None
 
-    def _apply_reins_work(self, reins_list, base_density, debug):
+    def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
         Actually do the work. Called by apply_reins and reins_audit_df.
         Only needs self to get limits, which it must guess without q (not computed
@@ -1456,6 +1461,7 @@ class Aggregate(Frequency):
         if debug is False:
             return ceder, netter, reins_df
 
+        logger.debug('making re graphs.')
         # quick debug; need to know kind=occ|agg here
         f = plt.figure(constrained_layout=True, figsize=(12, 9))
         axd = f.subplot_mosaic('AB\nCD')
@@ -1464,10 +1470,10 @@ class Aggregate(Frequency):
         x = np.linspace(0, xlim[1], 201)
         y = ceder(x)
         n = x - y
-        nxs = netter(xs)
+        nxs = netter(x)
 
         ax = axd['A']
-        ax.plot(xs, ys, 'o')
+        ax.plot(x, y, 'o')
         ax.plot(x, y)
         ax.plot(x, x, lw=.5, c='C7')
         ax.set(aspect='equal', xlim=xlim, ylim=xlim,
@@ -1475,7 +1481,7 @@ class Aggregate(Frequency):
                title=f'Subject and ceded\nMax ceded loss {y[-1]:,.1f}')
 
         ax = axd['B']
-        ax.plot(xs, nxs, 'o')
+        ax.plot(x, nxs, 'o')
         ax.plot(x, n)
         ax.plot(x, x, lw=.5, c='C7')
         ax.set(aspect='equal', ylim=xlim,
@@ -1544,6 +1550,9 @@ class Aggregate(Frequency):
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
         # store stuff
+        print(self.name, self.agg_reins, self.agg_kind)
+        display(agg_reins_df.loc[41.05:41.1])
+
         self.agg_reins_df = agg_reins_df
         self.agg_gross_density = self.agg_density
         self.agg_net_density = agg_reins_df['p_net']
@@ -1553,7 +1562,7 @@ class Aggregate(Frequency):
         elif self.agg_kind == 'net of':
             self.agg_density = self.agg_net_density
         else:
-            raise ValueError(f'Unexpected kind of agg reinsurace, {self.agg_kind}')
+            raise ValueError(f'Unexpected kind of agg reinsurance, {self.agg_kind}')
 
         # update ft of agg
         self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
@@ -1564,9 +1573,63 @@ class Aggregate(Frequency):
         # old_m = self.ex
         self.ex = _m2
         # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
-        logger.log(35,
-                   f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
-                   f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
+        # invalidate quantile function
+
+        logger.info(f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
+                    f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
+
+    def reinsurance_description(self, kind='both'):
+        """
+        Text description of the reinsurance.
+
+        :param kind: both, occ, or agg
+        """
+        ans = []
+        if self.occ_reins is not None and kind in ['occ', 'both']:
+            ans.append(self.occ_kind)
+            ra = []
+            for (s, y, a) in self.occ_reins:
+                if np.isinf(y):
+                    ra.append(f'{s:,.2%} share of unlimited xs {a:,.2f}')
+                else:
+                    if s == y:
+                        ra.append(f'{y:,.2f} xs {a:,.2f}')
+                    else:
+                        ra.append(f'{s:,.2f} part of {y:,.2f} xs {a:,.2f}')
+            ans.append(' and '.join(ra))
+            ans.append('per occurrence')
+        if self.agg_reins is not None and kind in ['agg', 'both']:
+            if len(ans):
+                ans.append('then')
+            ans.append(self.agg_kind)
+            ra = []
+            for (s, y, a) in self.agg_reins:
+                if np.isinf(y):
+                    ra.append(f'{s:,.2%} share of unlimited xs {a:,.2f}')
+                else:
+                    if s == y:
+                        ra.append(f'{y:,.2f} xs {a:,.2f}')
+                    else:
+                        ra.append(f'{s:,.2f} part of {y:,.2f} xs {a:,.2f}')
+            ans.append(' and '.join(ra))
+            ans.append('in the aggregate.')
+        if len(ans):
+            reins = 'Reinsurance: ' + ' '.join(ans)
+        else:
+            reins = 'Reinsurance: None'
+        return reins
+
+    def reinsurance_kinds(self):
+        n = 1 if  self.occ_reins is not None else 0
+        n += 2 if  self.agg_reins is not None else 0
+        if n == 0:
+            return "None"
+        elif n == 1:
+            return 'Occurrence only'
+        elif n == 2:
+            return 'Aggregate only'
+        else:
+            return 'Occurrence and aggregate'
 
     def apply_distortion(self, dist):
         """
@@ -1725,7 +1788,91 @@ class Aggregate(Frequency):
             raise ValueError('Must use compound Poisson for DH density')
         self.beta_name = beta_name
 
-    def plot(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
+    def plot(self, axd=None, xmax=0):
+        """
+        New style basic plot.
+
+        :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
+        the same scale. Only used on linear scales? 
+        :param axd:
+        :return:
+        """
+        if axd is None:
+            self.figure, axd = make_mosaic_figure('ABC')
+
+        if self.bs == 1 and self.ex < 1025:
+            # treat as discrete
+            if xmax > 0:
+                mx = xmax
+            else:
+                mx = self.q(1) * 1.05
+            span = nice_multiple(mx)
+
+            df = self.density_df[['p_total', 'p_sev', 'F', 'loss']].copy()
+            df['sevF'] = df.p_sev.cumsum()
+            df.loc[-0.5, :] = (0, 0, 0, 0, 0)
+            df = df.sort_index()
+            if self.ex < 100:
+                # stem plot for small means
+                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1s', label='Severity')
+                axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0o', label='Aggregate')
+            else:
+                df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
+                df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
+
+            axd['A'].set(xlim=[-mx / 25, mx + 1], title='Probability mass functions')
+            axd['A'].legend()
+            if span > 0:
+                axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
+            # for discrete plot F next
+            df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
+            df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
+            axd['B'].set(xlim=[-mx / 25, mx + 1], title='Distribution functions')
+            axd['B'].legend()
+            if span > 0:
+                axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
+
+            # for Lee diagrams
+            ax = axd['C']
+            # trim so that the Lee plot doesn't spuriously tend up to infinity
+            idx = (df.F == 1).idxmax()
+            dft = df.loc[:idx]
+            ax.plot(dft.F, dft.loss, drawstyle='steps-pre', lw=3, label='Aggregate')
+            # same trim for severity
+            df['sevF'] = df.p_sev.cumsum()
+            idx = (df.sevF == 1).idxmax()
+            df = df.loc[:idx]
+            ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
+            ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Lee diagram')
+            ax.legend()
+        else:
+            # continuous
+            df = self.density_df
+            if xmax > 0:
+                xlim = [-xmax / 50, xmax * 1.025]
+            else:
+                xlim = self.limits(stat='range', kind='linear')
+            xlim2 = self.limits(stat='range', kind='log')
+
+            ax = axd['A']
+            df.p_total.plot(ax=ax, lw=2, label='Aggregate')
+            df.p_sev.plot(ax=ax, lw=1, label='Severity')
+            ax.set(xlim=xlim, title='Probability density')
+            ax.legend()
+
+            df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
+            df.p_sev.plot(ax=axd['B'], lw=1, label='Severity')
+            axd['B'].set(xlim=xlim2, title='Log density', yscale='log')
+            axd['B'].legend()
+
+            ax = axd['C']
+            # to do: same trimming for p-->1 needed?
+            ax.plot(df.F, df.loss, lw=2, label='Aggregate')
+            ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
+            ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Lee (quantile) plot')
+            ax.legend()
+
+    def plot_old(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
         """
         plot computed density and aggregate
 
@@ -1812,8 +1959,7 @@ class Aggregate(Frequency):
             next(axiter).plot(1 / (1 - ps), qs)
             axiter.ax.set(title='Return Period', xscale='log')
 
-        elif kind == 'oldquick':
-            # original quick
+        elif kind == 'quick':
             if self.dh_agg_density is not None:
                 n = 4
             else:
@@ -1885,66 +2031,11 @@ class Aggregate(Frequency):
                 suptitle_and_tight(f'Aggregate {self.name}')
 
         else:
-            # new quick no DH, colors!
-            # TODO LIMITS!
-            f = plt.figure(constrained_layout=True, figsize=figsize)
-            axd = f.subplot_mosaic('ABC')
-
-            if self.bs == 1:
-                mx = self.q(1)
-                span = mx / 6
-                if span > 1:
-                    span = mx // 6
-
-                df = self.density_df[['p_total', 'p_sev', 'F', 'loss']].copy()
-                df['sevF'] = df.p_sev.cumsum()
-                df.loc[-0.5, :] = (0, 0, 0, 0, 0)
-                df = df.sort_index()
-                df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
-                df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
-                axd['A'].set(xlim=[-mx / 25, mx + 1], title='Probability mass functions')
-                axd['A'].legend()
-                axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
-                # for discrete plot F next
-                df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
-                df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
-                axd['B'].set(xlim=[-mx / 25, mx + 1], title='Distribution functions')
-                axd['B'].legend()
-                axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
-
-                # for Lee diagrams
-                ax = axd['C']
-                ax.plot(df.F, df.loss, drawstyle='steps-pre', lw=2, label='Aggregate')
-                ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
-                ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Lee diagram')
-                ax.legend()
-            else:
-                # continuous
-                df = self.density_df
-                mx = self.q(.999) + 0.5
-                xlim = self.limits(stat='range', kind='linear')
-                xlim2 = self.limits(stat='range', kind='log')
-
-                ax = axd['A']
-                df.p_total.plot(ax=ax, lw=2, label='Aggregate')
-                df.p_sev.plot(ax=ax, lw=1, label='Severity')
-                ax.set(xlim=xlim, title='Probability density')
-                ax.legend()
-
-                df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
-                df.p_sev.plot(ax=axd['B'], lw=1, label='Severity')
-                axd['B'].set(xlim=xlim2, title='Log density', yscale='log')
-                axd['B'].legend()
-
-                ax = axd['C']
-                ax.plot(df.F, df.loss, lw=2, label='Aggregate')
-                ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
-                ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Lee (quantile) plot')
-                ax.legend()
+            raise ValueError(f'Unknown option to plot_old, kind={kind}')
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """
-        Suggest sensible plotting limits for kind=range, density, ..
+        Suggest sensible plotting limits for kind=range, density, .. (Same as Portfolio)
 
         Should optionally return a locator for plots?
 
@@ -1968,7 +2059,7 @@ class Aggregate(Frequency):
         eps = 1e-16
 
         # if not computed
-        # GOTCH: if you call q and it fails because not agg_density then q is set to {}
+        # GOTCHA: if you call q and it fails because not agg_density then q is set to {}
         # which is not None
         if self.agg_density is None:
             return f(self.report_ser[('agg', 'P99.9e')])

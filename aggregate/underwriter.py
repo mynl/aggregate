@@ -449,7 +449,7 @@ class Underwriter(object):
                     obj = self.factory(kind, name, spec, program)
                     if update:
                         obj.update(log2, bs, **kwargs)
-                    rv[(kind, name)] = obj
+                    rv[(kind, name)] = (obj, program)
                 else:
                     rv[(kind, name)] = (spec, program)
 
@@ -460,9 +460,10 @@ class Underwriter(object):
         else:
             if len(rv):
                 logger.info(f'Underwriter.write | Program created {len(rv)} objects.')
-            if len(rv) == 1:
-                # dict, pop the last (only) element
-                rv = rv.popitem()[1]
+            # handle this in build
+            # if len(rv) == 1:
+            #     # dict, pop the last (only) element
+            #     rv = rv.popitem()[1]
 
         # return created objects
         return rv
@@ -594,7 +595,14 @@ class Underwriter(object):
 
 
 class Build(object):
-    uw = Underwriter(create_all=True, update=False)
+    """
+    The Build class wraps the Underwriter to provide a more elementary interface. Intelligent auto-update,
+    detects discrete distributions and sets ``bs = 1``.
+
+    """
+    # set overall debug mode, for parser and port, sev and aggregate object updates
+    DEBUG = False
+    uw = Underwriter(create_all=False, update=True, debug=DEBUG)
 
     @classmethod
     def parse(cls, program):
@@ -609,65 +617,104 @@ class Build(object):
         return cls.uw.describe(item_type, pretty_print=True)
 
     @classmethod
-    def build(cls, program, update=True, bs=0, log2=13, padding=1, **kwargs):
+    def build(cls, program, update=True, create_all=None, log2=-1, bs=0, **kwargs):
         """
-        Convenience function to make work easy for the user. Hide uw, updating etc.
+        Convenience function to make work easy for the user. Hide uw, updating etc. A single instance, called
+        ``build`` is exported from the module.
 
-        :param update:
         :param program:
+        :param update: build's update
+        :param create_all: for just this run
+        :param log2: -1 is default. Figure log2 for discrete and 13 for all others. Inupt value over-rides
+        and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
-        :param log2:
-        :param padding:
-        :param kwargs: passed to update
-        :return:
+        :param kwargs: passed to update, e.g., padding
+        :return: created object(s)
         """
 
         if program in ['underwriter', 'uw']:
             return cls.uw
 
+        # options for this run
+        create_all0 = cls.uw.create_all
+        if create_all is not None:
+            cls.uw.create_all = create_all
+
         # make stuff
-        out = cls.uw(program)
+        # write will return a dict with keys (kind, name) and value either the object or the spec
+        out_dict = cls.uw.write(program, update=False)
 
-        if isinstance(out, dict):
-            pass
-        elif isinstance(out, Aggregate) and update is True:
-            d = out.spec
-            if d['sev_name'] == 'dhistogram':
-                bs = 1
-                # how big?
-                if d['freq_name'] == 'fixed':
-                    max_loss = np.max(d['sev_xs']) * d['exp_en']
-                elif d['freq_name'] == 'empirical':
-                    max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
+        # in this loop bs_ and log2_ are the values actually used for each update; they do not
+        # overwrite the input default values
+        for (kind, name), (out, program) in out_dict.items():
+            if isinstance(out, dict):
+                # dict spec output, these objects where not created
+                logger.info(f'Object {name} of kind {kind} returned as a spec; no further processing.')
+            elif isinstance(out, Aggregate) and update is True:
+                d = out.spec
+                if d['sev_name'] == 'dhistogram' and log2 == -1:
+                    bs_ = 1
+                    # how big?
+                    if d['freq_name'] == 'fixed':
+                        max_loss = np.max(d['sev_xs']) * d['exp_en']
+                    elif d['freq_name'] == 'empirical':
+                        max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
+                    else:
+                        # normal approx on count
+                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en']**0.5)
+                    # binaries are 0b111... len-2 * 2 is len - 1
+                    log2_ = len(bin(int(max_loss))) - 1
+                    logger.info(f'({kind}, {name}): Discrete mode, using bs=1 and log2={log2_}')
                 else:
-                    # normal approx on count
-                    max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en']**0.5)
-                # binaries are 0b111... len-2 * 2 is len - 1
-                log2 = len(bin(int(max_loss))) - 1
-                logger.info(f'Discrete input, using bs=1 and log2={log2}')
-            try:
-                out.update(log2=log2, bs=bs, padding=padding, **kwargs)
-            except ZeroDivisionError as e:
-                logger.error(e)
-            except AttributeError as e:
-                logger.error(e)
-        elif isinstance(out, Severity):
-            # there is no updating for severities
-            pass
-        elif isinstance(out, Portfolio):
-            # figure stuff
-            pass
-        else:
-            pass
+                    if log2 == -1:
+                        log2_ = 13
+                    else:
+                        log2_ = log2
+                    if bs == 0:
+                        bs_ = out.recommend_bucket(log2_)
+                    else:
+                        bs_ = bs
+                    logger.info(f'({kind}, {name}): Normal mode, using bs={bs_} and log2={log2_}')
+                try:
+                    out.update(log2=log2_, bs=bs_, debug=cls.DEBUG, **kwargs)
+                except ZeroDivisionError as e:
+                    logger.error(e)
+                except AttributeError as e:
+                    logger.error(e)
+            elif isinstance(out, Severity):
+                # there is no updating for severities
+                pass
+            elif isinstance(out, Portfolio) and update is True:
+                # figure stuff
+                if log2 == -1:
+                    log2_ = 13
+                else:
+                    log2_ = log2
+                if bs == 0:
+                    bs_ = out.best_bucket(log2_)
+                else:
+                    bs_ = bs
+                print(f'updating with {log2}, bs=1/{1/bs_}')
+                logger.info(f'({kind}, {name}): bs={bs_} and log2={log2_}')
+                out.update(log2=log2_, bs=bs_, remove_fuzz=True, debug=cls.DEBUG, **kwargs)
+            else:
+                logger.warning(f'WTF??? output kind is {type(out)}. (expr/number?)')
+                pass
 
-        return out
+        # put back defaults
+        cls.uw.create_all = create_all0
+        if len(out_dict) == 1:
+            # only one output...just return that
+            # dict, pop the last (only) element (popitem: Remove and return a (key, value) pair as a 2-tuple.)
+            out_dict = out_dict.popitem()[1]
+            if len(out_dict) == 2:
+                out_dict = out_dict[0]
+            else:
+                print('WTF, investigate...'*5)
+
+        return out_dict
 
     __call__ = build
-
-    @staticmethod
-    def dummy_safe_lookup(buildinid):
-        """ for debugging """
-        return {'sev_name': 'BUILTIN', 'sev_a': buildinid}
 
     @classmethod
     def interpreter_file(cls, where='',
@@ -701,6 +748,7 @@ class Build(object):
         """
         do all the work for the est, allows into to be marshalled into the tester
         in different ways.
+
         :return:
         """
         lexer = UnderwritingLexer()
@@ -733,7 +781,7 @@ class Build(object):
                 else:
                     no_errs += 1
                 ans[test_name] = [kind, err, name,
-                                  parser.out_dict[(kind, name)] if kind!= 'expr' else None,
+                                  parser.out_dict[(kind, name)] if kind != 'expr' else None,
                                   program, f(program, program_in)]
             elif len(program) > 1:
                 logger.info(f'{program_in} preprocesses to {len(program)} lines; not processing.')
@@ -750,5 +798,5 @@ class Build(object):
         return df_out
 
 
-# exported item
+# exported instance
 build = Build()

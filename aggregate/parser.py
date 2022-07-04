@@ -353,10 +353,10 @@ class UnderwritingLexer(Lexer):
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
               AND, PERCENT,
               EXPONENT, EXP,
-              DFREQ, DSEV
+              DFREQ, DSEV, RANGE
               }
 
-    ignore = ' \t,\\:|'
+    ignore = ' \t,\\|'
     literals = {'[', ']', '!', '(', ')'}
 
     # per manual, need to list longer tokens before shorter ones
@@ -382,6 +382,7 @@ class UnderwritingLexer(Lexer):
     SCALE_MULTIPLY = r'@'
     LOCATION_ADD = '#'
     EQUAL_WEIGHT = r'='
+    RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
@@ -601,12 +602,12 @@ class UnderwritingParser(Parser):
         self.logger(f'agg_list <-- agg_list agg_out', p)
         return p.agg_list
 
+    # building aggregates ========================================
     @_('agg_out')
     def agg_list(self, p):
         self.logger(f'agg_list <-- agg_out', p)
         return [p.agg_out]
 
-    # building aggregates ========================================
     @_('AGG name builtin_agg note')
     def agg_out(self, p):
         # for use when you change the agg and need a new name
@@ -635,7 +636,6 @@ class UnderwritingParser(Parser):
     # separate treatment of dsev forbids 3 @ dsev # 4; that is also not handled for xps sevs
     # though it does parse. But with this separate treatment you do not need the sev keyword
     # if sev <-- dsev then in use you'd need sev dsev [1] which is no net gain.
-
     @_('AGG name exposures layers dsev occ_reins freq agg_reins note')
     def agg_out(self, p):
         self.logger(
@@ -657,14 +657,14 @@ class UnderwritingParser(Parser):
     #     self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.dfreq,  **p.sev,
     #                                      **p.occ_reins, **p.agg_reins, 'note': p.note}
     #     return p.agg_name
-
+    #
     # as above, can't have layers and can't have occ and agg without a split
-    @_('AGG name dfreq dsev occ_reins note')
+    @_('AGG name dfreq dsev occ_reins agg_reins note')
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- AGG name dfreq dsev occ_reins note', p)
         self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.dsev,
-                                         **p.occ_reins, 'note': p.note}
+                                         **p.occ_reins, **p.agg_reins, 'note': p.note}
         return p.name
 
     @_('builtin_agg agg_reins note')
@@ -676,15 +676,7 @@ class UnderwritingParser(Parser):
         self.out_dict[("agg", p.builtin_agg['name'])] = {**p.builtin_agg, **p.agg_reins, 'note': p.note}
         return p.builtin_agg['name']
 
-    # building severities ======================================
-    # @_('SEV name sev_name sev note')
-    # def sev_out(self, p):
-    #     self.logger(
-    #         f'sev_out <-- sev_out sev_name sev note', p)
-    #     p.sev['note'] = p.note
-    #     self.out_dict[("sev", p.sev_name)] = p.sev
-    #     return 'sev', p.sev_name
-
+    # building severities =====================================
     @_('SEV name sev note')
     def sev_out(self, p):
         self.logger(
@@ -761,21 +753,15 @@ class UnderwritingParser(Parser):
         return {'freq_name': p.FREQ}
 
     # agg reins clause ========================================
-    @_('NET OF reins_list AGGREGATE')
+    @_('AGGREGATE NET OF reins_list')
     def agg_reins(self, p):
-        self.logger(f'agg_reins <-- NET OF reins_list AGGREGATE', p)
+        self.logger(f'agg_reins <-- AGGREGATE NET OF reins_list', p)
         return {'agg_reins': p.reins_list, 'agg_kind': 'net of'}
 
-    @_('CEDED TO reins_list AGGREGATE')
+    @_('AGGREGATE CEDED TO reins_list')
     def agg_reins(self, p):
-        self.logger(f'agg_reins <-- NET OF reins_list AGGREGATE', p)
+        self.logger(f'agg_reins <--  AGGREGATE CEDED TO reins_list', p)
         return {'agg_reins': p.reins_list, 'agg_kind': 'ceded to'}
-
-    # @_('SUBJECT TO reins_list AGGREGATE')
-    # def agg_reins(self, p):
-    #     # same as CEDED TO
-    #     self.logger(f'agg_reins <-- NET OF reins_list AGGREGATE', p)
-    #     return {'agg_reins': p.reins_list, 'agg_kind': 'ceded to'}
 
     @_("")
     def agg_reins(self, p):
@@ -783,21 +769,15 @@ class UnderwritingParser(Parser):
         return {}
 
     # occ reins clause ========================================
-    @_('NET OF reins_list OCCURRENCE')
+    @_('OCCURRENCE NET OF reins_list')
     def occ_reins(self, p):
-        self.logger(f'occ_reins <-- NET OF reins_list OCCURRENCE', p)
+        self.logger(f'occ_reins <-- OCCURRENCE NET OF reins_list', p)
         return {'occ_reins': p.reins_list, 'occ_kind': 'net of'}
 
-    @_('CEDED TO reins_list OCCURRENCE')
+    @_('OCCURRENCE CEDED TO reins_list')
     def occ_reins(self, p):
-        self.logger(f'occ_reins <-- NET OF reins_list OCCURRENCE', p)
+        self.logger(f'occ_reins <-- OCCURRENCE CEDED TO reins_list', p)
         return {'occ_reins': p.reins_list, 'occ_kind': 'ceded to'}
-
-    # @_('SUBJECT TO reins_list OCCURRENCE')
-    # def occ_reins(self, p):
-    #     # same as CEDED TO
-    #     self.logger(f'occ_reins <-- NET OF reins_list OCCURRENCE', p)
-    #     return {'occ_reins': p.reins_list, 'occ_kind': 'ceded to'}
 
     @_("")
     def occ_reins(self, p):
@@ -967,6 +947,16 @@ class UnderwritingParser(Parser):
         a = self._check_vectorizable(p.numberl)
         return a
 
+    @_('"[" expr RANGE expr "]"')
+    def doutcomes(self, p):
+        self.logger('doutcomes <-- [expr : expr]', p)
+        return np.arange(p[1], p[3] + 1)
+
+    @_('"[" expr RANGE expr RANGE expr "]"')
+    def doutcomes(self, p):
+        self.logger('doutcomes <-- [expr : expr : expr]', p)
+        return np.arange(p[1], p[3] + 1, p[5])
+
     @_('"[" numberl "]"')
     def dprobs(self, p):
         self.logger('dprobs <-- [numberl]', p)
@@ -993,33 +983,6 @@ class UnderwritingParser(Parser):
     def weights(self, p):
         self.logger('weights <-- missing weights term', p)
         return 1
-
-    # @_('builtinids numbers numbers')
-    # def sev(self, p):
-    #     self.logger(
-    #         f'sev <-- builtinds numbers numbers (log2={p[1]}, bs={p[2]})', p)
-    #     requested_type = p.builtinids.split('.')[0]
-    #     if requested_type == "meta":
-    #         return {'sev_name': p.builtinids, 'sev_a': p[1], 'sev_b': p[2]}
-    #     else:
-    #         raise ValueError(
-    #             f'Only meta type can be used with arguments, not {p.builtinids}')
-    #
-    # @_('builtinids')
-    # def sev(self, p):
-    #     self.logger(f'sev <-- builtinds', p)
-    #     # look up ID in uw
-    #     # it is not accepetable to ask for an agg or port here; they need to be accessed through
-    #     # meta. E.g. if you request and agg it will overwrite other (freq) variables defined
-    #     # in the script...
-    #     requested_type = p.builtinids.split('.')[0]
-    #     if requested_type not in ("sev", "meta"):
-    #         raise ValueError(
-    #             f'built in type must be sev or meta, not {p.builtinids}')
-    #     if requested_type == 'meta':
-    #         return {'sev_name': p.builtinids}
-    #     else:
-    #         return self.safe_lookup(p.builtinids)
 
     # layer terms, optional ===================================
     @_('numbers XS numbers')
@@ -1068,11 +1031,6 @@ class UnderwritingParser(Parser):
         self.logger(
             f'exposures <-- numbers PREMIUM AT numbers LR', p)
         return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
-
-    # @_('BUILTINID')
-    # def builtinids(self, p):
-    #     self.logger(f'buildinids <-- BUILTINID', p)
-    #     return p.BUILTINID  # will always be treated as a list
 
     @_('"[" idl "]"')
     def ids(self, p):
@@ -1176,26 +1134,6 @@ class UnderwritingParser(Parser):
     def name(self, p):
         self.logger(f'name <-- ID = {p.ID}', p)
         return p.ID
-    
-    # @_('SEV ID')
-    # def sev_name(self, p):
-    #     self.logger(f'sev_name <-- SEV ID', p)
-    #     return p.ID
-    # 
-    # @_('AGG ID')
-    # def agg_name(self, p):
-    #     self.logger(f'agg_name <-- AGG ID', p)
-    #     # return {'name': p.ID}
-    #     if p.ID.find('_') >= 0:
-    #         raise ValueError(f'agg names cannot include _, you entered  {p.ID}. '
-    #                          '(sev and port object names can include _.)')
-    #     return p.ID
-    # 
-    # @_('PORT ID')
-    # def port_name(self, p):
-    #     self.logger(f'port_name <-- PORT ID', p)
-    #     # return {'name': p.ID}
-    #     return p.ID
 
     # vectors of numbers
     @_('"[" numberl "]"')

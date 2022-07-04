@@ -1,52 +1,25 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import scipy.stats as ss
-import pandas as pd
-from IPython.core.display import HTML, display
-import logging
-import logging.handlers
+from io import StringIO
 import itertools
+import logging.handlers
+import logging
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
+import pandas as pd
+import re
+import scipy.stats as ss
 from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
-from io import StringIO
-import re
 from time import time_ns
+from IPython.core.display import HTML, display
 
-# logging
-# June 2022 got rid of file logging
-# see https://docs.python.org/3.7/howto/logging.html
-# and https://docs.python.org/3.7/howto/logging-cookbook.html
-# LOGFILE = Path.home() / '.agglog/agg.main.logger.log'
-# LOGFILE.parent.mkdir(exist_ok=True, parents=True)
 
 # approved method is call (__name__)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# if len(logger.handlers) == 0:
-#     # otherwise they proliferate whenever module is loaded...
-#     # rh = logging.FileHandler(LOGFILE, 'w', 'utf-8')
-#     # rh.setLevel(logging.DEBUG)
-#     # rh_formatter = logging.Formatter(
-#     #     '%(asctime)s | %(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
-#     # rh.setFormatter(rh_formatter)
-#
-#     # to stderr
-#     ch = logging.StreamHandler()
-#     ch.setLevel(logging.INFO)
-#     ch_formatter = logging.Formatter(
-#         '%(levelname)-10s | %(funcName)-12s: %(message)s')
-#     ch.setFormatter(ch_formatter)
-#         # '%(name)s | %(levelname)-10s | %(funcName)-20s (l. %(lineno) 5d) | %(message)s')
-#
-#     # add loggers
-#     # logger.addHandler(rh)
-#     logger.addHandler(ch)
-
-# kick off message
-logger.debug('aggregate_project.__init__ | New Aggregate Session started')
 
 # TODO take out timer stuff
 last_time = first_time = 0
@@ -332,7 +305,7 @@ def make_ceder_netter(reins_list, debug=False):
         return ceder, netter
 
 
-# axis management
+# axis management OLD
 def axiter_factory(axiter, n, figsize=None, height=2, aspect=1, nr=5):
     """
     axiter = check_axiter(axiter, ...) to allow chaining
@@ -1373,3 +1346,120 @@ def subsets(x):
     """
     return list(itertools.chain.from_iterable(
         itertools.combinations(x, n) for n in range(len(x) + 1)))[1:]
+
+
+# new graphics methods
+def nice_multiple(mx):
+    """
+    Suggest a nice multiple for an axis with scale 0 to mx. Used by the MultipleLocator in discrete plots,
+    where you want an integer multiple. Return 0 to let matplotlib figure the answer. Real issue is stopping
+    multiples like 2.5.
+
+    :param mx:
+    :return:
+    """
+    m = mx / 6
+    if m < 0:
+        return 0
+
+    m = mx // 6
+    m = {3:2, 4:5, 6:5, 7:5, 8:10, 9:10}.get(m, m)
+    if m < 10:
+        return m
+
+    # punt back to mpl for larger values
+    return 0
+
+class GreatFormatter(ticker.ScalarFormatter):
+    def __init__(self, sci=True, power_range=(-3, 3), offset=True, mathText=False):
+        super().__init__(useOffset=offset, useMathText=mathText)
+        self.set_powerlimits(power_range)
+        self.set_scientific(sci)
+
+    def _set_order_of_magnitude(self):
+        super()._set_order_of_magnitude()
+        self.orderOfMagnitude = int(3 * np.floor(self.orderOfMagnitude / 3))
+
+
+def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', yfmt='great',
+                       places=None, power_range=(-3, 3), sep='', unit='', sci=True,
+                       mathText=False, offset=True):
+    """
+    make mosaic of axes
+    apply format to xy axes
+    default engineering format
+    default w x h
+
+    xfmt='d' for default axis formatting, n=nice, e=engineering, s=scientific, g=great
+    great = engineering with power of three exponents
+
+    """
+
+    if figsize is None:
+        sm = mosaic.split('\n')
+        nr = len(sm)
+        nc = len(sm[0])
+        figsize = (w * nc, h * nr)
+
+    f = plt.figure(constrained_layout=True, figsize=figsize)
+    axd = f.subplot_mosaic(mosaic)
+
+    for ax in axd.values():
+        if xfmt[0] != 'd':
+            easy_formatter(ax, which='x', kind=xfmt, places=places,
+                           power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText, offset=offset)
+        if yfmt[0] != 'default':
+            easy_formatter(ax, which='y', kind=yfmt, places=places,
+                           power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText, offset=offset)
+    return f, axd
+
+
+def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
+                   mathText=False, offset=True):
+    """
+    set which (x, y, b, both) to kind = sci, eng, nice
+    nice = engineering but uses e-3, e-6 etc.
+    see docs for ScalarFormatter and EngFormatter
+
+
+    """
+
+    def make_fmt(kind, places, power_range, sep, unit):
+        if kind == 'sci' or kind[0] == 's':
+            fm = ticker.ScalarFormatter()
+            fm.set_powerlimits(power_range)
+            fm.set_scientific(True)
+        elif kind == 'eng' or kind[0] == 'e':
+            fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
+        elif kind == 'great' or kind[0] == 'g':
+            fm = GreatFormatter(
+                sci=sci, power_range=power_range, offset=offset, mathText=mathText)
+        elif kind == 'nice' or kind[0] == 'n':
+            fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
+            fm.ENG_PREFIXES = {
+                i: f'e{i}' if i else '' for i in range(-24, 25, 3)}
+        else:
+            raise ValueError(f'Passed {kind}, expected sci or eng')
+        return fm
+
+    # what to set
+    if which == 'b' or which == 'both':
+        which = ['xaxis', 'yaxis']
+    elif which == 'x':
+        which = ['xaxis']
+    else:
+        which = ['yaxis']
+
+    for w in which:
+        fm = make_fmt(kind, places, power_range, sep, unit)
+        getattr(ax, w).set_major_formatter(fm)
+
+# styling
+def style_df(df, ):
+    """
+    Style a df similar to pricinginsurancerisk.com styles.
+
+    :param df:
+    :return:
+    """
+    pass

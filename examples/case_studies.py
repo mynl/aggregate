@@ -30,12 +30,11 @@ import aggregate as agg
 # importing like this makes isinstance work better
 from aggregate.distr import Aggregate
 from aggregate.port import Portfolio
-from aggregate.utils import round_bucket
+from aggregate.utils import round_bucket, make_mosaic_figure
 import argparse
 from collections import OrderedDict
 from cycler import cycler
 from datetime import datetime
-from flask import render_template
 import hashlib
 from itertools import product
 from jinja2 import Environment, FileSystemLoader
@@ -291,7 +290,7 @@ class CaseStudy(object):
     def add_case(cls, case_id, **kwargs):
         cls._cases_.loc[case_id] = kwargs
         cls._cases_.to_csv(cls._case_database_)
-        logger.log(35, f'Added {case_id} to cases and saved. Database has {len(cls._cases_)} entries.')
+        logger.info(f'Added {case_id} to cases and saved. Database has {len(cls._cases_)} entries.')
 
     @classmethod
     def cases_html(cls, cols=slice(0,12), check_dir=None, page='results'):
@@ -354,6 +353,8 @@ class CaseStudy(object):
         self.blend_d = None
         self.roe_d = None
         self.dist_dict = None
+        self.uw = agg.Underwriter(create_all=False, update=False)
+
 
         self.tab13_1 = None
         self.sop = None
@@ -393,6 +394,7 @@ class CaseStudy(object):
         self.re_attach_p = 0.
         self.re_detach = 0.
         self.re_detach_p = 0.
+        self.re_description = ''
         self.reg_p = 0.
         self.roe = 0.
         self.d2tc = 0.
@@ -426,7 +428,6 @@ class CaseStudy(object):
         self.net = None
         self.ports = None
         self.pricings = None
-        self.re_descriptor = ''
         self.re_summary = None
 
         # graphics and presentation
@@ -547,7 +548,6 @@ class CaseStudy(object):
         # standard exhibit, get number for exhibits
         self.case_number = {'tame': 0, 'cnc': 1, 'hs': 2}.get(self.case_id, 0)
 
-        uw = agg.Underwriter(create_all=False, update=False)
         self.v = 1 / (1 + self.roe)
         self.d = 1 - self.v
 
@@ -557,7 +557,7 @@ class CaseStudy(object):
 
         # units roughly millions
         # new style output from uw key (kind, name) output (obj or spec, program)
-        out = uw(f'''
+        out = self.uw(f'''
 
 port Gross_{self.case_id}
     {self.a_distribution}
@@ -594,10 +594,12 @@ port Gross_{self.case_id}
 
         net_program = gross_program + f' aggregate net of {self.re_limit} xs {self.re_attach}'
         net_program = net_program.replace('Gross', 'Net')
-        out = uw(net_program)
+        out = self.uw(net_program, remove_fuzz=True)
+
         self.net, net_program = out[('port', f'Net_{self.case_id}')]
         self.net.program = net_program
         self.net.update(log2=self.log2, bs=self.bs)
+
         enhance_portfolio(self.net)
 
         self.ports = OrderedDict(gross=self.gross, net=self.net)
@@ -606,7 +608,7 @@ port Gross_{self.case_id}
         self.pricings['gross'] = pricing(self.gross, reg_p, roe)
         self.pricings['net'] = pricing(self.net, reg_p, roe)
 
-        self.re_descriptor = f'&curren;{self.re_detach - self.re_attach:.1f} excess &curren;{self.re_attach:.1f} {self.re_type.lower()} reinsurance applied to {self.re_line}.'
+        self.re_description = f'&curren;{self.re_detach - self.re_attach:.1f} excess &curren;{self.re_attach:.1f} {self.re_type.lower()} reinsurance applied to {self.re_line}.'
         self.re_summary = pd.DataFrame([self.re_line, self.re_type, self.re_attach_p, self.re_attach, self.re_detach_p,
                                         self.re_detach - self.re_attach], index=[
             'Reinsured Line', 'Reinsurance Type', 'Attachment Probability', 'Attachment', 'Exhaustion Probability',
@@ -646,7 +648,10 @@ port Gross_{self.case_id}
                      f_discrete, _bs, _log2, _padding):
         """
         TODO: a_distribution s/b a_program?
-        
+
+        f_blend_fix True by default and try to do extend method.
+        f_roe_fix True by default (use approx to CCoC distortion)
+
         Create CaseStudy from case_id and all arguments in generic format with explicit reinsurance.
         re_line='B' required.
 
@@ -718,18 +723,27 @@ port Gross_{self.case_id}
         # standard exhibit, get number for exhibits
         self.case_number = 0
 
-        # uw = agg.Underwriter(create_all=False, update=False)
         # new style output from uw key (kind, name) output (obj or spec, program)
-        self.gross = Portfolio('Gross', [self.a_distribution, self.b_distribution_gross])
-
+        out = self.uw(f'''
+port Gross_{self.case_id}
+    {self.a_distribution}
+    {self.b_distribution_gross}
+''')
+        self.gross = out[('port', f'Gross_{self.case_id}')][0]
         # sort out better bucket
         if self.bs == 0 or np.isnan(self.bs):
             self.bs = self.gross.best_bucket(self.log2)
         self.gross = TensePortfolio(self.gross, log2=self.log2, bs=self.bs, padding=self.padding,
                                     ROE=self.roe, p=self.reg_p)
 
-        self.net = Portfolio('Net', [self.a_distribution, self.b_distribution_net])
-        self.net.update(log2=self.log2, bs=self.bs)
+        # net portfolio
+        out = self.uw(f'''
+port Net_{self.case_id}
+    {self.a_distribution}
+    {self.b_distribution_net}
+''')
+        self.net = out[('port', f'Net_{self.case_id}')][0]
+        self.net.update(log2=self.log2, bs=self.bs, remove_fuzz=True)
         enhance_portfolio(self.net)
         self.ports = OrderedDict(gross=self.gross, net=self.net)
 
@@ -738,10 +752,10 @@ port Gross_{self.case_id}
         self.pricings['net'] = pricing(self.net, reg_p, roe)
 
         # are these used?
-        self.re_type = self.net.reinsurance_kinds()
+        self.re_type = self.net[self.re_line].reinsurance_kinds()
         self.re_limit = 1e20
         self.re_attach = 1e20
-        self.re_descriptor = self.net.reinsurance_description(kind='both')
+        self.re_description = self.net[self.re_line].reinsurance_description(kind='both')
         self.re_summary = pd.DataFrame([self.re_line, self.re_type, self.re_attach_p, self.re_attach, self.re_detach_p,
                                         self.re_detach - self.re_attach], index=[
             'Reinsured Line', 'Reinsurance Type', 'Attachment Probability', 'Attachment', 'Exhaustion Probability',
@@ -751,25 +765,20 @@ port Gross_{self.case_id}
         # cap table needs pricing_summary
         self.make_audit_exhibits()
 
-        # the common distortions
-        if self.f_blend_fix:
-            logger.warning('Applying blend fix.')
-            # need ot make the cap table
-            self.make_cap_table()
-            try:
-                self.blend_d = self.make_blend()
-            except ValueError as e:
-                logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
-                self.blend_d = self.make_blend(mode='book')
-                self.f_blend_fix = False
-        else:
+        # set up the common distortions
+        self.f_blend_fix = True
+        # make the cap table
+        self.make_cap_table()
+        try:
             self.blend_d = self.make_blend()
+        except ValueError as e:
+            logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
+            self.blend_d = self.make_blend(mode='book')
+            self.f_blend_fix = False
 
-        if self.f_roe_fix:
-            logger.warning('applying ROE fix.')
-            self.roe_d = self.approx_roe(e=1e-10)
-        else:
-            self.roe_d = agg.Distortion('roe', self.roe, display_name='roe')
+        self.f_roe_fix = True
+        logger.info('applying ROE approximation fix.')
+        self.roe_d = self.approx_roe(e=1e-10)
         self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
 
         self.cache_dir = self.cache_base / f'{self.case_id}'
@@ -806,7 +815,12 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         process_memory()
         self.show_extended_graphs()
         process_memory()
-        logger.log(35, f'{self.case_id} completed!')
+        logger.log(35, f'{self.case_id} computed')
+
+        # save the results
+        mrm = ManualRenderResults()
+        p, p1 = mrm.render(self.case_id)
+        logger.log(35, f'{self.case_id} saved to HTML...complete!')
 
     def approx_roe(self, e=1e-15):
         """
@@ -1062,52 +1076,56 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         # ==================================================================================
         if 2 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 2: Case Study Intro</h2>'))
-            ff = lambda x: f'{x if x < 1000 else x / 1000:,.0f}' if abs(x) > 100 else f'{x:.3f}'
-            table_no = [2.5, 2.6, 2.7][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""{self.case_name} estimated mean, CV, skewness and kurtosis by line and in total, gross and net.
+            ff = lambda x: f'{x:,.3f}'
+            # table_no = [2.5, 2.6, 2.7][self.case_number]
+            # caption = f'Table {table_no}: '
+            if self.re_description == '':
+                # old book style
+                caption = f"""{self.case_name} estimated mean, CV, skewness and kurtosis by line and in total, gross and net.
 {self.re_type} reinsurance applied to {self.re_line} with an attachment probability {self.re_attach_p}
 (&curren; {self.re_attach:,.0f})
 and detachment probability {self.re_detach_p} (&curren; {self.re_detach:,.0f})."""
-
+            else:
+                caption = f"""{self.case_name} estimated mean, CV, skewness and kurtosis by line and in total, gross and net.
+{self.re_description} applied to {self.re_line}."""
             self._display("A", urn(self.audit_all.iloc[:4]), caption, ff)
 
         # ==================================================================================
         # ==================================================================================
         if 4 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 4: Risk Measures, VaR and TVaR</h2>'))
-            if self.case_id in ['tame', 'cnc', 'hs', 'discrete']:
-                units = ''
-                ff = lambda x: f'{x:,.0f}' if abs(x) > 1 else f'{x:.3g}'
-            else:
-                units = '\nAmounts in &curren; 000.'
-                ff = lambda x: f'{x if x < 1000 else x / 1000:,.0f}' if abs(x) > 100 else f'{x:.3f}'
-
-            table_no = [4.6, 4.7, 4.8][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""{self.case_name} estimated VaR, TVaR and EPD by line and in total, gross and net.
+            ff = lambda x: f'{x:,.1f}' if abs(x) > 1 else f'{x:.3g}'
+            # table_no = [4.6, 4.7, 4.8][self.case_number]
+            # caption = f'Table {table_no}: '
+            if self.re_description == '':
+                caption = f"""{self.case_name} estimated VaR, TVaR and EPD by line and in total, gross and net.
 EPD shows assets required for indicated EPD percentage.
-Sum shows sum of parts by line with no diversification and
+Sum column shows sum of parts by line with no diversification and
 benefit shows percentage reduction compared to total.
 {self.re_type} reinsurance applied to {self.re_line} with an attachment probability {self.re_attach_p}
 (&curren; {self.re_attach:,.0f})
-and detachment probability {self.re_detach_p} (&curren; {self.re_detach:,.0f}). {units}"""
+and detachment probability {self.re_detach_p} (&curren; {self.re_detach:,.0f})."""
+            else:
+                caption = f"""{self.case_name} estimated VaR, TVaR and EPD by line and in total, gross and net.
+EPD shows assets required for indicated EPD percentage.
+Sum column shows sum of parts by line with no diversification and
+benefit shows percentage reduction compared to total.
+{self.re_description} applied to {self.re_line}."""
             self._display("E", urn(self.audit_var_tvar), caption, ff)
 
         # ==================================================================================
         # ==================================================================================
         if 7 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 7: Guide to Practice Chapters</h2>'))
-            table_no = 7.2
-            caption = f'Table {table_no}: '
-            caption += f"""Pricing summary for {self.case_name}.
-Pricing summary by Case. The Case uses a {self.reg_p} capital standard. Cost of capital is {self.roe:.1%}."""
+            # table_no = 7.2
+            # caption = f'Table {table_no}: '
+            caption = f"""Pricing summary for {self.case_name} using a 
+a {self.reg_p} capital standard and {self.roe:.1%} constant cost of capital for all layers."""
             self._display("F", urn(self.pricing_summary), caption, None)
 
             if self.show: display(HTML('<hr>'))
-            table_no = 7.3
-            caption = f'Table {table_no}: '
-            caption += f"""Reinsurance summary for {self.case_name}."""
+            # table_no = 7.3
+            # caption = f'Table {table_no}: '
 
             def re_formatter(x):
                 try:
@@ -1115,36 +1133,38 @@ Pricing summary by Case. The Case uses a {self.reg_p} capital standard. Cost of 
                 except ValueError:
                     return x
 
-            self._display("G", urn(self.re_summary), caption, re_formatter)
+            if self.case_id in ['discrete', 'tame', 'cnc', 'hs']:
+                caption = f"""Reinsurance summary for {self.case_name}."""
+                self._display("G", urn(self.re_summary), caption, re_formatter)
 
         # ==================================================================================
         # ==================================================================================
         if 9 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 9: Classical Portfolio Pricing</h2>'))
-            table_no = [9.2, 9.5, 9.8][self.case_number]
-            ff = lambda x: '' if np.isnan(x) else f'{x:.3f}'
-            caption = f'Table {table_no}: '
-            caption += f"""Classical pricing by method for {self.case_name}. Pricing calibrated to total gross portfolio and applied to each line on a stand-alone basis.
+            # table_no = [9.2, 9.5, 9.8][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Classical pricing by method for {self.case_name}. Pricing calibrated to total gross portfolio and applied to each line on a stand-alone basis.
 Sorted by gross premium for {self.lns[1]}."""
+            ff = lambda x: '' if np.isnan(x) else (f'{x:,.3f}' if abs(x) < 5 else f'{x:,.1f}')
             self._display("H", urn(self.classic_pricing), caption, ff)
 
-            table_no = [9.3, 9.6, 9.9][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Sum of parts (SoP) stand-alone vs. diversified classical pricing by method for {self.case_name}. Delta
+            # table_no = [9.3, 9.6, 9.9][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Sum of parts (SoP) stand-alone vs. diversified classical pricing by method for {self.case_name}. Delta
 columns show the difference."""
             if self.show: display(HTML('<hr>'))
             self._display("I", urn(self.sop), caption, ff)
 
-            table_no = [9.4, 9.7, 9.10][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Implied loss ratios from classical pricing by method for {self.case_name}. Pricing calibrated to total gross portfolio and applied to each line on a stand-alone basis."""
             if self.show: display(HTML('<hr>'))
-            self._display("J", urn(self.lrs), caption, lambda x: f'{x:.3g}')
+            # table_no = [9.4, 9.7, 9.10][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Implied loss ratios from classical pricing by method for {self.case_name}. Pricing calibrated to total gross portfolio and applied to each line on a stand-alone basis."""
+            self._display("J", urn(self.lrs), caption, ff)
 
-            table_no = 9.11
-            caption = f'Table {table_no}: '
-            caption += f"""Comparison of stand-alone and sum of parts (SoP) premium for {self.case_name}."""
             if self.show: display(HTML('<hr>'))
+            # table_no = 9.11
+            # caption = f'Table {table_no}: '
+            caption = f"""Comparison of stand-alone and sum of parts (SoP) premium for {self.case_name}."""
             tab911 = self.modern_monoline_sa.loc[
                          [('No Default', 'Loss'), ('No Default', 'Premium'), ('No Default', 'Capital'),
                           ('With Default', 'Loss'), ('With Default', 'Premium'), ('With Default', 'Capital')]].iloc[:,
@@ -1153,66 +1173,67 @@ columns show the difference."""
             tab911['Gross Redn'] = tab911['Gross Total'] / tab911['Gross SoP'] - 1
             tab911['Net Redn'] = tab911['Net Total'] / tab911['Net SoP'] - 1
             tab911 = tab911.iloc[:, [0, 1, 4, 2, 3, 5]]
-            self._display("K", tab911, caption, lambda x: f'{x:.4g}' if x > 10 else f'{x:.1%}')
+            self._display("K", tab911, caption, lambda x: f'{x:,.1f}' if x > 10 else f'{x:.1%}')
 
-            table_no = [9.12, 9.13, 9.14][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Constant CoC pricing by unit for {self.case_name}, with {self.roe} cost of capital and $p={self.reg_p}$.
-The column sop shows the sum by unit.
-{self.re_descriptor}
-All units produce the same rate of return, by construction."""
             if self.show: display(HTML('<hr>'))
-            self._display("L", urn(self.modern_monoline_sa), caption, None)  # lambda x: f'{x:.4g}')
+            # table_no = [9.12, 9.13, 9.14][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Constant CoC pricing by unit for {self.case_name}, with {self.roe} cost of capital and p={self.reg_p}.
+The column sop shows the sum by unit. {self.re_description} All units produce the same rate of return, by construction."""
+            self._display("L", urn(self.modern_monoline_sa), caption, ff)  # lambda x: f'{x:.4g}')
 
         # ==================================================================================
         # ==================================================================================
         if 11 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 11: Modern Portfolio Pricing</h2>'))
-            table_no = 11.5
-            caption = f'Table {table_no}: '
-            caption += f"""Parameter estimates for the five base SRMs"""
+            # table_no = 11.5
+            # caption = f'Table {table_no}: '
+            caption = f"""Parameter estimates for the five base spectral risk measures."""
             tab115 = self.gross.dist_ans.droplevel((0, 1), axis=0).loc[
-                ['roe', 'ph', 'wang', 'dual', 'tvar'], ['param', 'error', '$P$', '$K$', 'ROE', '$S$']]
+                ['roe', 'ph', 'wang', 'dual', 'tvar'], ['param', 'error', '$P$', '$K$', 'ROE', '$S$']]. \
+                rename(columns={'$P$': 'P', '$K$': 'K', '$S$': 'S', 'ROE': 'ι'})
             self._display("N", urn(tab115), caption, None)
 
-            table_no = [11.7, 11.8, 11.9][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Traditional and stand alone Pricing by distortion.
+            # table_no = [11.7, 11.8, 11.9][self.case_number]
+            # caption = f'Table {table_no}: '
+            if self.show: display(HTML('<hr>'))
+            caption = f"""Traditional and stand alone Pricing by distortion.
 Pricing by unit and distortion for {self.case_name}, calibrated to
 CCoC pricing with {self.roe} cost of capital and $p={self.reg_p}$.
 Losses and assets are the same for all distortions.
-The column sop shows sum by unit, the different with total
+The column sop shows sum of parts by unit, the difference with the total
 shows the impact of diversification.
-{self.re_descriptor}"""
-            if self.show: display(HTML('<hr>'))
+{self.re_description}"""
             self._display("Q", urn(self.modern_monoline_by_distortion), caption, None)
 
         # ==================================================================================
         # ==================================================================================
         if 13 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 13: Classical Pricing Allocation</h2>'))
-            caption = 'Table 13.1: '
-            caption += f"""Comparison of gross expected losses by line. Second column shows allocated recovery with total assets. Third column shows stand-alone limited expected value with stand-alone {self.reg_p}-VaR assets."""
+            # caption = 'Table 13.1: '
+            caption = f"""Comparison of gross expected losses by line. Second column shows allocated 
+recovery with total assets. Third column shows stand-alone limited expected value with stand-alone 
+{self.reg_p}-VaR assets."""
             self._display("R", self.tab13_1, caption, None)
 
-            table_no = [13.2, 13.3, 13.4][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Constant {self.roe:.2f} ROE pricing for {self.case_name}, classical PCP methods."""
+            # table_no = [13.2, 13.3, 13.4][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Constant {self.roe:.2f} ROE pricing for {self.case_name}, classical PCP methods."""
             self._display("S", urn(self.classical_pricing), caption, None)
 
         # ==================================================================================
         # ==================================================================================
         if 15 in chapters:
             if self.show: display(HTML('<hr><h2>Chapter 15: Modern Pricing Allocation</h2>'))
-            table_no = [13.35, 13.36, 13.37][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""Constant {self.roe:.2f} ROE pricing for {self.case_name}, distortion, SRM methods."""
-            self._display("V", urn(self.distortion_pricing), caption, lambda x: f'{x:.2f}')
+            # table_no = [13.35, 13.36, 13.37][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""Constant {self.roe:.2f} ROE pricing for {self.case_name}, distortion, SRM methods."""
+            self._display("V", urn(self.distortion_pricing), caption, lambda x: f'{x:.2f}' if abs(x) > 5 else f'{x:.3f}')
 
             if self.show: display(HTML('<hr>'))
-            table_no = [15.38, 15.39, 15.40][self.case_number]
-            caption = f'Table {table_no}: '
-            caption += f"""{self.case_name} percentile layer of capital allocations compared to distortion allocations."""
+            # table_no = [15.38, 15.39, 15.40][self.case_number]
+            # caption = f'Table {table_no}: '
+            caption = f"""{self.case_name} percentile layer of capital allocations compared to distortion allocations."""
             self._display("Y", urn(self.bodoff_compare), caption, lambda x: f'{x:.4g}')
 
     def show_extended_exhibits(self):
@@ -1614,50 +1635,40 @@ shows the impact of diversification.
         if self.case_id == 'discrete':
             ylim = [-0.00025 / 4, .0075 / 4]
             xlim = [-5, 105]
-            p = 0.999
-            p2 = 0.999
             sort_order = [0, 1, 2]
             multiple_locator = .5e2
             legend_loc = 'center right'
         elif self.case_id == 'tame':
             ylim = [-0.00025 / 4, .0075 / 4]
             xlim = [-20, 175]
-            p = 0.999
-            p2 = 0.999
             sort_order = [2, 0, 1]
             multiple_locator = 1e2
             legend_loc = 'lower left'
         elif self.case_id == 'cnc':
             ylim = [-0.00025 / 4, .0075 / 4]
             xlim = [-20, 300]
-            p = 0.999
-            p2 = 0.999
             sort_order = [2, 0, 1]
-            # dnet = 'roe'
-            # dgross = 'roe'
             multiple_locator = 1e2
             legend_loc = 'lower left'
         elif self.case_id == 'hs':
             ylim = [-0.00025 / 4, .01 / 4]
             xlim = [-20, 2000]
-            p = 0.999
-            p2 = 0.999
             sort_order = [2, 0, 1]
             multiple_locator = 5e2
             legend_loc = 'center right'
         else:
-            # this needs more thought....
-            ylim = [-0.00025 / 4, 0.6]
-            xlim = [-10, 1010]
-            p = 0.999
-            p2 = 0.999
-            sort_order = [0, 1, 2]
-            multiple_locator = 5e2
+            # initial version...
+            ylim = self.gross.limits(stat='density')
+            xlim = self.gross.limits()
+            xm = round_bucket(xlim[1])
+            xlim = [-xm / 50 , xm]
+            sort_order = [2, 0, 1]
+            multiple_locator = round_bucket(xm / 10)
             legend_loc = 'center right'
-        # net / gross flavors
+        # net / gross flavors 15.2-3
         captions = [
-            f'(TN) Figure 15.3: {self.case_name}, net twelve plot with {self.dnet} distortion.',
-            f'(TG) Figure 12.2: {self.case_name}, gross twelve plot with {self.dgross} distortion.'
+            f'(TN) {self.case_name}, net twelve plot with {self.dnet} distortion.',
+            f'(TG) {self.case_name}, gross twelve plot with {self.dgross} distortion.'
         ]
         for port, nm, caption in zip((self.net, self.gross), ('T_net', 'T_gross'), captions):
             f, axs = self.smfig(4, 3, (10.8, 12.0))
@@ -1699,13 +1710,13 @@ shows the impact of diversification.
                 self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
                 for n, x in self.sp_ratings.loc[ix].iterrows():
                     ax.axvline(x.attachment, c='C7', lw=.25)
-                ax.axvline(el, c='C1', lw=1.5, label=f'EL={el:.1f} @ {port.sf(el):.3%}')
-                ax.axvline(prem, c='C2', lw=1.5, label=f'Premium={prem:.1f} @ {port.sf(prem):.3%}')
-                ax.axvline(max_debt, c='C3', lw=1.5, label=f'Debt attachment={max_debt:.1f} @ {port.sf(max_debt):.3%}')
-                msg = f'(max debt={cap - max_debt:.1f}, capital={cap - prem:.1f})'
-                ax.axvline(cap, c='C4', lw=1.5, label=f'Assets={cap:.1f} @ {port.sf(cap):.3%},\n{msg}')
+                ax.axvline(el, c='C1', lw=1.5, label=f'EL={el:,.0f} @ {port.sf(el):.3%}')
+                ax.axvline(prem, c='C2', lw=1.5, label=f'Premium={prem:,.0f} @ {port.sf(prem):.3%}')
+                ax.axvline(max_debt, c='C3', lw=1.5, label=f'Debt attachment={max_debt:,.0f} @ {port.sf(max_debt):.3%}')
+                msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
+                ax.axvline(cap, c='C4', lw=1.5, label=f'Assets={cap:,.0f} @ {port.sf(cap):.3%},\n{msg}')
                 ax.xaxis.set_major_locator(ticker.FixedLocator(self.sp_ratings.loc[ix, 'attachment']))
-                ax.xaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:.1f}\n'
+                ax.xaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
                                                                     f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
                                                                     ix]))
 
@@ -1884,7 +1895,7 @@ shows the impact of diversification.
         @return:
         """
 
-        logger.log(35, "15.11")
+        logger.info("15.11")
         f, axs = self.get_f_axs(3, 2)
 
         def diff(f):
@@ -2042,82 +2053,91 @@ shows the impact of diversification.
         # ==================================================================================================
         if 2 in chapters:
             # fig 2.2, 2.4, and 2.6
-            logger.log(35, 'Figures 2.2, 2.4, 2.6')
-            f, axs = self.get_f_axs(2, 2)
-            ax0, ax1, ax2, ax3 = axs.flat
+            logger.info('Figures 2.2, 2.4, 2.6')
+            # f, axs = self.get_f_axs(2, 2)
+            # ax0, ax1, ax2, ax3 = axs.flat
 
-            if self.case_id == 'cnc':
-                regex = 'p_[CNt]'
-                a = 300  # gross.q(reg_p)
-            elif self.case_id == 'tame':
-                regex = 'p_[ABt]'
-                a = 200
-            elif self.case_id == 'hs':
-                regex = 'p_[HSt]'
-                a = 1000
-            elif self.case_id == 'discrete':
-                regex = 'p_[Xt]'
-                a = 110
-            else:
-                # lines should be called A and B
-                regex = f'p_({self.a_name}|{self.b_name}|total)'
-                if self.f_discrete:
-                    a = self.gross.q(1)
-                else:
-                    a = self.gross.q((1 + self.reg_p) / 2)
+            f, axd = make_mosaic_figure('AB\nCD')
+            axd_top = {'A': axd['A'], 'B': axd['B']}
+            axd_bottom = {'A': axd['C'], 'B': axd['D']}
+            # order series so total is first
+            self.gross.plot(axd_top)
+            self.net.plot(axd_bottom)
+            caption = f'(B) {self.case_name}, gross (top) and net (bottom) densities on a nominal (left) and log (right) scale.'
+            self._display_plot('B', f, caption)
 
-            if self.f_discrete:
-                i = 0
-                for ax, ln in zip(axs.flat, self.gross.line_names_ex):
-                    self.gross.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', lw=2, ax=ax, c=f'C{i}',
-                                                                   label=f'Gross {ln}')
-                    if ln == self.re_line or ln == 'total':
-                        self.net.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', ls='--', lw=1, ax=ax,
-                                                                     c=f'C{i}', label=f'Net {ln}')
-                    ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
-                    ax.legend(loc='lower right')
-                    if self.case_id == 'discrete':
-                        ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-                    i += 1
+            # # limits for graphs
+            # if self.case_id == 'cnc':
+            #     regex = 'p_[CNt]'
+            #     a = 300  # gross.q(reg_p)
+            # elif self.case_id == 'tame':
+            #     regex = 'p_[ABt]'
+            #     a = 200
+            # elif self.case_id == 'hs':
+            #     regex = 'p_[HSt]'
+            #     a = 1000
+            # elif self.case_id == 'discrete':
+            #     regex = 'p_[Xt]'
+            #     a = 110
+            # else:
+            #     # lines should be called A and B
+            #     regex = f'p_({self.a_name}|{self.b_name}|total)'
+            #     if self.f_discrete:
+            #         a = self.gross.q(1)
+            #     else:
+            #         a = self.gross.q((1 + self.reg_p) / 2)
+            #
+            # if self.f_discrete:
+            #     i = 0
+            #     for ax, ln in zip(axs.flat, self.gross.line_names_ex):
+            #         self.gross.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', lw=2, ax=ax, c=f'C{i}',
+            #                                                        label=f'Gross {ln}')
+            #         if ln == self.re_line or ln == 'total':
+            #             self.net.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', ls='--', lw=1, ax=ax,
+            #                                                          c=f'C{i}', label=f'Net {ln}')
+            #         ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
+            #         ax.legend(loc='lower right')
+            #         if self.case_id == 'discrete':
+            #             ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+            #         i += 1
+            #
+            #     ax = axs.flatten()[-1]
+            #     self.gross.density_df.filter(regex='p_[tX]').cumsum().plot(drawstyle='steps-post', ax=ax)
+            #     ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
+            #     ax.legend(loc='lower right')
+            #     if self.case_id == 'discrete':
+            #         ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+            #     caption = f'(B) Figure (suppl.) 2.2: {self.case_name}, gross and net densities by line and combined gross.',
+            #     self._display_plot('B', f, caption)
+            #
+            # else:
+            #     self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
+            #         columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax0)
+            #     self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
+            #         columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax1, logy=True)
+            #
+            #     self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
+            #         columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax2)
+            #     self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
+            #         columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax3, logy=True)
+            #
+            #     for ax in axs.flat:
+            #         ax.set(xlim=[-a / 50, a])
+            #         # ax.grid(lw=.25)
+            #
+            #     if ax in [ax1, ax3]:
+            #         ax.legend().set(visible=False)
+            #
+            #     if self.case_id in ['tame', 'cnc']:
+            #         ax2.set(ylim=[-0.00125 / 16, .025 / 16])
+            #     else:
+            #         ax0.set(ylim=[-0.0025 / 2, .025])
+            #         ax2.set(ylim=[-0.005, .1])
 
-                ax = axs.flatten()[-1]
-                self.gross.density_df.filter(regex='p_[tX]').cumsum().plot(drawstyle='steps-post', ax=ax)
-                ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
-                ax.legend(loc='lower right')
-                if self.case_id == 'discrete':
-                    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-                caption = f'(B) Figure (suppl.) 2.2: {self.case_name}, gross and net densities by line and combined gross.',
-                self._display_plot('B', f, caption)
-
-            else:
-                self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-                    columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax0)
-                self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-                    columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax1, logy=True)
-
-                self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-                    columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax2)
-                self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-                    columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax3, logy=True)
-
-                for ax in axs.flat:
-                    ax.set(xlim=[-a / 50, a])
-                    # ax.grid(lw=.25)
-
-                if ax in [ax1, ax3]:
-                    ax.legend().set(visible=False)
-
-                if self.case_id in ['tame', 'cnc']:
-                    ax2.set(ylim=[-0.00125 / 16, .025 / 16])
-                else:
-                    ax0.set(ylim=[-0.0025 / 2, .025])
-                    ax2.set(ylim=[-0.005, .1])
-
-                caption = f'(B) Figure 2.2: {self.case_name}, gross (top) and net (bottom) densities on a nominal (left) and log (right) scale.'
-                self._display_plot('B', f, caption)
 
             # fig 2.3, 2.5, and 2.6  ===================================================================================
-            logger.log(35, 'Figures 2.3, 2.5, 2.7')
+            logger.info('Figures 2.3, 2.5, 2.7')
+
             if self.case_id == 'cnc':
                 xmax = 500
                 sim_xlim = [-10, 500]
@@ -2139,11 +2159,12 @@ shows the impact of diversification.
                 sim_ylim = [-5, 110]
                 sim_scale = 100
             else:
-                logger.warning('WHAT DO WE DO HERE ABOUT SCALES????')
-                xmax = 1100
-                sim_xlim = [-5, 1100]
-                sim_ylim = [-5, 1100]
-                sim_scale = 250
+                logger.warning('Check scales are reasonable...')
+                sim_xlim = self.gross.limits()
+                xmax = round_bucket(sim_xlim[1])
+                sim_xlim = [-xmax / 50, xmax]
+                sim_ylim = sim_xlim
+                sim_scale = xmax // 4  # ? QDFC
 
             # need to make this work for the other version
             ln1, ln0 = self.gross.line_names
@@ -2169,7 +2190,7 @@ shows the impact of diversification.
             ax2.grid(lw=.25)
             ax2.set(aspect='equal')
             ax2.axis('off')
-            bit_fn = Path.home() / f'temp/scatter_{self.case_id}.png'
+            bit_fn = Path.home() / f'aggregate/temp/scatter_{self.case_id}.png'
             f.savefig(bit_fn, dpi=1000)
             plt.close(f)
             del f
@@ -2196,14 +2217,14 @@ shows the impact of diversification.
             ax1.set(title='Net', ylabel=None)
             x, y = self.ports['gross'].line_names
             ax2.set(title='Gross sample', xlabel=f'Line {x}')
-            caption = f'(C) Figure 2.3: {self.case_name}, bivariate densities: gross (left), net (center), and a sample from gross (right). Impact of reinsurance is clear in net plot.'
+            caption = f'(C) {self.case_name}, bivariate densities: gross (left), net (center), and a sample from gross (right). Impact of reinsurance is clear in net plot.'
             self._display_plot('C', f, caption)
 
         # ==================================================================================================
         # ==================================================================================================
         if 4 in chapters:
             # fig 4.10, 11, 12 ===================================================================================
-            logger.log(35, 'Figures 4.10, 4.11, 4.12')
+            logger.info('Figures 4.10, 4.11, 4.12')
             f, axs = self.get_f_axs(2, 2)
             # ax0, ax1, ax2, ax3 = axs.flat
 
@@ -2243,7 +2264,7 @@ shows the impact of diversification.
                     ax.set(ylim=[0, 110])
                 else:
                     ax.set(ylim=[port.q(0.001), port.q(max(0.9999, self.reg_p))])
-                ax.set(title=f'{k.title()}, a={a:.1f}')
+                ax.set(title=f'{k.title()}, a={a:,.1f}')
                 ax.legend(loc='upper left')
 
                 ax = ax1
@@ -2268,7 +2289,7 @@ shows the impact of diversification.
         if 11 in chapters or 11.3 in chapters:
             # fig 11.3, 4, 5
             # warning: quite slow!
-            logger.log(35, 'Figures 11.3, 11.4, 11.5')
+            logger.info('Figures 11.3, 11.4, 11.5')
             f, axs = self.smfig(1, 3, (3 * 3, 1 * 3))
             bounds = self.boundss['gross']
             port = self.ports['gross']
@@ -2286,12 +2307,12 @@ shows the impact of diversification.
             for ax in axs.flatten():
                 ax.set(title=None)
             gridoff(axs)
-            caption = f'(M) Figure 11.2: Distortion envelope for {self.case_name}, gross. Left plot shows the distortion envelope, middle overlays the CCoC and TVaR distortions, right overlays proportional hazard, Wang, and dual moment distortions.'
+            caption = f'(M) Distortion envelope for {self.case_name}, gross. Left plot shows the distortion envelope, middle overlays the CCoC and TVaR distortions, right overlays proportional hazard, Wang, and dual moment distortions.'
             self._display_plot('M', f, caption)
 
         if 11 in chapters or 11.6 in chapters:
             # fig 11.6, 7, 8
-            logger.log(35, 'Figures 11.6, 11.7, 11.8')
+            logger.info('Figures 11.6, 11.7, 11.8')
             f, axs = self.smfig(4, 3, (3 * 2.5, 4 * 2.5))
 
             port = self.ports['gross']
@@ -2304,12 +2325,12 @@ shows the impact of diversification.
                 g_ins_stats(axi, dn, port.dists[dn], ls=ls)
 
             gridoff(axs)
-            caption = f'(O) Figure 11.6: {self.case_name}, variation in premium, loss ratio, markup (premium to loss), margin, discount rate, and premium to capital leverage for six distortions, shown in two groups of three. Top six plots show proportional hazard, Wang, and dual moment; lower six: CCoC, TVaR, and Blend.'
+            caption = f'(O) {self.case_name}, variation in premium, loss ratio, markup (premium to loss), margin, discount rate, and premium to capital leverage for six distortions, shown in two groups of three. Top six plots show proportional hazard, Wang, and dual moment; lower six: CCoC, TVaR, and Blend.'
             self._display_plot('O', f, caption)
 
         if 11 in chapters or 11.9 in chapters:
             # fig 11.9, 10, 11
-            logger.log(35, 'Figures 11.9, 11.10, 11.11')
+            logger.info('Figures 11.9, 11.10, 11.11')
             f, axs = self.smfig(6, 4, (4 * 2.5, 6 * 2.5))
 
             port = self.ports['gross']
@@ -2324,7 +2345,7 @@ shows the impact of diversification.
                     next(axi).legend().set(visible=False)
 
             gridoff(axs)
-            caption = f'(P) Figure 11.9: {self.case_name}, variation in SRM properties as the asset limit (x-axis) is varied. Column 1: total premium and loss; 2: total assets, premium, and capital; 3; total and layer loss ratio; and 4: total and layer discount factor. ' \
+            caption = f'(P) {self.case_name}, variation in SRM properties as the asset limit (x-axis) is varied. Column 1: total premium and loss; 2: total assets, premium, and capital; 3; total and layer loss ratio; and 4: total and layer discount factor. ' \
                       'By row CCoC, PH, Wang, Dual, TVaR, and Blend.'
             self._display_plot('P', f, caption)
 
@@ -2336,7 +2357,7 @@ shows the impact of diversification.
             self.twelve_plot()
 
             # fig 15.8, 15.9, 15.10
-            logger.log(35, "Figures 15.8, 15.9, 15.10")
+            logger.info("Figures 15.8, 15.9, 15.10")
             f, axs = self.get_f_axs(1, 2)
             ax0, ax1 = axs.flat
             if self.case_id == 'tame':
@@ -2349,7 +2370,7 @@ shows the impact of diversification.
                 xlim = [0, 100]
             else:
                 # TO DO! think about this!
-                xlim = [1, self.gross.q(0.999)]
+                xlim = self.gross.limits()
 
             for port, kind, ax in zip([self.gross, self.net], ['Gross', 'Net'], axs.flat):
                 bit = port.augmented_df.filter(regex='M\.Q|F|^S$')
@@ -2362,16 +2383,17 @@ shows the impact of diversification.
                        ylabel='Layer capital rate', ylim=[-0.1, 1.05])
                 if ax is ax0:
                     ax.legend()  # loc='lower right')
-                ax.grid(lw=.25)
-            gridoff(axs)
-            caption = f"(U) Figure 15.8: {self.case_name}, capital density for {self.case_name}, with {str(self.ports['gross'].dists[self.dgross])} gross and {str(self.ports['net'].dists[self.dnet])} net distortion."
+                # ax.grid(lw=.25)
+            # gridoff(axs)
+            # Figure 15.8
+            caption = f"(U) {self.case_name}, capital density for {self.case_name}, with {str(self.ports['gross'].dists[self.dgross])} gross and {str(self.ports['net'].dists[self.dnet])} net distortion."
             self._display_plot('U', f, caption)
 
             # fig 15.11
             self.loss_density_spectrum()
 
             # fig 15.12, 15.13, 15.14
-            logger.log(35, 'Figures 15.12, 15.13, 15.14.')
+            logger.info('Figures 15.12, 15.13, 15.14.')
             f, axs = self.get_f_axs(1, 2)
             ax0, ax1 = axs.flat
             # Bodoff allocation...
@@ -2386,9 +2408,10 @@ shows the impact of diversification.
                     ax.set(title='Gross')
                 else:
                     ax.set(title='Net')
-                ax.grid(lw=.25)
+                # ax.grid(lw=.25)
             gridoff(axs)
-            caption = f'(X) Figure 15.12: {self.case_name}, percentile layer of capital allocations by asset level, showing {self.reg_p} capital. (Same distortions.)'
+            # Figure 15.12
+            caption = f'(X) {self.case_name}, percentile layer of capital allocations by asset level, showing {self.reg_p} capital. (Same distortions.)'
             self._display_plot('X', f, caption)
 
     def make_boundss_p_stars(self, n_tps=1024, n_s=512):
@@ -2642,7 +2665,7 @@ shows the impact of diversification.
         """
         Integrate modern stand-alone and portfolio pricing
 
-        @return:
+        :return:
         """
         vas = ['Premium', 'Loss Ratio', 'Rate of Return']
         dns = ['CCoC', 'PH', 'Wang', 'Dual', 'TVaR']
@@ -2670,17 +2693,16 @@ shows the impact of diversification.
         b0 = b0.drop(columns=['Total'])
         b0.columns = list(b0.columns[:-1]) + ['Total']
         # difference
-        b0d = b0.loc['Stand-Alone'] - b0.loc['Allocated']
+        # TODO SORT OUT - why are there missing values?
+        b0d = b0.loc['Stand-Alone'].replace('', 0.) - b0.loc['Allocated']
         walk = pd.concat((b0d,
-                          b0d / b0.loc['Stand-Alone'],
+                          b0d / b0.loc['Stand-Alone'].replace('', 1),
                           b0d.div(b0d['Total'].values, axis=0)
                           ),
                          keys=['Pooling ¤ Benefit', 'Pct Premium Reduction', 'Pct of Benefit'],
                          axis=1,
                          names=['View', 'Unit']
-
                          )
-
         self.progression = bit
         self.walk = walk
 

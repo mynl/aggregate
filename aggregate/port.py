@@ -1015,14 +1015,9 @@ class Portfolio(object):
         for agg in self.agg_list:
             raw_nm = agg.name
             nm = f'p_{agg.name}'
+            # agg.update_work handles the reinsurance too
             agg.update_work(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
                             sev_calc, discretization_calc, normalize)
-            # update for grammar based aggregate reinsurance...which, doh!, lives in the agg object!!
-            # if aggregate_cession_function is not None:
-            #     aggregate_cession_function(agg, self.padding, tilt_vector)
-            # this work uses agg._apply_reins_work and mirrors the function apply_occ_reins
-            if agg.agg_reins is not None:
-                agg.apply_agg_reins(False, self.padding, tilt_vector)
 
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
@@ -1604,8 +1599,8 @@ class Portfolio(object):
                 # wider range for log density plots
                 return f(self.q(1 - 1e-10))
         elif stat == 'density':
-            mx = self.density_df.p_total.max()
-            mxx0 = self.density_df.p_total[1:].max()
+            mx = self.density_df.filter(regex='p_[a-zA-Z]').max().max()
+            mxx0 = self.density_df.filter(regex='p_[a-zA-Z]')[1:].max().max()
             if kind == 'linear':
                 if zero_mass == 'include':
                     return f(mx)
@@ -1641,14 +1636,19 @@ class Portfolio(object):
             self.figure, axd = make_mosaic_figure('AB')
 
         ax = axd['A']
-        xl = self.limits(zero_mass='exclude')
-        self.density_df.filter(regex='p_[a-zA-Z]').plot(ax=ax, xlim=xl)
+        xl = self.limits()
+        yl = self.limits(stat='density', zero_mass='exclude')
+        bit = self.density_df.filter(regex='p_[a-zA-Z]')
+        if bit.shape[1] == 3:
+            # put total first = Book standard
+            bit = bit.iloc[:, [2,0,1]]
+        bit.plot(ax=ax, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Density')
 
         ax = axd['B']
         xl = self.limits(kind='log')
         yl = self.limits(stat='logy')
-        self.density_df.filter(regex='p_[a-zA-Z]').plot(ax=ax, logy=True, xlim=xl, ylim=yl)
+        bit.plot(ax=ax, logy=True, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Log density')
 
         # ax = axd['C']

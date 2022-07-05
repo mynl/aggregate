@@ -1549,10 +1549,8 @@ class Aggregate(Frequency):
         _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-        # store stuff
-        print(self.name, self.agg_reins, self.agg_kind)
-        display(agg_reins_df.loc[41.05:41.1])
 
+        # store stuff
         self.agg_reins_df = agg_reins_df
         self.agg_gross_density = self.agg_density
         self.agg_net_density = agg_reins_df['p_net']

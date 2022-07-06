@@ -1030,7 +1030,7 @@ class UnderwritingParser(Parser):
     def exposures(self, p):
         self.logger(
             f'exposures <-- numbers PREMIUM AT numbers LR', p)
-        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': p[0] * p[3]}
+        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
 
     @_('"[" idl "]"')
     def ids(self, p):

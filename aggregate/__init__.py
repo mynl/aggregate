@@ -21,7 +21,7 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     frequency_examples, Answer, log_test, subsets, \
     start_timer, report_time, stop_timer, round_bucket, \
     make_ceder_netter, make_mosaic_figure, nice_multiple, \
-    style_df
+    style_df, logger_level, friendly
 from .parser import UnderwritingLexer, UnderwritingParser
 
 

@@ -108,6 +108,7 @@ from inspect import signature
 from .port import Portfolio
 from .distr import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
+from .utils import logger_level
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +361,7 @@ class Underwriter(object):
         # df = df.fillna('')
         # return df
 
-    def write(self, portfolio_program, log2=0, bs=0, **kwargs):
+    def write(self, portfolio_program, log2=0, bs=0, create_all=None, update=None, **kwargs):
         """
         Write a natural language program. Write carries out the following steps.
 
@@ -394,23 +395,18 @@ class Underwriter(object):
                      don't want to create underlying sevs and aggs in a portfolio.
 
         :param portfolio_program:
-        :param kwargs:
+        :param create_all: override class default
+        :param update: override class default
+        :param kwargs: passed to object's update method if update==True
         :return: single created object or dictionary name: object
         """
 
         # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
-        if 'create_all' in kwargs:
-            create_all = kwargs['create_all']
-            del kwargs['create_all']
-        else:
+        if create_all is None:
             create_all = self.create_all
-
-        if 'update' in kwargs:
-            update = kwargs['update']
-            del kwargs['update']
-        else:
+        if update is None:
             update = self.update
 
         if update is True and log2 == 0:
@@ -616,6 +612,11 @@ class Build(object):
     def describe(cls, item_type=''):
         return cls.uw.describe(item_type, pretty_print=True)
 
+    @staticmethod
+    def logger_level(level):
+        # set global logger_level
+        logger_level(level)
+
     @classmethod
     def build(cls, program, update=True, create_all=None, log2=-1, bs=0, **kwargs):
         """
@@ -628,7 +629,7 @@ class Build(object):
         :param log2: -1 is default. Figure log2 for discrete and 13 for all others. Inupt value over-rides
         and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
-        :param kwargs: passed to update, e.g., padding
+        :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
         :return: created object(s)
         """
 
@@ -642,7 +643,7 @@ class Build(object):
 
         # make stuff
         # write will return a dict with keys (kind, name) and value either the object or the spec
-        out_dict = cls.uw.write(program, update=False)
+        out_dict = cls.uw.write(program, update=False, force_severity=True)
 
         # in this loop bs_ and log2_ are the values actually used for each update; they do not
         # overwrite the input default values
@@ -676,7 +677,7 @@ class Build(object):
                         bs_ = bs
                     logger.info(f'({kind}, {name}): Normal mode, using bs={bs_} and log2={log2_}')
                 try:
-                    out.update(log2=log2_, bs=bs_, debug=cls.DEBUG, **kwargs)
+                    out.update(log2=log2_, bs=bs_, debug=cls.DEBUG, force_severity=True, **kwargs)
                 except ZeroDivisionError as e:
                     logger.error(e)
                 except AttributeError as e:
@@ -694,11 +695,12 @@ class Build(object):
                     bs_ = out.best_bucket(log2_)
                 else:
                     bs_ = bs
-                print(f'updating with {log2}, bs=1/{1/bs_}')
+                logger.info(f'updating with {log2}, bs=1/{1/bs_}')
                 logger.info(f'({kind}, {name}): bs={bs_} and log2={log2_}')
-                out.update(log2=log2_, bs=bs_, remove_fuzz=True, debug=cls.DEBUG, **kwargs)
+                out.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
+                           debug=cls.DEBUG, **kwargs)
             else:
-                logger.warning(f'WTF??? output kind is {type(out)}. (expr/number?)')
+                logger.warning(f'Unexpected: output kind is {type(out)}. (expr/number?)')
                 pass
 
         # put back defaults
@@ -710,7 +712,17 @@ class Build(object):
             if len(out_dict) == 2:
                 out_dict = out_dict[0]
             else:
-                print('WTF, investigate...'*5)
+                raise ValueError('Weird type coming out of update. Investigate.')
+        else:
+            # multiple outputs, see if there is just one portfolio...this is not ideal?!
+            ports_found = 0
+            port = None
+            for (kind, name), (ob, program) in out_dict.items():
+                if kind == 'port':
+                    ports_found += 1
+                    port = ob
+            if ports_found == 1:
+                out_dict = port
 
         return out_dict
 

@@ -918,6 +918,20 @@ class MomentWrangler(object):
         # shorter names are better
         return pd.Series((m, v, sd, cv, skew), index=('ex', 'var', 'sd', 'cv', 'skew'))
 
+    @property
+    def mcvsk(self):
+        m, v, c3 = self._central
+        sd = np.sqrt(v)
+        if m == 0:
+            cv = np.nan
+        else:
+            cv = sd / m
+        if sd == 0:
+            skew = np.nan
+        else:
+            skew = c3 / sd ** 3
+        return m, cv, skew
+
     def _make_central(self):
         ex1, ex2, ex3 = self._noncentral
         # p 42, 1.240
@@ -940,14 +954,35 @@ def xsden_to_meancv(xs, den):
     :param den:
     :return:
     """
-    ex1 = np.sum(xs * den)
-    ex2 = np.sum(xs ** 2 * den)
+    xd = xs * den
+    ex1 = np.sum(xd)
+    ex2 = np.sum(xd * xs)
     sd = np.sqrt(ex2 - ex1 ** 2)
     if ex1 != 0:
         cv = sd / ex1
     else:
         cv = np.nan
     return ex1, cv
+
+
+def xsden_to_meancvskew(xs, den):
+    """
+    compute mean and cv from xs and density
+
+    consider adding: np.nan_to_num(den)
+
+    :param xs:
+    :param den:
+    :return:
+    """
+    xd = xs * den
+    ex1 = np.sum(xd)
+    xd *= xs
+    ex2 = np.sum(xd)
+    ex3 = np.sum(xd * xs)
+    mw = MomentWrangler()
+    mw.noncentral = ex1, ex2, ex3
+    return mw.mcvsk
 
 
 def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
@@ -1340,6 +1375,27 @@ def log_test():
     print('...done')
 
 
+def logger_level(level=0):
+    """
+    Change logger level FOR EVERY LOGGER. From startup.py
+
+    FWIW, to list all loggers:
+
+        loggers = [logging.getLogger()]  # get the root logger
+        loggers = loggers + [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        loggers
+
+    :param level:
+    :return:
+    """
+    try:
+        logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s, %(funcName)s|  %(message)-s',
+                            datefmt='%M:%S', level=level, force=True)
+    except ValueError:
+        print('ValueError...retrying')
+        logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
+                            datefmt='%M:%S', level=level)
+
 def subsets(x):
     """
     all non empty subsets of x, an interable
@@ -1454,12 +1510,128 @@ def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', un
         fm = make_fmt(kind, places, power_range, sep, unit)
         getattr(ax, w).set_major_formatter(fm)
 
-# styling
-def style_df(df, ):
+# styling - greys verions
+def style_df(df):
     """
     Style a df similar to pricinginsurancerisk.com styles.
+
+    graph background color is B4C3DC and figure (paler) background is F1F8F#
+
+    Dropped row lines; bold level0, caption
+
+    :param df:
+    :return: styled dataframe
+
+    """
+
+    cell_hover = {
+        'selector': 'td:hover',
+        'props': [('background-color', '#ffffb3')]
+    }
+    index_names = {
+        'selector': '.index_name',
+        'props': 'font-style: italic; color: white; background-color: #777777; '
+                 'font-weight:bold; border: 1px solid white; text-transform: capitalize; '
+                 'text-align:left;'
+    }
+    headers = {
+        'selector': 'th:not(.index_name)',
+        'props': 'background-color: #DDDDDD; color: black;  border: 1px solid #ffffff;'
+    }
+    center_heading = {
+        'selector': 'th.col_heading',
+        'props': 'text-align: center;'
+    }
+    left_index = {
+        'selector': '.row_heading',
+        'props': 'text-align: left;'
+    }
+    td = {
+        'selector': 'td',
+        'props': f'text-align: right;'
+    }
+    all_styles = [cell_hover, index_names, headers, center_heading,  left_index, td]
+    return df.style.set_table_styles(all_styles)
+
+
+# styling blue to match graphs...not great
+# def style_df(df):
+#     """
+#     Style a df similar to pricinginsurancerisk.com styles.
+#
+#     graph background color is B4C3DC and figure (paler) background is F1F8F#
+#
+#     Dropped row lines; bold level0, caption
+#
+#     :param df:
+#     :return: styled dataframe
+#
+#     """
+#
+#     cell_hover = {
+#         'selector': 'td:hover',
+#         'props': [('background-color', '#ffffb3')]
+#     }
+#     index_names = {
+#         'selector': '.index_name',
+#         'props': 'font-style: italic; color: black; background-color: white; '
+#                  'font-weight:bold; border: 0px solid #a4b3dc; text-transform: capitalize; '
+#                  'text-align:left;'
+#     }
+#     headers = {
+#         'selector': 'th:not(.index_name)',
+#         'props': 'background-color: #b4c3dc; color: black;  border: 1px solid #ffffff;'
+#     }
+#     center_heading = {
+#         'selector': 'th.col_heading',
+#         'props': 'text-align: center;'
+#     }
+#     left_index = {
+#         'selector': '.row_heading',
+#         'props': 'text-align: left;'
+#     }
+#     td = {
+#         'selector': 'td',
+#         'props': f'text-align: right; '
+#     }
+#     nrow = {
+#         'selector': 'tr:nth-child(even)',
+#         'props': 'background-color: #f1f8fe;'
+#     }
+#     all_styles = [cell_hover, index_names, headers, center_heading, nrow, left_index, td]
+#     return df.style.set_table_styles(all_styles)
+
+
+def friendly(df):
+    """
+    Attempt to format df "nicely", in a user-friendly manner. Not designed for bit dataframes!
 
     :param df:
     :return:
     """
-    pass
+    def ur(x):
+        # simple ultimate renamer
+        if type(x) == str:
+            sx = x.split("_")
+            if len(sx) > 1:
+                x = ' '.join([rn(i) for i in sx])
+            else:
+                x = rn(x).title()
+
+        return x
+
+    def rn(x):
+        # specific renamings...
+        return {
+            'freq': 'Freqency',
+            'sev': 'Severity',
+            'agg': 'Aggregate',
+            'el': 'Expected Loss',
+            'm': 'Mean',
+            'cv': 'CV', 'skew': 'Skewness', 'kurt': 'Kurtosis'
+        }.get(x,x)
+
+    bit = df.rename(index=ur).rename(columns=ur)
+
+    # style like pricinginsurancerisk.com?
+    return style_df(bit).format(lambda x: x if type(x)==str else f'{x:,.3f}')

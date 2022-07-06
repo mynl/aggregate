@@ -19,9 +19,9 @@ from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 
 from .utils import sln_fit, sgamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, html_title, \
+    axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
-    make_mosaic_figure, nice_multiple, style_df
+    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, friendly
 from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
@@ -900,12 +900,7 @@ class Aggregate(Frequency):
                  agg_reins=None, agg_kind='',
                  note=''):
 
-        # assert np.allclose(np.sum(sev_wt), 1)
-
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
-
-        self.figure = None
-
         def get_value(v):
             if isinstance(v, list):
                 return v[0]
@@ -924,7 +919,7 @@ class Aggregate(Frequency):
         #                   occ_reins=occ_reins, occ_kind=occ_kind,
         #                   freq_name=freq_name, freq_a=freq_a, freq_b=freq_b,
         #                   agg_reins=agg_reins, agg_kind=agg_kind, note=note)
-        # using inspect, more robust
+        # using inspect, more robust...must call before you create other variables
         frame = inspect.currentframe()
         self._spec = inspect.getargvalues(frame).locals
         for n in ['frame', 'get_value', 'self']:
@@ -933,6 +928,7 @@ class Aggregate(Frequency):
         logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
         Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
+        self.figure = None
         self.xs = None
         self.bs = 0
         self.log2 = 0
@@ -1344,16 +1340,19 @@ class Aggregate(Frequency):
                                   axis=0)
         # add empirical stats
         if self.sev_density is not None:
-            _m, _cv = xsden_to_meancv(self.xs, self.sev_density)
+            _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.sev_density)
         else:
             _m = np.nan
             _cv = np.nan
+            _sk = np.nan
         self.audit_df.loc['mixed', 'emp_sev_1'] = _m
         self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
-        _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
+        self.audit_df.loc['mixed', 'emp_sev_skew'] = _sk
+        _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.agg_density)
         self.audit_df.loc['mixed', 'emp_agg_1'] = _m
         self.ex = _m
         self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
+        self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
 
         # invalidate stored functions
         self.nearest_quantile_function = None
@@ -1810,7 +1809,7 @@ class Aggregate(Frequency):
             df['sevF'] = df.p_sev.cumsum()
             df.loc[-0.5, :] = (0, 0, 0, 0, 0)
             df = df.sort_index()
-            if self.ex < 100:
+            if self.ex <= 100:
                 # stem plot for small means
                 axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1s', label='Severity')
                 axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0o', label='Aggregate')
@@ -1851,16 +1850,19 @@ class Aggregate(Frequency):
             else:
                 xlim = self.limits(stat='range', kind='linear')
             xlim2 = self.limits(stat='range', kind='log')
+            ylim = self.limits(stat='density')
 
             ax = axd['A']
             df.p_total.plot(ax=ax, lw=2, label='Aggregate')
             df.p_sev.plot(ax=ax, lw=1, label='Severity')
-            ax.set(xlim=xlim, title='Probability density')
+            ax.set(xlim=xlim, ylim=ylim, title='Probability density')
             ax.legend()
 
             df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
             df.p_sev.plot(ax=axd['B'], lw=1, label='Severity')
-            axd['B'].set(xlim=xlim2, title='Log density', yscale='log')
+            ylim = axd['B'].get_ylim()
+            ylim = [1e-15, ylim[1]]
+            axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
             axd['B'].legend()
 
             ax = axd['C']
@@ -2042,7 +2044,7 @@ class Aggregate(Frequency):
         Must work without q function when not computed (apply_reins_work for
         occ reins...uses report_ser instead).
 
-        :param stat:  range or density
+        :param stat:  range or density (for y axis)
         :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)
         :param zero_mass:  include exclude, for densities
         :return:
@@ -2068,6 +2070,7 @@ class Aggregate(Frequency):
             else:
                 # wider range for log density plots
                 return f(self.q(0.99999))
+
         elif stat == 'density':
             mx = self.agg_density.max()
             mxx0 = self.agg_density[1:].max()
@@ -2082,44 +2085,55 @@ class Aggregate(Frequency):
             # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
-    def report(self, report_list='audit'):
+    @property
+    def _report_df(self):
         """
-        statistics, quick or audit reports
+        Created on the fly report to audit creation of object.
+        There were some bad choices of columns in audit_df...but it [maybe] embedded in other code....
+        Eg the use of _1 vs _m for mean is inconsistent.
 
-        TODO better audit report?
-        :param report_list:
         :return:
         """
-        full_report_list = ['statistics', 'quick', 'audit']
-        if report_list == 'all':
-            report_list = full_report_list
 
-        if 'quick' in report_list:
-            html_title(f'{self.name} Quick Report (Theoretic)', 1, False)
-            display(pd.DataFrame(self.report_ser).unstack())
+        if self.audit_df is not None:
+            # want both mixed and unmixed
+            cols = ['name', 'limit', 'attachment', 'el', 'freq_m', 'freq_cv', 'freq_skew',
+                    'sev_m', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
+            # massaged version of original audit_df, including indep and mixed total views
+            df = pd.concat((self.statistics_df[cols], self.statistics_total_df[cols]), axis=0).T
+            df['empirical'] = np.nan
+            # add empirical stats
+            df.loc['sev_m', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_1']
+            df.loc['sev_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_cv']
+            df.loc['sev_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_skew']
+            df.loc['agg_m', 'empirical']  = self.audit_df.loc['mixed', 'emp_agg_1']
+            df.loc['agg_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_cv']
+            df.loc['agg_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_skew']
+            df = df
+            df['error'] = df['empirical'] / df['mixed'] - 1
+            df = df.fillna('')
+            # better column order  units; indep sum; mixed sum; empirical; error
+            c = list(df.columns)
+            c = c[:-4] + [c[-3], c[-4], c[-2], c[-1]]
+            df = df[c]
+            if df.shape[1] == 4:
+                # only one sev, don't show extra sev column
+                df = df.iloc[:, 1:]
+            df.index.name = 'statistic'
+            df.columns.name = 'view'
+        return df
 
-        if 'audit' in report_list:
-            if self.audit_df is not None:
-                html_title(f'{self.name} Audit Report', 1, False)
-                # massaged version of original audit_df
-                df = self.audit_df.T.copy()
-                # put empirical beside model for easier viewing
-                df['empirical'] = np.nan
-                df.loc[['sev_1', 'sev_cv', 'agg_m', 'agg_cv'], 'empirical'] = \
-                    df.loc[['emp_sev_1', 'emp_sev_cv', 'emp_agg_1', 'emp_agg_cv'], 'mixed'].values
-                df = df.iloc[:-4].fillna('')
-                if df.shape[1] == 3:
-                    # only one sev, don't show extra sev column
-                    df = df.iloc[:, 1:]
-                display(df.style.format(lambda x: x if type(x) == str else f'{x:,.3f}'))
+    @property
+    def report_df(self):
+        return friendly(self._report_df)
 
-        if 'statistics' in report_list:
-            if len(self.statistics_df) > 1:
-                df = pd.concat((self.statistics_df, self.statistics_total_df), axis=1)
-            else:
-                df = self.statistics_df
-            html_title(f'{self.name} Statistics Report', 1, False)
-            return df.T
+    @property
+    def statistics(self):
+        if len(self.statistics_df) > 1:
+            df = pd.concat((self.statistics_df, self.statistics_total_df), axis=1)
+        else:
+            df = self.statistics_df
+        return df.T
 
     def describe(self):
         """

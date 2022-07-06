@@ -40,7 +40,7 @@ from .utils import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    report_time, make_mosaic_figure
+    report_time, make_mosaic_figure, friendly
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -927,7 +927,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, add_exa=True, debug=False):
+               trim_df=False, add_exa=True, force_severity=True, debug=False):
         """
         TODO: currently debug doesn't do anything...
 
@@ -1017,7 +1017,7 @@ class Portfolio(object):
             nm = f'p_{agg.name}'
             # agg.update_work handles the reinsurance too
             agg.update_work(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
-                            sev_calc, discretization_calc, normalize)
+                            sev_calc, discretization_calc, normalize, force_severity, debug)
 
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
@@ -1564,6 +1564,38 @@ class Portfolio(object):
                             display(df)
                     else:
                         html_title(f'Report {r} not generated', 2)
+
+    @property
+    def _report_df(self):
+        if self.audit_df is not None:
+            summary_sl = (slice(None), ['mean', 'cv', 'skew'])
+
+            bit1 = self.statistics_df.loc[summary_sl, :]
+            bit1.index = ['freq_m', 'sev_m', 'agg_m', 'freq_cv', 'sev_cv', 'agg_cv', 'freq_skew', 'sev_skew', 'agg_skew']
+
+
+            bit2 = self.audit_df[['EmpMean', 'EmpCV', 'EmpSkew', 'EmpKurt', 'P99.0', 'P99.6']].T
+            bit2.index = ['agg_emp_m', 'agg_emp_cv', 'agg_emp_skew', 'agg_emp_kurt', 'P99.0_emp', 'P99.6_emp']
+
+            df = pd.concat((bit1, bit2), axis=0)
+            df.loc['agg_m_err', :] = df.loc['agg_emp_m'] / df.loc['agg_m'] - 1
+            df.loc['agg_cv_err', :] = df.loc['agg_emp_cv'] / df.loc['agg_cv'] - 1
+            df.loc['agg_skew_err', :] = df.loc['agg_emp_skew'] / df.loc['agg_skew'] - 1
+            df = df.loc[['freq_m', 'freq_cv', 'freq_skew', 'sev_m', 'sev_cv', 'sev_skew',
+                         'agg_m', 'agg_emp_m', 'agg_m_err',
+                         'agg_cv', 'agg_emp_cv', 'agg_cv_err',
+                         'agg_skew', 'agg_emp_skew', 'agg_skew_err',
+                         'agg_emp_kurt',
+                         'P99.0_emp','P99.6_emp']]
+            df.columns.name = 'unit'
+            df.index.name = 'statistic'
+        else:
+            df = None
+        return df
+
+    @property
+    def report_df(self):
+        return friendly(self._report_df)
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """

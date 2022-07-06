@@ -38,6 +38,7 @@ from collections import OrderedDict
 from cycler import cycler
 from datetime import datetime
 import hashlib
+from inspect import signature, currentframe, getargvalues
 from itertools import product
 from jinja2 import Environment, FileSystemLoader
 import json
@@ -90,6 +91,38 @@ stat_renamer = {'L': 'Expected Loss', 'P': "Premium", 'LR': 'Loss Ratio',
                 'M': "Margin", 'PQ': 'Leverage', 'Q': 'Capital', 'ROE': "ROE", 'a': 'Assets',
                 'rp': "Return Period", 'epdr': 'EPD Ratio', 'EPDR': 'EPD Ratio'}
 
+
+
+def add_defaults(dict_in, kind='agg'):
+    """
+    add default values to dict_inin. Leave existing values unchanged
+    Used to output to a data frame, where you want all columns completed
+
+    :param dict_in:
+    :param kind:
+    :return:
+    """
+
+    print('running add_defaults\n' * 10)
+
+    # use inspect to get the defaults
+    # obtain signature
+    sig = signature(Aggregate.__init__)
+
+    # self and name --> bound signature
+    bs = sig.bind(None, '')
+    bs.apply_defaults()
+    # remove self
+    bs.arguments.pop('self')
+    defaults = bs.arguments
+
+    if kind == 'agg':
+        defaults.update(dict_in)
+
+    elif kind == 'sev':
+        for k, v in defaults.items():
+            if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
+                dict_in[k] = v
 
 def distortion_namer(x):
     if len(x) < 4:
@@ -235,10 +268,48 @@ class CaseStudy(object):
         self.cache_base.mkdir(exist_ok=True)
         self.cache_dir = None
 
+    def to_json(self):
+        """
+        Persist to json in file aggregate/cases/case_id.json
+
+        :param fn:
+        :return:
+        """
+        ans = {}
+        # use inspect to get the arguments
+        sig = signature(self.factory)
+        for k in sig.parameters.keys():
+            ans[k] = getattr(self, k)
+        json.dump(ans, (Path.home() / f'aggregate/cases/{self.case_id}.json').
+                  open('w', encoding='utf-8'))
+
+        return ans
+
+    def read_json(self, fn):
+        """
+        Load from json object.
+        Files in aggregate/cases.
+
+        :param fn:
+        :return:
+        """
+        args = json.load((Path.home() / f'aggregate/cases/{fn}.json').open('r', encoding='utf=8'))
+        self.factory(**args)
+
+    @staticmethod
+    def list():
+        """
+        List cases with stored json files.
+
+        :return:
+        """
+        for p in (Path.home() / 'aggregate/cases').glob('*.json'):
+            print(p)
+
     def factory(self, case_id, case_name, case_description,
-                     a_distribution, b_distribution_gross, b_distribution_net,
-                     reg_p, roe, d2tc,
-                     f_discrete, f_blend_extend, bs, log2, padding):
+                a_distribution, b_distribution_gross, b_distribution_net,
+                reg_p, roe, d2tc,
+                f_discrete, f_blend_extend, bs, log2, padding):
         """
         Create CaseStudy from case_id and all arguments in generic format with explicit reinsurance.
 
@@ -571,7 +642,8 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         # color, matching color background fonts
         index_names = {
             'selector': '.index_name',
-            'props': 'font-style: italic; color: black; background-color: #B4C3DC; font-weight:bold; border: 1px solid white; text-transform: capitalize; text-align:left;'
+            'props': 'font-style: italic; color: black; background-color: #B4C3DC; '
+                     'font-weight:bold; border: 1px solid white; text-transform: capitalize; text-align:left;'
         }
         headers = {
             'selector': 'th:not(.index_name)',
@@ -740,8 +812,7 @@ The column sop shows the sum by unit. {self.re_description} All units produce th
             # table_no = [11.7, 11.8, 11.9][self.case_number]
             # caption = f'Table {table_no}: '
             if self.show: display(HTML('<hr>'))
-            caption = f"""Traditional and stand alone Pricing by distortion.
-Pricing by unit and distortion for {self.case_name}, calibrated to
+            caption = f"""Pricing by unit and distortion for {self.case_name}, calibrated to
 CCoC pricing with {self.roe} cost of capital and $p={self.reg_p}$.
 Losses and assets are the same for all distortions.
 The column sop shows sum of parts by unit, the difference with the total
@@ -2754,116 +2825,6 @@ def macro_market_graphs(axi, port, dn, rp):
     a.plot(xs, delta, ':', label='layer')
     a.set(ylim=[-0.01, 1.01], title='Discount rate $\\delta$')
     a.legend(loc='upper right')
-
-
-# def RelaxedPortfolio(port_or_prog, log2=13, bs=0, padding=2, approx_freq_ge=100):
-#     """
-#     enable basic set of exhibits
-#     checks to see if the enhanced methods are in the class and adds to the instance if not
-#
-#     executes a recalc with sensible defaults
-#
-#     see enhance_portfolio for a list of added methods
-#     from common_scripts.py
-#
-#     """
-#     if type(port_or_prog) == str:
-#         # program
-#         uw = agg.Underwriter(create_all=False)
-#         # new style return
-#         out = uw(port_or_prog)
-#         # TODO: sort out
-#         print(out, 'FIGURE OUT WHAT TO DO'*4)
-#         raise ValueError('asdf')
-#     else:
-#         port = port_or_prog
-#
-#     if port.density_df is None:
-#         # not recomputed
-#         if bs == 0:
-#             bs = port.best_bucket(log2)
-#         logging.warning(
-#             f'Recomputing {port.name} with log2={log2}, bs={bs if bs >= 1 else 1/bs if bs >= 1 else int(1 / bs)}...')
-#         port.update(log2=log2, bs=bs, padding=padding, remove_fuzz=True, add_exa=True,
-#                     approx_freq_ge=approx_freq_ge, trim_df=False)
-#
-#     enhance_portfolio(port)
-#     # create standard exhibit
-#     # port.basic_loss_statistics()
-#     return port
-#
-#
-# def TensePortfolio(port_or_prog, log2=13, bs=0, padding=2, approx_freq_ge=100,
-#                    dist_name='wang', a=0, p=0, ROE=0.10, r0=0.02, df=[0.0, 0.9], mass_hints=None,
-#                    dist=None):
-#     """
-#     relaxed plus more...where you need a distortion or generally more choices are required
-#
-#     dist_name for analysis
-#
-#     dist = just pass in a distortion directly...it will be applied.
-#
-#     also handles populating the reserve example templates
-#
-#     see enhance_portfolio for a list of added methods
-#
-#     from common_scripts.py
-#
-#     """
-#
-#     port = RelaxedPortfolio(port_or_prog, log2, bs, padding, approx_freq_ge=approx_freq_ge)
-#     a, p = port.set_a_p(a, p)
-#     port.a = a
-#     port.p = p
-#     port.ROE = ROE
-#
-#     if dist is None:
-#         recalibrate = False
-#         if port.dist_ans is None:
-#             recalibrate = True
-#         if port.distortion is None:
-#             port.dist_name = dist_name
-#             recalibrate = True
-#         else:
-#             # have both...make sure consistent
-#             port.dist_name = dist_name
-#             if dist_name != port.distortion.name:
-#                 # need to change distortion and recalibrate
-#                 recalibrate = True
-#
-#         if recalibrate:
-#             logging.warning(f'Calibrating distortions for {port.name} with ROE={ROE}, a={a}, p={p}...')
-#             port.calibrate_distortions(r0=r0, df=df, ROEs=[ROE], As=[a], strict=False)
-#
-#             port.apply_distortion(port.dists[dist_name], plots=None, df_in=None, create_augmented=True,
-#                                   mass_hints=mass_hints)
-#             port.ad_ans = port.analyze_distortion(dist_name, p=p, A=a, ROE=ROE, use_self=True, plot=False,
-#                                                   mass_hints=mass_hints)
-#
-#             # one line premium and capital summary from dist calibration
-#             # port.distortion_information()
-#             # port.distortion_calibration()
-#     else:
-#         # handed in a distortion
-#         logging.warning(f'Applying input distortion for {port.name} with ROE={ROE}, a={a}, p={p}...')
-#         port.apply_distortion(dist, plots=None, df_in=None, create_augmented=True, mass_hints=mass_hints)
-#         port.ad_ans = port.analyze_distortion(dist, use_self=True, plot=False, mass_hints=mass_hints)
-#
-#         # one line premium and capital summary from dist calibration
-#         # port.distortion_information()
-#         # port.distortion_calibration()
-#
-#     # levels for the distortion calibration
-#     # dm = port.dist_ans.xs(port.dist_name, level=2, axis=0).reset_index()
-#     # dma = float(dm['$a$'])
-#     # dmp = port.cdf(port.a)
-#     # dmROE = float(dm['ROE'])
-#     # logging.warning(f' Final calibration returned a={dma}, p={dmp}, ROE={dmROE}')
-#
-#     # make the standard exhibits
-#     # port.distortion_information()
-#     # port.distortion_calibration()
-#     return port
 
 
 def enhance_portfolio(port, force=False):

@@ -4589,7 +4589,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         K = As[0]
         LR = LRs[0]
         idx = (K, LR)
-        dd = Distortion.distortions_from_params(params, index=idx, r0=r0, plot=False)
+        dd = Distortion.distortions_from_params(params, index=idx, r0=r0)
         if num_plots == 2:
             axiter = axiter_factory(None, len(dd))
         elif num_plots == 3:

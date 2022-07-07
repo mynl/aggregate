@@ -19,30 +19,28 @@ logger = logging.getLogger(__name__)
 
 class Distortion(object):
     """
-    handles everything to do with distortion functions
+    Creation and management of distortion functions.
 
+    0.9.4: renamed roe to ccoc, but kept creator with roe for backwards compatibility.
 
     """
     # make these (mostly) immutable...avoid changing by mistake
-    _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar', 'convex', 'tt')
+    _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'ccoc', 'tvar',
+                               'wtdtvar', 'convex', 'tt')
     _has_mass_ = ('ly', 'clin', 'lep', 'roe')
-    _med_names_ = ("Prop Hzrd", "Wang", 'Capd Loglin', "Lev Equiv",
-                    "Lin Yield", "Capped Linear", "Dual Mom", "Const ROE", "Tail VaR", 'Wtd TVaR', "Convex Env", 'Wang-tt')
+    _med_names_ = ("Prop Hzrd", "Wang", 'Capd Loglin', "Lev Equiv", "Lin Yield", "Capped Linear", "Dual Mom",
+                   'Const CoC', "Tail VaR", 'Wtd TVaR', "Convex Env", 'Wang-tt')
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Capped Loglinear', "Leverage Equivalent Pricing",
-                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant ROE", "Tail VaR", 'Weighted TVaR',
-                    "Convex Envelope", 'Wang-tt')
+                    "Linear Yield", "Capped Linear", "Dual Moment", "Constant CoC", "Tail VaR",
+                    'Weighted TVaR', "Convex Envelope", 'Wang-tt')
     # TODO fix examples!
-    # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'roe', 'tvar', 'wtdtvar,  'convex')
-    _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,    .1,    0.15,     .15)
-    _eg_param_2_ =              (.5,     .75,     .5,    0.5,   1.5,   1.8,     3,    .25,    0.5,      .5)
+    # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'ccoc', 'tvar', 'wtdtvar,  'convex')
+    _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,   .1,     0.15,     .15)
+    _eg_param_2_ =              (.5,     .75,     .5,    0.5,   1.5,   1.8,     3,   .25,    0.50,      .5)
     # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
     renamer = _distortion_names_
 
-    # @property
-    # @staticmethod
-    # def renamer():
-    #     return _distortion_names_
 
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):
@@ -63,7 +61,7 @@ class Distortion(object):
 
     def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y='', display_name=''):
         """
-        create new distortion
+        Create a new distortion.
 
         Tester:
 
@@ -94,6 +92,7 @@ class Distortion(object):
         :param col_y:
         :param display_name: over-ride name, useful for parameterized convex fix distributions
         """
+
         self._name = name
         self.shape = shape
         self.r0 = r0
@@ -193,9 +192,10 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x <= self.r0, 0, (x - self.r0) / sl)
 
-        elif self._name == 'roe':
+        elif self._name == 'roe' or self._name == 'ccoc':
             # constant roe = capped linear with shape = 1/(1+r), r0=r/(1+r)
             # r = target roe
+            self._name = 'ccoc'
             r = self.shape
             v = 1 / (1 + r)
             d = 1 - v
@@ -296,16 +296,13 @@ class Distortion(object):
 
         self.g = g
         self.g_inv = g_inv
+
         def g_dual(x):
             return 1 - self.g(x)
+
         self.g_dual = g_dual
 
     def __str__(self):
-        """
-        printable version of distortion
-
-        :return:
-        """
         if self.display_name != '':
             s = self.display_name
             return s
@@ -319,7 +316,7 @@ class Distortion(object):
             s += f', ({self.df[0]:.3f}/{self.df[1]:.3f})'
         elif self.has_mass:
             # don't show the mass for wtdtvar
-            s += f', {self.r0:.3f}'
+            s += f', mass {self.mass:.3f}'
 
         return s
 
@@ -345,16 +342,21 @@ class Distortion(object):
         """
         quick plot of the distortion
 
-        :param ax:
         :param xs:
         :param n:  length of vector is no xs
         :param both: True: plot g and ginv and add decorations, if False just g and no trimmings
+        :param ax:
+        :param plot_points:
         :param scale: linear as usual or return plots -log(gs)  vs -logs and inverts both scales
         :param kwargs:  passed to plot
         :return:
         """
 
         assert scale in ['linear', 'return']
+
+        if scale == 'return' and n == 101:
+            # default not enough for return
+            n = 10001
 
         if xs is None:
             xs = np.linspace(0, 1, n)
@@ -375,7 +377,7 @@ class Distortion(object):
             ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
             if both:
                 ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
-            ax.set(xscale='log', yscale='log', xlim=[1/2000, 1], ylim=[1/2000, 1])
+            ax.set(xscale='log', yscale='log', xlim=[1/5000, 1], ylim=[1/5000, 1])
             ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
 
         if self._name == 'convex' and plot_points:
@@ -391,8 +393,6 @@ class Distortion(object):
                 ax.scatter(x=self.df[self.col_x], y=self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
             elif scale == 'return':
                 ax.scatter(x=1/self.df[self.col_x], y=1/self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
-
-        ax.grid(linewidth='0.25')
 
         ax.set(title=fill(str(self), 20), aspect='equal')
 
@@ -442,40 +442,30 @@ class Distortion(object):
         f1.suptitle('Example Distortion Functions - Return Scale')
 
     @staticmethod
-    def distortions_from_params(params, index, r0=0.025, df=5.5, plot=True, axiter=None, pricing=True, strict=True):
+    def distortions_from_params(params, index, r0=0.025, df=5.5, pricing=True, strict=True):
         """
-        make set of dist funs and inverses from params, output of port.calibrate_distortions
-        params must just have one row for each method and be in the output format of cal_dist
+        Make set of dist funs and inverses from params, output of port.calibrate_distortions
+        params must just have one row for each method and be in the output format of cal_dist.
 
-        :param plot:
+        Called by Portfolio.
+
         :param index:
-        :param r0: min rol parameters
         :param params: dataframe such that params[index, :] has a [lep, param] etc.
         pricing=True, strict=True: which distortions to allow
         df for t distribution
+        :param r0: min rol parameters
+        :param strict:
+        :param pricing:
         :return:
         """
+
         temp = params.loc[index, :]
         dists = {}
         for dn in Distortion.available_distortions(pricing=pricing, strict=strict):
             param = float(temp.loc[dn, 'param'])
             dists[dn] = Distortion(name=dn, shape=param, r0=r0, df=df)
 
-        if plot:
-            axiter = axiter_factory(axiter, len(dists))
-            # f, axs = plt.subplots(2, 3, figsize=(8, 6))
-            # it = iter(axs.flatten())
-            for dn in Distortion.available_distortions(pricing=pricing, strict=strict):
-                dists[dn].plot(ax=next(axiter))
-            try:
-                axiter.tidy()
-                plt.tight_layout()
-            except:
-                # fails if axiter is just an iteration of axis elements
-                # assume then that constrained_layout =True so no tight layout
-                pass
-
-        return dists  # [g_lep, g_ph, g_wang, g_ly, g_clin]
+        return dists
 
     @staticmethod
     def convex_example(source='bond'):

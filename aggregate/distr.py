@@ -1809,13 +1809,13 @@ class Aggregate(Frequency):
             df['sevF'] = df.p_sev.cumsum()
             df.loc[-0.5, :] = (0, 0, 0, 0, 0)
             df = df.sort_index()
-            if self.ex <= 100:
+            if mx <= 60:
                 # stem plot for small means
-                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1s', label='Severity')
                 axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0o', label='Aggregate')
+                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1s', label='Severity')
             else:
-                df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
+                df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
 
             axd['A'].set(xlim=[-mx / 25, mx + 1], title='Probability mass functions')
             axd['A'].legend()
@@ -1832,7 +1832,8 @@ class Aggregate(Frequency):
             # for Lee diagrams
             ax = axd['C']
             # trim so that the Lee plot doesn't spuriously tend up to infinity
-            idx = (df.F == 1).idxmax()
+            # little care: may not exaclty equal 1
+            idx = (df.F == df.F.max()).idxmax()
             dft = df.loc[:idx]
             ax.plot(dft.F, dft.loss, drawstyle='steps-pre', lw=3, label='Aggregate')
             # same trim for severity

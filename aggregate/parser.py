@@ -49,7 +49,7 @@ agg_out             	::= AGG name builtin_agg note
                     	 | AGG name exposures layers SEV sev occ_reins freq agg_reins note
                     	 | AGG name exposures layers builtin_sev occ_reins freq agg_reins note
                     	 | AGG name exposures layers dsev occ_reins freq agg_reins note
-                    	 | AGG name dfreq dsev occ_reins note
+                    	 | AGG name dfreq dsev occ_reins agg_reins note
                     	 | builtin_agg agg_reins note
 
 sev_out             	::= SEV name sev note
@@ -62,12 +62,12 @@ freq                	::= MIXED ID expr expr
                     	 | FREQ expr
                     	 | FREQ
 
-agg_reins           	::= NET OF reins_list AGGREGATE
-                    	 | CEDED TO reins_list AGGREGATE
+agg_reins           	::= AGGREGATE NET OF reins_list
+                    	 | AGGREGATE CEDED TO reins_list
                     	 | 
 
-occ_reins           	::= NET OF reins_list OCCURRENCE
-                    	 | CEDED TO reins_list OCCURRENCE
+occ_reins           	::= OCCURRENCE NET OF reins_list
+                    	 | OCCURRENCE CEDED TO reins_list
                     	 | 
 
 reins_list          	::= reins_list AND reins_clause
@@ -95,6 +95,8 @@ dsev                	::= DSEV doutcomes dprobs
 dfreq               	::= DFREQ doutcomes dprobs
 
 doutcomes           	::= "[" numberl "]"
+                    	 | "[" expr RANGE expr "]"
+                    	 | "[" expr RANGE expr RANGE expr "]"
 
 dprobs              	::= "[" numberl "]"
                     	 | 

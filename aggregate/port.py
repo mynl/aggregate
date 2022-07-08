@@ -40,19 +40,12 @@ from .utils import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    report_time, make_mosaic_figure, friendly
+    make_mosaic_figure, friendly
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
-matplotlib.rcParams['legend.fontsize'] = 'xx-small'
-
+# matplotlib.rcParams['legend.fontsize'] = 'xx-small'
 logger = logging.getLogger(__name__)
 
-
-# debug
-# info
-# warning
-# error
-# critical
 
 class Portfolio(object):
     """
@@ -82,12 +75,12 @@ class Portfolio(object):
             elif isinstance(spec, str):
                 # look up object in uw return actual instance
                 # note here you could do uw.aggregate[spec] and get the dictionary def
-                # or uw(spec) to return the already-created (and maybe updated) object
+                # or uw.write(spec) to return the already-created (and maybe updated) object
                 # we go the latter route...if user wants they can pull off the dict item themselves
                 if uw is None:
                     raise ValueError(f'Must pass valid Underwriter instance to create aggs by name')
                 try:
-                    a = uw(spec)
+                    a = uw.write(spec)
                 except Exception as e:
                     logger.error(f'Item {spec} not found in your underwriter')
                     raise e
@@ -859,7 +852,7 @@ class Portfolio(object):
         """
         returns new Portfolio with the fit
 
-        Deprecated...prefer uw(self.fit()) to go through the agg language approach
+        Deprecated...prefer uw.write(self.fit()) to go through the agg language approach
 
         :param approx_type: slognorm | sgamma
         :return:
@@ -2848,10 +2841,8 @@ class Portfolio(object):
                            f' mass {dist.mass} {dist}')
             # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
-        report_time('apply_distortion - refob completed')
 
         for line in self.line_names:
-            report_time(f'apply_distortion - starting {line} loop 1')
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
             # for <=a cumintegral,  for > a reverse and use cumsum (no step back)
             # UC = unconditional
@@ -3024,7 +3015,6 @@ class Portfolio(object):
 
             # print(f"g'(0)={gprime1:.5f}\nroe zero vector {roe_zero}")
             for line in self.line_names_ex:
-                report_time(f'apply_distortion - starting {line} efficient loop')
                 df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
 
                 mm_l = df[f'T.M_{line}'].diff().shift(-1) / self.bs
@@ -3072,11 +3062,9 @@ class Portfolio(object):
         # where is the ROE zero? need to handle separately else Q will blow up
         roe_zero = (df['M.ROE_total'] == 0.0)
 
-        report_time('apply_distortion - first line loop complete')
 
         # print(f"g'(0)={gprime1:.5f}\nroe zero vector {roe_zero}")
         for line in self.line_names_ex:
-            report_time(f'apply_distortion - starting {line} loop 2')
 
             # these are not used
             # df[f'exa_{line}_pcttotal'] = df['exa_' + line] / df.exa_total
@@ -3685,8 +3673,6 @@ class Portfolio(object):
 
         """
 
-        report_time('analyze_distortion | start')
-
         # setup: figure what distortion to use, apply if necessary
         if use_self:
             # augmented_df was called deets before, FYI
@@ -3751,8 +3737,6 @@ class Portfolio(object):
                 dist = self.calibrate_distortion(dname, r0=dr0, df=ddf, roe=ROE, assets=a_cal)
                 _x = self.apply_distortion(dist, create_augmented=False, mass_hints=mass_hints, efficient=efficient)
                 augmented_df = _x.augmented_df
-
-        report_time('analyze_distortion | distortion applied etc.')
 
         # other helpful audit values
         # keeps track of details of calc for Answer
@@ -5048,7 +5032,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 if l in sub_port:
                     pgm += f'\t{agg_dict[l]}\n'
             if uw:
-                ports[name] = uw(pgm)
+                ports[name] = uw.write(pgm)
             else:
                 ports[name] = pgm
             if uw and bs * log2 > 0:

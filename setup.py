@@ -17,7 +17,6 @@ install_requires = [
     'pypandoc',
     'sly==0.3',
     'scipy',
-    'seaborn',
     'matplotlib',
     'numpy'
 ]

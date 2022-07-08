@@ -18,11 +18,11 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 from recommonmark.parser import CommonMarkParser
-import os
-import sys
-sys.path.insert(0, os.path.abspath('c:/s/telos/python/aggregate_project'))
-#sys.path.insert(0, os.path.abspath('c:/s/telos/python/aggregate_project/examples'))
-sys.path.insert(0, os.path.abspath('c:/s/telos/python/'))
+# import os
+# import sys
+# sys.path.append('c:/s/telos/python/aggregate_project')
+# sys.path.insert(0, os.path.abspath('c:/s/telos/python/aggregate_project/examples'))
+# sys.path.insert(0, os.path.abspath('c:/s/telos/python/'))
 
 
 # -- General configuration ------------------------------------------------
@@ -93,20 +93,44 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 # html_theme = 'alabaster'
-html_theme = 'agg_theme'
-html_theme_path = ['_theme']
+# pre July 2022
+# html_theme = 'agg_theme'
+# html_theme_path = ['_theme']
+# match Great, carto etc.
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 # See https://alabaster.re`thedocs.io/en/latest/customization.html
+# html_theme_options = {
+#     "edit_link": "true",
+#     "sidebar": "right",
+#     "scipy_org_logo": "false",
+#     "rootlinks": [("https://github.com/mynl/aggregate", "aggregate Code"),]
+#                   # ("http://www.mynl.com/aggregate/index.html", "aggregate Docs")]
+# }
 html_theme_options = {
-    "edit_link": "true",
-    "sidebar": "right",
-    "scipy_org_logo": "false",
-    "rootlinks": [("https://github.com/mynl/aggregate", "aggregate Code"),]
-                  # ("http://www.mynl.com/aggregate/index.html", "aggregate Docs")]
+    'logo_only': False,
+    'display_version': True,
+    'prev_next_buttons_location': 'bottom',
+    'style_external_links': False,
+    # 'style_nav_header_background': 'white',
+    # Toc options
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'includehidden': True,
+    'titles_only': False,
+    'logo': 'logo.png',
+    'logo_name': True,
+    # other ????
+     'github_user' :'mynl',
+     'github_repo': 'aggregate',
+     'github_button': True
 }
+
+
 # html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
 # 'description': 'aggregate is a Python package providing fast, accurate, and expressive data'
 # 'structures designed to make working with probability distributions easy and intuitive.',

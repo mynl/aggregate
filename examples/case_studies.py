@@ -363,7 +363,7 @@ class CaseStudy(object):
         self.padding = padding
 
         # new style output from uw key (kind, name) output (obj or spec, program)
-        out = self.uw(f'''
+        out = self.uw.write(f'''
 port Gross_{self.case_id}
     {self.a_distribution}
     {self.b_distribution_gross}
@@ -378,7 +378,7 @@ port Gross_{self.case_id}
         #                             ROE=self.roe, p=self.reg_p)
 
         # net portfolio
-        out = self.uw(f'''
+        out = self.uw.write(f'''
 port Net_{self.case_id}
     {self.a_distribution}
     {self.b_distribution_net}
@@ -635,19 +635,57 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         :param save:
         @return:
         """
-        cell_hover = {  # for row hover use <tr> instead of <td>
+        # cell_hover = {  # for row hover use <tr> instead of <td>
+        #     'selector': 'td:hover',
+        #     'props': [('background-color', '#ffffb3')]
+        # }
+        # # color, matching color background fonts
+        # index_names = {
+        #     'selector': '.index_name',
+        #     'props': 'font-style: italic; color: black; background-color: #B4C3DC; '
+        #              'font-weight:bold; border: 1px solid white; text-transform: capitalize; text-align:left;'
+        # }
+        # headers = {
+        #     'selector': 'th:not(.index_name)',
+        #     'props': 'background-color: #F1F8FE; color: black;  border: 1px solid #a4b3dc;'
+        # }
+        # center_heading = {
+        #     'selector': 'th.col_heading',
+        #     'props': 'text-align: center;'
+        # }
+        # left_index = {
+        #     'selector': '.row_heading',
+        #     'props': 'text-align: left;'
+        # }
+        # bold_level_0 = {
+        #     'selector': 'th.col_heading.level0',
+        #     'props': 'font-size: 1.2em;'
+        # }
+        # caption_f = {
+        #     'selector': 'caption',
+        #     'props': 'font-size: 1.1em; font-family: serif; font-weight: normal; text-align: left;'
+        # }
+        # td = {
+        #     'selector': 'td',
+        #     'props': f'text-align: {align}; border-bottom: 1px solid #a4b3dc;'
+        # }  # font-weight: bold;'}
+        # all_styles = [cell_hover, index_names, headers,
+        #               center_heading, bold_level_0, left_index, td, caption_f]
+
+        # revised set: used in agg, greys look better
+        cell_hover = {
             'selector': 'td:hover',
             'props': [('background-color', '#ffffb3')]
         }
-        # color, matching color background fonts
         index_names = {
             'selector': '.index_name',
-            'props': 'font-style: italic; color: black; background-color: #B4C3DC; '
-                     'font-weight:bold; border: 1px solid white; text-transform: capitalize; text-align:left;'
+            'props': 'font-style: italic; color: white; background-color: #777777; '
+                     'font-weight:bold; border: 1px solid white; text-transform: capitalize; '
+                     'text-align:left;'
         }
         headers = {
             'selector': 'th:not(.index_name)',
-            'props': 'background-color: #F1F8FE; color: black;  border: 1px solid #a4b3dc;'
+            'props': 'background-color: #DDDDDD; color: black;  border: 1px solid #ffffff;'
         }
         center_heading = {
             'selector': 'th.col_heading',
@@ -657,33 +695,17 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
             'selector': '.row_heading',
             'props': 'text-align: left;'
         }
-        bold_level_0 = {
-            'selector': 'th.col_heading.level0',
-            'props': 'font-size: 1.2em;'
-        }
-        caption_f = {
-            'selector': 'caption',
-            'props': 'font-size: 1.1em; font-family: serif; font-weight: normal; text-align: left;'
-        }
+        # note: this is only difference with generic aggregate method:
         td = {
             'selector': 'td',
-            'props': f'text-align: {align}; border-bottom: 1px solid #a4b3dc;'
-        }  # font-weight: bold;'}
+            'props': f'text-align: {align};'
+        }
+        all_styles = [cell_hover, index_names, headers, center_heading,  left_index, td]
+        # do the styling
+        styled_df = df.style.set_table_styles(all_styles)
 
         if exhibit_id != '':
             caption = f'({exhibit_id}) {caption}'
-
-        # do the styling
-        all_styles = [cell_hover, index_names, headers,
-                      center_heading, bold_level_0, left_index, td, caption_f]
-        styled_df = df.style.set_table_styles(all_styles)
-
-        # if additional_properties is not None:
-        #     for s, f in additional_properties:
-        #         styled_df = styled_df.set_properties(s, **f)
-
-        # if additional_styles is not None:
-        #     styled_df = df.style.set_table_styles(additional_styles, overwrite=False)
 
         styled_df = styled_df.format(ff).set_caption(caption)
 
@@ -4635,7 +4657,7 @@ def similar_risks_example():
     """
     # stand alone hlep from the code; split at program = to run different options
     uw = agg.Underwriter()
-    p_base = uw('''
+    p_base = uw.write('''
     port UNIF
         agg ONE 1 claim sev 1 * beta 1 1 fixed
     ''')
@@ -4680,7 +4702,7 @@ def similar_risks_example():
         # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts[.375 .375 .25] fixed
     
     '''
-    p_new = uw(program)
+    p_new = uw.write(program)
     p_new.update(11, 1 / 1024, remove_fuzz=True)
 
     p_new.plot(figsize=(6, 4))

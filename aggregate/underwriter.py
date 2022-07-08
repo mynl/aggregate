@@ -258,14 +258,14 @@ class Underwriter(object):
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
-    def __call__(self, portfolio_program, **kwargs):
-        """
-        make the Underwriter object callable; pass through to write
-
-        :param portfolio_program:
-        :return:
-        """
-        return self.write(portfolio_program, **kwargs)
+    # def __call__(self, portfolio_program, **kwargs):
+    #     """
+    #     make the Underwriter object callable; pass through to write
+    #
+    #     :param portfolio_program:
+    #     :return:
+    #     """
+    #     return self.write(portfolio_program, **kwargs)
 
     def factory(self, kind, name, spec, program):
         """
@@ -451,7 +451,6 @@ class Underwriter(object):
 
         # report on what has been done
         if rv is None:
-            # print('WARNING: Program did not contain any output...')
             logger.warning(f'Underwriter.write | Program did not contain any output')
         else:
             if len(rv):
@@ -492,7 +491,7 @@ class Underwriter(object):
         """
 
         # Preprocess ---------------------------------------------------------------------
-        portfolio_program = UnderwritingLexer.preprocess(portfolio_program)
+        portfolio_program = self.lexer.preprocess(portfolio_program)
 
         # Parse and Postprocess-----------------------------------------------------------
         self.parser.reset()
@@ -534,37 +533,37 @@ class Underwriter(object):
                 rv[(kind, name)] = (self.parser.out_dict[(kind, name)], program_line)
         return rv
 
-    @staticmethod
-    def add_defaults(dict_in, kind='agg'):
-        """
-        add default values to dict_inin. Leave existing values unchanged
-        Used to output to a data frame, where you want all columns completed
-
-        :param dict_in:
-        :param kind:
-        :return:
-        """
-
-        print('running add_defaults\n' * 10)
-
-        # use inspect to get the defaults
-        # obtain signature
-        sig = signature(Aggregate.__init__)
-
-        # self and name --> bound signature
-        bs = sig.bind(None, '')
-        bs.apply_defaults()
-        # remove self
-        bs.arguments.pop('self')
-        defaults = bs.arguments
-
-        if kind == 'agg':
-            defaults.update(dict_in)
-
-        elif kind == 'sev':
-            for k, v in defaults.items():
-                if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
-                    dict_in[k] = v
+    # @staticmethod
+    # def add_defaults(dict_in, kind='agg'):
+    #     """
+    #     add default values to dict_inin. Leave existing values unchanged
+    #     Used to output to a data frame, where you want all columns completed
+    #
+    #     :param dict_in:
+    #     :param kind:
+    #     :return:
+    #     """
+    #
+    #     print('running add_defaults\n' * 10)
+    #
+    #     # use inspect to get the defaults
+    #     # obtain signature
+    #     sig = signature(Aggregate.__init__)
+    #
+    #     # self and name --> bound signature
+    #     bs = sig.bind(None, '')
+    #     bs.apply_defaults()
+    #     # remove self
+    #     bs.arguments.pop('self')
+    #     defaults = bs.arguments
+    #
+    #     if kind == 'agg':
+    #         defaults.update(dict_in)
+    #
+    #     elif kind == 'sev':
+    #         for k, v in defaults.items():
+    #             if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
+    #                 dict_in[k] = v
 
     def safe_lookup(self, buildinid):
         """
@@ -589,39 +588,22 @@ class Underwriter(object):
             raise ValueError(f'Error: type of {name} is  {found_kind}, not expected {kind}')
         return spec
 
-
-class Build(object):
-    """
-    The Build class wraps the Underwriter to provide a more elementary interface. Intelligent auto-update,
-    detects discrete distributions and sets ``bs = 1``.
-
-    """
-    # set overall debug mode, for parser and port, sev and aggregate object updates
-    DEBUG = False
-    uw = Underwriter(create_all=False, update=True, debug=DEBUG)
-
-    @classmethod
-    def parse(cls, program):
-        return cls.uw.parse_portfolio_program(program)
-
-    @classmethod
-    def list(cls):
-        return cls.uw.list()
-
-    @classmethod
-    def describe(cls, item_type=''):
-        return cls.uw.describe(item_type, pretty_print=True)
-
     @staticmethod
     def logger_level(level):
+        """
+        Convenience function.
+        :param level:
+        :return:
+        """
         # set global logger_level
         logger_level(level)
 
-    @classmethod
-    def build(cls, program, update=True, create_all=None, log2=-1, bs=0, **kwargs):
+    def build(self, program, update=True, create_all=None, log2=-1, bs=0, log_level=30, **kwargs):
         """
-        Convenience function to make work easy for the user. Hide uw, updating etc. A single instance, called
-        ``build`` is exported from the module.
+        Convenience function to make work easy for the user. Intelligent auto updating.
+        Detects discrete distributions and sets ``bs = 1``.
+
+        ``build`` method sets loger level to 30 by default.
 
         :param program:
         :param update: build's update
@@ -629,21 +611,20 @@ class Build(object):
         :param log2: -1 is default. Figure log2 for discrete and 13 for all others. Inupt value over-rides
         and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
+        :param log_level:
         :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
         :return: created object(s)
         """
 
-        if program in ['underwriter', 'uw']:
-            return cls.uw
+        self.logger_level(log_level)
 
         # options for this run
-        create_all0 = cls.uw.create_all
-        if create_all is not None:
-            cls.uw.create_all = create_all
+        if create_all is None:
+            create_all = self.create_all
 
         # make stuff
         # write will return a dict with keys (kind, name) and value either the object or the spec
-        out_dict = cls.uw.write(program, update=False, force_severity=True)
+        out_dict = self.write(program, create_all=create_all, update=False, force_severity=True)
 
         # in this loop bs_ and log2_ are the values actually used for each update; they do not
         # overwrite the input default values
@@ -677,7 +658,7 @@ class Build(object):
                         bs_ = bs
                     logger.info(f'({kind}, {name}): Normal mode, using bs={bs_} and log2={log2_}')
                 try:
-                    out.update(log2=log2_, bs=bs_, debug=cls.DEBUG, force_severity=True, **kwargs)
+                    out.update(log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
                 except ZeroDivisionError as e:
                     logger.error(e)
                 except AttributeError as e:
@@ -698,13 +679,11 @@ class Build(object):
                 logger.info(f'updating with {log2}, bs=1/{1/bs_}')
                 logger.info(f'({kind}, {name}): bs={bs_} and log2={log2_}')
                 out.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
-                           debug=cls.DEBUG, **kwargs)
+                           debug=self.debug, **kwargs)
             else:
                 logger.warning(f'Unexpected: output kind is {type(out)}. (expr/number?)')
                 pass
 
-        # put back defaults
-        cls.uw.create_all = create_all0
         if len(out_dict) == 1:
             # only one output...just return that
             # dict, pop the last (only) element (popitem: Remove and return a (key, value) pair as a 2-tuple.)
@@ -728,43 +707,44 @@ class Build(object):
 
     __call__ = build
 
-    @classmethod
-    def interpreter_file(cls, where='',
-                         filename='C:\\S\\TELOS\\Python\\aggregate_extensions_project\\aggregate2\\agg2_database.csv'):
+    def interpreter_file(self, where='', filename=''):
         """
         Run a suite of test programs. For detailed analysis, run_one.
 
         """
+        if filename == '':
+            filename = Path.home() / 'aggregate/tests/test_suite.csv'
         df = pd.read_csv(filename, index_col=0)
         if where != '':
             df = df.loc[df.index.str.match(where)]
-        return cls.interpreter_work(df.iterrows()), df
+        # add One severity
+        self.write('sev One dsev [1]')
+        return self.interpreter_work(df.iterrows())
 
-    @classmethod
-    def interpreter_one(cls, program):
+    def interpreter_one(self, program):
         """
         Interpret single test in debug mode.
         """
 
-        return cls.interpreter_work(iter([('one off', program)]), debug=True)
+        return self.interpreter_work(iter([('one off', program)]), debug=True)
 
-    @classmethod
-    def interpreter_list(cls, program_list):
+    def interpreter_list(self, program_list):
         """
         Interpret single test in debug mode.
         """
-        return cls.interpreter_work(list(enumerate(program_list)), debug=True)
+        return self.interpreter_work(list(enumerate(program_list)), debug=True)
 
-    @classmethod
-    def interpreter_work(cls, iterable, debug=False):
+    def interpreter_work(self, iterable, debug=False):
         """
-        do all the work for the est, allows into to be marshalled into the tester
-        in different ways.
+        Do all the work for the test, allows input to be marshalled into the tester
+        in different ways. Unlike production interpret_program, runs one line at a time.
+        Each line is preprocessed and then run through a clean parser, and the output
+        analyzed.
 
         :return:
         """
         lexer = UnderwritingLexer()
-        parser = UnderwritingParser(cls.uw.safe_lookup, debug)
+        parser = UnderwritingParser(self.safe_lookup, debug)
         ans = {}
         errs = 0
         no_errs = 0
@@ -811,4 +791,4 @@ class Build(object):
 
 
 # exported instance
-build = Build()
+build = Underwriter(create_all=False, update=True, debug=False)

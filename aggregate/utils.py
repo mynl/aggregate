@@ -12,38 +12,16 @@ from scipy.special import kv
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
-from time import time_ns
+# from time import time_ns
 from IPython.core.display import HTML, display
 
 
-# approved method is call (__name__)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # TODO take out timer stuff
 last_time = first_time = 0
 timer_active = False
-
-
-def start_timer():
-    global last_time, first_time, timer_active
-    last_time = time_ns()
-    first_time = last_time
-    timer_active = True
-
-
-def report_time(msg):
-    global last_time, timer_active
-    if timer_active:
-        t = time_ns()
-        logger.log(logging.INFO+1, f'{(t - last_time)/1e9:.6f} | {(t - first_time)/1e9:10.6f} | {msg}')
-        last_time = t
-
-
-def stop_timer():
-    global timer_active
-    timer_active = False
 
 
 def get_fmts(df):
@@ -1419,7 +1397,7 @@ def nice_multiple(mx):
         return 0
 
     m = mx // 6
-    m = {3:2, 4:5, 6:5, 7:5, 8:10, 9:10}.get(m, m)
+    m = {3: 2, 4: 5, 6: 5, 7: 5, 8: 10, 9: 10}.get(m, m)
     if m < 10:
         return m
 
@@ -1509,6 +1487,7 @@ def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', un
     for w in which:
         fm = make_fmt(kind, places, power_range, sep, unit)
         getattr(ax, w).set_major_formatter(fm)
+
 
 # styling - greys verions
 def style_df(df):

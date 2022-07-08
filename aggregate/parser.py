@@ -339,7 +339,7 @@ import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-DEBUGFILE = 'c:\\temp\\parser.out'
+DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
 
 
 class UnderwritingLexer(Lexer):
@@ -483,7 +483,7 @@ class UnderwritingLexer(Lexer):
 
 class UnderwritingParser(Parser):
     # uncomment to write detailed grammar rules
-    debugfile = 'c:\\temp\\parser.out'
+    debugfile = Path.home() / 'aggregate/parser/parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
         ('left', LOCATION_ADD),
@@ -537,7 +537,7 @@ class UnderwritingParser(Parser):
             return
 
         if f_out == '':
-            f_out = Path(DEBUGFILE + '.html')
+            f_out = DEBUGFILE.with_suffix('.html')
         else:
             f_out = Path(fn)
 
@@ -1229,7 +1229,7 @@ class UnderwritingParser(Parser):
             raise ValueError('Unexpected end of file')
 
 
-def grammar(add_to_doc=False):
+def grammar(add_to_doc=False, save_to_fn=''):
     '''
     write the grammar at the top of the file as a docstring
     '''
@@ -1365,6 +1365,9 @@ LOCATION_ADD            ::= "#"
         txt = txt[0:st] + s + txt[end:]
         with open(__file__, 'w') as f:
             f.write(txt)
+    if save_to_fn == '':
+        save_to_fn = Path.home() / 'aggregate/parser/grammar.md'
+    Path(save_to_fn).write_text(s, encoding='utf-8')
 
 
 if __name__ == '__main__':

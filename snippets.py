@@ -25,160 +25,21 @@ section = []
 if len(sys.argv) > 1:
     # there are args
     if sys.argv[1] == 'h' or sys.argv[1] == '-h':
-        print('Select options from:\n    new_parse\n    scratch\n    scratch_ex\n    parse_test\n    netters_and_ceders\n    simple_discrete\n    hu_scs_case\n    sev_intro\n    easter_egg.')
+        print('Select options from:\n    parse_tests\n    scratch\n    scratch_ex\n    parse_test\n    netters_and_ceders\n    simple_discrete\n    hu_scs_case\n    sev_intro\n    easter_egg.')
         print('\nSelect no options just to import build etc.')
     else:
         section = sys.argv[1:]
 
 
 # section = [
-    # 'book_case_studies',
-    # 'new_parse',
     # 'scratch',
-    # 'scratch_ex',
-    # 'parse_test',
+    # 'book_case_studies',
+    # 'parse_tests',
     # 'netters_and_ceders',
     # 'simple_discrete',
-    # 'hu_scs_case',
     # 'sev_intro'
     # 'easter_egg'
 # ]
-
-
-def book_case_studies_XX():
-    pass
-
-
-if 'book_case_studies' in section:
-    print(
-        f'ACTIVATING book_case_studies SECTION {__name__} ===========================')
-
-    discrete = cs.CaseStudy()
-    discrete.factory(case_id='discrete_new',
-                     case_name='Discrete Case',
-                     case_description='Discrete Case in the new syntax.',
-                     a_distribution='agg X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed',
-                     b_distribution_gross='agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed',
-                     b_distribution_net=f'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed aggregate net of 70 xs 20',
-                     reg_p=1,
-                     roe=0.10,
-                     d2tc=0.3,
-                     f_discrete=True,
-                     f_blend_extend=True,
-                     bs=1,
-                     log2=8,
-                     padding=1)
-    discrete.full_monty()
-
-    # tame
-    recalc = build('agg B 1 claim sev gamma  50 cv 0.15 fixed',
-                   log2=16, bs=1/64)
-    a, d = recalc.q(0.8), recalc.q(0.99)
-    y = d - a
-    tame = cs.CaseStudy()
-    tame.factory(case_id='tame_new',
-                 case_name='Tame Case',
-                 case_description='Tame Case in the new syntax.',
-                 a_distribution='agg A 1 claim sev gamma  50 cv 0.10 fixed',
-                 b_distribution_gross='agg B 1 claim sev gamma  50 cv 0.15 fixed',
-                 b_distribution_net=f'agg B 1 claim sev gamma  50 cv 0.15 fixed aggregate net of {y} xs {a}',
-                 reg_p=0.999,
-                 roe=0.10,
-                 d2tc=0.3,
-                 f_discrete=False,
-                 f_blend_extend=True,
-                 bs=1/64,
-                 log2=16,
-                 padding=1)
-    tame.full_monty()
-
-    # CNC
-    recalc = build(
-        'agg Cat    1 claim sev lognorm  20 cv 1.00 fixed', log2=16, bs=1/64)
-    a, d = recalc.q(0.9), recalc.q(0.995)
-    y = d - a
-    cnc = cs.CaseStudy()
-    cnc.factory(case_id='cnc_new',
-                case_name='Cat/Non-Cat',
-                case_description='Cat/Non-Cat in the new syntax.',
-                a_distribution='agg NonCat 1 claim sev gamma    80 cv 0.15 fixed',
-                b_distribution_gross='agg Cat    1 claim sev lognorm  20 cv 1.00 fixed',
-                b_distribution_net=f'agg Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of {y} xs {a}',
-                reg_p=0.999,
-                roe=0.10,
-                d2tc=0.3,
-                f_discrete=False,
-                f_blend_extend=True,
-                bs=1/64,
-                log2=16,
-                padding=1)
-    cnc.full_monty()
-
-    # hs
-    recalc = build('sev Husev  15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5')
-    a, d = recalc.isf(0.05), recalc.isf(0.005)
-    y = d - a
-    hs = cs.CaseStudy()
-    hs.factory(case_id='hs_new',
-                       case_name='Hu/SCS Case',
-                       case_description='Hu/SCS Case in the new syntax.',
-                       a_distribution='agg SCS 70 claims sev exp(0 - 1.9**2 / 2)      @ lognorm 1.9 poisson',
-                       b_distribution_gross='agg Hu   2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 poisson',
-                       b_distribution_net=f'agg Hu   2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 poisson aggregate net of {y} xs {a}',
-                       reg_p=0.999,
-                       roe=0.10,
-                       d2tc=0.3,
-                       f_discrete=False,
-                       f_blend_extend=True,
-                       bs=1/4,
-                       log2=19,
-                       padding=1)
-    hs.full_monty()
-
-
-def new_parse_XX():
-    pass
-
-
-if 'new_parse' in section:
-    print(
-        f'ACTIVATING new_parse SECTION {__name__} ===========================')
-
-    tests = [
-        'agg A 1 claim dsev [1 2 3] fixed',
-        'agg B 2 claim dsev [1 2 3] fixed',
-        'agg C 1 claim dsev [1 2 3 10] fixed',
-        'sev S dsev[1 2 3 5 10 25 100]',
-        'sev T dsev[1 2 3 5 10 25 100 1000]',
-        'port PORT0\n\tagg XLN 1 claim sev lognorm 20 cv .9 poisson',
-        'port PORTA\n\tagg.A',
-        'port PORTB\n\tagg.A\n\tagg.B',
-        'port PORTC\n\tagg NewA 3 @ agg.A\n\tagg.C',
-        'port PORTD\n\tagg AA 1 claim sev.S fixed\n\tagg AB 1 claim sev sev.T fixed',
-        'port PORTE\n\tagg S2    2 claims sev 3 @ sev.S fixed\n\tagg T~5   2 claims sev sev.T # 5 fixed\n\tagg T_4_5 2 claims sev 4 @ sev.T # 5 fixed',
-        'port PORTF\n\tagg S1  3 * agg.A\n\tagg S2  4 @ agg.A\n\tagg S3  agg.A # 6\n\tagg S4   9 * 3 @ agg.A # 6'
-    ]
-    # for parse to work actually have to build referents
-    build('agg A 1 claim dsev [1 2 3] fixed')
-    build('agg B 2 claim dsev [1 2 3] fixed')
-    build('agg C 1 claim dsev [1 2 3 10] fixed')
-    build('sev S dsev[1 2 3 5 10 25 100]')
-    build('sev T dsev[1 2 3 5 10 25 100 1000]')
-    display(build.uw.knowledge)
-
-    display(build.interpreter_list(tests))
-
-    # for test in tests:
-    #     display(build.interpreter_one(test))
-
-    ans = {}
-    build.uw.create_all = False
-    for n, test in enumerate(tests):
-        ans[n] = build(test)
-        display(ans[n])
-    build.uw.create_all = True
-
-# ==========================================================================================
 
 
 def scratch_XX():
@@ -196,8 +57,6 @@ if 'scratch' in section:
     net = build(
         'agg TestB 2 claim sev lognorm 30 cv .3 fixed net of 60 x 40 aggregate')
 
-
-if 'scratch_ex' in section:
     net.plot()
     display(net)
 
@@ -224,18 +83,194 @@ if 'scratch_ex' in section:
 # ==========================================================================================
 
 
-def parse_test_XX():
+def book_case_studies_XX():
     pass
 
 
-if 'parse_test' in section:
+if 'book_case_studies' in section:
+    print(
+        f'ACTIVATING book_case_studies SECTION {__name__} ===========================')
+
+    discrete = cs.CaseStudy()
+    discrete.factory(case_id='discrete_new',
+                     case_name='Discrete Case',
+                     case_description='Discrete Case in the new syntax.',
+                     a_distribution='agg X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed',
+                     b_distribution_gross='agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed',
+                     b_distribution_net=f'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed aggregate net of 70 xs 20',
+                     reg_p=1,
+                     roe=0.10,
+                     d2tc=0.3,
+                     f_discrete=True,
+                     f_blend_extend=True,
+                     bs=1,
+                     log2=8,
+                     padding=1)
+    discrete.full_monty()
+    discrete.to_json()
+
+    discrete_eq = cs.CaseStudy()
+    discrete_eq.factory(case_id='discrete_equal_new',
+                       case_name='Discrete Case, equal points',
+                       case_description='Discrete Case, equal points, in the new syntax.',
+                       a_distribution       = 'agg X1 1 claim dsev [0 9 10] [1/2 1/4 1/4] fixed',
+                       b_distribution_gross = 'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed',
+                       b_distribution_net   =f'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed aggregate net of 70 xs 20',
+                       reg_p=1,
+                       roe=0.10,
+                       d2tc=0.3,
+                       f_discrete=True,
+                       f_blend_extend=True,
+                       bs=1,
+                       log2=8,
+                       padding=1)
+    discrete_eq.full_monty()
+    discrete_eq.to_json()
+
+
+    # tame
+    recalc = build('agg B 1 claim sev gamma  50 cv 0.15 fixed',
+                   log2=16, bs=1/64)
+    a, d = recalc.q(0.8), recalc.q(0.99)
+    y = d - a
+    tame = cs.CaseStudy()
+    tame.factory(case_id='tame_new',
+                 case_name='Tame Case',
+                 case_description='Tame Case in the new syntax.',
+                 a_distribution='agg A 1 claim sev gamma  50 cv 0.10 fixed',
+                 b_distribution_gross='agg B 1 claim sev gamma  50 cv 0.15 fixed',
+                 b_distribution_net=f'agg B 1 claim sev gamma  50 cv 0.15 fixed aggregate net of {y} xs {a}',
+                 reg_p=0.999,
+                 roe=0.10,
+                 d2tc=0.3,
+                 f_discrete=False,
+                 f_blend_extend=True,
+                 bs=1/64,
+                 log2=16,
+                 padding=1)
+    tame.full_monty()
+    tame.to_json()
+
+    # CNC
+    recalc = build(
+        'agg Cat    1 claim sev lognorm  20 cv 1.00 fixed', log2=16, bs=1/64)
+    a, d = recalc.q(0.9), recalc.q(0.995)
+    y = d - a
+    cnc = cs.CaseStudy()
+    cnc.factory(case_id='cnc_new',
+                case_name='Cat/Non-Cat',
+                case_description='Cat/Non-Cat in the new syntax.',
+                a_distribution='agg NonCat 1 claim sev gamma    80 cv 0.15 fixed',
+                b_distribution_gross='agg Cat 1 claim sev lognorm  20 cv 1.00 fixed',
+                b_distribution_net=f'agg Cat 1 claim sev lognorm  20 cv 1.00 fixed aggregate net of {y} xs {a}',
+                reg_p=0.999,
+                roe=0.10,
+                d2tc=0.3,
+                f_discrete=False,
+                f_blend_extend=True,
+                bs=1/64,
+                log2=16,
+                padding=1)
+    cnc.full_monty()
+    cnc.to_json()
+
+    # hs
+    # these are numbers from the new_case_studies md files
+    freq1, sigma1 = 70, 1.9
+    freq2, sigma2 = 2, 2.5
+    mu1 = np.log(70 / freq1) - sigma1**2 / 2
+    mu2 = np.log(30 / freq2) - sigma2**2 / 2
+    print(freq1, exp(mu1), sigma1, freq2, exp(
+        mu2), sigma2, mu1, sigma1, mu2, sigma2)
+
+    recalc = build('sev Husev  15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5')
+    a, d = recalc.isf(0.05), recalc.isf(0.005)
+    y = d - a
+    hs = cs.CaseStudy()
+    hs.factory(case_id='hs_new',
+                       case_name='Hu/SCS Case',
+                       case_description='Hu/SCS Case in the new syntax.',
+                       a_distribution='agg SCS 70 claims sev exp(0 - 1.9**2 / 2)      @ lognorm 1.9 poisson',
+                       b_distribution_gross='agg Hu  2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 poisson',
+                       b_distribution_net=f'agg Hu   2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 poisson aggregate net of {y} xs {a}',
+                       reg_p=0.999,
+                       roe=0.10,
+                       d2tc=0.3,
+                       f_discrete=False,
+                       f_blend_extend=True,
+                       bs=1/4,
+                       log2=19,
+                       padding=1)
+    hs.full_monty()
+    hs.to_json()
+
+    hs2 = cs.CaseStudy()
+    hs2.factory(case_id='hs_per_occ',
+                case_name='Hu/SCS',
+                case_description='Hu/SCS Case in the new syntax with per occurrence reinsurance .',
+                a_distribution='agg SCS 70 claims sev exp(0 - 1.9**2 / 2)      @ lognorm 1.9 poisson',
+                b_distribution_gross='agg Hu   2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 poisson',
+                b_distribution_net=f'agg Hu   2 claims sev 15 * exp(0 - 2.5**2 / 2) @ lognorm 2.5 occurrence net of {y} xs {a} poisson',
+                reg_p=0.999,
+                roe=0.10,
+                d2tc=0.3,
+                f_discrete=False,
+                f_blend_extend=True,
+                bs=1/4,
+                log2=19,
+                padding=1)
+    hs2.full_monty()
+    hs2.to_json()
+
+
+def parse_tests_XX():
+    pass
+
+
+if 'parse_tests' in section:
+    print(
+        f'ACTIVATING parse_tests SECTION {__name__} ===========================')
+
     # do some parser testing!
     build('sev One dhistogram xps [1] [1]')
     build('sev ONE dsev [1]')
-    print(
-        f'ACTIVATING parse_test SECTION {__name__} ===========================')
-    test, df = build.interpreter_file(where='')
 
+    df = build.interpreter_file(where='')
+    display(df)
+
+    tests = [
+        'agg A 1 claim dsev [1 2 3] fixed',
+        'agg B 2 claim dsev [1 2 3] fixed',
+        'agg C 1 claim dsev [1 2 3 10] fixed',
+        'sev S dsev[1 2 3 5 10 25 100]',
+        'sev T dsev[1 2 3 5 10 25 100 1000]',
+        'port PORT0\n\tagg XLN 1 claim sev lognorm 20 cv .9 poisson',
+        'port PORTA\n\tagg.A',
+        'port PORTB\n\tagg.A\n\tagg.B',
+        'port PORTC\n\tagg NewA 3 @ agg.A\n\tagg.C',
+        'port PORTD\n\tagg AA 1 claim sev.S fixed\n\tagg AB 1 claim sev sev.T fixed',
+        'port PORTE\n\tagg S2    2 claims sev 3 @ sev.S fixed\n\tagg T~5   2 claims sev sev.T # 5 fixed\n\tagg T_4_5 2 claims sev 4 @ sev.T # 5 fixed',
+        'port PORTF\n\tagg S1  3 * agg.A\n\tagg S2  4 @ agg.A\n\tagg S3  agg.A # 6\n\tagg S4   9 * 3 @ agg.A # 6'
+    ]
+    # for parse to work actually have to build referents
+    build('agg A 1 claim dsev [1 2 3] fixed')
+    build('agg B 2 claim dsev [1 2 3] fixed')
+    build('agg C 1 claim dsev [1 2 3 10] fixed')
+    build('sev S dsev[1 2 3 5 10 25 100]')
+    build('sev T dsev[1 2 3 5 10 25 100 1000]')
+    display(build.knowledge)
+
+    display(build.interpreter_list(tests))
+
+    # for test in tests:
+    #     display(build.interpreter_one(test))
+
+    ans = {}
+    build.uw.create_all = False
+    for n, test in enumerate(tests):
+        ans[n] = build(test)
+        display(ans[n])
+    build.uw.create_all = True
 
 # ==========================================================================================
 
@@ -414,93 +449,6 @@ if 'simple_discrete' in section:
 
 # ==========================================================================================
 
-def hu_scs_case_XX():
-    pass
-
-
-if 'hu_scs_case' in section:
-
-    sys.path.append('c:/s/websites/pricinginsurancerisk/')
-    from case_studies import CaseStudy
-    import case_studies as cs
-
-    os.chdir('c:/s/websites/pricinginsurancerisk/')
-    case = CaseStudy.factory('hs')
-
-    print(case.gross.program)
-    print(case.net.program)
-
-    gross = uw(
-        'agg HU 2 claims 1200000000 x 0 sev 0.6590540043511113 @ lognorm 2.5 poisson')
-    neto = uw('agg HU 2 claims 1200000000 x 0 sev 0.6590540043511113 @ lognorm 2.5 net of 372.4 xs 40.25 occurrence poisson')
-    neta = uw('agg HU 2 claims 1200000000 x 0 sev 0.6590540043511113 @ lognorm 2.5 poisson net of 372.4 xs 40.25 aggregate')
-
-    gross.easy_update(bs=0.25, log2=19, padding=1)
-    neto. easy_update(bs=0.25, log2=19, padding=1)
-    neta. easy_update(bs=0.25, log2=19, padding=1)
-
-    frame = {'gross': gross, 'neto': neto, 'neta': neta}
-
-    ans = []
-    for k, ob in frame.items():
-        a = ob.q(0.999)
-        ans.append(pd.Series([a, ob.density_df.at[a, 'exa']],
-                             index=['assets', 'exa']))
-
-    display(pd.concat(ans, axis=1, keys=frame.keys()))
-
-    # these are numbers from the new_case_studies md files
-    freq1, sigma1 = 70, 1.9
-    freq2, sigma2 = 2, 2.5
-    mu1 = np.log(70 / freq1) - sigma1**2 / 2
-    mu2 = np.log(30 / freq2) - sigma2**2 / 2
-    print(freq1, exp(mu1), sigma1, freq2, exp(
-        mu2), sigma2, mu1, sigma1, mu2, sigma2)
-
-    bookg = uw(f'''
-    port Gross_hs
-        agg SCS 70 claims 1200000000 x 0 sev 0.1644744565771549 @ lognorm 1.9 poisson
-        agg HU 2 claims 1200000000 x 0 sev 0.6590540043511113 @ lognorm 2.5  poisson
-    ''', create_all=False)
-
-    bookn = uw(f'''
-    port Net_hs
-        agg SCS 70 claims 1200000000 x 0 sev 0.1644744565771549 @ lognorm 1.9 poisson
-        agg HU 2 claims 1200000000 x 0 sev 0.6590540043511113 @ lognorm 2.5 poisson net of 372.4 xs 40.25 aggregate
-    ''', create_all=False)
-
-    bookg.update(bs=0.25, log2=19, padding=1, remove_fuzz=True)
-
-    bookn.update(bs=0.25, log2=19, padding=1, remove_fuzz=True)
-
-    for ob in [bookg, bookn, gross, neto, neta]:
-        display(ob)
-
-    display(
-        pd.concat((net.audit_df.T, case.net.audit_df.T, case.gross.audit_df.T), keys=[
-                  'Occ', 'Agg', 'Gross'], axis=1)
-    )
-
-    frame = {'gross': gross, 'neto': neto, 'neta': neta}
-
-    ans = []
-    for k, ob in frame.items():
-        a = ob.q(0.999)
-        ans.append(pd.Series([a, ob.density_df.at[a, 'exa']],
-                             index=['assets', 'exa']))
-
-    display(pd.concat(ans, axis=1, keys=frame.keys()))
-
-    # check the reins...it was computed off the severity only
-    import scipy.stats as ss
-    fz = ss.lognorm(2.5, scale=exp(mu2))
-    fz.stats('mv')
-
-    print(fz.isf(0.05), fz.isf(0.005),  -fz.isf(0.05) + fz.isf(0.005))
-
-
-# ==========================================================================================
-
 
 def sev_intro_XX():
     pass
@@ -515,59 +463,3 @@ if 'sev_intro' in section:
 
     s.plot()
 
-
-# ==========================================================================================
-
-
-def easter_egg_XX():
-    pass
-
-
-if 'easter_egg' in section:
-    # do some parser testing!
-    print(
-        f'ACTIVATING easter_egg SECTION {__name__} ===========================')
-
-    def make_awkward(log2, scale=False):
-        """
-        Decompose a uniform random variable on range(2**log2) into two part
-        using Eamonn Long's method.
-        """
-        n = 1 << log2
-        sc = 2 * n
-        xs = [int(bin(i)[2:], 4) for i in range(n)]
-        ys = [2*i for i in xs]
-        ps = [1 / n for i in xs]
-        if scale is True:
-            xs = xs / sc
-            ys = ys / sc
-
-        A = agg.Aggregate('A', exp_en=1, sev_name='dhistogram',
-                          sev_xs=xs, sev_ps=ps, freq_name='fixed')
-        B = agg.Aggregate('B', exp_en=1, sev_name='dhistogram',
-                          sev_xs=ys, sev_ps=ps, freq_name='fixed')
-        awk = agg.Portfolio('awkward', [A, B])
-        awk.update(log2+1, 1 / sc if scale else 1, remove_fuzz=True)
-        return awk
-
-    awk = make_awkward(16, False)
-
-    awk.update(18, 1, remove_fuzz=True)
-
-    awk.plot(kind='audit', figsize=(12, 8))
-
-    awk.density_df.p_B.plot()
-
-    awk.density_df.filter(regex='p_[tAB]')  # .plot()
-
-    # %%sf 1 1
-    # bit = awk.density_df.filter(regex='exeqa_[tAB]')
-
-    # bit.plot(logx=True, logy=True, ax=ax)
-    # ax.set(ylim=[1, 1e6])
-    # ```
-
-    # ```python
-    # bit[bit==0] = np.nan
-    # bit.head(100)
-    # ```

@@ -4798,7 +4798,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         both do nothing
 
         """
-        if a==0 and p==0:
+        if a == 0 and  p== 0:
             p = 0.995
             a = self.q(p)
             # click to exact

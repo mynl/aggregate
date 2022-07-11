@@ -1,0 +1,31 @@
+<!-- sub menubar for results applications -->
+
+
+<nav class="navbar navbar-expand-md bg-secondary py-0">
+
+    <a class="navbar-brand nav-link text-white" href="https://www.pricinginsurancerisk.com/results">Results </a>
+
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbarCite"
+            aria-controls="collapsibleMainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon text-white ">&#x2630;</span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="collapsibleNavbarCite">
+        <ul class="navbar-nav mr-auto">
+
+            {% for id in ids %}
+                <li class="nav-link nav-submasthead text-white"><a class='nav-link'
+                                                                   href="#{{ id }}">{{ id }}</a></li>
+            {% endfor %}
+
+            <li class="nav-link nav-submasthead text-white"><a class='nav-link'
+                    href="#spec">Specification</a>
+
+            <li class="nav-link nav-submasthead text-white"><a class='nav-link'
+                    href="https://www.pricinginsurancerisk.com/results/appendix">Appendix</a>
+
+            </li>
+        </ul>
+    </div>
+</nav>
+

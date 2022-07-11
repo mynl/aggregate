@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="Stephen J Mildenhall" />
+    <title>{{ title }}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ templates }}/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ templates }}/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ templates }}/favicon-16x16.png">
+    <link rel="manifest" href="/static/favicon/rounded/site.webmanifest">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link href="https://www.pricinginsurancerisk.com/static/css/site.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/1000hz-bootstrap-validator/0.11.9/validator.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/shareon@1/dist/shareon.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/shareon@1/dist/shareon.min.js" type="text/javascript"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"> </script>
+
+</head>
+<body>
+
+<nav class="navbar navbar-expand-md bg-dark">
+    <a class="navbar-brand nav-link text-white" href="https://www.pricinginsurancerisk.com">Pricing Insurance Risk</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleMainNavbar"
+            aria-controls="collapsibleMainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon text-white">&#x2630;</span>
+    </button>
+    <div class="collapse navbar-collapse" id="collapsibleMainNavbar">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='home' %} active {% endif %}" href="https://www.pricinginsurancerisk.com">Home</a>
+            </li>
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='cases' %} active {% endif %}" href="https://www.pricinginsurancerisk.com/cases">Cases</a>
+            </li>
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='results' %} active {% endif %}" href="https://www.pricinginsurancerisk.com/results">Results</a>
+            </li>
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='presentations' %} active {% endif %}" href="https://www.pricinginsurancerisk.com/presentations">Presentations</a>
+            </li>
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='errata' %} active {% endif %}" href="https://www.pricinginsurancerisk.com/errata">Errata</a>
+            </li>
+            <li class="nav-item nav-masthead">
+                <a class="nav-link {% if page=='about' %} active {% endif %}" href="https://www.pricinginsurancerisk.com/about">About</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+
+{% block content %}{% endblock %}
+
+<!-- Footer -->
+<footer class="footer bg-light pt-3 pb-0">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <p class="text-muted small" style="font-family: sans-serif;"> Site &copy; and managed by <a href="https://www.convexrisk.com">Convex Risk LLC</a>, 2022 &sdot; All Rights Reserved </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
+
+
+

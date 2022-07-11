@@ -208,6 +208,8 @@ class CaseStudy(object):
         self.summaries = None
         self.sp_ratings = None
         self.cap_table = None
+        self.cap_table_total = None
+        self.cap_table_marginal = None
         self.debt_stats = None
         self.walk = None
         self.progression = None
@@ -275,14 +277,19 @@ class CaseStudy(object):
         :param fn:
         :return:
         """
+        json.dump(self.to_dict(), (Path.home() / f'aggregate/cases/{self.case_id}.json').
+                  open('w', encoding='utf-8'))
+
+    def to_dict(self):
+        """
+        Definition to dictionary
+        :return:
+        """
         ans = {}
         # use inspect to get the arguments
         sig = signature(self.factory)
         for k in sig.parameters.keys():
             ans[k] = getattr(self, k)
-        json.dump(ans, (Path.home() / f'aggregate/cases/{self.case_id}.json').
-                  open('w', encoding='utf-8'))
-
         return ans
 
     def read_json(self, fn):
@@ -447,28 +454,29 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         @return:
         """
 
-        logger.log(35, 'Start Full Monty Update')
+        logger.info('Start Full Monty Update')
         self.make_all()
         process_memory()
 
-        logger.log(35, 'display exhibits')
+        logger.info('display exhibits')
         self.show = False
         self.show_exhibits('all')
-        process_memory()
+        # process_memory()
         self.show_extended_exhibits()
         process_memory()
 
-        logger.log(35, 'create graphics')
+        logger.info('create graphics')
         self.show_graphs('all')
         process_memory()
         self.show_extended_graphs()
         process_memory()
-        logger.log(35, f'{self.case_id} computed')
+        logger.info(f'{self.case_id} computed')
 
         # save the results
-        mrm = ManualRenderResults(self)
-        p, p1 = mrm.render()
-        logger.log(35, f'{self.case_id} saved to HTML...complete!')
+        mrr = ManualRenderResults(self)
+        mrr.render_custom('[A-Y]', suffix='book')
+        mrr.render_custom('Z*', suffix='extended')
+        logger.info(f'{self.case_id} saved to HTML...complete!')
 
     def approx_roe(self, e=1e-15):
         """
@@ -707,13 +715,14 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         if exhibit_id != '':
             caption = f'({exhibit_id}) {caption}'
 
-        styled_df = styled_df.format(ff).set_caption(caption)
+        styled_df = styled_df.format(ff).set_caption(caption) # .set_table_attributes(f'id={exhibit_id}')
 
-        if show is True and save is True:
+        if show is True: # ? and save is True:
             display(styled_df)
-        if save:
+        if save is True:
             styled_df.to_html(buf=Path(cache_dir / f'{exhibit_id}.html'))
-        process_memory()
+        # shut up already...
+        # process_memory()
         return styled_df
 
     def _display(self, exhibit_id, df, caption, ff=None, save=True):
@@ -723,10 +732,28 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         ff = float format function
 
         """
+        # figure the optimal by column formatting
+        fc = lambda x: f'{x:,.1f}'
+        f3 = lambda x: f'{x:.3f}'
+        f5g = lambda x: f'{x:.5g}'
+        # fp = lambda x: f'{x:.1%}'
+        # guess sensible defaults
         if ff is None:
-            ff = self.default_float_format
-
-        return self._display_work(exhibit_id, df, caption, ff, save, self.cache_dir, self.show)
+            fmts = {}
+            for n, r in df.agg([np.mean, np.min, np.max, np.std]).T.iterrows():
+                if r.amax < 1 and r.amin < 1e-4 and r.amin > 0:
+                    fmts[n] = f5g
+                elif r.amax < 1 and r.amin > 1e-4:
+                    fmts[n] = f3
+                elif r.amax < 10 and r.amin >= 0:
+                    fmts[n] = f3
+                else:
+                    fmts[n] = fc
+            ff = fmts
+        return self._display_work(exhibit_id, df, f'<div id="{exhibit_id}" /> ' + caption, ff, save,
+                                  self.cache_dir, self.show)
+        # return self._display_work(exhibit_id, df, caption, ff, save, self.cache_dir, self.show)
+        logger.info(f'Exhibit {exhibit_id} processed')
 
     def show_exhibits(self, *chapters):
         if chapters[0] == 'all':
@@ -765,7 +792,7 @@ benefit shows percentage reduction compared to total.
             # caption = f'Table {table_no}: '
             caption = f"""Pricing summary for {self.case_name} using a 
 a {self.reg_p} capital standard and {self.roe:.1%} constant cost of capital for all layers."""
-            self._display("F", urn(self.pricing_summary), caption, None)
+            self._display("F", urn(self.pricing_summary), caption, lambda x: f'{x:,.3f}')
 
             if self.show: display(HTML('<hr>'))
             # table_no = 7.3
@@ -835,7 +862,7 @@ The column sop shows the sum by unit. {self.re_description} All units produce th
             # caption = f'Table {table_no}: '
             if self.show: display(HTML('<hr>'))
             caption = f"""Pricing by unit and distortion for {self.case_name}, calibrated to
-CCoC pricing with {self.roe} cost of capital and $p={self.reg_p}$.
+CCoC pricing with {self.roe} cost of capital and p={self.reg_p}.
 Losses and assets are the same for all distortions.
 The column sop shows sum of parts by unit, the difference with the total
 shows the impact of diversification.
@@ -913,27 +940,141 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             fp = lambda x: f'{x:.0%}'
             fp1 = lambda x: f'{x:.1%}'
             ff = dict(zip(self.walk.columns, (f1, f1, f1, fp1, fp1, fp1, fp, fp, fp)))
-            caption = f'Table (new): Progression of premium benefit by distortion. Differences between allocated and stand-alone, ' \
+            # TODO be explicit about the distortion
+            caption = 'Table (new): Progression of premium benefit by distortion. ' \
+                      'Differences between allocated and stand-alone, ' \
                       'the implied premium reduction, and the split by unit.'
             self._display('Z-15-2', self.walk, caption, ff)
 
-            self.make_cap_table()
-            caption = f'Table (new): Asset tranching with S&P bond default rates and a {self.d2tc:.1%} debt to ' \
-                      'total capital limit.'
-            # format by column name
-            ff = {k: (lambda x: f'{x:.1%}') if k.find('Pct') >= 0
-            else
-            ((lambda x: f'{x:.4f}') if k.find('Pr') == 0
-             else (lambda x: f'{x:.2f}'))
-                  for k in self.cap_table.columns}
-            self._display('Z-TR-1', self.cap_table, caption, ff);
+            # cap table related
+            for kind in ['gross', 'net']:
+                self.make_cap_table(kind=kind)
+                self.ports[kind].apply_distortion(self.blend_d)
+                caption = f'Table (new): {kind.title()} asset tranching with S&P bond default rates and a {self.d2tc:.1%} debt to ' \
+                          'total capital limit.'
+                self._display(f'Z-TR-{kind[0]}', self.cap_table, caption);
+                self._display(f'Z-TRT-{kind[0]}', self.cap_table_total,
+                              f'Return by tranche, total {kind} view, blend distortion.');
+                self._display(f'Z-TRM-{kind[0]}', self.cap_table_marginal,
+                              f'Return by tranche, marginal {kind} view, blend distortion.');
+                self.show_tranching_graph(kind, style='new')
 
     def make_cap_table(self, kind='gross'):
         """
+        TODO: this should be a Portfolio method. Input should be a. prem and EL are computable given
+        distortion has been applied.
+        XXXX Don't want that... want to be able to apply without ref to augmented df
+        Suggest reasonable debt tranching for kind=(gross|net) subject to self.d2tc debt to total capital limit.
+        Uses S&P bond default analysis.
+
+        Creates self.cap_table and self.debt_stats
+
+        This is a cluster. There must be a better way...
+
+        This version did all the difficult tranching...which is based on dubious info anyways...
+
+        """
+
+        port = self.ports[kind]
+        a, premium, el = self.pricing_summary.loc[['a', 'P', 'L'], kind]
+        capital = a - premium
+        debt = self.d2tc * capital
+        equity = capital - debt
+        debt_attach = a - debt
+        prob_debt_attach = port.sf(debt_attach)
+        cap_table = port.density_df.loc[[port.snap(i) for i in [a, premium+equity, premium, el]],
+                                  ['loss', 'F', 'S']]
+        cap_table['Amount'] = -np.diff(cap_table.loss, append=0)
+        # add prob attaches
+        cap_table['Pct Assets'] = cap_table.Amount / cap_table.iloc[0, 0]
+        cap_table['Cumul Pct'] = cap_table.loss / cap_table.iloc[0, 0]
+        cap_table['Attaches'] = cap_table.loss.shift(-1, fill_value=0)
+        cap_table = cap_table.rename(columns={'loss': 'Exhausts', 'S': 'Pr Attaches'})
+        cap_table['Pr Attaches'] = cap_table['Pr Attaches'].shift(-1, fill_value=1)
+        cap_table['Pr Exhausts'] = [port.sf(i) for i in cap_table.Exhausts]
+        cap_table = cap_table[
+            ['Amount', 'Pct Assets', 'Attaches', 'Pr Attaches', 'Exhausts', 'Pr Exhausts', 'Cumul Pct']]
+        cap_table.index = ['Debt', 'Equity', 'Premium', 'Loss']
+        cap_table.columns.name = 'Quantity'
+        cap_table.index.name = 'Tranche'
+
+        # make the total and incremental views
+        if port.augmented_df is not None:
+            # first call to create cap table is before any pricing....
+            total_renamer = {'F': 'Adequacy',
+                             'capital': 'Capital',
+                             'exa_total': 'Loss',
+                             'exag_total': 'Premium',
+                             'margin': 'Margin',
+                             'lr': 'LR',
+                             'coc': 'CoC',
+                             'loss': 'Assets'}
+            bit = port.augmented_df.loc[[port.snap(i) for i in cap_table.Exhausts],
+                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
+            bit['lr'] = bit.exa_total / bit.exag_total
+            bit['margin'] = (bit.exag_total - bit.exa_total)
+            bit['capital'] = bit.loss - bit.exag_total
+            bit['coc'] = bit.margin / bit.capital
+            bit['Discount'] = bit.coc / (1 + bit.coc)
+            # leverage here does not make sense because of reserves
+            bit.index = cap_table.index
+            bit = bit.rename(columns=total_renamer)
+            self.cap_table_total = bit
+
+            marginal_renamer = {
+                                'F': 'Adequacy',  # that the loss is in the layer
+                                'loss': 'Assets',
+                                'exa_total': 'Loss',
+                                'exag_total': 'Premium',
+                                'margin': 'Margin',
+                                'capital': 'Capital',
+                                'lr': 'LR',
+                                'coc': 'CoC',
+                                }
+            bit = port.augmented_df.loc[[0] + [port.snap(i) for i in cap_table.Exhausts],
+                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
+            bit = bit.diff(-1).iloc[:-1]
+            bit['lr'] = bit.exa_total / bit.exag_total
+            bit['margin'] = (bit.exag_total - bit.exa_total)
+            bit['capital'] = bit.loss - bit.exag_total
+            bit['coc'] = bit.margin / bit.capital
+
+            bit.index = self.cap_table_total.index
+            bit.loc['Total', :] = bit.sum()
+            bit.loc['Total', 'lr'] = bit.loc['Total', 'exa_total'] / bit.loc['Total', 'exag_total']
+            bit.loc['Total', 'coc'] = bit.loc['Total', 'margin'] / bit.loc['Total', 'capital']
+            bit['Discount'] = bit.coc / (1 + bit.coc)
+            bit = bit.rename(columns=marginal_renamer)
+            self.cap_table_marginal = bit
+
+        # return ans, tranches, bit, spdf, cap_table
+        # self.debt_stats = pd.Series(
+        #     [a, el, premium, capital, equity, debt, debt_attach, prob_debt_attach, attach_rating, exhaust_rating],
+        #     index=['a', 'EL', 'P', 'Capital', 'Equity', 'Debt', 'D_attach', 'Pr(D_attach)', 'Attach Rating',
+        #            'Exhaust Rating'])
+        self.cap_table = cap_table
+
+        # in case this is needed
+        r = Ratings()
+        spdf = r.make_ratings()
+        # ad hoc adjustment for highest rated issues
+        spdf.loc[0, 'default'] = .00003
+        spdf.loc[1, 'default'] = .00005
+        spdf['attachment'] = [port.q(1 - i) for i in spdf.default]
+        spdf = spdf.set_index('rating', drop=True)
+        self.sp_ratings = spdf
+
+    def make_cap_table_old(self, kind='gross'):
+        """
         Suggest reasonable debt tranching for kind=(gross|net) subject to self.d2tc debt to total capital limit. 
         Uses S&P bond default analysis.
-        
-        This is a cluster. There must be a better way... 
+
+        Creates self.cap_table and self.debt_stats
+
+        This is a cluster. There must be a better way...
+
+        This version did all the difficult tranching...which is based on dubious info anyways...
+
         """
 
         port = self.ports[kind]
@@ -1011,7 +1152,56 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         cap_table.columns.name = 'Quantity'
         cap_table.index.name = 'Tranche'
 
-        # return ans, tranches, bit, spdf, captable
+        # make the total and incremental views
+        if port.augmented_df is not None:
+            # first call to create cap table is before any pricing....
+            total_renamer = {'F': 'Adequacy',
+                             'capital': 'Capital',
+                             'exa_total': 'Loss',
+                             'exag_total': 'Premium',
+                             'margin': 'Margin',
+                             'lr': 'LR',
+                             'coc': 'CoC',
+                             'loss': 'Assets'}
+            bit = port.augmented_df.loc[[port.snap(i) for i in cap_table.Exhausts],
+                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
+            bit['lr'] = bit.exa_total / bit.exag_total
+            bit['margin'] = (bit.exag_total - bit.exa_total)
+            bit['capital'] = bit.loss - bit.exag_total
+            bit['coc'] = bit.margin / bit.capital
+            bit['Discount'] = bit.coc / (1 + bit.coc)
+            # leverage here does not make sense because of reserves
+            bit.index = cap_table.index
+            bit = bit.rename(columns=total_renamer)
+            self.cap_table_total = bit
+
+            marginal_renamer = {
+                                'F': 'Adequacy',  # that the loss is in the layer
+                                'loss': 'Assets',
+                                'exa_total': 'Loss',
+                                'exag_total': 'Premium',
+                                'margin': 'Margin',
+                                'capital': 'Capital',
+                                'lr': 'LR',
+                                'coc': 'CoC',
+                                }
+            bit = port.augmented_df.loc[[0] + [port.snap(i) for i in cap_table.Exhausts],
+                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
+            bit = bit.diff(-1).iloc[:-1]
+            bit['lr'] = bit.exa_total / bit.exag_total
+            bit['margin'] = (bit.exag_total - bit.exa_total)
+            bit['capital'] = bit.loss - bit.exag_total
+            bit['coc'] = bit.margin / bit.capital
+
+            bit.index = self.cap_table.index
+            bit.loc['Total', :] = bit.sum()
+            bit.loc['Total', 'lr'] = bit.loc['Total', 'exa_total'] / bit.loc['Total', 'exag_total']
+            bit.loc['Total', 'coc'] = bit.loc['Total', 'margin'] / bit.loc['Total', 'capital']
+            bit['Discount'] = bit.coc / (1 + bit.coc)
+            bit = bit.rename(columns=marginal_renamer)
+            self.cap_table_marginal = bit
+
+        # return ans, tranches, bit, spdf, cap_table
         self.debt_stats = pd.Series(
             [a, el, premium, capital, equity, debt, debt_attach, prob_debt_attach, attach_rating, exhaust_rating],
             index=['a', 'EL', 'P', 'Capital', 'Equity', 'Debt', 'D_attach', 'Pr(D_attach)', 'Attach Rating',
@@ -1109,8 +1299,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         premium = self.pricing_summary.at['P', kind]
         logger.info(f'Calibrating to premium of {premium:.1f} at assets {a:.1f}.')
         # calibrate and apply use 1 = forward sum
-        S = (1 - df.p_total[0:a].cumsum())
         bs = self.gross.bs
+        S = (1 - df.p_total[0:a-bs].cumsum())
 
         d = None
 
@@ -1129,12 +1319,13 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         def pricer(distortion):
             # re-state as series, interp returns numpy array
-            temp = pd.Series(distortion.g(S)[::-1], index=S.index)
-            temp = temp.shift(1, fill_value=0).cumsum() * bs
-            return temp.iloc[-1]
+            return np.sum(distortion.g(S)) * bs
+            # temp = pd.Series(distortion.g(S)[::-1], index=S.index)
+            # temp = temp.shift(1, fill_value=0).cumsum() * bs
+            # return temp.iloc[-1]
 
         # two methods of calibration
-        if self.f_blend_extend == 0:
+        if self.f_blend_extend is False:
 
             def make_distortion(roe):
                 nonlocal attach_probs, layer_roes
@@ -1152,7 +1343,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             logger.info('  i       fx        \troe        \tfxp')
             logger.info(f'{i: 3d}\t{fx: 8.3f}\t{s:8.6f}\t{fxp:8.3f}')
 
-        elif self.f_blend_extend == 1:
+        elif self.f_blend_extend is True:
             pp = interp1d(dd.default, dd['yield'], bounds_error=False, fill_value='extrapolate')
 
             def make_distortion(s):
@@ -1247,7 +1438,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # make the container html snippet
         pth = str(p.relative_to(self.cache_base).as_posix())
         blob = f"""
-<figure>
+<figure id="{plot_id}">
 <img src="/{pth}" width="100%" alt="Figure {f}" style="width:{100}%">
 <figcaption class="caption">{caption}</figcaption>
 </figure>
@@ -1324,42 +1515,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         """
         if self.f_discrete:
             return
-        # graph of tranching
-        f, axs = self.smfig(1, 2, (12.0, 4.0))
-        ax0, ax1 = axs.flat
-        port = self.gross
-        el = self.debt_stats['EL']
-        prem = self.debt_stats['P']
-        cap = self.debt_stats['a']
-        max_debt = self.debt_stats['D_attach']
-
-        # just show the full letter levels
-        ix = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B']
-        for ax in axs.flat:
-            self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
-            for n, x in self.sp_ratings.loc[ix].iterrows():
-                ax.axvline(x.attachment, c='C7', lw=.25)
-            ax.axvline(el, c='C1', lw=1.5, label=f'EL={el:,.0f} @ {port.sf(el):.3%}')
-            ax.axvline(prem, c='C2', lw=1.5, label=f'Premium={prem:,.0f} @ {port.sf(prem):.3%}')
-            ax.axvline(max_debt, c='C3', lw=1.5, label=f'Debt attachment={max_debt:,.0f} @ {port.sf(max_debt):.3%}')
-            msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
-            ax.axvline(cap, c='C4', lw=1.5, label=f'Assets={cap:,.0f} @ {port.sf(cap):.3%},\n{msg}')
-            ax.xaxis.set_major_locator(ticker.FixedLocator(self.sp_ratings.loc[ix, 'attachment']))
-            ax.xaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
-                                                                f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
-                                                                ix]))
-
-        xmin = self.gross.q(0.0001)
-        xmax = self.gross.q(1 - .00003 / 2)
-        if self.case_id == 'tame':
-            xmax *= 1.25
-        ax0.set(xlabel='Loss', ylabel='Density')
-        ax0.set(xlim=[xmin, xmax], yscale='linear')
-        ax1.set(xlim=[xmin, xmax], ylim=1e-10, yscale='log', xlabel='Loss')
-        ax0.legend(loc='upper right')
-        caption = f'(Z-TR-1) Figure (new): capital tranching with a {self.d2tc:.1%} debt to total capital limit.'
-        self._display_plot('Z-TR-1', f, caption)
-
+        # blended distortion
         f, axs = self.smfig(1, 3, (12.0, 4.0), )
         ax0, ax1, ax2 = axs.flat
         d0 = self.make_blend()
@@ -1385,6 +1541,129 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         caption = f'(Z-BL-1) Figure (new): Calibrated blend distortion, compard to CCoC and naive blend. The x marks show bond default and pricing data used in calibration. ' \
                   'Middle plot zooms into 0 < s < 0.1. Righthand plot uses a log/log scale. PH distortion added for comparison.'
         self._display_plot('Z-BL-1', f, caption)
+
+    def show_tranching_graph(self, kind, style='new'):
+        """
+        graph of tranching
+        revised vertical view
+        kind = gross or net
+        called by show_extended_exhibits
+
+        """
+        port = self.ports[kind]
+        if style == 'new':
+            # new style = vertical, but focused on what is shown in the cap_table range
+            f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
+            ax0, ax1 = axs.flat
+            for ax in axs.flat:
+                if ax is ax0:
+                    ax.plot(port.density_df.F, port.density_df.loss,
+                        lw=1.5, label='Loss')
+                else:
+                    ax.plot(1 / port.density_df.S, port.density_df.loss,
+                        lw=1.5, label='Loss')
+
+                col = 0
+                for n, x in self.cap_table_total.iterrows():
+                    col += 1
+                    ax.axhline(x.Assets, c=f'C{col}', lw=1.5, label=f'{n}, ¤{x.Assets:,.0f} @ p={x.Adequacy:.3%}')
+            pts = self.cap_table_total.Assets
+            ax.yaxis.set_major_locator(ticker.FixedLocator(pts.values))
+            ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}: ¤{v:,.0f}' for i, v in pts.items()]))
+
+            ax0.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
+            ax0.axvline(0, lw=0.25, c='k')
+            ax0.axvline(1, lw=0.25, c='k')
+            ax1.axvline(1 / (1 - self.cap_table_total.Adequacy[0]), lw=0.25, c='k')
+            ymin = port.q(0.0001)
+            ymax = 1.05 * self.cap_table_total.Assets[0]
+            ax0.set(ylabel='Loss', xlabel='Non exceedance probability')
+            ax0.set(ylim=[ymin, ymax], yscale='linear')
+            ax1.set(ylim=[ymin, ymax], xlim=[0.8, 2 / (1 - self.cap_table_total.Adequacy[0])],
+                    xscale='log', xlabel='Log return period')
+            ax0.legend(loc='upper left')
+            caption = f'(Z-TR-1) Figure (new): {kind} capital tranching with a {self.d2tc:.1%} debt ' \
+                        'to total capital limit.'
+            self._display_plot(f'Z-TR-1-{kind[0]}', f, caption)
+
+        elif style == 'old':
+            f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
+            ax0, ax1 = axs.flat
+            el = self.debt_stats['EL']
+            prem = self.debt_stats['P']
+            cap = self.debt_stats['a']
+            max_debt = self.debt_stats['D_attach']
+
+            # just show the full letter levels
+            ix = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B']
+            for ax in axs.flat:
+                # self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
+                if ax is ax0:
+                    ax.plot(port.density_df.F, port.density_df.loss,
+                        lw=1.5, label='Loss density')
+                else:
+                    ax.plot(1 / port.density_df.S, port.density_df.loss,
+                        lw=1.5, label='Loss density')
+
+                for n, x in self.sp_ratings.loc[ix].iterrows():
+                    ax.axhline(x.attachment, c='C7', lw=.25)
+                ax.axhline(el, c='C1', lw=1.5, label=f'EL=¤{el:,.0f} @ p={port.sf(el):.3%}')
+                ax.axhline(prem, c='C2', lw=1.5, label=f'Premium=¤{prem:,.0f} @ p={port.sf(prem):.3%}')
+                ax.axhline(max_debt, c='C3', lw=1.5, label=f'Debt attachment=¤{max_debt:,.0f} @ p={port.sf(max_debt):.3%}')
+                msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
+                ax.axhline(cap, c='C4', lw=1.5, label=f'Assets=¤{cap:,.0f} @ p={port.sf(cap):.3%},\n{msg}')
+                pts = pd.concat((self.sp_ratings.loc[ix, 'attachment'], self.debt_stats[['EL', 'P']]))
+                ax.yaxis.set_major_locator(ticker.FixedLocator(pts))
+                ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}: ¤{v:,.0f}'
+                                                                    for i, v in pts.items()]))
+                # ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
+                #                                                     f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
+                #                                                     ix]))
+
+            ax0.axvline(0, lw=0.25, c='k')
+            ax0.axvline(1, lw=0.25, c='k')
+            ymin = self.gross.q(0.0001)
+            ymax = self.gross.q(1 - .00003 / 2)
+            ax0.set(ylabel='Loss', xlabel='Non exceedance probability')
+            ax0.set(ylim=[ymin, ymax], yscale='linear')
+            ax1.set(ylim=[ymin, ymax], xlim=[1, 1/0.000015], xscale='log', xlabel='Log return period')
+            ax0.legend(loc='upper left')
+
+            # old horizontal density view
+            # f, axs = self.smfig(1, 2, (12.0, 4.0))
+            # ax0, ax1 = axs.flat
+            # port = self.gross
+            # el = self.debt_stats['EL']
+            # prem = self.debt_stats['P']
+            # cap = self.debt_stats['a']
+            # max_debt = self.debt_stats['D_attach']
+
+            # just show the full letter levels
+            # ix = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B']
+            # for ax in axs.flat:
+            #     self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
+            #     for n, x in self.sp_ratings.loc[ix].iterrows():
+            #         ax.axvline(x.attachment, c='C7', lw=.25)
+            #     ax.axvline(el, c='C1', lw=1.5, label=f'EL={el:,.0f} @ {port.sf(el):.3%}')
+            #     ax.axvline(prem, c='C2', lw=1.5, label=f'Premium={prem:,.0f} @ {port.sf(prem):.3%}')
+            #     ax.axvline(max_debt, c='C3', lw=1.5, label=f'Debt attachment={max_debt:,.0f} @ {port.sf(max_debt):.3%}')
+            #     msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
+            #     ax.axvline(cap, c='C4', lw=1.5, label=f'Assets={cap:,.0f} @ {port.sf(cap):.3%},\n{msg}')
+            #     ax.xaxis.set_major_locator(ticker.FixedLocator(self.sp_ratings.loc[ix, 'attachment']))
+            #     ax.xaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
+            #                                                         f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
+            #                                                         ix]))
+            #
+            # xmin = self.gross.q(0.0001)
+            # xmax = self.gross.q(1 - .00003 / 2)
+            # if self.case_id == 'tame':
+            #     xmax *= 1.25
+            # ax0.set(xlabel='Loss', ylabel='Density')
+            # ax0.set(xlim=[xmin, xmax], yscale='linear')
+            # ax1.set(xlim=[xmin, xmax], ylim=1e-10, yscale='log', xlabel='Loss')
+            # ax0.legend(loc='upper right')
+            caption = f'(Z-TR-1) Figure (new): capital tranching with a {self.d2tc:.1%} debt to total capital limit.'
+            self._display_plot('Z-TR-1', f, caption)
 
     def show_similar_risks_graphs(self, base='gross', new='net'):
         """
@@ -1629,7 +1908,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             lbl = 'Gross E[Xi | X]'
             for (k, b), ax in zip(self.exeqa.items(), axs.flat):
                 b.plot(ax=ax)
-                ylim = {'tame': 200, 'cnc': 500, 'hs': 2500}.get(self.case_id, self.gross.q(0.999))
+                ylim = {'tame': 200, 'cnc': 500, 'hs': 2500}.get(self.case_id, self.gross.limits('range', 'log')[1])
                 ax.set(xlim=[1, .5e6], ylim=[0, ylim], xscale='log', ylabel=lbl, xlabel=None)
                 lbl = 'Net E[Xi | X]'
                 ax.legend(loc='upper left')
@@ -1661,8 +1940,11 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             self.diff_g.iloc[:, :-1].plot(ax=ax, lw=1)
             ax.set(xlim=[0.5, 0.5e5], ylim=[.1, 200], xscale='log', yscale='log', xlabel='Loss return period')
 
-        caption = f'(W) Figure 15.11: {self.case_name}, loss spectrum (gross/net top row). Rows 2 and show VaR weights by distortion. In the second row, the CCoC distortion includes a mass putting weight 𝑑 = {self.roe}∕{1 + self.roe} at the maximum loss, corresponding to an infinite density. ' \
-                  'The lower right-hand plot compares all five distortions on a log-log scale.'
+        caption = (
+            f'(W) Figure 15.11: {self.case_name}, loss spectrum (gross/net top row). Rows 2 and show VaR weights '
+            'by distortion. In the second row, the CCoC distortion includes a mass putting weight '
+            f'𝑑 = {self.roe}∕{1 + self.roe} at the maximum loss, corresponding to an infinite density. '
+            'The lower right-hand plot compares all five distortions on a log-log scale.')
         self._display_plot('W', f, caption)
 
     def show_graphs(self, *chapters):
@@ -5092,9 +5374,9 @@ def process_memory(show_process=False):
     mu = m // 100000000
     m = m / (1 << 30)
     if show_process:
-        logger.log(35, f'Process id = {p}\nMemory usage = {m:.3f}GB: |' + '=' * mu)
+        logger.info(f'Process id = {p}\nMemory usage = {m:.3f}GB: |' + '=' * mu)
     else:
-        logger.log(35, f'Memory usage = {m:.3f}GB: |' + '=' * mu)
+        logger.info(f'Memory usage = {m:.3f}GB: |' + '=' * mu)
 
 
 def run_case_in_background(case_id, logLevel=30):
@@ -5132,14 +5414,15 @@ class ManualRenderResults():
 
     def __init__(self, case_object):
         """
-        Create local HTML page for the results datasets. Relies on pricinginsurancerisk templates.
-
-        TODO link them into the directory to keep consistent with the website?
+        Create local HTML page for the results datasets. Based on pricinginsurancerisk templates.
+        Uses pricinginsurancerisk.com css file.
 
         """
+        self.templates = Path(agg.__file__).parent / 'templates'
         self.case_object = case_object
-        self.case_id = case_object.case_id
-        self.env = Environment(loader=FileSystemLoader(Path.home() / 'S/websites/pricinginsurancerisk/templates'), autoescape=(['html', 'xml']))
+        self.env = Environment(loader=FileSystemLoader(self.templates),
+                               autoescape=(['html', 'xml']))
+        # self.env = Environment(loader=FileSystemLoader(Path.home() / 'S/websites/pricinginsurancerisk/templates'), autoescape=(['html', 'xml']))
         # not surprisingly, this doesn't work...will need to package...
         # self.env = Environment(loader=FileSystemLoader('https://www.pricinginsurancerisk.com/templates'), autoescape=(['html', 'xml']))
 
@@ -5147,114 +5430,77 @@ class ManualRenderResults():
     def now():
         return 'Created {date:%Y-%m-%d %H:%M:%S.%f}'.format(date=datetime.now()).rstrip('0')
 
-    @staticmethod
-    def format_name(n):
+    def render(self):
         """
-        case_flags
+        Render all the exhibits. To render the book exhibits only (without the
+        extended exhibits) run .render_custom('[A-Y]')
+
+        :return:
         """
-        ns = n.split('_')
-        case_study_names = {'cnc': 'Cat/Noncat', 'hs': "Hurricane/Severe Convective Storm", 'Discrete': "Simple Discrete Example", 'tame': "Tame"}
-        n = case_study_names.get(ns[0], ns[0].title())
-        other = {'roe': '(ROE fixed)', 'equal': "(10 in two ways)", 'ccocblend': ' CCoC blend calibration', 'extendblend': 'Extend blend calibration' }
-        ans = [n]
-        for i in ns[1:]:
-            ans.append(other.get(i, i.title()))
-        return ' '.join(ans)
+        self.render_custom('[A-Z]', suffix='book')
+        self.render_custom('Z*', suffix='extended')
 
-    @staticmethod
-    def get_menu_items(base_dir0, page):
-        p = base_dir0.glob('*')
-        pp = [(i, i.stat().st_mtime) for i in p]
-        links = []
-        for i, (pth, _) in enumerate(sorted(pp, key=lambda x: x[1], reverse=True)):
-            links.append(f'<a {"" if i < 3 else "class=dropdown-item"} '
-                         f'class ="text-white" href="/{page}?case={pth.name}" > {ManualRenderResults.format_name(pth.name)} < / a > \n')
-        return links
+    def render_custom(self, *argv, suffix='custom'):
+        """
+        Render a custom list of exhibits using standard glob file expansion.
 
-    def render_exhibits_work(self):
-        page = 'results'
+        The book exhibits are A-Y with Tn and Tg net and gross.
 
-        case_description = self.case_object.case_description
+        All extended exhibits are Z...
 
+        :param argv:
+        :return:
+        """
         base_dir0 = Path.home() / 'aggregate/cases'
-        base_dir = base_dir0 / self.case_id
-
-        if base_dir.exists() is False:
-            raise ValueError('{self.case_id} directory not found')
-
-        args = {}
-        exhibits = list('ABCDEFGHIJKLMNOPQRSUVWXY')
-        exhibits.extend(['T_gross', 'T_net'])
-        for t in exhibits:
-            p = base_dir / f'{t}.html'
-            if p.exists():
-                args[t] = p.read_text(encoding='utf-8')
-            else:
-                args[t] = f'</p>Placeholder for Exhibit {t}.</p>'
-
-        # menu bar items
-        links = self.get_menu_items(base_dir0, page)
-        template = self.env.get_template('results.html')
-        return template.render(title=self.APPNAME,
-                               case_name=self.format_name(self.case_id),
-                               case_id=self.case_id,
-                               case_description=case_description,
-                               og_meta={},
-                               page=page,
-                               subpage='results',
-                               links=links,
-                               **args,
-                               timestamp=self.now(),
-                               request_method='MANUAL',
-                               requestor_id='ALSO MANUAL')
-
-    def render_extended_work(self):
-        page = 'extended'
-
-        base_dir0 = Path.home() / 'aggregate/cases'
-        base_dir = base_dir0 / self.case_id
+        base_dir = base_dir0 / self.case_object.case_id
         if base_dir.exists() is False:
             raise ValueError('{self.case_id} directory not found')
 
         # this is the actual content
         blobs = []
-        for p in sorted(base_dir.glob('Z*.html')):
-            blobs.append(p.read_text(encoding='utf-8'))
+        ids = []
+        for pattern in argv:
+            for p in sorted(base_dir.glob(f'{pattern}.html')):
+                ids.append(p.stem)
+                blobs.append(p.read_text(encoding='utf-8'))
+
+        desc = [f'<p>{self.case_object.case_description}</p>']
+        spec = self.case_object.to_dict()
+        desc.append(f'<p>Distributions</p><pre>{spec["a_distribution"]}')
+        desc.append(f'{spec["b_distribution_gross"]}')
+        desc.append(f'{spec["b_distribution_net"]}</pre>')
+        desc.append(f'<p>Other parameters: ')
+        # desc.append('<ul>')
+        desc.append(f'reg_p = {spec["reg_p"]}, ')
+        desc.append(f'roe = {spec["roe"]}, ')
+        desc.append(f'd2tc = {spec["d2tc"]}, ')
+        desc.append(f'f_discrete = {spec["f_discrete"]}, ')
+        desc.append(f'f_blend_extend = {spec["f_blend_extend"]}, ')
+        desc.append(f'log2 = {spec["log2"]}, ')
+        desc.append(f'bs = {spec["bs"]}, and')
+        desc.append(f'padding = {spec["padding"]}.</p>')
+        # desc.append('</ul>')
+        desc = '\n'.join(desc)
 
         # menu bar items
-        links = self.get_menu_items(base_dir0, page)
         template = self.env.get_template('results_extended.html')
-        return template.render(title=self.APPNAME,
-                               case_name=self.format_name(self.case_id),
-                               case_id=self.case_id,
-                               og_meta={},
-                               page=page,
+        h = template.render(title=self.APPNAME,
+                               case_name=self.case_object.case_name,
+                               case_id=self.case_object.case_id,
+                               case_description=desc,
                                subpage='extended',
-                               links=links,
                                blobs=blobs,
+                               ids=ids,
                                timestamp=self.now(),
-                               request_method='MANUAL',
-                               requestor_id='ALSO MANUAL')
+                               templates=self.templates
+                            )
 
-    def rebase(self, h):
-        h = h.replace('/static', 'static')
-        h = h.replace('static\\cases\\', '')
-        h = h.replace(f'src="/{self.case_id}', f'src="{self.case_id}')
-        return h
-
-    def render(self):
-        h = self.render_exhibits_work()
-        # rebase directories
-        h = self.rebase(h)
-        p = Path.home() / f'aggregate/cases/{self.case_id}_book.html'
+        # rebase images, entered in snippets as /{case_id}/...
+        # other rebasing issues removed because we use the custom installed template
+        h = h.replace(f'src="/{self.case_object.case_id}', f'src="{self.case_object.case_id}')
+        p = Path.home() / f'aggregate/cases/{self.case_object.case_id}_{suffix}.html'
         p.write_text(h, encoding='utf-8')
-
-        h1 = self.render_extended_work()
-        h1 = self.rebase(h1)
-        p1 = Path.home() / f'aggregate/cases/{self.case_id}_extended.html'
-        p1.write_text(h1, encoding='utf-8')
-
-        return p, p1
+        logger.info(f'Rendered {len(blobs)} exhibits and plots.')
 
 
 # command line related

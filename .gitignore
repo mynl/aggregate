@@ -30,7 +30,7 @@ wheels/
 MANIFEST
 doc
 node_modules/*
-aggregate/frozen_0.9.2/*
+frozen_0.9.2/*
 dm*.*
 
 

@@ -21,9 +21,9 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     frequency_examples, Answer, log_test, subsets, \
     round_bucket, \
     make_ceder_netter, make_mosaic_figure, nice_multiple, \
-    style_df, logger_level, friendly
+    style_df, logger_level, friendly, make_awkward
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
-
+from pathlib import Path
 
 # module level doc-string
 __doc__ = """
@@ -38,3 +38,16 @@ generating processes. It has applications in insurance, risk management, actuari
 science, and related areas.
 
 """
+
+print('hello from aggregate.__init__')
+
+base_dir = Path.home() / 'aggregate'
+base_dir.mkdir(exist_ok=True)
+
+for p in ['cases', 'parser', 'tests', 'temp']:
+    (base_dir / p).mkdir(exist_ok=True)
+
+print('All directories exist')
+
+del p, base_dir
+

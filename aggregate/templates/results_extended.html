@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% include "results_base.html" %}
+
+<div class="container-fluid text-center px-5 mt-5">
+  <div class="row content">
+    <div class="col-lg-8 col-md-9 col-sm-12 text-left">
+      <h1 id="home">{{  case_name }} Case Study Results</h1>
+    </div>
+  </div>
+</div>
+
+
+<div class="container-fluid text-center px-5">
+  <div class="row content my-3">
+    {%  for blob in blobs %}
+        <div class="col-lg-8 col-md-9 col-sm-12 my-3 text-left">
+            {{ blob  | safe }}
+        </div>
+    {%  endfor %}
+  </div>
+</div>
+
+<div class="container-fluid text-center px-5 mt-5">
+  <div class="row content">
+    <div class="col-lg-8 col-md-9 col-sm-12 text-left">
+      <h2 id="spec">{{  case_name }} Specification</h1>
+      {{ case_description | safe }}
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

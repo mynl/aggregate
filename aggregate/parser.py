@@ -350,7 +350,7 @@ class UnderwritingLexer(Lexer):
               PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
               LOSS, PREMIUM, AT, LR, CLAIMS, SPECIFIED,
               XS,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS, CONSTANT,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS, #  CONSTANT,
               MIXED, FREQ, EMPIRICAL,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
               AND, PERCENT,
@@ -398,8 +398,8 @@ class UnderwritingLexer(Lexer):
     # ID['part'] = PART
     # ID['share'] = SHARE
     ID['specified'] = SPECIFIED
-    # constant severity
-    ID['constant'] = CONSTANT
+    # constant severity... now just use dsev [n]
+    # ID['constant'] = CONSTANT
     # nps freq specification
     ID['empirical'] = EMPIRICAL
     ID['premium'] = PREMIUM
@@ -682,7 +682,7 @@ class UnderwritingParser(Parser):
     @_('SEV name sev note')
     def sev_out(self, p):
         self.logger(
-            f'sev_out <-- sev ID sev note ', p)
+            f'sev_out <-- sev name sev note ', p)
         p.sev['name'] = p.name
         p.sev['note'] = p.note
         self.out_dict[("sev", p.name)] = p.sev
@@ -691,7 +691,7 @@ class UnderwritingParser(Parser):
     @_('SEV name dsev note')
     def sev_out(self, p):
         self.logger(
-            f'sev_out <-- sev ID dsev note ', p)
+            f'sev_out <-- sev name dsev note ', p)
         p.dsev['name'] = p.name
         p.dsev['note'] = p.note
         self.out_dict[("sev", p.name)] = p.dsev
@@ -902,11 +902,11 @@ class UnderwritingParser(Parser):
         self.logger(f'sev <-- ids xps (ids should be (c|d)histogram', p)
         return {'sev_name': p.ids, **p.xps}
 
-    @_('CONSTANT expr')
-    def sev(self, p):
-        self.logger(f'sev <-- CONSTANT expr', p)
-        # syntactic sugar to specify a constant severity
-        return {'sev_name': 'dhistogram', 'sev_xs': [p.expr], 'sev_ps': [1]}
+    # @_('CONSTANT expr')
+    # def sev(self, p):
+    #     self.logger(f'sev <-- CONSTANT expr', p)
+    #     # syntactic sugar to specify a constant severity
+    #     return {'sev_name': 'dhistogram', 'sev_xs': [p.expr], 'sev_ps': [1]}
 
     @_('XPS doutcomes dprobs')
     def xps(self, p):

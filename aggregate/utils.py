@@ -1417,15 +1417,17 @@ class GreatFormatter(ticker.ScalarFormatter):
 
 def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', yfmt='great',
                        places=None, power_range=(-3, 3), sep='', unit='', sci=True,
-                       mathText=False, offset=True):
+                       mathText=False, offset=True, return_array=False):
     """
     make mosaic of axes
     apply format to xy axes
     default engineering format
-    default w x h
+    default w x h per subplot
 
     xfmt='d' for default axis formatting, n=nice, e=engineering, s=scientific, g=great
     great = engineering with power of three exponents
+
+    if return_array then the returns are mor comparable with the old axiter_factory
 
     """
 
@@ -1445,7 +1447,11 @@ def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', y
         if yfmt[0] != 'default':
             easy_formatter(ax, which='y', kind=yfmt, places=places,
                            power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText, offset=offset)
-    return f, axd
+
+    if return_array:
+        return f, np.array(list(axd.values()))
+    else:
+        return f, axd
 
 
 def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
@@ -1614,3 +1620,33 @@ def friendly(df):
 
     # style like pricinginsurancerisk.com?
     return style_df(bit).format(lambda x: x if type(x)==str else f'{x:,.3f}')
+
+
+def make_awkward(log2, scale=False):
+    """
+    Decompose a uniform random variable on range(2**log2) into two parts
+    using Eamonn Long's base 4 method.
+
+    Usage: ::
+
+        awk = make_awkward(16)
+        awk.density_df.filter(regex='p_[ABt]').cumsum().plot()
+        awk.density_df.filter(regex='exeqa_[AB]|loss').plot()
+
+    """
+    n = 1 << log2
+    sc = 2 * n
+    xs = [int(bin(i)[2:], 4) for i in range(n)]
+    ys = [2*i for i in xs]
+    ps = [1 / n for i in xs]
+    if scale is True:
+        xs = xs / sc
+        ys = ys / sc
+
+    A = agg.Aggregate('A', exp_en=1, sev_name='dhistogram', sev_xs=xs, sev_ps=ps,
+                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
+    B = agg.Aggregate('B', exp_en=1, sev_name='dhistogram', sev_xs=ys, sev_ps=ps,
+                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
+    awk = agg.Portfolio('awkward', [A, B])
+    awk.update(log2+1, 1/sc if scale else 1, remove_fuzz=True, padding=0)
+    return awk

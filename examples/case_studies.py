@@ -32,6 +32,7 @@ Note and To Do
 import aggregate as agg
 from aggregate.distr import Aggregate
 from aggregate.port import Portfolio
+from aggregate.spectral import Distortion
 from aggregate.utils import round_bucket, make_mosaic_figure, GreatFormatter
 import argparse
 from collections import OrderedDict
@@ -62,6 +63,7 @@ from scipy.integrate import cumtrapz
 from scipy.interpolate import interp1d
 from scipy.optimize import linprog
 from scipy.sparse import coo_matrix
+from scipy.spatial import ConvexHull
 import shlex
 from subprocess import Popen
 from textwrap import fill
@@ -135,7 +137,8 @@ def distortion_namer(x):
          "roe": 'CCoC',
          "blend": "Blend",
          "Tail VaR": "TVaR",
-         "Dual Moment": "Dual"}[x]
+         "Dual Moment": "Dual",
+         "Blend": "Blend"}.get(x, x)
     return x
 
 
@@ -190,6 +193,9 @@ class CaseStudy(object):
         """
 
         # variables set in other functions
+        self.gs_values = None
+        self.s_values = None
+        self.blend_distortions = None
         self.blend_d = None
         self.roe_d = None
         self.dist_dict = None
@@ -235,7 +241,6 @@ class CaseStudy(object):
         self.roe = 0.
         self.d2tc = 0.
         self.f_discrete = False
-        self.f_blend_extend = False
         self.bs = 0.
         self.log2 = 0
         self.padding = 1
@@ -316,7 +321,7 @@ class CaseStudy(object):
     def factory(self, case_id, case_name, case_description,
                 a_distribution, b_distribution_gross, b_distribution_net,
                 reg_p, roe, d2tc,
-                f_discrete, f_blend_extend, bs, log2, padding):
+                f_discrete, s_values, gs_values, bs, log2, padding):
         """
         Create CaseStudy from case_id and all arguments in generic format with explicit reinsurance.
 
@@ -364,7 +369,9 @@ class CaseStudy(object):
         self.d = 1 - self.v
         self.d2tc = d2tc
         self.f_discrete = f_discrete
-        self.f_blend_extend = f_blend_extend
+        self.blend_distortions = None
+        self.s_values = s_values
+        self.gs_values = gs_values
         self.log2 = log2
         self.bs = bs
         self.padding = padding
@@ -414,28 +421,40 @@ port Net_{self.case_id}
 
         # set up the common distortions
         # make the cap table
-        if self.f_discrete is False:
-            self.make_cap_table()
-            try:
-                self.blend_d = self.make_blend()
-            except ValueError as e:
-                logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
-                # TODO try the ROE blend method?
-                self.f_blend_extend = False
-                self.blend_d = self.make_blend()
+        logger.info('Calibrating blend distortions')
+        self.make_cap_table()
+        prem = self.pricings['gross'].at['P', 'total']
+        a = self.pricings['gross'].at['a', 'total']
+        self.blend_distortions = calibrate_blends(self.gross, a, prem, s_values, gs_values, debug=False)
 
-            logger.info('applying ROE approximation fix.')
-            self.roe_d = self.approx_roe(e=1e-10)
-            self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
-        else:
-            # original book blend, FYI (if f_blend_fix = 0)
-            attach_probs = np.array([1e-6, .01, .03, .05, .1, .2])
-            layer_roes = np.array([.02, .03, .04, .06, .08, self.roe])
-            g_values = (attach_probs + layer_roes) / (1 + layer_roes)
-            self.blend_d = agg.Distortion.s_gs_distortion(attach_probs, g_values, 'blend')
-            self.roe_d = self.approx_roe(e=1e-10)
-            self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
-
+        self.roe_d = self.approx_roe(e=1e-10)
+        # self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
+        self.dist_dict = OrderedDict(roe=self.roe_d, **self.blend_distortions)
+        # TODO Enhance!
+        k = list(self.blend_distortions.keys())[0]
+        self.blend_d = self.blend_distortions[k]
+        # old
+        # if self.f_discrete is False:
+        #     self.make_cap_table()
+        #     try:
+        #         self.blend_d = self.make_blend()
+        #     except ValueError as e:
+        #         logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
+        #         # TODO try the ROE blend method?
+        #         self.f_blend_extend = False
+        #         self.blend_d = self.make_blend()
+        #
+        #     logger.info('applying ROE approximation fix.')
+        #     self.roe_d = self.approx_roe(e=1e-10)
+        #     self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
+        # else:
+        #     # original book blend, FYI (if f_blend_fix = 0)
+        #     attach_probs = np.array([1e-6, .01, .03, .05, .1, .2])
+        #     layer_roes = np.array([.02, .03, .04, .06, .08, self.roe])
+        #     g_values = (attach_probs + layer_roes) / (1 + layer_roes)
+        #     self.blend_d = agg.Distortion.s_gs_distortion(attach_probs, g_values, 'blend')
+        #     self.roe_d = self.approx_roe(e=1e-10)
+        #     self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
         self.cache_dir = self.cache_base / f'{self.case_id}'
         self.cache_dir.mkdir(exist_ok=True)
 
@@ -2467,6 +2486,11 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 port.dists['roe'] = self.dist_dict['roe']
             if 'blend' not in port.dists and 'blend' in self.dist_dict:
                 port.dists['blend'] = self.dist_dict['blend']
+            elif 'blend' not in port.dists:
+                # TODO arbitrary?!
+                k = list(self.blend_distortions.keys())[-1]
+                port.dists['blend'] = self.dist_dict[k]
+
         # Ch. Modern Mono Practice across distortions
         # all using GROSS calibrated distortions:
         distortions = [self.ports['gross'].dists[dn] for dn in ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']]
@@ -2632,6 +2656,192 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 '''
         return img_tag
 
+
+def check01(s):
+    """ add 0 1 at start end """
+    if 0 not in s:
+        s = np.hstack((0, s))
+    if 1 not in s:
+        s = np.hstack((s, 1))
+    return s
+
+
+def make_array(s, gs):
+    """ convert to np array and pad with 0 1 """
+    s = np.array(s)
+    gs = np.array(gs)
+    s = check01(s)
+    gs = check01(gs)
+    return np.array((s, gs)).T
+
+
+def convex_points(s, gs):
+    """
+    Extract the points that make the convex envelope, including 0 1
+
+    Testers::
+
+        %%sf 1 1 5 5
+
+        s_points, gs_points = [.001,.0011, .002,.003, 0.005, .008, .01], [0.002,.02, .03, .035, 0.036, .045, 0.05]
+        s_points, gs_points = [.001, .002,.003, .009, .011, 1],  [0.02, .03, .035, .05, 0.05, 1]
+        s_points, gs_points = [.001, .002,.003, .009, .01, 1],  [0.02, .03, .035, .0351, 0.05, 1]
+        s_points, gs_points = [0.01, 0.04], [0.03, 0.07]
+
+        points = make_array(s_points, gs_points)
+        ax.plot(points[:, 0], points[:, 1], 'x')
+
+        s_points, gs_points = convex_points(s_points, gs_points)
+        ax.plot(s_points, gs_points, 'r+')
+
+        ax.set(xlim=[-0.0025, .1], ylim=[-0.0025, .1])
+
+        hull = ConvexHull(points)
+        for simplex in hull.simplices:
+            ax.plot(points[simplex, 0], points[simplex, 1], 'k-', lw=.25)
+
+
+    """
+    points = make_array(s, gs)
+    hull = ConvexHull(points)
+    hv = hull.vertices[::-1]
+    hv = np.roll(hv, -np.argmin(hv))
+    return points[hv, :].T
+
+
+def calibrate_blends(self, a, premium, s_points, gs_points=None, spread_points=None, debug=False):
+    """
+    Input s values and gs values or (market) yield or spread.
+
+    A bond with prob s (small) of default is quoted with a yield (to maturity)
+    of r over risk free (e.g., a cat bond spread, or a corporate bond spread
+    over the appropriate Treasury). As a discount bond, the price is v = 1 - d.
+
+    B(s) = bid price for 1(U<s) (bond residual value)
+    A(s) = ask price for 1(U<s) (insurance policy)
+
+    By no arb A(s) + B(1-s) = 1.
+    By definition g(s) = A(s) (using LI so the particular U doesn't matter. Applied
+    to U = F(X)).
+
+    Let v = 1 / (1 + r) and d = 1 - v be the usual theory of interest quantities.
+
+    Hence B(1-s) = v = 1 - A(s) = 1 - g(s) and therefore g(s) = 1 - v = d.
+
+    The rate of risk discount δ and risk discount factor (nu) ν are defined so that
+    B(1-s) = ν * (1 - s), it is the extra discount applied to the actuarial value that
+    is bid for the bond. It is a function of s. Therefore ν = (1 - d) / (1 - s) =
+    price of bond / actuarial value of payment.
+
+    Then, g(s) = 1 - B(1-s) = 1 - ν (1 - s) = ν s + δ.
+
+    Thus, if return (i.e., market yield spreads) are input, they convert to
+    discount factors to define g points.
+
+    Blend can be defined by extrapolating the last points in a credit curve. If
+    that fails, increase the return on the highest s point and fill in with a
+    constant return to 1.
+
+    The ROE on the investment is not the promised return, because the latter does not
+    allow for default.
+
+    Set up to be a function of the Portfolio = self. Calibrated to hit premium at
+    asset level a. a must be in the index.
+
+        a = self.pricing_summary.at['a', kind]
+        premium = self.pricing_summary.at['P', kind]
+
+    method = extend or roe
+
+    Inpu
+
+    =====
+
+    blend_d0 is the Book's blend, with roe above the equity point
+    blend_d is calibrated to the same premium as the other distortions
+
+    method = extend if f_blend_extend or ccoc
+        ccoc = pick and equity point and back into its required roe. Results in a
+        poor fit to the calibration data
+
+        extend = extrapolate out the last slope from calibrtion data
+
+    Initially tried interpolating the bond yield curve up, but that doesn't work.
+    (The slope is too flat and it interpolates too far. Does not look like
+    a blend distortion.)
+    Now, adding the next point off the credit yield curve as the "equity"
+    point and solving for ROE.
+
+    If debug, returns more output, for diagnostics.
+
+    """
+    global logger
+
+    # corresponding gs values to s_points
+    if gs_points is None:
+        gs_points = 1 - 1 / (1 + np.array(spread_points))
+
+    # figure out the convex hull points out of input s, gs
+    s_points, gs_points = convex_points(s_points, gs_points)
+    if len(s_points) < 4:
+        raise ValueError('Input s,gs points do not generate enough separate points.')
+
+    # calibration prefob to compute rho
+    df = self.density_df
+    bs = self.bs
+    # survival function points
+    S = (1 - df.p_total[0:a-bs].cumsum())
+
+    def pricer(g):
+        nonlocal S, bs
+        return np.sum(g(S)) * bs
+
+    # figure the four extreme values:
+    # extrapolate or interp to 0 and l or r end
+    ans = []
+    dists = {}
+    for left in ['e', '0']:
+        for right in ['e', '1']:
+            s = s_points.copy()
+            gs = gs_points.copy()
+            if left == 'e':
+                s = s[1:]
+                gs = gs[1:]
+            if right == 'e':
+                s = s[:-1]
+                gs = gs[:-1]
+            new_g = interp1d(s, gs, bounds_error=False, fill_value='extrapolate')
+            dists[(left, right)] = new_g
+            new_p = pricer(new_g)
+            ans.append((left, right, new_p, new_p > premium))
+
+    # horrible but small and short...
+    df = pd.DataFrame(ans, columns=['left', 'right', 'premium', 'gt'])
+    wts = {}
+    wdists = {}
+    for i, j in [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]:
+        pi = df.iloc[i, 2]
+        pj = df.iloc[j, 2]
+        if min(pi, pj) <= premium <= max(pi, pj):
+            il = df.iat[i, 0]
+            ir = df.iat[i, 1]
+            jl = df.iat[j, 0]
+            jr = df.iat[j, 1]
+            w = (premium - pj) / (pi - pj)
+            wts[(il, ir, jl, jr)] = w
+            # spoon feed into a dummy distortion
+            temp = Distortion('ph', .599099)
+            temp.name = 'blend'
+            # temp.display_name  = f'Extension ({il}, {ir}), ({jl}, {jr})'
+            temp.g = lambda x: (
+                    w * dists[(il, ir)](x) + (1 - w) * dists[(jl, jr)](x))
+            temp.g_inv = None
+            wdists[(il, ir, jl, jr)] = temp
+
+    if debug is True:
+        return wdists, df, pricer, dists, wts
+    else:
+        return wdists
 
 def extract_sort_order(summaries, _varlist_, classical=False):
     '''
@@ -3777,7 +3987,7 @@ def enhance_portfolio(port, force=False):
 def twelve_plot(self, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0, biv_log=True, legend_font=0,
                 contour_scale=10, sort_order=None, kind='two', cmap='viridis'):
     """
-    Twelve-up plot for ASTIN paper, by rc index:
+    Twelve-up plot for ASTIN paper and book, by rc index:
 
     Greys for grey color map
 
@@ -5422,9 +5632,6 @@ class ManualRenderResults():
         self.case_object = case_object
         self.env = Environment(loader=FileSystemLoader(self.templates),
                                autoescape=(['html', 'xml']))
-        # self.env = Environment(loader=FileSystemLoader(Path.home() / 'S/websites/pricinginsurancerisk/templates'), autoescape=(['html', 'xml']))
-        # not surprisingly, this doesn't work...will need to package...
-        # self.env = Environment(loader=FileSystemLoader('https://www.pricinginsurancerisk.com/templates'), autoescape=(['html', 'xml']))
 
     @staticmethod
     def now():
@@ -5474,8 +5681,9 @@ class ManualRenderResults():
         desc.append(f'reg_p = {spec["reg_p"]}, ')
         desc.append(f'roe = {spec["roe"]}, ')
         desc.append(f'd2tc = {spec["d2tc"]}, ')
+        desc.append(f's_values = {spec["s_values"]}, ')
+        desc.append(f'gs_values = {spec["gs_values"]}, ')
         desc.append(f'f_discrete = {spec["f_discrete"]}, ')
-        desc.append(f'f_blend_extend = {spec["f_blend_extend"]}, ')
         desc.append(f'log2 = {spec["log2"]}, ')
         desc.append(f'bs = {spec["bs"]}, and')
         desc.append(f'padding = {spec["padding"]}.</p>')
@@ -5504,7 +5712,7 @@ class ManualRenderResults():
 
 
 # command line related
-def setup_parser():
+def setup_command_line():
     """
     Set up all command line options and return parser
 
@@ -5541,8 +5749,8 @@ if __name__ == '__main__':
 
     # for debugging
 
-    parser = setup_parser()
-    args = parser.parse_args()
+    command_line = setup_command_line()
+    args = command_line.parse_args()
 
     logger.setLevel(args.logger)
 

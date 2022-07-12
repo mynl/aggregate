@@ -133,6 +133,9 @@ if 'book_case_studies' in section:
                    log2=16, bs=1/64)
     a, d = recalc.q(0.8), recalc.q(0.99)
     y = d - a
+    s = np.array([.005, 0.01, 0.03])
+    r = np.array([0.03, 0.05, 0.08])
+    g = r / (1 + r)
     tame = cs.CaseStudy()
     tame.factory(case_id='tame_new',
                  case_name='Tame Case',
@@ -144,7 +147,8 @@ if 'book_case_studies' in section:
                  roe=0.10,
                  d2tc=0.3,
                  f_discrete=False,
-                 f_blend_extend=True,
+                 s_values=[.005, 0.01, 0.03],
+                 gs_values=[  0.029126,   0.047619,   0.074074],
                  bs=1/64,
                  log2=16,
                  padding=1)

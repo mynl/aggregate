@@ -13,26 +13,27 @@ A Portfolio represents a collection of Aggregate objects. Applications include
 """
 
 import collections
+from copy import deepcopy
 import json
 import logging
-from copy import deepcopy
-
+import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import matplotlib
 import matplotlib.ticker as ticker
+from matplotlib.ticker import (MultipleLocator, StrMethodFormatter, MaxNLocator,
+                               FixedLocator, FixedFormatter, AutoMinorLocator)
 import numpy as np
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
-import pypandoc
-import scipy.stats as ss
-from scipy.interpolate import interp1d
-from IPython.core.display import HTML, display
-from matplotlib.ticker import MultipleLocator, StrMethodFormatter, MaxNLocator, FixedLocator, \
-    FixedFormatter, AutoMinorLocator
-from scipy import interpolate
-import re
 from pathlib import Path
+import pypandoc
+import re
+import scipy.stats as ss
+from scipy import interpolate
+from scipy.interpolate import interp1d
+from scipy.spatial import ConvexHull
+from textwrap import fill
+from IPython.core.display import HTML, display
 from .distr import Aggregate, Severity
 from .spectral import Distortion
 from .utils import ft, \
@@ -51,6 +52,180 @@ class Portfolio(object):
     """
     Portfolio creates and manages a portfolio of Aggregate objects.
 
+
+    Notes from Enhance Portfolio
+    ============================
+
+        Add all the enhanced exhibits methods to port.
+
+    Methods defined within this function.
+
+    From common_scripts.py
+    June 2022 took out options that needed a jinja template (reserve story etc.)
+
+    Added Methods
+
+    Exhibit creators (EX_name)
+    --------------------------
+        1. basic_loss_statistics
+        2. distortion_information
+        3. distortion_calibration
+        4. premium_capital
+        5. multi_premium_capital
+        6. accounting_economic_balance_sheet
+            compares best estimate, default adjusted, risk adjusted values
+
+        Exhibits 7-9 are for reserving
+        DROPPED 7. margin_earned (by year)
+        DROPPED 8. year_end_option_analysis (implied stand alone vs pooled analysis)
+
+        Run a distortion and compare allocations
+        9. compare_allocations
+            creates:
+                EX_natural_allocation_summary
+                EX_allocated_capital_comparison
+                EX_margin_comparison
+                EX_return_on_allocated_capital_comparison
+
+    Exhibit Utilities
+    -----------------
+        10. make_all
+            runs all of 1-9 with sensible defaults
+
+        11. show
+            shows all exhibits, with exhibit title
+            uses `self.dir` to find all attributes EX_
+
+        12. qi
+            quick info: the basic_loss_stats plus a density plot
+
+    Graphics
+    --------
+        DROPPED 13. density_plot
+        14. profit_segment_plot
+            plots given lines S, gS and shades the profit segment between the two
+            lines plotted on a stand-alone basis; optional transs allows shifting up/down
+        15. natural_profit_segment_plot
+            plot kappa = EX_i|X against F and gF
+            compares the natural allocation with stand alone pricing
+        DROPPED 16. alpha_beta_four_plot
+            alpha, beta; layer and cumulative margin plots
+        DROPPED 17. alpha_beta_four_plot2 (for two line portfolios )
+            lee and not lee orientations (lee orientation hard to parse)
+            S, aS; gS, b gS separately by line
+            S, aS, gS, bGS  for each line [these are most useful plots]
+        18. biv_contour_plot
+            bivariate plot of marginals with some x+y=constant lines
+        DROPPED 19. reserve_story_md
+
+    Reserve Template Populators
+    ---------------------------
+        DROPPED 20. reserve_runoff_md
+        DROPPED 21. reserve_two_step_md
+        22. nice_program
+
+    Other
+    -----
+        DROPPED 23. show_md
+        DROPPED 24. report_args
+        DROPPED 25. save
+        26. density_sample: stratified sample from density_df
+
+
+    Sample Runner
+    =============
+    ```python
+
+        from common_header import *
+        get_ipython().run_line_magic('config', "InlineBackend.figure_format = 'svg'")
+        import common_scripts as cs
+
+        port = cs.TensePortfolio('''
+        port CAS
+            agg Thick 5000 loss 100 x 0 sev lognorm 10 cv 20 mixed sig 0.35 0.6
+            agg Thin 5000 loss 100 x 0 sev lognorm 10 cv 20 poisson
+        ''', dist_name='wang', a=20000, ROE=0.1, log2=16, bs=1, padding=2)
+
+        # port.make_all() will update all exhibits with sensible defaults
+
+        port.basic_loss_statistics(p=.9999)
+        display(port.EX_basic_loss_statistics)
+
+        port.distortion_information()
+        display(port.EX_distortion_information)
+
+        port.distortion_calibration()
+        display(port.EX_distortion_calibration)
+
+        port.premium_capital(a=20000)
+        display(port.EX_premium_capital)
+
+        port.multi_premium_capital(As=[15000, 20000, 25000])
+        display(port.EX_multi_premium_capital)
+
+        port.accounting_economic_balance_sheet(a=20000)
+        display(port.EX_accounting_economic_balance_sheets)
+
+        port.margin_earned(a=20000)
+        display(port.EX_margin_earned)
+
+        port.year_end_option_analysis('Thin', a=20000)
+        display(port.EX_year_end_option_analysis)
+
+        port.compare_allocations('wang', ROE=0.1, a=20000)
+        display(port.EX_natural_allocation_summary)
+        display(port.EX_allocated_capital_comparison)
+        display(port.EX_margin_comparison)
+        display(port.EX_return_on_allocated_capital_comparison)
+
+        port.show()
+
+        port.qi()
+
+        f, axs = smfig(1,2, (7,3))
+        a1, a2 = axs.flat
+        port.density_plot(f, a1, a2, p=0.999999)
+
+        smfig = grt.FigureManager(cycle='c', color_mode='c', legend_font='medium')
+        f, a = smfig(1,1,(4,6))
+        port.profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
+                                     [2,0,1,0], [0,0,0], 'ph')
+
+        f, a = smfig(1,1,(6,10))
+        port.natural_profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
+                                     [2,0,1,0], [0,0,0])
+        port.profit_segment_plot(a, 0.999, ['Thick', 'Thin'],
+                                     [3,4], [0,0], 'wang')
+        a.legend()
+
+        f, axs = smfig(2,2,(8,6))
+        port.alpha_beta_four_plot(axs, 20000)
+
+        f, axs = smfig(2,2,(8,6))
+        port.alpha_beta_four_plot2(axs, 20000, 20000, 'xlee')
+
+        f, axs = smfig(2,2,(8,6))
+        port.alpha_beta_four_plot2(axs, 20000, 20000, 'lee')
+
+        aug_df = port.augmented_df
+        f, axs = smfig(1,2, (10,5), sharey=True)
+        a1, a2 = axs.flat
+        bigx = 20000
+        bit = aug_df.loc[0:, :].filter(regex='exeqa_(T|t)').copy()
+        bit.loc[bit.exeqa_Thick==0, ['exeqa_Thick', 'exeqa_Thin']] = np.nan
+        bit.rename(columns=port.renamer).sort_index(1).plot(ax=a1)
+        a1.set(xlim=[0,bigx], ylim=[0,bigx], xlabel='Total Loss', ylabel="Conditional Line Loss");
+        a1.set(aspect='equal', title='Conditional Expectations\nBy Line')
+        port.biv_contour_plot(f, a2, 5, bigx, 100, log=False, cmap='viridis_r', min_density=1e-12)
+
+    ```
+    force = do even if exist...force an update
+
+
+
+
+
+
     :param name: the name of the portfolio, no spaces or underscores
     :param spec_list: a list of 1) dictionary: Aggregate object dictionary specifications or
                                 2) Aggregate: An actual aggregate objects or
@@ -58,6 +233,20 @@ class Portfolio(object):
                                 4) string: Names referencing objects in the optionally passed underwriter
 
     """
+
+    # namer helper classes
+    premium_capital_renamer = {
+        'Assets': "0. Assets",
+        'T.A': '1. Allocated assets',
+        'T.P': '2. Market value liability',
+        'T.L': '3. Expected incurred loss',
+        'T.M': '4. Margin',
+        'T.LR': '5. Loss ratio',
+        'T.Q': '6. Allocated equity',
+        'T.ROE': '7. Cost of allocated equity',
+        'T.PQ': '8. Premium to surplus ratio',
+        'EPD': '9. Expected pol holder deficit'
+    }
 
     def __init__(self, name, spec_list, uw=None):
         self.name = name
@@ -103,6 +292,7 @@ class Portfolio(object):
                       a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
             max_limit = max(max_limit, np.max(np.array(a.limit)))
         self.line_names_ex = self.line_names + ['total']
+        self.line_name_pipe = "|".join(self.line_names_ex)
         for n in self.line_names:
             # line names cannot equal total
             if n == 'total':
@@ -151,6 +341,20 @@ class Portfolio(object):
         self.dists = None
         self.dist_ans = None
         self.figure = None
+
+        # enhanced portfolio items
+        self.EX_basic_loss_statistics = None
+        self.EX_distortion_information = None
+        self.EX_distortion_calibration = None
+        self.EX_premium_capital = None
+        self.last_a = None
+        self.EX_multi_premium_capital = None
+        self.EX_accounting_economic_balance_sheet = None
+        self.EX_natural_allocation_summary = None
+        self.EX_allocated_capital_comparison = None
+        self.EX_margin_comparison = None
+        self.EX_loss_ratio_comparison = None
+        self.EX_return_on_allocated_capital_comparison = None
 
     def __str__(self):
         """
@@ -5039,3 +5243,994 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 ports[name].update(log2=log2, bs=bs, padding=padding, **kwargs)
 
         return ports
+
+    # enhanced portfolio methods (see description in class doc string)
+    def basic_loss_statistics(self, p=0.995, lines=None, line_names=None, deets=True):
+        """
+        mean, CV, skew, curt and some percentiles
+        optionally add additional p quantiles
+
+        lines = include not these lines to right with names as given
+
+        """
+        cols = ['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'Skew', 'EmpKurt', 'P99.0', 'P99.6']
+        if not deets:
+            for i in ['EmpMean', 'MeanErr', 'EmpCV', 'CVErr']:
+                cols.remove(i)
+        bls = self.audit_df[cols].T
+        if p not in [.99, .996]:
+            bls.loc[f'P{100 * p:.4f}', :] = \
+                [ag.q(p) for ag in self.agg_list] + [self.q(p)]
+
+        if lines:
+            if line_names is None:
+                line_names = [f'Not {line}' for line in lines]
+            for line, line_name in zip(lines, line_names):
+                # add not line which becomes the end of period reserves
+                xs = self.density_df.loss
+                ps = self.density_df[f'ημ_{line}']
+                t = xs * ps
+                ex1 = np.sum(t)
+                t *= xs
+                ex2 = np.sum(t)
+                t *= xs
+                ex3 = np.sum(t)
+                t *= xs
+                ex4 = np.sum(t)
+                m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
+                # empirical kurtosis
+                kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
+                ans = np.zeros(3)
+                temp = ps.cumsum()
+                for i, p in enumerate([0.99, 0.995, p]):
+                    ans[i] = (temp > p).idxmax()
+                newcol = [m, cv, s, kurt] + list(ans)
+                bls[line_name] = newcol[:len(bls)]
+
+        self.EX_basic_loss_statistics = bls.rename(index=dict(EmpKurt='Kurt'),
+                                                   columns=self.line_renamer)
+
+    def distortion_information(self):
+        """
+        summary of the distortion calibration information
+        """
+        self.EX_distortion_information = self.dist_ans.reset_index(drop=False). \
+            sort_values('method')[['method', 'param']]. \
+            rename(columns=dict(method='Distortion', param='Shape Parameter')). \
+            set_index('Distortion').rename(index=Distortion._distortion_names_)
+
+    def distortion_calibration(self):
+
+        """
+        one line summary from the distortion calibration
+        was premium_capital_summary
+        """
+
+        self.EX_distortion_calibration = self.dist_ans.xs(self.distortion.name, level=2).iloc[:, :-1]
+        self.EX_distortion_calibration = self.EX_distortion_calibration.reset_index(drop=False)
+        self.EX_distortion_calibration.columns = ['$a$', 'LR', '$S(a)$', '$\\iota$', '$\\delta$', '$\\nu$',
+                                                  '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg', '$\\bar Q(a)$',
+                                                  'ROE', 'Shape']
+        # delta and nu kinda useless
+        self.EX_distortion_calibration = self.EX_distortion_calibration[
+            ['Shape', '$a$', 'LR', '$S(a)$', '$\\iota$', '$\\nu$',
+             '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg',
+             '$\\bar Q(a)$', 'ROE']]
+        self.EX_distortion_calibration.loc[0, 'Distortion'] = self.distortion.name
+        self.EX_distortion_calibration = self.EX_distortion_calibration.set_index('Distortion')
+
+    def premium_capital(self, a=0, p=0):
+        """
+        at a if given else p level of capital
+
+        pricing story allows two asset levels...handle that with a concat
+
+        was premium_capital_detail
+
+        """
+        a, p = self.set_a_p(a, p)
+
+        if getattr(self, '_raw_premium_capital', None) is not None and self.last_a == a:
+            # done already
+            return
+
+        # else recompute
+
+        # story == run off
+        # pricing report from adf
+        dm = self.augmented_df.filter(regex=f'T.[MPQLROE]+.({self.line_name_pipe})').loc[[a]].T
+        dm.index = dm.index.str.split('_', expand=True)
+        self._raw_premium_capital = dm.unstack(1)
+        self._raw_premium_capital = self._raw_premium_capital.droplevel(axis=1, level=0)  # .drop(index=['Assets'])
+        self._raw_premium_capital.loc['T.A', :] = self._raw_premium_capital.loc['T.Q', :] + \
+                                                  self._raw_premium_capital.loc['T.P', :]
+        self._raw_premium_capital.index.name = 'Item'
+        self.EX_premium_capital = self._raw_premium_capital. \
+            rename(index=self.premium_capital_renamer, columns=self.line_renamer).sort_index()
+        self.last_a = a
+
+    def multi_premium_capital(self, As, keys=None):
+        """
+        concatenate multiple prem_capital exhibits
+
+        """
+        if keys is None:
+            keys = [f'$a={i:.1f}$' for i in As]
+
+        ans = []
+        for a in As:
+            self.premium_capital(a)
+            ans.append(self.EX_premium_capital.copy())
+        self.EX_multi_premium_capital = pd.concat(ans, axis=1, keys=keys, names=['Assets', "Line"])
+
+    def accounting_economic_balance_sheet(self, a=0, p=0):
+        """
+        story version assumes line 0 = reserves and 1 = prospective....other than that identical
+
+        usual a and p rules
+        """
+
+        # check for update
+        self.premium_capital(a, p)
+
+        aebs = pd.DataFrame(0.0, index=self.line_names_ex + ['Assets', 'Equity'],
+                            columns=['Statutory', 'Objective', 'Market', 'Difference'])
+        slc = slice(0, len(self.line_names_ex))
+        aebs.iloc[slc, 0] = self.audit_df['Mean'].values
+        aebs.iloc[slc, 1] = self._raw_premium_capital.loc['T.L']
+        aebs.iloc[slc, 2] = self._raw_premium_capital.loc['T.P']
+        aebs.loc['Assets', :] = self._raw_premium_capital.loc['T.A', 'total']
+        aebs.loc['Equity', :] = aebs.loc['Assets'] - \
+                                aebs.loc['total']
+        aebs[
+            'Difference'] = aebs.Market - aebs.Objective
+        # put in accounting order
+        aebs = aebs.iloc[
+            [-2] + list(range(len(self.line_names) + 1)) + [-1]]
+        aebs.index.name = 'Item'
+        self.EX_accounting_economic_balance_sheet = aebs.rename(index=self.line_renamer)
+
+    def compare_allocations(self, verbose=False):
+
+        """
+
+        CAS-ASTIN talks...and general comparison of ROE, alloc capital etc.
+        cycle round -
+
+        """
+        # utility
+        if verbose:
+            qd = lambda x: display(x.style)  # .format('{:.5g}'))
+        else:
+            qd = lambda x: 1
+
+        # use last calibration / run
+        dist_name = self.distortion.name
+        a = self.ad_ans.audit_df.at['a', 'stat']
+
+        display(HTML('<h3>Audit</h3>'))
+        qd(self.ad_ans.audit_df)
+
+        # double check
+        a1 = float(self.ad_ans.audit_df.loc['a_cal'])
+        if a1 != a:
+            print('Warning: computed and input a values disagree\n' * 3, f'input {a}\ncalcd {a1}')
+
+        # hack off exhibits
+        display(HTML(f'<h3>Natural Allocation, $a={a:.1f}$</h3>'))
+        bit = self.ad_ans.exhibit.loc[f'Dist {dist_name}']
+        bit.index.name = None
+        self.EX_natural_allocation_summary = bit.rename(
+            index=dict(L='Loss', LR='Loss Ratio', M='Margin', P='Premium', PQ='P/S Ratio', Q='Equity'),
+            columns=self.line_renamer).copy()
+        self.EX_natural_allocation_summary.loc['Assets', :] = self.EX_natural_allocation_summary.loc['Premium'] + \
+                                                              self.EX_natural_allocation_summary.loc['Equity']
+        qd(self.EX_natural_allocation_summary)
+
+        display(HTML(f'<h3>Allocated Capital Comparison, $a={a:.1f}$</h3>'))
+        bit = self.ad_ans.exhibit.xs('Q', level=1)
+        bit.index.name = None
+        self.EX_allocated_capital_comparison = bit.rename(
+            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
+        qd(self.EX_allocated_capital_comparison)
+
+        display(HTML(f'<h3>Margin Comparison, $a={a:.1f}$</h3>'))
+        bit = self.ad_ans.exhibit.xs('M', level=1)
+        bit.index.name = None
+        self.EX_margin_comparison = bit.rename(
+            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
+        qd(self.EX_margin_comparison)
+
+        display(HTML(f'<h3>Loss Ratio Comparison, $a={a:.1f}$</h3>'))
+        bit = self.ad_ans.exhibit.xs('LR', level=1)
+        bit.index.name = None
+        self.EX_loss_ratio_comparison = bit.rename(
+            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
+        qd(self.EX_loss_ratio_comparison)
+
+        display(HTML(f'<h3>ROE Comparison, $a={a:.1f}$</h3>'))
+        bit = self.ad_ans.exhibit.xs('ROE', level=1)
+        bit.index.name = None
+        self.EX_return_on_allocated_capital_comparison = bit.rename(
+            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
+        qd(self.EX_return_on_allocated_capital_comparison)
+
+    def make_all(self, p=0, a=0, As=None, ROE=0.1, mass_hints=None):
+        """
+        make all exhibits with sensible defaults
+        if not entered, paid line is selected as the LAST line
+
+        """
+        a, p = self.set_a_p(a, p)
+
+        self.basic_loss_statistics(p)
+
+        # exhibits that require a distortion
+        if self.distortion is not None:
+            self.distortion_information()
+            self.distortion_calibration()
+            self.premium_capital(a=a, p=p)
+            if As:
+                self.multi_premium_capital(As)
+            self.accounting_economic_balance_sheet(a=a, p=p)
+
+    def show_enhanced_exhibits(self, fmt='{:.5g}'):
+        """
+        show all the made exhibits
+        """
+        display(HTML(f'<h2>Exhibits for {self.name.replace("_", " ").title()} Portfolio</h2>'))
+        for x in dir(self):
+            if x[0:3] == 'EX_':
+                ob = getattr(self, x)
+                if isinstance(ob, pd.DataFrame):
+                    # which they all will be...
+                    display(HTML(f'<h3>{x[3:].replace("_", " ").title()}</h3>'))
+                    display(ob.style.format(fmt, subset=ob.select_dtypes(np.number).columns))
+                    display(HTML(f'<hr>'))
+
+    def profit_segment_plot(self, a, p, line_names, colors, transs, dist_name):
+        """
+        add all the lines, optionally translate
+        requested distortion is applied on the fly
+
+        """
+        dist = self.dists[dist_name]
+        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        for line, cn, trans in zip(line_names, colors, transs):
+            c = col_list[cn]
+            f1 = self.density_df[f'p_{line}'].cumsum()
+            idx = (f1 < p) * (f1 > 1.0 - p)
+            f1 = f1[idx]
+            gf = 1 - dist.g(1 - f1)
+            x = self.density_df.loss[idx] + trans
+            a.plot(gf, x, '-', c=c, label=f'Risk Adj {line}' if trans == 0 else None)
+            a.plot(f1, x, '--', c=c, label=line if trans == 0 else None)
+            if trans == 0:
+                a.fill_betweenx(x, gf, f1, color=c, alpha=0.5)
+            else:
+                a.fill_betweenx(x, gf, f1, color=c, edgecolor='black', alpha=0.5, hatch='+')
+        a.set(ylim=[0, self.q(p)])
+        a.legend(loc='upper left')
+
+    def natural_profit_segment_plot(self, a, p, line_names, colors, transs):
+        """
+        plot the natural allocations
+        between 1-p and p th percentiles
+        optionally translate a line
+        works with augmented_df, no input dist
+
+        """
+        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        lw, up = self.q(1 - p), self.q(p)
+        # common extract for all lines
+        bit = self.augmented_df.query(f' {lw} <= loss <= {up} ')
+        F = bit[f'F']
+        gF = bit[f'gF']
+        x = bit.loss
+        for line, cn, trans in zip(line_names, colors, transs):
+            c = col_list[cn]
+            ser = bit[f'exeqa_{line}']
+            a.plot(F, ser, ls='dashed', c=c)
+            a.plot(gF, ser, c=c)
+            if trans == 0:
+                a.fill_betweenx(ser + trans, gF, F, color=c, alpha=0.5, label=line)
+            else:
+                a.fill_betweenx(ser, gF, F, color=c, alpha=0.5, label=line)
+        a.set(ylim=[0, self.q(p)])
+        a.legend(loc='upper left')
+        # a.set(title=self.distortion)
+
+    def density_sample(self, n=20, reg="loss|p_|exeqa_"):
+        """
+        sample of equally likely points from density_df with interesting columns
+        reg - regex to select the columns
+        """
+        ps = np.linspace(0.001, 0.999, 20)
+        xs = [self.q(i) for i in ps]
+        return self.density_df.filter(regex=reg).loc[xs, :].rename(columns=self.renamer)
+
+    def biv_contour_plot(self, fig, ax, min_loss, max_loss, jump,
+                         log=True, cmap='Greys', min_density=1e-15, levels=30, lines=None, linecolor='w',
+                         colorbar=False, normalize=False, **kwargs):
+        """
+        Nake contour plot of line A vs line B
+        Assumes port only has two lines
+
+        Works with an extract density_df.loc[np.arange(min_loss, max_loss, jump), densities]
+        (i.e., jump is the stride). Jump = 100 * bs is not bad...just think about how big the outer product will get!
+
+        Param:
+
+        min_loss  density for each line is sampled at min_loss:max_loss:jump
+        max_loss
+        jump
+        log
+        cmap
+        min_density: smallest density to show on underlying log region; not used if log
+        levels: number of contours or the actual contours if you like
+        lines: iterable giving specific values of k to plot X+Y=k
+        color_bar: show color bar
+        normalize: if true replace Z with Z / sum(Z)
+        kwargs passed to contourf (e.g., use for corner_mask=False, vmin,vmax)
+
+        optionally could deal with diagonal lines, countour levels etc.
+        originally from ch09
+        """
+        # careful about origin when big prob of zero loss
+        npts = np.arange(min_loss, max_loss, jump)
+        ps = [f'p_{i}' for i in self.line_names]
+        bit = self.density_df.loc[npts, ps]
+        n = len(bit)
+        Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
+        if normalize:
+            Z = Z / np.sum(Z)
+        X, Y = np.meshgrid(bit.index, bit.index)
+
+        if log:
+            z = np.log10(Z)
+            mask = np.zeros_like(z)
+            mask[z == -np.inf] = True
+            mz = np.ma.array(z, mask=mask)
+            cp = ax.contourf(X, Y, mz, levels=levels, cmap=cmap, **kwargs)
+            # cp = ax.contourf(X, Y, mz, levels=np.linspace(-12, 0, levels), cmap=cmap, **kwargs)
+            if colorbar:
+                cb = fig.colorbar(cp, fraction=.1, shrink=0.5, aspect=10)
+                cb.set_label('Log10(Density)')
+        else:
+            mask = np.zeros_like(Z)
+            mask[Z < min_density] = True
+            mz = np.ma.array(Z, mask=mask)
+            cp = ax.contourf(X, Y, mz, levels=levels, cmap=cmap, **kwargs)
+            if colorbar:
+                cb = fig.colorbar(cp)
+                cb.set_label('Density')
+        # put in X+Y=c lines
+        if lines is None:
+            lines = np.arange(max_loss / 4, 2 * max_loss, max_loss / 4)
+        try:
+            for x in lines:
+                ax.plot([0, x], [x, 0], lw=.75, c=linecolor, label=f'Sum = {x:,.0f}')
+        except:
+            pass
+
+        title = (f'Bivariate Log Density Contour Plot\n{self.name.replace("_", " ").title()}'
+                 if log
+                 else f'Bivariate Density Contour Plot\n{self.name.replace("_", " ")}')
+
+        # previously limits set from min_loss, but that doesn't seem right
+        ax.set(xlabel=f'Line {self.line_names[0]}',
+               ylabel=f'Line {self.line_names[1]}',
+               xlim=[-max_loss / 50, max_loss],
+               ylim=[-max_loss / 50, max_loss],
+               title=title,
+               aspect=1)
+
+        # for post-processing
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+
+    def nice_program(self, wrap_col=90):
+        """
+        return wrapped version of port program
+        :return:
+        """
+        return fill(self.program, wrap_col, subsequent_indent='\t\t', replace_whitespace=False)
+
+    def short_renamer(self, prefix='', postfix=''):
+        if prefix:
+            prefix = prefix + '_'
+        if postfix:
+            postfix = '_' + postfix
+
+        knobble = lambda x: 'Total' if x == 'total' else x
+
+        return {f'{prefix}{i}{postfix}': knobble(i).title() for i in self.line_names_ex}
+
+    def twelve_plot(self, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0, biv_log=True, legend_font=0,
+                    contour_scale=10, sort_order=None, kind='two', cmap='viridis'):
+        """
+        Twelve-up plot for ASTIN paper and book, by rc index:
+
+        Greys for grey color map
+
+        11 density
+        12 log density
+        13 biv density plot
+
+        21 kappa
+        22 alpha (from alpha beta plot 4)
+        23 beta (?with alpha)
+
+        row 3 = line A, row 4 = line B from alpha beta four 2
+         1 S, gS, aS, bgS
+
+        32 margin
+        33 shift margin
+        42 cumul margin
+        43 natural profit compare
+
+        Args
+        ====
+        self = portfolio or enhanced portfolio object
+        p control xlim of plots via quantile; used if xmax=0
+        p2 controls ylim for 33 and 34: stand alone M and natural M; used if ymax2=0
+        biv_log - bivariate plot on log scale
+        legend_font - fine tune legend font size if necessary
+        sort_order = plot sorts by column and then .iloc[:, sort_order], if None [1,2,0]
+
+        from common_scripts.py
+
+        """
+
+        a11, a12, a13, a21, a22, a23, a31, a32, a33, a41, a42, a43 = axs.flat
+        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        lss = ['solid', 'dashed', 'dotted', 'dashdot']
+
+        if sort_order is None:
+            sort_order = [1, 2, 0]  # range(len(self.line_names_ex))
+
+        if xmax == 0:
+            xmax = self.q(p)
+        ymax = xmax
+
+        # density and log density
+
+        temp = self.density_df.filter(regex='p_').rename(columns=self.short_renamer('p')).sort_index(axis=1).loc[:xmax]
+        temp = temp.iloc[:, sort_order]
+        temp.index.name = 'Loss'
+        l1 = temp.plot(ax=a11, lw=1)
+        l2 = temp.plot(ax=a12, lw=1, logy=True)
+        l1.lines[-1].set(linewidth=1.5)
+        l2.lines[-1].set(linewidth=1.5)
+        a11.set(title='Density')
+        a12.set(title='Log density')
+        a11.legend()
+        a12.legend()
+
+        # biv den plot
+        if kind == 'two':
+            # biv den plot
+            # min_loss, max_loss, jump = 0, xmax, (2 ** (self.log2 - 8)) * self.bs
+            xmax = self.snap(xmax)
+            min_loss, max_loss, jump = 0, xmax, self.snap(xmax / 255)
+            min_density = 1e-15
+            levels = 30
+            color_bar = False
+
+            # careful about origin when big prob of zero loss
+            # handle for discrete distributions
+            ps = [f'p_{i}' for i in self.line_names]
+            title = 'Bivariate density'
+            query = ' or '.join([f'`p_{i}` > 0' for i in self.line_names])
+            if self.density_df.query(query).shape[0] < 512:
+                logger.info('Contour plot has few points...going discrete...')
+                bit = self.density_df.query(query)
+                n = len(bit)
+                Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
+                X, Y = np.meshgrid(bit.index, bit.index)
+                norm = mpl.colors.Normalize(vmin=-10, vmax=np.log10(np.max(Z.flat)))
+                cm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+                mapper = cm.to_rgba
+                a13.scatter(x=X.flat, y=Y.flat, s=1000 * Z.flatten(), c=mapper(np.log10(Z.flat)))
+                # edgecolor='C2', lw=1, facecolors='none')
+                a13.set(xlim=[min_loss - (max_loss - min_loss) / 10, max_loss],
+                        ylim=[min_loss - (max_loss - min_loss) / 10, max_loss])
+
+            else:
+                npts = np.arange(min_loss, max_loss, jump)
+                bit = self.density_df.loc[npts, ps]
+                n = len(bit)
+                Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
+                Z = Z / np.sum(Z)
+                X, Y = np.meshgrid(bit.index, bit.index)
+
+                if biv_log:
+                    z = np.log10(Z)
+                    mask = np.zeros_like(z)
+                    mask[z == -np.inf] = True
+                    mz = np.ma.array(z, mask=mask)
+                    cp = a13.contourf(X, Y, mz, levels=np.linspace(-17, 0, levels), cmap=cmap)
+                    if color_bar:
+                        cb = fig.colorbar(cp)
+                        cb.set_label('Log10(Density)')
+                else:
+                    mask = np.zeros_like(Z)
+                    mask[Z < min_density] = True
+                    mz = np.ma.array(Z, mask=mask)
+                    cp = a13.contourf(X, Y, mz, levels=levels, cmap=cmap)
+                    if color_bar:
+                        cb = fig.colorbar(cp)
+                        cb.set_label('Density')
+                a13.set(xlim=[min_loss, max_loss], ylim=[min_loss, max_loss])
+
+            # put in X+Y=c lines
+            lines = np.arange(contour_scale / 4, 2 * contour_scale + 1, contour_scale / 4)
+            logger.debug(f'Contour lines based on {contour_scale} gives {lines}')
+            for x in lines:
+                a13.plot([0, x], [x, 0], ls='solid', lw=.35, c='k', alpha=0.5, label=f'Sum = {x:,.0f}')
+
+            a13.set(xlabel=f'Line {self.line_names[0]}',
+                    ylabel=f'Line {self.line_names[1]}',
+                    title=title,
+                    aspect=1)
+        else:
+            # kind == 'three' plot survival functions...bivariate plots elsewhere
+            l1 = (1 - temp.cumsum()).plot(ax=a13, lw=1)
+            l1.lines[-1].set(linewidth=1.5)
+            a13.set(title='Survival Function')
+            a13.legend()
+
+        # kappa
+        bit = self.density_df.loc[:xmax]. \
+            filter(regex=f'^exeqa_({self.line_name_pipe})$')
+        bit = bit.iloc[:, sort_order]
+        bit.rename(columns=self.short_renamer('exeqa')).replace(0, np.nan). \
+            sort_index(axis=1).iloc[:, sort_order].plot(ax=a21, lw=1)
+        a21.set(title='$\\kappa_i(x)=E[X_i\\mid X=x]$')
+        # ugg for ASTIN paper example
+        # a21.set(xlim=[0,5], ylim=[0,5])
+        a21.set(xlim=[0, xmax], ylim=[0, xmax], aspect='equal')
+        a21.legend(loc='upper left')
+
+        # alpha and beta
+        aug_df = self.augmented_df
+        aug_df.filter(regex=f'exi_xgta_({self.line_name_pipe})'). \
+            rename(columns=self.short_renamer('exi_xgta')). \
+            sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a22, lw=1)
+        for ln, ls in zip(a22.lines, lss[1:]):
+            ln.set_linestyle(ls)
+        a22.legend()
+        a22.set(xlim=[0, xmax], title='$\\alpha_i(x)=E[X_i/X\\mid X>x]$');
+
+        bit = aug_df.query(f'loss < {xmax}').filter(regex=f'exi_xgtag?_({self.line_name_pipe})')
+        bit.rename(columns=self.short_renamer('exi_xgtag')). \
+            sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a23)
+        for i, l in enumerate(a23.lines[len(self.line_names):]):
+            if l.get_label()[0:3] == 'exi':
+                a23.lines[i].set(linewidth=2, ls=lss[1 + i])
+                l.set(color=f'C{i}', linestyle=lss[1 + i], linewidth=1,
+                      alpha=.5, label=None)
+        a23.legend(loc='upper left');
+        a23.set(xlim=[0, xmax], title="$\\beta_i(x)=E_{Q}[X_i/X \\mid X> x]$");
+
+        aug_df.filter(regex='M.M').rename(columns=self.short_renamer('M.M')). \
+            sort_index(axis=1).iloc[:, sort_order].plot(ax=a32, lw=1)
+        a32.set(xlim=[0, xmax], title='Margin density $M_i(x)$')
+
+        aug_df.filter(regex='T.M').rename(columns=self.short_renamer('T.M')). \
+            sort_index(axis=1).iloc[:, sort_order].plot(ax=a42, lw=1)
+        a42.set(xlim=[0, xmax], title='Margin $\\bar M_i(x)$');
+
+        # by line S, gS, aS, bgS
+        adf = self.augmented_df.loc[:xmax]
+        if kind == 'two':
+            zipper = zip(range(2), sorted(self.line_names), [a31, a41])
+        else:
+            zipper = zip(range(3), sorted(self.line_names), [a31, a41, a33])
+        for i, line, a in zipper:
+            a.plot(adf.loss, adf.S, c=col_list[2], ls=lss[1], lw=1, alpha=0.5, label='$S$')
+            a.plot(adf.loss, adf.gS, c=col_list[2], ls=lss[0], lw=1, alpha=0.5, label='$g(S)$')
+            a.plot(adf.loss, adf.S * adf[f'exi_xgta_{line}'], c=col_list[i], ls=lss[1], lw=1, label=f'$\\alpha S$ {line}')
+            a.plot(adf.loss, adf.gS * adf[f'exi_xgtag_{line}'], c=col_list[i], ls=lss[0], lw=1,
+                   label=f"$\\beta g(S)$ {line}")
+            a.set(xlim=[0, ymax])
+
+            a.set(title=f'Line = {line}')
+            a.legend()
+            a.set(xlim=[0, ymax])
+            a.legend(loc='upper right')
+
+        alpha = 0.05
+        if kind == 'two':
+            # three mode this is used for the third line
+            # a33 from profit segment plot
+            # special ymax for last two plots
+            ymax = ymax2 if ymax2 > 0 else self.q(p2)
+            # if could have changed
+            p2 = self.cdf(ymax)
+            for cn, ln in enumerate(sort_order):
+                line = sorted(self.line_names_ex)[ln]
+                c = col_list[cn]
+                s = lss[cn]
+                # print(line, s)
+                f1 = self.density_df[f'p_{line}'].cumsum()
+                idx = (f1 < p2) * (f1 > 1.0 - p2)
+                f1 = f1[idx]
+                gf = 1 - self.distortion.g(1 - f1)
+                x = self.density_df.loss[idx]
+                a33.plot(gf, x, c=c, ls=s, lw=1, label=None)
+                a33.plot(f1, x, ls=s, c=c, lw=1, label=None)
+                # a33.plot(f1, x, ls=lss[1], c=c, lw=1, label=None)
+                a33.fill_betweenx(x, gf, f1, color=c, alpha=alpha, label=line.title())
+            a33.set(ylim=[0, ymax], title='Stand-alone $M$')
+            a33.legend(loc='upper left')  # .set_visible(False)
+
+        # a43 from natural profit segment plot
+        # common extract for all lines
+        lw, up = self.q(1 - p2), ymax
+        bit = self.augmented_df.query(f' {lw} <= loss <= {up} ')
+        F = bit[f'F']
+        gF = bit[f'gF']
+        # x = bit.loss
+        for cn, ln in enumerate(sort_order):
+            line = sorted(self.line_names_ex)[ln]
+            c = col_list[cn]
+            s = lss[cn]
+            ser = bit[f'exeqa_{line}']
+            if kind == 'three':
+                a43.plot(1 / (1 - F), ser, lw=1, ls=lss[1], c=c)
+                a43.plot(1 / (1 - gF), ser, lw=1, c=c)
+                a43.set(xlim=[1, 1e4], xscale='log')
+                a43.fill_betweenx(ser, 1 / (1 - gF), 1 / (1 - F), color=c, alpha=alpha, lw=0.5, label=line.title())
+            else:
+                a43.plot(F, ser, lw=1, ls=s, c=c)
+                a43.plot(gF, ser, lw=1, ls=s, c=c)
+                a43.fill_betweenx(ser, gF, F, color=c, alpha=alpha, lw=0.5, label=line.title())
+        a43.set(ylim=[0, ymax], title='Natural $M$')
+        a43.legend(loc='upper left')  # .set_visible(False)
+
+        if legend_font:
+            for ax in axs.flat:
+                try:
+                    if ax is not a13:
+                        ax.legend(prop={'size': 7})
+                except:
+                    pass
+
+    def stand_alone_pricing_work(self, dist, p, kind, roe, S_calc='cumsum'):
+        """
+        Apply dist to the individual lines of self, with capital standard determined by a, p, kind=VaR, TVaR, etc.
+        Return usual data frame with L LR M P PQ  Q ROE, and a
+
+        Dist can be a distortion, traditional, or defaut pricing modes. For latter two you have to input an ROE. ROE
+        not required for a distortion.
+
+        :param self: a portfolio object
+        :param dist: "traditional", "default", or a distortion (already calibrated)
+        :param p: probability level for assets
+        :param kind: var (or lower, upper), tvar or epd (note, p should be small for EPD, to pander, if p is large we use 1-p)
+        :param roe: for traditional methods input roe
+
+        :return: exhibit is copied and augmented with the stand-alone statistics
+
+        from common_scripts.py
+        """
+        assert S_calc in ('S', 'cumsum')
+
+        var_dict = self.var_dict(p, kind=kind, total='total', snap=True)
+        exhibit = pd.DataFrame(0.0, index=['L', 'LR', 'M', 'P', "PQ", 'Q', 'ROE'], columns=['sop'])
+
+        def tidy_and_write(exhibit, ax, exa, prem):
+            """ finish up calculation and store answer """
+            roe_ = (prem - exa) / (ax - prem)
+            exhibit.loc[['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE'], l] = \
+                (exa, exa / prem, prem - exa, prem, prem / (ax - prem), ax - prem, roe_)
+
+        if dist == 'traditional - no default':
+            # traditional roe method, no allowance for default
+            method = dist
+            d = roe / (1 + roe)
+            v = 1 - d
+            for l in self.line_names_ex:
+                ax = var_dict[l]
+                # no allowance for default
+                exa = self.audit_df.at[l, 'EmpMean']
+                prem = v * exa + d * ax
+                tidy_and_write(exhibit, ax, exa, prem)
+        elif dist == 'traditional':
+            # traditional but allowing for default
+            method = dist
+            d = roe / (1 + roe)
+            v = 1 - d
+            for l in self.line_names_ex:
+                ax = var_dict[l]
+                exa = self.density_df.loc[ax, f'lev_{l}']
+                prem = v * exa + d * ax
+                tidy_and_write(exhibit, ax, exa, prem)
+        else:
+            # distortion method
+            method = f'sa {str(dist)}'
+            for l, ag in zip(self.line_names_ex, self.agg_list + [None]):
+                # use built in apply distortion
+                if ag is None:
+                    # total
+                    if S_calc == 'S':
+                        S = self.density_df.S
+                    else:
+                        # revised
+                        S = (1 - self.density_df['p_total'].cumsum())
+                    # some dist return np others don't this converts to numpy...
+                    gS = pd.Series(dist.g(S), index=S.index)
+                    exag = gS.shift(1, fill_value=0).cumsum() * self.bs
+                else:
+                    ag.apply_distortion(dist)
+                    exag = ag.density_df.exag
+                ax = var_dict[l]
+                exa = self.density_df.loc[ax, f'lev_{l}']
+                prem = exag.loc[ax]
+                tidy_and_write(exhibit, ax, exa, prem)
+
+        exhibit.loc['a'] = exhibit.loc['P'] + exhibit.loc['Q']
+        exhibit['sop'] = exhibit.filter(regex='[A-Z]').sum(axis=1)
+        exhibit.loc['LR', 'sop'] = exhibit.loc['L', 'sop'] / exhibit.loc['P', 'sop']
+        exhibit.loc['ROE', 'sop'] = exhibit.loc['M', 'sop'] / (exhibit.loc['a', 'sop'] - exhibit.loc['P', 'sop'])
+        exhibit.loc['PQ', 'sop'] = exhibit.loc['P', 'sop'] / exhibit.loc['Q', 'sop']
+
+        exhibit['method'] = method
+        exhibit = exhibit.reset_index()
+        exhibit = exhibit.set_index(['method', 'index'])
+        exhibit.index.names = ['method', 'stat']
+        exhibit.columns.name = 'line'
+        exhibit = exhibit.sort_index(axis=1)
+
+        return exhibit
+
+    def stand_alone_pricing(self, dist, p=0, kind='var', S_calc='cumsum'):
+        """
+
+        Run distortion pricing, use it to determine and ROE and then compute traditional and default
+        pricing, then consolidate the answer
+
+        :param self:
+        :param roe:
+        :param p:
+        :param kind:
+        :return:
+
+        from common_scripts.py
+        """
+        assert isinstance(dist, (Distortion, list))
+        if type(dist) != list:
+            dist = [dist]
+        ex1s = []
+        for d in dist:
+            ex1s.append(self.stand_alone_pricing_work(d, p=p, kind=kind, roe=0, S_calc=S_calc))
+            if len(ex1s) == 1:
+                roe = ex1s[0].at[(f'sa {str(d)}', 'ROE'), 'total']
+        ex2 = self.stand_alone_pricing_work('traditional - no default', p=p, kind=kind, roe=roe, S_calc=S_calc)
+        ex3 = self.stand_alone_pricing_work('traditional', p=p, kind=kind, roe=roe, S_calc=S_calc)
+
+        return pd.concat(ex1s + [ex2, ex3])
+
+    def calibrate_blends(self, a, premium, s_values, gs_values=None, spread_values=None, debug=False):
+        """
+        Input s values and gs values or (market) yield or spread.
+
+        A bond with prob s (small) of default is quoted with a yield (to maturity)
+        of r over risk free (e.g., a cat bond spread, or a corporate bond spread
+        over the appropriate Treasury). As a discount bond, the price is v = 1 - d.
+
+        B(s) = bid price for 1(U<s) (bond residual value)
+        A(s) = ask price for 1(U<s) (insurance policy)
+
+        By no arb A(s) + B(1-s) = 1.
+        By definition g(s) = A(s) (using LI so the particular U doesn't matter. Applied
+        to U = F(X)).
+
+        Let v = 1 / (1 + r) and d = 1 - v be the usual theory of interest quantities.
+
+        Hence B(1-s) = v = 1 - A(s) = 1 - g(s) and therefore g(s) = 1 - v = d.
+
+        The rate of risk discount δ and risk discount factor (nu) ν are defined so that
+        B(1-s) = ν * (1 - s), it is the extra discount applied to the actuarial value that
+        is bid for the bond. It is a function of s. Therefore ν = (1 - d) / (1 - s) =
+        price of bond / actuarial value of payment.
+
+        Then, g(s) = 1 - B(1-s) = 1 - ν (1 - s) = ν s + δ.
+
+        Thus, if return (i.e., market yield spreads) are input, they convert to
+        discount factors to define g points.
+
+        Blend can be defined by extrapolating the last points in a credit curve. If
+        that fails, increase the return on the highest s point and fill in with a
+        constant return to 1.
+
+        The ROE on the investment is not the promised return, because the latter does not
+        allow for default.
+
+        Set up to be a function of the Portfolio = self. Calibrated to hit premium at
+        asset level a. a must be in the index.
+
+            a = self.pricing_summary.at['a', kind]
+            premium = self.pricing_summary.at['P', kind]
+
+        method = extend or roe
+
+        Inpu
+
+        =====
+
+        blend_d0 is the Book's blend, with roe above the equity point
+        blend_d is calibrated to the same premium as the other distortions
+
+        method = extend if f_blend_extend or ccoc
+            ccoc = pick and equity point and back into its required roe. Results in a
+            poor fit to the calibration data
+
+            extend = extrapolate out the last slope from calibrtion data
+
+        Initially tried interpolating the bond yield curve up, but that doesn't work.
+        (The slope is too flat and it interpolates too far. Does not look like
+        a blend distortion.)
+        Now, adding the next point off the credit yield curve as the "equity"
+        point and solving for ROE.
+
+        If debug, returns more output, for diagnostics.
+
+        """
+        global logger
+
+        # corresponding gs values to s_values
+        if gs_values is None:
+            gs_values = 1 - 1 / (1 + np.array(spread_values))
+
+        # figure out the convex hull points out of input s, gs
+        s_values, gs_values = convex_points(s_values, gs_values)
+        if len(s_values) < 4:
+            raise ValueError('Input s,gs points do not generate enough separate points.')
+
+        # calibration prefob to compute rho
+        df = self.density_df
+        bs = self.bs
+        # survival function points
+        S = (1 - df.p_total[0:a-bs].cumsum())
+
+        def pricer(g):
+            nonlocal S, bs
+            return np.sum(g(S)) * bs
+
+        # figure the four extreme values:
+        # extrapolate or interp to 0 and l or r end
+        # it appears you need to do this extra step to lock in the parameters.
+        def make_g(s, gs):
+            i = interp1d(s, gs, bounds_error=False, fill_value='extrapolate')
+            def f(x):
+                return np.minimum(1, i(x))
+            return f
+
+        ans = []
+        dists = {}
+        for left in ['e', '0']:
+            for right in ['e', '1']:
+                s = s_values.copy()
+                gs = gs_values.copy()
+                if left == 'e':
+                    s = s[1:]
+                    gs = gs[1:]
+                if right == 'e':
+                    s = s[:-1]
+                    gs = gs[:-1]
+                dists[(left, right)] = make_g(s, gs)
+                new_p = pricer(dists[(left, right)])
+                ans.append((left, right, new_p, new_p > premium))
+
+        # horrible but small and short...
+        df = pd.DataFrame(ans, columns=['left', 'right', 'premium', 'gt'])
+        wts = {}
+        wdists = {}
+        for i, j in [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]:
+            pi = df.iat[i, 2]
+            pj = df.iat[j, 2]
+            if min(pi, pj) <= premium <= max(pi, pj):
+                il = df.iat[i, 0]
+                ir = df.iat[i, 1]
+                jl = df.iat[j, 0]
+                jr = df.iat[j, 1]
+                w = (premium - pj) / (pi - pj)
+                wts[(il, ir, jl, jr)] = w
+                # spoon feed into a dummy distortion
+                temp = Distortion('ph', .599099)
+                temp.name = 'blend'
+                # temp.display_name  = f'Extension ({il}, {ir}), ({jl}, {jr})'
+                temp.g = lambda x: (
+                        w * dists[(il, ir)](x) + (1 - w) * dists[(jl, jr)](x))
+                temp.g_inv = None
+                wdists[(il, ir, jl, jr)] = temp
+
+        if debug is True:
+            return wdists, df, pricer, dists, wts
+        else:
+            return wdists
+
+
+def check01(s):
+    """ add 0 1 at start end """
+    if 0 not in s:
+        s = np.hstack((0, s))
+    if 1 not in s:
+        s = np.hstack((s, 1))
+    return s
+
+
+def make_array(s, gs):
+    """ convert to np array and pad with 0 1 """
+    s = np.array(s)
+    gs = np.array(gs)
+    s = check01(s)
+    gs = check01(gs)
+    return np.array((s, gs)).T
+
+
+def convex_points(s, gs):
+    """
+    Extract the points that make the convex envelope, including 0 1
+
+    Testers::
+
+        %%sf 1 1 5 5
+
+        s_values, gs_values = [.001,.0011, .002,.003, 0.005, .008, .01], [0.002,.02, .03, .035, 0.036, .045, 0.05]
+        s_values, gs_values = [.001, .002,.003, .009, .011, 1],  [0.02, .03, .035, .05, 0.05, 1]
+        s_values, gs_values = [.001, .002,.003, .009, .01, 1],  [0.02, .03, .035, .0351, 0.05, 1]
+        s_values, gs_values = [0.01, 0.04], [0.03, 0.07]
+
+        points = make_array(s_values, gs_values)
+        ax.plot(points[:, 0], points[:, 1], 'x')
+
+        s_values, gs_values = convex_points(s_values, gs_values)
+        ax.plot(s_values, gs_values, 'r+')
+
+        ax.set(xlim=[-0.0025, .1], ylim=[-0.0025, .1])
+
+        hull = ConvexHull(points)
+        for simplex in hull.simplices:
+            ax.plot(points[simplex, 0], points[simplex, 1], 'k-', lw=.25)
+
+
+    """
+    points = make_array(s, gs)
+    hull = ConvexHull(points)
+    hv = hull.vertices[::-1]
+    hv = np.roll(hv, -np.argmin(hv))
+    return points[hv, :].T
+
+
+def make_awkward(log2, scale=False):
+    """
+    Decompose a uniform random variable on range(2**log2) into two parts
+    using Eamonn Long's base 4 method.
+
+    Usage: ::
+
+        awk = make_awkward(16)
+        awk.density_df.filter(regex='p_[ABt]').cumsum().plot()
+        awk.density_df.filter(regex='exeqa_[AB]|loss').plot()
+
+    """
+    n = 1 << log2
+    sc = 2 * n
+    xs = [int(bin(i)[2:], 4) for i in range(n)]
+    ys = [2*i for i in xs]
+    ps = [1 / n for i in xs]
+    if scale is True:
+        xs = xs / sc
+        ys = ys / sc
+
+    A = Aggregate('A', exp_en=1, sev_name='dhistogram', sev_xs=xs, sev_ps=ps,
+                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
+    B = Aggregate('B', exp_en=1, sev_name='dhistogram', sev_xs=ys, sev_ps=ps,
+                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
+    awk = Portfolio('awkward', [A, B])
+    awk.update(log2+1, 1/sc if scale else 1, remove_fuzz=True, padding=0)
+    return awk

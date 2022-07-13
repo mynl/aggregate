@@ -33,10 +33,10 @@ import aggregate as agg
 from aggregate.distr import Aggregate
 from aggregate.port import Portfolio
 from aggregate.spectral import Distortion
-from aggregate.utils import round_bucket, make_mosaic_figure, GreatFormatter
+from aggregate.utils import round_bucket, make_mosaic_figure, FigureManager
+from aggregate.bounds import Bounds, plot_max_min, plot_lee
 import argparse
 from collections import OrderedDict
-from cycler import cycler
 from datetime import datetime
 import hashlib
 from inspect import signature, currentframe, getargvalues
@@ -50,7 +50,6 @@ import matplotlib as mpl
 from matplotlib.colors import ListedColormap
 from numbers import Number
 import numpy as np
-from numpy.linalg import pinv
 import os
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
@@ -58,17 +57,11 @@ from pathlib import Path
 from platform import platform
 import psutil
 import re
-import scipy.stats as ss
 from scipy.integrate import cumtrapz
 from scipy.interpolate import interp1d
-from scipy.optimize import linprog
-from scipy.sparse import coo_matrix
-from scipy.spatial import ConvexHull
 import shlex
 from subprocess import Popen
-from textwrap import fill
 from titlecase import titlecase as title
-import types
 import warnings
 
 from IPython.display import HTML, display
@@ -125,6 +118,7 @@ def add_defaults(dict_in, kind='agg'):
         for k, v in defaults.items():
             if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
                 dict_in[k] = v
+
 
 def distortion_namer(x):
     if len(x) < 4:
@@ -212,7 +206,6 @@ class CaseStudy(object):
         self.distortion_pricing = None
         self.classical_pricing = None
         self.summaries = None
-        self.sp_ratings = None
         self.cap_table = None
         self.cap_table_total = None
         self.cap_table_marginal = None
@@ -294,7 +287,12 @@ class CaseStudy(object):
         # use inspect to get the arguments
         sig = signature(self.factory)
         for k in sig.parameters.keys():
-            ans[k] = getattr(self, k)
+            ob = getattr(self, k)
+            # these are not json serializable?!!
+            # TODO is this the best?
+            if isinstance(ob, np.ndarray):
+                ob = list(ob)
+            ans[k] = ob
         return ans
 
     def read_json(self, fn):
@@ -344,7 +342,6 @@ class CaseStudy(object):
         :param reg_p:
         :param roe:
         :param d2tc:
-        :param f_blend_extend: if true, use the extend method to parameterize blend; else ROE point method
         :param f_discrete:
         :param bs:
         :param log2:
@@ -387,7 +384,6 @@ port Gross_{self.case_id}
         if self.bs == 0 or np.isnan(self.bs):
             self.bs = self.gross.best_bucket(self.log2)
         self.gross.update(log2=self.log2, bs=self.bs, padding=self.padding, remove_fuzz=True)
-        enhance_portfolio(self.gross)
         # self.gross = TensePortfolio(self.gross, ,
         #                             ROE=self.roe, p=self.reg_p)
 
@@ -399,7 +395,6 @@ port Net_{self.case_id}
 ''')
         self.net = out[('port', f'Net_{self.case_id}')][0]
         self.net.update(log2=self.log2, bs=self.bs, remove_fuzz=True)
-        enhance_portfolio(self.net)
         self.ports = OrderedDict(gross=self.gross, net=self.net)
 
         self.pricings = OrderedDict()
@@ -410,7 +405,8 @@ port Net_{self.case_id}
         self.re_type = self.net[self.re_line].reinsurance_kinds()
         self.re_description = self.net[self.re_line].reinsurance_description(kind='both')
         # TODO replace! Output as Table G in Ch 7
-        # self.re_summary = pd.DataFrame([self.re_line, self.re_type, self.re_attach_p, self.re_attach, self.re_detach_p,
+        # self.re_summary = pd.DataFrame([self.re_line, self.re_type, self.re_attach_p,
+        #                                 self.re_attach, self.re_detach_p,
         #                                 self.re_detach - self.re_attach], index=[
         #     'Reinsured Line', 'Reinsurance Type', 'Attachment Probability', 'Attachment', 'Exhaustion Probability',
         #     'Limit'], columns=[self.case_id])
@@ -425,7 +421,7 @@ port Net_{self.case_id}
         self.make_cap_table()
         prem = self.pricings['gross'].at['P', 'total']
         a = self.pricings['gross'].at['a', 'total']
-        self.blend_distortions = calibrate_blends(self.gross, a, prem, s_values, gs_values, debug=False)
+        self.blend_distortions = self.gross.calibrate_blends(a, prem, s_values, gs_values, debug=False)
 
         self.roe_d = self.approx_roe(e=1e-10)
         # self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
@@ -433,28 +429,6 @@ port Net_{self.case_id}
         # TODO Enhance!
         k = list(self.blend_distortions.keys())[0]
         self.blend_d = self.blend_distortions[k]
-        # old
-        # if self.f_discrete is False:
-        #     self.make_cap_table()
-        #     try:
-        #         self.blend_d = self.make_blend()
-        #     except ValueError as e:
-        #         logger.error(f'Extend method failed...defaulting back to book blend. Message {e}')
-        #         # TODO try the ROE blend method?
-        #         self.f_blend_extend = False
-        #         self.blend_d = self.make_blend()
-        #
-        #     logger.info('applying ROE approximation fix.')
-        #     self.roe_d = self.approx_roe(e=1e-10)
-        #     self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
-        # else:
-        #     # original book blend, FYI (if f_blend_fix = 0)
-        #     attach_probs = np.array([1e-6, .01, .03, .05, .1, .2])
-        #     layer_roes = np.array([.02, .03, .04, .06, .08, self.roe])
-        #     g_values = (attach_probs + layer_roes) / (1 + layer_roes)
-        #     self.blend_d = agg.Distortion.s_gs_distortion(attach_probs, g_values, 'blend')
-        #     self.roe_d = self.approx_roe(e=1e-10)
-        #     self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
         self.cache_dir = self.cache_base / f'{self.case_id}'
         self.cache_dir.mkdir(exist_ok=True)
 
@@ -569,84 +543,6 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         self.pricing_summary = pricing_summary
         # return audit_all, bit, pricing_summary
 
-    @staticmethod
-    def default_float_format(x, neng=3):
-        """
-        the endless quest for the perfect float formatter...
-
-        Based on Great Tikz Format
-
-        tester::
-
-            for x in 1.123123982398324723947 * 10.**np.arange(-23, 23):
-                print(default_float_format(x))
-
-        :param x:
-        :return:
-        """
-        ef = EngFormatter(neng, True)
-        try:
-            if np.isnan(x):
-                return ''
-            elif x == 0:
-                ans = '0'
-            elif 1e-3 <= abs(x) < 1e6:
-                if abs(x) < 1:
-                    ans = f'{x:.3g}'
-                elif abs(x) < 10:
-                    ans = f'{x:.4g}'
-                elif abs(x) <= 100:
-                    ans = f'{x:.4g}'
-                elif abs(x) < 1000:
-                    ans = f'{x:,.1f}'
-                else:
-                    ans = f'{x:,.0f}'
-            else:
-                ans = ef(x)
-            return ans
-        except ValueError:
-            return x
-
-    @staticmethod
-    def default_float_format2(x, neng=3):
-        """
-        the endless quest for the perfect float formatter...
-        Like above, but two digit numbers still have 3dps
-        Based on Great Tikz Format
-
-        tester::
-
-            for x in 1.123123982398324723947 * 10.**np.arange(-23, 23):
-                print(default_float_format(x))
-
-        :param x:
-        :return:
-        """
-        ef = EngFormatter(neng, True)
-        try:
-            if np.isnan(x):
-                return ''
-            elif abs(x) <= 1e-14:
-                ans = '0'
-            elif 1e-3 <= abs(x) < 1e6:
-                if abs(x) < 1:
-                    ans = f'{x:.3g}'
-                elif abs(x) < 10:
-                    ans = f'{x:.4g}'
-                elif abs(x) < 100:
-                    ans = f'{x:.5g}'
-                elif x == 100:
-                    ans = '100'
-                elif abs(x) < 1000:
-                    ans = f'{x:,.1f}'
-                else:
-                    ans = f'{x:,.0f}'
-            else:
-                ans = ef(x)
-            return ans
-        except ValueError:
-            return x
-
     @classmethod
     def _display_work(cls, exhibit_id, df, caption, ff=None, save=True, cache_dir=None, show=False, align='right'):
         """
@@ -662,42 +558,6 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         :param save:
         @return:
         """
-        # cell_hover = {  # for row hover use <tr> instead of <td>
-        #     'selector': 'td:hover',
-        #     'props': [('background-color', '#ffffb3')]
-        # }
-        # # color, matching color background fonts
-        # index_names = {
-        #     'selector': '.index_name',
-        #     'props': 'font-style: italic; color: black; background-color: #B4C3DC; '
-        #              'font-weight:bold; border: 1px solid white; text-transform: capitalize; text-align:left;'
-        # }
-        # headers = {
-        #     'selector': 'th:not(.index_name)',
-        #     'props': 'background-color: #F1F8FE; color: black;  border: 1px solid #a4b3dc;'
-        # }
-        # center_heading = {
-        #     'selector': 'th.col_heading',
-        #     'props': 'text-align: center;'
-        # }
-        # left_index = {
-        #     'selector': '.row_heading',
-        #     'props': 'text-align: left;'
-        # }
-        # bold_level_0 = {
-        #     'selector': 'th.col_heading.level0',
-        #     'props': 'font-size: 1.2em;'
-        # }
-        # caption_f = {
-        #     'selector': 'caption',
-        #     'props': 'font-size: 1.1em; font-family: serif; font-weight: normal; text-align: left;'
-        # }
-        # td = {
-        #     'selector': 'td',
-        #     'props': f'text-align: {align}; border-bottom: 1px solid #a4b3dc;'
-        # }  # font-weight: bold;'}
-        # all_styles = [cell_hover, index_names, headers,
-        #               center_heading, bold_level_0, left_index, td, caption_f]
 
         # revised set: used in agg, greys look better
         cell_hover = {
@@ -931,23 +791,23 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         if self.f_discrete is True:
             bit = self.make_discrete()
             caption = 'Tables 11.1 and 11.2: computing expected loss and premium, PH 0.5 distortion.'
-            self._display("Z-11-1", bit, caption, self.default_float_format2)
+            self._display("Z-11-1", bit, caption) # , self.default_float_format2)
 
             bit = self.gross.augmented_df.query('loss==80').filter(regex='^(exag?_total)$').copy()
             bit.index.name = 'a'
             bit.columns = ['Limited Loss', 'Premium']
             caption = 'Table 11.3 outcomes with assets a=80 (answers only), PH 0.5 distortion.'
-            self._display("Z-11-2", bit, caption, self.default_float_format2)
+            self._display("Z-11-2", bit, caption) # , self.default_float_format2)
 
             bit = self.make_discrete('tvar')
             caption = 'Table 11.4 (Exercise): computing expected loss and premium, calibrated TVaR distortion.'
-            self._display("Z-11-3", bit, caption, self.default_float_format2)
+            self._display("Z-11-3", bit, caption) #, self.default_float_format2)
 
             bit = self.gross.augmented_df.query('loss==80').filter(regex='^(exag?_total)$').copy()
             bit.index.name = 'a'
             bit.columns = ['Limited Loss', 'Premium']
             caption = 'Table (new) outcomes with assets a=80 (answers only), TVaR distortion.'
-            self._display("Z-11-4", bit, caption, self.default_float_format2)
+            self._display("Z-11-4", bit, caption) # , self.default_float_format2)
 
         else:
             # progress of benefits - always show
@@ -976,7 +836,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                               f'Return by tranche, total {kind} view, blend distortion.');
                 self._display(f'Z-TRM-{kind[0]}', self.cap_table_marginal,
                               f'Return by tranche, marginal {kind} view, blend distortion.');
-                self.show_tranching_graph(kind, style='new')
+                self.show_tranching_graph(kind)
 
     def make_cap_table(self, kind='gross'):
         """
@@ -1073,161 +933,6 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         #            'Exhaust Rating'])
         self.cap_table = cap_table
 
-        # in case this is needed
-        r = Ratings()
-        spdf = r.make_ratings()
-        # ad hoc adjustment for highest rated issues
-        spdf.loc[0, 'default'] = .00003
-        spdf.loc[1, 'default'] = .00005
-        spdf['attachment'] = [port.q(1 - i) for i in spdf.default]
-        spdf = spdf.set_index('rating', drop=True)
-        self.sp_ratings = spdf
-
-    def make_cap_table_old(self, kind='gross'):
-        """
-        Suggest reasonable debt tranching for kind=(gross|net) subject to self.d2tc debt to total capital limit. 
-        Uses S&P bond default analysis.
-
-        Creates self.cap_table and self.debt_stats
-
-        This is a cluster. There must be a better way...
-
-        This version did all the difficult tranching...which is based on dubious info anyways...
-
-        """
-
-        port = self.ports[kind]
-
-        r = Ratings()
-        spdf = r.make_ratings()
-        # ad hoc adjustment for highest rated issues
-        spdf.loc[0, 'default'] = .00003
-        spdf.loc[1, 'default'] = .00005
-        spdf['attachment'] = [port.q(1 - i) for i in spdf.default]
-        spdf = spdf.set_index('rating', drop=True)
-        # if you want a plot
-        # spdf[::-1].plot.barh(ax=ax, width=.8)
-        # ax.set(xscale='log', xlabel='default probability')
-        # ax.legend().set(visible=False)
-
-        # debt to total capital limit
-        a, premium, el = self.pricing_summary.loc[['a', 'P', 'L'], kind]
-        capital = a - premium
-        debt = self.d2tc * capital
-        equity = capital - debt
-        debt_attach = a - debt
-        prob_debt_attach = port.sf(debt_attach)
-        i = (spdf.default < prob_debt_attach).values.argmin()
-        j = (spdf.default > 1 - self.reg_p).values.argmax() - 1
-        attach_rating = spdf.index[i]
-        exhaust_rating = spdf.index[j]
-        # tranche out: pull out the relevant rating bands
-        bit = spdf.iloc[j:i + 1]
-        # add debt attachment and capital
-        bit.loc['attach'] = [prob_debt_attach, debt_attach]
-        bit.loc['capital'] = [port.sf(a), a]
-        bit = bit.sort_values('attachment', ascending=False)
-
-        # compute tranche widths and extract just the tranches that apply (tricky!)
-        # convert to series with attachment
-        tranches = bit.attachment.shift(1) - bit.attachment
-        # tranches ott ratings, capital, ratings, attach, bottom rating
-        # needs converting into just the relevant ratings bands. Attach is replaced with the bottom rating
-        # and cut off below capital
-        # hence
-        ix = list(tranches.index[:-1])
-        ix[-1] = tranches.index[-1]
-        # drop bottom
-        tranches = tranches.iloc[:-1]
-        # re index
-        tranches.index = ix
-        capix = tranches.index.get_loc('capital')
-        tranches = tranches.iloc[capix + 1:]
-        tranches.index.name = 'rating'
-        tranches = tranches.to_frame()
-        tranches.columns = ['Amount']
-        # merge in attachments
-        tranches['attachment'] = bit.iloc[capix + 1:-1, -1].values
-        # tranches
-
-        # integrate into a cap table
-        cap_table = tranches.copy()
-        # add prob attaches
-        cap_table['Pr Attach'] = [port.sf(i) for i in cap_table.attachment]
-        # add equity, premium (margin), and EL rows
-        cap_table.loc['Equity'] = [debt_attach - premium, premium, port.sf(premium)]
-        cap_table.loc['Margin'] = [premium - el, el, port.sf(el)]
-        cap_table.loc['EL'] = [el, 0, port.sf(0)]
-
-        cap_table['Total'] = cap_table.Amount[::-1].cumsum()
-        cap_table['Pct Assets'] = cap_table.Amount / cap_table.iloc[0, -1]
-        cap_table['Cumul Pct'] = cap_table.Total / cap_table.iloc[0, -2]
-        # just recompute to be sure...
-        cap_table['Pr Exhaust'] = [port.sf(i) for i in cap_table.Total]
-        cap_table.columns = ['Amount', 'Attaches', 'Pr Attaches', 'Exhausts', 'Pct Assets', 'Cumul Pct', 'Pr Exhausts']
-        cap_table = cap_table[
-            ['Amount', 'Pct Assets', 'Attaches', 'Pr Attaches', 'Exhausts', 'Pr Exhausts', 'Cumul Pct']]
-
-        cap_table.columns.name = 'Quantity'
-        cap_table.index.name = 'Tranche'
-
-        # make the total and incremental views
-        if port.augmented_df is not None:
-            # first call to create cap table is before any pricing....
-            total_renamer = {'F': 'Adequacy',
-                             'capital': 'Capital',
-                             'exa_total': 'Loss',
-                             'exag_total': 'Premium',
-                             'margin': 'Margin',
-                             'lr': 'LR',
-                             'coc': 'CoC',
-                             'loss': 'Assets'}
-            bit = port.augmented_df.loc[[port.snap(i) for i in cap_table.Exhausts],
-                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
-            bit['lr'] = bit.exa_total / bit.exag_total
-            bit['margin'] = (bit.exag_total - bit.exa_total)
-            bit['capital'] = bit.loss - bit.exag_total
-            bit['coc'] = bit.margin / bit.capital
-            bit['Discount'] = bit.coc / (1 + bit.coc)
-            # leverage here does not make sense because of reserves
-            bit.index = cap_table.index
-            bit = bit.rename(columns=total_renamer)
-            self.cap_table_total = bit
-
-            marginal_renamer = {
-                                'F': 'Adequacy',  # that the loss is in the layer
-                                'loss': 'Assets',
-                                'exa_total': 'Loss',
-                                'exag_total': 'Premium',
-                                'margin': 'Margin',
-                                'capital': 'Capital',
-                                'lr': 'LR',
-                                'coc': 'CoC',
-                                }
-            bit = port.augmented_df.loc[[0] + [port.snap(i) for i in cap_table.Exhausts],
-                                     ['loss', 'F', 'exa_total', 'exag_total']].sort_index(ascending=False)
-            bit = bit.diff(-1).iloc[:-1]
-            bit['lr'] = bit.exa_total / bit.exag_total
-            bit['margin'] = (bit.exag_total - bit.exa_total)
-            bit['capital'] = bit.loss - bit.exag_total
-            bit['coc'] = bit.margin / bit.capital
-
-            bit.index = self.cap_table.index
-            bit.loc['Total', :] = bit.sum()
-            bit.loc['Total', 'lr'] = bit.loc['Total', 'exa_total'] / bit.loc['Total', 'exag_total']
-            bit.loc['Total', 'coc'] = bit.loc['Total', 'margin'] / bit.loc['Total', 'capital']
-            bit['Discount'] = bit.coc / (1 + bit.coc)
-            bit = bit.rename(columns=marginal_renamer)
-            self.cap_table_marginal = bit
-
-        # return ans, tranches, bit, spdf, cap_table
-        self.debt_stats = pd.Series(
-            [a, el, premium, capital, equity, debt, debt_attach, prob_debt_attach, attach_rating, exhaust_rating],
-            index=['a', 'EL', 'P', 'Capital', 'Equity', 'Debt', 'D_attach', 'Pr(D_attach)', 'Attach Rating',
-                   'Exhaust Rating'])
-        self.cap_table = cap_table
-        self.sp_ratings = spdf
-
     def make_discrete(self, distortion_name='default'):
         """
         the extra exhibits for discrete cases (ch11)
@@ -1259,147 +964,6 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         bit = bit[['X', 'ΔX', 'p', 'S', 'X p', 'S ΔX', 'g(S)', 'Δg(S)', 'X Δg(S)', 'g(S) ΔX']]
         return bit
-
-    def bond_pricing_table(self):
-        """
-        Credit yield curve info used to create calibrated blend
-
-        creates dd, the distortion dataframe
-
-        @return:
-        """
-        dd = self.sp_ratings.copy()
-        dd['yield'] = np.nan
-        # TODO SUBOPTIMAL!! Interpolate yields
-        dd.loc[['AAA', 'AA', 'A', 'A-', 'BBB+', 'BBB', 'B+', 'CCC/C'], 'yield'] = [0.0364, .04409, .04552, .04792,
-                                                                                   .04879, .05177, .09083, .1]
-        dd['yield'] = dd.set_index('default')['yield'].interpolate(method='index').values
-
-        lowest_tranche = self.cap_table.index[-4]
-        # +2 to go one below the actual lowest tranche used in the debt structure
-        lowest_tranche_ix = self.sp_ratings.index.get_loc(lowest_tranche) + 2
-
-        dd = dd.iloc[0:lowest_tranche_ix]
-        dd = dd.drop(columns=['attachment'])
-        return dd
-
-    def make_blend(self, kind='gross', debug=False):
-        """
-        blend_d0 is the Book's blend, with roe above the equity point
-        blend_d is calibrated to the same premium as the other distortions
-
-        method = extend if f_blend_extend or ccoc
-            ccoc = pick and equity point and back into its required roe. Results in a
-            poor fit to the calibration data
-
-            extend = extrapolate out the last slope from calibrtion data
-
-        Initially tried interpolating the bond yield curve up, but that doesn't work.
-        (The slope is too flat and it interpolates too far. Does not look like
-        a blend distortion.)
-        Now, adding the next point off the credit yield curve as the "equity"
-        point and solving for ROE.
-
-        If debug, returns more output, for diagnostics.
-
-        """
-        global logger
-
-        # otherwise, calibrating to self.ports[kind]
-        port = self.ports[kind]
-        # dd = distortion dataframe; this is already trimmed down to the relevant issues
-        dd = self.bond_pricing_table()
-        attach_probs = dd.iloc[:, 0]
-        layer_roes = dd.iloc[:, 1]
-
-        # calibration prefob
-        df = port.density_df
-        a = self.pricing_summary.at['a', kind]
-        premium = self.pricing_summary.at['P', kind]
-        logger.info(f'Calibrating to premium of {premium:.1f} at assets {a:.1f}.')
-        # calibrate and apply use 1 = forward sum
-        bs = self.gross.bs
-        S = (1 - df.p_total[0:a-bs].cumsum())
-
-        d = None
-
-        # generic NR function
-        def f(s):
-            nonlocal d
-            eps = 1e-8
-            d = make_distortion(s)
-            d1 = make_distortion(s + eps / 2)
-            d2 = make_distortion(s - eps / 2)
-            ex = pricer(d)
-            p1 = pricer(d1)
-            p2 = pricer(d2)
-            ex_prime = (p1 - p2) / eps
-            return ex - premium, ex_prime
-
-        def pricer(distortion):
-            # re-state as series, interp returns numpy array
-            return np.sum(distortion.g(S)) * bs
-            # temp = pd.Series(distortion.g(S)[::-1], index=S.index)
-            # temp = temp.shift(1, fill_value=0).cumsum() * bs
-            # return temp.iloc[-1]
-
-        # two methods of calibration
-        if self.f_blend_extend is False:
-
-            def make_distortion(roe):
-                nonlocal attach_probs, layer_roes
-                layer_roes[-1] = roe
-                g_values = (attach_probs + layer_roes) / (1 + layer_roes)
-                return agg.Distortion.s_gs_distortion(attach_probs, g_values, 'blend')
-
-            # newton raphson with numerical derivative
-            i = 0
-            # first step
-            s = self.roe
-            fx, fxp = f(s)
-            logger.info(f'starting premium {fx + premium:.1f}\ttarget={premium:.1f} @ {s:.3%}')
-            max_iter = 50
-            logger.info('  i       fx        \troe        \tfxp')
-            logger.info(f'{i: 3d}\t{fx: 8.3f}\t{s:8.6f}\t{fxp:8.3f}')
-
-        elif self.f_blend_extend is True:
-            pp = interp1d(dd.default, dd['yield'], bounds_error=False, fill_value='extrapolate')
-
-            def make_distortion(s):
-                nonlocal attach_probs, layer_roes
-                attach_probs[-1] = s
-                layer_roes[-1] = pp(s)
-                g_values = (attach_probs + layer_roes) / (1 + layer_roes)
-                return agg.Distortion.s_gs_distortion(attach_probs, g_values, 'blend')
-
-            # newton raphson with numerical derivative
-            i = 0
-            # first step, start a bit to the right of the largest default used in pricing
-            s = dd.default.max() * 1.5
-            fx, fxp = f(s)
-            logger.info(f'starting premium {fx + premium:.1f}\ttarget={premium:.1f} @ {s:.3%}')
-            max_iter = 50
-            logger.info('  i       fx        \ts          \tfxp')
-            logger.info(f'{i: 3d}\t{fx: 8.3f}\t{s:8.6f}\t{fxp:8.3f}')
-
-        else:
-            raise ValueError(f'Inadmissible option passed to make_blend.')
-
-        # actual NR code is generic
-        while abs(fx) > 1e-8 and i < max_iter:
-            logger.info(f'{i: 3d}\t{fx: 8.3f}\t{s:8.6f}\t{fxp:8.3f}')
-            s = s - fx / fxp
-            fx, fxp = f(s)
-            i += 1
-        if i == max_iter:
-            logger.error(f'NR failed to converge...Target={premium:2f}, achieved={fx + premium:.2f}')
-        logger.info(f'Ending parameter={s:.5g} (s or roe)')
-        logger.info(f'Target={premium:2f}, achieved={fx + premium:.2f}')
-
-        if debug is True:
-            return d, premium, pricer
-        else:
-            return d
 
     def get_f_axs(self, nr, nc):
         w = nc * self.fw
@@ -1465,7 +1029,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         (self.cache_dir / f'{plot_id}.html').write_text(blob, encoding='utf-8')
         process_memory()
 
-    def twelve_plot(self):
+    def case_twelve_plot(self):
         """
         make the 12 up plot
         must call apply_distortions first!
@@ -1511,7 +1075,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         ]
         for port, nm, caption in zip((self.net, self.gross), ('T_net', 'T_gross'), captions):
             f, axs = self.smfig(4, 3, (10.8, 12.0))
-            twelve_plot(port, f, axs, xmax=xlim[1], ymax2=xlim[1],
+            port.twelve_plot(f, axs, xmax=xlim[1], ymax2=xlim[1],
                         contour_scale=port.q(self.reg_p), sort_order=sort_order, cmap=self.colormap)
             axs[0][0].set(ylim=ylim, xlim=xlim)
             axs[0][1].set(xlim=xlim)
@@ -1529,6 +1093,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
     def show_extended_graphs(self):
         """
         Create relevant extended graphs
+        TODO this is over the top and too slow.
 
         @return:
         """
@@ -1537,31 +1102,33 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # blended distortion
         f, axs = self.smfig(1, 3, (12.0, 4.0), )
         ax0, ax1, ax2 = axs.flat
-        d0 = self.make_blend()
-        dd = self.bond_pricing_table()
 
-        ps = np.hstack((np.linspace(0, 0.1, 200000, endpoint=False), np.linspace(0.1, 1, 1000)))
-        droe = agg.Distortion('roe', self.roe).g(ps)
-        blend = d0.g(ps)
-        fit_blend = self.blend_d.g(ps)
+        ps = np.hstack((np.linspace(0, 0.1, 2000, endpoint=False), np.linspace(0.1, 1, 100)))
         ph = self.gross.dists['ph'].g(ps)
 
+        # ax.plot(ps, blend, label='Naive blend')
+        lsi = iter([':', '--', '-.', ':'])
+        for k, v in self.dist_dict.items():
+            temp = v.g(ps)
+            ls = next(lsi)
+            for ax in axs.flat:
+                ax.plot(ps, temp, lw=1, ls=ls, label=k)
         for ax in axs.flat:
             ax.plot(ps, ps, c='k', lw=0.5)
-            ax.plot(ps, droe, label='CCoC')
-            ax.plot(ps, blend, label='Naive blend')
-            ax.plot(ps, fit_blend, label='Calibrated blend')
-            ax.plot(dd.default, dd['yield'], 'x', lw=.5, label='Bond pricing data')
+            ax.plot(self.s_values, self.gs_values, 'x', lw=.5, label='Calibration pricing data')
             ax.plot(ps, ph, lw=0.5, label='PH')
             ax.legend()
         ax1.set(xlim=[0, 0.1], ylim=[0, 0.1])
         ax2.set(xscale='log', yscale='log', xlim=[.8e-6, 1], ylim=[.8e-6, 1])
 
-        caption = f'(Z-BL-1) Figure (new): Calibrated blend distortion, compard to CCoC and naive blend. The x marks show bond default and pricing data used in calibration. ' \
-                  'Middle plot zooms into 0 < s < 0.1. Righthand plot uses a log/log scale. PH distortion added for comparison.'
+        caption = f'(Z-BL-1) Figure (new): Calibrated blend distortions, compard to CCoC. ' \
+                    'The x marks show default and pricing data used in calibration. ' \
+                    'Middle plot zooms into 0 < s < 0.1. Righthand plot uses a log/log scale. ' \
+                    'PH distortion added for comparison.'
         self._display_plot('Z-BL-1', f, caption)
+        return f
 
-    def show_tranching_graph(self, kind, style='new'):
+    def show_tranching_graph(self, kind):
         """
         graph of tranching
         revised vertical view
@@ -1570,119 +1137,40 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         """
         port = self.ports[kind]
-        if style == 'new':
-            # new style = vertical, but focused on what is shown in the cap_table range
-            f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
-            ax0, ax1 = axs.flat
-            for ax in axs.flat:
-                if ax is ax0:
-                    ax.plot(port.density_df.F, port.density_df.loss,
-                        lw=1.5, label='Loss')
-                else:
-                    ax.plot(1 / port.density_df.S, port.density_df.loss,
-                        lw=1.5, label='Loss')
 
-                col = 0
-                for n, x in self.cap_table_total.iterrows():
-                    col += 1
-                    ax.axhline(x.Assets, c=f'C{col}', lw=1.5, label=f'{n}, ¤{x.Assets:,.0f} @ p={x.Adequacy:.3%}')
-            pts = self.cap_table_total.Assets
-            ax.yaxis.set_major_locator(ticker.FixedLocator(pts.values))
-            ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}: ¤{v:,.0f}' for i, v in pts.items()]))
+        # new style = vertical, but focused on what is shown in the cap_table range
+        f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
+        ax0, ax1 = axs.flat
+        for ax in axs.flat:
+            if ax is ax0:
+                ax.plot(port.density_df.F, port.density_df.loss,
+                    lw=1.5, label='Loss')
+            else:
+                ax.plot(1 / port.density_df.S, port.density_df.loss,
+                    lw=1.5, label='Loss')
 
-            ax0.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
-            ax0.axvline(0, lw=0.25, c='k')
-            ax0.axvline(1, lw=0.25, c='k')
-            ax1.axvline(1 / (1 - self.cap_table_total.Adequacy[0]), lw=0.25, c='k')
-            ymin = port.q(0.0001)
-            ymax = 1.05 * self.cap_table_total.Assets[0]
-            ax0.set(ylabel='Loss', xlabel='Non exceedance probability')
-            ax0.set(ylim=[ymin, ymax], yscale='linear')
-            ax1.set(ylim=[ymin, ymax], xlim=[0.8, 2 / (1 - self.cap_table_total.Adequacy[0])],
-                    xscale='log', xlabel='Log return period')
-            ax0.legend(loc='upper left')
-            caption = f'(Z-TR-1) Figure (new): {kind} capital tranching with a {self.d2tc:.1%} debt ' \
-                        'to total capital limit.'
-            self._display_plot(f'Z-TR-1-{kind[0]}', f, caption)
+            col = 0
+            for n, x in self.cap_table_total.iterrows():
+                col += 1
+                ax.axhline(x.Assets, c=f'C{col}', lw=1.5, label=f'{n}, ¤{x.Assets:,.0f} @ p={x.Adequacy:.3%}')
+        pts = self.cap_table_total.Assets
+        ax.yaxis.set_major_locator(ticker.FixedLocator(pts.values))
+        ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}: ¤{v:,.0f}' for i, v in pts.items()]))
 
-        elif style == 'old':
-            f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
-            ax0, ax1 = axs.flat
-            el = self.debt_stats['EL']
-            prem = self.debt_stats['P']
-            cap = self.debt_stats['a']
-            max_debt = self.debt_stats['D_attach']
-
-            # just show the full letter levels
-            ix = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B']
-            for ax in axs.flat:
-                # self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
-                if ax is ax0:
-                    ax.plot(port.density_df.F, port.density_df.loss,
-                        lw=1.5, label='Loss density')
-                else:
-                    ax.plot(1 / port.density_df.S, port.density_df.loss,
-                        lw=1.5, label='Loss density')
-
-                for n, x in self.sp_ratings.loc[ix].iterrows():
-                    ax.axhline(x.attachment, c='C7', lw=.25)
-                ax.axhline(el, c='C1', lw=1.5, label=f'EL=¤{el:,.0f} @ p={port.sf(el):.3%}')
-                ax.axhline(prem, c='C2', lw=1.5, label=f'Premium=¤{prem:,.0f} @ p={port.sf(prem):.3%}')
-                ax.axhline(max_debt, c='C3', lw=1.5, label=f'Debt attachment=¤{max_debt:,.0f} @ p={port.sf(max_debt):.3%}')
-                msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
-                ax.axhline(cap, c='C4', lw=1.5, label=f'Assets=¤{cap:,.0f} @ p={port.sf(cap):.3%},\n{msg}')
-                pts = pd.concat((self.sp_ratings.loc[ix, 'attachment'], self.debt_stats[['EL', 'P']]))
-                ax.yaxis.set_major_locator(ticker.FixedLocator(pts))
-                ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}: ¤{v:,.0f}'
-                                                                    for i, v in pts.items()]))
-                # ax.yaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
-                #                                                     f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
-                #                                                     ix]))
-
-            ax0.axvline(0, lw=0.25, c='k')
-            ax0.axvline(1, lw=0.25, c='k')
-            ymin = self.gross.q(0.0001)
-            ymax = self.gross.q(1 - .00003 / 2)
-            ax0.set(ylabel='Loss', xlabel='Non exceedance probability')
-            ax0.set(ylim=[ymin, ymax], yscale='linear')
-            ax1.set(ylim=[ymin, ymax], xlim=[1, 1/0.000015], xscale='log', xlabel='Log return period')
-            ax0.legend(loc='upper left')
-
-            # old horizontal density view
-            # f, axs = self.smfig(1, 2, (12.0, 4.0))
-            # ax0, ax1 = axs.flat
-            # port = self.gross
-            # el = self.debt_stats['EL']
-            # prem = self.debt_stats['P']
-            # cap = self.debt_stats['a']
-            # max_debt = self.debt_stats['D_attach']
-
-            # just show the full letter levels
-            # ix = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B']
-            # for ax in axs.flat:
-            #     self.gross.density_df.p_total.plot(ax=ax, lw=1.5, label='Loss density')
-            #     for n, x in self.sp_ratings.loc[ix].iterrows():
-            #         ax.axvline(x.attachment, c='C7', lw=.25)
-            #     ax.axvline(el, c='C1', lw=1.5, label=f'EL={el:,.0f} @ {port.sf(el):.3%}')
-            #     ax.axvline(prem, c='C2', lw=1.5, label=f'Premium={prem:,.0f} @ {port.sf(prem):.3%}')
-            #     ax.axvline(max_debt, c='C3', lw=1.5, label=f'Debt attachment={max_debt:,.0f} @ {port.sf(max_debt):.3%}')
-            #     msg = f'(max debt={cap - max_debt:.0f}, capital={cap - prem:,.0f})'
-            #     ax.axvline(cap, c='C4', lw=1.5, label=f'Assets={cap:,.0f} @ {port.sf(cap):.3%},\n{msg}')
-            #     ax.xaxis.set_major_locator(ticker.FixedLocator(self.sp_ratings.loc[ix, 'attachment']))
-            #     ax.xaxis.set_major_formatter(ticker.FixedFormatter([f'{i}\n{self.sp_ratings.loc[i, "attachment"]:,.0f}\n'
-            #                                                         f'{self.sp_ratings.loc[i, "default"]:.3%}' for i in
-            #                                                         ix]))
-            #
-            # xmin = self.gross.q(0.0001)
-            # xmax = self.gross.q(1 - .00003 / 2)
-            # if self.case_id == 'tame':
-            #     xmax *= 1.25
-            # ax0.set(xlabel='Loss', ylabel='Density')
-            # ax0.set(xlim=[xmin, xmax], yscale='linear')
-            # ax1.set(xlim=[xmin, xmax], ylim=1e-10, yscale='log', xlabel='Loss')
-            # ax0.legend(loc='upper right')
-            caption = f'(Z-TR-1) Figure (new): capital tranching with a {self.d2tc:.1%} debt to total capital limit.'
-            self._display_plot('Z-TR-1', f, caption)
+        ax0.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
+        ax0.axvline(0, lw=0.25, c='k')
+        ax0.axvline(1, lw=0.25, c='k')
+        ax1.axvline(1 / (1 - self.cap_table_total.Adequacy[0]), lw=0.25, c='k')
+        ymin = port.q(0.0001)
+        ymax = 1.05 * self.cap_table_total.Assets[0]
+        ax0.set(ylabel='Loss', xlabel='Non exceedance probability')
+        ax0.set(ylim=[ymin, ymax], yscale='linear')
+        ax1.set(ylim=[ymin, ymax], xlim=[0.8, 2 / (1 - self.cap_table_total.Adequacy[0])],
+                xscale='log', xlabel='Log return period')
+        ax0.legend(loc='upper left')
+        caption = f'(Z-TR-1) Figure (new): {kind} capital tranching with a {self.d2tc:.1%} debt ' \
+                    'to total capital limit.'
+        self._display_plot(f'Z-TR-1-{kind[0]}', f, caption)
 
     def show_similar_risks_graphs(self, base='gross', new='net'):
         """
@@ -2266,7 +1754,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         if 15 in chapters:
 
             # fig 15.2--15.7 (Twelve Plot)
-            self.twelve_plot()
+            self.case_twelve_plot()
 
             # fig 15.8, 15.9, 15.10
             logger.info("Figures 15.8, 15.9, 15.10")
@@ -2460,7 +1948,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         bitsgross = []
         for port in self.ports.values():
             # unlike
-            bitgross = stand_alone_pricing(port, self.roe_d, p=self.reg_p, kind='var')
+            bitgross = port.stand_alone_pricing(self.roe_d, p=self.reg_p, kind='var')
             bitgross = bitgross.swaplevel(0, 1).sort_index(ascending=[1, 0]).rename(
                 index={'traditional - no default': 'no default', f'sa {self.roe_d}': 'constant roe'})
             # if len(bitsgross) == 0:
@@ -2496,7 +1984,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         distortions = [self.ports['gross'].dists[dn] for dn in ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']]
         bit_apply_gross = []
         for port in self.ports.values():
-            temp = stand_alone_pricing(port, distortions, p=self.reg_p, kind='var')
+            temp = port.stand_alone_pricing(distortions, p=self.reg_p, kind='var')
             temp = temp.swaplevel(0, 1).sort_index(ascending=[1, 0])
             bit_apply_gross.append(temp.filter(regex='sa', axis=0).rename(index=distortion_namer))
         bit = pd.concat([bg.loc[['L', 'M', 'P', 'LR', 'Q', 'ROE', 'PQ', 'a']]
@@ -2625,22 +2113,22 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # print('audit exhibits done')
         self.make_boundss_p_stars(n_tps, n_s)
         process_memory()
-        logger.log(35, 'boundss and pstar done')
+        logger.info('boundss and pstar done')
         self.make_classic_pricing()
         process_memory()
-        logger.log(35, 'classic pricing done')
+        logger.info('classic pricing done')
         self.make_modern_monoline()
         process_memory()
-        logger.log(35, 'modern monoline done')
+        logger.info('modern monoline done')
         self.make_ad_comps()
         process_memory()
-        logger.log(35, 'ad comps done')
+        logger.info('ad comps done')
         self.apply_distortions(dnet, dgross)
         process_memory()
-        logger.log(35, 'apply distortions done')
+        logger.info('apply distortions done')
         self.make_bodoff_comparison()
         process_memory()
-        logger.log(35, 'Bodoff exhibits done')
+        logger.info('Bodoff exhibits done')
 
     @staticmethod
     def extract_image(p, ref, w=100, caption=''):
@@ -2657,191 +2145,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         return img_tag
 
 
-def check01(s):
-    """ add 0 1 at start end """
-    if 0 not in s:
-        s = np.hstack((0, s))
-    if 1 not in s:
-        s = np.hstack((s, 1))
-    return s
 
-
-def make_array(s, gs):
-    """ convert to np array and pad with 0 1 """
-    s = np.array(s)
-    gs = np.array(gs)
-    s = check01(s)
-    gs = check01(gs)
-    return np.array((s, gs)).T
-
-
-def convex_points(s, gs):
-    """
-    Extract the points that make the convex envelope, including 0 1
-
-    Testers::
-
-        %%sf 1 1 5 5
-
-        s_points, gs_points = [.001,.0011, .002,.003, 0.005, .008, .01], [0.002,.02, .03, .035, 0.036, .045, 0.05]
-        s_points, gs_points = [.001, .002,.003, .009, .011, 1],  [0.02, .03, .035, .05, 0.05, 1]
-        s_points, gs_points = [.001, .002,.003, .009, .01, 1],  [0.02, .03, .035, .0351, 0.05, 1]
-        s_points, gs_points = [0.01, 0.04], [0.03, 0.07]
-
-        points = make_array(s_points, gs_points)
-        ax.plot(points[:, 0], points[:, 1], 'x')
-
-        s_points, gs_points = convex_points(s_points, gs_points)
-        ax.plot(s_points, gs_points, 'r+')
-
-        ax.set(xlim=[-0.0025, .1], ylim=[-0.0025, .1])
-
-        hull = ConvexHull(points)
-        for simplex in hull.simplices:
-            ax.plot(points[simplex, 0], points[simplex, 1], 'k-', lw=.25)
-
-
-    """
-    points = make_array(s, gs)
-    hull = ConvexHull(points)
-    hv = hull.vertices[::-1]
-    hv = np.roll(hv, -np.argmin(hv))
-    return points[hv, :].T
-
-
-def calibrate_blends(self, a, premium, s_points, gs_points=None, spread_points=None, debug=False):
-    """
-    Input s values and gs values or (market) yield or spread.
-
-    A bond with prob s (small) of default is quoted with a yield (to maturity)
-    of r over risk free (e.g., a cat bond spread, or a corporate bond spread
-    over the appropriate Treasury). As a discount bond, the price is v = 1 - d.
-
-    B(s) = bid price for 1(U<s) (bond residual value)
-    A(s) = ask price for 1(U<s) (insurance policy)
-
-    By no arb A(s) + B(1-s) = 1.
-    By definition g(s) = A(s) (using LI so the particular U doesn't matter. Applied
-    to U = F(X)).
-
-    Let v = 1 / (1 + r) and d = 1 - v be the usual theory of interest quantities.
-
-    Hence B(1-s) = v = 1 - A(s) = 1 - g(s) and therefore g(s) = 1 - v = d.
-
-    The rate of risk discount δ and risk discount factor (nu) ν are defined so that
-    B(1-s) = ν * (1 - s), it is the extra discount applied to the actuarial value that
-    is bid for the bond. It is a function of s. Therefore ν = (1 - d) / (1 - s) =
-    price of bond / actuarial value of payment.
-
-    Then, g(s) = 1 - B(1-s) = 1 - ν (1 - s) = ν s + δ.
-
-    Thus, if return (i.e., market yield spreads) are input, they convert to
-    discount factors to define g points.
-
-    Blend can be defined by extrapolating the last points in a credit curve. If
-    that fails, increase the return on the highest s point and fill in with a
-    constant return to 1.
-
-    The ROE on the investment is not the promised return, because the latter does not
-    allow for default.
-
-    Set up to be a function of the Portfolio = self. Calibrated to hit premium at
-    asset level a. a must be in the index.
-
-        a = self.pricing_summary.at['a', kind]
-        premium = self.pricing_summary.at['P', kind]
-
-    method = extend or roe
-
-    Inpu
-
-    =====
-
-    blend_d0 is the Book's blend, with roe above the equity point
-    blend_d is calibrated to the same premium as the other distortions
-
-    method = extend if f_blend_extend or ccoc
-        ccoc = pick and equity point and back into its required roe. Results in a
-        poor fit to the calibration data
-
-        extend = extrapolate out the last slope from calibrtion data
-
-    Initially tried interpolating the bond yield curve up, but that doesn't work.
-    (The slope is too flat and it interpolates too far. Does not look like
-    a blend distortion.)
-    Now, adding the next point off the credit yield curve as the "equity"
-    point and solving for ROE.
-
-    If debug, returns more output, for diagnostics.
-
-    """
-    global logger
-
-    # corresponding gs values to s_points
-    if gs_points is None:
-        gs_points = 1 - 1 / (1 + np.array(spread_points))
-
-    # figure out the convex hull points out of input s, gs
-    s_points, gs_points = convex_points(s_points, gs_points)
-    if len(s_points) < 4:
-        raise ValueError('Input s,gs points do not generate enough separate points.')
-
-    # calibration prefob to compute rho
-    df = self.density_df
-    bs = self.bs
-    # survival function points
-    S = (1 - df.p_total[0:a-bs].cumsum())
-
-    def pricer(g):
-        nonlocal S, bs
-        return np.sum(g(S)) * bs
-
-    # figure the four extreme values:
-    # extrapolate or interp to 0 and l or r end
-    ans = []
-    dists = {}
-    for left in ['e', '0']:
-        for right in ['e', '1']:
-            s = s_points.copy()
-            gs = gs_points.copy()
-            if left == 'e':
-                s = s[1:]
-                gs = gs[1:]
-            if right == 'e':
-                s = s[:-1]
-                gs = gs[:-1]
-            new_g = interp1d(s, gs, bounds_error=False, fill_value='extrapolate')
-            dists[(left, right)] = new_g
-            new_p = pricer(new_g)
-            ans.append((left, right, new_p, new_p > premium))
-
-    # horrible but small and short...
-    df = pd.DataFrame(ans, columns=['left', 'right', 'premium', 'gt'])
-    wts = {}
-    wdists = {}
-    for i, j in [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]:
-        pi = df.iloc[i, 2]
-        pj = df.iloc[j, 2]
-        if min(pi, pj) <= premium <= max(pi, pj):
-            il = df.iat[i, 0]
-            ir = df.iat[i, 1]
-            jl = df.iat[j, 0]
-            jr = df.iat[j, 1]
-            w = (premium - pj) / (pi - pj)
-            wts[(il, ir, jl, jr)] = w
-            # spoon feed into a dummy distortion
-            temp = Distortion('ph', .599099)
-            temp.name = 'blend'
-            # temp.display_name  = f'Extension ({il}, {ir}), ({jl}, {jr})'
-            temp.g = lambda x: (
-                    w * dists[(il, ir)](x) + (1 - w) * dists[(jl, jr)](x))
-            temp.g_inv = None
-            wdists[(il, ir, jl, jr)] = temp
-
-    if debug is True:
-        return wdists, df, pricer, dists, wts
-    else:
-        return wdists
 
 def extract_sort_order(summaries, _varlist_, classical=False):
     '''
@@ -2988,25 +2292,6 @@ def show3d(df, height=600, xlabel="p_upper", ylabel="p_lower", zlabel="Price", i
     htmlCode = "<iframe srcdoc='" + visCode + "' width='100%' height='" + str(
         height) + "px' style='border:0;' scrolling='no'> </iframe>"
     display(HTML(htmlCode))
-
-
-def plot_max_min(self, ax):
-    """
-    Extracted from bounds, self=Bounds object
-    """
-    ax.fill_between(self.cloud_df.index, self.cloud_df.min(1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-    self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='w')
-    self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=0.5, ls='-', c='w')
-
-
-def plot_lee(port, ax, c, lw=2):
-    """
-    Lee diagram by hand
-    """
-    p_ = np.linspace(0, 1, 1001)
-    qs = [port.q(p) for p in p_]
-    ax.step(p_, qs, lw=lw, c=c)
-    ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, max(qs) + .05], title=f'Lee Diagram {port.name}', aspect='equal')
 
 
 class ClassicalPremium(object):
@@ -3246,18 +2531,6 @@ class ClassicalPremium(object):
         return pd.DataFrame(ans, columns=['n', 'ea', 'min'])
 
 
-# code from common_scripts
-#  `enhance_portfolio`
-#  `TensePortfolio`
-#  `RelaxedPortfolio`
-#  `pricing`
-#  `twelve_plot`
-#  `bivariate_density_plots`
-#  `ch04_macro_market_stats` --> macro_market_graphs
-#  `Bounds` class
-#  `stand_alone_pricing`
-
-
 def macro_market_graphs(axi, port, dn, rp):
     """
     Create more succinct 4x4 graph to illustrate macro market structure and result, LR, P:S and ROE, etc.
@@ -3339,901 +2612,6 @@ def macro_market_graphs(axi, port, dn, rp):
     a.plot(xs, delta, ':', label='layer')
     a.set(ylim=[-0.01, 1.01], title='Discount rate $\\delta$')
     a.legend(loc='upper right')
-
-
-def enhance_portfolio(port, force=False):
-    """
-    Add all the enhanced exhibits methods to port.
-
-    Methods defined within this function.
-
-    From common_scripts.py
-    June 2022 took out options that needed a jinja template (reserve story etc.)
-
-    Added Methods
-
-    Exhibit creators (EX_name)
-    --------------------------
-        1. basic_loss_statistics
-        2. distortion_information
-        3. distortion_calibration
-        4. premium_capital
-        5. multi_premium_capital
-        6. accounting_economic_balance_sheet
-            compares best estimate, default adjusted, risk adjusted values
-
-        Exhibits 7-9 are for reserving
-        DROPPED 7. margin_earned (by year)
-        DROPPED 8. year_end_option_analysis (implied stand alone vs pooled analysis)
-
-        Run a distortion and compare allocations
-        9. compare_allocations
-            creates:
-                EX_natural_allocation_summary
-                EX_allocated_capital_comparison
-                EX_margin_comparison
-                EX_return_on_allocated_capital_comparison
-
-    Exhibit Utilities
-    -----------------
-        10. make_all
-            runs all of 1-9 with sensible defaults
-
-        11. show
-            shows all exhibits, with exhibit title
-            uses `self.dir` to find all attributes EX_
-
-        12. qi
-            quick info: the basic_loss_stats plus a density plot
-
-    Graphics
-    --------
-        DROPPED 13. density_plot
-        14. profit_segment_plot
-            plots given lines S, gS and shades the profit segment between the two
-            lines plotted on a stand-alone basis; optional transs allows shifting up/down
-        15. natural_profit_segment_plot
-            plot kappa = EX_i|X against F and gF
-            compares the natural allocation with stand alone pricing
-        DROPPED 16. alpha_beta_four_plot
-            alpha, beta; layer and cumulative margin plots
-        DROPPED 17. alpha_beta_four_plot2 (for two line portfolios )
-            lee and not lee orientations (lee orientation hard to parse)
-            S, aS; gS, b gS separately by line
-            S, aS, gS, bGS  for each line [these are most useful plots]
-        18. biv_contour_plot
-            bivariate plot of marginals with some x+y=constant lines
-        DROPPED 19. reserve_story_md
-
-    Reserve Template Populators
-    ---------------------------
-        DROPPED 20. reserve_runoff_md
-        DROPPED 21. reserve_two_step_md
-        22. nice_program
-
-    Other
-    -----
-        DROPPED 23. show_md
-        DROPPED 24. report_args
-        DROPPED 25. save
-        26. density_sample: stratified sample from density_df
-
-
-    Sample Runner
-    =============
-    ```python
-
-        from common_header import *
-        get_ipython().run_line_magic('config', "InlineBackend.figure_format = 'svg'")
-        import common_scripts as cs
-
-        port = cs.TensePortfolio('''
-        port CAS
-            agg Thick 5000 loss 100 x 0 sev lognorm 10 cv 20 mixed sig 0.35 0.6
-            agg Thin 5000 loss 100 x 0 sev lognorm 10 cv 20 poisson
-        ''', dist_name='wang', a=20000, ROE=0.1, log2=16, bs=1, padding=2)
-
-        # port.make_all() will update all exhibits with sensible defaults
-
-        port.basic_loss_statistics(p=.9999)
-        display(port.EX_basic_loss_statistics)
-
-        port.distortion_information()
-        display(port.EX_distortion_information)
-
-        port.distortion_calibration()
-        display(port.EX_distortion_calibration)
-
-        port.premium_capital(a=20000)
-        display(port.EX_premium_capital)
-
-        port.multi_premium_capital(As=[15000, 20000, 25000])
-        display(port.EX_multi_premium_capital)
-
-        port.accounting_economic_balance_sheet(a=20000)
-        display(port.EX_accounting_economic_balance_sheets)
-
-        port.margin_earned(a=20000)
-        display(port.EX_margin_earned)
-
-        port.year_end_option_analysis('Thin', a=20000)
-        display(port.EX_year_end_option_analysis)
-
-        port.compare_allocations('wang', ROE=0.1, a=20000)
-        display(port.EX_natural_allocation_summary)
-        display(port.EX_allocated_capital_comparison)
-        display(port.EX_margin_comparison)
-        display(port.EX_return_on_allocated_capital_comparison)
-
-        port.show()
-
-        port.qi()
-
-        f, axs = smfig(1,2, (7,3))
-        a1, a2 = axs.flat
-        port.density_plot(f, a1, a2, p=0.999999)
-
-        smfig = grt.FigureManager(cycle='c', color_mode='c', legend_font='medium')
-        f, a = smfig(1,1,(4,6))
-        port.profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
-                                     [2,0,1,0], [0,0,0], 'ph')
-
-        f, a = smfig(1,1,(6,10))
-        port.natural_profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
-                                     [2,0,1,0], [0,0,0])
-        port.profit_segment_plot(a, 0.999, ['Thick', 'Thin'],
-                                     [3,4], [0,0], 'wang')
-        a.legend()
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot(axs, 20000)
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot2(axs, 20000, 20000, 'xlee')
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot2(axs, 20000, 20000, 'lee')
-
-        aug_df = port.augmented_df
-        f, axs = smfig(1,2, (10,5), sharey=True)
-        a1, a2 = axs.flat
-        bigx = 20000
-        bit = aug_df.loc[0:, :].filter(regex='exeqa_(T|t)').copy()
-        bit.loc[bit.exeqa_Thick==0, ['exeqa_Thick', 'exeqa_Thin']] = np.nan
-        bit.rename(columns=port.renamer).sort_index(1).plot(ax=a1)
-        a1.set(xlim=[0,bigx], ylim=[0,bigx], xlabel='Total Loss', ylabel="Conditional Line Loss");
-        a1.set(aspect='equal', title='Conditional Expectations\nBy Line')
-        port.biv_contour_plot(f, a2, 5, bigx, 100, log=False, cmap='viridis_r', min_density=1e-12)
-
-    ```
-    force = do even if exist...force an update
-    """
-    if not force and getattr(port, 'distortion_information', None) is not None:
-        # port has exhibit methods enabled
-        return
-
-    if type(port) == type:
-        # set for the agg.Portfolio class - all objects new and existing
-        logging.info('Enhancing agg.Portfolio class')
-
-        def add_method(func):
-            setattr(port, func.__name__, func)
-
-    elif isinstance(port, Portfolio):
-        # set for just one instance
-        logging.info(f'Enhancing just this Portfolio instance, called {port.name}')
-
-        def add_method(func):
-            setattr(port, func.__name__, types.MethodType(func, port))
-
-        def add_method(func):
-            setattr(port, func.__name__, types.MethodType(func, port))
-
-    else:
-        raise ValueError(f'Item of type {type(port)} unexpected passed to add_enhanced_exhibit_methods. '
-                         'Expecting agg.Portfolio class or an instance.')
-
-    port.line_name_pipe = "|".join(port.line_names_ex)
-
-    # namer helper classes
-    port.premium_capital_renamer = {
-        'Assets': "0. Assets",
-        'T.A': '1. Allocated assets',
-        'T.P': '2. Market value liability',
-        'T.L': '3. Expected incurred loss',
-        'T.M': '4. Margin',
-        'T.LR': '5. Loss ratio',
-        'T.Q': '6. Allocated equity',
-        'T.ROE': '7. Cost of allocated equity',
-        'T.PQ': '8. Premium to surplus ratio',
-        'EPD': '9. Expected pol holder deficit'
-    }
-
-    def basic_loss_statistics(self, p=0.995, lines=None, line_names=None, deets=True):
-        """
-        mean, CV, skew, curt and some percentiles
-        optionally add additional p quantiles
-
-        lines = include not these lines to right with names as given
-
-        """
-        cols = ['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'Skew', 'EmpKurt', 'P99.0', 'P99.6']
-        if not deets:
-            for i in ['EmpMean', 'MeanErr', 'EmpCV', 'CVErr']:
-                cols.remove(i)
-        bls = self.audit_df[cols].T
-        if p not in [.99, .996]:
-            bls.loc[f'P{100 * p:.4f}', :] = \
-                [ag.q(p) for ag in self.agg_list] + [self.q(p)]
-
-        if lines:
-            if line_names is None:
-                line_names = [f'Not {line}' for line in lines]
-            for line, line_name in zip(lines, line_names):
-                # add not line which becomes the end of period reserves
-                xs = self.density_df.loss
-                ps = self.density_df[f'ημ_{line}']
-                t = xs * ps
-                ex1 = np.sum(t)
-                t *= xs
-                ex2 = np.sum(t)
-                t *= xs
-                ex3 = np.sum(t)
-                t *= xs
-                ex4 = np.sum(t)
-                m, cv, s = agg.MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
-                # empirical kurtosis
-                kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
-                ans = np.zeros(3)
-                temp = ps.cumsum()
-                for i, p in enumerate([0.99, 0.995, p]):
-                    ans[i] = (temp > p).idxmax()
-                newcol = [m, cv, s, kurt] + list(ans)
-                bls[line_name] = newcol[:len(bls)]
-
-        self.EX_basic_loss_statistics = bls.rename(index=dict(EmpKurt='Kurt'),
-                                                   columns=self.line_renamer)
-
-    add_method(basic_loss_statistics)
-
-    def distortion_information(self):
-        """
-        summary of the distortion calibration information
-        """
-        self.EX_distortion_information = self.dist_ans.reset_index(drop=False). \
-            sort_values('method')[['method', 'param']]. \
-            rename(columns=dict(method='Distortion', param='Shape Parameter')). \
-            set_index('Distortion').rename(index=agg.Distortion._distortion_names_)
-
-    add_method(distortion_information)
-
-    def distortion_calibration(self):
-
-        """
-        one line summary from the distortion calibration
-        was premium_capital_summary
-        """
-
-        self.EX_distortion_calibration = self.dist_ans.xs(self.distortion.name, level=2).iloc[:, :-1]
-        self.EX_distortion_calibration = self.EX_distortion_calibration.reset_index(drop=False)
-        self.EX_distortion_calibration.columns = ['$a$', 'LR', '$S(a)$', '$\\iota$', '$\\delta$', '$\\nu$',
-                                                  '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg', '$\\bar Q(a)$',
-                                                  'ROE', 'Shape']
-        # delta and nu kinda useless
-        self.EX_distortion_calibration = self.EX_distortion_calibration[
-            ['Shape', '$a$', 'LR', '$S(a)$', '$\\iota$', '$\\nu$',
-             '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg',
-             '$\\bar Q(a)$', 'ROE']]
-        self.EX_distortion_calibration.loc[0, 'Distortion'] = self.distortion.name
-        self.EX_distortion_calibration = self.EX_distortion_calibration.set_index('Distortion')
-
-    add_method(distortion_calibration)
-
-    def premium_capital(self, a=0, p=0):
-        """
-        at a if given else p level of capital
-
-        pricing story allows two asset levels...handle that with a concat
-
-        was premium_capital_detail
-
-        """
-        a, p = self.set_a_p(a, p)
-
-        if getattr(self, '_raw_premium_capital', None) is not None and self.last_a == a:
-            # done already
-            return
-
-        # else recompute
-
-        # story == run off
-        # pricing report from adf
-        dm = self.augmented_df.filter(regex=f'T.[MPQLROE]+.({self.line_name_pipe})').loc[[a]].T
-        dm.index = dm.index.str.split('_', expand=True)
-        self._raw_premium_capital = dm.unstack(1)
-        self._raw_premium_capital = self._raw_premium_capital.droplevel(axis=1, level=0)  # .drop(index=['Assets'])
-        self._raw_premium_capital.loc['T.A', :] = self._raw_premium_capital.loc['T.Q', :] + \
-                                                  self._raw_premium_capital.loc['T.P', :]
-        self._raw_premium_capital.index.name = 'Item'
-        self.EX_premium_capital = self._raw_premium_capital. \
-            rename(index=self.premium_capital_renamer, columns=self.line_renamer).sort_index()
-        self.last_a = a
-
-    add_method(premium_capital)
-
-    def multi_premium_capital(self, As, keys=None):
-        """
-        concatenate multiple prem_capital exhibits
-
-        """
-        if keys is None:
-            keys = [f'$a={i:.1f}$' for i in As]
-
-        ans = []
-        for a in As:
-            self.premium_capital(a)
-            ans.append(self.EX_premium_capital.copy())
-        self.EX_multi_premium_capital = pd.concat(ans, axis=1, keys=keys, names=['Assets', "Line"])
-
-    add_method(multi_premium_capital)
-
-    def accounting_economic_balance_sheet(self, a=0, p=0):
-        """
-        story version assumes line 0 = reserves and 1 = prospective....other than that identical
-
-        usual a and p rules
-        """
-
-        # check for update
-        self.premium_capital(a, p)
-
-        aebs = pd.DataFrame(0.0, index=self.line_names_ex + ['Assets', 'Equity'],
-                            columns=['Statutory', 'Objective', 'Market', 'Difference'])
-        slc = slice(0, len(self.line_names_ex))
-        aebs.iloc[slc, 0] = self.audit_df['Mean'].values
-        aebs.iloc[slc, 1] = self._raw_premium_capital.loc['T.L']
-        aebs.iloc[slc, 2] = self._raw_premium_capital.loc['T.P']
-        aebs.loc['Assets', :] = self._raw_premium_capital.loc['T.A', 'total']
-        aebs.loc['Equity', :] = aebs.loc['Assets'] - \
-                                aebs.loc['total']
-        aebs[
-            'Difference'] = aebs.Market - aebs.Objective
-        # put in accounting order
-        aebs = aebs.iloc[
-            [-2] + list(range(len(self.line_names) + 1)) + [-1]]
-        aebs.index.name = 'Item'
-        self.EX_accounting_economic_balance_sheet = aebs.rename(index=self.line_renamer)
-
-    add_method(accounting_economic_balance_sheet)
-
-    def compare_allocations(self, verbose=False):
-
-        """
-
-        CAS-ASTIN talks...and general comparison of ROE, alloc capital etc.
-        cycle round -
-
-        """
-        # utility
-        if verbose:
-            qd = lambda x: display(x.style)  # .format('{:.5g}'))
-        else:
-            qd = lambda x: 1
-
-        # use last calibration / run
-        dist_name = self.distortion.name
-        a = self.ad_ans.audit_df.at['a', 'stat']
-
-        display(HTML('<h3>Audit</h3>'))
-        qd(self.ad_ans.audit_df)
-
-        # double check
-        a1 = float(self.ad_ans.audit_df.loc['a_cal'])
-        if a1 != a:
-            print('Warning: computed and input a values disagree\n' * 3, f'input {a}\ncalcd {a1}')
-
-        # hack off exhibits
-        display(HTML(f'<h3>Natural Allocation, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.loc[f'Dist {dist_name}']
-        bit.index.name = None
-        self.EX_natural_allocation_summary = bit.rename(
-            index=dict(L='Loss', LR='Loss Ratio', M='Margin', P='Premium', PQ='P/S Ratio', Q='Equity'),
-            columns=self.line_renamer).copy()
-        self.EX_natural_allocation_summary.loc['Assets', :] = self.EX_natural_allocation_summary.loc['Premium'] + \
-                                                              self.EX_natural_allocation_summary.loc['Equity']
-        qd(self.EX_natural_allocation_summary)
-
-        display(HTML(f'<h3>Allocated Capital Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('Q', level=1)
-        bit.index.name = None
-        self.EX_allocated_capital_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_allocated_capital_comparison)
-
-        display(HTML(f'<h3>Margin Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('M', level=1)
-        bit.index.name = None
-        self.EX_margin_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_margin_comparison)
-
-        display(HTML(f'<h3>Loss Ratio Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('LR', level=1)
-        bit.index.name = None
-        self.EX_loss_ratio_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_loss_ratio_comparison)
-
-        display(HTML(f'<h3>ROE Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('ROE', level=1)
-        bit.index.name = None
-        self.EX_return_on_allocated_capital_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_return_on_allocated_capital_comparison)
-
-    add_method(compare_allocations)
-
-    # def cotvar(self, p, ROE): folded into portfolio object
-
-    def make_all(self, p=0, a=0, As=None, ROE=0.1, mass_hints=None):
-        """
-        make all exhibits with sensible defaults
-        if not entered, paid line is selected as the LAST line
-
-        """
-        a, p = self.set_a_p(a, p)
-
-        self.basic_loss_statistics(p)
-
-        # exhibits that require a distortion
-        if self.distortion is not None:
-            self.distortion_information()
-            self.distortion_calibration()
-            self.premium_capital(a=a, p=p)
-            if As:
-                self.multi_premium_capital(As)
-            self.accounting_economic_balance_sheet(a=a, p=p)
-
-    add_method(make_all)
-
-    def show(self, fmt='{:.5g}'):
-        """
-        show all the made exhibits
-        """
-        display(HTML(f'<h2>Exhibits for {self.name.replace("_", " ").title()} Portfolio</h2>'))
-        for x in dir(self):
-            if x[0:3] == 'EX_':
-                ob = getattr(self, x)
-                if isinstance(ob, pd.DataFrame):
-                    # which they all will be...
-                    display(HTML(f'<h3>{x[3:].replace("_", " ").title()}</h3>'))
-                    display(ob.style.format(fmt, subset=ob.select_dtypes(np.number).columns))
-                    display(HTML(f'<hr>'))
-
-    add_method(show)
-
-    def profit_segment_plot(self, a, p, line_names, colors, transs, dist_name):
-        """
-        add all the lines, optionally translate
-        requested distortion is applied on the fly
-
-        """
-        dist = self.dists[dist_name]
-        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        for line, cn, trans in zip(line_names, colors, transs):
-            c = col_list[cn]
-            f1 = self.density_df[f'p_{line}'].cumsum()
-            idx = (f1 < p) * (f1 > 1.0 - p)
-            f1 = f1[idx]
-            gf = 1 - dist.g(1 - f1)
-            x = self.density_df.loss[idx] + trans
-            a.plot(gf, x, '-', c=c, label=f'Risk Adj {line}' if trans == 0 else None)
-            a.plot(f1, x, '--', c=c, label=line if trans == 0 else None)
-            if trans == 0:
-                a.fill_betweenx(x, gf, f1, color=c, alpha=0.5)
-            else:
-                a.fill_betweenx(x, gf, f1, color=c, edgecolor='black', alpha=0.5, hatch='+')
-        a.set(ylim=[0, self.q(p)])
-        a.legend(loc='upper left')
-
-    add_method(profit_segment_plot)
-
-    def natural_profit_segment_plot(self, a, p, line_names, colors, transs):
-        """
-        plot the natural allocations
-        between 1-p and p th percentiles
-        optionally translate a line
-        works with augmented_df, no input dist
-
-        """
-        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        lw, up = self.q(1 - p), self.q(p)
-        # common extract for all lines
-        bit = self.augmented_df.query(f' {lw} <= loss <= {up} ')
-        F = bit[f'F']
-        gF = bit[f'gF']
-        x = bit.loss
-        for line, cn, trans in zip(line_names, colors, transs):
-            c = col_list[cn]
-            ser = bit[f'exeqa_{line}']
-            a.plot(F, ser, ls='dashed', c=c)
-            a.plot(gF, ser, c=c)
-            if trans == 0:
-                a.fill_betweenx(ser + trans, gF, F, color=c, alpha=0.5, label=line)
-            else:
-                a.fill_betweenx(ser, gF, F, color=c, alpha=0.5, label=line)
-        a.set(ylim=[0, self.q(p)])
-        a.legend(loc='upper left')
-        # a.set(title=self.distortion)
-
-    add_method(natural_profit_segment_plot)
-
-    def density_sample(self, n=20, reg="loss|p_|exeqa_"):
-        """
-        sample of equally likely points from density_df with interesting columns
-        reg - regex to select the columns
-        """
-        ps = np.linspace(0.001, 0.999, 20)
-        xs = [self.q(i) for i in ps]
-        return self.density_df.filter(regex=reg).loc[xs, :].rename(columns=self.renamer)
-
-    add_method(density_sample)
-
-    def biv_contour_plot(self, fig, ax, min_loss, max_loss, jump,
-                         log=True, cmap='Greys', min_density=1e-15, levels=30, lines=None, linecolor='w',
-                         colorbar=False, normalize=False, **kwargs):
-        """
-        Nake contour plot of line A vs line B
-        Assumes port only has two lines
-
-        Works with an extract density_df.loc[np.arange(min_loss, max_loss, jump), densities]
-        (i.e., jump is the stride). Jump = 100 * bs is not bad...just think about how big the outer product will get!
-
-        Param:
-
-        min_loss  density for each line is sampled at min_loss:max_loss:jump
-        max_loss
-        jump
-        log
-        cmap
-        min_density: smallest density to show on underlying log region; not used if log
-        levels: number of contours or the actual contours if you like
-        lines: iterable giving specific values of k to plot X+Y=k
-        color_bar: show color bar
-        normalize: if true replace Z with Z / sum(Z)
-        kwargs passed to contourf (e.g., use for corner_mask=False, vmin,vmax)
-
-        optionally could deal with diagonal lines, countour levels etc.
-        originally from ch09
-        """
-        # careful about origin when big prob of zero loss
-        npts = np.arange(min_loss, max_loss, jump)
-        ps = [f'p_{i}' for i in self.line_names]
-        bit = self.density_df.loc[npts, ps]
-        n = len(bit)
-        Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
-        if normalize:
-            Z = Z / np.sum(Z)
-        X, Y = np.meshgrid(bit.index, bit.index)
-
-        if log:
-            z = np.log10(Z)
-            mask = np.zeros_like(z)
-            mask[z == -np.inf] = True
-            mz = np.ma.array(z, mask=mask)
-            cp = ax.contourf(X, Y, mz, levels=levels, cmap=cmap, **kwargs)
-            # cp = ax.contourf(X, Y, mz, levels=np.linspace(-12, 0, levels), cmap=cmap, **kwargs)
-            if colorbar:
-                cb = fig.colorbar(cp, fraction=.1, shrink=0.5, aspect=10)
-                cb.set_label('Log10(Density)')
-        else:
-            mask = np.zeros_like(Z)
-            mask[Z < min_density] = True
-            mz = np.ma.array(Z, mask=mask)
-            cp = ax.contourf(X, Y, mz, levels=levels, cmap=cmap, **kwargs)
-            if colorbar:
-                cb = fig.colorbar(cp)
-                cb.set_label('Density')
-        # put in X+Y=c lines
-        if lines is None:
-            lines = np.arange(max_loss / 4, 2 * max_loss, max_loss / 4)
-        try:
-            for x in lines:
-                ax.plot([0, x], [x, 0], lw=.75, c=linecolor, label=f'Sum = {x:,.0f}')
-        except:
-            pass
-
-        title = (f'Bivariate Log Density Contour Plot\n{self.name.replace("_", " ").title()}'
-                 if log
-                 else f'Bivariate Density Contour Plot\n{self.name.replace("_", " ")}')
-
-        # previously limits set from min_loss, but that doesn't seem right
-        ax.set(xlabel=f'Line {self.line_names[0]}',
-               ylabel=f'Line {self.line_names[1]}',
-               xlim=[-max_loss / 50, max_loss],
-               ylim=[-max_loss / 50, max_loss],
-               title=title,
-               aspect=1)
-
-        # for post-processing
-        self.X = X
-        self.Y = Y
-        self.Z = Z
-
-    add_method(biv_contour_plot)
-
-    def nice_program(self, wrap_col=90):
-        """
-        return wrapped version of port program
-        :return:
-        """
-        return fill(self.program, wrap_col, subsequent_indent='\t\t', replace_whitespace=False)
-
-    add_method(nice_program)
-
-    def short_renamer(self, prefix='', postfix=''):
-        if prefix:
-            prefix = prefix + '_'
-        if postfix:
-            postfix = '_' + postfix
-
-        knobble = lambda x: 'Total' if x == 'total' else x
-
-        return {f'{prefix}{i}{postfix}': knobble(i).title() for i in self.line_names_ex}
-
-    add_method(short_renamer)
-
-
-def twelve_plot(self, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0, biv_log=True, legend_font=0,
-                contour_scale=10, sort_order=None, kind='two', cmap='viridis'):
-    """
-    Twelve-up plot for ASTIN paper and book, by rc index:
-
-    Greys for grey color map
-
-    11 density
-    12 log density
-    13 biv density plot
-
-    21 kappa
-    22 alpha (from alpha beta plot 4)
-    23 beta (?with alpha)
-
-    row 3 = line A, row 4 = line B from alpha beta four 2
-     1 S, gS, aS, bgS
-
-    32 margin
-    33 shift margin
-    42 cumul margin
-    43 natural profit compare
-
-    Args
-    ====
-    self = portfolio or enhanced portfolio object
-    p control xlim of plots via quantile; used if xmax=0
-    p2 controls ylim for 33 and 34: stand alone M and natural M; used if ymax2=0
-    biv_log - bivariate plot on log scale
-    legend_font - fine tune legend font size if necessary
-    sort_order = plot sorts by column and then .iloc[:, sort_order], if None [1,2,0]
-
-    from common_scripts.py
-
-    """
-
-    a11, a12, a13, a21, a22, a23, a31, a32, a33, a41, a42, a43 = axs.flat
-    col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    lss = ['solid', 'dashed', 'dotted', 'dashdot']
-
-    if sort_order is None:
-        sort_order = [1, 2, 0]  # range(len(self.line_names_ex))
-
-    if xmax == 0:
-        xmax = self.q(p)
-    ymax = xmax
-
-    # density and log density
-
-    temp = self.density_df.filter(regex='p_').rename(columns=self.short_renamer('p')).sort_index(axis=1).loc[:xmax]
-    temp = temp.iloc[:, sort_order]
-    temp.index.name = 'Loss'
-    l1 = temp.plot(ax=a11, lw=1)
-    l2 = temp.plot(ax=a12, lw=1, logy=True)
-    l1.lines[-1].set(linewidth=1.5)
-    l2.lines[-1].set(linewidth=1.5)
-    a11.set(title='Density')
-    a12.set(title='Log density')
-    a11.legend()
-    a12.legend()
-
-    # biv den plot
-    if kind == 'two':
-        # biv den plot
-        # min_loss, max_loss, jump = 0, xmax, (2 ** (self.log2 - 8)) * self.bs
-        xmax = self.snap(xmax)
-        min_loss, max_loss, jump = 0, xmax, self.snap(xmax / 255)
-        min_density = 1e-15
-        levels = 30
-        color_bar = False
-
-        # careful about origin when big prob of zero loss
-        # handle for discrete distributions
-        ps = [f'p_{i}' for i in self.line_names]
-        title = 'Bivariate density'
-        query = ' or '.join([f'`p_{i}` > 0' for i in self.line_names])
-        if self.density_df.query(query).shape[0] < 512:
-            logger.info('Contour plot has few points...going discrete...')
-            bit = self.density_df.query(query)
-            n = len(bit)
-            Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
-            X, Y = np.meshgrid(bit.index, bit.index)
-            norm = mpl.colors.Normalize(vmin=-10, vmax=np.log10(np.max(Z.flat)))
-            cm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-            mapper = cm.to_rgba
-            a13.scatter(x=X.flat, y=Y.flat, s=1000 * Z.flatten(), c=mapper(np.log10(Z.flat)))
-            # edgecolor='C2', lw=1, facecolors='none')
-            a13.set(xlim=[min_loss - (max_loss - min_loss) / 10, max_loss],
-                    ylim=[min_loss - (max_loss - min_loss) / 10, max_loss])
-
-        else:
-            npts = np.arange(min_loss, max_loss, jump)
-            bit = self.density_df.loc[npts, ps]
-            n = len(bit)
-            Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
-            Z = Z / np.sum(Z)
-            X, Y = np.meshgrid(bit.index, bit.index)
-
-            if biv_log:
-                z = np.log10(Z)
-                mask = np.zeros_like(z)
-                mask[z == -np.inf] = True
-                mz = np.ma.array(z, mask=mask)
-                cp = a13.contourf(X, Y, mz, levels=np.linspace(-17, 0, levels), cmap=cmap)
-                if color_bar:
-                    cb = fig.colorbar(cp)
-                    cb.set_label('Log10(Density)')
-            else:
-                mask = np.zeros_like(Z)
-                mask[Z < min_density] = True
-                mz = np.ma.array(Z, mask=mask)
-                cp = a13.contourf(X, Y, mz, levels=levels, cmap=cmap)
-                if color_bar:
-                    cb = fig.colorbar(cp)
-                    cb.set_label('Density')
-            a13.set(xlim=[min_loss, max_loss], ylim=[min_loss, max_loss])
-
-        # put in X+Y=c lines
-        lines = np.arange(contour_scale / 4, 2 * contour_scale + 1, contour_scale / 4)
-        logger.debug(f'Contour lines based on {contour_scale} gives {lines}')
-        for x in lines:
-            a13.plot([0, x], [x, 0], ls='solid', lw=.35, c='k', alpha=0.5, label=f'Sum = {x:,.0f}')
-
-        a13.set(xlabel=f'Line {self.line_names[0]}',
-                ylabel=f'Line {self.line_names[1]}',
-                title=title,
-                aspect=1)
-    else:
-        # kind == 'three' plot survival functions...bivariate plots elsewhere
-        l1 = (1 - temp.cumsum()).plot(ax=a13, lw=1)
-        l1.lines[-1].set(linewidth=1.5)
-        a13.set(title='Survival Function')
-        a13.legend()
-
-    # kappa
-    bit = self.density_df.loc[:xmax]. \
-        filter(regex=f'^exeqa_({self.line_name_pipe})$')
-    bit = bit.iloc[:, sort_order]
-    bit.rename(columns=self.short_renamer('exeqa')).replace(0, np.nan). \
-        sort_index(axis=1).iloc[:, sort_order].plot(ax=a21, lw=1)
-    a21.set(title='$\\kappa_i(x)=E[X_i\\mid X=x]$')
-    # ugg for ASTIN paper example
-    # a21.set(xlim=[0,5], ylim=[0,5])
-    a21.set(xlim=[0, xmax], ylim=[0, xmax], aspect='equal')
-    a21.legend(loc='upper left')
-
-    # alpha and beta
-    aug_df = self.augmented_df
-    aug_df.filter(regex=f'exi_xgta_({self.line_name_pipe})'). \
-        rename(columns=self.short_renamer('exi_xgta')). \
-        sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a22, lw=1)
-    for ln, ls in zip(a22.lines, lss[1:]):
-        ln.set_linestyle(ls)
-    a22.legend()
-    a22.set(xlim=[0, xmax], title='$\\alpha_i(x)=E[X_i/X\\mid X>x]$');
-
-    bit = aug_df.query(f'loss < {xmax}').filter(regex=f'exi_xgtag?_({self.line_name_pipe})')
-    bit.rename(columns=self.short_renamer('exi_xgtag')). \
-        sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a23)
-    for i, l in enumerate(a23.lines[len(self.line_names):]):
-        if l.get_label()[0:3] == 'exi':
-            a23.lines[i].set(linewidth=2, ls=lss[1 + i])
-            l.set(color=f'C{i}', linestyle=lss[1 + i], linewidth=1,
-                  alpha=.5, label=None)
-    a23.legend(loc='upper left');
-    a23.set(xlim=[0, xmax], title="$\\beta_i(x)=E_{Q}[X_i/X \\mid X> x]$");
-
-    aug_df.filter(regex='M.M').rename(columns=self.short_renamer('M.M')). \
-        sort_index(axis=1).iloc[:, sort_order].plot(ax=a32, lw=1)
-    a32.set(xlim=[0, xmax], title='Margin density $M_i(x)$')
-
-    aug_df.filter(regex='T.M').rename(columns=self.short_renamer('T.M')). \
-        sort_index(axis=1).iloc[:, sort_order].plot(ax=a42, lw=1)
-    a42.set(xlim=[0, xmax], title='Margin $\\bar M_i(x)$');
-
-    # by line S, gS, aS, bgS
-    adf = self.augmented_df.loc[:xmax]
-    if kind == 'two':
-        zipper = zip(range(2), sorted(self.line_names), [a31, a41])
-    else:
-        zipper = zip(range(3), sorted(self.line_names), [a31, a41, a33])
-    for i, line, a in zipper:
-        a.plot(adf.loss, adf.S, c=col_list[2], ls=lss[1], lw=1, alpha=0.5, label='$S$')
-        a.plot(adf.loss, adf.gS, c=col_list[2], ls=lss[0], lw=1, alpha=0.5, label='$g(S)$')
-        a.plot(adf.loss, adf.S * adf[f'exi_xgta_{line}'], c=col_list[i], ls=lss[1], lw=1, label=f'$\\alpha S$ {line}')
-        a.plot(adf.loss, adf.gS * adf[f'exi_xgtag_{line}'], c=col_list[i], ls=lss[0], lw=1,
-               label=f"$\\beta g(S)$ {line}")
-        a.set(xlim=[0, ymax])
-
-        a.set(title=f'Line = {line}')
-        a.legend()
-        a.set(xlim=[0, ymax])
-        a.legend(loc='upper right')
-
-    alpha = 0.05
-    if kind == 'two':
-        # three mode this is used for the third line
-        # a33 from profit segment plot
-        # special ymax for last two plots
-        ymax = ymax2 if ymax2 > 0 else self.q(p2)
-        # if could have changed
-        p2 = self.cdf(ymax)
-        for cn, ln in enumerate(sort_order):
-            line = sorted(self.line_names_ex)[ln]
-            c = col_list[cn]
-            s = lss[cn]
-            # print(line, s)
-            f1 = self.density_df[f'p_{line}'].cumsum()
-            idx = (f1 < p2) * (f1 > 1.0 - p2)
-            f1 = f1[idx]
-            gf = 1 - self.distortion.g(1 - f1)
-            x = self.density_df.loss[idx]
-            a33.plot(gf, x, c=c, ls=s, lw=1, label=None)
-            a33.plot(f1, x, ls=s, c=c, lw=1, label=None)
-            # a33.plot(f1, x, ls=lss[1], c=c, lw=1, label=None)
-            a33.fill_betweenx(x, gf, f1, color=c, alpha=alpha, label=line.title())
-        a33.set(ylim=[0, ymax], title='Stand-alone $M$')
-        a33.legend(loc='upper left')  # .set_visible(False)
-
-    # a43 from natural profit segment plot
-    # common extract for all lines
-    lw, up = self.q(1 - p2), ymax
-    bit = self.augmented_df.query(f' {lw} <= loss <= {up} ')
-    F = bit[f'F']
-    gF = bit[f'gF']
-    # x = bit.loss
-    for cn, ln in enumerate(sort_order):
-        line = sorted(self.line_names_ex)[ln]
-        c = col_list[cn]
-        s = lss[cn]
-        ser = bit[f'exeqa_{line}']
-        if kind == 'three':
-            a43.plot(1 / (1 - F), ser, lw=1, ls=lss[1], c=c)
-            a43.plot(1 / (1 - gF), ser, lw=1, c=c)
-            a43.set(xlim=[1, 1e4], xscale='log')
-            a43.fill_betweenx(ser, 1 / (1 - gF), 1 / (1 - F), color=c, alpha=alpha, lw=0.5, label=line.title())
-        else:
-            a43.plot(F, ser, lw=1, ls=s, c=c)
-            a43.plot(gF, ser, lw=1, ls=s, c=c)
-            a43.fill_betweenx(ser, gF, F, color=c, alpha=alpha, lw=0.5, label=line.title())
-    a43.set(ylim=[0, ymax], title='Natural $M$')
-    a43.legend(loc='upper left')  # .set_visible(False)
-
-    if legend_font:
-        for ax in axs.flat:
-            try:
-                if ax is not a13:
-                    ax.legend(prop={'size': 7})
-            except:
-                pass
 
 
 def pricing(port, p, roe, as_dataframe=True):
@@ -4340,1240 +2718,6 @@ def bivariate_density_plots(axi, ports, xmax, contour_scale, biv_log=True, cmap=
                             ylabel=f'Line {port.line_names[j]}',
                             title=title,
                             aspect=1)
-
-
-class Bounds(object):
-    """
-    Implement IME pricing bounds methodology.
-
-    Typical usage:
-
-    * Create a Portfolio or Aggregate object a
-    * bd = cd.Bounds(a)
-    * bd.tvar_cloud('line', premium=, a=, n_tps=, s=, kind=)
-    * p_star = bd.p_star('line', premium)
-    * bd.cloud_view(axes, ...)
-
-    distribution_spec = Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
-    If DataFrame or Series values interpreted as desnsity, sum to 1. F, S, exgta all computed using Portfolio
-    methdology
-    If DataFrame line --> p_{line}
-
-    from common_scripts.cs
-    """
-
-    def __init__(self, distribution_spec):
-        assert isinstance(distribution_spec, (pd.Series, pd.DataFrame, agg.Portfolio, agg.Aggregate))
-        self.distribution_spec = distribution_spec
-        # although passed as input to certain functions (tvar with bounds) b is actually fixed
-        self.b = 0
-        self.Fb = 0
-        self.tvar_function = None
-        self.tvars = None
-        self.tps = None
-        self.weight_df = None
-        self.idx = None
-        self.hinges = None
-        # in cases where we hold the tvar function here
-        self._tail_var = None
-        self._inverse_tail_var = None
-        self.cloud_df = None
-        # uniform mode
-        self._t_mode = 'u'
-        # data frame with tvar weights and principal extreme distortion weights by method
-        self.pedw_df = None
-        self._tvar_df = None
-        # hack for beta distribution, you want to force 1 to be in tvar ps, but Fp = 1
-        # TODO figure out why p_star grinds to a halt if you input b < inf
-        self.add_one = False
-
-    def __repr__(self):
-        """
-        gets called automatically but so we can tweak
-        :return:
-        """
-        return 'My Bounds Object at ' + super(Bounds, self).__repr__()
-
-    def __str__(self):
-        return 'Hello' + super(Bounds, self).__repr__()
-
-    @property
-    def tvar_df(self):
-        if self._tvar_df is None:
-            self._tvar_df = pd.DataFrame({'p': self.tps, 'tvar': self.tvars}).set_index('p')
-        return self._tvar_df
-
-    @property
-    def t_mode(self):
-        return self._t_mode
-
-    @t_mode.setter
-    def t_mode(self, val):
-        assert val in ['u', 'gl']
-        self._t_mode = val
-
-    def make_tvar_function(self, line, b=np.inf):
-        """
-        make the tvar function from a Series p_total indexed by loss
-        Includes determining sup and putting in value for zero
-        If sup is largest value in index, sup set to inf
-
-        also sets self.Fb
-
-        Applies to min(Line, b)
-
-        :param line:
-        :param b:  bound on the losses, e.g., to model limited liability insurer
-        :return:
-        """
-        self.b = b
-        if isinstance(self.distribution_spec, agg.Portfolio):
-            assert line in self.distribution_spec.line_names_ex
-            if line == 'total':
-                self.tvar_function = self.distribution_spec.tvar
-                self.Fb = self.distribution_spec.cdf(b)
-            else:
-                ag = getattr(self.distribution_spec, line)
-                self.tvar_function = ag.tvar
-                self.Fb = ag.cdf(b)
-            if np.isinf(b): self.Fb = 1.0
-            return
-
-        elif isinstance(self.distribution_spec, agg.Aggregate):
-            self.tvar_function = self.distribution_spec.tvar
-            self.Fb = self.distribution_spec.cdf(b)
-            if np.isinf(b): self.Fb = 1.0
-            return
-
-        elif isinstance(self.distribution_spec, pd.DataFrame):
-            assert f'p_{line}' in self.distribution_spec.columns
-            # given a port.density_df
-            p_total = self.distribution_spec[f'p_{line}']
-
-        elif isinstance(self.distribution_spec, pd.Series):
-            logger.info('tvar_array using Series')
-            p_total = self.distribution_spec
-
-        # need to create tvar function on the fly, using same method as Portfolio and Aggregate:
-        bs = p_total.index[1]
-        F = p_total.cumsum()
-        if np.isinf(b):
-            self.Fb = 0
-        else:
-            self.Fb = F[b]
-
-        S = p_total.shift(-1, fill_value=min(p_total.iloc[-1], max(0, 1. - (p_total.sum()))))[::-1].cumsum()[::-1]
-        lev = S.shift(1, fill_value=0).cumsum() * bs
-        ex1 = lev.iloc[-1]
-        ex = np.sum(p_total * p_total.index)
-        logger.info(f'Computed mean loss for {line} = {ex:,.15f} (diff {ex - ex1:,.15f}) max F = {max(F)}')
-        exgta = (ex - lev) / S + S.index
-        sup = (p_total[::-1] > 0).idxmax()
-        if sup == p_total.index[-1]:
-            sup = np.inf
-        exgta[S == 0] = sup
-        logger.info(f'sup={sup}, max = {(p_total[::-1] > 0).idxmax()} "inf" = {p_total.index[-1]}')
-
-        def _tvar(p, kind='interp'):
-            """
-            UNLIMITED tvar function!
-            :param p:
-            :param kind:
-            :return:
-            """
-            if kind == 'interp':
-                # original implementation interpolated
-                if self._tail_var is None:
-                    # make tvar function
-                    self._tail_var = interp1d(F, exgta, kind='linear', bounds_error=False,
-                                              fill_value=(0, sup))
-                return self._tail_var(p)
-            elif kind == 'inverse':
-                if self._inverse_tail_var is None:
-                    # make tvar function
-                    self._inverse_tail_var = interp1d(exgta, F, kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
-                return self._inverse_tail_var(p)
-
-        self.tvar_function = _tvar
-
-    def make_ps(self, n, mode):
-        """
-        mode are you making s points (always uniform) or tvar p points (use t_mode)?
-        self.t_mode == 'u': make uniform s points against which to evaluate g from 0 to 1 inclusive with more around 0
-        self.t_mode == 'gl': make Gauss-Legndre p points at which TVaRs are evaluated from 0 inclusive to 1 exclusive with more around 1
-
-        :param n:
-        :return:
-        """
-        assert mode in ('s', 't')
-
-        if mode == 't' and (self.Fb < 1 or self.add_one):
-            # we will add 1 at the end
-            n -= 1
-
-        # Gauus Legendre points
-        lg = np.polynomial.legendre.leggauss
-
-        if self.t_mode == 'gl':
-            if mode == 's':
-                x, wts = lg(n - 2)
-                ps = np.hstack((0, (x + 1) / 2, 1))
-
-            elif mode == 't':
-                x, wts = lg(n * 2 + 1)
-                ps = x[n:]
-        elif self.t_mode == 'u':
-            if mode == 's':
-                ps = np.linspace(1 / n, 1, n)
-            elif mode == 't':
-                # exclude 1 (sup distortion) at the end; 0=mean
-                ps = np.linspace(0, 1, n, endpoint=False)
-        # always ensure that 1  is in ps for t mode when b < inf if Fb < 1
-        if mode == 't' and self.Fb < 1 or self.add_one:
-            ps = np.hstack((ps, 1))
-        return ps
-
-    def tvar_array(self, line, n_tps=256, b=np.inf, kind='interp'):
-        """
-        compute tvars at n equally spaced points, tps
-
-
-        :param line:
-        :param n_tps:  number of tvar p points, default 256
-        :param b: cap on losses applied before computing TVaRs (e.g., adjust losses for finite assets b).
-        Use np.inf for unlimited losses.
-        :param kind: if interp  uses the standard function, easy, for continuous distributions; if 'tail' uses
-        explicit integration of tail values, for discrete distributions
-        :return:
-        """
-        assert kind in ('interp', 'tail')
-        self.make_tvar_function(line, b)
-
-        logger.info(f'F(b) = {self.Fb:.5f}')
-        # tvar p values should linclude 0 (the mean) but EXCLUDE 1
-        # self.tps = np.linspace(0.5 / n_tps, 1 - 0.5 / n_tps, n_tps)
-        self.tps = self.make_ps(n_tps, 't')
-
-        if kind == 'interp':
-            self.tvars = self.tvar_function(self.tps)
-            if not np.isinf(b):
-                # subtract S(a)(TVaR(F(a)) - a)
-                # do all at once here - do not call self.tvar_with_bounds function
-                self.tvars = np.where(self.tps <= self.Fb,
-                                      self.tvars - (1 - self.Fb) * (self.tvar_function(self.Fb) - b) / (1 - self.tps),
-                                      b)
-        elif kind == 'tail':
-            self.tvars = np.array([self.tvar_with_bound(i, b, kind) for i in self.tps])
-
-    def p_star(self, line, premium, b=np.inf, kind='interp'):
-        """
-        Compute p* so TVaR @ p* of min(X, b) = premium
-
-        In this case the cap b has an impact (think of integrating q(p) over p to 1, q is impacted by b)
-
-        premium <= b is required (no rip off condition)
-
-        If b < inf then must solve TVaR(p) - (1 - F(b)) / (1 - p)[TVaR(F(b)) - b] = premium
-        Let k = (1 - F(b)) [TVaR(F(b)) - b], so solving
-
-        f(p) = TVaR(p) - k / (1 - p) - premium == 0
-
-        using NR
-
-        :param line:
-        :param premium: target premium
-        :param b:  bound
-        :return:
-        """
-        assert kind in ('interp', 'tail')
-        if premium > b:
-            raise ValueError(f'p_star must have premium ({premium}) <= largest loss bound ({b})')
-
-        if kind == 'interp':
-
-            self.make_tvar_function(line, b)
-
-            if np.isinf(b):
-                p_star = self.tvar_function(premium, 'inverse')
-            else:
-                # nr, remember F(a) is self.Fa set by make_tvar_function
-                k = (1 - self.Fb) * (self.tvar_function(self.Fb) - b)
-
-                def f(p):
-                    return self.tvar_function(p) - k / (1 - p) - premium
-
-                # should really compute f' numerically, but...
-                fp = 100
-                p = 0.5
-                iters = 0
-                delta = 1e-10
-                while abs(fp) > 1e-6 and iters < 20:
-                    fp = f(p)
-                    fpp = (f(p + delta) - f(p)) / delta
-                    pnew = p - fp / fpp
-                    if 0 <= pnew <= 1:
-                        p = pnew
-                    elif pnew < 0:
-                        p = p / 2
-                    else:
-                        #  pnew > 1:
-                        p = (1 + p) / 2
-
-                if iters == 20:
-                    logger.warning(f'Questionable convergence solving for p_star, last error {fp}.')
-                p_star = p
-
-        elif kind == 'tail':
-            def f(p):
-                return self.tvar_with_bound(p, b, 'tail') - premium
-
-            fp = 100
-            p = 0.5
-            iters = 0
-            delta = 1e-10
-            while abs(fp) > 1e-6 and iters < 20:
-                fp = f(p)
-                fpp = (f(p + delta) - f(p)) / delta
-                pnew = p - fp / fpp
-                if 0 <= pnew <= 1:
-                    p = pnew
-                elif pnew < 0:
-                    p = p / 2
-                else:
-                    #  pnew > 1:
-                    p = (1 + p) / 2
-
-            if iters == 20:
-                logger.warning(f'Questionable convergence solving for p_star, last error {fp}.')
-            p_star = p
-
-        return p_star
-
-    def tvar_with_bound(self, p, b=np.inf, kind='interp'):
-        """
-        compute tvar taking bound into account
-        assumes tvar_function setup
-
-        Warning: b must equal the b used when calibrated. The issue is computing F
-        varies with the type of underlying portfolio. This is fragile.
-        Added storing b and checking equal. For backwards comp. need to keep b argument
-
-        :param p:
-        :param b:
-        :return:
-        """
-        assert self.tvar_function is not None
-        assert b == self.b
-
-        if kind == 'interp':
-            tvar = self.tvar_function(p)
-            if not np.isinf(b):
-                if p < self.Fb:
-                    tvar = tvar - (1 - self.Fb) * (self.tvar_function(self.Fb) - b) / (1 - p)
-                else:
-                    tvar = b
-        elif kind == 'tail':
-            # use the tail method for discrete distributions
-            tvar = self.distribution_spec.tvar(p, 'tail')
-            if not np.isinf(b):
-                if p < self.Fb:
-                    tvar = tvar - (1 - self.Fb) * (self.distribution_spec.tvar(self.Fb, 'tail') - b) / (1 - p)
-                else:
-                    tvar = b
-        return tvar
-
-    def compute_weight(self, premium, p0, p1, b=np.inf, kind='interp'):
-        """
-        compute the weight for a single TVaR p0 < p1 value pair
-
-        :param line:
-        :param premium:
-        :param tp:
-        :param b:
-        :return:
-        """
-
-        assert p0 < p1
-        assert self.tvar_function is not None
-
-        lhs = self.tvar_with_bound(p0, b, kind)
-        rhs = self.tvar_with_bound(p1, b, kind)
-
-        assert lhs != rhs
-        weight = (premium - lhs) / (rhs - lhs)
-        return weight
-
-    def compute_weights(self, line, premium, n_tps, b=np.inf, kind='interp'):
-        """
-        Compute the weights of the extreme distortions
-
-        Applied to min(line, b)  (allows to work for net)
-
-        Note: independent of the asset level
-
-        :param line: within port, or total
-        :param premium: target premium for the line
-        :param n_tps: number of tvar p points (tps)number of tvar p points (tps)number of tvar p points
-            (tps)number of tvar p points (tps).
-        :param b: loss bound: compute weights for min(line, b); generally used for net losses only.
-        :return:
-        """
-
-        self.tvar_array(line, n_tps, b, kind)
-        # you add zero, so there will be one additional point
-        # n_tps += 1
-        p_star = self.p_star(line, premium, b, kind)
-        if p_star in self.tps:
-            logger.critical('p_star in tps')
-            # raise ValueError()
-
-        lhs = self.tps[self.tps <= p_star]
-        rhs = self.tps[self.tps > p_star]
-
-        tlhs = self.tvars[self.tps <= p_star]
-        trhs = self.tvars[self.tps > p_star]
-
-        lhs, rhs = np.meshgrid(lhs, rhs)
-        tlhs, trhs = np.meshgrid(tlhs, trhs)
-
-        df = pd.DataFrame({'p_lower': lhs.flat, 'p_upper': rhs.flat,
-                           't_lower': tlhs.flat, 't_upper': trhs.flat,
-                           })
-        # will fail when p_star in self.ps; let's deal with then when it happens
-        df['weight'] = (premium - df.t_lower) / (df.t_upper - df.t_lower)
-
-        df = df.set_index(['p_lower', 'p_upper'], verify_integrity=True)
-        df = df.sort_index()
-
-        if p_star in self.tps:
-            # raise ValueError('Found pstar in ps')
-            logger.critical(f'Found p_star = {p_star} in ps!!')
-            df.at[(p_star, p_star), 'weight'] = 1.0
-
-        logger.info(f'p_star={p_star:.4f}, len(p<=p*) = {len(df.index.levels[0])}, '
-                    f'len(p>p*) = {len(df.index.levels[1])}; '
-                    f' pstar in ps: {p_star in self.tps}')
-
-        self.weight_df = df
-
-        # index for tp values
-        r = np.arange(n_tps)
-        r_rhs, r_lhs = np.meshgrid(r[self.tps > p_star], r[self.tps <= p_star])
-        self.idx = np.vstack((r_lhs.flat, r_rhs.flat)).reshape((2, r_rhs.size))
-
-    def tvar_hinges(self, s):
-        """
-        make the tvar hinge functions by evaluating each tvar_p(s) = min(1, s/(1-p) for p in tps, at EP points s
-
-        all arguments in [0,1] x [0,1]
-
-        :param s:
-        :return:
-        """
-
-        self.hinges = coo_matrix(np.minimum(1.0, s.reshape(1, len(s)) / (1.0 - self.tps.reshape(len(self.tps), 1))))
-
-    def tvar_cloud(self, line, premium, a, n_tps, s, kind='interp'):
-        """
-        weight down tvar functions to the extremal convex measures
-
-        asset level a acts like an agg stop on what is being priced, i.e. we are working with min(X, a)
-
-        :param line:
-        :param premium:
-        :param a:
-        :param n_tps:
-        :param s:
-        :param b:  bound, applies to min(line, b)
-        :return:
-        """
-
-        self.compute_weights(line, premium, n_tps, a, kind)
-
-        if type(s) == int:
-            # points at which g is evaluated - all OK to include 0 and 1
-            # s = np.linspace(0, 1, s+1, endpoint=True)
-            s = self.make_ps(s, 's')
-
-        self.tvar_hinges(s)
-
-        ml = coo_matrix((1 - self.weight_df.weight, (np.arange(len(self.weight_df)), self.idx[0])),
-                        shape=(len(self.weight_df), len(self.tps)))
-        mr = coo_matrix((self.weight_df.weight, (np.arange(len(self.weight_df)), self.idx[1])),
-                        shape=(len(self.weight_df), len(self.tps)))
-        m = ml + mr
-
-        logger.info(f'm shape = {m.shape}, hinges shape = {self.hinges.shape}, types {type(m)}, {type(self.hinges)}')
-
-        self.cloud_df = pd.DataFrame((m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
-        self.cloud_df.index.name = 's'
-
-    def cloud_view(self, axs, n_resamples, scale='linear', alpha=0.05, pricing=True, distortions=None,
-                   title='', lim=(-0.025, 1.025), check=False):
-        """
-        visualize the cloud with n_resamples
-
-        after you have recomputed...
-
-        if there are distortions plot on second axis
-
-        :param axs:
-        :param n_resamples: if random sample
-        :param scale: linear or return
-        :param alpha: opacity
-        :param pricing: restrict to p_max = 0, ensuring g(s)<1 when s<1
-        :param distortions:
-        :param title: optional title (applied to all plots)
-        :param lim: axis limits
-        :param check:   construct and plot Distortions to check working ; reduces n_resamples to 5
-        :return:
-        """
-        assert scale in ['linear', 'return']
-        assert not distortions or (len(axs.flat) > 1)
-        bit = None
-        if check: n_resamples = min(n_resamples, 5)
-        norm = mpl.colors.Normalize(0, 1)
-        cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
-        mapper = cm.get_cmap()
-
-        def plot_max_min(ax):
-            ax.fill_between(self.cloud_df.index, self.cloud_df.min(1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-            self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=1, ls='-', c='k')
-            self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=1, ls='-', c='k')
-
-        logger.info('starting cloudview...')
-        if scale == 'linear':
-            ax = axs[0]
-            if n_resamples > 0:
-                if pricing:
-                    if n_resamples < 10:
-                        bit = self.weight_df.xs(0, drop_level=False).sample(n=n_resamples, replace=True).reset_index()
-                    else:
-                        bit = self.weight_df.xs(0, drop_level=False).reset_index()
-                else:
-                    bit = self.weight_df.sample(n=n_resamples, replace=True).reset_index()
-                logger.info('cloudview...done 1')
-                # display(bit)
-                for i in bit.index:
-                    pl, pu, tl, tu, w = bit.loc[i]
-                    self.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w), alpha=alpha, label=None)
-                    if check:
-                        # put in actual for each sample
-                        d = agg.Distortion('wtdtvar', w, df=[pl, pu])
-                        gs = d.g(s)
-                        ax.plot(s, gs, c=mapper(w), lw=2, ls='--', alpha=.5, label=f'ma ({pl:.3f}, {pu:.3f}) ')
-                ax.get_figure().colorbar(cm, ax=ax, shrink=.5, aspect=16, label='Weight to Higher Threshold')
-            else:
-                logger.info('cloudview: no resamples, skipping 1')
-            logger.info('cloudview: start max/min')
-            plot_max_min(ax)
-            logger.info('cloudview: done with max/min')
-            for ln in ax.lines:
-                ln.set(label=None)
-            if check:
-                ax.legend(loc='lower right', fontsize='large')
-            ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-')
-            ax.set(xlim=lim, ylim=lim, aspect='equal')
-
-            if type(distortions) == dict:
-                distortions = [distortions]
-            if distortions == 'space':
-                ax = axs[1]
-                plot_max_min(ax)
-                ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-', label='_nolegend_')
-                ax.legend(loc='lower right', ncol=3, fontsize='large')
-                ax.set(xlim=lim, ylim=lim, aspect='equal')
-            elif type(distortions) == list:
-                logger.info('cloudview: start 4 adding distortions')
-                name_mapper = {'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
-                s = np.linspace(0, 1, 1001)
-                lss = list(mpl.lines.lineStyles.keys())
-                for ax, dist_dict in zip(axs[1:], distortions):
-                    ii = 1
-                    for k, d in dist_dict.items():
-                        gs = d.g(s)
-                        k = name_mapper.get(k, k)
-                        ax.plot(s, gs, lw=1, ls=lss[ii], label=k)
-                        ii += 1
-                    plot_max_min(ax)
-                    ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-', label='_nolegend_')
-                    ax.legend(loc='lower right', ncol=3, fontsize='large')
-                    ax.set(xlim=lim, ylim=lim, aspect='equal')
-            else:
-                # do nothing
-                pass
-
-        elif scale == 'return':
-            ax = axs[0]
-            bit = self.cloud_df.sample(n=n_resamples, axis=1)
-            bit.index = 1 / bit.index
-            bit = 1 / bit
-            bit.plot(ax=ax, lw=.5, c='C7', alpha=alpha)
-            ax.plot([0, 1000], [0, 1000], c='C0', lw=1)
-            ax.legend().set(visible=False)
-            ax.set(xscale='log', yscale='log')
-            ax.set(xlim=[2000, 1], ylim=[2000, 1])
-
-        if title != '':
-            for ax in axs:
-                if bit is not None:
-                    title1 = f'{title}, n={len(bit)} samples'
-                else:
-                    title1 = title
-                ax.set(title=title1)
-
-    def weight_image(self, ax, levels=20, colorbar=True):
-        bit = self.weight_df.weight.unstack()
-        img = ax.contourf(bit.columns, bit.index, bit, cmap='viridis_r', levels=levels)
-        ax.set(xlabel='p1', ylabel='p0', title='Weight for p1', aspect='equal')
-        if colorbar:
-            ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='Weight to p_upper')
-
-    def quick_price(self, distortion, a):
-        """
-        price total to assets a using distortion
-
-        requires distribution_spec has a density_df dataframe with a p_total or p_total
-
-        TODO: add ability to price other lines
-        :param distortion:
-        :param a:
-        :return:
-        """
-
-        assert isinstance(self.distribution_spec, (agg.Portfolio, agg.Aggregate))
-
-        df = self.distribution_spec.density_df
-        temp = distortion.g(df.p_total.shift(-1, fill_value=0)[::-1].cumsum())[::-1]
-
-        if isinstance(temp, np.ndarray):
-            # not aall g functions return Series (you can't guarantee it is called on something with an index)
-            temp = pd.Series(temp, index=df.index)
-
-        temp = temp.shift(1, fill_value=0).cumsum() * self.distribution_spec.bs
-        return temp.loc[a]
-
-    def principal_extreme_distortion_analysis(self, gs, pricing=False):
-        """
-        Find the principal extreme distortion analysis to solve for gs = g(s), s=self.cloud_df.index
-
-        Assumes that tvar_cloud has been called and that cloud_df exists
-        len(gs) = len(cloud_df)
-
-        E.g., call
-
-            b = Bounds(port)
-            b.t_mode = 'u'
-            # set premium and asset level a
-            b.tvar_cloud('total', premium, a)
-            # make gs
-            b.principal_extreme_distortion_analysis(gs)
-
-        :param gs: either g(s) evaluated on s = cloud_df.index or the name of a calibrated distortion in
-        distribution_spec.dists (created by a call to calibrate_distortions)
-        :param pricing: if try, try just using pricing distortions
-        :return:
-        """
-
-        assert self.cloud_df is not None
-
-        if type(gs) == str:
-            s = np.array(self.cloud_df.index)
-            gs = self.distribution_spec.dists[gs].g(s)
-
-        assert len(gs) == len(self.cloud_df)
-
-        if pricing:
-            _ = self.cloud_df.xs(0, axis=1, level=0, drop_level=False)
-            X = _.to_numpy()
-            idx = _.columns
-        else:
-            _ = self.cloud_df
-            X = _.to_numpy()
-            idx = _.columns
-        n = X.shape[1]
-
-        print(X.shape, self.cloud_df.shape)
-
-        # Moore Penrose solution
-        mp = pinv(X) @ gs
-        logger.info('Moore-Penrose solved...')
-
-        # optimization solutions
-        A = np.hstack((X, np.eye(X.shape[0])))
-        b_eq = gs
-        c = np.hstack((np.zeros(X.shape[1]), np.ones_like(b_eq)))
-
-        lprs = linprog(c, A_eq=A, b_eq=b_eq, method='revised simplex')
-        logger.info(
-            f'Revised simpled solved...\nSum of added variables={np.sum(lprs.x[n:])} (should be zero for exact)')
-        self.lprs = lprs
-
-        lpip = linprog(c, A_eq=A, b_eq=b_eq, method='interior-point')
-        logger.info(f'Interior point solved...\nSum of added variables={np.sum(lpip.x[n:])}')
-        self.lpip = lpip
-
-        print(lprs.x, lpip.x)
-
-        # consolidate answers
-        self.pedw_df = pd.DataFrame({'w_mp': mp, 'w_rs': lprs.x[:n], 'w_ip': lpip.x[:n]}, index=idx)
-        self.pedw_df['w_upper'] = self.weight_df.weight
-
-        # diagnostics
-        for c in self.pedw_df.columns[:-1]:
-            answer = self.pedw_df[c].values
-            ganswer = answer[answer > 1e-16]
-            logger.info(f'Method {c}\tMinimum parameter {np.min(answer)}\tNumber non-zero {len(ganswer)}')
-
-        return gs
-
-    def ped_distortion(self, n, solver='rs'):
-        """
-        make the approximating distortion from the first n Principal Extreme Distortions (PED)s using rs or ip solutions
-
-        :param n:
-        :return:
-        """
-        assert solver in ['rs', 'ip']
-
-        # the weight column for solver
-        c = f'w_{solver}'
-        # pull off the tvar and PED weights
-        df = self.pedw_df.sort_values(c, ascending=False)
-        bit = df.loc[df.index[:n], [c, 'w_upper']]
-        # re-weight partial (method / lp-solve) weights to 1
-        bit[c] /= bit[c].sum()
-        # multiply lp-solve weights with the weigh_df extreme distortion p_lower/p_upper weights
-        bit['c_lower'] = (1 - bit.w_upper) * bit[c]
-        bit['c_upper'] = bit.w_upper * bit[c]
-        # gather into data frame of p and total weight (labeled c)
-        bit2 = bit.reset_index().drop([c, 'w_upper'], 1)
-        bit2.columns = bit2.columns.str.split('_', expand=True)
-        bit2 = bit2.stack(1).groupby('p')['c'].sum()
-        # bit2 has index = probability points and values = weights for the wtd tvar distortion
-        d = agg.Distortion.wtd_tvar(bit2.index, bit2.values, f'PED({solver}, {n})')
-        return d
-
-
-def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
-    """
-    stand-alone
-    ONLY WORKS FOR BOUNDED PORTFOLIOS (use for beta mixture examples)
-    Updated version in CaseStudy
-    axd from mosaic
-    bounds = Bounds class from port (calibrated to some base)it
-    pnew = new portfolio
-    input new beta(a,b) portfolio, using existing bounds object
-
-    sample: see similar_risks_sample()
-
-    Provenance : from make_port in Examples_2022_post_publish
-    """
-
-    df = bounds.weight_df.copy()
-    df['test'] = df['t_upper'] * df.weight + df.t_lower * (1 - df.weight)
-
-    # HERE IS ISSUE - should really use tvar with bounds and incorporate the bound
-    tvar1 = {p: float(pnew.tvar(p)) for p in bounds.tps}
-    df['t1_lower'] = [tvar1[p] for p in df.index.get_level_values(0)]
-    df['t1_upper'] = [tvar1[p] for p in df.index.get_level_values(1)]
-    df['t1'] = df.t1_upper * df.weight + df.t1_lower * (1 - df.weight)
-
-    roe_d = agg.Distortion('roe', roe)
-    tvar_d = agg.Distortion('tvar', bounds.p_star('total', prem))
-    idx = df.index.get_locs(df.idxmax()['t1'])[0]
-    pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
-    max_d = agg.Distortion('wtdtvar', w, df=[pl, pu])
-
-    tmax = float(df.iloc[idx]['t1'])
-    print('Ties for max: ', len(df.query('t1 == @tmax')))
-    print('Near ties for max: ', len(df.query('t1 >= @tmax - 1e-4')))
-
-    idn = df.index.get_locs(df.idxmin()['t1'])[0]
-    pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
-    min_d = agg.Distortion('wtdtvar', wn, df=[pln, pun])
-
-    ax = axd['A']
-    plot_max_min(bounds, ax)
-    n = len(ax.lines)
-    roe_d.plot(ax=ax, both=False)
-    tvar_d.plot(ax=ax, both=False)
-    max_d.plot(ax=ax, both=False)
-    min_d.plot(ax=ax, both=False)
-
-    ax.lines[n + 0].set(label='roe')
-    ax.lines[n + 2].set(color='green', label='tvar')
-    ax.lines[n + 4].set(color='red', label='max')
-    ax.lines[n + 6].set(color='purple', label='min')
-    ax.legend(loc='upper left')
-
-    ax.set(title=f'Max ({pl}, {pu}), min ({pln}, {pun})')
-
-    ax = axd['B']
-    bounds.weight_image(ax)
-
-    bit = df['t1'].unstack(1)
-    ax = axd['C']
-    img = ax.contourf(bit.columns, bit.index, bit, cmap='viridis_r', levels=20)
-    ax.set(xlabel='p1', ylabel='p0', title='Pricing on New Risk', aspect='equal')
-    ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='rho(X_new)')
-    ax.plot(pu, pl, '.', c='w')
-    ax.plot(pun, pln, 's', ms=3, c='white')
-
-    ax = axd['D']
-    plot_lee(port, ax, 'k', lw=1)
-    plot_lee(pnew, ax, 'r')
-
-    ax = axd['E']
-    pnew.density_df.p_total.plot(ax=ax)
-    ax.set(xlim=[-0.05, 1.05], title='Density')
-
-    ax = axd['F']
-    plot_max_min(bounds, ax)
-    for c, dd in zip(['r', 'g', 'b'], ['ph', 'wang', 'dual']):
-        port.dists[dd].plot(ax=ax, both=False, lw=1)
-        ax.lines[n].set(c=c, label=dd)
-        n += 2
-    ax.legend(loc='lower right')
-
-    return df
-
-
-def similar_risks_example():
-    """
-    Interesting beta risks and how to use similar_risks_sa
-
-
-    @return:
-    """
-    # stand alone hlep from the code; split at program = to run different options
-    uw = agg.Underwriter()
-    p_base = uw.write('''
-    port UNIF
-        agg ONE 1 claim sev 1 * beta 1 1 fixed
-    ''')
-    p_base.update(11, 1 / 1024, remove_fuzz=True)
-    prem = p_base.tvar(0.2, 'interp')
-    a = 1
-    d = (prem - p_base.ex) / (a - p_base.ex)
-    v = 1 - d
-    roe = d / v
-    prem, roe
-    p_base.calibrate_distortions(As=[1], ROEs=[roe], strict='ordered')
-    bounds = Bounds(p_base)
-    bounds.tvar_cloud('total', prem, a, 128 * 2, 64 * 2, 'interp')
-    p_star = bounds.p_star('total', prem, kind='interp')
-
-    smfig = FigureManager(cycle='c', color_mode='color', font_size=10, legend_font='small',
-                          default_figsize=(5, 3.5))
-
-    f, axs = smfig(1, 3, (18.0, 6.0), )
-    ax0, ax1, ax2 = axs.flat
-    axi = iter(axs.flat)
-    # all with base portfolio
-
-    bounds.cloud_view(axs.flatten(), 0, alpha=1, pricing=True,
-                      title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={p_star:.3f}',
-                      distortions=[{k: p_base.dists[k] for k in ['roe', 'tvar']},
-                                   {k: p_base.dists[k] for k in ['ph', 'wang', 'dual']}])
-    for ax in axs.flatten()[1:]:
-        ax.legend(ncol=1, loc='lower right')
-    for ax in axs.flatten():
-        ax.set(title=None)
-
-    program = '''
-    port BETA
-        agg TWO 1 claim sev 1 * beta [200 300 400 500 600 7] [600 500 400 300 200 1] wts=6 fixed
-        # never worked
-        # agg TWO 1 claim sev 1 * beta [1 2000 4000 6000 50] [100 6000 4000 2000 1] wts[0.1875 0.1875 0.1875 0.1875 .25] fixed
-        # interior solution:
-        # agg TWO 1 claim sev 1 * beta [300 400 500 600 35] [500 400 300 200 5] wts[.125 .25 .125 .25 .25] fixed
-        #
-        # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts=3 fixed
-        # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts[.375 .375 .25] fixed
-    
-    '''
-    p_new = uw.write(program)
-    p_new.update(11, 1 / 1024, remove_fuzz=True)
-
-    p_new.plot(figsize=(6, 4))
-
-    axd = plt.figure(constrained_layout=True, figsize=(16, 8)).subplot_mosaic(
-        '''
-        AAAABBFF
-        AAAACCFF
-        AAAADDEE
-        AAAADDEE
-    '''
-    )
-    df = similar_risks_graphs_sa(axd, bounds, p_base, p_new, roe, prem)
-    return df
-
-
-def stand_alone_pricing_work(self, dist, p, kind, roe, S_calc='cumsum'):
-    """
-    Apply dist to the individual lines of self, with capital standard determined by a, p, kind=VaR, TVaR, etc.
-    Return usual data frame with L LR M P PQ  Q ROE, and a
-
-    Dist can be a distortion, traditional, or defaut pricing modes. For latter two you have to input an ROE. ROE
-    not required for a distortion.
-
-    :param self: a portfolio object
-    :param dist: "traditional", "default", or a distortion (already calibrated)
-    :param p: probability level for assets
-    :param kind: var (or lower, upper), tvar or epd (note, p should be small for EPD, to pander, if p is large we use 1-p)
-    :param roe: for traditional methods input roe
-
-    :return: exhibit is copied and augmented with the stand-alone statistics
-
-    from common_scripts.py
-    """
-    assert S_calc in ('S', 'cumsum')
-
-    var_dict = self.var_dict(p, kind=kind, total='total', snap=True)
-    exhibit = pd.DataFrame(0.0, index=['L', 'LR', 'M', 'P', "PQ", 'Q', 'ROE'], columns=['sop'])
-
-    def tidy_and_write(exhibit, ax, exa, prem):
-        """ finish up calculation and store answer """
-        roe_ = (prem - exa) / (ax - prem)
-        exhibit.loc[['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE'], l] = \
-            (exa, exa / prem, prem - exa, prem, prem / (ax - prem), ax - prem, roe_)
-
-    if dist == 'traditional - no default':
-        # traditional roe method, no allowance for default
-        method = dist
-        d = roe / (1 + roe)
-        v = 1 - d
-        for l in self.line_names_ex:
-            ax = var_dict[l]
-            # no allowance for default
-            exa = self.audit_df.at[l, 'EmpMean']
-            prem = v * exa + d * ax
-            tidy_and_write(exhibit, ax, exa, prem)
-    elif dist == 'traditional':
-        # traditional but allowing for default
-        method = dist
-        d = roe / (1 + roe)
-        v = 1 - d
-        for l in self.line_names_ex:
-            ax = var_dict[l]
-            exa = self.density_df.loc[ax, f'lev_{l}']
-            prem = v * exa + d * ax
-            tidy_and_write(exhibit, ax, exa, prem)
-    else:
-        # distortion method
-        method = f'sa {str(dist)}'
-        for l, ag in zip(self.line_names_ex, self.agg_list + [None]):
-            # use built in apply distortion
-            if ag is None:
-                # total
-                if S_calc == 'S':
-                    S = self.density_df.S
-                else:
-                    # revised
-                    S = (1 - self.density_df['p_total'].cumsum())
-                # some dist return np others don't this converts to numpy...
-                gS = pd.Series(dist.g(S), index=S.index)
-                exag = gS.shift(1, fill_value=0).cumsum() * self.bs
-            else:
-                ag.apply_distortion(dist)
-                exag = ag.density_df.exag
-            ax = var_dict[l]
-            exa = self.density_df.loc[ax, f'lev_{l}']
-            prem = exag.loc[ax]
-            tidy_and_write(exhibit, ax, exa, prem)
-
-    exhibit.loc['a'] = exhibit.loc['P'] + exhibit.loc['Q']
-    exhibit['sop'] = exhibit.filter(regex='[A-Z]').sum(axis=1)
-    exhibit.loc['LR', 'sop'] = exhibit.loc['L', 'sop'] / exhibit.loc['P', 'sop']
-    exhibit.loc['ROE', 'sop'] = exhibit.loc['M', 'sop'] / (exhibit.loc['a', 'sop'] - exhibit.loc['P', 'sop'])
-    exhibit.loc['PQ', 'sop'] = exhibit.loc['P', 'sop'] / exhibit.loc['Q', 'sop']
-
-    exhibit['method'] = method
-    exhibit = exhibit.reset_index()
-    exhibit = exhibit.set_index(['method', 'index'])
-    exhibit.index.names = ['method', 'stat']
-    exhibit.columns.name = 'line'
-    exhibit = exhibit.sort_index(axis=1)
-
-    return exhibit
-
-
-def stand_alone_pricing(self, dist, p=0, kind='var', S_calc='cumsum'):
-    """
-
-    Run distortion pricing, use it to determine and ROE and then compute traditional and default
-    pricing, then consolidate the answer
-
-    :param self:
-    :param roe:
-    :param p:
-    :param kind:
-    :return:
-
-    from common_scripts.py
-    """
-    assert isinstance(dist, (agg.Distortion, agg.spectral.Distortion, list))
-    if type(dist) != list:
-        dist = [dist]
-    ex1s = []
-    for d in dist:
-        ex1s.append(stand_alone_pricing_work(self, d, p=p, kind=kind, roe=0, S_calc=S_calc))
-        if len(ex1s) == 1:
-            roe = ex1s[0].at[(f'sa {str(d)}', 'ROE'), 'total']
-    ex2 = stand_alone_pricing_work(self, 'traditional - no default', p=p, kind=kind, roe=roe, S_calc=S_calc)
-    ex3 = stand_alone_pricing_work(self, 'traditional', p=p, kind=kind, roe=roe, S_calc=S_calc)
-
-    return pd.concat(ex1s + [ex2, ex3])
-
-
-# class GreatFormatter(ticker.ScalarFormatter):
-#     """
-#     From Great
-#
-#     """
-#
-#     def __init__(self, sci=True, power_range=(-3, 3), offset=True, mathText=True):
-#         super().__init__(useOffset=offset, useMathText=mathText)
-#         self.set_powerlimits(power_range)
-#         self.set_scientific(sci)
-#
-#     def _set_order_of_magnitude(self):
-#         super()._set_order_of_magnitude()
-#         self.orderOfMagnitude = int(3 * np.floor(self.orderOfMagnitude / 3))
-
-
-class FigureManager():
-    def __init__(self, cycle='c', lw=1.5, color_mode='mono', k=0.8, font_size=12,
-                 legend_font='small', default_figsize=(5, 3.5)):
-        """
-        Another figure/plotter manager: manages cycles for color/black and white
-        from Great utils.py, edited and stripped down
-        combined with lessons from MetaReddit on matplotlib options for fonts, background
-        colors etc.
-
-        Font size was 9 and legend was x-small
-
-        Create figure with common defaults
-
-        cycle = cws
-            c - cycle colors
-            w - cycle widths
-            s - cycle styles
-            o - styles x colors, implies csw and w=single number (produces 8 series)
-
-        lw = default line width or [lws] of length 4
-
-        smaller k overall darker lines; colors are equally spaced between 0 and k
-        k=0.8 is a reasonable range for four colors (0, k/3, 2k/3, k)
-
-        https://matplotlib.org/3.1.1/tutorials/intermediate/color_cycle.html
-
-        https://matplotlib.org/3.1.1/users/dflt_style_changes.html#colors-in-default-property-cycle
-
-        https://matplotlib.org/2.0.2/examples/color/colormaps_reference.html
-
-        https://matplotlib.org/3.1.0/gallery/lines_bars_and_markers/linestyles.html
-
-        https://stackoverflow.com/questions/22408237/named-colors-in-matplotlib
-        """
-
-        assert len(cycle) > 0
-
-        # this sets a much smaller base fontsize
-        # plt.rcParams.update({'axes.titlesize': 'large'})
-        # plt.rcParams.update({'axes.labelsize': 'small'})
-        # list(map(plt.rcParams.get, ('axes.titlesize', 'font.size')))
-        # everything scales off font size
-        plt.rcParams['font.size'] = font_size
-        # mpl default is medium
-        plt.rcParams['legend.fontsize'] = legend_font
-        # see https://matplotlib.org/stable/gallery/color/named_colors.html
-        self.plot_face_color = 'lightsteelblue'
-        self.figure_bg_color = 'aliceblue'
-        # graphics set up
-        plt.rcParams["axes.facecolor"] = self.plot_face_color
-        # note plt.rc lets you set multiple related properties at once:
-        plt.rc('legend', fc=self.plot_face_color, ec=self.plot_face_color)
-        # is equivalent to two calls:
-        # plt.rcParams["legend.facecolor"] = self.plot_face_color
-        # plt.rcParams["legend.edgecolor"] = self.plot_face_color
-        plt.rcParams['figure.facecolor'] = self.figure_bg_color
-
-        self.default_figsize = default_figsize
-        self.plot_colormap_name = 'cividis'
-
-        # fonts: add some better fonts as earlier defaults
-        mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif', 'Bitstream Vera Serif',
-                                      'Computer Modern Roman', 'New Century Schoolbook', 'Century Schoolbook L',
-                                      'Utopia', 'ITC Bookman',
-                                      'Bookman', 'Nimbus Roman No9 L', 'Times', 'Palatino', 'Charter', 'serif']
-        mpl.rcParams['font.sans-serif'] = ['Nirmala UI', 'Myriad Pro', 'Segoe UI', 'DejaVu Sans', 'Bitstream Vera Sans',
-                                           'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid',
-                                           'Arial',
-                                           'sans-serif']
-        mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono',
-                                          'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono',
-                                          'Nimbus Mono L', 'Courier New',
-                                          'Courier', 'Fixed', 'Terminal', 'monospace']
-        mpl.rcParams['font.family'] = 'serif'
-        # or
-        # plt.rc('font', family='serif')
-        # much nicer math font, default is dejavusans
-        mpl.rcParams['mathtext.fontset'] = 'stixsans'
-
-        if color_mode == 'mono':
-            # https://stackoverflow.com/questions/20118258/matplotlib-coloring-line-plots-by-iteration-dependent-gray-scale
-            # default_colors = ['black', 'grey', 'darkgrey', 'lightgrey']
-            default_colors = [(i * k, i * k, i * k) for i in [0, 1 / 3, 2 / 3, 1]]
-            default_ls = ['solid', 'dashed', 'dotted', 'dashdot']
-
-        elif color_mode == 'cmap':
-            # print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-            norm = mpl.colors.Normalize(0, 1, clip=True)
-            cmappable = mpl.cm.ScalarMappable(
-                norm=norm, cmap=self.plot_colormap_name)
-            mapper = cmappable.to_rgba
-            default_colors = list(map(mapper, np.linspace(0, 1, 10)))
-            default_ls = ['solid', 'dashed',
-                          'dotted', 'dashdot', (0, (5, 1))] * 2
-        else:
-            default_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
-                              '#7f7f7f', '#bcbd22', '#17becf']
-            default_ls = ['solid', 'dashed',
-                          'dotted', 'dashdot', (0, (5, 1))] * 2
-
-        props = []
-        if 'o' in cycle:
-            n = len(default_colors) // 2
-            if color_mode == 'mono':
-                cc = [i[1] for i in product(default_ls, default_colors[::2])]
-            else:
-                cc = [i[1] for i in product(default_ls, default_colors[:n])]
-            lsc = [i[0] for i in product(default_ls, default_colors[:n])]
-            props.append(cycler('color', cc))
-            props.append(
-                cycler('linewidth', [lw] * (len(default_colors) * len(default_ls) // 2)))
-            props.append(cycler('linestyle', lsc))
-        else:
-            if 'c' in cycle:
-                props.append(cycler('color', default_colors))
-            else:
-                props.append(
-                    cycler('color', [default_colors[0]] * len(default_ls)))
-            if 'w' in cycle:
-                if type(lw) == int:
-                    props.append(
-                        cycler('linewidth', [lw] * len(default_colors)))
-                else:
-                    props.append(cycler('linewidth', lw))
-            if 's' in cycle:
-                props.append(cycler('linestyle', default_ls))
-
-        # combine all cyclers
-        cprops = props[0]
-        for c in props[1:]:
-            cprops += c
-
-        mpl.rcParams['axes.prop_cycle'] = cycler(cprops)
-
-    def make_fig(self, nr=1, nc=1, figsize=None, xfmt='great', yfmt='great',
-                 places=None, power_range=(-3, 3), sep='', unit='', sci=True,
-                 mathText=False, offset=True, **kwargs):
-        """
-
-        make grid of axes
-        apply format to xy axes
-
-        xfmt='d' for default axis formatting, n=nice, e=engineering, s=scientific, g=great
-        great = engineering with power of three exponents
-
-        """
-
-        if figsize is None:
-            figsize = self.default_figsize
-
-        f, axs = plt.subplots(nr, nc, figsize=figsize,
-                              constrained_layout=True, squeeze=False, **kwargs)
-        for ax in axs.flat:
-            if xfmt[0] != 'd':
-                FigureManager.easy_formatter(ax, which='x', kind=xfmt, places=places,
-                                             power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText,
-                                             offset=offset)
-            if yfmt[0] != 'default':
-                FigureManager.easy_formatter(ax, which='y', kind=yfmt, places=places,
-                                             power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText,
-                                             offset=offset)
-
-        if nr * nc == 1:
-            axs = axs[0, 0]
-
-        self.last_fig = f
-        return f, axs
-
-    __call__ = make_fig
-
-    @staticmethod
-    def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
-                       mathText=False, offset=True):
-        """
-        set which (x, y, b, both) to kind = sci, eng, nice
-        nice = engineering but uses e-3, e-6 etc.
-        see docs for ScalarFormatter and EngFormatter
-
-
-        """
-
-        def make_fmt(kind, places, power_range, sep, unit):
-            if kind == 'sci' or kind[0] == 's':
-                fm = ticker.ScalarFormatter()
-                fm.set_powerlimits(power_range)
-                fm.set_scientific(True)
-            elif kind == 'eng' or kind[0] == 'e':
-                fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
-            elif kind == 'great' or kind[0] == 'g':
-                fm = GreatFormatter(
-                    sci=sci, power_range=power_range, offset=offset, mathText=mathText)
-            elif kind == 'nice' or kind[0] == 'n':
-                fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
-                fm.ENG_PREFIXES = {
-                    i: f'e{i}' if i else '' for i in range(-24, 25, 3)}
-            else:
-                raise ValueError(f'Passed {kind}, expected sci or eng')
-            return fm
-
-        # what to set
-        if which == 'b' or which == 'both':
-            which = ['xaxis', 'yaxis']
-        elif which == 'x':
-            which = ['xaxis']
-        else:
-            which = ['yaxis']
-
-        for w in which:
-            fm = make_fmt(kind, places, power_range, sep, unit)
-            getattr(ax, w).set_major_formatter(fm)
-
-
-class Ratings():
-    """
-    class to hold various ratings dictionaries
-    Just facts
-
-    """
-    # https://www.spglobal.com/ratings/en/research/articles/200429-default-transition-and-recovery-2019-annual-global-corporate-default-and-rating-transition-study-11444862
-    # Table 9 On Year Global Corporate Default Rates by Rating Modifier
-    # in PERCENT
-    sp_ratings = 'AAA    AA+  AA    AA-   A+    A     A-    BBB+  BBB   BBB-  BB+   BB    BB-   B+    B     B-    CCC/C'
-    sp_default = '0.00  0.00  0.01  0.02  0.04  0.05  0.07  0.12  0.21  0.25  0.49  0.70  1.19  2.08  5.85  8.77  24.34'
-
-    @classmethod
-    def make_ratings(cls):
-        sp_ratings = re.split(' +', cls.sp_ratings)
-        sp_default = [np.round(float(i) / 100, 8) for i in re.split(' +', cls.sp_default)]
-        spdf = pd.DataFrame({'rating': sp_ratings, 'default': sp_default})
-        return spdf
 
 
 def process_memory(show_process=False):
@@ -5765,7 +2909,7 @@ if __name__ == '__main__':
 
     process_memory(True)
     for case_id in case_ids:
-        logger.log(35, f'{case_id} creating CaseStudy object')
+        logger.info(f'{case_id} creating CaseStudy object')
         case = CaseStudy.factory(case_id)
         process_memory()
         case.full_monty()

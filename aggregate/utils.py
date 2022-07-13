@@ -1,7 +1,9 @@
+from cycler import cycler
 from io import StringIO
 import itertools
 import logging.handlers
 import logging
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
@@ -1622,31 +1624,213 @@ def friendly(df):
     return style_df(bit).format(lambda x: x if type(x)==str else f'{x:,.3f}')
 
 
-def make_awkward(log2, scale=False):
-    """
-    Decompose a uniform random variable on range(2**log2) into two parts
-    using Eamonn Long's base 4 method.
+class FigureManager():
+    def __init__(self, cycle='c', lw=1.5, color_mode='mono', k=0.8, font_size=12,
+                 legend_font='small', default_figsize=(5, 3.5)):
+        """
+        Another figure/plotter manager: manages cycles for color/black and white
+        from Great utils.py, edited and stripped down
+        combined with lessons from MetaReddit on matplotlib options for fonts, background
+        colors etc.
 
-    Usage: ::
+        Font size was 9 and legend was x-small
 
-        awk = make_awkward(16)
-        awk.density_df.filter(regex='p_[ABt]').cumsum().plot()
-        awk.density_df.filter(regex='exeqa_[AB]|loss').plot()
+        Create figure with common defaults
 
-    """
-    n = 1 << log2
-    sc = 2 * n
-    xs = [int(bin(i)[2:], 4) for i in range(n)]
-    ys = [2*i for i in xs]
-    ps = [1 / n for i in xs]
-    if scale is True:
-        xs = xs / sc
-        ys = ys / sc
+        cycle = cws
+            c - cycle colors
+            w - cycle widths
+            s - cycle styles
+            o - styles x colors, implies csw and w=single number (produces 8 series)
 
-    A = agg.Aggregate('A', exp_en=1, sev_name='dhistogram', sev_xs=xs, sev_ps=ps,
-                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
-    B = agg.Aggregate('B', exp_en=1, sev_name='dhistogram', sev_xs=ys, sev_ps=ps,
-                      freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
-    awk = agg.Portfolio('awkward', [A, B])
-    awk.update(log2+1, 1/sc if scale else 1, remove_fuzz=True, padding=0)
-    return awk
+        lw = default line width or [lws] of length 4
+
+        smaller k overall darker lines; colors are equally spaced between 0 and k
+        k=0.8 is a reasonable range for four colors (0, k/3, 2k/3, k)
+
+        https://matplotlib.org/3.1.1/tutorials/intermediate/color_cycle.html
+
+        https://matplotlib.org/3.1.1/users/dflt_style_changes.html#colors-in-default-property-cycle
+
+        https://matplotlib.org/2.0.2/examples/color/colormaps_reference.html
+
+        https://matplotlib.org/3.1.0/gallery/lines_bars_and_markers/linestyles.html
+
+        https://stackoverflow.com/questions/22408237/named-colors-in-matplotlib
+        """
+
+        assert len(cycle) > 0
+
+        # this sets a much smaller base fontsize
+        # plt.rcParams.update({'axes.titlesize': 'large'})
+        # plt.rcParams.update({'axes.labelsize': 'small'})
+        # list(map(plt.rcParams.get, ('axes.titlesize', 'font.size')))
+        # everything scales off font size
+        plt.rcParams['font.size'] = font_size
+        # mpl default is medium
+        plt.rcParams['legend.fontsize'] = legend_font
+        # see https://matplotlib.org/stable/gallery/color/named_colors.html
+        self.plot_face_color = 'lightsteelblue'
+        self.figure_bg_color = 'aliceblue'
+        # graphics set up
+        plt.rcParams["axes.facecolor"] = self.plot_face_color
+        # note plt.rc lets you set multiple related properties at once:
+        plt.rc('legend', fc=self.plot_face_color, ec=self.plot_face_color)
+        # is equivalent to two calls:
+        # plt.rcParams["legend.facecolor"] = self.plot_face_color
+        # plt.rcParams["legend.edgecolor"] = self.plot_face_color
+        plt.rcParams['figure.facecolor'] = self.figure_bg_color
+
+        self.default_figsize = default_figsize
+        self.plot_colormap_name = 'cividis'
+
+        # fonts: add some better fonts as earlier defaults
+        mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif', 'Bitstream Vera Serif',
+                                      'Computer Modern Roman', 'New Century Schoolbook', 'Century Schoolbook L',
+                                      'Utopia', 'ITC Bookman',
+                                      'Bookman', 'Nimbus Roman No9 L', 'Times', 'Palatino', 'Charter', 'serif']
+        mpl.rcParams['font.sans-serif'] = ['Nirmala UI', 'Myriad Pro', 'Segoe UI', 'DejaVu Sans', 'Bitstream Vera Sans',
+                                           'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid',
+                                           'Arial',
+                                           'sans-serif']
+        mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono',
+                                          'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono',
+                                          'Nimbus Mono L', 'Courier New',
+                                          'Courier', 'Fixed', 'Terminal', 'monospace']
+        mpl.rcParams['font.family'] = 'serif'
+        # or
+        # plt.rc('font', family='serif')
+        # much nicer math font, default is dejavusans
+        mpl.rcParams['mathtext.fontset'] = 'stixsans'
+
+        if color_mode == 'mono':
+            # https://stackoverflow.com/questions/20118258/matplotlib-coloring-line-plots-by-iteration-dependent-gray-scale
+            # default_colors = ['black', 'grey', 'darkgrey', 'lightgrey']
+            default_colors = [(i * k, i * k, i * k) for i in [0, 1 / 3, 2 / 3, 1]]
+            default_ls = ['solid', 'dashed', 'dotted', 'dashdot']
+
+        elif color_mode == 'cmap':
+            # print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+            norm = mpl.colors.Normalize(0, 1, clip=True)
+            cmappable = mpl.cm.ScalarMappable(
+                norm=norm, cmap=self.plot_colormap_name)
+            mapper = cmappable.to_rgba
+            default_colors = list(map(mapper, np.linspace(0, 1, 10)))
+            default_ls = ['solid', 'dashed',
+                          'dotted', 'dashdot', (0, (5, 1))] * 2
+        else:
+            default_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
+                              '#7f7f7f', '#bcbd22', '#17becf']
+            default_ls = ['solid', 'dashed',
+                          'dotted', 'dashdot', (0, (5, 1))] * 2
+
+        props = []
+        if 'o' in cycle:
+            n = len(default_colors) // 2
+            if color_mode == 'mono':
+                cc = [i[1] for i in product(default_ls, default_colors[::2])]
+            else:
+                cc = [i[1] for i in product(default_ls, default_colors[:n])]
+            lsc = [i[0] for i in product(default_ls, default_colors[:n])]
+            props.append(cycler('color', cc))
+            props.append(
+                cycler('linewidth', [lw] * (len(default_colors) * len(default_ls) // 2)))
+            props.append(cycler('linestyle', lsc))
+        else:
+            if 'c' in cycle:
+                props.append(cycler('color', default_colors))
+            else:
+                props.append(
+                    cycler('color', [default_colors[0]] * len(default_ls)))
+            if 'w' in cycle:
+                if type(lw) == int:
+                    props.append(
+                        cycler('linewidth', [lw] * len(default_colors)))
+                else:
+                    props.append(cycler('linewidth', lw))
+            if 's' in cycle:
+                props.append(cycler('linestyle', default_ls))
+
+        # combine all cyclers
+        cprops = props[0]
+        for c in props[1:]:
+            cprops += c
+
+        mpl.rcParams['axes.prop_cycle'] = cycler(cprops)
+
+    def make_fig(self, nr=1, nc=1, figsize=None, xfmt='great', yfmt='great',
+                 places=None, power_range=(-3, 3), sep='', unit='', sci=True,
+                 mathText=False, offset=True, **kwargs):
+        """
+
+        make grid of axes
+        apply format to xy axes
+
+        xfmt='d' for default axis formatting, n=nice, e=engineering, s=scientific, g=great
+        great = engineering with power of three exponents
+
+        """
+
+        if figsize is None:
+            figsize = self.default_figsize
+
+        f, axs = plt.subplots(nr, nc, figsize=figsize,
+                              constrained_layout=True, squeeze=False, **kwargs)
+        for ax in axs.flat:
+            if xfmt[0] != 'd':
+                FigureManager.easy_formatter(ax, which='x', kind=xfmt, places=places,
+                                             power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText,
+                                             offset=offset)
+            if yfmt[0] != 'default':
+                FigureManager.easy_formatter(ax, which='y', kind=yfmt, places=places,
+                                             power_range=power_range, sep=sep, unit=unit, sci=sci, mathText=mathText,
+                                             offset=offset)
+
+        if nr * nc == 1:
+            axs = axs[0, 0]
+
+        self.last_fig = f
+        return f, axs
+
+    __call__ = make_fig
+
+    @staticmethod
+    def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
+                       mathText=False, offset=True):
+        """
+        set which (x, y, b, both) to kind = sci, eng, nice
+        nice = engineering but uses e-3, e-6 etc.
+        see docs for ScalarFormatter and EngFormatter
+
+
+        """
+
+        def make_fmt(kind, places, power_range, sep, unit):
+            if kind == 'sci' or kind[0] == 's':
+                fm = ticker.ScalarFormatter()
+                fm.set_powerlimits(power_range)
+                fm.set_scientific(True)
+            elif kind == 'eng' or kind[0] == 'e':
+                fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
+            elif kind == 'great' or kind[0] == 'g':
+                fm = GreatFormatter(
+                    sci=sci, power_range=power_range, offset=offset, mathText=mathText)
+            elif kind == 'nice' or kind[0] == 'n':
+                fm = ticker.EngFormatter(unit=unit, places=places, sep=sep)
+                fm.ENG_PREFIXES = {
+                    i: f'e{i}' if i else '' for i in range(-24, 25, 3)}
+            else:
+                raise ValueError(f'Passed {kind}, expected sci or eng')
+            return fm
+
+        # what to set
+        if which == 'b' or which == 'both':
+            which = ['xaxis', 'yaxis']
+        elif which == 'x':
+            which = ['xaxis']
+        else:
+            which = ['yaxis']
+
+        for w in which:
+            fm = make_fmt(kind, places, power_range, sep, unit)
+            getattr(ax, w).set_major_formatter(fm)

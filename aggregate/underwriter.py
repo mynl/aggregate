@@ -291,9 +291,10 @@ class Underwriter(object):
             # obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
         elif kind == 'sev':
             if 'sev_wt' in spec:
-                spec = spec.copy()
-                del spec['sev_wt']
-            obj = Severity(**spec)
+                logger.warning('mixed severity cannot be created, returning spec.')
+                obj = None
+            else:
+                obj = Severity(**spec)
         else:
             ValueError(f'Cannot build {kind} objects')
         return obj
@@ -443,9 +444,15 @@ class Underwriter(object):
                 # remember the spec comes back as a list of aggs that have been entered into the uw
                 if create_all or program != '':
                     obj = self.factory(kind, name, spec, program)
-                    if update:
-                        obj.update(log2, bs, **kwargs)
-                    rv[(kind, name)] = (obj, program)
+                    if obj is not None:
+                        # this can fail for named mixed severities, which can only
+                        # be created in context of an agg... that behaviour is
+                        # useful for named severities though... hence:
+                        if update:
+                            obj.update(log2, bs, **kwargs)
+                        rv[(kind, name)] = (obj, program)
+                    else:
+                        rv[(kind, name)] = (spec, program)
                 else:
                     rv[(kind, name)] = (spec, program)
 

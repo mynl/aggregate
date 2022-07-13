@@ -52,7 +52,6 @@ class Portfolio(object):
     """
     Portfolio creates and manages a portfolio of Aggregate objects.
 
-
     Notes from Enhance Portfolio
     ============================
 
@@ -67,9 +66,9 @@ class Portfolio(object):
 
     Exhibit creators (EX_name)
     --------------------------
-        1. basic_loss_statistics
-        2. distortion_information
-        3. distortion_calibration
+        1. DROPPED basic_loss_statistics
+        2. DROPPED distortion_information
+        3. DROPPED distortion_calibration
         4. premium_capital
         5. multi_premium_capital
         6. accounting_economic_balance_sheet
@@ -80,7 +79,7 @@ class Portfolio(object):
         DROPPED 8. year_end_option_analysis (implied stand alone vs pooled analysis)
 
         Run a distortion and compare allocations
-        9. compare_allocations
+        9. DROPPED compare_allocations
             creates:
                 EX_natural_allocation_summary
                 EX_allocated_capital_comparison
@@ -92,11 +91,11 @@ class Portfolio(object):
         10. make_all
             runs all of 1-9 with sensible defaults
 
-        11. show
+        11. show_enhaned_exhibits
             shows all exhibits, with exhibit title
             uses `self.dir` to find all attributes EX_
 
-        12. qi
+        12. DROPPED qi
             quick info: the basic_loss_stats plus a density plot
 
     Graphics
@@ -148,15 +147,6 @@ class Portfolio(object):
 
         # port.make_all() will update all exhibits with sensible defaults
 
-        port.basic_loss_statistics(p=.9999)
-        display(port.EX_basic_loss_statistics)
-
-        port.distortion_information()
-        display(port.EX_distortion_information)
-
-        port.distortion_calibration()
-        display(port.EX_distortion_calibration)
-
         port.premium_capital(a=20000)
         display(port.EX_premium_capital)
 
@@ -166,46 +156,18 @@ class Portfolio(object):
         port.accounting_economic_balance_sheet(a=20000)
         display(port.EX_accounting_economic_balance_sheets)
 
-        port.margin_earned(a=20000)
-        display(port.EX_margin_earned)
+        port.show_enhanced_exhibits()
 
-        port.year_end_option_analysis('Thin', a=20000)
-        display(port.EX_year_end_option_analysis)
+        port.density_plot(f, ax0, ax1, p=0.999999)
 
-        port.compare_allocations('wang', ROE=0.1, a=20000)
-        display(port.EX_natural_allocation_summary)
-        display(port.EX_allocated_capital_comparison)
-        display(port.EX_margin_comparison)
-        display(port.EX_return_on_allocated_capital_comparison)
-
-        port.show()
-
-        port.qi()
-
-        f, axs = smfig(1,2, (7,3))
-        a1, a2 = axs.flat
-        port.density_plot(f, a1, a2, p=0.999999)
-
-        smfig = grt.FigureManager(cycle='c', color_mode='c', legend_font='medium')
-        f, a = smfig(1,1,(4,6))
-        port.profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
+        port.profit_segment_plot(ax, 0.999, ['total', 'Thick', 'Thin'],
                                      [2,0,1,0], [0,0,0], 'ph')
 
-        f, a = smfig(1,1,(6,10))
-        port.natural_profit_segment_plot(a, 0.999, ['total', 'Thick', 'Thin'],
+        port.natural_profit_segment_plot(ax, 0.999, ['total', 'Thick', 'Thin'],
                                      [2,0,1,0], [0,0,0])
-        port.profit_segment_plot(a, 0.999, ['Thick', 'Thin'],
+
+        port.profit_segment_plot(ax, 0.999, ['Thick', 'Thin'],
                                      [3,4], [0,0], 'wang')
-        a.legend()
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot(axs, 20000)
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot2(axs, 20000, 20000, 'xlee')
-
-        f, axs = smfig(2,2,(8,6))
-        port.alpha_beta_four_plot2(axs, 20000, 20000, 'lee')
 
         aug_df = port.augmented_df
         f, axs = smfig(1,2, (10,5), sharey=True)
@@ -220,11 +182,6 @@ class Portfolio(object):
 
     ```
     force = do even if exist...force an update
-
-
-
-
-
 
     :param name: the name of the portfolio, no spaces or underscores
     :param spec_list: a list of 1) dictionary: Aggregate object dictionary specifications or
@@ -343,18 +300,10 @@ class Portfolio(object):
         self.figure = None
 
         # enhanced portfolio items
-        self.EX_basic_loss_statistics = None
-        self.EX_distortion_information = None
-        self.EX_distortion_calibration = None
         self.EX_premium_capital = None
         self.last_a = None
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
-        self.EX_natural_allocation_summary = None
-        self.EX_allocated_capital_comparison = None
-        self.EX_margin_comparison = None
-        self.EX_loss_ratio_comparison = None
-        self.EX_return_on_allocated_capital_comparison = None
 
     def __str__(self):
         """
@@ -5245,79 +5194,6 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         return ports
 
     # enhanced portfolio methods (see description in class doc string)
-    def basic_loss_statistics(self, p=0.995, lines=None, line_names=None, deets=True):
-        """
-        mean, CV, skew, curt and some percentiles
-        optionally add additional p quantiles
-
-        lines = include not these lines to right with names as given
-
-        """
-        cols = ['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'Skew', 'EmpKurt', 'P99.0', 'P99.6']
-        if not deets:
-            for i in ['EmpMean', 'MeanErr', 'EmpCV', 'CVErr']:
-                cols.remove(i)
-        bls = self.audit_df[cols].T
-        if p not in [.99, .996]:
-            bls.loc[f'P{100 * p:.4f}', :] = \
-                [ag.q(p) for ag in self.agg_list] + [self.q(p)]
-
-        if lines:
-            if line_names is None:
-                line_names = [f'Not {line}' for line in lines]
-            for line, line_name in zip(lines, line_names):
-                # add not line which becomes the end of period reserves
-                xs = self.density_df.loss
-                ps = self.density_df[f'ημ_{line}']
-                t = xs * ps
-                ex1 = np.sum(t)
-                t *= xs
-                ex2 = np.sum(t)
-                t *= xs
-                ex3 = np.sum(t)
-                t *= xs
-                ex4 = np.sum(t)
-                m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
-                # empirical kurtosis
-                kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
-                ans = np.zeros(3)
-                temp = ps.cumsum()
-                for i, p in enumerate([0.99, 0.995, p]):
-                    ans[i] = (temp > p).idxmax()
-                newcol = [m, cv, s, kurt] + list(ans)
-                bls[line_name] = newcol[:len(bls)]
-
-        self.EX_basic_loss_statistics = bls.rename(index=dict(EmpKurt='Kurt'),
-                                                   columns=self.line_renamer)
-
-    def distortion_information(self):
-        """
-        summary of the distortion calibration information
-        """
-        self.EX_distortion_information = self.dist_ans.reset_index(drop=False). \
-            sort_values('method')[['method', 'param']]. \
-            rename(columns=dict(method='Distortion', param='Shape Parameter')). \
-            set_index('Distortion').rename(index=Distortion._distortion_names_)
-
-    def distortion_calibration(self):
-
-        """
-        one line summary from the distortion calibration
-        was premium_capital_summary
-        """
-
-        self.EX_distortion_calibration = self.dist_ans.xs(self.distortion.name, level=2).iloc[:, :-1]
-        self.EX_distortion_calibration = self.EX_distortion_calibration.reset_index(drop=False)
-        self.EX_distortion_calibration.columns = ['$a$', 'LR', '$S(a)$', '$\\iota$', '$\\delta$', '$\\nu$',
-                                                  '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg', '$\\bar Q(a)$',
-                                                  'ROE', 'Shape']
-        # delta and nu kinda useless
-        self.EX_distortion_calibration = self.EX_distortion_calibration[
-            ['Shape', '$a$', 'LR', '$S(a)$', '$\\iota$', '$\\nu$',
-             '$EL(a)$', '$\\rho(X\\wedge a)$', 'Levg',
-             '$\\bar Q(a)$', 'ROE']]
-        self.EX_distortion_calibration.loc[0, 'Distortion'] = self.distortion.name
-        self.EX_distortion_calibration = self.EX_distortion_calibration.set_index('Distortion')
 
     def premium_capital(self, a=0, p=0):
         """
@@ -5355,7 +5231,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         """
         if keys is None:
-            keys = [f'$a={i:.1f}$' for i in As]
+            keys = [f'a={i:.1f}' for i in As]
 
         ans = []
         for a in As:
@@ -5390,72 +5266,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         aebs.index.name = 'Item'
         self.EX_accounting_economic_balance_sheet = aebs.rename(index=self.line_renamer)
 
-    def compare_allocations(self, verbose=False):
-
-        """
-
-        CAS-ASTIN talks...and general comparison of ROE, alloc capital etc.
-        cycle round -
-
-        """
-        # utility
-        if verbose:
-            qd = lambda x: display(x.style)  # .format('{:.5g}'))
-        else:
-            qd = lambda x: 1
-
-        # use last calibration / run
-        dist_name = self.distortion.name
-        a = self.ad_ans.audit_df.at['a', 'stat']
-
-        display(HTML('<h3>Audit</h3>'))
-        qd(self.ad_ans.audit_df)
-
-        # double check
-        a1 = float(self.ad_ans.audit_df.loc['a_cal'])
-        if a1 != a:
-            print('Warning: computed and input a values disagree\n' * 3, f'input {a}\ncalcd {a1}')
-
-        # hack off exhibits
-        display(HTML(f'<h3>Natural Allocation, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.loc[f'Dist {dist_name}']
-        bit.index.name = None
-        self.EX_natural_allocation_summary = bit.rename(
-            index=dict(L='Loss', LR='Loss Ratio', M='Margin', P='Premium', PQ='P/S Ratio', Q='Equity'),
-            columns=self.line_renamer).copy()
-        self.EX_natural_allocation_summary.loc['Assets', :] = self.EX_natural_allocation_summary.loc['Premium'] + \
-                                                              self.EX_natural_allocation_summary.loc['Equity']
-        qd(self.EX_natural_allocation_summary)
-
-        display(HTML(f'<h3>Allocated Capital Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('Q', level=1)
-        bit.index.name = None
-        self.EX_allocated_capital_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_allocated_capital_comparison)
-
-        display(HTML(f'<h3>Margin Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('M', level=1)
-        bit.index.name = None
-        self.EX_margin_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_margin_comparison)
-
-        display(HTML(f'<h3>Loss Ratio Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('LR', level=1)
-        bit.index.name = None
-        self.EX_loss_ratio_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_loss_ratio_comparison)
-
-        display(HTML(f'<h3>ROE Comparison, $a={a:.1f}$</h3>'))
-        bit = self.ad_ans.exhibit.xs('ROE', level=1)
-        bit.index.name = None
-        self.EX_return_on_allocated_capital_comparison = bit.rename(
-            index={'T': f'Natural, {dist_name}'}, columns=self.line_renamer).copy()
-        qd(self.EX_return_on_allocated_capital_comparison)
-
-    def make_all(self, p=0, a=0, As=None, ROE=0.1, mass_hints=None):
+    def make_all(self, p=0, a=0, As=None):
         """
         make all exhibits with sensible defaults
         if not entered, paid line is selected as the LAST line
@@ -5463,20 +5274,16 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         """
         a, p = self.set_a_p(a, p)
 
-        self.basic_loss_statistics(p)
-
         # exhibits that require a distortion
         if self.distortion is not None:
-            self.distortion_information()
-            self.distortion_calibration()
             self.premium_capital(a=a, p=p)
-            if As:
+            if As is not None:
                 self.multi_premium_capital(As)
             self.accounting_economic_balance_sheet(a=a, p=p)
 
     def show_enhanced_exhibits(self, fmt='{:.5g}'):
         """
-        show all the made exhibits
+        show all the exhibits created by enhanced_portfolio methods
         """
         display(HTML(f'<h2>Exhibits for {self.name.replace("_", " ").title()} Portfolio</h2>'))
         for x in dir(self):
@@ -5488,64 +5295,93 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                     display(ob.style.format(fmt, subset=ob.select_dtypes(np.number).columns))
                     display(HTML(f'<hr>'))
 
-    def profit_segment_plot(self, a, p, line_names, colors, transs, dist_name):
+    def profit_segment_plot(self, ax, p, line_names, dist_name, colors=None, translations=None):
         """
-        add all the lines, optionally translate
-        requested distortion is applied on the fly
+        Lee diagram for each requested line on a stand-alone basis, loss and risk adj
+        premium using the dist_name distortion. Optionally specify colors, using C{n}.
+        Optionally specify translations applied to each line. Generally, this applies
+        to shift the cat line up by E[non cat] losses to show it overlays the total.
 
+        For a Portfolio with line names CAT and NC::
+
+            port.gross.profit_segment_plot(ax, 0.99999, ['total', 'CAT', 'NC'],
+                                'wang', [2,0,1])
+
+        add translation to cat line::
+
+            port.gross.profit_segment_plot(ax, 0.99999, ['total', 'CAT', 'NC'],
+                                'wang', [2,0,1], [0, E[NC], 0])
+
+
+        :param ax: axis on which to render
+        :param p:  probability level to set upper and lower y axis limits (p and 1-p quantiles)
+        :param line_names:
+        :param dist_name:
+        :param colors:
+        :param translations:
+        :return:
         """
+
         dist = self.dists[dist_name]
-        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        for line, cn, trans in zip(line_names, colors, transs):
-            c = col_list[cn]
+        if colors is None:
+            colors = range(len(line_names))
+        if translations is None:
+            translations = [0] * len(line_names)
+        for line, cn, translation in zip(line_names, colors, translations):
+            c = f'C{cn}'
             f1 = self.density_df[f'p_{line}'].cumsum()
             idx = (f1 < p) * (f1 > 1.0 - p)
             f1 = f1[idx]
             gf = 1 - dist.g(1 - f1)
-            x = self.density_df.loss[idx] + trans
-            a.plot(gf, x, '-', c=c, label=f'Risk Adj {line}' if trans == 0 else None)
-            a.plot(f1, x, '--', c=c, label=line if trans == 0 else None)
-            if trans == 0:
-                a.fill_betweenx(x, gf, f1, color=c, alpha=0.5)
+            x = self.density_df.loss[idx] + translation
+            ax.plot(gf, x, '-', c=c, label=f'Risk Adj {line}' if translation == 0 else None)
+            ax.plot(f1, x, '--', c=c, label=line if translation == 0 else None)
+            if translation == 0:
+                ax.fill_betweenx(x, gf, f1, color=c, alpha=0.5)
             else:
-                a.fill_betweenx(x, gf, f1, color=c, edgecolor='black', alpha=0.5, hatch='+')
-        a.set(ylim=[0, self.q(p)])
-        a.legend(loc='upper left')
+                ax.fill_betweenx(x, gf, f1, color=c, edgecolor='black', alpha=0.5)
+        # if you plot a small line this needs to start at zer0!
+        ax.set(ylim=[0, self.q(p)])
+        ax.legend(loc='upper left')
 
-    def natural_profit_segment_plot(self, a, p, line_names, colors, transs):
+    def natural_profit_segment_plot(self, ax, p, line_names, colors, translations):
         """
-        plot the natural allocations
-        between 1-p and p th percentiles
-        optionally translate a line
-        works with augmented_df, no input dist
+        Plot the natural allocations between 1-p and p th percentiles and
+        optionally translate line(s).
+        Works with augmented_df, no input distortion. User must ensure the
+        correct distortion has been applied.
 
+        :param ax:
+        :param p:
+        :param line_names:
+        :param colors:
+        :param translations:
+        :return:
         """
-        col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
         lw, up = self.q(1 - p), self.q(p)
         # common extract for all lines
         bit = self.augmented_df.query(f' {lw} <= loss <= {up} ')
         F = bit[f'F']
         gF = bit[f'gF']
-        x = bit.loss
-        for line, cn, trans in zip(line_names, colors, transs):
-            c = col_list[cn]
+        for line, cn, translation in zip(line_names, colors, translations):
+            c = f'C{cn}'
             ser = bit[f'exeqa_{line}']
-            a.plot(F, ser, ls='dashed', c=c)
-            a.plot(gF, ser, c=c)
-            if trans == 0:
-                a.fill_betweenx(ser + trans, gF, F, color=c, alpha=0.5, label=line)
+            ax.plot(F, ser, ls='dashed', c=c)
+            ax.plot(gF, ser, c=c)
+            if translation == 0:
+                ax.fill_betweenx(ser + translation, gF, F, color=c, alpha=0.5, label=line)
             else:
-                a.fill_betweenx(ser, gF, F, color=c, alpha=0.5, label=line)
-        a.set(ylim=[0, self.q(p)])
-        a.legend(loc='upper left')
-        # a.set(title=self.distortion)
+                ax.fill_betweenx(ser, gF, F, color=c, alpha=0.5, label=line)
+        # see comment above.
+        ax.set(ylim=[0, up], title=self.distortion)
+        ax.legend(loc='upper left')
 
     def density_sample(self, n=20, reg="loss|p_|exeqa_"):
         """
         sample of equally likely points from density_df with interesting columns
         reg - regex to select the columns
         """
-        ps = np.linspace(0.001, 0.999, 20)
+        ps = np.linspace(0.001, 0.999, n)
         xs = [self.q(i) for i in ps]
         return self.density_df.filter(regex=reg).loc[xs, :].rename(columns=self.renamer)
 
@@ -5553,7 +5389,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                          log=True, cmap='Greys', min_density=1e-15, levels=30, lines=None, linecolor='w',
                          colorbar=False, normalize=False, **kwargs):
         """
-        Nake contour plot of line A vs line B
+        Make contour plot of line A vs line B
         Assumes port only has two lines
 
         Works with an extract density_df.loc[np.arange(min_loss, max_loss, jump), densities]
@@ -5576,6 +5412,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         optionally could deal with diagonal lines, countour levels etc.
         originally from ch09
         """
+        
         # careful about origin when big prob of zero loss
         npts = np.arange(min_loss, max_loss, jump)
         ps = [f'p_{i}' for i in self.line_names]

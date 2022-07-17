@@ -1,13 +1,4 @@
 """
-Purpose
--------
-
-A Portfolio represents a collection of Aggregate objects. Applications include
-
-* Model a book of insurance
-* Model a large account with several sub lines
-* Model a reinsurance portfolio or large treaty
-
 
 
 """
@@ -50,12 +41,16 @@ logger = logging.getLogger(__name__)
 
 class Portfolio(object):
     """
-    Portfolio creates and manages a portfolio of Aggregate objects.
+    Portfolio creates and manages a portfolio of Aggregate objects. Applications include
+
+    * Model a book of insurance
+    * Model a large account with several sub lines
+    * Model a reinsurance portfolio or large treaty
 
     Notes from Enhance Portfolio
     ============================
 
-        Add all the enhanced exhibits methods to port.
+    Add all the enhanced exhibits methods to port.
 
     Methods defined within this function.
 
@@ -130,10 +125,7 @@ class Portfolio(object):
         DROPPED 25. save
         26. density_sample: stratified sample from density_df
 
-
-    Sample Runner
-    =============
-    ```python
+    **Sample Runner** ::
 
         from common_header import *
         get_ipython().run_line_magic('config', "InlineBackend.figure_format = 'svg'")
@@ -180,15 +172,18 @@ class Portfolio(object):
         a1.set(aspect='equal', title='Conditional Expectations\nBy Line')
         port.biv_contour_plot(f, a2, 5, bigx, 100, log=False, cmap='viridis_r', min_density=1e-12)
 
-    ```
+
     force = do even if exist...force an update
 
-    :param name: the name of the portfolio, no spaces or underscores
-    :param spec_list: a list of 1) dictionary: Aggregate object dictionary specifications or
-                                2) Aggregate: An actual aggregate objects or
-                                3) tuple (type, dict) as returned by uw['name'] or
-                                4) string: Names referencing objects in the optionally passed underwriter
+    :param name: The name of the portfolio, no spaces or underscores.
+    :param spec_list: A list of
 
+           1) dictionary: Aggregate object dictionary specifications or
+           2) Aggregate: An actual aggregate objects or
+           3) tuple (type, dict) as returned by uw['name'] or
+           4) string: Names referencing objects in the optionally passed underwriter
+
+    :returns:
     """
 
     # namer helper classes
@@ -918,9 +913,10 @@ class Portfolio(object):
 
     def merton_perold(self, p, kind='lower'):
         """
-        compute Merton Perold capital allocation at VaR(p) capital using VaR as risk measure
-        v = q(p)
+        Compute Merton-Perold capital allocation at VaR(p) capital using VaR as risk measure.
+
         TODO TVaR version of Merton Perold
+
         """
         # figure total assets
         a = self.q(p, kind)
@@ -939,17 +935,18 @@ class Portfolio(object):
 
     def cotvar(self, p):
         """
-        make the p co-tvar asset allocation  using ISA
-        Asset alloc = exgta = tail expected value, treating TVaR like a pricing variable
+        Compute the p co-tvar asset allocation using ISA.
+        Asset alloc = exgta = tail expected value, treating TVaR like a pricing variable.
+
         """
         av = self.q(p)
         return self.density_df.loc[av, [f'exgta_{l}' for l in self.line_names_ex]].values
 
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """
-        convert into a severity without recomputing
+        Convert portfolio into a severity without recomputing.
 
-        throws error if self not updated
+        Throws an error if self not updated.
 
         :param limit:
         :param attachment:
@@ -963,8 +960,8 @@ class Portfolio(object):
 
     def fit(self, approx_type='slognorm', output='agg'):
         """
-        returns a dictionary specification of the portfolio aggregate_project
-        if updated uses empirical moments, otherwise uses theoretic moments
+        Returns a dictionary specification of the portfolio aggregate_project.
+        If updated uses empirical moments, otherwise uses theoretic moments
 
         :param approx_type: slognorm | sgamma
         :param output: return a dict or agg language specification
@@ -1003,9 +1000,9 @@ class Portfolio(object):
 
     def collapse(self, approx_type='slognorm'):
         """
-        returns new Portfolio with the fit
+        Returns new Portfolio with the fit
 
-        Deprecated...prefer uw.write(self.fit()) to go through the agg language approach
+        Deprecated...prefer uw.write(self.fit()) to go through the agg language approach.
 
         :param approx_type: slognorm | sgamma
         :return:
@@ -1017,10 +1014,10 @@ class Portfolio(object):
 
     def percentiles(self, pvalues=None):
         """
-        report_ser on percentiles and large losses
-        uses interpolation, audit_df uses nearest
+        report_ser on percentiles and large losses.
+        Uses interpolation, audit_df uses nearest.
 
-        :pvalues: optional vector of log values to use. If None sensible defaults provided
+        :param pvalues: optional vector of log values to use. If None sensible defaults provided
         :return: DataFrame of percentiles indexed by line and log
         """
         df = pd.DataFrame(columns=['line', 'log', 'Agg Quantile'])
@@ -1039,7 +1036,7 @@ class Portfolio(object):
 
     def recommend_bucket(self):
         """
-        data to help estimate a good bucket size
+        Data to help estimate a good bucket size.
 
         :return:
         """
@@ -1062,7 +1059,8 @@ class Portfolio(object):
 
     def best_bucket(self, log2=16):
         """
-        Recommend the best bucket.
+        Recommend the best bucket. Rounded recommended bucket for log2 points.
+
         TODO: Is this really the best approach?!
 
         :param log2:
@@ -1075,9 +1073,10 @@ class Portfolio(object):
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
                trim_df=False, add_exa=True, force_severity=True, debug=False):
         """
+
         TODO: currently debug doesn't do anything...
 
-        create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
+        Create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
 
         tilting: [@Grubel1999]: Computation of Compound Distributions I: Aliasing Errors and Exponential Tilting
@@ -1264,8 +1263,12 @@ class Portfolio(object):
     def update_efficiently(self, log2, bs, approx_freq_ge=100, approx_type='slognorm',
                            sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1):
         """
-        runs stripped down versions of update and add_exa - bare bones
-        code copied from those routines and cleaned for comments etc.
+        Runs stripped down versions of update and add_exa.
+        Code copied from those routines and cleaned for comments etc.
+        NOT UPDATED FOR REINSURANCE.
+
+        TODO: is this enough of a speedup to be useful?
+
 
         :param log2:
         :param bs:
@@ -1466,7 +1469,7 @@ class Portfolio(object):
 
     def trim_df(self):
         """
-        trim out unwanted columns from density_df
+        Trim out unwanted columns from density_df
 
         epd used in graphics
 
@@ -1494,16 +1497,17 @@ class Portfolio(object):
 
         :param epsilon: the increment to use; scale is 1+epsilon
         :param kind:    homog[ogeneous] or inhomog: homog computes impact of f((1+epsilon)X_i)-f(X_i). Inhomog
-                        scales the frequency and recomputes. Note inhomog will have a slight scale issues with
-                        E[Severity]
+               scales the frequency and recomputes. Note inhomog will have a slight scale issues with
+               E[Severity]
         :param method:  forward, central (using epsilon/2) or backwards
         :param distortion: if included derivatives of statistics using the distortion, such as exag are also
-                            computed
+               computed
         :param extra_columns: extra columns to compute dervs of. Note there is virtually no overhead of adding additional
-                        columns
+               columns
         :param do_swap: force the step to replace line with line+epsilon in all not line2's line2!=line1; whether you need
-        this or not depends on what variables you to be differentiated. E.g. if you ask for exa_total only you don't need
-        to swap. But if you want exa_A, exa_B you do, otherwise the d/dA exa_B won't be correct. TODO: replace with code!
+               this or not depends on what variables you to be differentiated. E.g. if you ask for exa_total only you don't need
+                to swap. But if you want exa_A, exa_B you do, otherwise the d/dA exa_B won't be correct.
+                TODO: replace with code!
         :return:   DataFrame of gradients and audit_df in an Answer class
         """
 
@@ -5389,28 +5393,26 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                          log=True, cmap='Greys', min_density=1e-15, levels=30, lines=None, linecolor='w',
                          colorbar=False, normalize=False, **kwargs):
         """
-        Make contour plot of line A vs line B
-        Assumes port only has two lines
+        Make contour plot of line A vs line B. Assumes port only has two lines.
 
         Works with an extract density_df.loc[np.arange(min_loss, max_loss, jump), densities]
         (i.e., jump is the stride). Jump = 100 * bs is not bad...just think about how big the outer product will get!
 
-        Param:
-
-        min_loss  density for each line is sampled at min_loss:max_loss:jump
-        max_loss
-        jump
-        log
-        cmap
-        min_density: smallest density to show on underlying log region; not used if log
-        levels: number of contours or the actual contours if you like
-        lines: iterable giving specific values of k to plot X+Y=k
-        color_bar: show color bar
-        normalize: if true replace Z with Z / sum(Z)
-        kwargs passed to contourf (e.g., use for corner_mask=False, vmin,vmax)
-
-        optionally could deal with diagonal lines, countour levels etc.
-        originally from ch09
+        :param fig:
+        :param ax:
+        :param min_loss:  the density for each line is sampled at min_loss:max_loss:jump
+        :param max_loss:
+        :param jump:
+        :param log:
+        :param cmap:
+        :param min_density: smallest density to show on underlying log region; not used if log
+        :param levels: number of contours or the actual contours if you like
+        :param lines: iterable giving specific values of k to plot X+Y=k
+        :param linecolor:
+        :param colorbar:  show color bar
+        :param normalize: if true replace Z with Z / sum(Z)
+        :param kwargs: passed to contourf (e.g., use for corner_mask=False, vmin,vmax)
+        :return:
         """
         
         # careful about origin when big prob of zero loss
@@ -5894,9 +5896,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         method = extend or roe
 
-        Inpu
-
-        =====
+        Input
 
         blend_d0 is the Book's blend, with roe above the equity point
         blend_d is calibrated to the same premium as the other distortions

@@ -32,7 +32,7 @@ The documentation is divided into five parts. If you are new to the tool, start 
 
 4. The **Reference** describes everything that each object can do. Once you've got the basics, look here for the details.
 
-   * Agg language grammar and railroad diagram
+   * Agg language grammar and railroad diagram.
 
 5. **Technical resources** give actuarial, probability, and other non-programming backup. Background on agg loss dists, SRMs, and useful references.
 
@@ -64,19 +64,12 @@ Table of Contents
 -----------------
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
 
    1_Tutorials
    2_HowTo
-      03_Basic_Examples.ipynb
+   03_Basic_Examples
    3_Discussion
    4_Reference
-   41_underwriter
-   42_parser
-   43_distr
-   44_port
-   45_spectral
-   46_utils
-   47_extensions
    5_Technical
 

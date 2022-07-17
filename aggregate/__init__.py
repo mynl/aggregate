@@ -22,7 +22,7 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     round_bucket, \
     make_ceder_netter, make_mosaic_figure, nice_multiple, \
     style_df, logger_level, friendly, \
-    FigureManager
+    FigureManager, tweedie_convert, power_variance_family
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 from pathlib import Path

@@ -1,6 +1,4 @@
 """
-HACK ON THE ORIGINAL AGG SLY
-
 lexer and parser specification for aggregate
 ============================================
 
@@ -343,6 +341,10 @@ DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
 
 
 class UnderwritingLexer(Lexer):
+    """
+    Implements the Lexer for agg language.
+
+    """
 
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
@@ -351,7 +353,7 @@ class UnderwritingLexer(Lexer):
               LOSS, PREMIUM, AT, LR, CLAIMS, SPECIFIED,
               XS,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS, #  CONSTANT,
-              MIXED, FREQ, EMPIRICAL,
+              MIXED, FREQ, EMPIRICAL, TWEEDIE,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
               AND, PERCENT,
               EXPONENT, EXP,
@@ -402,6 +404,7 @@ class UnderwritingLexer(Lexer):
     # ID['constant'] = CONSTANT
     # nps freq specification
     ID['empirical'] = EMPIRICAL
+    ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['mixed'] = MIXED
     ID['unlim'] = INFINITY
@@ -447,14 +450,14 @@ class UnderwritingLexer(Lexer):
     @staticmethod
     def preprocess(program):
         """
-        Separate preprocessor step so it can be called separately.
+        Separate preprocessor step, allowing it to be called separately.
+        Preprocessing involves ss steps:
 
-        preprocessing:
-            remove // comments, through end of line
-            remove \n in [] (vectors) e.g. put by f{np.linspace} TODO only works for 1d vectors
-            ; mapped to newline
-            backslash (line continuation) mapped to space
-            split on newlines
+        1. Remove // comments, through end of line
+        2. Remove \\n in [ ] (vectors) that appear from  by ``f'{np.linspace}'``
+        3. Semicolon ; mapped to newline
+        4. Backslash (line continuation) mapped to space
+        5. Split on newlines
 
         :param program:
         :return:
@@ -482,6 +485,11 @@ class UnderwritingLexer(Lexer):
 
 
 class UnderwritingParser(Parser):
+    """
+    Implements the Parser for agg language.
+
+    """
+
     # uncomment to write detailed grammar rules
     debugfile = Path.home() / 'aggregate/parser/parser.out'
     tokens = UnderwritingLexer.tokens
@@ -668,6 +676,29 @@ class UnderwritingParser(Parser):
         self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.dsev,
                                          **p.occ_reins, **p.agg_reins, 'note': p.note}
         return p.name
+
+    @_('AGG name TWEEDIE expr expr expr')
+    def agg_out(self, p):
+        self.logger('agg_out <-- AGG name TWEEDIE expr expr expr', p)
+        # Tweedie distribution in p, mean, sigma^2 format
+        # variance function is sigma^2 mean^p
+        # phi = sigma^2 in Jorgenson p. 127 notation
+        # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
+        # lambda = mu^(2-p) / ((2-p) sigma^2)
+        # beta = lambda alpha / mu
+        # see also tweedie_convert... should prob use that here...
+        pp = p[3]
+        mu = p[4]
+        sig2 = p[5]
+        alpha = (2 - pp) / (pp - 1)
+        lam = mu ** (2 - pp) / ((2 - pp) * sig2)
+        beta = lam * alpha / mu
+
+        dout = {'name': p.name, 'exp_en': lam, 'freq_name': 'poisson',
+                'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': 1 / beta,
+                'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:4f}, ga(α={alpha:.4f}, β={beta:.4f}), '
+                        f'scale={1/beta:.4f}'}
+        self.out_dict[('agg', p.name)] = dout
 
     @_('builtin_agg agg_reins note')
     def agg_out(self, p):
@@ -1230,9 +1261,10 @@ class UnderwritingParser(Parser):
 
 
 def grammar(add_to_doc=False, save_to_fn=''):
-    '''
-    write the grammar at the top of the file as a docstring
-    '''
+    """
+    Write the grammar at the top of the file as a docstring
+    """
+
     start_string = '''Language Specification
 ----------------------
 

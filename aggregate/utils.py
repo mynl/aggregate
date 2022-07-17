@@ -204,16 +204,18 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
 
 def round_bucket(bs):
     """
-    compute a decent rounded bucket from an input float bs
+    Compute a decent rounded bucket from an input float bs. ::
 
-    if bs > 1 round to 2, 5, 10,
+        if bs > 1 round to 2, 5, 10, ...
 
-    if bs < 1 find the smallest power of two greater than 1/bs
+        elif bs < 1 find the smallest power of two greater than 1/bs
 
-    Test cases:
+    Test cases: ::
 
-        test_cases = [1, 1.1, 2, 2.5, 4, 5, 5.5, 8.7, 9.9, 10, 13, 15, 20, 50, 100, 99, 101, 200, 250, 400, 457,
-                        500, 750, 1000, 2412, 12323, 57000, 119000, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21]
+        test_cases = [1, 1.1, 2, 2.5, 4, 5, 5.5, 8.7, 9.9, 10, 13,
+                      15, 20, 50, 100, 99, 101, 200, 250, 400, 457,
+                        500, 750, 1000, 2412, 12323, 57000, 119000,
+                        1e6, 1e9, 1e12, 1e15, 1e18, 1e21]
         for i in test_cases:
             print(i, round_bucket(i))
         for i in test_cases:
@@ -926,9 +928,9 @@ class MomentWrangler(object):
 
 def xsden_to_meancv(xs, den):
     """
-    compute mean and cv from xs and density
+    Compute mean and cv from xs and density.
 
-    consider adding: np.nan_to_num(den)
+    Consider adding: np.nan_to_num(den)
 
     :param xs:
     :param den:
@@ -947,14 +949,14 @@ def xsden_to_meancv(xs, den):
 
 def xsden_to_meancvskew(xs, den):
     """
-    compute mean and cv from xs and density
+    Compute mean, cv and skewness from xs and density
 
-    consider adding: np.nan_to_num(den)
+        Consider adding: np.nan_to_num(den)
 
-    :param xs:
-    :param den:
-    :return:
-    """
+        :param xs:
+        :param den:
+        :return:
+        """
     xd = xs * den
     ex1 = np.sum(xd)
     xd *= xs
@@ -965,20 +967,109 @@ def xsden_to_meancvskew(xs, den):
     return mw.mcvsk
 
 
-def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500, **kwds):
+def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
+    """
+    Translate between Tweedie parameters. Input p, μ, σ2 or λ, α, β or  λ, m, cv. Remaining
+    parameters are computed and returned in pandas Series.
+
+    p, μ, σ2 are the reproductive parameters, μ is the mean and the variance equals σ2 μ^p
+    λ, α, β are the additive parameters; λα/β is the mean, λα(α + 1) / β^2 is the variance
+    λ, m, cv specify the compound Poisson with expected claim count λ and gamma with mean m and cv
+
+    In addition, returns p0, the probability mass at 0.
+    """
+
+    if μ is None:
+        if α is None:
+            # λ, m, cv spec directly as compound Poisson
+            assert λ is not None and m is not None and cv is not None
+            α = 1 / cv ** 2
+            β = α / m
+        else:
+            # λ, α, β in additive form
+            assert λ is not None and α is not None and β is not None
+            m = α / β
+            cv = α ** -0.5
+        p = (2 + α) / (1 + α)
+        μ = λ * m
+        σ2 = λ * α * (α + 1) / β ** 2 / μ ** p
+    else:
+        # p, μ, σ2 in reproductive form
+        assert p is not None and μ is not None and σ2 is not None
+        α = (2 - p) / (p - 1)
+        λ = μ**(2-p) / ((2-p) * σ2)
+        β =  λ * α / μ
+        m = α / β
+        cv = α ** -0.5
+
+    p0 = np.exp(-λ)
+    twcv = np.sqrt(σ2 * μ ** p) / μ
+    ans = pd.Series([p, μ, σ2, λ, α, β, twcv, m, cv, p0],
+                    index=['p', 'μ', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
+    return ans
+
+def power_variance_family():
+    """
+    Graph to illustrate the power variance exponential family distributions.
+
+    Reference: Jørgensen, Bent. 1997. The theory of dispersion models. CRC Press.
+    """
+    alpha = np.linspace(-2, 2, 101)
+    p = (alpha-2) / (alpha-1)
+    alphabar = -(alpha+1)
+    f, ax = plt.subplots(figsize=(7,7))
+    ax.plot(alphabar, p, lw=3)
+    ax.set(ylim=[-5,10])
+    # ax.grid(lw=.25, c='b', alpha=.5)
+    ax.axhline(1, c='k', lw=1)
+    ax.axhline(0, c='k', lw=1)
+    ax.axvline(-2, c='k', lw=.5)
+    ax.axvline(-3/2, c='k', lw=0.5, ls='--')
+    ax.axhline(3, c='k', lw=0.5, ls='--')
+    ax.axhline(2, c='r', lw=1)
+    ax.axvline(-1, c='r', lw=1)
+    ax.set(xlabel='$\\bar\\alpha=-(\\alpha+1)$, base jump density is $x^{\\bar\\alpha}$',
+           ylabel='Variance power function $p$, $V(\\mu)=\\phi\\mu^p$')
+    ax.yaxis.set_major_locator(ticker.FixedLocator(np.arange(-4,10)))
+
+    def ql(x, y, t, dot=True, rhs=None):
+        ax.text(x + .05, y+0.2, t)
+        if dot:
+            ax.plot(x,y, 'rd', ms=5)
+        else:
+            if rhs is None:
+                rhs = x + 1
+            ax.plot([x, rhs], [y, y], lw=3)
+
+    ql(-3, 0, 'Normal')
+    ql(-3, 6, 'Stable', False)
+    ql(-2, 9, 'Cauchy')
+    ql(-2, -2, 'Pos Stable', False)
+    ql(-1.5, 3, 'Stab 3/2\nIG')
+    ql(-1, 2, 'Gamma')
+    ql(1, 1, 'Poisson')
+    ql(-1, -2, 'Tweedie', False, 1)
+    ax.set(title='Power Variance Exponential Family Distributions');
+
+
+def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500):
     """
     Illustrate different frequency distributions and frequency moment
     calculations.
 
     sichel_case = gamma | ig | ''
 
-    Sample call: df, ans = frequency_examples(n=100, ν=0.45, f=0.5, κ=1.25, sichel_case='', log2=16, xmax=2500)
+    Sample call: ::
 
-    n = E(N) = expected claim count
-    ν = CV(mixing) = asymptotic CV of any compound aggregate whose severity has a second moment
-    f = proportion of certain claims, 0 <= f < 1, higher f corresponds to greater skewnesss
-    κ = claims per occurrence
-    g_mult = adjust EG^3 of Sichel above/below standard PIG
+        df, ans = frequency_examples(n=100, ν=0.45, f=0.5, κ=1.25,
+                                     sichel_case='', log2=16, xmax=2500)
+
+    :param n: E(N) = expected claim count
+    :param ν: CV(mixing) = asymptotic CV of any compound aggregate whose severity has a second moment
+    :param f: proportion of certain claims, 0 <= f < 1, higher f corresponds to greater skewnesss
+    :param κ: (kappa) claims per occurrence
+    :param sichel_case: gamma, ig or ''
+    :param xmax:
     """
 
     def ft(x):

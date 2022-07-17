@@ -1,11 +1,3 @@
-"""
-Purpose
--------
-
-Bounds implements the methods described in IME 2022.
-
-"""
-
 import aggregate as agg
 import logging
 import matplotlib.pyplot as plt
@@ -25,23 +17,21 @@ logger = logging.getLogger(__name__)
 
 class Bounds(object):
     """
-    Implement IME pricing bounds methodology.
+    Implement IME 2022 pricing bounds methodology.
 
-    Typical usage:
+    Typical usage: First, create a Portfolio or Aggregate object a. Then ::
 
-    * Create a Portfolio or Aggregate object a
-    * bd = cd.Bounds(a)
-    * bd.tvar_cloud('line', premium=, a=, n_tps=, s=, kind=)
-    * p_star = bd.p_star('line', premium)
-    * bd.cloud_view(axes, ...)
+        bd = cd.Bounds(a)
+        bd.tvar_cloud('line', premium=, a=, n_tps=, s=, kind=)
+        p_star = bd.p_star('line', premium)
+        bd.cloud_view(axes, ...)
 
-    distribution_spec = Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
-    If DataFrame or Series values interpreted as desnsity, sum to 1. F, S, exgta all computed using Portfolio
-    methdology
-    If DataFrame line --> p_{line}
-
-    from common_scripts.cs
+    :param: distribution_spec = Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
+            If DataFrame or Series values interpreted as desnsity, sum to 1. F, S, exgta all computed using Portfolio
+            methdology
+            If DataFrame line --> p_{line}
     """
+    # from common_scripts.cs
 
     def __init__(self, distribution_spec):
         assert isinstance(distribution_spec, (pd.Series, pd.DataFrame, agg.Portfolio, agg.Aggregate))
@@ -70,7 +60,8 @@ class Bounds(object):
 
     def __repr__(self):
         """
-        gets called automatically but so we can tweak
+        Gets called automatically but so we can tweak.
+
         :return:
         """
         return 'My Bounds Object at ' + super(Bounds, self).__repr__()
@@ -180,7 +171,7 @@ class Bounds(object):
 
     def make_ps(self, n, mode):
         """
-        mode are you making s points (always uniform) or tvar p points (use t_mode)?
+        Mode are you making s points (always uniform) or tvar p points (use t_mode)?
         self.t_mode == 'u': make uniform s points against which to evaluate g from 0 to 1 inclusive with more around 0
         self.t_mode == 'gl': make Gauss-Legndre p points at which TVaRs are evaluated from 0 inclusive to 1 exclusive with more around 1
 
@@ -217,15 +208,15 @@ class Bounds(object):
 
     def tvar_array(self, line, n_tps=256, b=np.inf, kind='interp'):
         """
-        compute tvars at n equally spaced points, tps
+        Compute tvars at n equally spaced points, tps.
 
 
         :param line:
         :param n_tps:  number of tvar p points, default 256
         :param b: cap on losses applied before computing TVaRs (e.g., adjust losses for finite assets b).
-        Use np.inf for unlimited losses.
+               Use np.inf for unlimited losses.
         :param kind: if interp  uses the standard function, easy, for continuous distributions; if 'tail' uses
-        explicit integration of tail values, for discrete distributions
+               explicit integration of tail values, for discrete distributions
         :return:
         """
         assert kind in ('interp', 'tail')
@@ -333,8 +324,8 @@ class Bounds(object):
 
     def tvar_with_bound(self, p, b=np.inf, kind='interp'):
         """
-        compute tvar taking bound into account
-        assumes tvar_function setup
+        Compute tvar taking bound into account.
+        Assumes tvar_function setup.
 
         Warning: b must equal the b used when calibrated. The issue is computing F
         varies with the type of underlying portfolio. This is fragile.
@@ -823,10 +814,10 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
 
 def similar_risks_example():
     """
-    Interesting beta risks and how to use similar_risks_sa
+    Interesting beta risks and how to use similar_risks_sa.
 
 
-    @return:
+    :return:
     """
     # stand alone hlep from the code; split at program = to run different options
     uw = agg.Underwriter()

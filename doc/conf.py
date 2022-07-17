@@ -39,6 +39,7 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx.ext.autosectionlabel',
     'nbsphinx']
 
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
@@ -49,7 +50,7 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-source_suffix = ['.rst', '.ipnb']
+source_suffix = ['.rst', '.ipynb']
 # source_suffix = '.rst'
 
 # The master toctree document.

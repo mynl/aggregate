@@ -1,9 +1,3 @@
-"""
-Distortion functions to implement spectral risk measures
-
-May 2019: added capped log linear and tt distortions
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
@@ -11,7 +5,6 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from io import StringIO
 import pandas as pd
-from . utils import axiter_factory
 from textwrap import fill
 import logging
 
@@ -24,6 +17,7 @@ class Distortion(object):
     0.9.4: renamed roe to ccoc, but kept creator with roe for backwards compatibility.
 
     """
+
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'ccoc', 'tvar',
                                'wtdtvar', 'convex', 'tt')
@@ -45,7 +39,7 @@ class Distortion(object):
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):
         """
-        list of the available distortions
+        List of the available distortions.
 
         :param pricing: only return list suitable for pricing, excludes tvar and convex
         :param strict: only include those without mass at zero  (pricing only)
@@ -63,7 +57,7 @@ class Distortion(object):
         """
         Create a new distortion.
 
-        Tester:
+        Tester: ::
 
             ps = np.linspace(0, 1, 201)
             for dn in agg.Distortion.available_distortions(True):
@@ -81,7 +75,6 @@ class Distortion(object):
                 print(dn)
                 print("errors")
                 display(df.query(' abs(gg_inv - g_invg) > 1e-5'))
-
 
         :param name: name of an available distortion, call ``Distortion.available_distortions()`` for a list
         :param shape: float or [float, float]
@@ -340,7 +333,7 @@ class Distortion(object):
 
     def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', c=None, **kwargs):
         """
-        quick plot of the distortion
+        Quick plot of the distortion
 
         :param xs:
         :param n:  length of vector is no xs
@@ -401,7 +394,7 @@ class Distortion(object):
     @classmethod
     def test(cls, r0=0.035, df=[0.0, .9]):
         """
-        tester: make some nice plots
+        Tester: make some nice plots of available distortions.
 
         :return:
         """
@@ -444,15 +437,15 @@ class Distortion(object):
     @staticmethod
     def distortions_from_params(params, index, r0=0.025, df=5.5, pricing=True, strict=True):
         """
-        Make set of dist funs and inverses from params, output of port.calibrate_distortions
+        Make set of dist funs and inverses from params, output of port.calibrate_distortions.
         params must just have one row for each method and be in the output format of cal_dist.
 
         Called by Portfolio.
 
         :param index:
         :param params: dataframe such that params[index, :] has a [lep, param] etc.
-        pricing=True, strict=True: which distortions to allow
-        df for t distribution
+               pricing=True, strict=True: which distortions to allow
+               df for t distribution
         :param r0: min rol parameters
         :param strict:
         :param pricing:
@@ -470,7 +463,7 @@ class Distortion(object):
     @staticmethod
     def convex_example(source='bond'):
         """
-        example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf
+        Example convex distortion using data from https://www.bis.org/publ/qtrpdf/r_qt0312e.pdf.
 
         :param source: bond gives a bond yield curve example, cat gives cat bond / cat reinsurance pricing based example
         :return:
@@ -514,12 +507,12 @@ class Distortion(object):
     @staticmethod
     def bagged_distortion(data, proportion, samples, display_name="", random_state=None):
         """
-        make a distortion by bootstrap aggregation (Bagging) resampling, taking the convex envelope,
-        and averaging from data
+        Make a distortion by bootstrap aggregation (Bagging) resampling, taking the convex envelope,
+        and averaging from data.
 
-        Each sample uses proportion of the data
+        Each sample uses proportion of the data.
 
-        data has columns just two columns: EL and Spread
+        Data must have  two columns: EL and Spread
 
         :param data:
         :param proportion: proportion of data for each sample
@@ -550,8 +543,8 @@ class Distortion(object):
     @staticmethod
     def average_distortion(data, display_name, n=201, el_col='EL', spread_col='Spread'):
         """
-        create average distortion from (s, g(s)) pairs. Each point defines a wtdTVaR with
-        p=s and p=1 points
+        Create average distortion from (s, g(s)) pairs. Each point defines a wtdTVaR with
+        p=s and p=1 points.
 
         :param data:
         :param display_name:
@@ -579,7 +572,7 @@ class Distortion(object):
     @staticmethod
     def wtd_tvar(ps, wts, display_name='', details=False):
         """
-        a careful version of wtd tvar with knots at ps and wts
+        A careful version of wtd tvar with knots at ps and wts.
 
         :param ps:
         :param wts:
@@ -609,7 +602,7 @@ class Distortion(object):
     @staticmethod
     def s_gs_distortion(s, gs, display_name=''):
         """
-        make a convex envelope distortion from {s, g(s)} points
+        Make a convex envelope distortion from {s, g(s)} points.
 
         :param s: iterable (can be converted into numpy.array
         :param gs:

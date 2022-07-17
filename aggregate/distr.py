@@ -31,13 +31,12 @@ class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
 
-    freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
+    * freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
+    * mgf(n, z): returns the moment generating function applied to z when EN=n
 
-    mgf(n, z): returns the moment generating function applied to z when EN=n
+    Frequency distributions are either non-mixture types or mixture types.
 
-    **Available Frequency Distributions**
-
-    **Non-Mixture** Types
+    **Non-Mixture** Frequency Types
 
     * ``fixed``: no parameters
     * ``bernoulli``: exp_en interpreted as a probability, must be < 1
@@ -50,7 +49,7 @@ class Frequency(object):
       has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
       cv freq_a
 
-    **Mixture** Types
+    **Mixture** Frequency Types
 
     These distributions are G-mixed Poisson, so N | G ~ Poisson(n G). They are labelled by
     the name of the mixing distribution or the common name for the resulting frequency
@@ -88,11 +87,10 @@ class Frequency(object):
 
     def __init__(self, freq_name, freq_a, freq_b):
         """
-        creates the mgf and moment function
+        Creates the mgf and moment function:
 
-        moment function(n) returns EN, EN^2, EN^3 when EN=n
-
-        mgf(n, z) is the mgf evaluated at log(z) when EN=n
+        * moment function(n) returns EN, EN^2, EN^3 when EN=n.
+        * mgf(n, z) is the mgf evaluated at log(z) when EN=n
 
         """
         self.freq_name = freq_name
@@ -426,254 +424,245 @@ class Frequency(object):
 class Aggregate(Frequency):
     """
     Aggregate distribution class manages creation and calculation of aggregate distributions.
-        Aggregate allows for very flexible creation of Aggregate distributions. Severity
-        can express a limit profile, a mixed severity or both. Mixed frequency types share
-        a mixing distribution across all broadcast terms to ensure an appropriate inter-
-        class correlation.
+    It allows for very flexible creation of Aggregate distributions. Severity
+    can express a limit profile, a mixed severity or both. Mixed frequency types share
+    a mixing distribution across all broadcast terms to ensure an appropriate inter-
+    class correlation.
 
-    Limit Profiles
-        The exposure variables can be vectors to express a *limit profile*.
-        All ```exp_[en|prem|loss|count]``` related elements are broadcast against one-another.
-        For example
+    **Limit Profiles**
+    The exposure variables can be vectors to express a *limit profile*.
+    All ```exp_[en|prem|loss|count]``` related elements are broadcast against one-another.
+    For example ::
 
-        ::
+    [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000
 
-        [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000
+    expresses a limit profile with 100 of premium at 1000 x 1000; 200 at 2000 x 1000
+    400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
+    the same, but they could vary too, as could the attachments.
 
-        expresses a limit profile with 100 of premium at 1000 x 1000; 200 at 2000 x 1000
-        400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
-        the same, but they could vary too, as could the attachments.
+    **Mixtures**
+    The severity variables can be vectors to express a *mixed severity*. All ``sev_``
+    elements are broadcast against one-another. For example ::
 
-    Mixtures
-        The severity variables can be vectors to express a *mixed severity*. All ``sev_``
-        elements are broadcast against one-another. For example
+        sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
 
-        ::
+    expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
+    weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
+    relevant number of components.
 
-            sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
+    **Limit Profiles and Mixtures**
+    Limit profiles and mixtures can be combined. Each mixed severity is applied to each
+    limit profile component. For example ::
 
-        expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
-        weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
-        relevant number of components.
+        ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]
+            sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')```
 
-    Limit Profiles and Mixtures
-        Limit profiles and mixtures can be combined. Each mixed severity is applied to each
-        limit profile component. For example
+    creates an aggregate with six severity subcomponents
 
-        ::
+    +---+-------+------------+--------+
+    | # | limit | attachment | claims |
+    +===+=======+============+========+
+    | 0 | 100   |  0         |  6     |
+    +---+-------+------------+--------+
+    | 1 | 100   |  0         |  4     |
+    +---+-------+------------+--------+
+    | 2 | 200   | 50         | 12     |
+    +---+-------+------------+--------+
+    | 3 | 200   | 50         |  8     |
+    +---+-------+------------+--------+
+    | 4 |  75   | 75         | 18     |
+    +---+-------+------------+--------+
+    | 5 |  75   | 75         | 12     |
+    +---+-------+------------+--------+
 
-            ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]
-                sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')```
+    **Circumventing Products**
+    It is sometimes desirable to enter two or more lines each with a different severity but
+    with a shared mixing variable. For example to model the current accident year and a run-
+    off reserve, where the current year is gamma mean 100 cv 1 and the reserves are
+    larger lognormal mean 150 cv 0.5 claims requires ::
 
-        creates an aggregate with six severity subcomponents
+        agg MixedPremReserve [100 200] claims sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.4
 
-        +---+-------+------------+--------+
-        | # | limit | attachment | claims |
-        +===+=======+============+========+
-        | 0 | 100   |  0         |  6     |
-        +---+-------+------------+--------+
-        | 1 | 100   |  0         |  4     |
-        +---+-------+------------+--------+
-        | 2 | 200   | 50         | 12     |
-        +---+-------+------------+--------+
-        | 3 | 200   | 50         |  8     |
-        +---+-------+------------+--------+
-        | 4 |  75   | 75         | 18     |
-        +---+-------+------------+--------+
-        | 5 |  75   | 75         | 12     |
-        +---+-------+------------+--------+
+    so that the result is not the four-way exposure / severity product but just a two-way
+    combination. These two cases are distinguished looking at the total weights. If the weights sum to
+    one then the result is an exposure / severity product. If the weights are missing or sum to the number
+    of severity components (i.e. are all equal to 1) then the result is a row by row combination.
 
-    Circumventing Products
-        It is sometimes desirable to enter two or more lines each with a different severity but
-        with a shared mixing variable. For example to model the current accident year and a run-
-        off reserve, where the current year is gamma mean 100 cv 1 and the reserves are
-        larger lognormal mean 150 cv 0.5 claims requires
+    **Other Programs**
+    Below are a series of programs illustrating the different ways exposure, frequency and severity can be
+    broadcast together, several different types of severity and all the different types of severity. ::
 
-        ::
+        test_string_0 = '''
+        # use to create sev and aggs so can illustrate use of sev. and agg. below
 
-            agg MixedPremReserve [100 200] claims sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.4
+        sev sev1 lognorm 10 cv .3
 
-        so that the result is not the four-way exposure / severity product but just a two-way
-        combination. These two cases are distinguished looking at the total weights. If the weights sum to
-        one then the result is an exposure / severity product. If the weights are missing or sum to the number
-        of severity components (i.e. are all equal to 1) then the result is a row by row combination.
+        agg Agg0 1 claim sev lognorm 10 cv .09 fixed
 
-    Other Programs
-        Below are a series of programs illustrating the different ways exposure, frequency and severity can be
-        broadcast together, several different types of severity and all the different types of severity.
+        '''
 
-        ::
+        test_string_1 = f'''
+        agg Agg1  1 claim sev {10*np.exp(-.3**2/2)} @ lognorm .3      fixed note{{sigma=.3 mean=10}}
+        agg Agg2  1 claim sev {10*np.exp(-.3**2/2)} @ lognorm .3 # 5  fixed note{{shifted right by 5}}''' \
+        '''
+        agg Agg3  1 claim sev 10 @ lognorm 0.5 cv .3                  fixed note{mean 0.5 scaled by 10 and cv 0.3}
+        agg Agg4  1 claim sev 10 @ lognorm 1 cv .5 + 5                fixed note{shifted right by 5}
 
-            test_string_0 = '''
-            # use to create sev and aggs so can illustrate use of sev. and agg. below
+        agg Agg5  1 claim sev 10 @ gamma .3                           fixed note{gamma distribution....can use any two parameter scipy.stats distribution plus expon, uniform and normal}
+        agg Agg6  1 claim sev 10 @ gamma 1 cv .3 # 5                  fixed note{mean 10 x 1, cv 0.3 shifted right by 5}
 
-            sev sev1 lognorm 10 cv .3
+        agg Agg7  1 claim sev 2 @ pareto 1.6  # -2                      fixed note{pareto alpha=1.6 lambda=2}
+        agg Agg8  1 claim sev 2 @ uniform 5 # 2.5                     fixed note{uniform 2.5 to 12.5}
 
-            agg Agg0 1 claim sev lognorm 10 cv .09 fixed
+        agg Agg9  1 claim 10 x  2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, 1 claim}
+        agg Agg10 10 loss 10 xs 2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, total loss 10, derives requency}
+        agg Agg11 14 prem at .7    10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency}
+        agg Agg11 14 prem at .7 lr 10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency, lr is optional}
 
-            '''
+        agg Agg12: 14 prem at .7 lr (10 x 1) sev (lognorm 20 cv 1.5)  fixed note{trailing semi and other punct ignored};
 
-            test_string_1 = f'''
-            agg Agg1  1 claim sev {10*np.exp(-.3**2/2)} @ lognorm .3      fixed note{{sigma=.3 mean=10}}
-            agg Agg2  1 claim sev {10*np.exp(-.3**2/2)} @ lognorm .3 # 5  fixed note{{shifted right by 5}}''' \
-            '''
-            agg Agg3  1 claim sev 10 @ lognorm 0.5 cv .3                  fixed note{mean 0.5 scaled by 10 and cv 0.3}
-            agg Agg4  1 claim sev 10 @ lognorm 1 cv .5 + 5                fixed note{shifted right by 5}
+        agg Agg13: 1 claim sev 50 @ beta 3 2 # 10 fixed note{scaled and shifted beta, two parameter distribution}
+        agg Agg14: 1 claim sev 100 @ expon # 10   fixed note{exponential single parameter, needs scale, optional shift}
+        agg Agg15: 1 claim sev 10 @ norm # 50     fixed note{normal is single parameter too, needs scale, optional shift}
 
-            agg Agg5  1 claim sev 10 @ gamma .3                           fixed note{gamma distribution....can use any two parameter scipy.stats distribution plus expon, uniform and normal}
-            agg Agg6  1 claim sev 10 @ gamma 1 cv .3 # 5                  fixed note{mean 10 x 1, cv 0.3 shifted right by 5}
+        # any scipy.stat distribution taking one parameter can be used; only cts vars supported on R+ make sense
+        agg Agg16: 1 claim sev 1 * invgamma 4.07 fixed  note{inverse gamma distribution}
 
-            agg Agg7  1 claim sev 2 @ pareto 1.6  # -2                      fixed note{pareto alpha=1.6 lambda=2}
-            agg Agg8  1 claim sev 2 @ uniform 5 # 2.5                     fixed note{uniform 2.5 to 12.5}
+        # mixtures
+        agg MixedLine1: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equally weighted mixture of 5 lognormals different cvs}
+        agg MixedLine2: 1 claim 25 xs 0 sev lognorm [10, 15, 20, 25, 50] cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equal weighted mixture of 5 lognormals different cvs and means}
+        agg MixedLine3: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wt [.2, .3, .3, .15, .05]   fixed note{weights scaled to equal 1 if input}
 
-            agg Agg9  1 claim 10 x  2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, 1 claim}
-            agg Agg10 10 loss 10 xs 2 sev lognorm 20 cv 1.5               fixed note{10 x 2 layer, total loss 10, derives requency}
-            agg Agg11 14 prem at .7    10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency}
-            agg Agg11 14 prem at .7 lr 10 x 1 sev lognorm 20 cv 1.5       fixed note{14 prem at .7 lr derive frequency, lr is optional}
+        # limit profile
+        agg LimitProfile1: 1 claim [1, 5, 10, 20] xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{maybe input EL by band for wt}
+        agg LimitProfile2: 5 claim            20  xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{input EL by band for wt}
+        agg LimitProfile3: [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv 1.25   fixed note{input counts directly}
 
-            agg Agg12: 14 prem at .7 lr (10 x 1) sev (lognorm 20 cv 1.5)  fixed note{trailing semi and other punct ignored};
+        # limits and distribution blend
+        agg Blend1 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3]          fixed note{options all broadcast against one another, 50 claims of each}
+        agg Blend2 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3] wt=3     fixed note{options all broadcast against one another, 50 claims of each}
 
-            agg Agg13: 1 claim sev 50 @ beta 3 2 # 10 fixed note{scaled and shifted beta, two parameter distribution}
-            agg Agg14: 1 claim sev 100 @ expon # 10   fixed note{exponential single parameter, needs scale, optional shift}
-            agg Agg15: 1 claim sev 10 @ norm # 50     fixed note{normal is single parameter too, needs scale, optional shift}
+        agg Blend5cv1  50 claims  5 x 0 sev lognorm 12 cv 1 fixed
+        agg Blend10cv1 50 claims 10 x 0 sev lognorm 12 cv 1 fixed
+        agg Blend15cv1 50 claims 15 x 0 sev lognorm 12 cv 1 fixed
 
-            # any scipy.stat distribution taking one parameter can be used; only cts vars supported on R+ make sense
-            agg Agg16: 1 claim sev 1 * invgamma 4.07 fixed  note{inverse gamma distribution}
+        agg Blend5cv15  50 claims  5 x 0 sev lognorm 12 cv 1.5 fixed
+        agg Blend10cv15 50 claims 10 x 0 sev lognorm 12 cv 1.5 fixed
+        agg Blend15cv15 50 claims 15 x 0 sev lognorm 12 cv 1.5 fixed
 
-            # mixtures
-            agg MixedLine1: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equally weighted mixture of 5 lognormals different cvs}
-            agg MixedLine2: 1 claim 25 xs 0 sev lognorm [10, 15, 20, 25, 50] cv [0.2, 0.4, 0.6, 0.8, 1.0] wts=5             fixed note{equal weighted mixture of 5 lognormals different cvs and means}
-            agg MixedLine3: 1 claim 25 xs 0 sev lognorm 10                   cv [0.2, 0.4, 0.6, 0.8, 1.0] wt [.2, .3, .3, .15, .05]   fixed note{weights scaled to equal 1 if input}
+        # semi colon can be used for newline and backslash works
+        agg Blend5cv3  50 claims  5 x 0 sev lognorm 12 cv 3 fixed; agg Blend10cv3 50 claims 10 x 0 sev lognorm 12 cv 3 fixed
+        agg Blend15cv3 50 claims 15 x 0 sev \
+        lognorm 12 cv 3 fixed
 
-            # limit profile
-            agg LimitProfile1: 1 claim [1, 5, 10, 20] xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{maybe input EL by band for wt}
-            agg LimitProfile2: 5 claim            20  xs 0 sev lognorm 10 cv 1.2 wt [.50, .20, .20, .1]   fixed note{input EL by band for wt}
-            agg LimitProfile3: [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv 1.25   fixed note{input counts directly}
+        # not sure if it will broadcast limit profile against severity mixture...
+        agg LimitProfile4: [10 30 15 5] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv [1.0, 1.25, 1.5] wts=3  fixed note{input counts directly}
+        ''' \
+        f'''
+        # the logo
+        agg logo 1 claim {np.linspace(10, 250, 20)} xs 0 sev lognorm 100 cv 1 fixed'''
 
-            # limits and distribution blend
-            agg Blend1 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3]          fixed note{options all broadcast against one another, 50 claims of each}
-            agg Blend2 50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 1.5, 3] wt=3     fixed note{options all broadcast against one another, 50 claims of each}
+        test_string_2 = '''
+        # empirical distributions
+        agg dHist1 1 claim sev dhistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{discrete histogram}
+        agg cHist1 1 claim sev chistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{continuous histogram, guessed right hand endpiont}
+        agg cHist2 1 claim sev chistogram xps [1 10 40 45] [.5 .3 .2]  fixed     note{continuous histogram, explicit right hand endpoint, don't need commas}
+        agg BodoffWind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed   note{examples from Bodoffs paper}
+        agg BodoffQuake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
-            agg Blend5cv1  50 claims  5 x 0 sev lognorm 12 cv 1 fixed
-            agg Blend10cv1 50 claims 10 x 0 sev lognorm 12 cv 1 fixed
-            agg Blend15cv1 50 claims 15 x 0 sev lognorm 12 cv 1 fixed
+        # set up fixed sev for future use
+        sev One dhistogram xps [1] [1]   note{a certain loss of 1}
+        '''
 
-            agg Blend5cv15  50 claims  5 x 0 sev lognorm 12 cv 1.5 fixed
-            agg Blend10cv15 50 claims 10 x 0 sev lognorm 12 cv 1.5 fixed
-            agg Blend15cv15 50 claims 15 x 0 sev lognorm 12 cv 1.5 fixed
+        test_string_3 = '''
+        # sev, agg and port: using built in objects [have to exist prior to running program]
+        agg ppa:       0.01 * agg.PPAL       note{this is using lmult on aggs, needs a dictionary specification to adjust means}
+        agg cautoQS:   1e-5 * agg.CAL        note{lmult is quota share or scale for rmul see below }
+        agg cautoClms: agg.CAL * 1e-5        note{rmult adjusts the claim count}
 
-            # semi colon can be used for newline and backslash works
-            agg Blend5cv3  50 claims  5 x 0 sev lognorm 12 cv 3 fixed; agg Blend10cv3 50 claims 10 x 0 sev lognorm 12 cv 3 fixed
-            agg Blend15cv3 50 claims 15 x 0 sev \
-            lognorm 12 cv 3 fixed
+        # scaling works with distributions already made by uw
+        agg mdist: 5000 * agg.dHist1
 
-            # not sure if it will broadcast limit profile against severity mixture...
-            agg LimitProfile4: [10 30 15 5] claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm 10 cv [1.0, 1.25, 1.5] wts=3  fixed note{input counts directly}
-            ''' \
-            f'''
-            # the logo
-            agg logo 1 claim {np.linspace(10, 250, 20)} xs 0 sev lognorm 100 cv 1 fixed'''
+        '''
 
-            test_string_2 = '''
-            # empirical distributions
-            agg dHist1 1 claim sev dhistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{discrete histogram}
-            agg cHist1 1 claim sev chistogram xps [1, 10, 40] [.5, .3, .2] fixed     note{continuous histogram, guessed right hand endpiont}
-            agg cHist2 1 claim sev chistogram xps [1 10 40 45] [.5 .3 .2]  fixed     note{continuous histogram, explicit right hand endpoint, don't need commas}
-            agg BodoffWind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed   note{examples from Bodoffs paper}
-            agg BodoffQuake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+        test_string_4 = '''
+        # frequency options
+        agg FreqFixed      10 claims sev sev.One fixed
+        agg FreqPoisson    10 claims sev sev.One poisson                   note{Poisson frequency}
+        agg FreqBernoulli  .8 claims sev sev.One bernoulli               note{Bernoulli en is frequency }
+        agg FreqBinomial   10 claims sev sev.One binomial 0.5
+        agg FreqPascal     10 claims sev sev.One pascal .8 3
 
-            # set up fixed sev for future use
-            sev One dhistogram xps [1] [1]   note{a certain loss of 1}
-            '''
+        # mixed freqs
+        agg FreqNegBin     10 claims sev sev.One (mixed gamma 0.65)     note{gamma mixed Poisson = negative binomial}
+        agg FreqDelaporte  10 claims sev sev.One mixed delaporte .65 .25
+        agg FreqIG         10 claims sev sev.One mixed ig  .65
+        agg FreqSichel     10 claims sev sev.One mixed delaporte .65 -0.25
+        agg FreqSichel.gamma  10 claims sev sev.One mixed sichel.gamma .65 .25
+        agg FreqSichel.ig     10 claims sev sev.One mixed sichel.ig  .65 .25
+        agg FreqBeta       10 claims sev sev.One mixed beta .5  4  note{second param is max mix}
+        '''
+        test_strings = [test_string_0, test_string_1, test_string_2, test_string_3, test_string_4]
 
-            test_string_3 = '''
-            # sev, agg and port: using built in objects [have to exist prior to running program]
-            agg ppa:       0.01 * agg.PPAL       note{this is using lmult on aggs, needs a dictionary specification to adjust means}
-            agg cautoQS:   1e-5 * agg.CAL        note{lmult is quota share or scale for rmul see below }
-            agg cautoClms: agg.CAL * 1e-5        note{rmult adjusts the claim count}
+        # run the various tests
+        uw = agg.Underwriter()
+        uw.glob = globals()
+        uw.create_all = True
+        uw.update = True
+        uw.log2 = 8
+        ans = {}
+        # make sure we have this base first:
+        uw('sev One dhistogram xps [1] [1]   note{a certain loss of 1}')
+        for i, t in enumerate(test_strings):
+            print(f'line {i} of {len(test_strings)}')
+            ans.update(uw(t))
 
-            # scaling works with distributions already made by uw
-            agg mdist: 5000 * agg.dHist1
+    **Other Notes**
 
-            '''
+    How Expected Claim Count is determined etc.
 
-            test_string_4 = '''
-            # frequency options
-            agg FreqFixed      10 claims sev sev.One fixed
-            agg FreqPoisson    10 claims sev sev.One poisson                   note{Poisson frequency}
-            agg FreqBernoulli  .8 claims sev sev.One bernoulli               note{Bernoulli en is frequency }
-            agg FreqBinomial   10 claims sev sev.One binomial 0.5
-            agg FreqPascal     10 claims sev sev.One pascal .8 3
+    * en determines en
+    * prem x loss ratio -> el
+    * severity x en -> el
 
-            # mixed freqs
-            agg FreqNegBin     10 claims sev sev.One (mixed gamma 0.65)     note{gamma mixed Poisson = negative binomial}
-            agg FreqDelaporte  10 claims sev sev.One mixed delaporte .65 .25
-            agg FreqIG         10 claims sev sev.One mixed ig  .65
-            agg FreqSichel     10 claims sev sev.One mixed delaporte .65 -0.25
-            agg FreqSichel.gamma  10 claims sev sev.One mixed sichel.gamma .65 .25
-            agg FreqSichel.ig     10 claims sev sev.One mixed sichel.ig  .65 .25
-            agg FreqBeta       10 claims sev sev.One mixed beta .5  4  note{second param is max mix}
-            '''
-            test_strings = [test_string_0, test_string_1, test_string_2, test_string_3, test_string_4]
+    * always have en and el; may have prem and exp_lr
+    * if prem then exp_lr computed
+    * if exp_lr then premium computed
 
-            # run the various tests
-            uw = agg.Underwriter()
-            uw.glob = globals()
-            uw.create_all = True
-            uw.update = True
-            uw.log2 = 8
-            ans = {}
-            # make sure we have this base first:
-            uw('sev One dhistogram xps [1] [1]   note{a certain loss of 1}')
-            for i, t in enumerate(test_strings):
-                print(f'line {i} of {len(test_strings)}')
-                ans.update(uw(t))
+    * el is determined using np.where(el==0, prem*exp_lr, el)
+    * if el==0 then el = freq * sev
+    * assert np.all( el>0 or en>0 )
 
-    Other Notes
-        How Expected Claim Count is determined etc.
-        * en determines en
-        * prem x loss ratio -> el
-        * severity x en -> el
+    * call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity
+    * call with el expressing lines of business with an array of severities
+    * call with single el and array of sevs expressing a mixture; [] broken down by weights
 
-        * always have en and el; may have prem and exp_lr
-        * if prem then exp_lr computed
-        * if exp_lr then premium computed
+    * n is the CONDITIONAL claim count
+    * X is the GROUND UP severity, so X | X > attachment is used and generates n claims
 
-        * el is determined using np.where(el==0, prem*exp_lr, el)
-        * if el==0 then el = freq * sev
-        * assert np.all( el>0 or en>0 )
+    * For fixed or histogram, have to separate the parameter so they are not broad cast; otherwise
+      you end up with multiple lines when you intend only one
 
-        * call with el (or prem x exp_lr) (or n) expressing a mixture, with the same severity
-        * call with el expressing lines of business with an array of severities
-        * call with single el and array of sevs expressing a mixture; [] broken down by weights
-
-        * n is the CONDITIONAL claim count
-        * X is the GROUND UP severity, so X | X > attachment is used and generates n claims
-
-        * For fixed or histogram have to separate the parameter so they are not broad cast; otherwise
-          you end up with multiple lines when you intend only one
-
-
-        :param name:            name of the aggregate
-        :param exp_el:          expected loss or vector
-        :param exp_premium:     premium volume or vector  (requires loss ratio)
-        :param exp_lr:          loss ratio or vector  (requires premium)
-        :param exp_en:          expected claim count per segment (self.n = total claim count)
-        :param exp_attachment:  occurrence attachment
-        :param exp_limit:       occurrence limit
-        :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
-        :param sev_a:           scipy stats shape parameter
-        :param sev_b:           scipy stats shape parameter
-        :param sev_mean:        average (unlimited) severity
-        :param sev_cv:          unlimited severity coefficient of variation
-        :param sev_loc:         scipy stats location parameter
-        :param sev_scale:       scipy stats scale parameter
-        :param sev_xs:          xs and ps must be provided if sev_name is (c|d)histogram, xs are the bucket break points
-        :param sev_ps:          ps are the probability densities within each bucket; if buckets equal size no adjustments needed
-        :param sev_wt:          weight for mixed distribution
-        :param freq_name:       name of frequency distribution
-        :param freq_a:          cv of freq dist mixing distribution
-        :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
+    :param name:            name of the aggregate
+    :param exp_el:          expected loss or vector
+    :param exp_premium:     premium volume or vector  (requires loss ratio)
+    :param exp_lr:          loss ratio or vector  (requires premium)
+    :param exp_en:          expected claim count per segment (self.n = total claim count)
+    :param exp_attachment:  occurrence attachment
+    :param exp_limit:       occurrence limit
+    :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
+    :param sev_a:           scipy stats shape parameter
+    :param sev_b:           scipy stats shape parameter
+    :param sev_mean:        average (unlimited) severity
+    :param sev_cv:          unlimited severity coefficient of variation
+    :param sev_loc:         scipy stats location parameter
+    :param sev_scale:       scipy stats scale parameter
+    :param sev_xs:          xs and ps must be provided if sev_name is (c|d)histogram, xs are the bucket break points
+    :param sev_ps:          ps are the probability densities within each bucket; if buckets equal size no adjustments needed
+    :param sev_wt:          weight for mixed distribution
+    :param freq_name:       name of frequency distribution
+    :param freq_a:          cv of freq dist mixing distribution
+    :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
     """
 
     # TODO must be able to automate this with inspect
@@ -685,8 +674,9 @@ class Aggregate(Frequency):
     @property
     def spec(self):
         """
-        get the dictionary specification but treat as a read only
+        Get the dictionary specification, but treat as a read only
         property
+
         :return:
         """
         return self._spec
@@ -694,7 +684,7 @@ class Aggregate(Frequency):
     @property
     def spec_ex(self):
         """
-        All relevant info
+        All relevant info.
 
         :return:
         """
@@ -704,8 +694,8 @@ class Aggregate(Frequency):
     @property
     def density_df(self):
         """
-        create and return the _density_df data frame
-        read only property...though if you write d = a.density_df you can obviously edit d...
+        Create and return the _density_df data frame. A
+        read only property, though if you write d = a.density_df you can obviously edit d.
         :return:
         """
         if self._density_df is None:
@@ -765,8 +755,9 @@ class Aggregate(Frequency):
     @property
     def reins_audit_df(self):
         """
-        create and return the _density_df data frame
-        read only property...though if you write d = a.density_df you can obviously edit d...
+        Create and return the _density_df data frame.
+        Read only property.
+
         :return:
         """
         if self._reins_audit_df is None:
@@ -790,7 +781,7 @@ class Aggregate(Frequency):
 
     def _reins_audit_df_work(self, kind='occ'):
         """
-        Apply each re layer separately and aggregate loss and other stats
+        Apply each re layer separately and aggregate loss and other stats.
 
         """
         ans = []
@@ -838,9 +829,9 @@ class Aggregate(Frequency):
 
     def rescale(self, scale, kind='homog'):
         """
-        return a rescaled Aggregate object - used to compute derivatives
+        Return a rescaled Aggregate object - used to compute derivatives.
 
-        all need to be safe mults because of array specification there is an array that is not a numpy array
+        All need to be safe multiplies because of array specification there is an array that is not a numpy array
 
         TODO have parser return numpy arrays not lists!
 
@@ -1149,16 +1140,16 @@ class Aggregate(Frequency):
         probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
         is often not desirable (we expect to see a smooth continuous distribution and we get a mass). The
         other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
-        the probabilities short. We opt here for the latter and rescale
+        the probabilities short. We opt here for the latter and rescale.
 
-        defaults: discrete, survival, True
+        Sensible defaults: discrete sev_calc, survival method, normalize True.
 
         :param sev_calc:  continuous or discrete or raw (for...);
-        and method becomes discrete otherwise
+               and method becomes discrete otherwise
         :param discretization_calc:  survival, distribution or both; in addition
-        the method then becomes survival
+               the method then becomes survival
         :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
-        when dealing with thick tailed distributions it can be helpful to turn it off.
+               when dealing with thick tailed distributions it can be helpful to turn it off.
         :return:
         """
 
@@ -1197,7 +1188,7 @@ class Aggregate(Frequency):
 
     def snap(self, x):
         """
-        snap value x to the index of density_df
+        Snap value x to the index of density_df, i.e., as a multiple of self.bs.
 
         :param x:
         :return:
@@ -1207,8 +1198,8 @@ class Aggregate(Frequency):
 
     def update(self, log2=13, bs=0, debug=False, **kwargs):
         """
-        Convenience function, delegates to update. Avoids having to pass xs.
-
+        Convenience function, delegates to update_work. Avoids having to pass xs. Also
+        aliased as easy_update for backward compatibility.
 
         :param log2:
         :param bs:
@@ -1233,28 +1224,28 @@ class Aggregate(Frequency):
     def update_work(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
-        Compute the density
-        Pre-0.9.3....does not have reinsurance features.
+        Compute the aggregate density.
 
-        0.9.3 removed verbose option: it just makes plots you can get with .plot
-        0.9.3: multi-way switch force_severity: if "yes" then update exists after sev comp (eg for plot).
-        else if True create severity and perform an update.
+        * Pre-0.9.3....does not have reinsurance features.
+        * 0.9.3 removed verbose option: it just makes plots you can get with .plot
+        * 0.9.3: multi-way switch force_severity: if "yes" then update exists after sev comp (eg for plot).
+          else if True create severity and perform an update.
 
         Quick simple test with log2=13 update took 5.69 ms and _eff took 2.11 ms. So quicker
-        but not an issue unless you are doing many!
+        but not an issue unless you are doing many buckets or aggs.
 
         :param xs:  range of x values used to discretize
         :param padding: for FFT calculation
         :param tilt_vector: tilt_vector = np.exp(self.tilt_amount * np.arange(N)), N=2**log2, and
-                tilt_amount * N < 20 recommended
+               tilt_amount * N < 20 recommended
         :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
-                sgamma apply shifted lognormal or shifted gamma approximations.
+               sgamma apply shifted lognormal or shifted gamma approximations.
         :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
         :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
         :param normalize: normalize severity to 1.0
         :param force_severity: make severities even if using approximation, for plotting
         :param verbose: make partial plots and return details of all moments by limit profile or
-                severity mixture component.
+               severity mixture component.
         :return:
         """
         self._density_df = None  # invalidate
@@ -1617,6 +1608,11 @@ class Aggregate(Frequency):
         return reins
 
     def reinsurance_kinds(self):
+        """
+        Text desciption of kinds of reinsurance applied: None, Occurrence, Aggergate, both.
+
+        :return:
+        """
         n = 1 if  self.occ_reins is not None else 0
         n += 2 if  self.agg_reins is not None else 0
         if n == 0:
@@ -1648,7 +1644,7 @@ class Aggregate(Frequency):
 
     def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=0):
         """
-        return the CL function relating surplus to eventual probability of ruin
+        Return the CL function relating surplus to eventual probability of ruin.
 
         Assumes frequency is Poisson
 
@@ -1662,9 +1658,16 @@ class Aggregate(Frequency):
 
         Pollaczeck-Khinchine Capital
 
-        returns ruin vector as pd.Series
-            function to lookup (no interpolation if kind==index; else interp) capitals
+        returns ruin vector as pd.Series and function to lookup (no interpolation if
+        kind==index; else interp) capitals
 
+        :param rho:
+        :param cap:
+        :param excess:
+        :param stop_loss:
+        :param kind:
+        :param padding:
+        :return:
         """
 
         if self.sev_density is None:
@@ -1718,7 +1721,7 @@ class Aggregate(Frequency):
 
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name=""):
         """
-        Compare the base and Delbaen Haezendonck transformed aggregates
+        Compare the base and Delbaen Haezendonck transformed aggregates.
 
         * beta(x) = alpha + gamma(x)
         * alpha = log(freq' / freq): log of the increase in claim count
@@ -1726,14 +1729,12 @@ class Aggregate(Frequency):
 
         Adjustment guarantees a positive loading iff beta is an increasing function
         iff gamma is increasing iff tilde f / f is increasing.
-        cf. eqn 3.7 and 3.8
+        cf. eqn 3.7 and 3.8.
 
         Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
         form of beta function described in 2.23 via, 2.16-17 and 2.18
 
-        From examples on last page of paper:
-
-        ::
+        From examples on last page of paper: ::
 
             beta(x) = a ==> adjust frequency by factor of e^a
             beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
@@ -1787,10 +1788,10 @@ class Aggregate(Frequency):
 
     def plot(self, axd=None, xmax=0):
         """
-        New style basic plot.
+        New style basic plot with severity and aggregate, linear and log plots and Lee plot.
 
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
-        the same scale. Only used on linear scales? 
+               the same scale. Only used on linear scales?
         :param axd:
         :return:
         """
@@ -1875,7 +1876,7 @@ class Aggregate(Frequency):
 
     def plot_old(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
         """
-        plot computed density and aggregate
+        Plot computed density and aggregate. To be removed!
 
         **kind** option:
 
@@ -2036,14 +2037,14 @@ class Aggregate(Frequency):
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """
-        Suggest sensible plotting limits for kind=range, density, .. (Same as Portfolio)
+        Suggest sensible plotting limits for kind=range, density, etc., same as Portfolio.
 
         Should optionally return a locator for plots?
 
         Called by ploting routines. Single point of failure!
 
         Must work without q function when not computed (apply_reins_work for
-        occ reins...uses report_ser instead).
+        occ reins; then use report_ser instead).
 
         :param stat:  range or density (for y axis)
         :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)
@@ -2130,6 +2131,12 @@ class Aggregate(Frequency):
 
     @property
     def statistics(self):
+        """
+        Pandas series of theoretic frequency, severity, and aggregate 1st, 2nd, and 3rd moments.
+        Mean, cv, and skewness.
+
+        :return:
+        """
         if len(self.statistics_df) > 1:
             df = pd.concat((self.statistics_df, self.statistics_total_df), axis=1)
         else:
@@ -2170,7 +2177,7 @@ class Aggregate(Frequency):
 
     def recommend_bucket(self, log2=10, verbose=False):
         """
-        recommend a bucket size given 2**N buckets
+        Recommend a bucket size given 2**N buckets. Not rounded.
 
         :param log2: log2 of number of buckets. log2=10 is default.
         :return:
@@ -2195,13 +2202,15 @@ class Aggregate(Frequency):
 
     def q_old(self, p):
         """
-        return lowest quantile, appropriate for discrete bucketing.
+        Return lowest quantile, appropriate for discrete bucketing.
         quantile guaranteed to be in the index
         nearest does not work because you always want to pick rounding up
 
         Definition 2.1 (Quantiles)
-        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
-        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
+
+        :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] ≥ α\}` is the lower α-quantile of X
+
+        :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] > α\}` is the upper α-quantile of X.
 
         We use the x-notation if the dependence on X is evident, otherwise the q-notion.
         Acerbi and Tasche (2002)
@@ -2220,12 +2229,10 @@ class Aggregate(Frequency):
 
     def q(self, p, kind='lower'):
         """
-        Exact same code from Portfolio.q
-
-        kind==middle reproduces middle_q
+        Compute quantile, returning element in the index. Exact same code from Portfolio.q.
 
         :param p:
-        :param kind:
+        :param kind: lower, middle reproduces middle_q, upper
         :return:
         """
         if self._linear_quantile_function is None:
@@ -2263,11 +2270,11 @@ class Aggregate(Frequency):
 
     def careful_q(self, p):
         """
-        careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
+        Careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
         Note this is automatically vectorized and returns and array whereas q isn't.
         It doesn't necessarily return an element of the index.
 
-        Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb.
+        Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb. ::
 
             uw = agg.Underwriter(create_all=True)
 
@@ -2469,7 +2476,7 @@ class Aggregate(Frequency):
 
     def cdf(self, x):
         """
-        return cumulative probability distribution using linear interpolation
+        Return cumulative probability distribution at x using linear interpolation.
 
         :param x: loss size
         :return:
@@ -2481,7 +2488,7 @@ class Aggregate(Frequency):
 
     def sf(self, x):
         """
-        return survival function using linear interpolation
+        Return survival function using linear interpolation.
 
         :param x: loss size
         :return:
@@ -2490,7 +2497,8 @@ class Aggregate(Frequency):
 
     def pdf(self, x):
         """
-        probability density function, assuming a continuous approximation of the bucketed density
+        Probability density function, assuming a continuous approximation of the bucketed density.
+
         :param x:
         :return:
         """
@@ -2501,18 +2509,19 @@ class Aggregate(Frequency):
 
     def json(self):
         """
-        write in json
+        Write spec to json string.
+
         :return:
         """
         return json.dumps(self._spec)
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """
-        Find the max entropy fit to the aggregate based on n_moments fit
+        Find the max entropy fit to the aggregate based on n_moments fit.
         The constant is added (sum of probabilities constraint), for two
         moments there are n_const = 3 constrains.
 
-        Based on discussions with and R code from Jon Evans
+        Based on discussions with, and R code from, Jon Evans
 
         Run ::
 
@@ -2571,12 +2580,12 @@ class Aggregate(Frequency):
 
     def var_dict(self, p, kind='lower', snap=False):
         """
-        make a dictionary of value at risks for the line, mirrors Portfolio.var_dict.
-        Here is just marshalls calls to the appropriate var or tvar function
+        Make a dictionary of value at risks for the line, mirrors Portfolio.var_dict.
+        Here is just marshals calls to the appropriate var or tvar function.
 
         No epd. Allows the price function to run consistently with Portfolio version.
 
-        Example:
+        Example Use: ::
 
             for p, arg in zip([.996, .996, .996, .985, .01], ['var', 'lower', 'upper', 'tvar', 'epd']):
                 print(port.var_dict(p, arg,  snap=True))
@@ -2601,18 +2610,18 @@ class Aggregate(Frequency):
         Unlike Portfolio, cannot calibrate. Applying specified Distortions only.
         If calibration is needed, embed Aggregate in a one-line Portfolio object.
 
-            Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
-            the regulatory distortion
+        Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
+        the regulatory distortion.
 
-            regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
+        Regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
 
-            * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
-            * if input > 1 it is a directly input  capital number
-            * d dictionary: Distortion; spec { name = dist name | var, shape=p value a distortion used directly
+        * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
+        * if input > 1 it is a directly input  capital number
+        * d dictionary: Distortion; spec { name = dist name | var, shape=p value a distortion used directly
 
-            ``pricing_g`` is  { name = ph|wang and shape=}, if shape (lr or roe not allowed; require calibration).
+        ``pricing_g`` is  { name = ph|wang and shape=}, if shape (lr or roe not allowed; require calibration).
 
-            if ly it must include ro in spec
+        if ly, must include ro in spec
 
         :param p: a distortion function spec or just a number; if >1 assets, if <1 a prob converted to quantile
         :param kind: var lower upper tvar
@@ -2656,30 +2665,21 @@ class Aggregate(Frequency):
 
 
 class Severity(ss.rv_continuous):
-    """
-
-    A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``.
-
-    adds layer and attachment to scipy statistics_df continuous random variable class
-    overrides
-
-    * cdf
-    * pdf
-    * isf
-    * ppf
-    * moments
-
-    Should consider over-riding: sf, **statistics_df** ?munp
-
-    TODO issues remain using numerical integration to compute moments for distributions having
-    infinite support and a low standard deviation. See logger for more information in particular
-    cases.
-
-    """
 
     def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=0, sev_b=0,
-                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_conditional=True, name='', note=''):
+                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True, name='', note=''):
         """
+        A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``,
+        adding layer and attachment functionality. It overrides
+
+        * **cdf**
+        * **pdf**
+        * **isf**
+        * **ppf**
+        * **sf**
+        * **stats**
+
+        TODO numerical integration with infinite support and a low standard deviation.
 
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param exp_attachment:
@@ -2692,10 +2692,14 @@ class Severity(ss.rv_continuous):
         :param sev_scale:
         :param sev_xs: for fixed or histogram classes
         :param sev_ps:
+        :param sev_wt: this is not used; but it is convenient to pass it in and ignore it because sevs are
+               created with sev_wt=1. They should never be created with sev_wt not equal to 1.
         :param sev_conditional: conditional or unconditional; for severities use conditional
         """
 
         from .port import Portfolio
+
+        assert sev_wt == 1
 
         ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
         # I think this is preferred now, but these are the same (probably...)
@@ -2888,10 +2892,9 @@ class Severity(ss.rv_continuous):
 
     def cv_to_shape(self, cv, hint=1):
         """
-        create a frozen object of type dist_name with given cv
-
-        lognormal, gamma, inverse gamma and inverse gaussian solved analytically.
-
+        Create a frozen object of type dist_name with given cv. The
+        lognormal, gamma, inverse gamma and inverse gaussian distributions
+        are solved analytically.
         Other distributions solved numerically and may be unstable.
 
         :param cv:
@@ -2939,8 +2942,8 @@ class Severity(ss.rv_continuous):
 
     def mean_to_scale(self, shape, mean, loc=0):
         """
-        adjust scale of fz to have desired mean
-        return frozen instance
+        Adjust the scale to achieved desired mean.
+        Return a frozen instance.
 
         :param shape:
         :param mean:
@@ -3027,7 +3030,7 @@ class Severity(ss.rv_continuous):
 
     def moms(self):
         """
-        revised moments for Severity class. Trying to compute moments of
+        Revised moments for Severity class. Trying to compute moments of
 
             X(a,d) = min(d, (X-a)+)
 
@@ -3041,63 +3044,69 @@ class Severity(ss.rv_continuous):
         the moments needed.
 
         Old moments tried to compute int S(x)dx, but that is over a large, non-compact domain and
-        did not work so well. With 0.9.3 old_moms was removed. Old_moms code did this:
+        did not work so well. With 0.9.3 old_moms was removed. Old_moms code did this: ::
 
             ex1 = safe_integrate(lambda x: self.fz.sf(x), 1)
             ex2 = safe_integrate(lambda x: 2 * (x - self.attachment) * self.fz.sf(x), 2)
             ex3 = safe_integrate(lambda x: 3 * (x - self.attachment) ** 2 * self.fz.sf(x), 3)
 
-        # tests examples
-        def test(mu, sigma, a, y):
-            global moms
-            import types
-            # analytic with no layer attachment
-            fz = ss.lognorm(sigma, scale=np.exp(mu))
-            tv = np.array([np.exp(k*mu + k * k * sigma**2/2) for k in range(1,4)])
+        **Test examples** ::
 
-            # old method
-            s = agg.Severity('lognorm', sev_a=sigma, sev_scale=np.exp(mu), exp_attachment=a, exp_limit=y)
-            est = np.array(s.old_moms())
+            def test(mu, sigma, a, y):
+                global moms
+                import types
+                # analytic with no layer attachment
+                fz = ss.lognorm(sigma, scale=np.exp(mu))
+                tv = np.array([np.exp(k*mu + k * k * sigma**2/2) for k in range(1,4)])
 
-            # swap out moment routine
-            setattr(s, moms.__name__, types.MethodType(moms, s))
-            ans = np.array(s.moms())
+                # old method
+                s = agg.Severity('lognorm', sev_a=sigma, sev_scale=np.exp(mu),
+                                 exp_attachment=a, exp_limit=y)
+                est = np.array(s.old_moms())
 
-            # summarize and report
-            sg = f'Example: mu={mu}  sigma={sigma}  a={a}  y={y}'
-            print(f'{sg}\n{"="*len(sg)}')
-            print(pd.DataFrame({'new_ans' : ans, 'old_ans': est, 'err': ans/est-1, 'no_la_analytic' : tv}))
+                # swap out moment routine
+                setattr(s, moms.__name__, types.MethodType(moms, s))
+                ans = np.array(s.moms())
+
+                # summarize and report
+                sg = f'Example: mu={mu}  sigma={sigma}  a={a}  y={y}'
+                print(f'{sg}\\n{"="*len(sg)}')
+                print(pd.DataFrame({'new_ans' : ans, 'old_ans': est,
+                                    'err': ans/est-1, 'no_la_analytic' : tv}))
 
 
-        test(8.7, .5, 0, np.inf)
-        test(8.7, 2.5, 0, np.inf)
-        test(8.7, 2.5, 10e6, 200e6)
+            test(8.7, .5, 0, np.inf)
+            test(8.7, 2.5, 0, np.inf)
+            test(8.7, 2.5, 10e6, 200e6)
 
-        Example: mu=8.7  sigma=0.5  a=0  y=inf
-        ======================================
-                new_ans       old_ans           err  no_la_analytic
-        0  6.802191e+03  6.802191e+03  3.918843e-11    6.802191e+03
-        1  5.941160e+07  5.941160e+07  3.161149e-09    5.941160e+07
-        2  6.662961e+11  6.662961e+11  2.377354e-08    6.662961e+11
+        **Example:**  ``mu=8.7``,  ``sigma=0.5``, ``a=0``,   ``y=inf`` ::
 
-        Example: mu=8.7  sigma=2.5  a=0  y=inf [here OLD METHOD WAS POOR]
-        ======================================
-                new_ans       old_ans           err  no_la_analytic
-        0  1.366256e+05  1.366257e+05 -6.942541e-08    1.366257e+05
-        1  9.663487e+12  1.124575e+11  8.493016e+01    9.669522e+12
-        2  2.720128e+23  7.597127e+19  3.579469e+03    3.545017e+23
+                    new_ans       old_ans           err  no_la_analytic
+            0  6.802191e+03  6.802191e+03  3.918843e-11    6.802191e+03
+            1  5.941160e+07  5.941160e+07  3.161149e-09    5.941160e+07
+            2  6.662961e+11  6.662961e+11  2.377354e-08    6.662961e+11
 
-        Example: mu=8.7  sigma=2.5  a=10000000.0  y=200000000.0
-        =======================================================
-                new_ans       old_ans           err  no_la_analytic
-        0  1.692484e+07  1.692484e+07  2.620126e-14    1.366257e+05
-        1  1.180294e+15  1.180294e+15  5.242473e-13    9.669522e+12
-        2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
+        **Example:** mu=8.7  sigma=2.5  a=0  y=inf (here the old method failed) ::
+
+                    new_ans       old_ans           err  no_la_analytic
+            0  1.366256e+05  1.366257e+05 -6.942541e-08    1.366257e+05
+            1  9.663487e+12  1.124575e+11  8.493016e+01    9.669522e+12
+            2  2.720128e+23  7.597127e+19  3.579469e+03    3.545017e+23
+
+        **Example:** mu=8.7  sigma=2.5  a=10000000.0  y=200000000.0 ::
+
+                    new_ans       old_ans           err  no_la_analytic
+            0  1.692484e+07  1.692484e+07  2.620126e-14    1.366257e+05
+            1  1.180294e+15  1.180294e+15  5.242473e-13    9.669522e+12
+            2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
 
         """
 
         def safe_integrate(f, lower, upper, level):
-            """ remember, you are integrating Survival funciton """
+            """
+            Integrate the survival function, pay attention to error messages.
+
+            """
 
             argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
             ex = quad(f, lower, upper, **argkw)
@@ -3170,6 +3179,8 @@ class Severity(ss.rv_continuous):
     def update(self, log2=0, bs=0, **kwargs):
         """
         This is a convenience function so that update can be called on any kind of object.
+        It has no effect.
+
         :param log2:
         :param bs:
         :param kwargs:
@@ -3179,7 +3190,7 @@ class Severity(ss.rv_continuous):
 
     def plot(self, N=100, figsize=(12, 3)):
         """
-        quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
+        Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
 
         TODO better coordination of figsize! Better axis formats and ranges.
@@ -3220,7 +3231,7 @@ class Severity(ss.rv_continuous):
 
 class CarefulInverse(object):
     """
-    from SRM_Examples Noise: careful inverse functions
+    From SRM_Examples Noise: careful inverse functions.
 
     """
 
@@ -3249,14 +3260,15 @@ class CarefulInverse(object):
     @staticmethod
     def dist_inv1d(xs, fx, kind='linear', max_Fx=1.):
         """
-        from SRM_Examples Noise
         Careful inverse of distribution function with jumps. Assumes xs is evenly spaced.
         Assumes that if there are two or more xs values between changes in dist it is a jump,
         otherwise is is a continuous part. Puts in -eps values to make steps around jumps.
+
         :param xs:
         :param fx:  density
         :param kind:
         :param max_Fx: what is the max allowable value of F(x)?
+        :return:
         """
 
         # make dataframe to allow summarization

@@ -29,13 +29,10 @@ from pathlib import Path
 
 # module level doc-string
 __doc__ = """
-aggregate - a powerful aggregate loss modeling library
-======================================================
-
 **aggregate** is a Python package providing fast, accurate, and expressive data
-structures that make working with aggregate (or compound) probability distributions
+structures that make working with aggregate (also called compound) probability distributions
 easy and intuitive. It allows students and practitioners to work with realistic 
-**real-world** distributions that reflect the underlying frequency and severity 
+real-world distributions that reflect the underlying frequency and severity 
 generating processes. It has applications in insurance, risk management, actuarial 
 science, and related areas.
 

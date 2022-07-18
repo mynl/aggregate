@@ -1,6 +1,5 @@
-====================
-Technical Background
-====================
+6. Technical Resources
+======================
 
 
 Probability and Risk Theory

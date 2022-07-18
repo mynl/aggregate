@@ -50,7 +50,9 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-source_suffix = ['.rst', '.ipynb']
+# source_suffix = ['.rst', '.ipynb']
+# source_suffix = ['.rst']
+# https://github.com/spatialaudio/nbsphinx/issues/595
 # source_suffix = '.rst'
 
 # The master toctree document.
@@ -93,29 +95,13 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = 'alabaster'
-# pre July 2022
-# html_theme = 'agg_theme'
-# html_theme_path = ['_theme']
-# match Great, carto etc.
 html_theme = 'sphinx_rtd_theme'
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-# See https://alabaster.re`thedocs.io/en/latest/customization.html
-# html_theme_options = {
-#     "edit_link": "true",
-#     "sidebar": "right",
-#     "scipy_org_logo": "false",
-#     "rootlinks": [("https://github.com/mynl/aggregate", "aggregate Code"),]
-#                   # ("http://www.mynl.com/aggregate/index.html", "aggregate Docs")]
-# }
 html_theme_options = {
     'logo_only': False,
     'display_version': True,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
+    'prev_next_buttons_location': 'both',
+    'style_external_links': True,
     # 'style_nav_header_background': 'white',
     # Toc options
     'collapse_navigation': True,
@@ -123,19 +109,14 @@ html_theme_options = {
     'navigation_depth': 4,
     'includehidden': True,
     'titles_only': False,
-    'logo': 'logo.png',
-    'logo_name': True,
-    # other ????
-     'github_user' :'mynl',
-     'github_repo': 'aggregate',
-     'github_button': True
+    'html_logo': 'static/logo.PNG',
+    'html_favicon': 'static/sjmm.png',
+     'github_url' :'https://github.com/mynl/aggregate',
+     # 'github_user' :'mynl',
+     # 'github_repo': 'aggregate',
+     # 'github_button': True
 }
 
-
-# html_theme_options = {'logo': 'logo.PNG', 'logo_name': True,
-# 'description': 'aggregate is a Python package providing fast, accurate, and expressive data'
-# 'structures designed to make working with probability distributions easy and intuitive.',
-#  'github_user' :'mynl', 'github_repo': 'aggregate', 'github_button': True, 'github_banner': False}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -144,19 +125,7 @@ html_static_path = ['_static']
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
-#
-# This is required for the alabaster theme
-# refs: http://alabaster.readthedocs.io/en/latest/installation.html#sidebars
 html_sidebars = { }
-    # '**': [
-#        'about.html',
-#        'navigation.html',
-       # 'relations.html',  # needs 'show_related': True theme option to display
-       # 'searchbox.html',
-       # 'donate.html',
-#     ]
-# }
-
 
 # -- Options for HTMLHelp output ------------------------------------------
 

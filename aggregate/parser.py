@@ -1,333 +1,3 @@
-"""
-lexer and parser specification for aggregate
-============================================
-
-Overview
-    Implements the ``agg`` programming lanaguage
-
-Example program
-    The following short program replicates Thought Experiemnt 1 from Neil Bodoff's
-    paper Capital Allocation by Percentile Layer
-
-    ::
-
-        port BODOFF1 note{Bodoff Thought Experiment No. 1}
-            agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
-            agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
-
-Preprocessing
-    tab or four spaces needed and are replaced with space (program is on one line)
-
-
-Ignored characters
-    colon, comma, ( ) |
-
-To view the grammar using a railroad diagram paste the specification below into
-the Edit Grammar tab of https://www.bottlecaps.de/rr/ui and then View Diagram.
-(Site diagram uses #DDDDDD as the base color.)
-
-Language Specification
-----------------------
-
-The ```agg``` Language Grammar:
-
-::
-
-answer              	::= sev_out
-                    	 | agg_out
-                    	 | port_out
-                    	 | expr
-
-port_out            	::= PORT name note agg_list
-
-agg_list            	::= agg_list agg_out
-                    	 | agg_out
-
-agg_out             	::= AGG name builtin_agg note
-                    	 | AGG name exposures layers SEV sev occ_reins freq agg_reins note
-                    	 | AGG name exposures layers builtin_sev occ_reins freq agg_reins note
-                    	 | AGG name exposures layers dsev occ_reins freq agg_reins note
-                    	 | AGG name dfreq dsev occ_reins agg_reins note
-                    	 | builtin_agg agg_reins note
-
-sev_out             	::= SEV name sev note
-                    	 | SEV name dsev note
-
-freq                	::= MIXED ID expr expr
-                    	 | MIXED ID expr
-                    	 | EMPIRICAL doutcomes dprobs
-                    	 | FREQ expr expr
-                    	 | FREQ expr
-                    	 | FREQ
-
-agg_reins           	::= AGGREGATE NET OF reins_list
-                    	 | AGGREGATE CEDED TO reins_list
-                    	 | 
-
-occ_reins           	::= OCCURRENCE NET OF reins_list
-                    	 | OCCURRENCE CEDED TO reins_list
-                    	 | 
-
-reins_list          	::= reins_list AND reins_clause
-                    	 | reins_clause
-
-reins_clause        	::= expr XS expr
-                    	 | expr SHARE_OF expr XS expr
-                    	 | expr PART_OF expr XS expr
-
-sev                 	::= sev "!"
-                    	 | sev LOCATION_ADD numbers
-                    	 | numbers SCALE_MULTIPLY sev
-                    	 | builtin_sev
-                    	 | ids numbers CV numbers weights
-                    	 | ids numbers weights
-                    	 | ids numbers numbers weights
-                    	 | ids xps
-                    	 | CONSTANT expr
-
-xps                 	::= XPS doutcomes dprobs
-                    	 | 
-
-dsev                	::= DSEV doutcomes dprobs
-
-dfreq               	::= DFREQ doutcomes dprobs
-
-doutcomes           	::= "[" numberl "]"
-                    	 | "[" expr RANGE expr "]"
-                    	 | "[" expr RANGE expr RANGE expr "]"
-
-dprobs              	::= "[" numberl "]"
-                    	 | 
-
-weights             	::= WEIGHTS EQUAL_WEIGHT expr
-                    	 | WEIGHTS numbers
-                    	 | 
-
-layers              	::= numbers XS numbers
-                    	 | 
-
-note                	::= NOTE
-                    	 | 
-
-exposures           	::= SPECIFIED CLAIMS
-                    	 | numbers CLAIMS
-                    	 | numbers LOSS
-                    	 | numbers PREMIUM AT numbers LR
-
-ids                 	::= "[" idl "]"
-                    	 | ID
-
-idl                 	::= idl ID
-                    	 | ID
-
-builtin_agg         	::= expr TIMES builtin_agg
-                    	 | expr SCALE_MULTIPLY builtin_agg
-                    	 | builtin_agg LOCATION_ADD expr
-                    	 | BUILTIN_AGG
-
-builtin_sev         	::= BUILTIN_SEV
-
-name                	::= ID
-
-numbers             	::= "[" numberl "]"
-                    	 | expr
-
-numberl             	::= numberl expr
-                    	 | expr
-
-expr                	::= expr PLUS expr
-                    	 | expr MINUS expr
-                    	 | expr TIMES expr
-                    	 | expr DIVIDE expr
-                    	 | expr EXPONENT expr
-                    	 | "(" expr ")"
-                    	 | EXP "(" expr ")"
-                    	 | expr PERCENT
-                    	 | INFINITY
-                    	 | NUMBER
-
-
-FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
-
-BUILTINID               ::= 'sev|agg|port|meta.ID'
-
-NOTE                    ::= 'note{TEXT}'
-
-EQUAL_WEIGHT            ::= "="
-
-AGG                     ::= 'agg'
-
-AGGREGATE               ::= 'aggregate'
-
-AND                     ::= 'and'
-
-AT                      ::= 'at'
-
-CEDED                   ::= 'ceded'
-
-CLAIMS                  ::= 'claims|claim'
-
-CONSTANT                ::= 'constant'
-
-CV                      ::= 'cv'
-
-DFREQ                   ::= 'dfreq'
-
-DSEV                    ::= 'dsev'
-
-EMPIRICAL               ::= 'empirical|nps'
-
-EXP                     ::= 'exp'
-
-EXPONENT                ::= '^|**'
-
-INFINITY                ::= 'inf|unlim|unlimited'
-
-LOSS                    ::= 'loss'
-
-LR                      ::= 'lr'
-
-MIXED                   ::= 'mixed'
-
-NET                     ::= 'net'
-
-OCCURRENCE              ::= 'occurrence'
-
-OF                      ::= 'of'
-
-PART_OF                 ::= 'po'
-
-PORT                    ::= 'port'
-
-PREMIUM                 ::= 'premium|prem'
-
-SEV                     ::= 'sev'
-
-SHARE_OF                ::= 'so'
-
-SPECIFIED               ::= 'specified'
-
-TO                      ::= 'to'
-
-WEIGHTS                 ::= 'wts|wt'
-
-XPS                     ::= 'xps'
-
-xs                      ::= "xs|x"
-
-PERCENT                 ::= '%'
-
-EXP                     ::= 'exp'
-
-SCALE_MULTIPLY          ::= "@"
-
-LOCATION_ADD            ::= "#"
-
-parser.out parser debug information
------------------------------------
-
-Lexer term definition
----------------------
-
-::
-
-    tokens = {ID, BUILTINID, NOTE,
-              SEV, AGG, PORT,
-              PLUS, MINUS, TIMES, NUMBER,
-              LOSS, PREMIUM, AT, LR, CLAIMS,
-              XS,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
-              MIXED, FREQ
-              }
-    ignore = ' \t,\\:\\(\\)|'
-    literals = {'[', ']'}
-
-    # per manual, need to list longer tokens before shorter ones
-    # NOTE = r'note\{[0-9a-zA-Z,\.\(\)\-=\+!\s]*\}'  # r'[^\}]+'
-    NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTINID = r'(sev|agg|port|meta)\.[a-zA-Z][a-zA-Z0-9_]*'
-    FREQ = r'binomial|poisson|bernoulli|fixed'
-    ID = r'[a-zA-Z][\.a-zA-Z0-9~]*'  # do not allow _ in line names, use ~ instead: BECAUSE p_ etc. makes _ special
-    PLUS = r'\+'
-    MINUS = r'\-'
-    TIMES = r'\*'
-    EQUAL_WEIGHT = r'='
-    ID['loss'] = LOSS
-    ID['at'] = AT
-    ID['cv'] = CV
-    ID['premium'] = PREMIUM
-    ID['prem'] = PREMIUM
-    ID['lr'] = LR
-    ID['claims'] = CLAIMS
-    ID['claim'] = CLAIMS
-    ID['xs'] = XS
-    ID['x'] = XS
-    ID['wts'] = WEIGHTS
-    ID['wt'] = WEIGHTS
-    ID['xps'] = XPS
-    ID['mixed'] = MIXED
-    ID['inf'] = NUMBER
-    ID['sev'] = SEV
-    ID['on'] = SEV
-    ID['agg'] = AGG
-    ID['port'] = PORT
-
-
-Example Code
-------------
-
-    ::
-
-        port Complex~Portfolio~Mixed
-            agg LineA  50  claims           sev lognorm 12 cv [2, 3, 4] wt [.3 .5 .2] mixed gamma 0.4
-            agg LineB  24  claims 10 x 5    sev lognorm 12 cv [{', '.join([str(i) for i in np.linspace(2,5, 20)])}] wt=20 mixed gamma 0.35
-            agg LineC 124  claims 120 x 5   sev lognorm 16 cv 3.4                     mixed gamma 0.45
-
-        port Complex~Portfolio
-            agg Line3  50  claims [5 10 15] x 0         sev lognorm 12 cv [1, 2, 3]        mixed gamma 0.25
-            agg Line9  24  claims [5 10 15] x 5         sev lognorm 12 cv [1, 2, 3] wt=3   mixed gamma 0.25
-
-        port Portfolio~2
-            agg CA 500 prem at .5 lr 15 x 12  sev gamma 12 cv [2 3 4] wt [.3 .5 .2] mixed gamma 0.4
-            agg FL 1.7 claims 100 x 5         sev 10000 * pareto 1.3 - 10000        poisson
-            agg IL 1e-8 * agg.CMP
-            agg OH agg.CMP * 1e-8
-            agg NY 500 prem at .5 lr 15 x 12  sev [20 30 40 10] * gamma [9 10 11 12] cv [1 2 3 4] wt =4 mixed gamma 0.4
-
-        sev proda 30000 * lognorm 2
-        sev prodc:   50000 * lognorm(3)
-        sev weird    50000 * beta(1, 4) + 10000
-        sev premsop1 25000 * lognorm 2.3; sev premsop2 35000 * lognorm 2.4;
-        sev premsop3 45000 * lognorm 2.8
-
-        agg Agg1     20 claims 10 x 2 sev lognorm 12 cv 0.2 mixed gamma 0.8
-        agg Agg2     20 claims 10 x 2 sev 15 * lognorm 2.5  poisson;
-        sev premsop1 25000 * lognorm 2.3;
-        agg Agg3     20 claims 10 x 2 on 25 * lognorm 2 fixed;
-
-        port MyFirstPortfolio
-            agg A1: 50  claims          sev gamma 12 cv .30 (mixed gamma 0.014)
-            agg A2: 50  claims 30 xs 10 sev gamma 12 cv .30 (mixed gamma 0.014)
-            agg A3: 50  claims          sev gamma 12 cv 1.30 (mixed gamma 0.014)
-            agg A4: 50  claims 30 xs 20 sev gamma 12 cv 1.30 (mixed gamma 0.14)
-            agg B 15 claims 15 xs 15 sev lognorm 12 cv 1.5 + 2 mixed gamma 4.8
-            agg Cat 1.7 claims 25 xs 5  sev 25 * pareto 1.3 0 - 25 poisson
-            agg ppa: 1e-8 * agg.PPAL
-
-        port distortionTest
-            agg mix    50 claims              [50, 100, 150, 200] xs 0  sev lognorm 12 cv [1,2,3,4]    poisson
-            agg low    500 premium at 0.5     5 xs 5                    sev gamma 12 cv .30            mixed gamma 0.2
-            agg med    500 premium at 0.5 lr  15 xs 10                  sev gamma 12 cv .30            mixed gamma 0.4
-            agg xsa    50  claims             30 xs 10                  sev gamma 12 cv .30            mixed gamma 1.2
-            agg hcmp   1e-8 * agg.CMP
-            agg ihmp   agg.PPAL * 1e-8
-
-References
-----------
-
-https://sly.readthedocs.io/en/latest/sly.html
-
-"""
 from sly import Lexer, Parser
 import sly
 import logging
@@ -352,7 +22,7 @@ class UnderwritingLexer(Lexer):
               PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
               LOSS, PREMIUM, AT, LR, CLAIMS, SPECIFIED,
               XS,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS, #  CONSTANT,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
               MIXED, FREQ, EMPIRICAL, TWEEDIE,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
               AND, PERCENT,
@@ -451,13 +121,14 @@ class UnderwritingLexer(Lexer):
     def preprocess(program):
         """
         Separate preprocessor step, allowing it to be called separately.
-        Preprocessing involves ss steps:
+        Preprocessing involves six steps:
 
         1. Remove // comments, through end of line
-        2. Remove \\n in [ ] (vectors) that appear from  by ``f'{np.linspace}'``
+        2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
         3. Semicolon ; mapped to newline
         4. Backslash (line continuation) mapped to space
-        5. Split on newlines
+        5. \\n\\t is replaced with space, supporting the tabbed indented Portfolio layout
+        6. Split on newlines
 
         :param program:
         :return:
@@ -1266,17 +937,21 @@ def grammar(add_to_doc=False, save_to_fn=''):
     """
 
     start_string = '''Language Specification
-----------------------
+======================
 
 The ```agg``` Language Grammar:
 
 ::
 
 '''
-    end_string = 'parser.out parser debug information'
+    end_string = '''
+References
+----------
+'''
+    pout = Path(__file__).parent / '../doc/5_Langauge_Reference.rst'
+    pin = Path(__file__)
 
-    with open(__file__, 'r') as f:
-        txt = f.read()
+    txt = pin.read_text(encoding='utf-8')
     stxt = txt.split('@_')
     ans = {}
     for it in stxt[3:-2]:
@@ -1389,23 +1064,22 @@ LOCATION_ADD            ::= "#"
 # DIVIDE                  ::=  '/'
 
     s += lang_words
-    print(s)
     # actually put into this file (uncomment)
     if add_to_doc is True:
+        txt = pout.read_text(encoding='utf-8')
         st = txt.find(start_string) + len(start_string)
         end = txt.find(end_string)
         txt = txt[0:st] + s + txt[end:]
-        with open(__file__, 'w') as f:
-            f.write(txt)
+        pout.write_text(txt, encoding='utf-8')
+
     if save_to_fn == '':
         save_to_fn = Path.home() / 'aggregate/parser/grammar.md'
     Path(save_to_fn).write_text(s, encoding='utf-8')
 
+    return s
 
 if __name__ == '__main__':
-    # print the grammar and add to this file as part of docstring
-    # TODO fix comments!
+    # print the grammar and add to this file as part of docstring in 41_language_reference.rst
 
-    # may need to put an extra indent for rst to work properly
-    # eg %run agg_parser.py to run in Jupyter
     grammar(add_to_doc=True)
+    UnderwritingParser.enhance_debugfile()

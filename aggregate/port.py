@@ -2560,7 +2560,7 @@ class Portfolio(object):
                 ex = np.sum(np.minimum(1, r0_rS)) * self.bs + mass
                 ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * self.bs
                 return ex - premium_target, ex_prime
-        elif name == 'roe':
+        elif name in ['roe', 'ccoc']:
             # constant roe
             # TODO Note if you input the roe this is easy!
             shape = 0.25
@@ -2888,6 +2888,10 @@ class Portfolio(object):
         if S_calculation == 'forwards':
             logger.debug('Using updated S_forwards calculation in apply_distortion! ')
             df['S'] = 1 - df.p_total.cumsum()
+
+        if type(dist) == str:
+            # try looking it up in calibrated distortions
+            dist = self.dists[dist]
 
         # make g and ginv and other interpolation functions
         g, g_inv = dist.g, dist.g_inv

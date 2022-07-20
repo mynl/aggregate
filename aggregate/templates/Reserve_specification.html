@@ -1,0 +1,96 @@
+<h3 id="specification-of-risks-for-scenario_name-example">Specification
+of Risks for {{scenario_name}} Example</h3>
+
+<h4 class="unnumbered" id="portfolio-program">Portfolio Program</h4>
+
+<p>The portfolio is generated using the following <code>Aggregate</code>
+specification.</p>
+
+
+<pre><code>{{ program | safe }}
+</code></pre>
+
+<p>Line <span class="math inline">\(Xm1=X_{-1}\)</span> represents
+reserves and <span class="math inline">\(X0=X_{0}\)</span> new
+business.</p>
+
+<h4 id="basic-loss-statistics">Basic Loss Statistics</h4>
+
+{{ basic_loss_statistics | safe }}
+
+<p>Table: Loss statistics for new business and prior year reserves. </p>
+
+<p>Statistics are shown on an unlimited basis, i.e. assuming unlimited
+InsCo assets.</p>
+
+<p>New business is more volatile than reserves because it allows for
+uncertainty in claim occurrence as well as ultimate payment amount. In
+practice a prospective book may have an estimated CV between 20 and 40
+percent. Reserves often have estimated CVs below 10 percent.</p>
+
+<figure>
+<img src="img/%7B%7Bscenario_name%7D%7D-distributions.png"
+alt="Liability densities and log densities (right)." />
+<figcaption aria-hidden="true">Liability densities and log densities
+(right).</figcaption>
+</figure>
+<h3 id="pricing-information">Pricing Information</h3>
+<h4 class="unnumbered" id="distortion-calibration">Distortion
+Calibration</h4>
+
+{{ distortion_calibration | safe }}
+
+<p>In the table Total assets are <span
+class="math inline">\(a={{a_x}}\)</span>. <span
+class="math inline">\(\iota\)</span> is the input average investor cost
+of capital across the entire portfolio and <span
+class="math inline">\(\nu=1/(1+\iota)\)</span>, see Ch. 4. The premium
+is <span class="math inline">\(\rho(X\wedge a)\)</span> when the insurer
+has assets <span class="math inline">\(a\)</span>. Levg shows the
+premium to surplus ratio and <span class="math inline">\(\bar
+Q(a)\)</span> initial capital. Expected losses, EL, are reduced to
+reflect available assets.</p>
+
+<p>The summary confirms pricing is calibrated to produce a {{ROE}}
+percent ROE at <span class="math inline">\(p={{p}}\)</span>-VaR capital
+for the total portfolio.</p>
+
+<h4 class="unnumbered" id="distortion-information">Distortion
+Information</h4>
+<p>Parameters for distortions producing a {{ROE}} percent ROE at <span
+class="math inline">\(p={{p}}\)</span>-VaR capital.</p>
+
+{{ distortion_information | safe }}
+
+<p>The example uses a {{dist}} distortion.</p>
+
+<h4 class="unnumbered" id="premium-and-capital-detail">Premium and
+Capital Detail</h4>
+
+{{ premium_capital | safe }}
+
+<p>Table: Insurance metrics by line on a run-off (ro) and going-concern
+(gc) basis. Rows 6, 7, 8 only apply to prospective business and are
+shown for comparison purposes only. </p>
+
+<p> shows objective and risk adjusted values for each line at the
+required {{p}} value at risk asset levels. The amounts are all natural
+allocation values. All by-line quantities sum to the total shown. Rows
+6-8 compute one-period returns for each line.</p>
+
+<h4 class="unnumbered"
+id="accounting-and-economic-balance-sheets">Accounting and Economic
+Balance Sheets</h4>
+
+{{ accounting_economic_balance_sheets | safe }}
+
+<p>Table: Premium and capital detail. </p>
+
+<p>The objective and market values track from . The Difference column is
+the difference between Market and Objective, which corresponds to the
+risk margin. Equity increases from statutory to objective because of
+limited liability, but decreases to market because of risk margins. The
+latter are far more material than the former for a well capitalized
+company, so there is a more material difference between Market and
+Objective equity than between Objective and Statutory.</p>
+

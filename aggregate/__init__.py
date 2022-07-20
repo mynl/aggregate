@@ -8,6 +8,19 @@ __version__ = "0.9.4.1"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 
+# set up
+from pathlib import Path
+base_dir = Path.home() / 'aggregate'
+base_dir.mkdir(exist_ok=True)
+
+for p in ['cases', 'parser', 'tests', 'temp']:
+    (base_dir / p).mkdir(exist_ok=True)
+
+# print('All directories exist')
+
+del p, base_dir
+
+
 # imports
 from .underwriter import Underwriter, build
 from .port import Portfolio, make_awkward
@@ -25,7 +38,6 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     FigureManager, tweedie_convert, power_variance_family
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
-from pathlib import Path
 
 # module level doc-string
 __doc__ = """
@@ -38,13 +50,4 @@ science, and related areas.
 
 """
 
-base_dir = Path.home() / 'aggregate'
-base_dir.mkdir(exist_ok=True)
-
-for p in ['cases', 'parser', 'tests', 'temp']:
-    (base_dir / p).mkdir(exist_ok=True)
-
-# print('All directories exist')
-
-del p, base_dir
 

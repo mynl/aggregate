@@ -508,6 +508,7 @@ class Bounds(object):
         norm = mpl.colors.Normalize(0, 1)
         cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
         mapper = cm.get_cmap()
+        s = np.linspace(0, 1, 1001)
 
         def plot_max_min(ax):
             ax.fill_between(self.cloud_df.index, self.cloud_df.min(1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
@@ -519,10 +520,7 @@ class Bounds(object):
             ax = axs[0]
             if n_resamples > 0:
                 if pricing:
-                    if n_resamples < 10:
-                        bit = self.weight_df.xs(0, drop_level=False).sample(n=n_resamples, replace=True).reset_index()
-                    else:
-                        bit = self.weight_df.xs(0, drop_level=False).reset_index()
+                    bit = self.weight_df.xs(0, drop_level=False).sample(n=n_resamples, replace=True).reset_index()
                 else:
                     bit = self.weight_df.sample(n=n_resamples, replace=True).reset_index()
                 logger.info('cloudview...done 1')
@@ -559,7 +557,6 @@ class Bounds(object):
             elif type(distortions) == list:
                 logger.info('cloudview: start 4 adding distortions')
                 name_mapper = {'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
-                s = np.linspace(0, 1, 1001)
                 lss = list(mpl.lines.lineStyles.keys())
                 for ax, dist_dict in zip(axs[1:], distortions):
                     ii = 1
@@ -614,17 +611,30 @@ class Bounds(object):
         :return:
         """
 
-        assert isinstance(self.distribution_spec, (agg.Portfolio, agg.Aggregate))
+        if isinstance(self.distribution_spec, (agg.Portfolio, agg.Aggregate)):
+            df = self.distribution_spec.density_df
+            bs = self.distribution_spec.bs
+        elif isinstance(self.distribution_spec, pd.DataFrame):
+            df = self.distribution_spec
+            bs = df.index[1]
+        else:
+            raise NotImplemented('Must input Aggregate, Portfolio, or DataFrame, '
+                            f'not type {type(self.distribution_spec)}')
 
-        df = self.distribution_spec.density_df
         temp = distortion.g(df.p_total.shift(-1, fill_value=0)[::-1].cumsum())[::-1]
 
         if isinstance(temp, np.ndarray):
-            # not aall g functions return Series (you can't guarantee it is called on something with an index)
+            # not all g functions return Series (you can't guarantee it is called on something with an index)
             temp = pd.Series(temp, index=df.index)
 
-        temp = temp.shift(1, fill_value=0).cumsum() * self.distribution_spec.bs
-        return temp.loc[a]
+        temp = temp.shift(1, fill_value=0).cumsum() * bs
+
+        if np.isinf(a):
+            r = len(temp) - 1
+        else:
+            r = temp.index.get_loc(a)
+
+        return temp.iloc[r] * bs
 
     def principal_extreme_distortion_analysis(self, gs, pricing=False):
         """

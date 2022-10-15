@@ -32,7 +32,7 @@ from .utils import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    make_mosaic_figure, friendly
+    make_mosaic_figure, friendly, iman_conover
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -182,6 +182,8 @@ class Portfolio(object):
            2) Aggregate: An actual aggregate objects or
            3) tuple (type, dict) as returned by uw['name'] or
            4) string: Names referencing objects in the optionally passed underwriter
+           5) a single DataFrame: empirical samples (the total column, if present, is ignored);
+              a p_total column is used for probabilities if present
 
     :returns:
     """
@@ -208,11 +210,31 @@ class Portfolio(object):
         # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
+        if (len(spec_list) == 1 and isinstance(spec_list[0], pd.DataFrame)):
+            # create from samples...slightly different looping behavior
+            logger.info('Creating from sample DataFrame')
+            spec_list = spec_list[0]
+        if isinstance(spec_list, pd.DataFrame):
+            if 'p_total' in spec_list:
+                probs = spec_list['p_total'].to_numpy()
+            else:
+                probs = np.repeat(1 / len(spec_list), len(spec_list))
+
         for spec in spec_list:
             if isinstance(spec, Aggregate):
                 # directly passed in an agg object
                 a = spec
                 agg_name = spec.name
+            elif isinstance(spec, str) and isinstance(spec_list, pd.DataFrame):
+                if spec not in ['total', 'p_total']:
+                    s = spec_list[spec].sort_values().to_numpy()
+                    a = Aggregate(name=spec,
+                                  exp_en=1,
+                                  sev_name='dhistogram', sev_xs=s, sev_ps=probs,
+                                  freq_name='fixed')
+                    agg_name = spec
+                else:
+                    a = None
             elif isinstance(spec, str):
                 # look up object in uw return actual instance
                 # note here you could do uw.aggregate[spec] and get the dictionary def
@@ -237,12 +259,15 @@ class Portfolio(object):
             else:
                 raise ValueError(f'Invalid type {type(spec)} passed to Portfolio, expect Aggregate, str or dict.')
 
-            self.agg_list.append(a)
-            self.line_names.append(agg_name)
-            self.__setattr__(agg_name, a)
-            ma.add_fs(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
-                      a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
-            max_limit = max(max_limit, np.max(np.array(a.limit)))
+            if a is not None:
+                # deals with total in DataFrame intput mode
+                self.agg_list.append(a)
+                self.line_names.append(agg_name)
+                self.__setattr__(agg_name, a)
+                ma.add_fs(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
+                          a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
+                max_limit = max(max_limit, np.max(np.array(a.limit)))
+
         self.line_names_ex = self.line_names + ['total']
         self.line_name_pipe = "|".join(self.line_names_ex)
         for n in self.line_names:
@@ -2654,7 +2679,7 @@ class Portfolio(object):
             raise ValueError(f'calibrate_distortion not implemented for {name}')
 
         # numerical solve except for tvar, and roe when premium is known
-        if name == 'roe':
+        if name in ('roe', 'ccoc'):
             assert el and premium_target
             r = (premium_target - el) / (assets - premium_target)
             shape = r
@@ -2746,7 +2771,7 @@ class Portfolio(object):
         self.dists = dists
         return ans
 
-    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1):
+    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1, efficient=False):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
         show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
@@ -2771,7 +2796,7 @@ class Portfolio(object):
             pass
 
         for g in dist_dict.values():
-            _x = self.apply_distortion(g) #, axiter, num_plots)
+            _x = self.apply_distortion(g, efficient=efficient) #, axiter, num_plots)
             df = _x.augmented_df
             # extract range of S values
             if As[0] in df.index:
@@ -3715,7 +3740,7 @@ class Portfolio(object):
         return Answer(pricing_df=df, dist=g)
 
     def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None,
-                            regex=''):
+                            regex='', add_comps=True):
         """
         run analyze_distortion on self.dists
 
@@ -3746,7 +3771,7 @@ class Portfolio(object):
                     use_self = False
                     logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
                 # first distortion...add the comps...these are same for all dists
-                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=len(dfs) == 0, mass_hints=mass_hints,
+                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=(len(dfs) == 0) and add_comps, mass_hints=mass_hints,
                                                  efficient=efficient, use_self=use_self)
                 dfs.append(ad_ans.exhibit)
                 ans[f'{k}_exhibit'] = ad_ans.exhibit
@@ -3996,7 +4021,7 @@ class Portfolio(object):
         logger.debug(f'In analyze_distortion_comps p={p} and a_cal={a_cal}')
         try:
             p_t = self.tvar_threshold(p, kind)
-        except ValueError as e:
+        except (ZeroDivisionError, ValueError) as e:
             logger.warning(f'Error computing p_t threshold for VaR at p={p}')
             logger.warning(str(e))
             p_t = np.nan
@@ -5993,6 +6018,27 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             return wdists, df, pricer, dists, wts
         else:
             return wdists
+
+    def resample(self, n, desired_correlation=None):
+        """
+        Resample from port object lines
+        Apply Iman Conover if required
+
+        """
+        df = pd.DataFrame(index=range(n))
+        for c in self.line_names:
+            pc = f'p_{c}'
+            df[c] = self.density_df[['loss', pc]].query(f'`{pc}` > 0').\
+                sample(n, replace=True, weights=pc).\
+                drop(columns=pc).reset_index(drop=True)
+
+        if desired_correlation is not None:
+            df = iman_conover(df, desired_correlation)
+        else:
+            df['total'] = df.sum(axis=1)
+            df = df.set_index('total')
+        return df
+
 
 
 def check01(s):

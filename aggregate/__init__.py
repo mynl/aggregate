@@ -35,7 +35,10 @@ from .utils import get_fmts, tidy_agg_program, ft, \
     round_bucket, \
     make_ceder_netter, make_mosaic_figure, nice_multiple, \
     style_df, logger_level, friendly, \
-    FigureManager, tweedie_convert, power_variance_family
+    FigureManager, tweedie_convert, power_variance_family, \
+    iman_conover, rearrangement_algorithm_max_VaR, \
+    mu_sigma_from_mean_cv, \
+    make_corr_matrix, random_corr_matrix
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 

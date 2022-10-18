@@ -411,19 +411,31 @@ class Portfolio(object):
         return ', '.join(s) + '}'
 
     def _repr_html_(self):
-        s = [f'<h2>Portfolio object: {self.name}</h2>']
+        """
+        Updated to mimic Aggregate
+        """
+        s = [f'<h3>Portfolio object: {self.name}</h3>']
         _n = len(self.agg_list)
         _s = "" if _n <= 1 else "s"
-        s.append(f'Portfolio contains {_n} aggregate component{_s}')
-        summary_sl = (slice(None), ['mean', 'cv', 'skew'])
-        if self.audit_df is not None:
-            _df = pd.concat((self.statistics_df.loc[summary_sl, :],
-                             self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
-                            sort=True)
-            s.append(_df._repr_html_())
-        else:
-            s.append(self.statistics_df.loc[summary_sl, :]._repr_html_())
-        return '\n'.join(s)
+        s.append(f'Portfolio contains {_n} aggregate component{_s}.')
+        if self.bs > 0:
+            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+        df = self.describe
+        return '\n'.join(s) + df.to_html()
+        # original
+        # s = [f'<h2>Portfolio object: {self.name}</h2>']
+        # _n = len(self.agg_list)
+        # _s = "" if _n <= 1 else "s"
+        # s.append(f'Portfolio contains {_n} aggregate component{_s}')
+        # summary_sl = (slice(None), ['mean', 'cv', 'skew'])
+        # if self.audit_df is not None:
+        #     _df = pd.concat((self.statistics_df.loc[summary_sl, :],
+        #                      self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
+        #                     sort=True)
+        #     s.append(_df._repr_html_())
+        # else:
+        #     s.append(self.statistics_df.loc[summary_sl, :]._repr_html_())
+        # return '\n'.join(s)
 
     def __hash__(self):
         """
@@ -452,39 +464,51 @@ class Portfolio(object):
         return self.agg_list[item]
 
     @property
-    def audit(self):
-        """
-        Renamed version of the audit dataframe
-        :return:
-        """
-        if self.audit_df is not None:
-            return self.audit_df.rename(columns=self.renamer, index=self.line_renamer).T
-
-    @property
-    def density(self):
-        """
-        Renamed version of the density_df dataframe
-        :return:
-        """
-        if self.density_df is not None:
-            return self.density_df.rename(columns=self.renamer)
-
-    @property
-    def augmented(self):
-        """
-        Renamed version of the density_df dataframe
-        :return:
-        """
-        if self.augmented_df is not None:
-            return self.augmented_df.rename(columns=self.renamer)
-
-    @property
     def statistics(self):
         """
-        Renamed version of the statistics dataframe
+        Same as statistics df, to be consistent with Aggregate objects
         :return:
         """
-        return self.statistics_df.rename(columns=self.renamer)
+        return self.statistics_df
+
+    @property
+    def describe(self):
+        """
+        Theoretic and empirical stats. Used in _repr_html_.
+        Leverage Aggregate object stats; same format
+
+        """
+        sev_m = self.statistics_df.loc[('sev', 'ex1'), 'total']
+        sev_cv = self.statistics_df.loc[('sev', 'cv'), 'total']
+        sev_skew = self.statistics_df.loc[('sev', 'skew'), 'total']
+        n_m = self.statistics_df.loc[('freq', 'ex1'), 'total']
+        n_cv = self.statistics_df.loc[('freq', 'cv'), 'total']
+        n_skew = self.statistics_df.loc[('freq', 'skew'), 'total']
+        a_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
+        a_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
+        a_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
+        df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
+                           'Skew(X)': [sev_skew, n_skew, a_skew]},
+                          index=['Sev', 'Freq', 'Agg'])
+        df.index.name = 'X'
+
+        if self.audit_df is not None:
+            esev_m = np.nan # self.audit_df.loc['total', 'emp_sev_1']
+            esev_cv = np.nan # self.audit_df.loc['total', 'emp_sev_cv']
+            ea_m = self.audit_df.loc['total', 'EmpEX1']
+            ea_cv = self.audit_df.loc['total', 'EmpCV']
+            df.loc['Sev', 'Est E(X)'] = esev_m
+            df.loc['Agg', 'Est E(X)'] = ea_m
+            df['Err E(X)'] = df['Est E(X)'] / df['E(X)'] - 1
+            df.loc['Sev', 'Est CV(X)'] = esev_cv
+            df.loc['Agg', 'Est CV(X)'] = ea_cv
+            df['Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
+            df = df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+
+        t1 = [a.describe for a in self] + [df]
+        t2 = [a.name for a in self] + ['total']
+        df = pd.concat(t1, keys=t2, names=['line', 'X']).fillna('')
+        return df
 
     def json(self, stream=None):
         """
@@ -731,7 +755,7 @@ class Portfolio(object):
             # Dec 2019: kind='linear' --> kind='previous'
             self._cdf = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='previous',
                                              bounds_error=False, fill_value='extrapolate')
-        return self._cdf(x)
+        return 0. + self._cdf(x)
 
     def sf(self, x):
         """
@@ -752,6 +776,21 @@ class Portfolio(object):
             self._pdf = interpolate.interp1d(self.density_df.loss, self.density_df.p_total, kind='linear',
                                              bounds_error=False, fill_value='extrapolate')
         return self._pdf(x) / self.bs
+
+    def pmf(self, x):
+        """
+        Probability mass function, treating aggregate as discrete
+        x must be in the index (?)
+
+        """
+        if self.density_df is None:
+            raise ValueError("Must update before computing probabilities!")
+
+        try:
+            return self.density_df.loc[x, 'p_total']
+        except KeyError:
+            return 0.0
+            # raise KeyError(f'Value {x} must be in index for probability mass function.')
 
     # # make some handy aliases; delete these go strictly with scipy.stats notation
     # def F(self, x):
@@ -1001,7 +1040,7 @@ class Portfolio(object):
             # use statistics_df matched to computed aggregate_project
             m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
 
-        name = f'{approx_type[0:4]}~{self.name[0:5]}'
+        name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
 
         if approx_type == 'slognorm':
@@ -1741,7 +1780,7 @@ class Portfolio(object):
                         html_title(f'Report {r} not generated', 2)
 
     @property
-    def _report_df(self):
+    def report_df(self):
         if self.audit_df is not None:
             summary_sl = (slice(None), ['mean', 'cv', 'skew'])
 
@@ -1767,10 +1806,6 @@ class Portfolio(object):
         else:
             df = None
         return df
-
-    @property
-    def report_df(self):
-        return friendly(self._report_df)
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """

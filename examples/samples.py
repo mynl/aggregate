@@ -22,7 +22,7 @@ def qd(df):
     """
     quick describe with nice percentiles and cv
     """
-    d = df.describe([.1, .25, .5, .75, .9, .95, .99])
+    d = df.describe
     d.loc['cv'] = d.loc['std'] / d.loc['mean']
     return d
 

@@ -422,9 +422,9 @@ if 'simple_discrete' in section:
     ans[9].plot()
     ans[9].plot(figsize=(12, 4))
     print(ans[9].program)
-    uw.describe()
+    uw.describe
     uw.list()
-    uw.describe()
+    uw.describe
     k, s = uw['A9']
     k
     s

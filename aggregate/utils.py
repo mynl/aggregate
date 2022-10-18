@@ -284,13 +284,16 @@ def make_ceder_netter(reins_list, debug=False):
     xs = [0]
     ys = [0]
     for (p, y, a) in reins_list:
-        if a > base:
-            xs.append(a)
+        if np.isinf(y):
+            raise NotImplementedError('inf not implemented')
+        else:
+            if a > base:
+                xs.append(a)
+                ys.append(h)
+            h += p
+            xs.append(a + y)
             ys.append(h)
-        h += p
-        xs.append(a + y)
-        ys.append(h)
-        base += (a + y)
+            base += (a + y)
     xs.append(np.inf)
     ys.append(h)
     ceder = interp1d(xs, ys)
@@ -570,7 +573,7 @@ class MomentAggregator(object):
     Not frequency aware
     makes report_ser df and statistics_df
 
-    Internal variables agg, sev, frqe, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
+    Internal variables agg, sev, freq, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
 
     :param freq_moms: function of one variable returning first three noncentral moments of the underlying
             frequency distribution
@@ -633,6 +636,16 @@ class MomentAggregator(object):
         # finally accumulate the aggregate_project
         self.tot_agg_1, self.tot_agg_2, self.tot_agg_3 = \
             self.cumulate_moments(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, self.agg_1, self.agg_2, self.agg_3)
+
+    def add_fs2(self, f1, vf, s1, vs):
+        """
+        accumulate based on first two moments entered as mean and variance - this
+        is how questions are generally written.
+
+        """
+        f2 = vf + f1 * f1
+        s2 = vs + s1 * s1
+        self.add_fs(f1, f2, 0., s1, s2, 0.)
 
     def add_f1s(self, f1, s1, s2, s3):
         """
@@ -712,6 +725,26 @@ class MomentAggregator(object):
         return f1 * s1, \
                f1 * s2 + (f2 - f1) * s1 ** 2, \
                f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
+
+    @staticmethod
+    def agg_from_fs2(f1, vf, s1, vs):
+        """
+        aggregate_project moments from freq and sev ex and var x
+
+
+        :param f1:
+        :param vf:
+        :param s1:
+        :param vs:
+        :return:
+        """
+        f2 = vf + f1 * f1
+        s2 = vs + s1 * s1
+        a1, a2, a3 = MomentAggregator.agg_from_fs(f1, f2, 0., s1, s2, 0.)
+        mw = MomentWrangler()
+        mw.noncentral = a1, a2, a3
+        # drop skewness
+        return mw.stats[:-1]
 
     def moments_to_mcvsk(self, mom_type, total=True):
         """
@@ -1696,7 +1729,7 @@ def style_df(df):
 
 def friendly(df):
     """
-    Attempt to format df "nicely", in a user-friendly manner. Not designed for bit dataframes!
+    Attempt to format df "nicely", in a user-friendly manner. Not designed for big dataframes!
 
     :param df:
     :return:
@@ -1725,9 +1758,9 @@ def friendly(df):
 
     bit = df.rename(index=ur).rename(columns=ur)
 
-    # style like pricinginsurancerisk.com?
-    return style_df(bit).format(lambda x: x if type(x)==str else f'{x:,.3f}')
-
+    # style like pricinginsurancerisk.com
+    # return style_df(bit).format(lambda x: x if type(x)==str else f'{x:,.3f}')
+    return bit
 
 class FigureManager():
     def __init__(self, cycle='c', lw=1.5, color_mode='mono', k=0.8, font_size=12,

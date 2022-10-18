@@ -731,7 +731,7 @@ class Aggregate(Frequency):
         self._tail_var = None
         self._tail_var2 = None
         self._inverse_tail_var = None
-        self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
+        # self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._linear_quantile_function = None
         self._cdf = None
         self._pdf = None
@@ -820,7 +820,7 @@ class Aggregate(Frequency):
         for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
             # WARNING: note sev_xs and sev_ps are NOT broadcast
-            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, sev_conditional)
+            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt, sev_conditional)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
             # input claim count trumps input loss
@@ -877,6 +877,9 @@ class Aggregate(Frequency):
         self.agg_m = self.statistics_total_df.loc['mixed', 'agg_m']
         self.agg_cv = self.statistics_total_df.loc['mixed', 'agg_cv']
         self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
+        # variance and sd come up in exam questions
+        self.agg_sd = self.agg_m * self.agg_cv
+        self.agg_var = self.agg_sd * self.agg_sd
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
         self._middle_q = None
@@ -905,7 +908,7 @@ class Aggregate(Frequency):
 
     def _repr_html_(self):
         s = [f'<h3>Aggregate object: {self.name}</h3>']
-        s.append(f'Claim count {self.n:0,.2f}, {self.freq_name} distribution<br>')
+        s.append(f'Claim count {self.n:0,.2f}, {self.freq_name} distribution.<br>')
         n = len(self.statistics_df)
         if n == 1:
             sv = self.sevs[0]
@@ -913,12 +916,12 @@ class Aggregate(Frequency):
                 _la = 'unlimited'
             else:
                 _la = f'{sv.limit} xs {sv.attachment}'
-            s.append(f'Severity{sv.long_name} distribution, {_la}<br>')
+            s.append(f'Severity{sv.long_name} distribution, {_la}.<br>')
         else:
-            s.append(f'Severity with {n} components<br>')
+            s.append(f'Severity with {n} components.<br>')
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}')
-        df = self.describe()
+            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+        df = self.describe
         return '\n'.join(s) + df.to_html()
 
     def discretize(self, sev_calc, discretization_calc, normalize):
@@ -1634,7 +1637,7 @@ class Aggregate(Frequency):
             idx = (df.sevF == 1).idxmax()
             df = df.loc[:idx]
             ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
-            ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Lee diagram')
+            ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Quantile (Lee) plot')
             ax.legend()
         else:
             # continuous
@@ -1647,15 +1650,16 @@ class Aggregate(Frequency):
             ylim = self.limits(stat='density')
 
             ax = axd['A']
-            df.p_total.plot(ax=ax, lw=2, label='Aggregate')
-            df.p_sev.plot(ax=ax, lw=1, label='Severity')
+            # divide by bucket size...approximating the densityh
+            (df.p_total / self.bs).plot(ax=ax, lw=2, label='Aggregate')
+            (df.p_sev / self.bs).plot(ax=ax, lw=1, label='Severity')
             ax.set(xlim=xlim, ylim=ylim, title='Probability density')
             ax.legend()
 
-            df.p_total.plot(ax=axd['B'], lw=2, label='Aggregate')
-            df.p_sev.plot(ax=axd['B'], lw=1, label='Severity')
+            (df.p_total / self.bs).plot(ax=axd['B'], lw=2, label='Aggregate')
+            (df.p_sev / self.bs).plot(ax=axd['B'], lw=1, label='Severity')
             ylim = axd['B'].get_ylim()
-            ylim = [1e-15, ylim[1]]
+            ylim = [1e-15, ylim[1]*2]
             axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
             axd['B'].legend()
 
@@ -1663,7 +1667,7 @@ class Aggregate(Frequency):
             # to do: same trimming for p-->1 needed?
             ax.plot(df.F, df.loss, lw=2, label='Aggregate')
             ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
-            ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Lee (quantile) plot')
+            ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
             ax.legend()
 
     def plot_old(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
@@ -1866,8 +1870,9 @@ class Aggregate(Frequency):
                 return f(self.q(0.99999))
 
         elif stat == 'density':
-            mx = self.agg_density.max()
-            mxx0 = self.agg_density[1:].max()
+            # for density need to divide by bs
+            mx = self.agg_density.max() / self.bs
+            mxx0 = self.agg_density[1:].max() / self.bs
             if kind == 'linear':
                 if zero_mass == 'include':
                     return f(mx)
@@ -1880,7 +1885,7 @@ class Aggregate(Frequency):
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
     @property
-    def _report_df(self):
+    def report_df(self):
         """
         Created on the fly report to audit creation of object.
         There were some bad choices of columns in audit_df...but it [maybe] embedded in other code....
@@ -1918,10 +1923,6 @@ class Aggregate(Frequency):
         return df
 
     @property
-    def report_df(self):
-        return friendly(self._report_df)
-
-    @property
     def statistics(self):
         """
         Pandas series of theoretic frequency, severity, and aggregate 1st, 2nd, and 3rd moments.
@@ -1930,11 +1931,22 @@ class Aggregate(Frequency):
         :return:
         """
         if len(self.statistics_df) > 1:
-            df = pd.concat((self.statistics_df, self.statistics_total_df), axis=1)
+            # there are mixture components
+            df = pd.concat((self.statistics_df, self.statistics_total_df), axis=0)
         else:
-            df = self.statistics_df
-        return df.T
+            df = self.statistics_df.copy()
+        # edit to make equivalent to Portfolio statistics
+        df = df.T
+        if df.shape[1] == 1:
+            df.columns = [df.iloc[0,0]]
+            df = df.iloc[1:]
+        df.index = df.index.str.split("_", expand=True, )
+        df = df.rename(index={'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean', np.nan: ''})
+        df.index.names =['component', 'measure']
+        df.columns.name = 'name'
+        return df
 
+    @property
     def describe(self):
         """
         Theoretic and empirical stats. Used in _repr_html_.
@@ -2266,17 +2278,38 @@ class Aggregate(Frequency):
         # i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
         # return q + (i1 + i2) / (1 - p)
 
-    def cdf(self, x):
+    def sev_cdf(self, x, verbose=False):
         """
-        Return cumulative probability distribution at x using linear interpolation.
+        Direct access to the underlying severity, exact computation.
+
+        """
+        ans = []
+        F = 0
+        for s in self.sevs:
+            w = s.sev_wt
+            c = s.cdf(x)
+            F += w * c
+            ans.append([s.sev_name, c, w])
+
+        if verbose is True:
+            return F, pd.DataFrame(ans, columns=['name', 'cdf', 'wt'])
+        else:
+            return F
+
+    def cdf(self, x, kind='previous'):
+        """
+        Return cumulative probability distribution at x using kind interpolation.
+
+        2022-10 change: kind introduced; default was linear
 
         :param x: loss size
         :return:
         """
         if self._cdf is None:
-            self._cdf = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind='linear',
+            self._cdf = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind=kind,
                                              bounds_error=False, fill_value='extrapolate')
-        return self._cdf(x)
+        # 0+ converts to float
+        return 0. + self._cdf(x)
 
     def sf(self, x):
         """
@@ -2299,6 +2332,21 @@ class Aggregate(Frequency):
                                              bounds_error=False, fill_value='extrapolate')
         return self._pdf(x) / self.bs
 
+    def pmf(self, x):
+        """
+        Probability mass function, treating aggregate as discrete
+        x must be in the index (?)
+
+        """
+        if self.density_df is None:
+            raise ValueError("Must update before computing probabilities!")
+
+        try:
+            return self.density_df.loc[x, 'p_total']
+        except KeyError:
+            return 0.0
+            # raise KeyError(f'Value {x} must be in index for probability mass function.')
+
     def json(self):
         """
         Write spec to json string.
@@ -2306,6 +2354,60 @@ class Aggregate(Frequency):
         :return:
         """
         return json.dumps(self._spec)
+
+    def fit(self, approx_type='slognorm', output='scipy'):
+        """
+        Create fixed freq agg approximation to self
+
+        output = agg (program), scipy frozen object, or [anything] = agg spec dict
+
+        Unlike Portfolio, which returns a single sev fixed freq agg, this
+        returns a scipy dist by default.
+
+        Use case: exam questions with the normal approacimation!
+
+        """
+
+        if self.audit_df is None:
+            # not updated
+            m = self.statistics_total_df.loc['mixed', 'agg_m']
+            cv = self.statistics_total_df.loc['mixed', 'agg_cv']
+            skew = self.statistics_total_df.loc['mixed', 'agg_skew']
+        else:
+            # use statistics_df matched to computed aggregate_project
+            m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
+
+        name = f'{approx_type[0:4]}.{self.name[0:5]}'
+        agg_str = f'agg {name} 1 claim sev '
+
+        if approx_type == 'norm':
+            sd = m*cv
+            sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+            agg_str += f'{sd} @ norm 1 # {m} '
+            if output=='scipy':
+                return ss.norm(loc=m, scale=sd)
+        elif approx_type == 'slognorm':
+            shift, mu, sigma = sln_fit(m, cv, skew)
+            # self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+            agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+            if output=='scipy':
+                return ss.lognorm(shape=sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
+        elif approx_type == 'sgamma':
+            shift, alpha, theta = sgamma_fit(m, cv, skew)
+            # self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
+            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+            agg_str += f'{theta} * lognorm {alpha} + {shift} '
+            if output=='scipy':
+                return ss.gamma(alpha, loc=shift, scale=theta)
+        else:
+            raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
+
+        if output == 'agg':
+            agg_str += ' fixed'
+            return agg_str
+        else:
+            return {'name': name, 'note': f'frozen version of {self.name}', 'exp_en': 1, **sev, 'freq_name': 'fixed'}
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """
@@ -2484,14 +2586,13 @@ class Severity(ss.rv_continuous):
         :param sev_scale:
         :param sev_xs: for fixed or histogram classes
         :param sev_ps:
-        :param sev_wt: this is not used; but it is convenient to pass it in and ignore it because sevs are
-               created with sev_wt=1. They should never be created with sev_wt not equal to 1.
+        :param sev_wt: this is not used directly; but it is convenient to pass it in and ignore it because sevs are
+               implicitly created with sev_wt=1.
         :param sev_conditional: conditional or unconditional; for severities use conditional
         """
 
         from .port import Portfolio
 
-        assert sev_wt == 1
 
         ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
         # I think this is preferred now, but these are the same (probably...)
@@ -2506,9 +2607,10 @@ class Severity(ss.rv_continuous):
         self.conditional = sev_conditional
         self.sev_name = sev_name
         self.name = name
-        self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}'
+        self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]'
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
+        self.sev_wt = sev_wt
         logger.debug(
             f'Severity.__init__  | creating new Severity {self.sev_name} at {super(Severity, self).__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist

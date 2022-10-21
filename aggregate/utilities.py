@@ -1048,7 +1048,7 @@ def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=N
         assert p is not None and μ is not None and σ2 is not None
         α = (2 - p) / (p - 1)
         λ = μ**(2-p) / ((2-p) * σ2)
-        β =  λ * α / μ
+        β = λ * α / μ
         m = α / β
         cv = α ** -0.5
 
@@ -1496,9 +1496,14 @@ def log_test():
     print('...done')
 
 
-def logger_level(level=0):
+def logger_level(level=30, name='aggregate', show=False):
     """
-    Change logger level FOR EVERY LOGGER. From startup.py
+    Code from common.py
+
+    Change logger level all loggers containing name
+    Changing for EVERY logger is a really bad idea,
+    you get the endless debug info out of matplotlib
+    find_font, for exapmle.
 
     FWIW, to list all loggers:
 
@@ -1509,13 +1514,25 @@ def logger_level(level=0):
     :param level:
     :return:
     """
+
     try:
         logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s, %(funcName)s|  %(message)-s',
-                            datefmt='%M:%S', level=level, force=True)
-    except ValueError:
-        print('ValueError...retrying')
-        logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
-                            datefmt='%M:%S', level=level)
+                            datefmt='%M:%S')
+        loggers = [logging.getLogger()]  # get the root logger
+        loggers = loggers + \
+            [logging.getLogger(name)
+             for name in logging.root.manager.loggerDict]
+
+        # set the level selectively
+        for logger in loggers:
+            if logger.name.find(name) >= 0:
+                logger.setLevel(level)
+        if show:
+            for logger in loggers:
+                print(logger.name, logger.getEffectiveLevel())
+    except ValueError as e:
+        raise e
+
 
 def subsets(x):
     """

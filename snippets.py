@@ -8,14 +8,7 @@ from examples import case_studies as cs
 
 from numpy import exp
 from scipy.interpolate import interp1d
-import logging
 
-
-logging.basicConfig(
-    format='|%(lineno)4d|%(levelname)-10s|%(message)-s',
-    datefmt='%M:%S',
-    level=10,
-    force=True)
 
 # ISSUES =================================================================
 # The million issues with matplotlib fonts!!!!
@@ -280,13 +273,13 @@ if 'parse_test_1' in section:
     # display(build.interpreter_list(tests))
 
     # # for test in tests:
-    # #     display(build.interpreter_one(test))
+    # #     display(build.interpreter_line(test))
 
 
 if 'parse_test_2' in section:
     print(
         f'ACTIVATING parse_test_2 SECTION {__name__} ===========================')
-    print('MUst run parse_test_1 first to create df')
+    print('Must run parse_test_1 first to create df')
 
     ans = {}
     # build.create_all = False
@@ -298,8 +291,8 @@ if 'parse_test_2' in section:
     df['emp_m'] = 0.
     df['emp_cv'] = 0.
     df['emp_sd'] = 0.
-    df0 = df.query('error==0 and type=="agg"').copy()
-    for n, p in df0.program.items():
+    df0 = df.query('error==0 and kind=="agg"').copy()
+    for n, p in df0['preprocessed program'].items():
         try:
             ans[n] = a = build(p, approximation='exact')
         except Exception as e:

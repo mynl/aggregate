@@ -56,5 +56,9 @@ def run_test():
     port = build(prog)
 
 if __name__ == '__main__':
+
+    import matplotlib.pyplot as plt
+    plt.plot(10, 30)
+
     run_test()
     # runpf_test()

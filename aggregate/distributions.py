@@ -83,9 +83,9 @@ class Frequency(object):
 
     """
 
-    __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b']
+    __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0']
 
-    def __init__(self, freq_name, freq_a, freq_b):
+    def __init__(self, freq_name, freq_a, freq_b, freq_zm, freq_p0):
         """
         Creates the mgf and moment function:
 
@@ -107,6 +107,14 @@ class Frequency(object):
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
+        self.freq_zm = freq_zm
+        self.freq_p0 = freq_p0
+
+        if freq_zm is True:
+            # add implemented methdods here....
+            if freq_name not in ('poisson', 'gamma'):
+                raise NotImplementedError(f'Zero modification not implemented for {freq_name}')
+
         logger.debug(
             f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
 
@@ -438,7 +446,7 @@ class Aggregate(Frequency):
     # TODO must be able to automate this with inspect
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
-                      'sev_wt', 'occ_kind', 'occ_reins', 'freq_name', 'freq_a', 'freq_b',
+                      'sev_wt', 'occ_kind', 'occ_reins', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
                       'agg_kind', 'agg_reins', 'note']
 
     @property
@@ -654,10 +662,10 @@ class Aggregate(Frequency):
         return Aggregate(**spec)
 
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
-                 sev_name='', sev_a=0, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
+                 sev_name='', sev_a=np.nan, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True,
                  occ_reins=None, occ_kind='',
-                 freq_name='', freq_a=0, freq_b=0,
+                 freq_name='', freq_a=0, freq_b=0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
                  note=''):
         """
@@ -690,6 +698,8 @@ class Aggregate(Frequency):
         :param freq_name:       name of frequency distribution
         :param freq_a:          cv of freq dist mixing distribution
         :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
+        :param freq_zm:         True/False zero modified flag
+        :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
         :param agg_reins:       layers
         :param agg_kind:        ceded to or net of
         :param note:            note, enclosed in {}
@@ -722,7 +732,8 @@ class Aggregate(Frequency):
 
         logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
-        Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b))
+        Frequency.__init__(self, get_value(freq_name), get_value(freq_a), get_value(freq_b),
+                           get_value(freq_zm), get_value(freq_p0))
         self.figure = None
         self.xs = None
         self.bs = 0
@@ -2572,7 +2583,7 @@ class Aggregate(Frequency):
 
 class Severity(ss.rv_continuous):
 
-    def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=0, sev_b=0,
+    def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True, name='', note=''):
         """
         A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``,
@@ -2738,17 +2749,22 @@ class Severity(ss.rv_continuous):
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
         else:
-            # distributions with one shape parameter
-            # TODO assumes 0 is an invalid shape parameter....
-            if sev_a == 0:
-                print('ASSUMING sev_a is INVALID>>>\n'*10)
+            # distributions with one shape parameter, which either comes from sev_a or sev_cv
+            if np.isnan(sev_a) and sev_cv > 0:
                 sev_a, _ = self.cv_to_shape(sev_cv)
+                logger.log(31, f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')
+            elif np.isnan(sev_a):
+                raise ValueError('sev_a not set and sev_cv=0 is invalid, no way to determine shape.')
+            # have sev_a, now assemble distribution
             if sev_scale == 0 and sev_mean > 0:
+                logger.log(31, f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
-            else:
+            elif sev_scale > 0 and sev_mean==0:
+                logger.log(31, f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
-
+            else:
+                raise ValueError('sev_scale and sev_mean both equal zero.')
         if self.detachment == np.inf:
             self.pdetach = 0
         else:

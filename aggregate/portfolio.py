@@ -243,10 +243,16 @@ class Portfolio(object):
                 if uw is None:
                     raise ValueError(f'Must pass valid Underwriter instance to create aggs by name')
                 try:
-                    a = uw.write(spec)
+                    a_out = uw.write(spec)
                 except Exception as e:
                     logger.error(f'Item {spec} not found in your underwriter')
                     raise e
+                # a is a disct (kind, name) -> (obj or spec, program) pair. Portfolios are ?always created so
+                # here, spec is the name
+                assert len(a_out) == 1
+                # remember, the thing you make must be called a as part of the loop
+                a = a_out[('agg', spec)][0]
+                assert isinstance(a, Aggregate)
                 agg_name = a.name
             elif isinstance(spec, tuple):
                 # uw returns type, spec

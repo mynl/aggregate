@@ -32,8 +32,7 @@ class Underwriter(object):
 
     """
 
-    def __init__(self, databases=None, store_mode=True, update=False,
-                 log2=10, debug=False, create_all=False):
+    def __init__(self, databases=None, update=False, log2=10, debug=False, create_all=False):
         """
         Here is doc for init.
 
@@ -43,7 +42,6 @@ class Underwriter(object):
         databases; if 'site' or site in databases, load all site databases (home() / agg, which
         is created it it does not exist); other entires treated as db names in home() / agg are then loaded.
         Databases not in site directory must be fully qualified path names.
-        :param store_mode: add newly created aggregates to the uw knowledge?
         :param update:
         :param log2:
         :param debug: run parser in debug mode
@@ -75,7 +73,6 @@ class Underwriter(object):
             self.dir_name.mkdir(parents=True, exist_ok=True)
 
         # make sure all database entries are stored:
-        self.store_mode = True
         if databases is None:
             # nothing to do
             databases = []
@@ -97,8 +94,6 @@ class Underwriter(object):
             else:
                 logger.warning(f'Database {fn} not found. Ignoring.')
 
-        # set desired store_mode
-        self.store_mode = store_mode
         self.create_all = create_all
 
     def _read_db(self, db_path):
@@ -130,21 +125,22 @@ class Underwriter(object):
 
         try:
             if type(item) == str:
+                # name == item, any type
                 rows = self._knowledge.xs(item, axis=0, level=1, drop_level=False)
             elif type(item) == tuple:
-                # return a dataframe
-                rows = self.loc[[item]]
+                # return a dataframe row
+                rows = self._knowledge.loc[[item]]
         except KeyError:
             raise KeyError(f'Item {item} not found.')
-        except TypeError:
+        except TypeError as e:
             # TODO fix this "TypeError: unhashable type: 'slice'"
-            logger.error(f'getitem type error issue....looking for {item}')
+            raise KeyError(f'getitem TypeError looking for {item}, {e}')
         else:
             if len(rows) == 1:
                 kind, name, spec, prog = rows.reset_index().iloc[0]
                 return kind, name, spec, prog
             else:
-                raise KeyError(f'Multiple objects matching {item} found. Returning them all.')
+                raise KeyError(f'{len(rows)}>1 objects matching {item} found.')
 
     def _repr_html_(self):
         s = [f'<h1>Underwriter Knowledge</h1>',
@@ -154,18 +150,9 @@ class Underwriter(object):
              f'<h3>Settings</h3>']
         # s.append(', '.join([f'{n} ({k})' for (k, n), v in
         #                     sorted(self._knowledge.items())]))
-        for k in ['log2', 'update', 'store_mode', 'create_all', 'debug']:
+        for k in ['log2', 'update', 'create_all', 'debug']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
-
-    # def __call__(self, portfolio_program, **kwargs):
-    #     """
-    #     make the Underwriter object callable; pass through to write
-    #
-    #     :param portfolio_program:
-    #     :return:
-    #     """
-    #     return self.write(portfolio_program, **kwargs)
 
     def factory(self, kind, name, spec, program):
         """
@@ -182,13 +169,9 @@ class Underwriter(object):
             obj = Aggregate(**spec)
             obj.program = program
         elif kind == 'port':
-            # actually make the object; spec = list of aggs
-            # print(f'Factory name={name}, spec={spec}')
-            agg_list = spec['spec'] # [self[v][1] for v in spec['spec']]
-            # print(agg_list)
+            # spec = list of aggs
+            agg_list = spec['spec']
             obj = Portfolio(name, agg_list, uw=self)
-            # # actually make the object previous code...
-            # obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
                 logger.warning(f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
@@ -249,7 +232,7 @@ class Underwriter(object):
         cols = ['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b', 'EN', 'Freq_a', 'ELoss', 'Notes']
         # what they are actually called
         cols_agg = ['sev_name', 'sev_mean', 'sev_a', 'sev_b', 'exp_en', 'freq_a', 'exp_el', 'note']
-        defaults = ['', 0, 0, 0, 0, 0, 0, '']
+        defaults = ['', 0, np.nan, 0, 0, 0, 0, '']
         df = pd.DataFrame(columns=cols)
         df = df.set_index('Name')
 
@@ -323,10 +306,13 @@ class Underwriter(object):
             obj = self.factory(kind, name, spec, program)
             if update:
                 obj.update(log2, bs, **kwargs)
-            return obj
+            # rationalize return to be the same as parsed programs
+            # TODO test this code
+            rv = {(kind, name): (obj, program)}
+            return rv
 
         # if you fall through to here then the portfolio_program did not refer to a built-in object
-        # run the program, get the interpreter return value, irv which contains info about all
+        # run the program, get the interpreter return value, the irv, which contains info about all
         # the objects in the program, including aggs within ports
         # kind0, name0 is the answer exit point object - this must always be created
         irv = self.interpret_program(portfolio_program)
@@ -425,11 +411,9 @@ class Underwriter(object):
                 program_line_dict[(kind0, name0)] = program_line
 
         # now go through self.parser.out_dict and store everything
-        # if in store_mode, add the program to uw dictionaries
-        # virtually nothing works if you don't store stuff...
-        # TODO what is use case for store_mode = False?!
+        # in the uw dictionaries
         rv = {}
-        if self.store_mode is True and len(self.parser.out_dict) > 0:
+        if len(self.parser.out_dict) > 0:
             logger.info(f'Adding {len(self.parser.out_dict)} specs to the knowledge.')
             for (kind, name), spec in self.parser.out_dict.items():
                 # will not know for aggs within port, for example
@@ -437,7 +421,9 @@ class Underwriter(object):
                 program_line = program_line_dict.get((kind, name), '')
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
                 logger.info(f'Added {kind}, {name}, {program_line[:20]} to knowledge.')
-                rv[(kind, name)] = (self.parser.out_dict[(kind, name)], program_line)
+                # !! rv[(kind, name)] = (self.parser.out_dict[(kind, name)], program_line)
+                # these are the new ones, that are returned
+                rv[(kind, name)] = (spec, program_line)
         return rv
 
     # @staticmethod
@@ -507,7 +493,7 @@ class Underwriter(object):
         # set global logger_level
         logger_level(level)
 
-    def build(self, program, update=True, create_all=None, log2=-1, bs=0, log_level=30, **kwargs):
+    def build(self, program, update=True, create_all=None, log2=-1, bs=0, log_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -527,7 +513,9 @@ class Underwriter(object):
         :return: created object(s)
         """
 
-        self.logger_level(log_level)
+        # TODO put back the original logger level
+        if log_level is not None:
+            self.logger_level(log_level)
 
         # options for this run
         if create_all is None:
@@ -636,12 +624,13 @@ class Underwriter(object):
         self.write('sev One dsev [1]')
         return self.interpreter_work(df.iterrows())
 
-    def interpreter_one(self, program):
+    def interpreter_line(self, program, name='one off', debug=True):
         """
-        Interpret single test in debug mode.
+        Interpret single line of code  in debug mode.
+        name is index of output
         """
 
-        return self.interpreter_work(iter([('one off', program)]), debug=True)
+        return self.interpreter_work(iter([(name, program)]), debug=debug)
 
     def interpreter_list(self, program_list):
         """
@@ -656,7 +645,9 @@ class Underwriter(object):
         Each line is preprocessed and then run through a clean parser, and the output
         analyzed.
 
-        :return:
+        Last column, program as input is only changed if the preprocessor changes the program
+
+        :return: DataFrame
         """
         lexer = UnderwritingLexer()
         parser = UnderwritingParser(self.safe_lookup, debug)
@@ -664,7 +655,7 @@ class Underwriter(object):
         errs = 0
         no_errs = 0
         # detect non-trivial change
-        f = lambda x, y: '' if x.replace(' ', '') == y.replace(' ', '').replace('\t', '') else y
+        f = lambda x, y: 'same' if x.replace(' ', '') == y.replace(' ', '').replace('\t', '') else y
         for test_name, program in iterable:
             parser.reset()
             if type(program) != str:
@@ -682,9 +673,21 @@ class Underwriter(object):
                 except (ValueError, TypeError) as e:
                     errs += 1
                     err = 1
-                    name = test_name
                     kind = program.split()[0]
-                    parser.out_dict[(kind, name)] = str(e)
+                    # get something to say about the error
+                    ea = getattr(e, 'args', None)
+                    if ea is not None:
+                        # t = getattr(ea[0], 'type', ea[0])
+                        # v = getattr(ea[0], 'value', ea[0])
+                        i = getattr(ea[0], 'index', 0)
+                        if type(i) != int:  i = 0
+                        # print(i, ea)
+                        txt = program[0:i] + f'>>>' + program[i:]
+                        name = 'parse error'
+                    else:
+                        txt = str(e)
+                        name = 'other error'
+                    parser.out_dict[(kind, name)] = txt
                 else:
                     no_errs += 1
                 ans[test_name] = [kind, err, name,
@@ -692,16 +695,16 @@ class Underwriter(object):
                                   program, f(program, program_in)]
             elif len(program) > 1:
                 logger.info(f'{program_in} preprocesses to {len(program)} lines; not processing.')
+                logger.info(program)
                 ans[test_name] = ['multiline', err, None, None, program, program_in]
             else:
                 logger.info(f'{program_in} preprocesses to a blank line; ignoring.')
                 ans[test_name] = ['blank', err, None, None, program, program_in]
 
-        # print((f'No errors reported.\n' if errs == 0 else f'{errs} errors reported.\n') +
-        #       f'{no_errs} programs parsed successfully.')
         df_out = pd.DataFrame(ans,
-                              index=['type', 'error', 'name', 'interpreted', 'program',
-                                     'raw_input']).T#.sort_values('error', ascending=False)
+                              index=['kind', 'error', 'name', 'output', 'preprocessed program',
+                                     'program']).T
+        df_out.index.name = 'index'
         return df_out
 
 

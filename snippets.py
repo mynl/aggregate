@@ -2,12 +2,20 @@
 
 import sys
 import aggregate as agg
-from aggregate import build
-from aggregate.utils import make_ceder_netter
+from aggregate import build, debug_build
+from aggregate.utilities import make_ceder_netter
 from examples import case_studies as cs
 
 from numpy import exp
 from scipy.interpolate import interp1d
+import logging
+
+
+logging.basicConfig(
+    format='|%(lineno)4d|%(levelname)-10s|%(message)-s',
+    datefmt='%M:%S',
+    level=10,
+    force=True)
 
 # ISSUES =================================================================
 # The million issues with matplotlib fonts!!!!
@@ -25,11 +33,10 @@ section = []
 if len(sys.argv) > 1:
     # there are args
     if sys.argv[1] == 'h' or sys.argv[1] == '-h':
-        print('Select options from:\n    parse_tests\n    scratch\n    scratch_ex\n    parse_test\n    netters_and_ceders\n    simple_discrete\n    hu_scs_case\n    sev_intro\n    easter_egg.')
+        print('Select options from:\n    parse_test_1\n    parse_test_2\n    reinsurance\n    scratch\n    scratch_ex\n    parse_builder\n    parse_test\n    netters_and_ceders\n    simple_discrete\n    hu_scs_case\n    sev_intro\n    easter_egg.')
         print('\nSelect no options just to import build etc.')
     else:
         section = sys.argv[1:]
-
 
 # section = [
     # 'scratch',
@@ -111,22 +118,21 @@ if 'book_case_studies' in section:
 
     discrete_eq = cs.CaseStudy()
     discrete_eq.factory(case_id='discrete_equal_new',
-                       case_name='Discrete Case, equal points',
-                       case_description='Discrete Case, equal points, in the new syntax.',
-                       a_distribution       = 'agg X1 1 claim dsev [0 9 10] [1/2 1/4 1/4] fixed',
-                       b_distribution_gross = 'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed',
-                       b_distribution_net   =f'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed aggregate net of 70 xs 20',
-                       reg_p=1,
-                       roe=0.10,
-                       d2tc=0.3,
-                       f_discrete=True,
-                       f_blend_extend=True,
-                       bs=1,
-                       log2=8,
-                       padding=1)
+                        case_name='Discrete Case, equal points',
+                        case_description='Discrete Case, equal points, in the new syntax.',
+                        a_distribution='agg X1 1 claim dsev [0 9 10] [1/2 1/4 1/4] fixed',
+                        b_distribution_gross='agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed',
+                        b_distribution_net=f'agg X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed aggregate net of 70 xs 20',
+                        reg_p=1,
+                        roe=0.10,
+                        d2tc=0.3,
+                        f_discrete=True,
+                        f_blend_extend=True,
+                        bs=1,
+                        log2=8,
+                        padding=1)
     discrete_eq.full_monty()
     discrete_eq.to_json()
-
 
     # tame
     recalc = build('agg B 1 claim sev gamma  50 cv 0.15 fixed',
@@ -148,7 +154,7 @@ if 'book_case_studies' in section:
                  d2tc=0.3,
                  f_discrete=False,
                  s_values=[.005, 0.01, 0.03],
-                 gs_values=[  0.029126,   0.047619,   0.074074],
+                 gs_values=[0.029126,   0.047619,   0.074074],
                  bs=1/64,
                  log2=16,
                  padding=1)
@@ -231,52 +237,113 @@ def parse_tests_XX():
     pass
 
 
-if 'parse_tests' in section:
+if 'parse_test_1' in section:
     print(
-        f'ACTIVATING parse_tests SECTION {__name__} ===========================')
+        f'ACTIVATING parse_test_1 SECTION {__name__} ===========================')
 
     # do some parser testing!
     build('sev One dhistogram xps [1] [1]')
     build('sev ONE dsev [1]')
 
     df = build.interpreter_file(where='')
-    display(df)
+    print('ERRORS\n======')
+    display(df.query('error==1'))
+    print('PASSES\n======')
+    display(df.query('error==0'))
 
-    tests = [
-        'agg A 1 claim dsev [1 2 3] fixed',
-        'agg B 2 claim dsev [1 2 3] fixed',
-        'agg C 1 claim dsev [1 2 3 10] fixed',
-        'sev S dsev[1 2 3 5 10 25 100]',
-        'sev T dsev[1 2 3 5 10 25 100 1000]',
-        'port PORT0\n\tagg XLN 1 claim sev lognorm 20 cv .9 poisson',
-        'port PORTA\n\tagg.A',
-        'port PORTB\n\tagg.A\n\tagg.B',
-        'port PORTC\n\tagg NewA 3 @ agg.A\n\tagg.C',
-        'port PORTD\n\tagg AA 1 claim sev.S fixed\n\tagg AB 1 claim sev sev.T fixed',
-        'port PORTE\n\tagg S2    2 claims sev 3 @ sev.S fixed\n\tagg T~5   2 claims sev sev.T # 5 fixed\n\tagg T_4_5 2 claims sev 4 @ sev.T # 5 fixed',
-        'port PORTF\n\tagg S1  3 * agg.A\n\tagg S2  4 @ agg.A\n\tagg S3  agg.A # 6\n\tagg S4   9 * 3 @ agg.A # 6'
-    ]
-    # for parse to work actually have to build referents
-    build('agg A 1 claim dsev [1 2 3] fixed')
-    build('agg B 2 claim dsev [1 2 3] fixed')
-    build('agg C 1 claim dsev [1 2 3 10] fixed')
-    build('sev S dsev[1 2 3 5 10 25 100]')
-    build('sev T dsev[1 2 3 5 10 25 100 1000]')
-    display(build.knowledge)
+    # removed - see below
+    # tests = [
+    #     'agg A 1 claim dsev [1 2 3] fixed',
+    #     'agg B 2 claim dsev [1 2 3] fixed',
+    #     'agg C 1 claim dsev [1 2 3 10] fixed',
+    #     'agg D 2 claim dsev [1 2 3 10] fixed',
+    #     'sev S dsev[1 2 3 5 10 25 100]',
+    #     'sev T dsev[1 2 3 5 10 25 100 1000]',
+    #     'port PORT0\n\tagg XLN 1 claim sev lognorm 20 cv .9 poisson',
+    #     'port PORTA\n\tagg.A',
+    #     'port PORTB\n\tagg.A\n\tagg.B',
+    #     'port PORTC\n\tagg NewA 3 * agg.A\n\tagg.C',
+    #     'port PORTD\n\tagg AA 1 claim sev.S fixed\n\tagg AB 1 claim sev sev.T fixed',
+    #     'port PORTE\n\tagg S2    2 claims sev 3 * sev.S fixed\n\tagg T.5   2 claims sev sev.T + 5 fixed\n\tagg T_4_5 2 claims sev 4 * sev.T - 1 fixed',
+    #     'port PORTF1\n\tagg S4   27 @ agg.A + 6\n\tagg S5   2 @ agg.B - 6',
+    #     # the aggs all need different names else you get into trouble, this fails with all agg.A
+    #     'port PORTF2\n\tagg S1  3 * agg.A\n\tagg S2  4 @ agg.B\n\tagg S3  6 * agg.C\n\tagg S4   27 @ agg.D + 6',
+    # ]
+    # # for parse to work actually have to build referents
+    # build('agg A 1 claim dsev [1 2 3] fixed')
+    # build('agg B 2 claim dsev [1 2 3] fixed')
+    # build('agg C 1 claim dsev [1 2 3 10] fixed')
+    # build('sev S dsev[1 2 3 5 10 25 100]')
+    # build('sev T dsev[1 2 3 5 10 25 100 1000]')
+    # display(build.knowledge)
 
-    display(build.interpreter_list(tests))
+    # display(build.interpreter_list(tests))
 
-    # for test in tests:
-    #     display(build.interpreter_one(test))
+    # # for test in tests:
+    # #     display(build.interpreter_one(test))
+
+
+if 'parse_test_2' in section:
+    print(
+        f'ACTIVATING parse_test_2 SECTION {__name__} ===========================')
+    print('MUst run parse_test_1 first to create df')
 
     ans = {}
-    build.uw.create_all = False
+    # build.create_all = False
+    df['log2'] = 0
+    df['bs'] = 0.
+    df['agg_m'] = 0.
+    df['agg_cv'] = 0.
+    df['agg_sd'] = 0.
+    df['emp_m'] = 0.
+    df['emp_cv'] = 0.
+    df['emp_sd'] = 0.
+    df0 = df.query('error==0 and type=="agg"').copy()
+    for n, p in df0.program.items():
+        try:
+            ans[n] = a = build(p, approximation='exact')
+        except Exception as e:
+            print(f'{n}: exception {e}')
+        else:
+            m, cv = a.describe.loc['Agg', ['Est E(X)', 'Est CV(X)']]
+            df0.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd',
+                        'emp_m', 'emp_cv', 'emp_sd']] = (
+                a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, m, cv, '')
+            print(n)
+        # display(ans[n])
+    display(df0[['program', 'log2', 'bs',
+                'agg_m',
+                 'emp_m',
+                 'agg_cv',
+                 'emp_cv',
+                 'agg_sd',
+                 'emp_sd']])
+    # build.create_all = True
+
+# ==========================================================================================
+
+
+def reinsurance():
+    pass
+
+
+if 'reinsurance' in section:
+    tests = [
+        'agg RE1 5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson',
+        'agg RE2 5 claims 100 x 0 sev lognorm 10 cv .75 poisson aggregate net of 50% so 25 x 0 and 75 xs 25',
+        'agg RE3 5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson  aggregate net of 50% so 25 x 0 and 100 xs 25',
+        #  'agg RE4 5 claims 100 x 0 sev lognorm 10 cv .75 poisson aggregate net of 50% so 25 x 0 and inf xs 25',
+    ]
+
+    ans = {}
     for n, test in enumerate(tests):
         ans[n] = build(test)
         display(ans[n])
-    build.uw.create_all = True
+        display(ans[n].reins_audit_df)
+        print(ans[n].reinsurance_kinds())
+        print(ans[n].reinsurance_description())
 
-# ==========================================================================================
+    print('REMEMBER: inf limit NYI!!\n'*5)
 
 
 def netters_and_ceders_XX():
@@ -466,4 +533,3 @@ if 'sev_intro' in section:
     s = build('sev sevA lognorm 20 cv .3')
 
     s.plot()
-

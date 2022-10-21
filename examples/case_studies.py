@@ -30,10 +30,10 @@ Note and To Do
 # Integrates FigureManager, to be stand-alone
 
 import aggregate as agg
-from aggregate.distr import Aggregate
-from aggregate.port import Portfolio
+from aggregate.distributions import Aggregate
+from aggregate.portfolio import Portfolio
 from aggregate.spectral import Distortion
-from aggregate.utils import round_bucket, make_mosaic_figure, FigureManager
+from aggregate.utilities import round_bucket, make_mosaic_figure, FigureManager
 from aggregate.bounds import Bounds, plot_max_min, plot_lee
 import argparse
 from collections import OrderedDict

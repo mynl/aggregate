@@ -22,11 +22,11 @@ del p, base_dir
 
 
 # imports
-from .underwriter import Underwriter, build
-from .port import Portfolio, make_awkward
-from .distr import Frequency, Severity, Aggregate, CarefulInverse
+from .underwriter import Underwriter, build, debug_build
+from .portfolio import Portfolio, make_awkward
+from .distributions import Frequency, Severity, Aggregate, CarefulInverse
 from .spectral import Distortion
-from .utils import get_fmts, tidy_agg_program, ft, \
+from .utilities import get_fmts, tidy_agg_program, ft, \
     ift, sln_fit, sgamma_fit, estimate_agg_percentile, \
     axiter_factory, AxisManager, lognorm_lev, html_title, \
     sensible_jump, suptitle_and_tight, \

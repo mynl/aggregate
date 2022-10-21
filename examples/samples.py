@@ -4,9 +4,9 @@
 
 import aggregate as agg
 from aggregate import build, Bounds
-from aggregate.utils  import iman_conover, mu_sigma_from_mean_cv
+from aggregate.utilities  import iman_conover, mu_sigma_from_mean_cv
 # from aggregate.utils import rearrangement_algorithm_max_VaR
-from aggregate.utils import random_corr_matrix
+from aggregate.utilities import random_corr_matrix
 
 from collections import namedtuple
 from functools import lru_cache

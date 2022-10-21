@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import linprog
 from scipy.sparse import coo_matrix
 
-from aggregate.utils import FigureManager
+from aggregate.utilities import FigureManager
 
 logger = logging.getLogger(__name__)
 

@@ -25,9 +25,9 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from textwrap import fill
 from IPython.core.display import HTML, display
-from .distr import Aggregate, Severity
+from .distributions import Aggregate, Severity
 from .spectral import Distortion
-from .utils import ft, \
+from .utilities import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \

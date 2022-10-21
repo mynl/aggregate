@@ -18,7 +18,7 @@ from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 
-from .utils import sln_fit, sgamma_fit, ft, ift, \
+from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, friendly
@@ -88,6 +88,17 @@ class Frequency(object):
     def __init__(self, freq_name, freq_a, freq_b):
         """
         Creates the mgf and moment function:
+
+        freq_zm True if zero modified, default False
+        freq_p0 modified value of p0
+
+        # check zero mod is acceptable? --> parser
+        if freq_zm is True:
+            assertg freq_name in ['poisson', 'binomial', 'geometric',
+                    'logarithmic']
+
+        logarithmic??
+        Enter NB not as mixed to allow easy creation of zm?
 
         * moment function(n) returns EN, EN^2, EN^3 when EN=n.
         * mgf(n, z) is the mgf evaluated at log(z) when EN=n
@@ -161,6 +172,7 @@ class Frequency(object):
                 return p / (1 - (1 - p) * z)
 
         elif self.freq_name == 'pascal':
+            # generalized Poisson-Pascal distribution, Panjer Willmot green book. p. 324
             # solve for local c to hit overall c=ν^2 value input
             ν = self.freq_a  # desired overall cv
             κ = self.freq_b  # claims per occurrence
@@ -2591,8 +2603,7 @@ class Severity(ss.rv_continuous):
         :param sev_conditional: conditional or unconditional; for severities use conditional
         """
 
-        from .port import Portfolio
-
+        from .portfolio import Portfolio
 
         ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
         # I think this is preferred now, but these are the same (probably...)
@@ -2730,6 +2741,7 @@ class Severity(ss.rv_continuous):
             # distributions with one shape parameter
             # TODO assumes 0 is an invalid shape parameter....
             if sev_a == 0:
+                print('ASSUMING sev_a is INVALID>>>\n'*10)
                 sev_a, _ = self.cv_to_shape(sev_cv)
             if sev_scale == 0 and sev_mean > 0:
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)

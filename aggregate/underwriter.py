@@ -4,10 +4,10 @@ import pandas as pd
 from pathlib import Path
 from inspect import signature
 
-from .port import Portfolio
-from .distr import Aggregate, Severity
+from .portfolio import Portfolio
+from .distributions import Aggregate, Severity
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utils import logger_level, round_bucket
+from .utilities import logger_level, round_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class Underwriter(object):
              f'<h3>Settings</h3>']
         # s.append(', '.join([f'{n} ({k})' for (k, n), v in
         #                     sorted(self._knowledge.items())]))
-        for k in ['log2', 'update', 'store_mode', 'create_all']:
+        for k in ['log2', 'update', 'store_mode', 'create_all', 'debug']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s)
 
@@ -190,8 +190,8 @@ class Underwriter(object):
             # # actually make the object previous code...
             # obj = Portfolio(portfolio_program, [self[v][1] for v in obj['spec']])
         elif kind == 'sev':
-            if spec['sev_wt'] != 1:
-                logger.warning('mixed severity cannot be created, returning spec.')
+            if 'sev_wt' in spec and spec['sev_wt'] != 1:
+                logger.warning(f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
                 obj = None
             else:
                 obj = Severity(**spec)
@@ -493,6 +493,8 @@ class Underwriter(object):
         logger.debug(f'UnderwritingParser.safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
         if found_kind != kind:
             raise ValueError(f'Error: type of {name} is  {found_kind}, not expected {kind}')
+        # don't want to pass back the original
+        spec = spec.copy()
         return spec
 
     @staticmethod
@@ -534,6 +536,10 @@ class Underwriter(object):
         # make stuff
         # write will return a dict with keys (kind, name) and value either the object or the spec
         out_dict = self.write(program, create_all=create_all, update=False, force_severity=True)
+
+        if out_dict is None:
+            logger.warning('build produced no output')
+            return None
 
         # in this loop bs_ and log2_ are the values actually used for each update; they do not
         # overwrite the input default values
@@ -695,9 +701,10 @@ class Underwriter(object):
         #       f'{no_errs} programs parsed successfully.')
         df_out = pd.DataFrame(ans,
                               index=['type', 'error', 'name', 'interpreted', 'program',
-                                     'raw_input']).T.sort_values('error', ascending=False)
+                                     'raw_input']).T#.sort_values('error', ascending=False)
         return df_out
 
 
 # exported instance
-build = Underwriter(create_all=False, update=True, debug=False)
+build = Underwriter(create_all=False, update=True, debug=False, log2=16)
+debug_build = Underwriter(create_all=False, update=True, debug=True, log2=13)

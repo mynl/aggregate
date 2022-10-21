@@ -19,13 +19,13 @@ class UnderwritingLexer(Lexer):
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
-              LOSS, PREMIUM, AT, LR, CLAIMS, SPECIFIED,
+              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY,
+              LOSS, PREMIUM, AT, LR, CLAIMS,
               XS,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
-              MIXED, FREQ, EMPIRICAL, TWEEDIE,
+              MIXED, FREQ, TWEEDIE,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
-              AND, PERCENT,
+              AND,  PERCENT,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
               }
@@ -42,7 +42,8 @@ class UnderwritingLexer(Lexer):
     FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
-    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
+    NUMBER = r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
+    # NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
 
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
@@ -51,11 +52,10 @@ class UnderwritingLexer(Lexer):
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
-    DIVIDE = r'/'
+    DIVIDE = '/'
     PERCENT = '%'
-    SCALE_MULTIPLY = r'@'
-    LOCATION_ADD = '#'
-    EQUAL_WEIGHT = r'='
+    HOMOG_MULTIPLY = '@'
+    EQUAL_WEIGHT = '='
     RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
@@ -65,15 +65,6 @@ class UnderwritingLexer(Lexer):
     ID['dfreq'] = DFREQ
     ID['dsev'] = DSEV
 
-    # when using an empirical freq the claim count is specified
-    # must use "specified claims" ... sets e_n = -1
-    # ID['part'] = PART
-    # ID['share'] = SHARE
-    ID['specified'] = SPECIFIED
-    # constant severity... now just use dsev [n]
-    # ID['constant'] = CONSTANT
-    # nps freq specification
-    ID['empirical'] = EMPIRICAL
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['mixed'] = MIXED
@@ -87,7 +78,6 @@ class UnderwritingLexer(Lexer):
     ID['net'] = NET
     ID['sev'] = SEV
     ID['agg'] = AGG
-    ID['nps'] = EMPIRICAL
     ID['xps'] = XPS
     ID['wts'] = WEIGHTS
     ID['inf'] = INFINITY
@@ -138,13 +128,13 @@ class UnderwritingLexer(Lexer):
         out_in = re.split(r'\[|\]', program)
         assert len(out_in) % 2  # must be odd
         odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
-        even = out_in[0::2]  # otherwise pass through
+        even = out_in[0::2]  # otherwise, pass through
         # reassemble
         program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
 
-        # remove comments C++-style // xxx (can't have comments with # used for location shift)
+        # remove comments C++-style // or # comments
         # must replace comments before changing other \ns
-        program = re.sub(r'//[^\n]*$', r'\n', program, flags=re.MULTILINE)
+        program = re.sub(r'(//|#)[^\n]*$', r'\n', program, flags=re.MULTILINE)
 
         #  preprocessing: line continuation; \n\t or \n____ to space (for port agg element indents),
         # ; to new line, split on new line
@@ -165,14 +155,15 @@ class UnderwritingParser(Parser):
     debugfile = Path.home() / 'aggregate/parser/parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
-        ('left', LOCATION_ADD),
-        ('left', SCALE_MULTIPLY),
+        ('nonassoc', LOCATION_ADD),
+        ('nonassoc', SCALE_MULTIPLY, HOMOG_MULTIPLY),
+        # LOW is used to force shift in rules like expr <- sum or expr <- sum + expr, and empty rules
+        ('nonassoc', LOW),
         ('left', PLUS, MINUS),
         ('left', TIMES, DIVIDE),
-        # ('right', UMINUS),
         ('right', EXP),
-        ('left', PERCENT),
-        ('right', EXPONENT)
+        ('right', EXPONENT),
+        ('nonassoc', PERCENT),
     )
 
     def __init__(self, safe_lookup_function, debug=False):
@@ -185,19 +176,20 @@ class UnderwritingParser(Parser):
     def logger(self, msg, p):
         if self.debug is False:
             return
-        logger.info(f'{msg:15s}')
-        return
         nm = p._namemap
         sl = p._slice
         ans = []
         for k, v in nm.items():
             rhs = sl[v]
             if type(rhs) == sly.yacc.YaccSymbol:
-                ans.append(f'{k}={rhs.value} (type: {rhs.type})')
+                # ans.append(f'{k}={rhs.value} (type: {rhs.type})')
+                ans.append(f'{k}={rhs.value}')
             else:
-                ans.append(f'{k}={rhs!s}')
+                # ans.append(f'{k}={rhs!s}')
+                pass
         ans = "; ".join(ans)
-        logger.info(f'{msg:15s}\n\t{ans}\n')
+        print(f'{msg:20s}\t{ans}')
+        # logger.info(f'{msg:15s}\n\t{ans}\n')
 
     def reset(self):
         # TODO Add sev_xs and sev_ps !!
@@ -237,12 +229,12 @@ class UnderwritingParser(Parser):
         check the if value can be vectorized
 
         """
-        if isinstance(value, float) or isinstance(value, int) or isinstance(value, np.ndarray):
+        if isinstance(value, (float, int, np.ndarray)):
             return value
         else:
             return np.array(value)
 
-    # final answer exit points ===================================
+    # final answer exit points =================================
     @_('sev_out')
     def answer(self, p):
         self.logger(
@@ -264,26 +256,24 @@ class UnderwritingParser(Parser):
     @_('expr')
     def answer(self, p):
         self.logger(f'answer <-- expr {p.expr} ', p)
-        return 'expr', p.expr
+        self.out_dict[('expr', 'expression')] = {'expr': p.expr}
+        return 'expr', f'{p.expr}'
 
-    # building portfolios =======================================
+    # building portfolios ======================================
     @_('PORT name note agg_list')
     def port_out(self, p):
         self.logger(
             f'port_out <-- PORT name note agg_list', p)
         self.out_dict[("port", p.name)] = {'spec': p.agg_list, 'note': p.note}
-        # print([self.out_dict[('agg', i)] for i in p.agg_list])
         return p.name
 
     @_('agg_list agg_out')
     def agg_list(self, p):
-        if p.agg_list is None:
-            raise ValueError('ODD agg list is empty')
+        self.logger(f'agg_list <-- agg_list, agg_out', p)
         p.agg_list.append(p.agg_out)
-        self.logger(f'agg_list <-- agg_list agg_out', p)
         return p.agg_list
 
-    # building aggregates ========================================
+    # building aggregates ======================================
     @_('agg_out')
     def agg_list(self, p):
         self.logger(f'agg_list <-- agg_out', p)
@@ -298,53 +288,20 @@ class UnderwritingParser(Parser):
             'name': p.name, **p.builtin_agg, 'note': p.note}
         return p.name
 
-    @_('AGG name exposures layers SEV sev occ_reins freq agg_reins note')
+    # simplify agg out with sev_clause
+    @_('AGG name exposures layers sev_clause occ_reins freq agg_reins note')
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- AGG name exposures layers SEV sev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.sev,
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.sev_clause,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
         return p.name
 
-    @_('AGG name exposures layers builtin_sev occ_reins freq agg_reins note')
-    def agg_out(self, p):
-        self.logger(
-            f'agg_out <-- AGG name exposures layers builtin_sev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.builtin_sev,
-                                         **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-        return p.name
-
-    # separate treatment of dsev forbids 3 @ dsev # 4; that is also not handled for xps sevs
-    # though it does parse. But with this separate treatment you do not need the sev keyword
-    # if sev <-- dsev then in use you'd need sev dsev [1] which is no net gain.
-    @_('AGG name exposures layers dsev occ_reins freq agg_reins note')
-    def agg_out(self, p):
-        self.logger(
-            f'agg_out <-- AGG name exposures layers dsev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.dsev,
-                                         **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-        return p.name
-
-    # AMBIGUOUS: net of 3 x 2 ?? occ or agg? and dfreq [1 2] [2 4], is 2 4 the probs
-    # or the start of exposure layering.
-    # at_('name dfreq layers SEV sev occ_reins agg_reins note')
-    # to the general with dfreq use specified claims and put freq term at the end.
-    # for reinstatements modeing with occ re may be useful, hence could have the
-    # following but doesn't seem worth it. Encourage specified
-    # at_('agg_name dfreq SEV sev occ_reins note')
-    # DEF agg_out(self, p):
-    #     self.logger(
-    #         f'agg_out <-- agg_name dfreq layers SEV sev occ_reins agg_reins note', p)
-    #     self.out_dict[("agg", p.agg_name)] = {'name': p.agg_name, **p.dfreq,  **p.sev,
-    #                                      **p.occ_reins, **p.agg_reins, 'note': p.note}
-    #     return p.agg_name
-    #
-    # as above, can't have layers and can't have occ and agg without a split
-    @_('AGG name dfreq dsev occ_reins agg_reins note')
+    @_('AGG name dfreq layers sev_clause occ_reins agg_reins note')
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- AGG name dfreq dsev occ_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.dsev,
+        self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.sev_clause,
                                          **p.occ_reins, **p.agg_reins, 'note': p.note}
         return p.name
 
@@ -357,7 +314,7 @@ class UnderwritingParser(Parser):
         # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
         # lambda = mu^(2-p) / ((2-p) sigma^2)
         # beta = lambda alpha / mu
-        # see also tweedie_convert... should prob use that here...
+        # see also tweedie_convert... TODO use that here...
         pp = p[3]
         mu = p[4]
         sig2 = p[5]
@@ -370,6 +327,7 @@ class UnderwritingParser(Parser):
                 'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:4f}, ga(α={alpha:.4f}, β={beta:.4f}), '
                         f'scale={1/beta:.4f}'}
         self.out_dict[('agg', p.name)] = dout
+        return p.name
 
     @_('builtin_agg agg_reins note')
     def agg_out(self, p):
@@ -380,7 +338,8 @@ class UnderwritingParser(Parser):
         self.out_dict[("agg", p.builtin_agg['name'])] = {**p.builtin_agg, **p.agg_reins, 'note': p.note}
         return p.builtin_agg['name']
 
-    # building severities =====================================
+    # building severities ======================================
+    # difference from sev_clause (below) is sev_out has a name
     @_('SEV name sev note')
     def sev_out(self, p):
         self.logger(
@@ -399,61 +358,49 @@ class UnderwritingParser(Parser):
         self.out_dict[("sev", p.name)] = p.dsev
         return p.name
 
-    # frequency term ==========================================
+    # frequency term ===========================================
     # for all frequency distributions claim count is determined by exposure / severity
-    # EXCEPT for EMPIRICAL
-    # only freq shape parameters need be entered
+    # EXCEPT for dfreq (and old EMPIRICAL) where it is entered
+    # only freq shape parameters need be entered at the end
     # one and two parameter mixing distributions
-    # no mixing here, just expr
     @_('MIXED ID expr expr')
     def freq(self, p):
         self.logger(
-            f'freq <-- MIXED ID expr expr', p)
+            f'freq <-- MIXED ID {p.ID} expr expr', p)
         return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}
 
-    @_('MIXED ID expr')
+    @_('MIXED ID expr %prec LOW')
     def freq(self, p):
         self.logger(
-            f'freq <-- MIXED ID expr', p)
+            f'freq <-- MIXED ID {p.ID} expr', p)
         return {'freq_name': p.ID, 'freq_a': p.expr}
-
-    @_('EMPIRICAL doutcomes dprobs')
-    def freq(self, p):
-        self.logger(f'freq <-- EMPIRICAL doutcomes dprobs', p)
-        # nps discrete given severity...
-        a = np.array(p.doutcomes, dtype=int)
-        if len(p.dprobs) == 0:
-            ps = np.ones_like(a) / len(a)
-        else:
-            ps = p.dprobs
-        return {'freq_name': 'empirical', 'freq_a': a, 'freq_b': ps}
 
     @_('FREQ expr expr')
     def freq(self, p):
         self.logger(
-            f'freq <-- FREQ expr expr', p)
+            f'freq <-- FREQ {p.FREQ} expr expr', p)
         if p.FREQ != 'pascal':
-            logger.warn(
+            logger.warning(
                 f'Illogical choice of frequency {p.FREQ}, expected pascal')
         return {'freq_name': p.FREQ, 'freq_a': p[1], 'freq_b': p[2]}
 
     # binomial p or TODO inflated poisson
-    @_('FREQ expr')
+    @_('FREQ expr %prec LOW')
     def freq(self, p):
         self.logger(
-            f'freq <-- FREQ expr', p)
+            f'freq <-- FREQ {p.FREQ} expr', p)
         if p.FREQ != 'binomial':
-            logger.warn(
+            logger.warning(
                 f'Illogical choice of frequency {p.FREQ}, expected binomial')
         return {'freq_name': p.FREQ, 'freq_a': p.expr}
 
-    @_('FREQ')
+    @_('FREQ %prec LOW')
     def freq(self, p):
         self.logger(
-            f'freq <-- FREQ (zero param distribution)', p)
+            f'freq <-- FREQ {p.FREQ} (zero param distribution)', p)
         if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric'):
             logger.error(
-                f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli, geometric, or fixed')
+                f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli, geometric, or fixed.')
         return {'freq_name': p.FREQ}
 
     # agg reins clause ========================================
@@ -467,7 +414,7 @@ class UnderwritingParser(Parser):
         self.logger(f'agg_reins <--  AGGREGATE CEDED TO reins_list', p)
         return {'agg_reins': p.reins_list, 'agg_kind': 'ceded to'}
 
-    @_("")
+    @_(" %prec LOW")
     def agg_reins(self, p):
         self.logger('agg_reins <-- missing agg reins', p)
         return {}
@@ -515,6 +462,7 @@ class UnderwritingParser(Parser):
         self.logger(
             f'reins_clause <-- expr SHARE_OF expr XS expr {p[0]} s/o {p[2]} xs {p[4]}', p)
         # here expr is the proportion...
+        # TODO should always store as a proportion; that holds for np.inf
         if np.isinf(p[2]):
             return (p[0], p[2], p[4])
         else:
@@ -527,25 +475,41 @@ class UnderwritingParser(Parser):
         return (p[0], p[2], p[4])
 
     # severity term ============================================
+    @_('SEV sev %prec LOW')
+    def sev_clause(self, p):
+        return p.sev
+
+    @_('dsev')
+    def sev_clause(self, p):
+        return p.dsev
+
     @_('sev "!"')
     def sev(self, p):
-        self.logger(f'sev <-- conditional flag set', p)
+        self.logger(f'sev <-- unconditional (conditional=False) flag set', p)
         p.sev['sev_conditional'] = False
         return p.sev
 
-    @_('sev LOCATION_ADD numbers')
+    @_('sev PLUS numbers %prec LOCATION_ADD')
     def sev(self, p):
-        # will need to use ugly sev LOCATION_ADD -number
-        self.logger(f'sev <-- sev LOCATION_ADD numbers', p)
+        self.logger(f'sev <-- sev PLUS numbers %prec LOCATION_ADD', p)
         p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
             p.sev.get('sev_loc', 0))
         p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
         p.sev['sev_loc'] += p.numbers
         return p.sev
 
-    @_('numbers SCALE_MULTIPLY sev')
+    @_('sev MINUS numbers %prec LOCATION_ADD')
     def sev(self, p):
-        self.logger(f'sev <-- numbers SCALE_MULTIPLY sev', p)
+        self.logger(f'sev <-- sev MINUS numbers %prec LOCATION_ADD', p)
+        p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
+            p.sev.get('sev_loc', 0))
+        p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
+        p.sev['sev_loc'] -= p.numbers
+        return p.sev
+
+    @_('numbers TIMES sev %prec SCALE_MULTIPLY')
+    def sev(self, p):
+        self.logger(f'sev <-- numbers TIMES sev %prec SCALE_MULTIPLY', p)
         p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
         if 'sev_mean' in p.sev:
             p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(
@@ -568,17 +532,11 @@ class UnderwritingParser(Parser):
             p.sev['sev_loc'] *= p.numbers
         return p.sev
 
-    @_('builtin_sev')
-    def sev(self, p):
-        # allow sev.NAME to become a sev
-        self.logger('sev <-- builtin_sev', p)
-        if 'name' in p.builtin_sev:
-            # print('NAME IS HERE...', p.builtin_sev)
-            del p.builtin_sev['name']
-        else:
-            # print('WHY IS NAME NOT HERE?', p.builtin_sev)
-            pass
-        return p.builtin_sev
+    # @_('ids %prec LOW')
+    # def sev(self, p):
+    #     self.logger(
+    #         f'sev <-- missing ids (zero param; norm, uniform, expon)', p)
+    #     return {'sev_name': p.ids}
 
     @_('ids numbers CV numbers weights')
     def sev(self, p):
@@ -586,29 +544,23 @@ class UnderwritingParser(Parser):
             f'sev <-- ids numbers CV numbers weights', p)
         return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_wt': p.weights}
 
-    @_('ids numbers weights')
-    def sev(self, p):
-        self.logger(
-            f'sev <-- ids numbers weights', p)
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
-
     @_('ids numbers numbers weights')
     def sev(self, p):
         self.logger(
             f'sev <-- ids numbers numbers weights', p)
         return {'sev_name': p.ids, 'sev_a': p[1], 'sev_b': p[2], 'sev_wt': p.weights}
 
+    @_('ids numbers weights')
+    def sev(self, p):
+        self.logger(
+            f'sev <-- ids numbers weights', p)
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
+
     # no weights with xps terms
     @_('ids xps')
     def sev(self, p):
-        self.logger(f'sev <-- ids xps (ids should be (c|d)histogram', p)
+        self.logger(f'sev <-- ids xps (ids should be (c|d)histogram)', p)
         return {'sev_name': p.ids, **p.xps}
-
-    # @_('CONSTANT expr')
-    # def sev(self, p):
-    #     self.logger(f'sev <-- CONSTANT expr', p)
-    #     # syntactic sugar to specify a constant severity
-    #     return {'sev_name': 'dhistogram', 'sev_xs': [p.expr], 'sev_ps': [1]}
 
     @_('XPS doutcomes dprobs')
     def xps(self, p):
@@ -619,10 +571,10 @@ class UnderwritingParser(Parser):
             ps = p.dprobs
         return {'sev_xs':  p.doutcomes, 'sev_ps':  ps}
 
-    @_('')
-    def xps(self, p):
-        self.logger('xps <-- missing xps term', p)
-        return {}
+    # @_(' %prec LOW')
+    # def xps(self, p):
+    #     self.logger('xps <-- missing xps term', p)
+    #     return {}
 
     @_('DSEV doutcomes dprobs')
     def dsev(self, p):
@@ -644,10 +596,11 @@ class UnderwritingParser(Parser):
             b = p.dprobs
         return {'freq_name': 'empirical', 'freq_a': p.doutcomes, 'freq_b': b, 'exp_en': -1}
 
-    # never valid for this to be a single number not in []
+    # never valid for this to be a single number not in [], using this
+    # format rather than numbers enforces an actual list
     @_('"[" numberl "]"')
     def doutcomes(self, p):
-        self.logger('doutcomes <-- [numberl]', p)
+        self.logger('doutcomes <-- [numberl] (must be a list)', p)
         a = self._check_vectorizable(p.numberl)
         return a
 
@@ -661,13 +614,14 @@ class UnderwritingParser(Parser):
         self.logger('doutcomes <-- [expr : expr : expr]', p)
         return np.arange(p[1], p[3] + 1, p[5])
 
+    # see note above doutcomes
     @_('"[" numberl "]"')
     def dprobs(self, p):
-        self.logger('dprobs <-- [numberl]', p)
+        self.logger('dprobs <-- [numberl] (must be a list)', p)
         a = self._check_vectorizable(p.numberl)
         return a
 
-    @_('')
+    @_(' %prec LOW')
     def dprobs(self, p):
         self.logger('dprobs <-- missing dprobs term', p)
         return []
@@ -683,12 +637,12 @@ class UnderwritingParser(Parser):
         self.logger(f'weights <-- WEIGHTS numbers', p)
         return p.numbers
 
-    @_('')
+    @_(' %prec LOW')
     def weights(self, p):
         self.logger('weights <-- missing weights term', p)
         return 1
 
-    # layer terms, optional ===================================
+    # layer terms, optional ====================================
     @_('numbers XS numbers')
     def layers(self, p):
         self.logger(
@@ -700,26 +654,18 @@ class UnderwritingParser(Parser):
         self.logger('layers <-- missing layer term', p)
         return {}
 
-    # optional note  ==========================================
+    # optional note  ===========================================
     @_('NOTE')
     def note(self, p):
         self.logger(f'note <-- NOTE', p)
         return p.NOTE[5:-1]
 
-    @_("")
+    @_(" %prec LOW")
     def note(self, p):
         self.logger("note <-- missing note term", p)
         return ''
 
-    # exposures term ==========================================
-    @_('SPECIFIED CLAIMS')
-    def exposures(self, p):
-        self.logger(f'exposures <- SPECIFIED CLAIMS', p)
-        # a code that needs to be picked up later...
-        # ONLY for use with EMPIRICAL/EMPIRICAL claim distribution
-        # TO DO INTEGRATE CODE!
-        return {'exp_en': -1}
-
+    # exposures ================================================
     @_('numbers CLAIMS')
     def exposures(self, p):
         self.logger(f'exposures <-- numbers CLAIMS', p)
@@ -736,6 +682,7 @@ class UnderwritingParser(Parser):
             f'exposures <-- numbers PREMIUM AT numbers LR', p)
         return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
 
+    # ID =======================================================
     @_('"[" idl "]"')
     def ids(self, p):
         self.logger(f'ids <-- [idl]', p)
@@ -743,6 +690,7 @@ class UnderwritingParser(Parser):
 
     @_('idl ID')
     def idl(self, p):
+        self.logger(f'idl <-- idl ID ({p.ID})', p)
         s1 = f'idl <-- idl ID'
         p.idl.append(p.ID)
         s1 += f'{p.idl}'
@@ -751,6 +699,7 @@ class UnderwritingParser(Parser):
 
     @_('ID')
     def idl(self, p):
+        self.logger(f'idl <-- ID ({p.ID})', p)
         ans = [p.ID]
         self.logger(f'idl <-- ID', p)
         return ans
@@ -761,11 +710,11 @@ class UnderwritingParser(Parser):
         return p.ID
 
     # elements made from named portfolios ========================
-    @_('expr TIMES builtin_agg')
+    @_('expr HOMOG_MULTIPLY builtin_agg')
     def builtin_agg(self, p):
         """  inhomogeneous change of scale """
         self.logger(
-            f'builtin_aggregate <-- builtin_agg TIMES expr', p)
+            f'builtin_agg <-- expr HOMOG_MULTIPLY builtin_agg', p)
         bid = p.builtin_agg.copy()
         bid['name'] += '_i_scaled'
         bid['exp_en'] = bid.get('exp_en', 0) * p.expr
@@ -773,13 +722,13 @@ class UnderwritingParser(Parser):
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
         return bid
 
-    @_('expr SCALE_MULTIPLY builtin_agg')
+    @_('expr TIMES builtin_agg %prec SCALE_MULTIPLY')
     def builtin_agg(self, p):
         """homogeneous change of scale """
-        self.logger('builtin_agg <-- expr TIMES builtin_agg', p)
+        self.logger('builtin_agg <-- expr TIMES builtin_agg %prec SCALE_MULTIPLY', p)
         # bid = built_in_dict, want to be careful not to add scale too much
-        bid = p.builtin_agg.copy()
-        bid['name'] += '_h_scaled'
+        bid = p.builtin_agg
+        bid['name'] += '_homog_scaled'
         if 'sev_mean' in bid:
             bid['sev_mean'] = bid['sev_mean'] * p.expr
         if 'sev_scale' in bid:
@@ -792,37 +741,42 @@ class UnderwritingParser(Parser):
         bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
         return bid
 
-    @_('builtin_agg LOCATION_ADD expr')
+    @_('builtin_agg PLUS expr %prec LOCATION_ADD', 'builtin_agg MINUS expr %prec LOCATION_ADD',)
     def builtin_agg(self, p):
         """
-        translation
+        translation (shift, change location) by expr
         :param p:
         :return:
         """
-        self.logger('builtin_agg <-- builtin_agg LOCATION_ADD expr', p)
+        self.logger('builtin_agg <-- builtin_agg {p[1]} expr %prec LOCATION_ADD', p)
         # bid = built_in_dict, want to be careful not to add scale too much
-        bid = p.builtin_agg.copy()
-        bid['name'] += '_translated'
+        bid = p.builtin_agg
+        bid['name'] += '_shifted'
+        sign = 1 if p[1]=="+" else -1
         if 'sev_loc' in bid:
-            bid['sev_loc'] += p.expr
+            bid['sev_loc'] += sign * p.expr
         else:
-            bid['sev_loc'] = p.expr
+            bid['sev_loc'] = sign * p.expr
         return bid
 
     @_('BUILTIN_AGG')
     def builtin_agg(self, p):
         # ensure lookup only happens here
-        self.logger(f'builtin_agg <-- AGG_BUILTIN', p)
+        self.logger(f'builtin_agg <-- BUILTIN_AGG ({p.BUILTIN_AGG})', p)
         built_in_dict = self.safe_lookup(p.BUILTIN_AGG)
         return built_in_dict
 
     @_('BUILTIN_SEV')
-    def builtin_sev(self, p):
+    def sev(self, p):
         # ensure lookup only happens here
         # unlike aggs, will never just say sev.A
-        # but, can allow  agg A 1 claim sev.B and for that need to distinguish from a sev
-        self.logger(f'builtin_agg <-- SEV_BUILTIN ({p.BUILTIN_SEV})', p)
+        # usage: agg A 1 claim sev sev.B fixed; a little awkward but not used much
+        # leaving it here allos for subsequent scaling and translation
+        # if it is directly a sev_clause it cannot be adjusted
+        self.logger(f'sev <-- BUILTIN_SEV ({p.BUILTIN_SEV})', p)
         built_in_dict = self.safe_lookup(p.BUILTIN_SEV)
+        if 'name' in built_in_dict:
+            del built_in_dict['name']
         return built_in_dict
 
     # @_('BUILTIN_PORT')
@@ -832,14 +786,13 @@ class UnderwritingParser(Parser):
     #     built_in_dict = self.safe_lookup(p.PORT_BUILTIN)
     #     return built_in_dict
 
-
     # ids =========================================================
     @_('ID')
     def name(self, p):
         self.logger(f'name <-- ID = {p.ID}', p)
         return p.ID
 
-    # vectors of numbers
+    # vectors of numbers ==========================================
     @_('"[" numberl "]"')
     def numbers(self, p):
         self.logger(f'numbers <-- [numberl]', p)
@@ -863,66 +816,90 @@ class UnderwritingParser(Parser):
         self.logger('numbers <-- expr', p)
         return p.expr
 
-    # implement simple calculator with exponents and exp as a convenience
-    @_('expr PLUS expr')
+    # calculator ===================================================
+    # implement simple calculator with exponents and exp as a convenience, % and unary minus
+    # mimics the Python grammar https://docs.python.org/3/reference/grammar.html
+    @_('sum %prec LOW')
     def expr(self, p):
-        self.logger('expr <-- expr + expr', p)
-        return p.expr0 + p.expr1
+        self.logger('expr <-- sum', p)
+        return p.sum
 
-    @_('expr MINUS expr')
-    def expr(self, p):
-        self.logger('expr <-- expr - expr', p)
-        return p.expr0 - p.expr1
+    @_('sum PLUS term')
+    def sum(self, p):
+        self.logger('sum <-- sum + term', p)
+        return p.sum + p.term
 
-    @_('expr TIMES expr')
-    def expr(self, p):
-        self.logger('expr <-- expr * expr', p)
-        return p.expr0 * p.expr1
+    @_('sum MINUS term')
+    def sum(self, p):
+        self.logger('sum <-- sum - term', p)
+        return p.sum - p.term
 
-    @_('expr DIVIDE expr')
-    def expr(self, p):
-        self.logger('expr <-- expr / expr', p)
-        return p.expr0 / p.expr1
+    @_('term %prec LOW')
+    def sum(self, p):
+        self.logger('term <-- sum', p)
+        return p.term
 
-    @_('expr EXPONENT expr')
-    def expr(self, p):
-        self.logger('expr <-- expr ** expr', p)
-        return p.expr0 ** p.expr1
+    @_('term TIMES factor')
+    def term(self, p):
+        self.logger('term <-- term * factor', p)
+        return p.term * p.factor
 
-    @_('"(" expr ")"')
-    def expr(self, p):
-        self.logger('expr <-- (expr)', p)
-        return p.expr
+    @_('term DIVIDE factor')
+    def term(self, p):
+        self.logger('term <-- term / factor', p)
+        return p.term / p.factor
 
-    # @_('MINUS "(" expr ")" %prec UMINUS')
-    # def expr(self, p):
-    #     self.logger('expr <-- MINUS(expr)', p)
-    #     return -p.expr
+    @_('factor')
+    def term(self, p):
+        self.logger('term <-- factor', p)
+        return p.factor
 
-    @_('EXP "(" expr ")"')
-    def expr(self, p):
-        self.logger('expr <-- EXP(expr)', p)
-        return exp(p.expr)
+    @_('PLUS factor', 'MINUS factor')
+    def factor(self, p):
+        self.logger(f'factor <-- {p[0]} factor', p)
+        if p[0] == '+':
+            return p.factor
+        else:
+            return -p.factor
 
-    @_('expr PERCENT')
-    def expr(self, p):
-        self.logger('expr <-- expr PERCENT', p)
-        return p.expr / 100
+    @_('power')
+    def factor(self, p):
+        self.logger('factor <-- power', p)
+        return p.power
+
+    @_('atom EXPONENT factor')
+    def power(self, p):
+        self.logger('power <-- atom EXPONENT factor', p)
+        return p.atom ** p.factor
+
+    @_('atom')
+    def power(self, p):
+        self.logger('power <-- atom', p)
+        return p.atom
+
+    @_('NUMBER PERCENT')
+    def atom(self, p):
+        self.logger('atom <-- atom PERCENT', p)
+        return float(p.NUMBER) / 100
 
     @_('INFINITY')
-    def expr(self, p):
-        self.logger(f'expr <-- INFINITY', p)
+    def atom(self, p):
+        self.logger(f'atom <-- INFINITY', p)
         return np.inf
 
     @_('NUMBER')
-    def expr(self, p):
-        # number regex includes -1 automatically so no need for a UMINUS parse
-        self.logger(f'expr <-- NUMBER, {p.NUMBER}', p)
-        if p.NUMBER in ('inf', 'unlimited', 'unlim'):
-            t = np.inf
-        else:
-            t = float(p.NUMBER)
+    def atom(self, p):
+        self.logger(f'atom <-- NUMBER, {p.NUMBER}', p)
+        t = float(p.NUMBER)
         return t
+
+    @_('"(" sum ")"')
+    def factor(self, p):
+        return p.sum
+    #
+    @_('EXP "(" sum ")"')
+    def factor(self, p):
+        return exp(p.sum)
 
     def error(self, p):
         if p:
@@ -934,6 +911,8 @@ class UnderwritingParser(Parser):
 def grammar(add_to_doc=False, save_to_fn=''):
     """
     Write the grammar at the top of the file as a docstring
+
+    To work with multi rules use ', ' all on one line
     """
 
     start_string = '''Language Specification
@@ -954,6 +933,7 @@ References
     txt = pin.read_text(encoding='utf-8')
     stxt = txt.split('@_')
     ans = {}
+    # 3:-2 get rid of junk at top and bottom (could change if file changes)
     for it in stxt[3:-2]:
         if it.find('# def') >= 0:
             # skip rows with a comment between @_ and def
@@ -961,15 +941,20 @@ References
         else:
             b = it.split('def')
             b0 = b[0].strip()[2:-2]
+            # check if multirule
+            if ', ' in b0:
+                b0 = [i.replace("'", '') for i in b0.split(', ')]
+            else:
+                b0 = [b0]
             try:
                 b1 = b[1].split("(self, p):")[0].strip()
             except:
                 print(it)
                 exit()
             if b1 in ans:
-                ans[b1] += [b0]
+                ans[b1] += b0
             else:
-                ans[b1] = [b0]
+                ans[b1] = b0
     s = ''
     for k, v in ans.items():
         s += f'{k:<20s}\t::= {v[0]:<s}\n'
@@ -979,7 +964,9 @@ References
 
     # finally add the language words
     # this is a bit manual, but these shouldnt change much...
+    # lang_words = '\n\nlanguage words go here\n\n'
     lang_words = '''
+    
 FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
@@ -1008,11 +995,11 @@ DFREQ                   ::= 'dfreq'
 
 DSEV                    ::= 'dsev'
 
-EMPIRICAL               ::= 'empirical|nps'
-
 EXP                     ::= 'exp'
 
 EXPONENT                ::= '^|**'
+
+HOMOG_MULTIPLY          ::= "@"
 
 INFINITY                ::= 'inf|unlim|unlimited'
 
@@ -1030,6 +1017,8 @@ OF                      ::= 'of'
 
 PART_OF                 ::= 'po'
 
+PERCENT                 ::= '%'
+
 PORT                    ::= 'port'
 
 PREMIUM                 ::= 'premium|prem'
@@ -1038,8 +1027,6 @@ SEV                     ::= 'sev'
 
 SHARE_OF                ::= 'so'
 
-SPECIFIED               ::= 'specified'
-
 TO                      ::= 'to'
 
 WEIGHTS                 ::= 'wts|wt'
@@ -1047,14 +1034,6 @@ WEIGHTS                 ::= 'wts|wt'
 XPS                     ::= 'xps'
 
 xs                      ::= "xs|x"
-
-PERCENT                 ::= '%'
-
-EXP                     ::= 'exp'
-
-SCALE_MULTIPLY          ::= "@"
-
-LOCATION_ADD            ::= "#"
 
 '''
 

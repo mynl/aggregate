@@ -36,8 +36,8 @@
 #     ans = port.analyze_distortion('clin', A=a, ROE=0.12, plot=True, mass_hints=mh)
 
 import aggregate as agg
-from aggregate import build
-from aggregate.utils import make_ceder_netter
+from aggregate import build, debug_build
+from aggregate.utilities import make_ceder_netter
 from examples import case_studies as  cs
 from numpy import exp
 from examples import case_studies as  cs
@@ -49,8 +49,12 @@ def runpf_test():
 
 
 def run_test():
+    prog1 = 'agg parsetest3 5 claims  sev  lognorm 2 cv .3 poisson'
+    a = build(prog1)
+
     prog = 'port PORT0\n\tagg X 1 claim sev lognorm 20 cv .9 poisson'
     port = build(prog)
 
 if __name__ == '__main__':
-    runpf_test()
+    run_test()
+    # runpf_test()

@@ -236,6 +236,9 @@ def round_bucket(bs):
             print(1/i, round_bucket(1/i))
 
     """
+    if bs == 0 or np.isinf(bs):
+        raise ValueError(f'Inadmissible value passed to round_bucket, {bs}')
+
     if bs == 1:
         return bs
 
@@ -1767,7 +1770,7 @@ class FigureManager():
                  legend_font='small', default_figsize=(5, 3.5)):
         """
         Another figure/plotter manager: manages cycles for color/black and white
-        from Great utils.py, edited and stripped down
+        from Great utilities.py, edited and stripped down
         combined with lessons from MetaReddit on matplotlib options for fonts, background
         colors etc.
 

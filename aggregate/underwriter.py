@@ -204,14 +204,19 @@ class Underwriter(object):
             # spec = list of aggs
             agg_list = spec['spec']
             obj = Portfolio(name, agg_list, uw=self)
+            obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
                 logger.warning(f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
                 obj = None
             else:
                 obj = Severity(**spec)
+                # ? set outside...
+                obj.program = program
         elif kind == 'distortion':
             obj = Distortion(**spec)
+            # ? set outside
+            obj.program = program
         else:
             ValueError(f'Cannot build {kind} objects')
         return obj

@@ -517,6 +517,28 @@ class Portfolio(object):
         df = pd.concat(t1, keys=t2, names=['line', 'X']).fillna('')
         return df
 
+    @property
+    def spec(self):
+        """
+        Get the dictionary specification.
+
+        :return:
+        """
+        d = dict()
+        d['name'] = self.name
+        d['spec_list'] = [a._spec for a in self.agg_list]
+        return d
+
+    @property
+    def spec_ex(self):
+        """
+        All relevant info.
+
+        :return:
+        """
+        return {'type': type(self), 'spec': self.spec, 'bs': self.bs, 'log2': self.log2,
+                'aggs': len(self.agg_list)}
+
     def json(self, stream=None):
         """
         write object as json
@@ -538,12 +560,8 @@ class Portfolio(object):
         args["last_update"] = str(self.last_update)
         args["hash_rep_at_last_update"] = str(self.hash_rep_at_last_update)
 
-        d = dict()
-        # original
-        # d[self.name] = dict(args=args, spec=[a.spec for a in self.agg_list])
-        d['name'] = self.name
+        d = self.spec
         d['args'] = args
-        d['spec_list'] = [a._spec for a in self.agg_list]
 
         logger.debug(f'Portfolio.json| dummping {self.name} to {stream}')
         s = json.dumps(d)  # , default_flow_style=False, indent=4)

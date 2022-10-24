@@ -6,6 +6,7 @@ from inspect import signature
 
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
+from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
 from .utilities import logger_level, round_bucket
 
@@ -209,6 +210,8 @@ class Underwriter(object):
                 obj = None
             else:
                 obj = Severity(**spec)
+        elif kind == 'distortion':
+            obj = Distortion(**spec)
         else:
             ValueError(f'Cannot build {kind} objects')
         return obj
@@ -379,7 +382,9 @@ class Underwriter(object):
                         # be created in context of an agg... that behaviour is
                         # useful for named severities though... hence:
                         if update:
-                            obj.update(log2, bs, **kwargs)
+                            update = getattr(obj, 'update', None)
+                            if update is not None:
+                                update(log2, bs, **kwargs)
                         rv[(kind, name)] = (obj, program)
                     else:
                         rv[(kind, name)] = (spec, program)
@@ -666,7 +671,7 @@ class Underwriter(object):
             df = df.loc[df.index.str.match(where)]
         # add One severity
         self.write('sev One dsev [1]')
-        return self.interpreter_work(df.iterrows())
+        return self._interpreter_work(df.iterrows())
 
     def interpreter_line(self, program, name='one off', debug=True):
         """
@@ -674,15 +679,15 @@ class Underwriter(object):
         name is index of output
         """
 
-        return self.interpreter_work(iter([(name, program)]), debug=debug)
+        return self._interpreter_work(iter([(name, program)]), debug=debug)
 
     def interpreter_list(self, program_list):
         """
         Interpret single test in debug mode.
         """
-        return self.interpreter_work(list(enumerate(program_list)), debug=True)
+        return self._interpreter_work(list(enumerate(program_list)), debug=True)
 
-    def interpreter_work(self, iterable, debug=False):
+    def _interpreter_work(self, iterable, debug=False):
         """
         Do all the work for the test, allows input to be marshalled into the tester
         in different ways. Unlike production interpret_program, runs one line at a time.

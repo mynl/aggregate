@@ -15,18 +15,19 @@ class Distortion(object):
     Creation and management of distortion functions.
 
     0.9.4: renamed roe to ccoc, but kept creator with roe for backwards compatibility.
+    Oct 2022: renamed wtdtvar to bitvar, but kept ...
 
     """
 
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'ccoc', 'tvar',
-                               'wtdtvar', 'convex', 'tt')
+                               'bitvar', 'convex', 'tt')
     _has_mass_ = ('ly', 'clin', 'lep', 'roe')
     _med_names_ = ("Prop Hzrd", "Wang", 'Capd Loglin', "Lev Equiv", "Lin Yield", "Capped Linear", "Dual Mom",
-                   'Const CoC', "Tail VaR", 'Wtd TVaR', "Convex Env", 'Wang-tt')
+                   'Const CoC', "Tail VaR", 'BiTVaR', "Convex Env", 'Wang-tt')
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Capped Loglinear', "Leverage Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Dual Moment", "Constant CoC", "Tail VaR",
-                    'Weighted TVaR', "Convex Envelope", 'Wang-tt')
+                    'BiTVaR', "Convex Envelope", 'Wang-tt')
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'ccoc', 'tvar', 'wtdtvar,  'convex')
     _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,   .1,     0.15,     .15)
@@ -237,7 +238,7 @@ class Distortion(object):
             def g_inv(y):
                 return 1 - (1 - y)**q
 
-        elif self._name == 'wtdtvar':
+        elif self._name == 'wtdtvar' or self._name == 'bitvar':
             # weighted tvar, df = p0 <p1, shape = weight on p1
             try:
                 p0, p1 = df

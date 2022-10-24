@@ -36,6 +36,7 @@ import numpy as np
 from numpy import exp
 import re
 from pathlib import Path
+from .utilities import tweedie_convert
 
 logger = logging.getLogger(__name__)
 DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
@@ -53,9 +54,10 @@ class UnderwritingLexer(Lexer):
               PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY, # SCALE_MULTIPLY, LOCATION_ADD,
               LOSS, PREMIUM, AT, LR, CLAIMS,
               XS,
+              DISTORTION,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
-              NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
+              NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
               AND,  PERCENT,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
@@ -70,17 +72,12 @@ class UnderwritingLexer(Lexer):
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
     # PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    # differentiate by number of parameters
     FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed'
-    # FREQ1 = 'binomial'
-    # FREQ2 = 'pascal'
-    # MIXED_ID2 = 'delaporte|sichel|beta|sig'
-    # MIXED_ID1 = 'gamma|ig'
-    # ZERO_PARAM_SEV = 'norm|expon|uniform'
+    DISTORTION = 'dist(ortion)?'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
-    NUMBER = r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
-    # NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
+    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
+    # NUMBER = r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
 
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
@@ -98,10 +95,9 @@ class UnderwritingLexer(Lexer):
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
-
-
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
+    ID['tower'] = TOWER
     ID['mixed'] = MIXED
     ID['unlim'] = INFINITY
     ID['prem'] = PREMIUM
@@ -194,7 +190,8 @@ class UnderwritingParser(Parser):
     debugfile = Path.home() / 'aggregate/parser/parser.out'
     tokens = UnderwritingLexer.tokens
     precedence = (
-        # LOW is used to force shift in rules like expr <- sum or expr <- sum + expr, and empty rules
+        # LOW is used to force shift in rules like
+        # expr <- sum or expr <- sum + expr, and empty rules
         ('nonassoc', LOW),
         # ('nonassoc', LOCATION_ADD),
         # ('nonassoc', SCALE_MULTIPLY, HOMOG_MULTIPLY),
@@ -293,11 +290,31 @@ class UnderwritingParser(Parser):
                     f'with {len(self.out_dict[("port", p.port_out)]["spec"])} aggregates', p)
         return 'port', p.port_out
 
+    @_('distortion_out')
+    def answer(self, p):
+        self.logger(f'answer <-- distortion_out, created distortion {p.distortion_out} ', p)
+        return 'distortion', p.distortion_out
+
     @_('expr')
     def answer(self, p):
         self.logger(f'answer <-- expr {p.expr} ', p)
         self.out_dict[('expr', 'expression')] = {'expr': p.expr}
         return 'expr', f'{p.expr}'
+
+    # making distortions ======================================
+    @_('DISTORTION name ids expr')
+    def distortion_out(self, p):
+        self.logger('distortion_out <-- DISTORTION ID name', p)
+        self.out_dict[("distortion", p.name)] = {'name': p.ids, 'shape': p.expr }
+        return p.name
+
+    @_('DISTORTION name ID expr "[" numberl "]"')
+    def distortion_out(self, p):
+        self.logger('distortion_out <-- DISTORTION name ID [ numberl ]', p)
+        # for bitvars etc. TODO apply edit to ID to check it is bitvar?
+        self.out_dict[('distortion', p.name)] = {'name': p.ID, 'shape': p.expr,
+                                                 'df': p.numberl}
+        return p.name
 
     # building portfolios ======================================
     @_('PORT name note agg_list')
@@ -345,8 +362,6 @@ class UnderwritingParser(Parser):
         # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
         # lambda = mu^(2-p) / ((2-p) sigma^2)
         # beta = lambda alpha / mu
-
-        from .utilities import tweedie_convert
         mu = p[3]
         pp = p[4]
         sig2 = p[5]
@@ -510,10 +525,19 @@ class UnderwritingParser(Parser):
         self.logger(f'reins_list <-- reins_clause becomes reins_list', p)
         return [p.reins_clause]
 
+    @_('tower')
+    def reins_list(self, p):
+        # would be dumb if it only contained one layer
+        self.logger(
+            f'reins_clause <-- tower', p)
+        limit = p.tower[0]
+        attach = p.tower[1]
+        return [(1, l, a) for l, a in zip(limit, attach)]
+
     @_('expr XS expr')
     def reins_clause(self, p):
         self.logger(
-            f'reins_clause <-- expr XS expr {p[0]} po {p[0]} xs {p[2]}', p)
+            f'reins_clause <-- expr XS expr {p[0]} xs {p[2]}', p)
         if np.isinf(p[0]):
             return (1, p[0], p[2])
         else:
@@ -713,10 +737,28 @@ class UnderwritingParser(Parser):
             f'layers <-- numbers XS numbers', p)
         return {'exp_attachment': p[2], 'exp_limit': p[0]}
 
+    @_('tower')
+    def layers(self, p):
+        self.logger(
+            f'layers <-- tower', p)
+        return {'exp_attachment': p.tower[1], 'exp_limit': p.tower[0]}
+
     @_('')
     def layers(self, p):
         self.logger('layers <-- missing layer term', p)
         return {}
+
+    @_('TOWER doutcomes')
+    def tower(self, p):
+        # doutcomes allows a list, range, or range with step
+        self.logger(f'tower <-- tower doutcomes', p)
+        breaks = p.doutcomes
+        if breaks[0] != 0:
+            breaks = np.hstack((0., breaks))
+        limits = np.diff(breaks)
+        attach = breaks[:-1]
+        # logger.info('\n'.join([f'{x} xs {y}' for x, y in zip(limits, attach)]))
+        return [limits, attach]
 
     # optional note  ===========================================
     @_('NOTE')
@@ -924,13 +966,16 @@ class UnderwritingParser(Parser):
         self.logger('term <-- factor', p)
         return p.factor
 
-    @_('PLUS factor', 'MINUS factor')
-    def factor(self, p):
-        self.logger(f'factor <-- {p[0]} factor', p)
-        if p[0] == '+':
-            return p.factor
-        else:
-            return -p.factor
+    # this causes an unresolvable difficulty with sev ID expr +expr
+    # can't tell if it is a two param dist or a location shift
+    # folded - into the regex def of a number
+    # @_('PLUS factor', 'MINUS factor')
+    # def factor(self, p):
+    #     self.logger(f'factor <-- {p[0]} factor', p)
+    #     if p[0] == '+':
+    #         return p.factor
+    #     else:
+    #         return -p.factor
 
     @_('power')
     def factor(self, p):

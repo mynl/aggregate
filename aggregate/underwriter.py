@@ -2,7 +2,7 @@ import numpy as np
 import logging
 import pandas as pd
 from pathlib import Path
-from inspect import signature
+# from inspect import signature
 
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
@@ -125,15 +125,17 @@ class Underwriter(object):
             db_path = self.default_dir / p
         else:
             logger.error(f'Database {fn} not found. Ignoring.')
+            return
 
         try:
             program = db_path.read_text(encoding='utf-8')
         except:
             logger.error(f'Error reading requested database {db_path.name}. Ignoring.')
-
-        # read in, parse, save to sev/agg/port dictionaries
-        self.interpret_program(program)
-        logger.info(f'Database {fn} read into knowledge.')
+        else:
+            # read in, parse, save to sev/agg/port dictionaries
+            # throw away answer...not creating anything
+            self.interpret_program(program)
+            logger.info(f'Database {fn} read into knowledge.')
 
     def __getitem__(self, item):
         """
@@ -254,7 +256,11 @@ class Underwriter(object):
 
     @property
     def knowledge(self):
+        return self._knowledge.sort_index()
+
+    def describe(self, kind='agg'):
         """
+        TODO this is not rationlized...and as a prop it needs to return something
         More informative version of knowledge showing the agg programs. Only Aggregates that have a program.
 
         TODO Add severities
@@ -263,7 +269,10 @@ class Underwriter(object):
         """
         from IPython.display import HTML
 
-        kinds = ['agg', 'port']
+        if kind == 'all':
+            kinds = ['agg', 'port']
+        else:
+            kinds = [kind]
 
         if 'port' in kinds:
             cols = ['Name', 'Type', 'Agg1', 'Agg2', 'Agg3', 'Notes']
@@ -278,8 +287,9 @@ class Underwriter(object):
                 note = spec['note']
                 df_port.loc[name, :] = [kind] + aggs + [note]
             df_port = df_port.sort_index()
-            display(HTML('<h3>Known Portfolios</h3>'))
-            display(df_port)
+            return df_port
+            # display(HTML('<h3>Known Portfolios</h3>'))
+            # display(df_port)
 
         if 'agg' in kinds:
             cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev',  'SevCV', 'Sev_a', 'Sev_b', 'Freq',      'EN',     'Freq_a',  'Notes']
@@ -294,8 +304,9 @@ class Underwriter(object):
             df_agg = df_agg.sort_index()
             df_agg['ELoss'] = np.where(df_agg.ELoss == '', df_agg.ESev.replace('', 0) * df_agg.EN.replace('', 0), df_agg.ELoss)
             df_agg = df_agg.drop(columns='Sev_b')
-            display(HTML('<h3>Known Aggregates</h3>'))
-            display(df_agg)
+            return df_agg
+            # display(HTML('<h3>Known Aggregates</h3>'))
+            # display(df_agg)
 
     def write(self, portfolio_program, log2=0, bs=0, create_all=None, update=None, **kwargs):
         """
@@ -364,9 +375,7 @@ class Underwriter(object):
             return rv
 
         # if you fall through to here then the portfolio_program did not refer to a built-in object
-        # run the program, get the interpreter return value, the irv, which contains info about all
-        # the objects in the program, including aggs within ports
-        # kind0, name0 is the answer exit point object - this must always be created
+        # run the program, get the interpreter return value, the irv, which contains kind/name->spec,program
         irv = self.interpret_program(portfolio_program)
 
         # create objects
@@ -379,8 +388,9 @@ class Underwriter(object):
             # parser.out_dict is indexed by (kind, name) and contains the defining dictionary
             # PrettyPrinter().pprint(self.parser.out_dict)
             for (kind, name), (spec, program) in irv.items():
-                # remember the spec comes back as a list of aggs that have been entered into the uw
-                if create_all or program != '':
+                # OLD the spec comes back as a list of aggs that have been entered into the uw
+                # NEW the spec comes back as a list of dictionary agg specs that are NOT entered into the uw
+                if create_all:
                     obj = self.factory(kind, name, spec, program)
                     if obj is not None:
                         # this can fail for named mixed severities, which can only
@@ -390,6 +400,7 @@ class Underwriter(object):
                             update = getattr(obj, 'update', None)
                             if update is not None:
                                 update(log2, bs, **kwargs)
+                        # TODO sort out this cluster
                         rv[(kind, name)] = (obj, program)
                     else:
                         rv[(kind, name)] = (spec, program)
@@ -402,10 +413,6 @@ class Underwriter(object):
         else:
             if len(rv):
                 logger.info(f'Underwriter.write | Program created {len(rv)} objects.')
-            # handle this in build
-            # if len(rv) == 1:
-            #     # dict, pop the last (only) element
-            #     rv = rv.popitem()[1]
 
         # return created objects
         return rv
@@ -426,12 +433,10 @@ class Underwriter(object):
 
     def interpret_program(self, portfolio_program):
         """
-        Preprocess and then parse one line at a time.
+        Preprocess and then parse a program one line at a time. Each output is
+        stored in the Underwriter's knowledge database. No objects are created.
 
         Error handling through parser.
-
-        Old parse_portfolio_program replaced with build.interpret_one and interpret_test,
-        and running write with
 
         :param portfolio_program:
         :return:
@@ -440,15 +445,19 @@ class Underwriter(object):
         # Preprocess ---------------------------------------------------------------------
         portfolio_program = self.lexer.preprocess(portfolio_program)
 
+        # create return value dictionary
+        rv = {}
+
         # Parse and Postprocess-----------------------------------------------------------
-        self.parser.reset()
-        program_line_dict = {}
+        # self.parser.reset()
+        # program_line_dict = {}
         for program_line in portfolio_program:
             logger.debug(program_line)
             # preprocessor only returns lines of length > 0
             try:
-                # parser returns the type and name of the object
-                kind0, name0 = self.parser.parse(self.lexer.tokenize(program_line))
+                # parser returns the type, name, and spec of the object
+                # this is where you can marry up with the program
+                kind, name, spec = self.parser.parse(self.lexer.tokenize(program_line))
             except ValueError as e:
                 if isinstance(e.args[0], str):
                     logger.error(e)
@@ -461,23 +470,11 @@ class Underwriter(object):
                     logger.error(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
             else:
-                logger.info(f'answer out: {kind0} object {name0} parsed successfully')
-                program_line_dict[(kind0, name0)] = program_line
-
-        # now go through self.parser.out_dict and store everything
-        # in the uw dictionaries
-        rv = {}
-        if len(self.parser.out_dict) > 0:
-            logger.info(f'Adding {len(self.parser.out_dict)} specs to the knowledge.')
-            for (kind, name), spec in self.parser.out_dict.items():
-                # will not know for aggs within port, for example
-                # when create_all is false, only create thigns with a program_line != ''
-                program_line = program_line_dict.get((kind, name), '')
+                # store in uw dictionary and create if needed
+                logger.info(f'answer out: {kind} object {name} parsed successfully...adding to knowledge')
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
-                logger.info(f'Added {kind}, {name}, {program_line[:20]} to knowledge.')
-                # !! rv[(kind, name)] = (self.parser.out_dict[(kind, name)], program_line)
-                # these are the new ones, that are returned
                 rv[(kind, name)] = (spec, program_line)
+
         return rv
 
     # @staticmethod
@@ -711,7 +708,6 @@ class Underwriter(object):
         # detect non-trivial change
         f = lambda x, y: 'same' if x.replace(' ', '') == y.replace(' ', '').replace('\t', '') else y
         for test_name, program in iterable:
-            parser.reset()
             if type(program) != str:
                 program_in = program[0]
                 program = lexer.preprocess(program_in)
@@ -723,7 +719,7 @@ class Underwriter(object):
                 program = program[0]
                 try:
                     # print(program)
-                    kind, name = parser.parse(lexer.tokenize(program))
+                    kind, name, spec = parser.parse(lexer.tokenize(program))
                 except (ValueError, TypeError) as e:
                     errs += 1
                     err = 1
@@ -741,12 +737,10 @@ class Underwriter(object):
                     else:
                         txt = str(e)
                         name = 'other error'
-                    parser.out_dict[(kind, name)] = txt
+                    spec = txt
                 else:
                     no_errs += 1
-                ans[test_name] = [kind, err, name,
-                                  parser.out_dict[(kind, name)] if kind != 'expr' else None,
-                                  program, f(program, program_in)]
+                ans[test_name] = [kind, err, name, spec, program, f(program, program_in)]
             elif len(program) > 1:
                 logger.info(f'{program_in} preprocesses to {len(program)} lines; not processing.')
                 logger.info(program)
@@ -763,5 +757,6 @@ class Underwriter(object):
 
 
 # exported instance
+# build = dbuild = None
 build = Underwriter(databases='examples', create_all=False, update=True, debug=False, log2=16)
 dbuild = Underwriter(name='Debug', create_all=False, update=True, debug=True, log2=13)

@@ -36,7 +36,6 @@ import numpy as np
 from numpy import exp
 import re
 from pathlib import Path
-from .utilities import tweedie_convert
 
 logger = logging.getLogger(__name__)
 DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
@@ -205,8 +204,7 @@ class UnderwritingParser(Parser):
 
     def __init__(self, safe_lookup_function, debug=False):
         self.debug = debug
-        self.out_dict = None
-        self.reset()
+        # self.reset()
         # instance of uw class to look up severities
         self.safe_lookup = safe_lookup_function
 
@@ -227,10 +225,6 @@ class UnderwritingParser(Parser):
         ans = "; ".join(ans)
         logger.info(f'{msg:20s}\t{ans}')
         # logger.info(f'{msg:15s}\n\t{ans}\n')
-
-    def reset(self):
-        # TODO Add sev_xs and sev_ps !!
-        self.out_dict = {}
 
     @staticmethod
     def enhance_debugfile(f_out=''):
@@ -275,54 +269,51 @@ class UnderwritingParser(Parser):
     @_('sev_out')
     def answer(self, p):
         self.logger(
-            f'answer <-- sev_out, created severity {p.sev_out}', p)
-        return 'sev', p.sev_out
+            f'answer <-- sev_out, created severity {p.sev_out[1]}', p)
+        return p.sev_out
 
     @_('agg_out')
     def answer(self, p):
         self.logger(
-            f'answer <-- agg_out, created aggregate {p.agg_out}', p)
-        return 'agg', p.agg_out
+            f'answer <-- agg_out, created aggregate {p.agg_out[1]}', p)
+        return p.agg_out
 
     @_('port_out')
     def answer(self, p):
-        self.logger(f'answer <-- port_out, created portfolio {p.port_out} '
-                    f'with {len(self.out_dict[("port", p.port_out)]["spec"])} aggregates', p)
-        return 'port', p.port_out
+        self.logger(f'answer <-- port_out, created portfolio {p.port_out[1]}', p)
+        return p.port_out
 
     @_('distortion_out')
     def answer(self, p):
-        self.logger(f'answer <-- distortion_out, created distortion {p.distortion_out} ', p)
-        return 'distortion', p.distortion_out
+        self.logger(f'answer <-- distortion_out, created distortion {p.distortion_out[1]} ', p)
+        return p.distortion_out
 
     @_('expr')
     def answer(self, p):
-        self.logger(f'answer <-- expr {p.expr} ', p)
-        self.out_dict[('expr', 'expression')] = {'expr': p.expr}
-        return 'expr', f'{p.expr}'
+        self.logger(f'expr_out <-- expr {p.expr} ', p)
+        return 'expr', f'{p.expr}', p.expr
 
     # making distortions ======================================
     @_('DISTORTION name ids expr')
     def distortion_out(self, p):
         self.logger('distortion_out <-- DISTORTION ID name', p)
-        self.out_dict[("distortion", p.name)] = {'name': p.ids, 'shape': p.expr }
-        return p.name
+        # self.out_dict[("distortion", p.name)] =
+        return 'distortion', p.name, {'name': p.ids, 'shape': p.expr }
 
     @_('DISTORTION name ID expr "[" numberl "]"')
     def distortion_out(self, p):
         self.logger('distortion_out <-- DISTORTION name ID [ numberl ]', p)
         # for bitvars etc. TODO apply edit to ID to check it is bitvar?
-        self.out_dict[('distortion', p.name)] = {'name': p.ID, 'shape': p.expr,
-                                                 'df': p.numberl}
-        return p.name
+        # self.out_dict[('distortion', p.name)] =
+        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr, 'df': p.numberl }
 
     # building portfolios ======================================
     @_('PORT name note agg_list')
     def port_out(self, p):
         self.logger(
             f'port_out <-- PORT name note agg_list', p)
-        self.out_dict[("port", p.name)] = {'spec': p.agg_list, 'note': p.note}
-        return p.name
+        # self.out_dict[("port", p.name)] =
+        return 'port', p.name, {'spec': p.agg_list, 'note': p.note}
 
     @_('agg_list agg_out')
     def agg_list(self, p):
@@ -341,17 +332,17 @@ class UnderwritingParser(Parser):
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- AGG name exposures layers SEV sev occ_reins freq agg_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.exposures, **p.layers, **p.sev_clause,
+        # self.out_dict[("agg", p.name)] =
+        return 'agg', p.name, {'name': p.name, **p.exposures, **p.layers, **p.sev_clause,
                                          **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-        return p.name
 
     @_('AGG name dfreq layers sev_clause occ_reins agg_reins note')
     def agg_out(self, p):
         self.logger(
             f'agg_out <-- AGG name dfreq dsev occ_reins note', p)
-        self.out_dict[("agg", p.name)] = {'name': p.name, **p.dfreq, **p.sev_clause,
+        # self.out_dict[("agg", p.name)] =
+        return 'agg', p.name, {'name': p.name, **p.dfreq, **p.sev_clause,
                                          **p.occ_reins, **p.agg_reins, 'note': p.note}
-        return p.name
 
     @_('AGG name TWEEDIE expr expr expr note')
     def agg_out(self, p):
@@ -362,6 +353,9 @@ class UnderwritingParser(Parser):
         # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
         # lambda = mu^(2-p) / ((2-p) sigma^2)
         # beta = lambda alpha / mu
+
+        # if not here then relative import fails when you run the program to pring the grammar
+        from .utilities import tweedie_convert
         mu = p[3]
         pp = p[4]
         sig2 = p[5]
@@ -378,17 +372,16 @@ class UnderwritingParser(Parser):
                 'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': 1 / beta,
                 'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:4f}, ga(α={alpha:.4f}, β={beta:.4f}), '
                         f'scale={1/beta:.4f}'}
-        self.out_dict[('agg', p.name)] = dout
-        return p.name
+        # self.out_dict[('agg', p.name)] = dout
+        return 'agg', p.name, dout
 
     @_('AGG name builtin_agg note')
     def agg_out(self, p):
         # for use when you change the agg and/or  want a new name
         self.logger(
             f'agg_out <-- AGG name builtin_aggregate note', p)
-        self.out_dict[("agg", p.name)] = {
-            'name': p.name, **p.builtin_agg, 'note': p.note}
-        return p.name
+        # self.out_dict[("agg", p.name)] =
+        return 'agg', p.name, {'name': p.name, **p.builtin_agg, 'note': p.note}
 
     @_('builtin_agg agg_reins note')
     def agg_out(self, p):
@@ -396,8 +389,8 @@ class UnderwritingParser(Parser):
         self.logger(
             f'agg_out <-- builtin_agg agg_reins note', p)
         # print(p.builtin_agg)
-        self.out_dict[("agg", p.builtin_agg['name'])] = {**p.builtin_agg, **p.agg_reins, 'note': p.note}
-        return p.builtin_agg['name']
+        # self.out_dict[("agg", p.builtin_agg['name'])] =
+        return 'agg', p.builtin_agg['name'],  {**p.builtin_agg, **p.agg_reins, 'note': p.note}
 
     # building severities ======================================
     # difference from sev_clause (below) is sev_out has a name
@@ -407,8 +400,8 @@ class UnderwritingParser(Parser):
             f'sev_out <-- sev name sev note ', p)
         p.sev['name'] = p.name
         p.sev['note'] = p.note
-        self.out_dict[("sev", p.name)] = p.sev
-        return p.name
+        # self.out_dict[("sev", p.name)] = p.sev
+        return 'sev', p.name, p.sev
 
     @_('SEV name dsev note')
     def sev_out(self, p):
@@ -416,8 +409,8 @@ class UnderwritingParser(Parser):
             f'sev_out <-- sev name dsev note ', p)
         p.dsev['name'] = p.name
         p.dsev['note'] = p.note
-        self.out_dict[("sev", p.name)] = p.dsev
-        return p.name
+        # self.out_dict[("sev", p.name)] = p.dsev
+        return 'sev', p.name, p.dsev
 
     # frequency term ===========================================
     # for all frequency distributions claim count is determined by exposure / severity
@@ -1080,9 +1073,7 @@ References
     # finally add the language words
     # this is a bit manual, but these shouldnt change much...
     # lang_words = '\n\nlanguage words go here\n\n'
-    lang_words = '''
-    
-FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
+    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
 

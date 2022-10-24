@@ -2,13 +2,14 @@
 
 import sys
 import aggregate as agg
-from aggregate import build, debug_build
+from aggregate import build, dbuild
 from aggregate.utilities import make_ceder_netter
 from examples import case_studies as cs
 
 from numpy import exp
 from scipy.interpolate import interp1d
 
+debug_build = dbuild
 
 # ISSUES =================================================================
 # The million issues with matplotlib fonts!!!!

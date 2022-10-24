@@ -428,9 +428,9 @@ class Distortion(object):
 
         # tidy up
         for ax in axiter0:
-            f.delaxes(ax)
+            f0.delaxes(ax)
         for ax in axiter1:
-            f.delaxes(ax)
+            f1.delaxes(ax)
 
         f0.suptitle('Example Distortion Functions - Linear Scale')
         f1.suptitle('Example Distortion Functions - Return Scale')

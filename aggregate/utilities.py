@@ -1496,7 +1496,7 @@ def log_test():
     print('...done')
 
 
-def logger_level(level=30, name='aggregate', show=False):
+def logger_level(level=30, name='aggregate', verbose=False):
     """
     Code from common.py
 
@@ -1527,7 +1527,7 @@ def logger_level(level=30, name='aggregate', show=False):
         for logger in loggers:
             if logger.name.find(name) >= 0:
                 logger.setLevel(level)
-        if show:
+        if verbose:
             for logger in loggers:
                 print(logger.name, logger.getEffectiveLevel())
     except ValueError as e:

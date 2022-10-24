@@ -3137,17 +3137,17 @@ class Severity(ss.rv_continuous):
 
         return ex1a, ex2a, ex3a
 
-    def update(self, log2=0, bs=0, **kwargs):
-        """
-        This is a convenience function so that update can be called on any kind of object.
-        It has no effect.
-
-        :param log2:
-        :param bs:
-        :param kwargs:
-        :return:
-        """
-        pass
+    # def update(self, log2=0, bs=0, **kwargs):
+    #     """
+    #     This is a convenience function so that update can be called on any kind of object.
+    #     It has no effect.
+    #
+    #     :param log2:
+    #     :param bs:
+    #     :param kwargs:
+    #     :return:
+    #     """
+    #     pass
 
     def plot(self, N=100, figsize=(12, 3)):
         """

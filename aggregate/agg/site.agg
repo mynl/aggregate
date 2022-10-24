@@ -29,18 +29,18 @@ agg PersAuto      5676073.30         claims 3e6 xs 0   sev lognorm  50000 cv 7.0
 agg CommAuto      5676073.30         claims            sev lognorm  30000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
 
 port BODOFF1 note{Bodoff Thought Experiment No. 1}
-    agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
-    agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+    agg wind.1  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
+    agg quake.1 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
 
 port BODOFF2 note{Bodoff Thought Experiment No. 2}
-    agg wind  1 claim sev dhistogram xps [0,  50] [0.80, 0.20] fixed
-    agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+    agg wind.2  1 claim sev dhistogram xps [0,  50] [0.80, 0.20] fixed
+    agg quake.2 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
 
 port BODOFF3 note{Bodoff Thought Experiment No. 3}
-    agg wind  1 claim sev dhistogram xps [0,   5] [0.80, 0.20] fixed
-    agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+    agg wind.3  1 claim sev dhistogram xps [0,   5] [0.80, 0.20] fixed
+    agg quake.3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
 port BODOFF4 note{Bodoff Thought Experiment No. 4 (check!)}
     agg a 0.25 claims sev   4 * expon poisson

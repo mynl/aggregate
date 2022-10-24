@@ -59,7 +59,7 @@ def get_fmts(df):
     return fmts
 
 
-def tidy_agg_program(txt):
+def pprint(txt):
     """
     guess a nice format for an agg program
 

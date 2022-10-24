@@ -32,22 +32,24 @@ class Underwriter(object):
 
     """
 
-    def __init__(self, databases=None, update=False, log2=10, debug=False, create_all=False):
+    def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False, create_all=False):
         """
-        Here is doc for init.
+        Create underwriter object.
 
-        :param dir_name:
-        :param name:
-        :param databases: if None: nothing loaded; if 'default' or 'default' in databases load the installed
-        databases; if 'site' or site in databases, load all site databases (home() / agg, which
-        is created it it does not exist); other entires treated as db names in home() / agg are then loaded.
-        Databases not in site directory must be fully qualified path names.
-        :param update:
-        :param log2:
+        :param name: Name of the underwriter object. Default is named after Rory Cline, the best
+        underwriter I know.
+        :param databases: if None: nothing loaded; if 'default' (installed) or 'site' (user,
+        in ~/aggregate/databases) database *.agg files in default or site directory are loaded.
+        If 'all' both default and site databases loaded. A string refers to a single database;
+        an interable of strings is also valid. See `read_database` for search path.
+        :param update: If True objects are updated after being created.
+        :param log2: Default log2 value.
         :param debug: run parser in debug mode
-        :param create_all: by default write only creates portfolios.
+        :param create_all: False write only creates Portfolio objects; True creates Aggregate objects
+        that are within Portfolios.
         """
 
+        self.name = name
         self.update = update
         if log2 <= 0:
             raise ValueError('log2 must be > 0. The number of buckets used equals 2**log2.')
@@ -63,14 +65,16 @@ class Underwriter(object):
             databases = ['default', 'site']
         elif type(databases) == str:
             databases = [databases]
+        # default_dir is installed by pip and contain installation files
         default_dir = Path(__file__).parent / 'agg'
-        site_dir = Path.home() / 'aggregate'
+        # site dir is in Users's home directory and stores their files
+        site_dir = Path.home() / 'aggregate/databases'
 
-        # TODO Useful?
-        self.dir_name = site_dir
-        if self.dir_name.exists() is False:
-            # check site dir exists
-            self.dir_name.mkdir(parents=True, exist_ok=True)
+        self.site_dir = site_dir
+        # check site dir exists
+        self.site_dir.mkdir(parents=True, exist_ok=True)
+
+        self.default_dir = default_dir
 
         # make sure all database entries are stored:
         if databases is None:
@@ -78,33 +82,57 @@ class Underwriter(object):
             databases = []
 
         if 'default' in databases:
+            # add all databases in default_dir
             databases.remove('default')
             for fn in default_dir.glob('*.agg'):
-                self._read_db(fn)
+                self.read_database(fn)
 
         if 'site' in databases:
+            # add all user databases
             databases.remove('site')
             databases += list(site_dir.glob('*.agg'))
 
         for fn in databases:
-            if Path(fn).exists():
-                self._read_db(fn)
-            elif (site_dir / fn).exists():
-                self._read_db(site_dir / fn)
-            else:
-                logger.warning(f'Database {fn} not found. Ignoring.')
+            self.read_database(fn)
 
         self.create_all = create_all
 
-    def _read_db(self, db_path):
-        if not isinstance(db_path, Path):
-            db_path = Path(db_path)
+    def read_database(self, fn):
+        """
+        read database of curves, aggs and portfolios. These can live in the default directory
+        that is part of the instalation or ~/aggregate/
+
+        fn can be a string filename, with or without extension. A .agg extension is
+        added if there is no suffix. Search path:
+
+        * in the current dir
+        * in site_dir (user)
+        * in default_dir (installation)
+
+        :param fn: database file name
+
+        """
+
+        p = Path(fn)
+        if p.suffix == '':
+            p = p.with_suffix('.agg')
+        if p.exists():
+            db_path = p
+        elif (self.site_dir / p).exists():
+            db_path = self.site_dir / fn
+        elif (self.default_dir / p).exists():
+            db_path = self.default_dir / p
+        else:
+            logger.error(f'Database {fn} not found. Ignoring.')
+
         try:
-            program = db_path.read_test(encoding='utf-8')
-        except FileNotFoundError:
-            logger.warning(f'Requested database {db_path.name} not found. Ignoring.')
+            program = db_path.read_text(encoding='utf-8')
+        except:
+            logger.error(f'Error reading requested database {db_path.name}. Ignoring.')
+
         # read in, parse, save to sev/agg/port dictionaries
         self.interpret_program(program)
+        logger.info(f'Database {fn} read into knowledge.')
 
     def __getitem__(self, item):
         """
@@ -143,16 +171,19 @@ class Underwriter(object):
                 raise KeyError(f'{len(rows)}>1 objects matching {item} found.')
 
     def _repr_html_(self):
-        s = [f'<h1>Underwriter Knowledge</h1>',
-             f'The underwriter knowledge contains {len(self._knowledge)} items.'
-             '<br>',
-             self.knowledge.to_html(),
-             f'<h3>Settings</h3>']
-        # s.append(', '.join([f'{n} ({k})' for (k, n), v in
-        #                     sorted(self._knowledge.items())]))
+        s = [f'<p><strong>Underwriter {self.name}: </strong></p>',
+             f'Underwriter knowledge contains {len(self._knowledge)} aggregates and porfolios. '
+             '<p>'
+             'Run <code>build.knowledge</code> for more details on each object and '
+             '<code>build.programs</code> for a program listing.' 
+             '</p>'
+             # '<br>',
+             # self.knowledge.to_html(),
+             f'<p>Settings: '
+             ]
         for k in ['log2', 'update', 'create_all', 'debug']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
-        return '\n'.join(s)
+        return '\n'.join(s) + '</p>'
 
     def factory(self, kind, name, spec, program):
         """
@@ -183,67 +214,80 @@ class Underwriter(object):
         return obj
 
     @property
-    def knowledge(self):
+    def programs(self):
         """
         Return the knowledge as a nice dataframe
 
         :return:
         """
-        return self._knowledge[['program']].style.set_table_styles([
+        bit = self._knowledge[['program']]
+        bit['note'] = [s['note'] for s in self._knowledge.spec]
+        bit['clean program']= bit.program.str.replace(r'note\{[^}]*\}|[ ]{2,}|\t+', ' ')
+        bit = bit.sort_index(ascending=[False, True])
+        bit = bit.reset_index(0, drop=False)
+        bit = bit[['kind', 'note', 'clean program']].query('`clean program` != ""')
+        bit = bit[['kind', 'note', 'clean program']]
+        with pd.option_context('display.multi_sparse', False):
+            # which seems to be ignored?
+            sbit = bit.style.set_table_styles([
             {
                 'selector': 'td',
                 'props': 'text-align: left'},
             {
                 'selector': 'th.col_heading',
-                'props': 'text-align: center;'
+                'props': 'text-align: left;'
             },
             {
                 'selector': '.row_heading',
                 'props': 'text-align: left;'
             }
         ])
+        return sbit
 
-    def list(self):
+    @property
+    def knowledge(self):
         """
-        List summary of the knowledge
+        More informative version of knowledge showing the agg programs. Only Aggregates that have a program.
+
+        TODO Add severities
 
         :return:
         """
-        raise NotImplementedError('NYI')
-        return
-        # sers = dict()
-        # for k in Underwriter.data_types:
-        #     # d = sorted(list(self.__getattribute__(k).keys()))
-        #     d = sorted(list(getattr(self, k).keys()))
-        #     sers[k.title()] = pd.Series(d, index=range(len(d)), name=k)
-        # df = pd.DataFrame(data=sers)
-        # df = df.fillna('')
-        # return df
+        from IPython.display import HTML
 
-    def describe(self, kinds=None):
-        """
-        More informative version of list including notes.
+        kinds = ['agg', 'port']
 
-        TODO: enhance!
+        if 'port' in kinds:
+            cols = ['Name', 'Type', 'Agg1', 'Agg2', 'Agg3', 'Notes']
+            df_port = pd.DataFrame(columns=cols)
+            df_port = df_port.set_index('Name')
+            for (kind, name), (spec, program) in self._knowledge.xs('port', axis=0, level=0, drop_level=False).iterrows():
+                aggs = spec['spec'][:3] # the list of agg items
+                if len(aggs) == 1:
+                    aggs.extend(['', ''])
+                elif len(aggs) == 2:
+                    aggs.extend([''])
+                note = spec['note']
+                df_port.loc[name, :] = [kind] + aggs + [note]
+            df_port = df_port.sort_index()
+            display(HTML('<h3>Known Portfolios</h3>'))
+            display(df_port)
 
-        :return:
-        """
-
-        cols = ['Name', 'Type', 'Severity', 'ESev', 'Sev_a', 'Sev_b', 'EN', 'Freq_a', 'ELoss', 'Notes']
-        # what they are actually called
-        cols_agg = ['sev_name', 'sev_mean', 'sev_a', 'sev_b', 'exp_en', 'freq_a', 'exp_el', 'note']
-        defaults = ['', 0, np.nan, 0, 0, 0, 0, '']
-        df = pd.DataFrame(columns=cols)
-        df = df.set_index('Name')
-
-        for (kind, name), (spec, program) in self._knowledge.iterrows():
-            pass
-            # for obj_name, obj_values in getattr(self, item_type).items():
-            #     data_fields = [obj_values.get(c, d) for c, d in zip(cols_agg, defaults)]
-            #     df.loc[obj_name, :] = [item_type] + data_fields
-        return None
-        # df = df.fillna('')
-        # return df
+        if 'agg' in kinds:
+            cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev',  'SevCV', 'Sev_a', 'Sev_b', 'Freq',      'EN',     'Freq_a',  'Notes']
+            # what they are actually called
+            cols_agg =          ['exp_el', 'sev_name', 'sev_mean', 'sev_cv', 'sev_a', 'sev_b', 'freq_name', 'exp_en', 'freq_a', 'note']
+            df_agg = pd.DataFrame(columns=cols)
+            df_agg = df_agg.set_index('Name')
+            for (kind, name), (spec, program) in self._knowledge.xs('agg', axis=0, level=0, drop_level=False).iterrows():
+                if program != '':
+                    # if no program then it is part of a Portfolio; don't want to replicate here
+                    df_agg.loc[name, :] = [kind] + [spec.get(f, '') for f in cols_agg]
+            df_agg = df_agg.sort_index()
+            df_agg['ELoss'] = np.where(df_agg.ELoss == '', df_agg.ESev.replace('', 0) * df_agg.EN.replace('', 0), df_agg.ELoss)
+            df_agg = df_agg.drop(columns='Sev_b')
+            display(HTML('<h3>Known Aggregates</h3>'))
+            display(df_agg)
 
     def write(self, portfolio_program, log2=0, bs=0, create_all=None, update=None, **kwargs):
         """
@@ -709,5 +753,5 @@ class Underwriter(object):
 
 
 # exported instance
-build = Underwriter(create_all=False, update=True, debug=False, log2=16)
-debug_build = Underwriter(create_all=False, update=True, debug=True, log2=13)
+build = Underwriter(databases='examples', create_all=False, update=True, debug=False, log2=16)
+dbuild = Underwriter(name='Debug', create_all=False, update=True, debug=True, log2=13)

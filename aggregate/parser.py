@@ -27,7 +27,7 @@
 # Zero parameter severities did not work. YOu must enter at least one parameter, but it is ignored.
 #
 # Calculator is more bother than it is worth... keep exp, ** and /, but drop everything else (use f strings!)
-# Result has SR conflicts but it parses all the test programs 
+# Result has SR conflicts but it parses all the test programs
 
 from sly import Lexer, Parser
 import sly
@@ -92,8 +92,6 @@ class UnderwritingLexer(Lexer):
     DIVIDE = '/'
     PERCENT = '%'
     HOMOG_MULTIPLY = '@'
-    # SCALE_MULTIPLY = '@'
-    # LOCATION_ADD = '#'
     EQUAL_WEIGHT = '='
     RANGE = ':'
 
@@ -198,8 +196,9 @@ class UnderwritingParser(Parser):
     precedence = (
         # LOW is used to force shift in rules like expr <- sum or expr <- sum + expr, and empty rules
         ('nonassoc', LOW),
-        ('nonassoc', LOCATION_ADD),
-        ('nonassoc', SCALE_MULTIPLY, HOMOG_MULTIPLY),
+        # ('nonassoc', LOCATION_ADD),
+        # ('nonassoc', SCALE_MULTIPLY, HOMOG_MULTIPLY),
+        ('nonassoc', HOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
         ('left', TIMES, DIVIDE),
         ('right', EXP),
@@ -337,10 +336,10 @@ class UnderwritingParser(Parser):
                                          **p.occ_reins, **p.agg_reins, 'note': p.note}
         return p.name
 
-    @_('AGG name TWEEDIE expr expr expr')
+    @_('AGG name TWEEDIE expr expr expr note')
     def agg_out(self, p):
-        self.logger('agg_out <-- AGG name TWEEDIE expr expr expr', p)
-        # Tweedie distribution in p, mean, sigma^2 format
+        self.logger('agg_out <-- AGG name TWEEDIE expr expr expr note', p)
+        # Tweedie distribution in mean, p, sigma^2 (dispersion) format (MUST be mean first!!)
         # variance function is sigma^2 mean^p
         # phi = sigma^2 in Jorgenson p. 127 notation
         # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
@@ -348,10 +347,10 @@ class UnderwritingParser(Parser):
         # beta = lambda alpha / mu
 
         from .utilities import tweedie_convert
-        pp = p[3]
-        mu = p[4]
+        mu = p[3]
+        pp = p[4]
         sig2 = p[5]
-        ans = tweedie_convert(pp, mu, sig2)
+        ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
         alpha = ans['α']
         lam = ans['λ']
         beta = ans['β']
@@ -562,7 +561,7 @@ class UnderwritingParser(Parser):
         p.sev['sev_conditional'] = False
         return p.sev
 
-    @_('sev PLUS numbers %prec LOCATION_ADD', 'sev MINUS numbers %prec LOCATION_ADD')
+    @_('sev PLUS numbers', 'sev MINUS numbers')
     def sev(self, p):
         self.logger(f'sev <-- sev {p[1]} numbers', p)
         p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
@@ -572,9 +571,9 @@ class UnderwritingParser(Parser):
         p.sev['sev_loc'] += sign * p.numbers
         return p.sev
 
-    @_('numbers TIMES sev %prec SCALE_MULTIPLY')
+    @_('numbers TIMES sev')
     def sev(self, p):
-        self.logger(f'sev <-- numbers TIMES sev %prec SCALE_MULTIPLY', p)
+        self.logger(f'sev <-- numbers TIMES sev', p)
         p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
         if 'sev_mean' in p.sev:
             p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(
@@ -595,13 +594,14 @@ class UnderwritingParser(Parser):
             p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
                 p.sev['sev_loc'])
             p.sev['sev_loc'] *= p.numbers
+        # logger.error(str(p.sev))
         return p.sev
 
     @_('ids numbers CV numbers weights')
     def sev(self, p):
         self.logger(
             f'sev <-- ids numbers CV numbers weights', p)
-        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_wt': p.weights}
+        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_scale': 1.0, 'sev_wt': p.weights}
 
     @_('ids numbers numbers weights')
     def sev(self, p):
@@ -809,7 +809,7 @@ class UnderwritingParser(Parser):
         :param p:
         :return:
         """
-        self.logger('builtin_agg <-- builtin_agg LOCATION_ADD expr', p)
+        self.logger('builtin_agg <-- builtin_agg PLUS expr', p)
         # bid = built_in_dict, want to be careful not to add scale too much
         bid = p.builtin_agg
         bid['name'] += '_shifted'

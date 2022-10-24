@@ -472,22 +472,27 @@ class Aggregate(Frequency):
     @property
     def density_df(self):
         """
-        Create and return the _density_df data frame. A
-        read only property, though if you write d = a.density_df you can obviously edit d.
-        :return:
+        Create and return the density_df data frame. A read only property, though if you write d = a.density_df you
+        can obviously edit d. Some duplication of columns (p and p_total) to ensure consistency with Portfolio.
+
+        :return: DataFrame similar to Portfolio.density_df.
+
         """
         if self._density_df is None:
             # really should have one of these anyway...
             if self.agg_density is None:
                 raise ValueError('Update Aggregate before asking for density_df')
+
             # really convenient to have p=p_total to be consistent with Portfolio objects
             self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_total=self.agg_density,
                                                  p_sev=self.sev_density))
-            # remove the fuzz
-            eps = 2.5e-16
+            # remove the fuzz, same method as Portfolio.remove_fuzz
+            eps = np.finfo(np.float).eps
             # may not have a severity, remember...
             self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
                 self._density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+
+            # reindex
             self._density_df = self._density_df.set_index('loss', drop=False)
             self._density_df['log_p'] = np.log(self._density_df.p)
             # when no sev this causes a problem
@@ -495,12 +500,22 @@ class Aggregate(Frequency):
                 self._density_df['log_p_sev'] = np.nan
             else:
                 self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
+
+            # generally acceptable for F, by construction
             self._density_df['F'] = self._density_df.p.cumsum()
             self._density_df['F_sev'] = self._density_df.p_sev.cumsum()
-            # remember...better way to compute
-            self._density_df['S'] = self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
-            self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=0)[::-1].cumsum()
-            # add LEV,   TVaR to each threshold point...
+
+            # S is more difficult. Can use 1-F or reverse cumsum pf p. Former is accurate on the
+            # left, latter more accurate in the right tail. For lev and similar calcs, care about
+            # the left (int of S). Upshot: need to pick the fill value carefully. Here is what
+            # Portfolio does
+            # fill_value = min(self._density_df.p_total.iloc[-1], max(0, 1. - (self._density_df.F.iloc[-1])))
+            fill_value = max(0, 1. - (self._density_df.F.iloc[-1]))
+            self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
+            fill_value = max(0, 1. - (self._density_df.F_sev.iloc[-1]))
+            self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=fill_value)[::-1].cumsum()
+
+            # add LEV, TVaR to each threshold point...
             self._density_df['lev'] = self._density_df.S.shift(1, fill_value=0).cumsum() * self.bs
             self._density_df['exa'] = self._density_df['lev']
             self._density_df['exlea'] = \
@@ -782,7 +797,9 @@ class Aggregate(Frequency):
         self.agg_ceded_density = None
         self.agg_net_density = None
         self.agg_gross_density = None
-
+        self.sev_calc = ""
+        self.discretization_calc = ""
+        self.normalize = ""
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
@@ -949,24 +966,36 @@ class Aggregate(Frequency):
 
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
-        Continuous is used when you think of the resulting distribution as continuous across the buckets
-        (which we generally don't). We use the discretized distribution as though it is fully discrete
-        and only takes values at the bucket points. Hence we should use sev_calc='discrete'. The buckets are
-        shifted left by half a bucket, so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2)`.
+        Discretize the severity distributions and weight.
 
-        The other wrinkle is the right hand end of the range. If we extend to np.inf then we ensure we have
+        `sev_calc='continuous'` is used when you think of the resulting distribution as continuous across the buckets
+        (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X <= b_i)`.
+        Note that :math:`b_{i-1}=-bs/2` is prepended.
+
+        We use the discretized distribution as though it is fully discrete and only takes values at the bucket
+        points. Hence, we should use `sev_calc='discrete'`. The buckets are shifted left by half a bucket,
+        so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2)`.
+
+        The other wrinkle is the righthand end of the range. If we extend to np.inf then we ensure we have
         probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
-        is often not desirable (we expect to see a smooth continuous distribution and we get a mass). The
+        is often not desirable (we expect to see a smooth continuous distribution, and we get a mass). The
         other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
-        the probabilities short. We opt here for the latter and rescale.
+        the probabilities short. We opt here for the latter and normalize (rescale).
 
-        Sensible defaults: discrete sev_calc, survival method, normalize True.
+        `discretization_calc` controls whether individual probabilities are computed using backward-differences of
+        the survival function or forward differences of the distribution function, or both. The former is most
+        accurate in the right-tail and the latter for the left-tail of the distribution. We are usually concerned
+        with the right-tail, so prefer `survival`. Using `both` takes the greater of the two esimates giving the best
+        of both worlds (underflow makes distribution zero in the right-tail and survival zero in the left tail,
+        so the maximum gives the best estimate) at the expense of computing time.
+
+        Sensible defaults: sev_calc=discrete, discretization_calc=survival, normalize=True.
 
         :param sev_calc:  continuous or discrete or raw (for...);
                and method becomes discrete otherwise
         :param discretization_calc:  survival, distribution or both; in addition
                the method then becomes survival
-        :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
+        :param normalize: if True, normalize the severity so sum probs = 1. This is generally what you want; but
                when dealing with thick tailed distributions it can be helpful to turn it off.
         :return:
         """
@@ -976,12 +1005,13 @@ class Aggregate(Frequency):
         elif sev_calc == 'discrete':
             # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
             # mass at the end undesirable. can be put in with reinsurance layer in spec
+            # note the first bucket is negative
             adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
         elif sev_calc == 'raw':
             adj_xs = self.xs
         else:
             raise ValueError(
-                f'Invalid parameter {sev_calc} passed to discretize; options are raw, discrete, continuous, inf or double.')
+                f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
 
         # bed = bucketed empirical distribution
         beds = []
@@ -1042,33 +1072,33 @@ class Aggregate(Frequency):
     def update_work(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
                discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
-        Compute the aggregate density.
+        Compute a discrete approximation to the aggregate density.
 
-        * Pre-0.9.3....does not have reinsurance features.
-        * 0.9.3 removed verbose option: it just makes plots you can get with .plot
-        * 0.9.3: multi-way switch force_severity: if "yes" then update exists after sev comp (eg for plot).
-          else if True create severity and perform an update.
+        See discretize for sev_calc, discretization_calc and normalize.
+
 
         Quick simple test with log2=13 update took 5.69 ms and _eff took 2.11 ms. So quicker
         but not an issue unless you are doing many buckets or aggs.
 
-        :param xs:  range of x values used to discretize
+        :param xs: range of x values used to discretize
         :param padding: for FFT calculation
         :param tilt_vector: tilt_vector = np.exp(self.tilt_amount * np.arange(N)), N=2**log2, and
                tilt_amount * N < 20 recommended
-        :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
-               sgamma apply shifted lognormal or shifted gamma approximations.
-        :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
+        :param approximation: 'exact' = perform frequency / severity convolution using FFTs.
+               'slognorm' or 'sgamma' use a shifted lognormal or shifted gamma approximation.
+        :param sev_calc: `discrete` = suitable for fft, `continuous` = for rv_histogram cts version. Only
+               use discrete unless you know what you are doing!
         :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
         :param normalize: normalize severity to 1.0
         :param force_severity: make severities even if using approximation, for plotting
-        :param verbose: make partial plots and return details of all moments by limit profile or
-               severity mixture component.
+        :param debug: run reinsurance in debug model if True.
         :return:
         """
         self._density_df = None  # invalidate
         self._linear_quantile_function = None
-
+        self.sev_calc = sev_calc
+        self.discretization_calc = discretization_calc
+        self.normalize = normalize
         self.xs = xs
         self.bs = xs[1]
         # WHOA! WTF
@@ -1109,9 +1139,17 @@ class Aggregate(Frequency):
             else:
                 # usual calculation...this is where the magic happens!
                 # have already dealt with per occ reinsurance
+                # don't loose accuracy and time by going through this step if freq is fixed 1
+                # these are needed when agg is part of a portfolio
                 z = ft(self.sev_density, padding, tilt_vector)
                 self.ftagg_density = self.mgf(self.n, z)
-                self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+                if np.sum(self.en) == 1 and self.freq_name == 'fixed':
+                    logger.info('FIXED 1: skipping FFT calcul                                                                                                              ation')
+                    # copy to be safe
+                    self.agg_density = self.sev_density.copy()
+                else:
+                    # logger.info('Performing fft convolution')
+                    self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
 
                 # NOW have to apply agg reinsurance to this line
                 self.apply_agg_reins(debug)
@@ -2744,7 +2782,8 @@ class Severity(ss.rv_continuous):
                 v = m * m * sev_cv * sev_cv
                 sev_a = m * (m * (1 - m) / v - 1)
                 sev_b = (1 - m) * (m * (1 - m) / v - 1)
-                self.fx = ss.beta(sev_a, sev_b, loc=0, scale=sev_scale)
+                # logger.error(f'{sev_mean}, {sev_cv}, {sev_scale}, {m}, {v}, {sev_a}, {sev_b}')
+                self.fz = ss.beta(sev_a, sev_b, loc=0, scale=sev_scale)
             else:
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
@@ -2756,7 +2795,7 @@ class Severity(ss.rv_continuous):
             elif np.isnan(sev_a):
                 raise ValueError('sev_a not set and sev_cv=0 is invalid, no way to determine shape.')
             # have sev_a, now assemble distribution
-            if sev_scale == 0 and sev_mean > 0:
+            if sev_mean > 0:
                 logger.log(31, f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
             elif sev_scale > 0 and sev_mean==0:

@@ -4,6 +4,7 @@
 """
 
 import collections
+from collections import namedtuple
 from copy import deepcopy
 import json
 import logging
@@ -32,7 +33,7 @@ from .utilities import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    make_mosaic_figure, friendly, iman_conover
+    make_mosaic_figure, iman_conover
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -1892,12 +1893,14 @@ class Portfolio(object):
             bit = bit.iloc[:, [2,0,1]]
         bit.plot(ax=ax, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Density')
+        ax.legend()
 
         ax = axd['B']
         xl = self.limits(kind='log')
         yl = self.limits(stat='logy')
         bit.plot(ax=ax, logy=True, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Log density')
+        ax.legend().set(visible=False)
 
         # ax = axd['C']
         # self.density_df.filter(regex='p_[a-zA-Z]')[::-1].cumsum().plot(ax=ax, xlim=xl, logy=True)
@@ -2242,6 +2245,7 @@ class Portfolio(object):
         #                          max(0, 1. - (df.p_total.sum())))))
         # which was ugly and not quite right because the it ended  ... pn plast  vs  pn+plast, plast
         # Dec 2020
+        # TODO: fix and rationalize with Aggregate.density_df; this can't be right, can it? Fill value is just S(last point)
         df['S'] =  \
             df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
 
@@ -3707,37 +3711,33 @@ class Portfolio(object):
         temp.drop(columns=['BEST', 'WORST'])
         return Answer(gamma_df=temp.sort_index(axis=1), base=self.name, assets=a, p=p, kind=kind)
 
-    def price(self, p, kind, g, mass_hints=None, efficient=True):
+    def price(self, p, g, kind='var', mass_hints=None, efficient=True):
         """
         Price using regulatory and pricing g functions
-            Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
-            the regulatory distortion
 
-            regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
+        Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
+        the regulatory distortion derived from p. p can be input as a probability level converted
+        to assets using `kind`, a level of assets directly (snapped to index).
 
-            * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
-            * if input > 1 it is a directly input  capital number
-            * d dictionary: Distortion; spec { name = dist name | var | epd, shape=p value a distortion used directly
+        Regulatory capital distortion is applied on unlimited basis.
 
-            ``pricing_g`` is  { name = ph|wang and shape= or lr= or roe= }, if shape and lr or roe shape is overwritten
-
-            if ly it must include ro in spec
-
-            if lr and roe then lr is used
-
-
+        ``g`` is a dictionary that creates a distortion or the dictionary `{ 'name': distortion_name, 'lr'|'roe':}`.
+        The function then calls calibrate distortion to figure the distortion.
 
         :param p: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
-        :param kind: var lower upper tvar epd
-        :param g:  pricing distortion function
+        :param g:  pricing distortion function or dictionary spec or dictionary with distortion name, and lr or roe.
+        :param kind: var (default), upper var, tvar, epd; passed to `var_dict`
         :param mass_hints: mass hints for distortions with a mass, pd.Series indexed by line names
         :param efficient: for apply_distortion
-        :return:
+        :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
 
         # figure regulatory assets; applied to unlimited losses
-        vd = self.var_dict(p, kind, snap=True)
-        a_reg = vd['total']
+        if p > 1:
+            a_reg = self.snap(p)
+        else:
+            vd = self.var_dict(p, kind, snap=True)
+            a_reg = vd['total']
 
         # relevant row for all statistics_df
         row = self.density_df.loc[a_reg]
@@ -3746,7 +3746,7 @@ class Portfolio(object):
         if isinstance(g, Distortion):
             # just use it
             pass
-        else:
+        elif isinstance(g, dict):
             # spec as dict
             prem = 0
             if 'lr' in g:
@@ -3761,6 +3761,8 @@ class Portfolio(object):
                 g = self.calibrate_distortion(name=g['name'], premium_target=prem, assets=a_reg)
             else:
                 g = Distortion(**g)
+        else:
+            raise ValueError(f'Inadmissible type {type(g)} passed to price. Expected Distortion or dict.')
 
         ans_ad = self.apply_distortion(g, create_augmented=False, mass_hints=mass_hints, efficient=efficient)
         aug_row = ans_ad.augmented_df.loc[a_reg]
@@ -3777,8 +3779,13 @@ class Portfolio(object):
         df['LR'] = df.L / df.P
         df['PQ'] = df.P / df.Q
         df['ROE'] = df.M / df.Q
+        price = df.loc['total', 'P']
+        reg_p = self.cdf(a_reg)
 
-        return Answer(pricing_df=df, dist=g)
+        PricingResult = namedtuple('PricingResult', ['price', 'assets', 'reg_p', 'distortion', 'df'])
+        ans = PricingResult(price, a_reg, reg_p, g, df)
+
+        return ans
 
     def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None,
                             regex='', add_comps=True):

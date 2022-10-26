@@ -59,23 +59,36 @@ def get_fmts(df):
     return fmts
 
 
-def pprint(txt):
+def pprint(txt, split=0, html=False, tacit=False):
     """
-    guess a nice format for an agg program
+    Try to format an agg program. This is impractical now - dfreq and dsev, optional
+    reinsurance, etc. Go for a simple approach of removing unnecessary spacing
+    and removing notes. Notes can be accessed from the spec that is always to hand.
+
+    For long programs use split=60 or so, they are split at appropriate points.
 
     :param txt: program text input
-
+    :param tacit: if True pp is silent, else it outputs.
     """
-    bits = re.split(r'(agg|sev|mixed|poisson|fixed)', txt)
-    clean = [re.sub(r'[ ]+', ' ', i.strip()) for i in bits]
-    sio = StringIO()
-    sio.write(clean[0])
-    for agg, exp, sev, sevd, fs, freq in zip(*[clean[i::6] for i in range(1, 7)]):
-        nm, *rest = exp.split(' ')
-        sio.write(f'\n\t{agg} {nm:^12s} {float(rest[0]):8.1f} {" ".join(rest[1:]):^20s} '
-                  f'{sev} {sevd:^25s} {fs:>8s}   {freq}')
-    return sio.getvalue()
-
+    ans = []
+    for t in txt.split('\n'):
+        clean = re.sub(r'[ \t]+', ' ', t.strip())
+        clean = re.sub(r' note.*$', '', clean)
+        if split > 0 and len(clean) > split:
+            clean = re.sub(r'(sev|occurrence|aggregate|mixed)', r'\n\t\1', clean)
+            s = clean.split(' ')
+            clean = ' '.join(s[:2]) + '\n\t' + ' '.join(s[2:])
+        ans.append(clean)
+    ans = '\n'.join(ans)
+    if html is True:
+        ans = f'<code>{ans}\n</code>'
+    if tacit is False and html is True:
+        display(HTML(ans))
+    elif tacit is False:
+        print(ans)
+        return
+    if tacit is True:
+        return ans
 
 # moment utility functions
 def ft(z, padding, tilt):
@@ -1023,7 +1036,8 @@ def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=N
     parameters are computed and returned in pandas Series.
 
     p, μ, σ2 are the reproductive parameters, μ is the mean and the variance equals σ2 μ^p
-    λ, α, β are the additive parameters; λα/β is the mean, λα(α + 1) / β^2 is the variance
+    λ, α, β are the additive parameters; λαβ is the mean, λα(α + 1) β^2 is the variance
+    (α is the gamma shape and β is the scale).
     λ, m, cv specify the compound Poisson with expected claim count λ and gamma with mean m and cv
 
     In addition, returns p0, the probability mass at 0.
@@ -1034,22 +1048,22 @@ def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=N
             # λ, m, cv spec directly as compound Poisson
             assert λ is not None and m is not None and cv is not None
             α = 1 / cv ** 2
-            β = α / m
+            β = m / α
         else:
             # λ, α, β in additive form
             assert λ is not None and α is not None and β is not None
-            m = α / β
+            m = α * β
             cv = α ** -0.5
         p = (2 + α) / (1 + α)
         μ = λ * m
-        σ2 = λ * α * (α + 1) / β ** 2 / μ ** p
+        σ2 = λ * α * (α + 1) * β ** 2 / μ ** p
     else:
         # p, μ, σ2 in reproductive form
         assert p is not None and μ is not None and σ2 is not None
         α = (2 - p) / (p - 1)
         λ = μ**(2-p) / ((2-p) * σ2)
-        β = λ * α / μ
-        m = α / β
+        β = μ / (λ * α)
+        m = α * β
         cv = α ** -0.5
 
     p0 = np.exp(-λ)
@@ -1429,6 +1443,7 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500):
 
 class Answer(dict):
     # TODO replace with collections.namedtuple? Or at least, stop using it!
+    # Maybe not, namedtuples are immutable
     def __init__(self, **kwargs):
         """
         Generic answer wrapping class with plotting
@@ -1442,7 +1457,6 @@ class Answer(dict):
 
     def __repr__(self):
         return str(self.list())
-        # return super().__repr__()
 
     def __str__(self):
         return self.list()
@@ -1450,7 +1464,10 @@ class Answer(dict):
     def list(self):
         """ List elements """
         return pd.DataFrame(zip(self.keys(),
-                                [self.nice(v) for v in self.values()]), columns=['Item', 'Type'])
+                                [self.nice(v) for v in self.values()]),
+                            columns=['Item', 'Type']).set_index('Item')
+
+    _repr_html_ = list
 
     def __str__(self):
         return '\n'.join([f'{i[0]:<20s}\t{i[1]}'
@@ -1496,6 +1513,32 @@ def log_test():
     print('...done')
 
 
+class LoggerManager():
+    def __init__(self, level, name='aggregate'):
+        """
+        Manage all the aggregate loggers: toggle levels
+        Put lm = LoggerManager(10) at the start of a function.
+        When it goes out of scope it puts the level back
+        where it was.
+
+        TODO: make work on a per logger basis!
+
+        """
+        self.level = level
+        self.loggers = [v for k, v in logging.root.manager.loggerDict.items()
+                        if k.find(name) >= 0 and v.getEffectiveLevel() != level]
+
+        if len(self.loggers) > 0:
+            self.base_level = self.loggers[0].getEffectiveLevel()
+            for l in self.loggers:
+                l.setLevel(level)
+
+    def __del__(self):
+        for l in self.loggers:
+            logger.info(f'Putting logger level back to {self.base_level} from {self.level}')
+            l.setLevel(self.base_level)
+
+
 def logger_level(level=30, name='aggregate', verbose=False):
     """
     Code from common.py
@@ -1516,7 +1559,8 @@ def logger_level(level=30, name='aggregate', verbose=False):
     """
 
     try:
-        logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s, %(funcName)s|  %(message)-s',
+        # logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
+        logging.basicConfig(format='line %(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
                             datefmt='%M:%S')
         loggers = [logging.getLogger()]  # get the root logger
         loggers = loggers + \

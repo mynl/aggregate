@@ -1127,7 +1127,7 @@ class Aggregate(Frequency):
 
         if approximation == 'exact':
             if self.n > 100:
-                logger.warning(f'Aggregate.update | warning, claim count {self.n} is high; consider an approximation ')
+                logger.warning(f'Claim count {self.n} is high; consider an approximation ')
 
             if self.n == 0:
                 # for dynamics it is helpful to have a zero risk return zero appropriately
@@ -1682,7 +1682,7 @@ class Aggregate(Frequency):
             df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
             df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
             axd['B'].set(xlim=[-mx / 25, mx + 1], title='Distribution functions')
-            axd['B'].legend()
+            axd['B'].legend().set(visible=False)
             if span > 0:
                 axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
 
@@ -1699,7 +1699,7 @@ class Aggregate(Frequency):
             df = df.loc[:idx]
             ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
             ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Quantile (Lee) plot')
-            ax.legend()
+            ax.legend().set(visible=False)
         else:
             # continuous
             df = self.density_df
@@ -2141,7 +2141,7 @@ class Aggregate(Frequency):
 
         Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb. ::
 
-            uw = agg.Underwriter(create_all=True)
+            uw = agg.Underwriter()
 
             def plot_eg_agg(b, e, w, n=32, axs=None, x_range=1):
                 '''
@@ -2791,15 +2791,15 @@ class Severity(ss.rv_continuous):
             # distributions with one shape parameter, which either comes from sev_a or sev_cv
             if np.isnan(sev_a) and sev_cv > 0:
                 sev_a, _ = self.cv_to_shape(sev_cv)
-                logger.log(31, f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')
+                logger.info(f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')
             elif np.isnan(sev_a):
                 raise ValueError('sev_a not set and sev_cv=0 is invalid, no way to determine shape.')
             # have sev_a, now assemble distribution
             if sev_mean > 0:
-                logger.log(31, f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
+                logger.info(f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
             elif sev_scale > 0 and sev_mean==0:
-                logger.log(31, f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
+                logger.info(f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
             else:

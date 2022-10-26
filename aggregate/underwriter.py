@@ -1,16 +1,22 @@
+# from collections import namedtuple
 import numpy as np
 import logging
 import pandas as pd
 from pathlib import Path
+import re
 # from inspect import signature
 
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import logger_level, round_bucket
+from .utilities import logger_level, round_bucket, Answer, LoggerManager
 
 logger = logging.getLogger(__name__)
+
+
+# rejected: immutable
+# WriteAnswer = namedtuple('WriteAnswer', ['kind', 'name', 'spec', 'program', 'object'])
 
 
 class Underwriter(object):
@@ -33,7 +39,7 @@ class Underwriter(object):
 
     """
 
-    def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False, create_all=False):
+    def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False):
         """
         Create underwriter object.
 
@@ -46,7 +52,6 @@ class Underwriter(object):
         :param update: If True objects are updated after being created.
         :param log2: Default log2 value.
         :param debug: run parser in debug mode
-        :param create_all: False write only creates Portfolio objects; True creates Aggregate objects
         that are within Portfolios.
         """
 
@@ -96,8 +101,6 @@ class Underwriter(object):
         for fn in databases:
             self.read_database(fn)
 
-        self.create_all = create_all
-
     def read_database(self, fn):
         """
         read database of curves, aggs and portfolios. These can live in the default directory
@@ -134,8 +137,11 @@ class Underwriter(object):
         else:
             # read in, parse, save to sev/agg/port dictionaries
             # throw away answer...not creating anything
+            logger.info(f'Reading database {fn}...')
+            n = len(self._knowledge)
             self.interpret_program(program)
-            logger.info(f'Database {fn} read into knowledge.')
+            n = len(self._knowledge) - n
+            logger.info(f'Database {fn} read into knowledge, adding {n} entries.')
 
     def __getitem__(self, item):
         """
@@ -168,48 +174,56 @@ class Underwriter(object):
             raise KeyError(f'getitem TypeError looking for {item}, {e}')
         else:
             if len(rows) == 1:
-                kind, name, spec, prog = rows.reset_index().iloc[0]
-                return kind, name, spec, prog
+                kind, name, spec, program = rows.reset_index().iloc[0]
+                return Answer(kind=kind, name=name, spec=spec, program=program, object=None)
             else:
-                raise KeyError(f'{len(rows)}>1 objects matching {item} found.')
+                raise KeyError(f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
 
     def _repr_html_(self):
-        s = [f'<p><strong>Underwriter {self.name}: </strong></p>',
-             f'Underwriter knowledge contains {len(self._knowledge)} aggregates and porfolios. '
-             '<p>'
-             'Run <code>build.knowledge</code> for more details on each object and '
-             '<code>build.programs</code> for a program listing.' 
+        s = [f'<p><h3>Underwriter {self.name}</h3>',
+             f'Knowledge contains {len(self._knowledge)} programs. '
+             'Run <code>build.list()</code> for a list. '
+             'Run <code>build.describe(kind)</code> for more details on objects of kind (port, '
+             'agg, sev, or distortion) and '
+             '<code>build.programs</code> for a program listing.'
              '</p>'
              # '<br>',
              # self.knowledge.to_html(),
              f'<p>Settings: '
              ]
-        for k in ['log2', 'update', 'create_all', 'debug']:
+        for k in ['log2', 'update', 'debug']:
             s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
         return '\n'.join(s) + '</p>'
 
-    def factory(self, kind, name, spec, program):
+    def factory(self, answer):
         """
         Create object of kind from spec, a dictionary.
         Creating from uw obviously needs the uw, so this is NOT a staticmethod!
 
-        :param kind:
-        :param name:
-        :param spec:
-        :return:
+        :param answer an Answer class with members kind, name, spec, and program
+        :return: creates answer.object
         """
+
+        kind, name, spec, program, obj = answer.values()
+
+        if obj is not None:
+            logger.error(f'Surprising: obj from Answer not None, type {type(obj)}. It will be overwritten.')
 
         if kind == 'agg':
             obj = Aggregate(**spec)
             obj.program = program
         elif kind == 'port':
-            # spec = list of aggs
-            agg_list = spec['spec']
+            # Portfolio expects name, agg_list, uw
+            # agg list is a list of spects that can be passed to Aggregate
+            # need to drop the 'agg', name before the spec that gets returned
+            # by the parser. Hence:
+            agg_list = [k for i, j, k in spec['spec']]
             obj = Portfolio(name, agg_list, uw=self)
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
-                logger.warning(f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
+                logger.warning(
+                    f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
                 obj = None
             else:
                 obj = Severity(**spec)
@@ -221,7 +235,10 @@ class Underwriter(object):
             obj.program = program
         else:
             ValueError(f'Cannot build {kind} objects')
-        return obj
+
+        # update the object
+        answer['object'] = obj
+        return answer
 
     @property
     def programs(self):
@@ -232,31 +249,22 @@ class Underwriter(object):
         """
         bit = self._knowledge[['program']]
         bit['note'] = [s['note'] for s in self._knowledge.spec]
-        bit['clean program']= bit.program.str.replace(r'note\{[^}]*\}|[ ]{2,}|\t+', ' ')
+        bit['clean program'] = bit.program.str.replace(r'note\{[^}]*\}|[ ]{2,}|\t+', ' ')
         bit = bit.sort_index(ascending=[False, True])
         bit = bit.reset_index(0, drop=False)
         bit = bit[['kind', 'note', 'clean program']].query('`clean program` != ""')
-        bit = bit[['kind', 'note', 'clean program']]
-        with pd.option_context('display.multi_sparse', False):
-            # which seems to be ignored?
-            sbit = bit.style.set_table_styles([
-            {
-                'selector': 'td',
-                'props': 'text-align: left'},
-            {
-                'selector': 'th.col_heading',
-                'props': 'text-align: left;'
-            },
-            {
-                'selector': '.row_heading',
-                'props': 'text-align: left;'
-            }
-        ])
-        return sbit
+        bit = bit[['kind', 'clean program', 'note']]
+        return bit
 
     @property
     def knowledge(self):
         return self._knowledge.sort_index()
+
+    def list(self):
+        """
+        Not sure what the best name is!
+        """
+        return self.knowledge
 
     def describe(self, kind='agg'):
         """
@@ -278,8 +286,9 @@ class Underwriter(object):
             cols = ['Name', 'Type', 'Agg1', 'Agg2', 'Agg3', 'Notes']
             df_port = pd.DataFrame(columns=cols)
             df_port = df_port.set_index('Name')
-            for (kind, name), (spec, program) in self._knowledge.xs('port', axis=0, level=0, drop_level=False).iterrows():
-                aggs = spec['spec'][:3] # the list of agg items
+            for (kind, name), (spec, program) in self._knowledge.xs('port', axis=0, level=0,
+                                                                    drop_level=False).iterrows():
+                aggs = spec['spec'][:3]  # the list of agg items
                 if len(aggs) == 1:
                     aggs.extend(['', ''])
                 elif len(aggs) == 2:
@@ -292,23 +301,38 @@ class Underwriter(object):
             # display(df_port)
 
         if 'agg' in kinds:
-            cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev',  'SevCV', 'Sev_a', 'Sev_b', 'Freq',      'EN',     'Freq_a',  'Notes']
+            cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev', 'SevCV', 'Sev_a', 'Sev_b', 'Freq', 'EN', 'Freq_a',
+                    'Notes']
             # what they are actually called
-            cols_agg =          ['exp_el', 'sev_name', 'sev_mean', 'sev_cv', 'sev_a', 'sev_b', 'freq_name', 'exp_en', 'freq_a', 'note']
+            cols_agg = ['exp_el', 'sev_name', 'sev_mean', 'sev_cv', 'sev_a', 'sev_b', 'freq_name', 'exp_en', 'freq_a',
+                        'note']
             df_agg = pd.DataFrame(columns=cols)
             df_agg = df_agg.set_index('Name')
-            for (kind, name), (spec, program) in self._knowledge.xs('agg', axis=0, level=0, drop_level=False).iterrows():
-                if program != '':
-                    # if no program then it is part of a Portfolio; don't want to replicate here
-                    df_agg.loc[name, :] = [kind] + [spec.get(f, '') for f in cols_agg]
+            for (kind, name), (spec, program) in self._knowledge.xs('agg', axis=0, level=0,
+                                                                    drop_level=False).iterrows():
+                df_agg.loc[name, :] = [kind] + [str(spec.get(f, '')) for f in cols_agg]
             df_agg = df_agg.sort_index()
-            df_agg['ELoss'] = np.where(df_agg.ELoss == '', df_agg.ESev.replace('', 0) * df_agg.EN.replace('', 0), df_agg.ELoss)
+            # compute E loss... but careful about arrays
+            # TODO must be a better way
+            for i in df_agg.query('ELoss == ""').index:
+                es, en = df_agg.loc[i, ['ESev', 'EN']]
+                try:
+                    es = float(es)
+                    en = float(en)
+                except (ValueError, TypeError):
+                    df_agg.loc[i, 'ELoss'] = '...'
+                else:
+                    df_agg.loc[i, 'ELoss'] = es * en
+
             df_agg = df_agg.drop(columns='Sev_b')
             return df_agg
             # display(HTML('<h3>Known Aggregates</h3>'))
             # display(df_agg)
 
-    def write(self, portfolio_program, log2=0, bs=0, create_all=None, update=None, **kwargs):
+        if 'distortion' in kinds:
+            return self._knowledge.loc['distortion']
+
+    def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
         Write a natural language program. Write carries out the following steps.
 
@@ -316,7 +340,6 @@ class Underwriter(object):
            removed and ignored, replace ; with new line etc.)
         2. Parse line by line to create a dictionary definition of sev, agg or port objects.
         3. Replace sev.name, agg.name and port.name references with their objects.
-        4. If create_all set, create all objects and return in dictionary. If not set only create the port objects.
         5. If update set, update all created objects.
 
         Sample input
@@ -338,11 +361,8 @@ class Underwriter(object):
         * **log2**
         * **update** overrides class default
         * **add_exa** should port.add_exa add the exa related columns to the output?
-        * **create_all**: create all objects, default just portfolios. You generally
-          don't want to create underlying sevs and aggs in a portfolio.
 
         :param portfolio_program:
-        :param create_all: override class default
         :param update: override class default
         :param kwargs: passed to object's update method if update==True
         :return: single created object or dictionary name: object
@@ -351,8 +371,6 @@ class Underwriter(object):
         # prepare for update
         # what / how to do; little awkward: to make easier for user have to strip named update args
         # out of kwargs
-        if create_all is None:
-            create_all = self.create_all
         if update is None:
             update = self.update
 
@@ -361,58 +379,44 @@ class Underwriter(object):
 
         # first see if portfolio_program refers to a built-in object
         try:
-            kind, name, spec, program = self[portfolio_program]  # calls __getitem__
+            # calls __getitem__
+            answer = self[portfolio_program]
         except (LookupError, TypeError):
             logger.debug(f'underwriter.write | object not found, processing as a program.')
         else:
-            logger.debug(f'underwriter.write | {kind} object found.')
-            obj = self.factory(kind, name, spec, program)
+            logger.debug(f'underwriter.write | {answer.kind} object found.')
+            answer = self.factory(answer)
             if update:
-                obj.update(log2, bs, **kwargs)
+                answer.object.update(log2, bs, **kwargs)
             # rationalize return to be the same as parsed programs
             # TODO test this code
-            rv = {(kind, name): (obj, program)}
-            return rv
+            return [answer]
 
         # if you fall through to here then the portfolio_program did not refer to a built-in object
         # run the program, get the interpreter return value, the irv, which contains kind/name->spec,program
         irv = self.interpret_program(portfolio_program)
-
-        # create objects
-        # 2019-11: create all objects not just the portfolios if create_all==True
-        # rv = return values
-        rv = None
-        if len(irv) > 0:
-            # create ports
-            rv = {}
-            # parser.out_dict is indexed by (kind, name) and contains the defining dictionary
-            # PrettyPrinter().pprint(self.parser.out_dict)
-            for (kind, name), (spec, program) in irv.items():
-                # OLD the spec comes back as a list of aggs that have been entered into the uw
-                # NEW the spec comes back as a list of dictionary agg specs that are NOT entered into the uw
-                if create_all:
-                    obj = self.factory(kind, name, spec, program)
-                    if obj is not None:
-                        # this can fail for named mixed severities, which can only
-                        # be created in context of an agg... that behaviour is
-                        # useful for named severities though... hence:
-                        if update:
-                            update = getattr(obj, 'update', None)
-                            if update is not None:
-                                update(log2, bs, **kwargs)
-                        # TODO sort out this cluster
-                        rv[(kind, name)] = (obj, program)
-                    else:
-                        rv[(kind, name)] = (spec, program)
-                else:
-                    rv[(kind, name)] = (spec, program)
+        rv = []
+        for answer in irv:
+            # create objects and update if needed
+            answer = self.factory(answer)
+            if answer not in irv:
+                logger.error('OK THAT FAILED' * 20)
+            if answer.object is not None:
+                # this can fail for named mixed severities, which can only
+                # be created in context of an agg... that behaviour is
+                # useful for named severities though... hence:
+                if update:
+                    update_method = getattr(answer.object, 'update', None)
+                    if update_method is not None:
+                        update_method(log2, bs, **kwargs)
+            rv.append(answer)
 
         # report on what has been done
         if rv is None:
-            logger.warning(f'Underwriter.write | Program did not contain any output')
+            logger.warning(f'Program did not contain any output')
         else:
             if len(rv):
-                logger.info(f'Underwriter.write | Program created {len(rv)} objects.')
+                logger.info(f'Program created {len(rv)} objects.')
 
         # return created objects
         return rv
@@ -445,8 +449,8 @@ class Underwriter(object):
         # Preprocess ---------------------------------------------------------------------
         portfolio_program = self.lexer.preprocess(portfolio_program)
 
-        # create return value dictionary
-        rv = {}
+        # create return value list
+        rv = []
 
         # Parse and Postprocess-----------------------------------------------------------
         # self.parser.reset()
@@ -473,7 +477,7 @@ class Underwriter(object):
                 # store in uw dictionary and create if needed
                 logger.info(f'answer out: {kind} object {name} parsed successfully...adding to knowledge')
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
-                rv[(kind, name)] = (spec, program_line)
+                rv.append(Answer(kind=kind, name=name, spec=spec, program=program_line, object=None))
 
         return rv
 
@@ -523,7 +527,8 @@ class Underwriter(object):
         kind, name = buildinid.split('.')
         try:
             # lookup in Underwriter
-            found_kind, found_name, spec, program = self[name]
+            answer = self[(kind, name)]
+            found_kind, found_name, spec, program, _ = answer.values()
         except LookupError as e:
             logger.error(f'ERROR id {kind}.{name} not found in the knowledge.')
             raise e
@@ -541,10 +546,10 @@ class Underwriter(object):
         :param level:
         :return:
         """
-        # set global logger_level
+        # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, create_all=None, log2=-1, bs=0, log_level=None, **kwargs):
+    def build(self, program, update=True, log2=-1, bs=0, log_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -555,7 +560,6 @@ class Underwriter(object):
 
         :param program:
         :param update: build's update
-        :param create_all: for just this run
         :param log2: -1 is default. Figure log2 for discrete and 13 for all others. Inupt value over-rides
         and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
@@ -564,30 +568,28 @@ class Underwriter(object):
         :return: created object(s)
         """
 
-        # TODO put back the original logger level
+        # automatically puts level back at the end
         if log_level is not None:
-            self.logger_level(log_level)
-
-        # options for this run
-        if create_all is None:
-            create_all = self.create_all
+            lm = LoggerManager(log_level)
 
         # make stuff
-        # write will return a dict with keys (kind, name) and value either the object or the spec
-        out_dict = self.write(program, create_all=create_all, update=False, force_severity=True)
+        # write will return a dict with keys (kind, name) and value a WriteAnswer namedtuple
+        rv = self.write(program, update=False, force_severity=True)
 
-        if out_dict is None:
+        if rv is None or len(rv) == 0:
             logger.warning('build produced no output')
             return None
 
-        # in this loop bs_ and log2_ are the values actually used for each update; they do not
-        # overwrite the input default values
-        for (kind, name), (out, program) in out_dict.items():
-            if isinstance(out, dict):
-                # dict spec output, these objects where not created
-                logger.info(f'Object {name} of kind {kind} returned as a spec; no further processing.')
-            elif isinstance(out, Aggregate) and update is True:
-                d = out.spec
+        # in this loop bs_ and log2_ are the values actually used for each update;
+        # they do not overwrite the input default values
+        for answer in rv:
+            if answer.object is None:
+                # object not created
+                logger.info(f'Object {answer.name} of kind {answer.kind} returned as '
+                            'a spec; no further processing.')
+            elif isinstance(answer.object, Aggregate) and update is True:
+                # figure some good defaults
+                d = answer.spec
                 if d['sev_name'] == 'dhistogram' and log2 == -1:
                     bs_ = 1
                     # how big?
@@ -597,81 +599,111 @@ class Underwriter(object):
                         max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
                     else:
                         # normal approx on count
-                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en']**0.5)
+                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
                     # binaries are 0b111... len-2 * 2 is len - 1
                     log2_ = len(bin(int(max_loss))) - 1
-                    logger.info(f'({kind}, {name}): Discrete mode, using bs=1 and log2={log2_}')
+                    logger.info(f'({answer.kind}, {answer.name}): Discrete mode, '
+                                'using bs=1 and log2={log2_}')
                 else:
                     if log2 == -1:
                         log2_ = 13
                     else:
                         log2_ = log2
                     if bs == 0:
-                        bs_ = round_bucket(out.recommend_bucket(log2_))
+                        bs_ = round_bucket(answer.object.recommend_bucket(log2_))
                     else:
                         bs_ = bs
-                    logger.info(f'({kind}, {name}): Normal mode, using bs={bs_} and log2={log2_}')
+                    logger.info(f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} and log2={log2_}')
                 try:
-                    out.update(log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
+                    answer.object.update(log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
                 except ZeroDivisionError as e:
                     logger.error(e)
                 except AttributeError as e:
                     logger.error(e)
-            elif isinstance(out, Severity):
+            elif isinstance(answer.object, Severity):
                 # there is no updating for severities
                 pass
-            elif isinstance(out, Portfolio) and update is True:
+            elif isinstance(answer.object, Portfolio) and update is True:
                 # figure stuff
                 if log2 == -1:
                     log2_ = 13
                 else:
                     log2_ = log2
                 if bs == 0:
-                    bs_ = out.best_bucket(log2_)
+                    bs_ = answer.object.best_bucket(log2_)
                 else:
                     bs_ = bs
-                logger.info(f'updating with {log2}, bs=1/{1/bs_}')
-                logger.info(f'({kind}, {name}): bs={bs_} and log2={log2_}')
-                out.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
-                           debug=self.debug, **kwargs)
+                logger.info(f'updating with {log2}, bs=1/{1 / bs_}')
+                logger.info(f'({answer.kind}, {answer.name}): bs={bs_} and log2={log2_}')
+                answer.object.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
+                                     debug=self.debug, **kwargs)
+            elif isinstance(answer.object, Distortion):
+                pass
+            elif isinstance(answer.object, (Aggregate, Portfolio)) and update is False:
+                pass
             else:
-                logger.warning(f'Unexpected: output kind is {type(out)}. (expr/number?)')
+                logger.warning(f'Unexpected: output kind is {type(answer.object)}. (expr/number?)')
                 pass
 
-        if len(out_dict) == 1:
+        if len(rv) == 1:
             # only one output...just return that
-            # dict, pop the last (only) element (popitem: Remove and return a (key, value) pair as a 2-tuple.)
-            out_dict = out_dict.popitem()[1]
-            if len(out_dict) == 2:
-                out_dict = out_dict[0]
-            else:
-                raise ValueError('Weird type coming out of update. Investigate.')
+            # retun object if it exists, otherwise the ans namedtuple
+            for answer in rv:
+                if answer.object is None:
+                    return answer
+                else:
+                    return answer.object
         else:
             # multiple outputs, see if there is just one portfolio...this is not ideal?!
             ports_found = 0
-            port = None
-            for (kind, name), (ob, program) in out_dict.items():
-                if kind == 'port':
+            for answer in rv:
+                if answer.kind == 'port':
                     ports_found += 1
-                    port = ob
             if ports_found == 1:
-                out_dict = port
-
-        return out_dict
+                # if only one, it must be answer
+                if answer.object is None:
+                    return answer
+                else:
+                    return answer.object
+        # in all other cases, return the full list
+        return rv
 
     __call__ = build
 
-    def interpreter_file(self, where='', filename=''):
+    def interpreter_file(self, *, filename='', where=''):
         """
         Run a suite of test programs. For detailed analysis, run_one.
+        filename is a string or Path. If a csv it is read into
+        a dataframe, with the first column used as index. If it
+        is an agg file (e.g. an agg database), it is preprocessed
+        to remove comments and replace \n\t agg with a space, then
+        split on new lines and converted to a dataframe.
+        Other file formats are rejected.
+
+        These methods are called interpreter_... rather than
+        interpret_... because they are for testing and debugging
+        the interpreter, not for actually interpreting anything!
 
         """
         if filename == '':
             filename = Path.home() / 'aggregate/tests/test_suite.csv'
-        df = pd.read_csv(filename, index_col=0)
+        elif type(filename) == str:
+            filename = Path(filename)
+        if filename.suffix == '.csv':
+            df = pd.read_csv(filename, index_col=0)
+        elif filename.suffix == '.agg':
+            txt = filename.read_text(encoding='utf-8')
+            stxt = re.sub('\n\tagg', ' agg', txt, flags=re.MULTILINE)
+            stxt = stxt.split('\n')
+            stxt = [i for i in stxt if len(i) and i[0] != '#']
+            df = pd.DataFrame(stxt, columns=['program'])
+        else:
+            raise ValueError(f'File suffix must be .csv or .agg, not {filename.suffix}')
         if where != '':
             df = df.loc[df.index.str.match(where)]
-        # add One severity
+        # add One severity if not input
+        # if txt.find('sev One dsev [1]') < 0:
+        #     logger.info('Adding One to knowledge.')
         self.write('sev One dsev [1]')
         return self._interpreter_work(df.iterrows())
 
@@ -685,7 +717,7 @@ class Underwriter(object):
 
     def interpreter_list(self, program_list):
         """
-        Interpret single test in debug mode.
+        Interpret elements in a list in debug mode.
         """
         return self._interpreter_work(list(enumerate(program_list)), debug=True)
 
@@ -758,5 +790,5 @@ class Underwriter(object):
 
 # exported instance
 # build = dbuild = None
-build = Underwriter(databases='examples', create_all=False, update=True, debug=False, log2=16)
-dbuild = Underwriter(name='Debug', create_all=False, update=True, debug=True, log2=13)
+build = Underwriter(databases='examples', update=True, debug=False, log2=16)
+dbuild = Underwriter(name='Debug', update=True, debug=True, log2=13)

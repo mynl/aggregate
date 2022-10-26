@@ -51,25 +51,25 @@ port PIR.Tame note{PIR Tame case study. For reinsurance see text.}
     agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed
 
 # hints: reg_p=.999, roe=0.10, bs=1/64, log2=16, padding=1
-port PIR.Cat.NonCat.Gross note{PIR Cat-Noncat gross case study.}
+port PIR.CNC.Gross note{PIR Cat-Noncat gross case study.}
     agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed
     agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed
 
-port PIR.Cat.NonCat.Net note{PIR Cat-Noncat net case study.}
+port PIR.CNC.Net note{PIR Cat-Noncat net case study.}
     agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed
     agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11
 
 # hints: reg_p=.999, roe=0.10, bs=1/4, log2=19, padding=1
-port PIR.HU.SCS.Gross note{PIR Hurricane SCS gross case study.}
+port PIR.HuSCS.Gross note{PIR Hurricane SCS gross case study.}
     agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson
     agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson
 
 
-port PIR.HU.SCS.Net note{PIR Hurricane SCS net case study.}
+port PIR.HuSCS.Net note{PIR Hurricane SCS net case study.}
     agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson
     agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson
 
-port BODOFF1   note{Bodoff Thought Experiment No. 1}
+port Bodoff1   note{Bodoff Thought Experiment No. 1}
     agg Bodoff.wind   dfreq [1] dsev [0, 99]  [0.80, 0.20]
     agg Bodoff.quake  dfreq [1] dsev [0, 100] [0.95, 0.05]
 

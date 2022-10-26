@@ -71,7 +71,7 @@ class UnderwritingLexer(Lexer):
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
     # PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed' # |empirical'
     DISTORTION = 'dist(ortion)?'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
@@ -294,11 +294,11 @@ class UnderwritingParser(Parser):
         return 'expr', f'{p.expr}', p.expr
 
     # making distortions ======================================
-    @_('DISTORTION name ids expr')
+    @_('DISTORTION name ID expr')
     def distortion_out(self, p):
         self.logger('distortion_out <-- DISTORTION ID name', p)
         # self.out_dict[("distortion", p.name)] =
-        return 'distortion', p.name, {'name': p.ids, 'shape': p.expr }
+        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr }
 
     @_('DISTORTION name ID expr "[" numberl "]"')
     def distortion_out(self, p):
@@ -369,9 +369,9 @@ class UnderwritingParser(Parser):
         # beta = lam * alpha / mu
 
         dout = {'name': p.name, 'exp_en': lam, 'freq_name': 'poisson',
-                'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': 1 / beta,
-                'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:4f}, ga(α={alpha:.4f}, β={beta:.4f}), '
-                        f'scale={1/beta:.4f}'}
+                'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': beta,
+                'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), '
+                        f'scale={beta:.8g}'}
         # self.out_dict[('agg', p.name)] = dout
         return 'agg', p.name, dout
 

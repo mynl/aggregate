@@ -38,7 +38,8 @@ from .utilities import get_fmts, pprint, ft, \
     FigureManager, tweedie_convert, power_variance_family, \
     iman_conover, rearrangement_algorithm_max_VaR, \
     mu_sigma_from_mean_cv, \
-    make_corr_matrix, random_corr_matrix
+    make_corr_matrix, random_corr_matrix, \
+    LoggerManager
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 

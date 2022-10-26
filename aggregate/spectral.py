@@ -10,6 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Distortion(object):
     """
     Creation and management of distortion functions.
@@ -388,7 +389,7 @@ class Distortion(object):
             elif scale == 'return':
                 ax.scatter(x=1/self.df[self.col_x], y=1/self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
 
-        ax.set(title=fill(str(self), 20), aspect='equal')
+        ax.set(title=fill(str(self), 20), aspect='equal');
 
         return ax
 

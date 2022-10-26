@@ -326,6 +326,14 @@ class Portfolio(object):
         self.dist_ans = None
         self.figure = None
 
+        # for consistency with Aggregates
+        self.agg_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
+        self.agg_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
+        self.agg_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
+        # variance and sd come up in exam questions
+        self.agg_sd = self.agg_m * self.agg_cv
+        self.agg_var = self.agg_sd * self.agg_sd
+
         # enhanced portfolio items
         self.EX_premium_capital = None
         self.last_a = None
@@ -1760,12 +1768,6 @@ class Portfolio(object):
                 gradient_df = self.apply_distortion(distortion, df_in=gradient_df, create_augmented=False).augmented_df
 
             # compute differentials and store answer!
-            # print(columns_of_interest)
-            # print([(line, i) for i in columns_of_interest])
-            # print(type(gradient_df))
-            # temp0 = gradient_df[columns_of_interest]
-            # temp1 = base[columns_of_interest]
-            # temp2 = (temp0 - temp1) / dx
             answer[[(line, i) for i in columns_of_interest]] = (gradient_df[columns_of_interest] -
                                                                 base[columns_of_interest]) / dx
 

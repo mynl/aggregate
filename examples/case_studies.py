@@ -71,7 +71,7 @@ pd.set_option("display.float_format", EngFormatter(3, True))
 pd.set_option('display.max_rows', 500)
 
 # get the logger
-logger = logging.getLogger('aggregate')
+logger = logging.getLogger('aggregate.case_studies')
 
 # logging.captureWarnings(True)  -> all warnings emitted by the warnings module
 # will automatically be logged at level WARNING
@@ -193,7 +193,7 @@ class CaseStudy(object):
         self.blend_d = None
         self.roe_d = None
         self.dist_dict = None
-        self.uw = agg.Underwriter(create_all=False, update=False)
+        self.uw = agg.Underwriter(update=False)
 
         self.tab13_1 = None
         self.sop = None
@@ -373,13 +373,13 @@ class CaseStudy(object):
         self.bs = bs
         self.padding = padding
 
-        # new style output from uw key (kind, name) output (obj or spec, program)
+        # new style output from uw as list of Answer(...) object
         out = self.uw.write(f'''
 port Gross_{self.case_id}
     {self.a_distribution}
     {self.b_distribution_gross}
 ''')
-        self.gross = out[('port', f'Gross_{self.case_id}')][0]
+        self.gross = out[0].object # [('port', f'Gross_{self.case_id}')][0]
         # sort out better bucket
         if self.bs == 0 or np.isnan(self.bs):
             self.bs = self.gross.best_bucket(self.log2)
@@ -393,7 +393,7 @@ port Net_{self.case_id}
     {self.a_distribution}
     {self.b_distribution_net}
 ''')
-        self.net = out[('port', f'Net_{self.case_id}')][0]
+        self.net = out[0].object
         self.net.update(log2=self.log2, bs=self.bs, remove_fuzz=True)
         self.ports = OrderedDict(gross=self.gross, net=self.net)
 
@@ -1107,7 +1107,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         ph = self.gross.dists['ph'].g(ps)
 
         # ax.plot(ps, blend, label='Naive blend')
-        lsi = iter([':', '--', '-.', ':'])
+        lsi = iter([':', '--', '-.'] * 5)
         for k, v in self.dist_dict.items():
             temp = v.g(ps)
             ls = next(lsi)

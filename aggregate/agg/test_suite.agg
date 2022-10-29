@@ -1,3 +1,6 @@
+## TO DO
+# rationalize
+# pull out actuary, student(=novice), expert subsets for abuild...
 
 # Test Suite Examples
 # ===================
@@ -7,6 +10,7 @@
 
 # Contents
 #
+# a. Novice examples interms of dice
 # A. Basic examples using dfreq and dsev notation
 # B. Frequency only fixed sev
 # C. Severity only, fixed freq, different distributions
@@ -17,9 +21,26 @@
 # H. Limit profiles with mixed severities
 # I. Reinsurance
 # J. Miscellaneous other novelties, including the Tweedie and the logo-generator
+# K. Examples from books and papers
+# L. Proxies for US Lines
+
+# port Weird.Example note{Example with unusual exeqa function.}
+# portfolio.make_awkward
 
 # Get this built for future use
 sev One dsev [1]
+
+## Actuary Examples (was examples.agg)
+# How to and Tutorial Examples
+# ============================
+
+# a. Novice Examples
+agg a.Novice.Dice.Roll       dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
+agg a.Novice.Dice.Roll2      dfreq [1]   dsev [1:6]                 note{Same as previous example.}
+agg a.Novice.2.Rolls         dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two die.}
+agg a.Novice.5.Rolls         dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five die.}
+agg a.Novice.1~6.Rolls       dfreq [1:6] dsev [1:6]
+agg a.Novice.Big.Rolls       dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
 
 # A. Basic examples using freq and dsev notation
 agg A.Basic01 dfreq [1] dsev [0 1]                                  note{toss of a single coin}
@@ -200,4 +221,116 @@ agg J.Tweedie2 tweedie 1 1.005 0.1
 
 agg J.Logo 1 claim [10 22.632 35.263 47.895 60.526 73.158 85.789 98.421 111.05 123.68 136.32 148.95 161.58 174.21 186.84 199.47 212.11 224.74 237.37 250] xs 0 sev lognorm 100 cv 1 fixed
 
+# K. Examples from books and papers
+port K.BODOFF1 note{Bodoff Thought Experiment No. 1}
+    agg wind1  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
+    agg quake1 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
+port K.BODOFF2 note{Bodoff Thought Experiment No. 2}
+    agg wind2  1 claim sev dhistogram xps [0,  50] [0.80, 0.20] fixed
+    agg quake2 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+port K.BODOFF3 note{Bodoff Thought Experiment No. 3}
+    agg wind3  1 claim sev dhistogram xps [0,   5] [0.80, 0.20] fixed
+    agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+port K.BODOFF4 note{Bodoff Thought Experiment No. 4 (check!)}
+    agg a 0.25 claims sev   4 * expon poisson
+    agg b 0.05 claims sev  20 * expon poisson
+    agg c 0.05 claims sev 100 * expon poisson
+
+# PIR book case studies
+# hints: reg_p=1, roe=0.10, bs=1, log2=8, padding=1
+port K.PIR.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.}
+    agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed
+    agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed
+
+# hints: reg_p=.999, roe=0.10, bs=1/64, log2=16, padding=1
+port K.PIR.Tame note{PIR Tame case study. For reinsurance see text.}
+    agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed
+    agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed
+
+# hints: reg_p=.999, roe=0.10, bs=1/64, log2=16, padding=1
+port K.PIR.CNC.Gross note{PIR Cat-Noncat gross case study.}
+    agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed
+    agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed
+
+port K.PIR.CNC.Net note{PIR Cat-Noncat net case study.}
+    agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed
+    agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11
+
+# hints: reg_p=.999, roe=0.10, bs=1/4, log2=19, padding=1
+port K.PIR.HuSCS.Gross note{PIR Hurricane SCS gross case study.}
+    agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson
+    agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson
+
+port K.PIR.HuSCS.Net note{PIR Hurricane SCS net case study.}
+    agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson
+    agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson
+
+# L. Proxies for US Lines
+
+# for portfolio construction: 10M sized books with "reasonable" severity curves
+# IRS: used cycle adjusted numbers, no further adjustments
+# RMI: see  \S\Teaching\2019-09\RMI3388\Notes\pdf\Archive\QA16_RMI3388_Tue-29-Oct-2019_cat_models.pdf
+# SCS is a swag; last pages of 2021 cat report for EF3+ tornados shows 25-50/year; big
+# SCS events 3-6 billion; https://www.aon.com/reinsurance/catastropheinsight/global-regional-losses.html?region=United%20States&type=insured
+# shows avg / year about 25B, so mean severity is 25 / 37.5 = 2/3 = 666M
+# sigma 1.75 of  makes 10B a 1 in 16 event; mu mean=666 eq np.log(666e6) - 1.75**2/2 = 18.785550228504665
+agg L.US.Hurricane 1.79 claims 1e12 xs 0 sev exp(19.595) * lognorm 2.581 poisson  note{Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.}
+agg L.US.SCS      37.50 claims 50e9 xs 0 sev exp(18.785550228504665) * lognorm 1.75 poisson note{Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B}
+
+# CVs based on sigmas of 1.5 for liab, 1.75 for prof and 1.25 for ppa
+# Average severity selected judgmentally
+agg L.Comm.Liability     10e6 loss 1e6 xs 0   sev lognorm 100e3 cv 3.77 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg L.Comm.Professional  10e6 loss 5e6 xs 0   sev lognorm 850e3 cv 8.48 mixed gamma 0.27 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg L.Personal.Auto            10e6 loss 300e3 xs 0 sev lognorm  45e3 cv 20.4 mixed gamma 0.13 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+
+# limits profile low and high limits and attaching book: 1/1, 4/1 and 5/5
+# severity midway between liability and professional
+agg L.Comm.Umbrella [6e6 3e6 1e6] loss [1e6 4e6 5e6] xs [1e6 1e6 5e6] sev lognorm 250e3 cv 5.00 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+
+# property mixed severity property and cat, pass through mixing
+# note on CV of betas: for high cv it becomes a zero / one variable, to the variance maxes out at p (1-p) where p is the mean
+# thus the CV maxes out at 1/sqrt(p(1-p)). For a mean of 0.1 the variance equals 1/sqrt(0.09) = 0.3 and the cv is 0.3 / 0.1 = 3
+# could limit profile too, but keep simple
+# assumes full ITV
+agg L.Comm.Property [7e6 3e6] loss 100e6 xs 0 sev 100e6 * beta 0.1 cv [1.25 2.5] mixed gamma 0.28 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg L.Homeowners          [8e6 2e6] loss 650e3 xs 0 sev 650e3 * beta 0.1 cv [0.75 2.75] mixed gamma 0.37 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+
+# really a severity curve, but you can't mix severity
+agg L.Comm.Auto.MED 1 claim sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] fixed note{Use log2=18 and bs=500 or apply limits. Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022).}
+
+
+
+## OLDER EXAMPLES
+# was site.agg
+# sev directorsA lognorm 10000000 cv 1.25 note{directors and officers liability class a, sigma=1.25}
+# sev directorsB lognorm 10000000 cv 1.75 note{directors and officers liability class b, sigma=1.75}
+# sev directorsC lognorm 10000000 cv 2.0  note{directors and officers liability class c, sigma=2.00}
+# sev cata pareto 2.1 -1  note{small cat, pareto 2.1}
+# sev catb pareto 1.7 -1  note{moderate cat, pareto 1.7}
+# sev catc pareto 1.4 -1  note{severe cat, pareto 1.4}
+# sev catd pareto 1.1 -1  note{very severe cat, pareto 1.1}
+# sev cate pareto 0.9 -1  note{extreme cat, pareto 0.9}
+# sev liaba lognorm 50 cv 1.0 note{prems ops A, lognormal cv=1.0}
+# sev liabb lognorm 24 cv 1.5 note{prems ops B, lognormal cv=1.5}
+# sev liabc lognorm 50 cv 2.0 note{prems ops C, lognormal cv=2.0}
+
+# agg Cata                 3.7         claims            sev pareto 2.1 -1          poisson             note{tropical storms and up US wind events}
+# agg Catb                 1.7         claims            sev pareto 1.7 -1          poisson             note{category 1 and up US wind events}
+# agg Catc                 1.3         claims            sev pareto 1.4 -1          poisson             note{category 3 and up US wind events}
+# agg Catd                 0.4         claims            sev pareto 1.1 -1          poisson             note{category 4 and up US wind events}
+# agg Cate                 0.1         claims            sev pareto 0.9 -1          poisson             note{category 5 and up US wind events}
+# agg Scs                 25.0         claims  2e9 xs 0  sev lognorm 100e6 cv 1.5   poisson             note{industry severe convective storm losses}
+# agg Casxol               0.5         claims 100e6 xs 0 sev lognorm   50e6 cv 0.75 poisson             note{Bermuda like casualty excess of loss book, 0.5 claims}
+# agg Noncata        1000000.00        claims            sev lognorm  50000 cv 1.0  mixed gamma 0.175   note{industry total non cat losses, all lines}
+# agg CAL             462316.42        claims            sev lognorm  40000 cv 0.5  mixed gamma 0.240   note{US statutory industry commercial auto liability, SNL 2017}
+# agg CMP             268153.90        claims            sev lognorm 100000 cv 0.5  mixed gamma 0.280   note{US statutory industry commercial multiperil (property and liability), SNL 2017}
+# agg CommProp        65087.40         claims            sev lognorm 250000 cv 1.25 mixed gamma 0.250   note{US statutory industry commercial property (fire + allied lines), SNL 2017}
+# agg Homeowners     4337346.31        claims 2500 xs 0  sev lognorm     15 cv 0.5  mixed gamma 0.240   note{US statutory industry homeowners, SNL 2017}
+# agg InlandMarine   314117.40         claims            sev lognorm  50000 cv 0.5  mixed gamma 0.350   note{US statutory industry indland marine, SNL 2017}
+# agg PPAL           5676073.30        claims            sev lognorm   5000 cv 10.0 mixed gamma 0.080   note{US statutory industry private passenger auto liability, SNL 2017}
+# agg WorkComp      2664340.53         claims            sev lognorm  15000 cv 7.0  mixed gamma 0.190   note{US statutory industry workers compensation (excluding excess), SNL 2017}
+# agg PersAuto      5676073.30         claims 3e6 xs 0   sev lognorm  50000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}
+# agg CommAuto      5676073.30         claims            sev lognorm  30000 cv 7.0  mixed gamma 0.080   note{US statutory personal auto liability and physical damage, SNL 2017}

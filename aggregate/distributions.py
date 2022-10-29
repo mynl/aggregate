@@ -21,7 +21,9 @@ from scipy.interpolate import interp1d
 from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
-    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, friendly
+    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, friendly, \
+    mu_sigma_from_mean_cv
+
 from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
@@ -960,7 +962,8 @@ class Aggregate(Frequency):
         else:
             s.append(f'Severity with {n} components.<br>')
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1/self.bs:,.0f}'
+            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
         df = self.describe
         return '\n'.join(s) + df.to_html()
 
@@ -969,12 +972,12 @@ class Aggregate(Frequency):
         Discretize the severity distributions and weight.
 
         `sev_calc='continuous'` is used when you think of the resulting distribution as continuous across the buckets
-        (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X <= b_i)`.
+        (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X \le b_i)`.
         Note that :math:`b_{i-1}=-bs/2` is prepended.
 
         We use the discretized distribution as though it is fully discrete and only takes values at the bucket
         points. Hence, we should use `sev_calc='discrete'`. The buckets are shifted left by half a bucket,
-        so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X <= b_i + b/2)`.
+        so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X \le b_i + b/2)`.
 
         The other wrinkle is the righthand end of the range. If we extend to np.inf then we ensure we have
         probabilities that sum to 1. But that method introduces a probability mass in the last bucket that
@@ -1642,17 +1645,20 @@ class Aggregate(Frequency):
             raise ValueError('Must use compound Poisson for DH density')
         self.beta_name = beta_name
 
-    def plot(self, axd=None, xmax=0):
+    def plot(self, axd=None, xmax=0, **kwargs):
         """
         New style basic plot with severity and aggregate, linear and log plots and Lee plot.
 
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
                the same scale. Only used on linear scales?
         :param axd:
+        :param **kwargs: passed to make_mosaic_figure
         :return:
         """
         if axd is None:
-            self.figure, axd = make_mosaic_figure('ABC')
+            self.figure, axd = make_mosaic_figure('ABC', **kwargs)
+        else:
+            self.figure = axd['A'].figure
 
         if self.bs == 1 and self.ex < 1025:
             # treat as discrete
@@ -1668,8 +1674,8 @@ class Aggregate(Frequency):
             df = df.sort_index()
             if mx <= 60:
                 # stem plot for small means
-                axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0o', label='Aggregate')
-                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1s', label='Severity')
+                axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0.', label='Aggregate')
+                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
             else:
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
                 df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
@@ -1711,7 +1717,7 @@ class Aggregate(Frequency):
             ylim = self.limits(stat='density')
 
             ax = axd['A']
-            # divide by bucket size...approximating the densityh
+            # divide by bucket size...approximating the density
             (df.p_total / self.bs).plot(ax=ax, lw=2, label='Aggregate')
             (df.p_sev / self.bs).plot(ax=ax, lw=1, label='Severity')
             ax.set(xlim=xlim, ylim=ylim, title='Probability density')
@@ -1722,14 +1728,14 @@ class Aggregate(Frequency):
             ylim = axd['B'].get_ylim()
             ylim = [1e-15, ylim[1]*2]
             axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
-            axd['B'].legend()
+            axd['B'].legend().set(visible=False)
 
             ax = axd['C']
             # to do: same trimming for p-->1 needed?
             ax.plot(df.F, df.loss, lw=2, label='Aggregate')
             ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
             ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
-            ax.legend()
+            ax.legend().set(visible=False)
 
     def plot_old(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
         """
@@ -1981,7 +1987,7 @@ class Aggregate(Frequency):
                 df = df.iloc[:, 1:]
             df.index.name = 'statistic'
             df.columns.name = 'view'
-        return df
+            return df
 
     @property
     def statistics(self):
@@ -2065,32 +2071,32 @@ class Aggregate(Frequency):
                 print(f'Bucket size set with {N} buckets at {self.bs:,.0f}')
             return rbr
 
-    def q_old(self, p):
-        """
-        Return lowest quantile, appropriate for discrete bucketing.
-        quantile guaranteed to be in the index
-        nearest does not work because you always want to pick rounding up
-
-        Definition 2.1 (Quantiles)
-
-        :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] ≥ α\}` is the lower α-quantile of X
-
-        :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] > α\}` is the upper α-quantile of X.
-
-        We use the x-notation if the dependence on X is evident, otherwise the q-notion.
-        Acerbi and Tasche (2002)
-
-        :param p:
-        :return:
-        """
-        if self._q is None:
-            self._q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
-        l = float(self._q(p))
-        # find next nearest index value if not an exact match (this is slightly faster and more robust
-        # than l/bs related math)
-        l1 = self.density_df.index.get_loc(l, 'bfill')
-        l1 = self.density_df.index[l1]
-        return l1
+    # def q_old(self, p):
+    #     """
+    #     Return lowest quantile, appropriate for discrete bucketing.
+    #     quantile guaranteed to be in the index
+    #     nearest does not work because you always want to pick rounding up
+    #
+    #     Definition 2.1 (Quantiles)
+    #
+    #     :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] ≥ α\}` is the lower α-quantile of X
+    #
+    #     :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] > α\}` is the upper α-quantile of X.
+    #
+    #     We use the x-notation if the dependence on X is evident, otherwise the q-notion.
+    #     Acerbi and Tasche (2002)
+    #
+    #     :param p:
+    #     :return:
+    #     """
+    #     if self._q is None:
+    #         self._q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
+    #     l = float(self._q(p))
+    #     # find next nearest index value if not an exact match (this is slightly faster and more robust
+    #     # than l/bs related math)
+    #     l1 = self.density_df.index.get_loc(l, 'bfill')
+    #     l1 = self.density_df.index[l1]
+    #     return l1
 
     def q(self, p, kind='lower'):
         """
@@ -2133,117 +2139,117 @@ class Aggregate(Frequency):
                          'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
         return l
 
-    def careful_q(self, p):
-        """
-        Careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
-        Note this is automatically vectorized and returns and array whereas q isn't.
-        It doesn't necessarily return an element of the index.
-
-        Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb. ::
-
-            uw = agg.Underwriter()
-
-            def plot_eg_agg(b, e, w, n=32, axs=None, x_range=1):
-                '''
-                makes a tricky distribution function with a poss isolated jump
-                creates an agg object and checks the quantile function is correct
-
-                mass at w
-
-                '''
-
-                if axs is None:
-                    f, axs0 = plt.subplots(2,3, figsize=(9,6))
-                    axs = iter(axs0.flatten())
-
-                tm = np.linspace(0, 1, 33)
-                tf = lambda x : f'{32*x:.0f}'
-
-                def pretty(axis, ticks, formatter):
-                    maj = ticks[::4]
-                    mnr = [i for i in ticks if i not in maj]
-                    labels = [formatter(i) for i in maj]
-                    axis.set_ticks(maj)
-                    axis.set_ticks(mnr, True)
-                    axis.set_ticklabels(labels)
-                    axis.grid(True, 'major', lw=0.707, c='lightblue')
-                    axis.grid(True, 'minor', lw=0.35, c='lightblue')
-
-                # make the distribution
-                xs = np.linspace(0, x_range, n+1)
-                Fx = np.zeros_like(xs)
-                Fx[b:13] = 1
-                Fx[20:e] = 1
-                Fx[w] = 32 - np.sum(Fx)
-                Fx = Fx / Fx.sum()
-                Fx = np.cumsum(Fx)
-
-                # make an agg version: find the jumps and create a dhistogram
-                temp = pd.DataFrame(dict(x=xs, F=Fx))
-                temp['f'] = np.diff(temp.F, prepend=0)
-                temp = temp.query('f > 0')
-                pgm = f'agg Tricky 1 claim sev dhistogram xps {temp.x.values} {temp.f.values} fixed'
-                a = uw(pgm)
-                a.easy_update(10, 0.001)
-                # plot
-                a.plot(axiter=axs)
-                pretty(axs0[0,0].xaxis, tm, tf)
-                pretty(axs0[0,2].xaxis, tm, tf)
-                pretty(axs0[0,2].yaxis, tm, tf)
-
-                # lower left plot: distribution function
-                ax = next(axs)
-                ax.step(xs, Fx, where='post', marker='.')
-                ax.plot(a.xs, a.agg_density.cumsum(), linewidth=3, alpha=0.5, label='from agg')
-                ax.set(title=f'b={b}, e={e}, w={w}', ylim=-0.05, aspect='equal')
-                if x_range  == 1:
-                    ax.set(aspect='equal')
-                ax.legend(frameon=False, loc='upper left')
-                pretty(ax.xaxis, tm, tf)
-                pretty(ax.yaxis, tm, tf)
-
-                # lower middle plot
-                ps = np.linspace(0, 1, 301)
-                agg_careful = a.careful_q(ps)
-                ax = next(axs)
-                ax.step(Fx, xs, where='pre', marker='.', label='input')
-                ax.plot(Fx, xs, ':', label='input joined')
-                ax.plot(ps, agg_careful, linewidth=1, label='agg careful')
-                ax.set(title='Inverse', ylim=-0.05)
-                if x_range  == 1:
-                    ax.set(aspect='equal')
-                pretty(ax.xaxis, tm, tf)
-                pretty(ax.yaxis, tm, tf)
-                ax.legend()
-
-                # lower right plot
-                ax = next(axs)
-                dmq = np.zeros_like(ps)
-                for i, p in enumerate(ps):
-                    try:
-                        dmq[i] = a.q(p)
-                    except:
-                        dmq[i] = 0
-                ax.plot(ps, agg_careful, label='careful (agg obj)', linewidth=1, alpha=1)
-                ax.plot(ps, dmq, label='agg version')
-                ax.legend(frameon=False, loc='upper left')
-                pretty(ax.xaxis, tm, tf)
-                pretty(ax.yaxis, tm, tf)
-                ax.set(title='Check with agg version')
-
-                plt.tight_layout()
-
-                return a
-
-            aw = plot_eg_agg(6, 29, 16)
-
-        :param p: single or vector of values of ps, 0<1
-        :return:  quantiles
-        """
-        if self._careful_q is None:
-            self._careful_q = CarefulInverse.dist_inv1d(self.xs, self.agg_density)
-
-        return self._careful_q(p)
+    # def careful_q(self, p):
+    #     """
+    #     Careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
+    #     Note this is automatically vectorized and returns and array whereas q isn't.
+    #     It doesn't necessarily return an element of the index.
+    #
+    #     Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb. ::
+    #
+    #         uw = agg.Underwriter()
+    #
+    #         def plot_eg_agg(b, e, w, n=32, axs=None, x_range=1):
+    #             '''
+    #             makes a tricky distribution function with a poss isolated jump
+    #             creates an agg object and checks the quantile function is correct
+    #
+    #             mass at w
+    #
+    #             '''
+    #
+    #             if axs is None:
+    #                 f, axs0 = plt.subplots(2,3, figsize=(9,6))
+    #                 axs = iter(axs0.flatten())
+    #
+    #             tm = np.linspace(0, 1, 33)
+    #             tf = lambda x : f'{32*x:.0f}'
+    #
+    #             def pretty(axis, ticks, formatter):
+    #                 maj = ticks[::4]
+    #                 mnr = [i for i in ticks if i not in maj]
+    #                 labels = [formatter(i) for i in maj]
+    #                 axis.set_ticks(maj)
+    #                 axis.set_ticks(mnr, True)
+    #                 axis.set_ticklabels(labels)
+    #                 axis.grid(True, 'major', lw=0.707, c='lightblue')
+    #                 axis.grid(True, 'minor', lw=0.35, c='lightblue')
+    #
+    #             # make the distribution
+    #             xs = np.linspace(0, x_range, n+1)
+    #             Fx = np.zeros_like(xs)
+    #             Fx[b:13] = 1
+    #             Fx[20:e] = 1
+    #             Fx[w] = 32 - np.sum(Fx)
+    #             Fx = Fx / Fx.sum()
+    #             Fx = np.cumsum(Fx)
+    #
+    #             # make an agg version: find the jumps and create a dhistogram
+    #             temp = pd.DataFrame(dict(x=xs, F=Fx))
+    #             temp['f'] = np.diff(temp.F, prepend=0)
+    #             temp = temp.query('f > 0')
+    #             pgm = f'agg Tricky 1 claim sev dhistogram xps {temp.x.values} {temp.f.values} fixed'
+    #             a = uw(pgm)
+    #             a.easy_update(10, 0.001)
+    #             # plot
+    #             a.plot(axiter=axs)
+    #             pretty(axs0[0,0].xaxis, tm, tf)
+    #             pretty(axs0[0,2].xaxis, tm, tf)
+    #             pretty(axs0[0,2].yaxis, tm, tf)
+    #
+    #             # lower left plot: distribution function
+    #             ax = next(axs)
+    #             ax.step(xs, Fx, where='post', marker='.')
+    #             ax.plot(a.xs, a.agg_density.cumsum(), linewidth=3, alpha=0.5, label='from agg')
+    #             ax.set(title=f'b={b}, e={e}, w={w}', ylim=-0.05, aspect='equal')
+    #             if x_range  == 1:
+    #                 ax.set(aspect='equal')
+    #             ax.legend(frameon=False, loc='upper left')
+    #             pretty(ax.xaxis, tm, tf)
+    #             pretty(ax.yaxis, tm, tf)
+    #
+    #             # lower middle plot
+    #             ps = np.linspace(0, 1, 301)
+    #             agg_careful = a.careful_q(ps)
+    #             ax = next(axs)
+    #             ax.step(Fx, xs, where='pre', marker='.', label='input')
+    #             ax.plot(Fx, xs, ':', label='input joined')
+    #             ax.plot(ps, agg_careful, linewidth=1, label='agg careful')
+    #             ax.set(title='Inverse', ylim=-0.05)
+    #             if x_range  == 1:
+    #                 ax.set(aspect='equal')
+    #             pretty(ax.xaxis, tm, tf)
+    #             pretty(ax.yaxis, tm, tf)
+    #             ax.legend()
+    #
+    #             # lower right plot
+    #             ax = next(axs)
+    #             dmq = np.zeros_like(ps)
+    #             for i, p in enumerate(ps):
+    #                 try:
+    #                     dmq[i] = a.q(p)
+    #                 except:
+    #                     dmq[i] = 0
+    #             ax.plot(ps, agg_careful, label='careful (agg obj)', linewidth=1, alpha=1)
+    #             ax.plot(ps, dmq, label='agg version')
+    #             ax.legend(frameon=False, loc='upper left')
+    #             pretty(ax.xaxis, tm, tf)
+    #             pretty(ax.yaxis, tm, tf)
+    #             ax.set(title='Check with agg version')
+    #
+    #             plt.tight_layout()
+    #
+    #             return a
+    #
+    #         aw = plot_eg_agg(6, 29, 16)
+    #
+    #     :param p: single or vector of values of ps, 0<1
+    #     :return:  quantiles
+    #     """
+    #     if self._careful_q is None:
+    #         self._careful_q = CarefulInverse.dist_inv1d(self.xs, self.agg_density)
+    #
+    #     return self._careful_q(p)
 
     def tvar(self, p, kind='interp'):
         """
@@ -2416,18 +2422,25 @@ class Aggregate(Frequency):
         """
         return json.dumps(self._spec)
 
-    def fit(self, approx_type='slognorm', output='scipy'):
+    def approximate(self, approx_type='slognorm', output='scipy'):
         """
-        Create fixed freq agg approximation to self
+        Create an approximation to self using method of moments matching.
 
-        output = agg (program), scipy frozen object, or [anything] = agg spec dict
-
-        Unlike Portfolio, which returns a single sev fixed freq agg, this
+        Compare to Portfolio.approximate which returns a single sev fixed freq agg, this
         returns a scipy dist by default.
 
         Use case: exam questions with the normal approacimation!
 
+        :param approx_type: norm, lognorn, slognorm (shifted lognormal), gamma, sgamma. If 'all'
+        then returns a dictionary of each approx.
+        :param output: scipy - returns a frozen scipy.stats object; agg returns an Aggregate program;
+        any other value returns the program and created aggregate object with fixed frequency equal to 1.
+        :return: as above.
         """
+
+        if approx_type == 'all':
+            return {kind: self.approximate(kind)
+                    for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
 
         if self.audit_df is None:
             # not updated
@@ -2436,31 +2449,47 @@ class Aggregate(Frequency):
             skew = self.statistics_total_df.loc['mixed', 'agg_skew']
         else:
             # use statistics_df matched to computed aggregate_project
-            m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
+            m, cv, skew = self.report_df.loc[['agg_m', 'agg_cv', 'agg_skew'], 'empirical']
 
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
 
         if approx_type == 'norm':
             sd = m*cv
-            sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-            agg_str += f'{sd} @ norm 1 # {m} '
             if output=='scipy':
                 return ss.norm(loc=m, scale=sd)
+            sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+            agg_str += f'{sd} @ norm 1 # {m} '
+
+        elif approx_type == 'lognorm':
+            mu, sigma = mu_sigma_from_mean_cv(m, cv)
+            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
+            if output=='scipy':
+                return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
+            agg_str += f'{np.exp(mu)} * lognorm {sigma} '
+
+        elif approx_type == 'gamma':
+            shape = cv ** -2
+            scale = m / shape
+            if output=='scipy':
+                return ss.gamma(shape, scale=scale)
+            sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
+            agg_str += f'{scale} * gamma {shape} '
+
         elif approx_type == 'slognorm':
             shift, mu, sigma = sln_fit(m, cv, skew)
-            # self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+            if output=='scipy':
+                return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
             sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
             agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
-            if output=='scipy':
-                return ss.lognorm(shape=sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
+
         elif approx_type == 'sgamma':
             shift, alpha, theta = sgamma_fit(m, cv, skew)
-            # self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
-            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-            agg_str += f'{theta} * lognorm {alpha} + {shift} '
             if output=='scipy':
                 return ss.gamma(alpha, loc=shift, scale=theta)
+            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+            agg_str += f'{theta} * gamma {alpha} + {shift} '
+
         else:
             raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
 
@@ -2468,7 +2497,10 @@ class Aggregate(Frequency):
             agg_str += ' fixed'
             return agg_str
         else:
-            return {'name': name, 'note': f'frozen version of {self.name}', 'exp_en': 1, **sev, 'freq_name': 'fixed'}
+            return Aggregate(**{'name': name, 'note': f'frozen version of {self.name}',
+                                'exp_en': 1, **sev, 'freq_name': 'fixed'})
+
+    fit = approximate
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """
@@ -3190,86 +3222,86 @@ class Severity(ss.rv_continuous):
         ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability p (or ω)', xlim=[-0.025, 1.025])
 
 
-class CarefulInverse(object):
-    """
-    From SRM_Examples Noise: careful inverse functions.
-
-    """
-
-    @staticmethod
-    def make1d(xs, ys, agg_fun=None, kind='linear', **kwargs):
-        """
-        Wrapper to make a reasonable 1d interpolation function with reasonable extrapolation
-        Does NOT handle inverse functions, for those use dist_inv1d
-        :param xs:
-        :param ys:
-        :param agg_fun:
-        :param kind:
-        :param kwargs:
-        :return:
-        """
-        temp = pd.DataFrame(dict(x=xs, y=ys))
-        if agg_fun:
-            temp = temp.groupby('x').agg(agg_fun)
-            fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
-            f = interpolate.interp1d(temp.index, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
-        else:
-            fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
-            f = interpolate.interp1d(temp.x, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
-        return f
-
-    @staticmethod
-    def dist_inv1d(xs, fx, kind='linear', max_Fx=1.):
-        """
-        Careful inverse of distribution function with jumps. Assumes xs is evenly spaced.
-        Assumes that if there are two or more xs values between changes in dist it is a jump,
-        otherwise is is a continuous part. Puts in -eps values to make steps around jumps.
-
-        :param xs:
-        :param fx:  density
-        :param kind:
-        :param max_Fx: what is the max allowable value of F(x)?
-        :return:
-        """
-
-        # make dataframe to allow summarization
-        df = pd.DataFrame(dict(x=xs, fx=fx))
-        # lots of problems with noise...strip it off
-        df['fx'] = np.where(np.abs(df.fx) < 1e-16, 0, df.fx)
-        # compute cumulative probabilities
-        df['Fx'] = df.fx.cumsum()
-        gs = df.groupby('Fx').agg({'x': [np.min, np.max, len]})
-        gs.columns = ['mn', 'mx', 'n']
-        # figure if a jump or not
-        gs['jump'] = 0
-        gs.loc[gs.n > 1, 'jump'] = 1
-        gs = gs.reset_index(drop=False)
-        # figure the right hand end of the jump
-        gs['nextFx'] = gs.Fx.shift(-1, fill_value=1)
-
-        # space for answer
-        ans = np.zeros((2 * len(gs), 2))
-        rn = 0
-        eps = 1e-10
-        max_Fx -= eps / 100
-        # write out known (x, y) points for lin interp
-        for n, r in gs.iterrows():
-            ans[rn, 0] = r.Fx
-            ans[rn, 1] = r.mn if r.Fx >= max_Fx else r.mx
-            rn += 1
-            if r.Fx >= max_Fx:
-                break
-            if r.jump:
-                if r.nextFx >= max_Fx:
-                    break
-                ans[rn, 0] = r.nextFx - eps
-                ans[rn, 1] = r.mx
-                rn += 1
-        # trim up ans
-        ans = ans[:rn, :]
-
-        # make interpolation function and return
-        fv = ((ans[0, 1]), (ans[-1, 1]))
-        ff = interpolate.interp1d(ans[:, 0], ans[:, 1], bounds_error=False, fill_value=fv, kind=kind)
-        # df = input in data frame; gs = grouped df, ans = carefully selected points for inverse
-        return ff
+# class CarefulInverse(object):
+#     """
+#     From SRM_Examples Noise: careful inverse functions.
+#
+#     """
+#
+#     @staticmethod
+#     def make1d(xs, ys, agg_fun=None, kind='linear', **kwargs):
+#         """
+#         Wrapper to make a reasonable 1d interpolation function with reasonable extrapolation
+#         Does NOT handle inverse functions, for those use dist_inv1d
+#         :param xs:
+#         :param ys:
+#         :param agg_fun:
+#         :param kind:
+#         :param kwargs:
+#         :return:
+#         """
+#         temp = pd.DataFrame(dict(x=xs, y=ys))
+#         if agg_fun:
+#             temp = temp.groupby('x').agg(agg_fun)
+#             fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
+#             f = interpolate.interp1d(temp.index, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
+#         else:
+#             fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
+#             f = interpolate.interp1d(temp.x, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
+#         return f
+#
+#     @staticmethod
+#     def dist_inv1d(xs, fx, kind='linear', max_Fx=1.):
+#         """
+#         Careful inverse of distribution function with jumps. Assumes xs is evenly spaced.
+#         Assumes that if there are two or more xs values between changes in dist it is a jump,
+#         otherwise is is a continuous part. Puts in -eps values to make steps around jumps.
+#
+#         :param xs:
+#         :param fx:  density
+#         :param kind:
+#         :param max_Fx: what is the max allowable value of F(x)?
+#         :return:
+#         """
+#
+#         # make dataframe to allow summarization
+#         df = pd.DataFrame(dict(x=xs, fx=fx))
+#         # lots of problems with noise...strip it off
+#         df['fx'] = np.where(np.abs(df.fx) < 1e-16, 0, df.fx)
+#         # compute cumulative probabilities
+#         df['Fx'] = df.fx.cumsum()
+#         gs = df.groupby('Fx').agg({'x': [np.min, np.max, len]})
+#         gs.columns = ['mn', 'mx', 'n']
+#         # figure if a jump or not
+#         gs['jump'] = 0
+#         gs.loc[gs.n > 1, 'jump'] = 1
+#         gs = gs.reset_index(drop=False)
+#         # figure the right hand end of the jump
+#         gs['nextFx'] = gs.Fx.shift(-1, fill_value=1)
+#
+#         # space for answer
+#         ans = np.zeros((2 * len(gs), 2))
+#         rn = 0
+#         eps = 1e-10
+#         max_Fx -= eps / 100
+#         # write out known (x, y) points for lin interp
+#         for n, r in gs.iterrows():
+#             ans[rn, 0] = r.Fx
+#             ans[rn, 1] = r.mn if r.Fx >= max_Fx else r.mx
+#             rn += 1
+#             if r.Fx >= max_Fx:
+#                 break
+#             if r.jump:
+#                 if r.nextFx >= max_Fx:
+#                     break
+#                 ans[rn, 0] = r.nextFx - eps
+#                 ans[rn, 1] = r.mx
+#                 rn += 1
+#         # trim up ans
+#         ans = ans[:rn, :]
+#
+#         # make interpolation function and return
+#         fv = ((ans[0, 1]), (ans[-1, 1]))
+#         ff = interpolate.interp1d(ans[:, 0], ans[:, 1], bounds_error=False, fill_value=fv, kind=kind)
+#         # df = input in data frame; gs = grouped df, ans = carefully selected points for inverse
+#         return ff

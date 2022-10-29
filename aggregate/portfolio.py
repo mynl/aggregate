@@ -3867,6 +3867,7 @@ class Portfolio(object):
         analyze_pricing will then zoom in and only look at one asset level for micro-dynamics...
 
         Logic of arguments:
+        ::
 
             if data_in == 'self' use self.augmented_df; this implies a distortion self.distortion
 
@@ -3890,7 +3891,7 @@ class Portfolio(object):
         Must pass p or A to determine assets
 
         Output is an `Answer` class object containing
-
+        ::
                 Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1 if plot else None,
                       fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2,
                       audit_df=audit_df)

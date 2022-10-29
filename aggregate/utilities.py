@@ -1,6 +1,6 @@
 from cycler import cycler
 from functools import lru_cache
-from io import StringIO
+from io import StringIO, BytesIO
 import itertools
 from itertools import product
 import logging.handlers
@@ -18,7 +18,7 @@ from scipy.optimize.nonlin import NoConvergence
 from scipy.special import kv
 from scipy.stats import multivariate_t
 # from time import time_ns
-from IPython.core.display import HTML, display
+from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
 
 
 logger = logging.getLogger(__name__)
@@ -1068,8 +1068,8 @@ def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=N
 
     p0 = np.exp(-λ)
     twcv = np.sqrt(σ2 * μ ** p) / μ
-    ans = pd.Series([p, μ, σ2, λ, α, β, twcv, m, cv, p0],
-                    index=['p', 'μ', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
+    ans = pd.Series([μ, p, σ2, λ, α, β, twcv, m, cv, p0],
+                    index=['μ', 'p', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
     return ans
 
 def power_variance_family():
@@ -1634,7 +1634,6 @@ def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', y
     if return_array then the returns are mor comparable with the old axiter_factory
 
     """
-
     if figsize is None:
         sm = mosaic.split('\n')
         nr = len(sm)
@@ -2353,3 +2352,24 @@ def random_corr_matrix(n, p=1, positive=False):
     np.fill_diagonal(A, 1)
 
     return make_corr_matrix(A)
+
+
+def show_fig(f, format='svg', **kwargs):
+    """
+    Save a figure so it can be placed precisely in output. Used by Underwriter.show to
+    interleaf tables and plots.
+
+    :param f: a plt.Figure
+    :param format: svg or png
+    :param kwargs: passed to savefig
+    """
+    bio = BytesIO()
+    f.savefig(bio, format=format, **kwargs)
+    bio.seek(0)
+    if format == 'png':
+        display(ipImage(bio.read()))
+    elif format == 'svg':
+        display(ipSVG(bio.read()))
+    else:
+        raise ValueError(f'Unknown type {format}')
+    plt.close(f)

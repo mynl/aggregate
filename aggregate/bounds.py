@@ -1,4 +1,3 @@
-import aggregate as agg
 import logging
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -10,7 +9,9 @@ from scipy.interpolate import interp1d
 from scipy.optimize import linprog
 from scipy.sparse import coo_matrix
 
-from aggregate.utilities import FigureManager
+# from aggregate.utilities import FigureManager
+from . import Portfolio, Aggregate, Distortion, Underwriter, FigureManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class Bounds(object):
     # from common_scripts.cs
 
     def __init__(self, distribution_spec):
-        assert isinstance(distribution_spec, (pd.Series, pd.DataFrame, agg.Portfolio, agg.Aggregate))
+        assert isinstance(distribution_spec, (pd.Series, pd.DataFrame, Portfolio, Aggregate))
         self.distribution_spec = distribution_spec
         # although passed as input to certain functions (tvar with bounds) b is actually fixed
         self.b = 0
@@ -99,7 +100,7 @@ class Bounds(object):
         :return:
         """
         self.b = b
-        if isinstance(self.distribution_spec, agg.Portfolio):
+        if isinstance(self.distribution_spec, Portfolio):
             assert line in self.distribution_spec.line_names_ex
             if line == 'total':
                 self.tvar_function = self.distribution_spec.tvar
@@ -111,7 +112,7 @@ class Bounds(object):
             if np.isinf(b): self.Fb = 1.0
             return
 
-        elif isinstance(self.distribution_spec, agg.Aggregate):
+        elif isinstance(self.distribution_spec, Aggregate):
             self.tvar_function = self.distribution_spec.tvar
             self.Fb = self.distribution_spec.cdf(b)
             if np.isinf(b): self.Fb = 1.0
@@ -530,7 +531,7 @@ class Bounds(object):
                     self.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w), alpha=alpha, label=None)
                     if check:
                         # put in actual for each sample
-                        d = agg.Distortion('wtdtvar', w, df=[pl, pu])
+                        d = Distortion('wtdtvar', w, df=[pl, pu])
                         gs = d.g(s)
                         ax.plot(s, gs, c=mapper(w), lw=2, ls='--', alpha=.5, label=f'ma ({pl:.3f}, {pu:.3f}) ')
                 ax.get_figure().colorbar(cm, ax=ax, shrink=.5, aspect=16, label='Weight to Higher Threshold')
@@ -611,7 +612,7 @@ class Bounds(object):
         :return:
         """
 
-        if isinstance(self.distribution_spec, (agg.Portfolio, agg.Aggregate)):
+        if isinstance(self.distribution_spec, (Portfolio, Aggregate)):
             df = self.distribution_spec.density_df
             bs = self.distribution_spec.bs
         elif isinstance(self.distribution_spec, pd.DataFrame):
@@ -734,7 +735,7 @@ class Bounds(object):
         bit2.columns = bit2.columns.str.split('_', expand=True)
         bit2 = bit2.stack(1).groupby('p')['c'].sum()
         # bit2 has index = probability points and values = weights for the wtd tvar distortion
-        d = agg.Distortion.wtd_tvar(bit2.index, bit2.values, f'PED({solver}, {n})')
+        d = Distortion.wtd_tvar(bit2.index, bit2.values, f'PED({solver}, {n})')
         return d
 
 
@@ -762,11 +763,11 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
     df['t1_upper'] = [tvar1[p] for p in df.index.get_level_values(1)]
     df['t1'] = df.t1_upper * df.weight + df.t1_lower * (1 - df.weight)
 
-    roe_d = agg.Distortion('roe', roe)
-    tvar_d = agg.Distortion('tvar', bounds.p_star('total', prem))
+    roe_d = Distortion('roe', roe)
+    tvar_d = Distortion('tvar', bounds.p_star('total', prem))
     idx = df.index.get_locs(df.idxmax()['t1'])[0]
     pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
-    max_d = agg.Distortion('wtdtvar', w, df=[pl, pu])
+    max_d = Distortion('wtdtvar', w, df=[pl, pu])
 
     tmax = float(df.iloc[idx]['t1'])
     print('Ties for max: ', len(df.query('t1 == @tmax')))
@@ -774,7 +775,7 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
 
     idn = df.index.get_locs(df.idxmin()['t1'])[0]
     pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
-    min_d = agg.Distortion('wtdtvar', wn, df=[pln, pun])
+    min_d = Distortion('wtdtvar', wn, df=[pln, pun])
 
     ax = axd['A']
     plot_max_min(bounds, ax)
@@ -830,7 +831,7 @@ def similar_risks_example():
     :return:
     """
     # stand alone hlep from the code; split at program = to run different options
-    uw = agg.Underwriter()
+    uw = Underwriter()
     p_base = uw.write('''
     port UNIF
         agg ONE 1 claim sev 1 * beta 1 1 fixed

@@ -35,7 +35,7 @@ setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version='0.9.4',
+      version='0.9.5',
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",
@@ -56,5 +56,5 @@ setup(name="aggregate",
           'Intended Audience :: Education'
       ],
       project_urls={"Documentation": 'https://www.mynl.com/aggregate/',
-                    "Source Code": "https://github.com/mynl/aggregate_project"}
+                    "Source Code": "https://github.com/mynl/aggregate"}
       )

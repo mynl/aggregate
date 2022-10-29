@@ -4,13 +4,14 @@ import logging
 import pandas as pd
 from pathlib import Path
 import re
+from IPython.display import HTML, display
 # from inspect import signature
 
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import logger_level, round_bucket, Answer, LoggerManager
+from .utilities import logger_level, round_bucket, Answer, LoggerManager, pprint, show_fig
 
 logger = logging.getLogger(__name__)
 
@@ -182,10 +183,9 @@ class Underwriter(object):
     def _repr_html_(self):
         s = [f'<p><h3>Underwriter {self.name}</h3>',
              f'Knowledge contains {len(self._knowledge)} programs. '
-             'Run <code>build.list()</code> for a list. '
-             'Run <code>build.describe(kind)</code> for more details on objects of kind (port, '
-             'agg, sev, or distortion) and '
-             '<code>build.programs</code> for a program listing.'
+             'Run <code>build.knowledge</code> for a DataFrame listing by kind and name. '
+             'Run <code>build.show(name)</code> for more details entry <code>name</code>, '
+             'accepts wildcards and regular expressions.'
              '</p>'
              # '<br>',
              # self.knowledge.to_html(),
@@ -241,96 +241,8 @@ class Underwriter(object):
         return answer
 
     @property
-    def programs(self):
-        """
-        Return the knowledge as a nice dataframe
-
-        :return:
-        """
-        bit = self._knowledge[['program']]
-        bit['note'] = [s['note'] for s in self._knowledge.spec]
-        bit['clean program'] = bit.program.str.replace(r'note\{[^}]*\}|[ ]{2,}|\t+', ' ')
-        bit = bit.sort_index(ascending=[False, True])
-        bit = bit.reset_index(0, drop=False)
-        bit = bit[['kind', 'note', 'clean program']].query('`clean program` != ""')
-        bit = bit[['kind', 'clean program', 'note']]
-        return bit
-
-    @property
     def knowledge(self):
-        return self._knowledge.sort_index()
-
-    def list(self):
-        """
-        Not sure what the best name is!
-        """
-        return self.knowledge
-
-    def describe(self, kind='agg'):
-        """
-        TODO this is not rationlized...and as a prop it needs to return something
-        More informative version of knowledge showing the agg programs. Only Aggregates that have a program.
-
-        TODO Add severities
-
-        :return:
-        """
-        from IPython.display import HTML
-
-        if kind == 'all':
-            kinds = ['agg', 'port']
-        else:
-            kinds = [kind]
-
-        if 'port' in kinds:
-            cols = ['Name', 'Type', 'Agg1', 'Agg2', 'Agg3', 'Notes']
-            df_port = pd.DataFrame(columns=cols)
-            df_port = df_port.set_index('Name')
-            for (kind, name), (spec, program) in self._knowledge.xs('port', axis=0, level=0,
-                                                                    drop_level=False).iterrows():
-                aggs = spec['spec'][:3]  # the list of agg items
-                if len(aggs) == 1:
-                    aggs.extend(['', ''])
-                elif len(aggs) == 2:
-                    aggs.extend([''])
-                note = spec['note']
-                df_port.loc[name, :] = [kind] + aggs + [note]
-            df_port = df_port.sort_index()
-            return df_port
-            # display(HTML('<h3>Known Portfolios</h3>'))
-            # display(df_port)
-
-        if 'agg' in kinds:
-            cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev', 'SevCV', 'Sev_a', 'Sev_b', 'Freq', 'EN', 'Freq_a',
-                    'Notes']
-            # what they are actually called
-            cols_agg = ['exp_el', 'sev_name', 'sev_mean', 'sev_cv', 'sev_a', 'sev_b', 'freq_name', 'exp_en', 'freq_a',
-                        'note']
-            df_agg = pd.DataFrame(columns=cols)
-            df_agg = df_agg.set_index('Name')
-            for (kind, name), (spec, program) in self._knowledge.xs('agg', axis=0, level=0,
-                                                                    drop_level=False).iterrows():
-                df_agg.loc[name, :] = [kind] + [str(spec.get(f, '')) for f in cols_agg]
-            df_agg = df_agg.sort_index()
-            # compute E loss... but careful about arrays
-            # TODO must be a better way
-            for i in df_agg.query('ELoss == ""').index:
-                es, en = df_agg.loc[i, ['ESev', 'EN']]
-                try:
-                    es = float(es)
-                    en = float(en)
-                except (ValueError, TypeError):
-                    df_agg.loc[i, 'ELoss'] = '...'
-                else:
-                    df_agg.loc[i, 'ELoss'] = es * en
-
-            df_agg = df_agg.drop(columns='Sev_b')
-            return df_agg
-            # display(HTML('<h3>Known Aggregates</h3>'))
-            # display(df_agg)
-
-        if 'distortion' in kinds:
-            return self._knowledge.loc['distortion']
+        return self._knowledge.sort_index()[['program', 'spec']]
 
     def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
@@ -543,13 +455,14 @@ class Underwriter(object):
     def logger_level(level):
         """
         Convenience function.
+
         :param level:
         :return:
         """
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, log2=-1, bs=0, log_level=None, **kwargs):
+    def build(self, program, update=True, log2=0, bs=0, log_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -560,7 +473,7 @@ class Underwriter(object):
 
         :param program:
         :param update: build's update
-        :param log2: -1 is default. Figure log2 for discrete and 13 for all others. Inupt value over-rides
+        :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
         and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
         :param log_level:
@@ -588,9 +501,9 @@ class Underwriter(object):
                 logger.info(f'Object {answer.name} of kind {answer.kind} returned as '
                             'a spec; no further processing.')
             elif isinstance(answer.object, Aggregate) and update is True:
-                # figure some good defaults
+                # try to guess good defaults
                 d = answer.spec
-                if d['sev_name'] == 'dhistogram' and log2 == -1:
+                if d['sev_name'] == 'dhistogram' and log2 == 0:
                     bs_ = 1
                     # how big?
                     if d['freq_name'] == 'fixed':
@@ -605,15 +518,15 @@ class Underwriter(object):
                     logger.info(f'({answer.kind}, {answer.name}): Discrete mode, '
                                 'using bs=1 and log2={log2_}')
                 else:
-                    if log2 == -1:
-                        log2_ = 13
+                    if log2 == 0:
+                        log2_ = self.log2
                     else:
                         log2_ = log2
                     if bs == 0:
                         bs_ = round_bucket(answer.object.recommend_bucket(log2_))
                     else:
                         bs_ = bs
-                    logger.info(f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} and log2={log2_}')
+                    logger.info(f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} (1/{1/bs_}) and log2={log2_}')
                 try:
                     answer.object.update(log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
                 except ZeroDivisionError as e:
@@ -787,8 +700,214 @@ class Underwriter(object):
         df_out.index.name = 'index'
         return df_out
 
+    def show(self, regex, kind='agg', plot=True, show=True, logger_level=30):
+        """
+        Create from knowledge by name or match to name.
+        Optionally plot. Returns the created object plus dataframe with more detailed information.
+        ??How diff from describe??
+        Allows exploration of pre-loaded databases.
+
+        Eg regex = "A.*[234] for A...2, 3 and 4.
+
+        Examples.
+        ::
+            from aggregate.utilities import pprint
+            # pretty print all prgrams starting A; no object creation
+            build.show('^A.*', 'agg', False, False).program.apply(lambda x: pprint(x, html=True));
+
+            # build and plot A..234
+            ans, df = build.show('^A.*')
+
+        :param regex: for filtering name
+        :param kind: the kind of object, port, agg, etc.
+        :param plot:
+        :param logger_level: work silently!
+        :return: dictionary of created objects and DataFrame with info about each.
+        """
+        # too painful getting the one thing out!
+        ans = []
+        # temp logger level
+        lm = LoggerManager(logger_level)
+        if kind is None or kind == '':
+            df = self.knowledge.droplevel('kind').filter(regex=regex, axis=0).copy()
+        else:
+            df = self.knowledge.loc[kind].filter(regex=regex, axis=0).copy()
+
+        if plot is False and show is False:
+            # just act like a filtered listing on knowledge
+            return df.sort_values('name')
+
+        # added detail columns
+        df['log2'] = 0
+        df['bs'] = 0.
+        df['agg_m'] = 0.
+        df['agg_cv'] = 0.
+        df['agg_sd'] = 0.
+        df['emp_m'] = 0.
+        df['emp_cv'] = 0.
+        df['emp_sd'] = 0.
+
+        for n, row in df.iterrows():
+            p = row.program
+            try:
+                a = self.build(p)
+                ans.append(a)
+            except NotImplementedError:
+                logger.error(f'skipping {n}...element not implemented')
+            else:
+                if show:
+                    display(a)
+                    display(HTML('<h4>Program</h4>'))
+                    pprint(p, split=60, html=True)
+                if plot is True:
+                    a.plot(figsize=(10, 3))
+                    display(HTML('<h4>Density and Quantiles</h4>'))
+                    show_fig(a.figure, format='svg')
+                if show:
+                    display(HTML('<br>'))
+                # info
+                m, cv = a.describe.loc['Agg', ['Est E(X)', 'Est CV(X)']]
+                df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd',
+                            'emp_m', 'emp_cv', 'emp_sd']] =\
+                        (a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, m, cv, '')
+        # if only one item, return it...much easier to use
+        if len(ans) == 1: ans = a
+        return ans, df
+
+    def dir(self, filter=''):
+        """
+        List all agg databases in site and default directories.
+        If entries is True then read them and return named objects.
+
+        Filter = glob filter for filename; .agg is added
+
+        """
+
+        if filter=='':
+            filter = '*.agg'
+        else:
+            filter += '.agg'
+
+        entries = []
+
+        for dn, d in zip(['site', 'default'], [self.site_dir, self.default_dir]):
+            for fn in d.glob(filter):
+                txt = fn.read_text(encoding='utf-8')
+                stxt = txt.split('\n')
+                for r in stxt:
+                    rs = r.split(' ')
+                    if rs[0] in ['agg', 'port', 'dist', 'distortion', 'sev']:
+                        entries.append([dn, fn.name] + rs[:2])
+
+        ans = pd.DataFrame(entries, columns=['Directory', 'Database', 'kind', 'name'])
+        return ans
+
+    # def list(self, regex='', kind=''):
+    #     """
+    #     Not sure what the best name is!
+    #     """
+    #
+    #     # catch called with kind = these seem to work...
+    #     if regex in ('agg', 'port', 'sev'):
+    #         kind = regex
+    #         regex = ''
+    #
+    #     if regex == '' and kind == '':
+    #         return self.knowledge
+    #     elif kind == '':
+    #         return self.knowledge.filter(regex=regex, axis=0)
+    #     elif regex == '':
+    #         return self.knowledge.loc[kind]
+    #     else:
+    #         return self.knowledge.loc[kind].filter(regex=regex, axis=0)
+
+    # def describe(self, kind='agg'):
+    #     """
+    #     TODO this is not rationlized...and as a prop it needs to return something
+    #     More informative version of knowledge showing the agg programs. Only Aggregates that have a program.
+    #
+    #     TODO Add severities
+    #
+    #     :return:
+    #     """
+    #     from IPython.display import HTML
+    #
+    #     if kind == 'all':
+    #         kinds = ['agg', 'port']
+    #     else:
+    #         kinds = [kind]
+    #
+    #     if 'port' in kinds:
+    #         cols = ['Name', 'Type', 'Agg1', 'Agg2', 'Agg3', 'Notes']
+    #         df_port = pd.DataFrame(columns=cols)
+    #         df_port = df_port.set_index('Name')
+    #         for (kind, name), (spec, program) in self._knowledge.xs('port', axis=0, level=0,
+    #                                                                 drop_level=False).iterrows():
+    #             aggs = spec['spec'][:3]  # the list of agg items
+    #             if len(aggs) == 1:
+    #                 aggs.extend(['', ''])
+    #             elif len(aggs) == 2:
+    #                 aggs.extend([''])
+    #             note = spec['note']
+    #             df_port.loc[name, :] = [kind] + aggs + [note]
+    #         df_port = df_port.sort_index()
+    #         return df_port
+    #         # display(HTML('<h3>Known Portfolios</h3>'))
+    #         # display(df_port)
+    #
+    #     if 'agg' in kinds:
+    #         cols = ['Name', 'Type', 'ELoss', 'Severity', 'ESev', 'SevCV', 'Sev_a', 'Sev_b', 'Freq', 'EN', 'Freq_a',
+    #                 'Notes']
+    #         # what they are actually called
+    #         cols_agg = ['exp_el', 'sev_name', 'sev_mean', 'sev_cv', 'sev_a', 'sev_b', 'freq_name', 'exp_en', 'freq_a',
+    #                     'note']
+    #         df_agg = pd.DataFrame(columns=cols)
+    #         df_agg = df_agg.set_index('Name')
+    #         for (kind, name), (spec, program) in self._knowledge.xs('agg', axis=0, level=0,
+    #                                                                 drop_level=False).iterrows():
+    #             df_agg.loc[name, :] = [kind] + [str(spec.get(f, '')) for f in cols_agg]
+    #         df_agg = df_agg.sort_index()
+    #         # compute E loss... but careful about arrays
+    #         # TODO must be a better way
+    #         for i in df_agg.query('ELoss == ""').index:
+    #             es, en = df_agg.loc[i, ['ESev', 'EN']]
+    #             try:
+    #                 es = float(es)
+    #                 en = float(en)
+    #             except (ValueError, TypeError):
+    #                 df_agg.loc[i, 'ELoss'] = '...'
+    #             else:
+    #                 df_agg.loc[i, 'ELoss'] = es * en
+    #
+    #         df_agg = df_agg.drop(columns='Sev_b')
+    #         return df_agg
+    #         # display(HTML('<h3>Known Aggregates</h3>'))
+    #         # display(df_agg)
+    #
+    #     if 'distortion' in kinds:
+    #         return self._knowledge.loc['distortion']
+
+    # @property
+    # def programs(self):
+    #     """
+    #     Return the knowledge as a nice dataframe
+    #
+    #     :return:
+    #     """
+    #     bit = self._knowledge[['program']]
+    #     bit['note'] = [s['note'] for s in self._knowledge.spec]
+    #     bit['clean program'] = bit.program.str.replace(r'note\{[^}]*\}|[ ]{2,}|\t+', ' ')
+    #     bit = bit.sort_index(ascending=[False, True])
+    #     bit = bit.reset_index(0, drop=False)
+    #     bit = bit[['kind', 'note', 'clean program']].query('`clean program` != ""')
+    #     bit = bit[['kind', 'clean program', 'note']]
+    #     return bit
+
 
 # exported instance
-# build = dbuild = None
-build = Underwriter(databases='examples', update=True, debug=False, log2=16)
-dbuild = Underwriter(name='Debug', update=True, debug=True, log2=13)
+# self = dbuild = None
+logger_level(30)
+build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
+# differentiate later!
+actuary_build = student_build = capital_build = dev_build = build
+debug_build = Underwriter(name='Debug', update=True, debug=True, log2=13)

@@ -4,7 +4,7 @@ __docformat__ = 'restructuredtext'
 __author__ = "Stephen J. Mildenhall"
 __copyright__ = "Copyright 2018-2022, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
-__version__ = "0.9.4.1"
+__version__ = "0.9.5"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 
@@ -22,9 +22,10 @@ del p, base_dir
 
 
 # imports
-from .underwriter import Underwriter, build, dbuild
+from .underwriter import Underwriter, build, actuary_build, student_build, \
+        capital_build, dev_build
 from .portfolio import Portfolio, make_awkward
-from .distributions import Frequency, Severity, Aggregate, CarefulInverse
+from .distributions import Frequency, Severity, Aggregate
 from .spectral import Distortion
 from .utilities import get_fmts, pprint, ft, \
     ift, sln_fit, sgamma_fit, estimate_agg_percentile, \

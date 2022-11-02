@@ -739,10 +739,12 @@ class UnderwritingParser(Parser):
         # doutcomes allows a list, range, or range with step
         self.logger(f'tower <-- tower doutcomes', p)
         breaks = p.doutcomes
-        if breaks[0] != 0:
-            breaks = np.hstack((0., breaks))
-        if not np.isinf(breaks[-1]):
-            breaks = np.hstack((breaks, np.inf))
+        # do not want this. it means net == 0 and ceded== gross in total which
+        # is rarely what you want. User can put in themselves.
+        # if breaks[0] != 0:
+        #     breaks = np.hstack((0., breaks))
+        # if not np.isinf(breaks[-1]):
+        #     breaks = np.hstack((breaks, np.inf))
         limits = np.diff(breaks)
         attach = breaks[:-1]
         # logger.info('\n'.join([f'{x} xs {y}' for x, y in zip(limits, attach)]))

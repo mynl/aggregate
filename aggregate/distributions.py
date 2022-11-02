@@ -21,8 +21,8 @@ from scipy.interpolate import interp1d
 from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
-    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, friendly, \
-    mu_sigma_from_mean_cv
+    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
+    mu_sigma_from_mean_cv, pprint
 
 from .spectral import Distortion
 
@@ -953,9 +953,13 @@ class Aggregate(Frequency):
             f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         return s
 
-    def _repr_html_(self):
+    def html_info_blob(self):
+        """
+        Text top of _repr_html_
+
+        """
         s = [f'<h3>Aggregate object: {self.name}</h3>']
-        s.append(f'Claim count {self.n:0,.2f}, {self.freq_name} distribution.<br>')
+        s.append(f'<p>Claim count: {self.n:0,.2f}, {self.freq_name} distribution.')
         n = len(self.statistics_df)
         if n == 1:
             sv = self.sevs[0]
@@ -963,14 +967,32 @@ class Aggregate(Frequency):
                 _la = 'unlimited'
             else:
                 _la = f'{sv.limit} xs {sv.attachment}'
-            s.append(f'Severity{sv.long_name} distribution, {_la}.<br>')
+            s.append(f'Severity{sv.long_name} distribution, {_la}.')
         else:
-            s.append(f'Severity with {n} components.<br>')
+            s.append(f'Severity with {n} components.')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1/self.bs:,.0f}'
-            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
+            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
+        return '\n'.join(s)
+
+    def _repr_html_(self):
+        s = [f'<h3>Aggregate object: {self.name}</h3>']
+        s.append(f'<p>Claim count {self.n:0,.2f}, {self.freq_name} distribution.</p>')
+        n = len(self.statistics_df)
+        if n == 1:
+            sv = self.sevs[0]
+            if sv.limit == np.inf and sv.attachment == 0:
+                _la = 'unlimited'
+            else:
+                _la = f'{sv.limit} xs {sv.attachment}'
+            s.append(f'<p>Severity{sv.long_name} distribution, {_la}.</p>')
+        else:
+            s.append(f'<p>Severity with {n} components.</p>')
+        if self.bs > 0:
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1/self.bs:,.0f}'
+            s.append(f'<p>Updated with bucket size {bss} and log2 = {self.log2}.</p>')
         df = self.describe
-        return '\n'.join(s) + df.to_html()
+        return self.html_info_blob() + df.to_html()
 
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
@@ -2036,6 +2058,13 @@ class Aggregate(Frequency):
         return df
 
     @property
+    def pprogram(self):
+        """
+        pretty print the program to html
+        """
+        pprint(self.program)
+
+    @property
     def describe(self):
         """
         Theoretic and empirical stats. Used in _repr_html_.
@@ -2064,7 +2093,10 @@ class Aggregate(Frequency):
             df.loc['Sev', 'Est CV(X)'] = esev_cv
             df.loc['Agg', 'Est CV(X)'] = ea_cv
             df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+            df['Est Skew(X)'] = np.nan
+            df.loc['Sev', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_sev_skew']
+            df.loc['Agg', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_agg_skew']
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)', 'Est Skew(X)']]
         df = df.fillna('')
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df

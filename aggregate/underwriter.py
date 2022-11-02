@@ -702,6 +702,14 @@ class Underwriter(object):
         df_out.index.name = 'index'
         return df_out
 
+    def qshow(self, regex):
+        """
+        Wrapper for show to just list elements in knowledge that match ``regex``.
+
+        """
+
+        return self.show(regex, kind='', plot=False, show=False)
+
     def show(self, regex, kind='agg', plot=True, show=True, logger_level=30):
         """
         Create from knowledge by name or match to name.
@@ -711,11 +719,14 @@ class Underwriter(object):
 
         Eg regex = "A.*[234] for A...2, 3 and 4.
 
+        See ``qshow`` for a wrapper that just returns the matches, with no object
+        creation or plotting.
+
         Examples.
         ::
             from aggregate.utilities import pprint
             # pretty print all prgrams starting A; no object creation
-            build.show('^A.*', 'agg', False, False).program.apply(lambda x: pprint(x, html=True));
+            build.show('^A.*', 'agg', False, False).program.apply(pprint);
 
             # build and plot A..234
             ans, df = build.show('^A.*')
@@ -728,8 +739,10 @@ class Underwriter(object):
         """
         # too painful getting the one thing out!
         ans = []
+
         # temp logger level
         lm = LoggerManager(logger_level)
+
         if kind is None or kind == '':
             df = self.knowledge.droplevel('kind').filter(regex=regex, axis=0).copy()
         else:
@@ -760,18 +773,23 @@ class Underwriter(object):
                 if show:
                     display(a)
                     display(HTML('<h4>Program</h4>'))
-                    pprint(p, split=60, html=True)
+                    pprint(p)
                 if plot is True:
-                    a.plot(figsize=(10, 3))
+                    a.plot(figsize=(8, 2.4))
                     display(HTML('<h4>Density and Quantiles</h4>'))
                     show_fig(a.figure, format='svg')
                 if show:
                     display(HTML('<br>'))
                 # info
-                m, cv = a.describe.loc['Agg', ['Est E(X)', 'Est CV(X)']]
+                if isinstance(a, Portfolio):
+                    m, cv = a.describe.loc[('total', 'Agg'), ['Est E[X]', 'Est CV(X)']]
+                elif isinstance(a, Aggregate):
+                    m, cv = a.describe.loc['Agg', ['Est E[X]', 'Est CV(X)']]
+                else:
+                    m = cv = np.nan
                 df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd',
-                            'emp_m', 'emp_cv', 'emp_sd']] =\
-                        (a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, m, cv, '')
+                            'emp_m', 'emp_cv', 'emp_sd']] = (a.log2, a.bs, a.agg_m, a.agg_cv,
+                                                             a.agg_sd, m, cv, '')
         # if only one item, return it...much easier to use
         if len(ans) == 1: ans = a
         return ans, df
@@ -910,6 +928,4 @@ class Underwriter(object):
 # self = dbuild = None
 logger_level(30)
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
-# differentiate later!
-actuary_build = student_build = capital_build = dev_build = build
 debug_build = Underwriter(name='Debug', update=True, debug=True, log2=13)

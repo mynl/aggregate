@@ -58,8 +58,13 @@ def get_fmts(df):
         fmts[k] = guess_fmt(k, v)
     return fmts
 
+def pprint(txt):
+    """
+    Simple version of pprint
+    """
+    return pprint_ex(txt, split=60, html=True)
 
-def pprint(txt, split=0, html=False, tacit=False):
+def pprint_ex(txt, split=0, html=False, tacit=False):
     """
     Try to format an agg program. This is impractical now - dfreq and dsev, optional
     reinsurance, etc. Go for a simple approach of removing unnecessary spacing
@@ -67,21 +72,28 @@ def pprint(txt, split=0, html=False, tacit=False):
 
     For long programs use split=60 or so, they are split at appropriate points.
 
+    To do: split doesn't work for ports.
+
     :param txt: program text input
     :param tacit: if True pp is silent, else it outputs.
     """
     ans = []
+    # programs come in as multiline
+    txt = txt.replace('\n\tagg', ' agg')
     for t in txt.split('\n'):
         clean = re.sub(r'[ \t]+', ' ', t.strip())
-        clean = re.sub(r' note.*$', '', clean)
+        clean = re.sub(r' note\{[^}]*\}', '', clean)
         if split > 0 and len(clean) > split:
-            clean = re.sub(r'(sev|occurrence|aggregate|mixed)', r'\n\t\1', clean)
+            clean = re.sub(r'\b(sev|occurrence|agg|aggregate|mixed|poisson|fixed)', r'\n\t\1', clean)
             s = clean.split(' ')
             clean = ' '.join(s[:2]) + '\n\t' + ' '.join(s[2:])
         ans.append(clean)
     ans = '\n'.join(ans)
     if html is True:
-        ans = f'<code>{ans}\n</code>'
+        ans = f'<p><code>{ans}\n</code></p>'
+        notes = re.findall('note\{([^}]*)\}', txt)
+        for i, n in enumerate(notes):
+            ans += f'<p><small>Note {i+1}. {n}</small><p>'
     if tacit is False and html is True:
         display(HTML(ans))
     elif tacit is False:
@@ -1670,7 +1682,7 @@ class GreatFormatter(ticker.ScalarFormatter):
         self.orderOfMagnitude = int(3 * np.floor(self.orderOfMagnitude / 3))
 
 
-def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', yfmt='great',
+def make_mosaic_figure(mosaic, figsize=None, w=2.0, h=2.4, xfmt='great', yfmt='great',
                        places=None, power_range=(-3, 3), sep='', unit='', sci=True,
                        mathText=False, offset=True, return_array=False):
     """
@@ -1706,6 +1718,53 @@ def make_mosaic_figure(mosaic, figsize=None, w=3.5*1.333, h=3.5, xfmt='great', y
         return f, np.array(list(axd.values()))
     else:
         return f, axd
+
+
+def knobble_fonts():
+    """
+    Not sure we should get into this...
+
+    See FigureManager in Great or common.py
+
+    https://matplotlib.org/3.1.1/tutorials/intermediate/color_cycle.html
+
+    https://matplotlib.org/3.1.1/users/dflt_style_changes.html#colors-in-default-property-cycle
+
+    https://matplotlib.org/2.0.2/examples/color/colormaps_reference.html
+
+    https://matplotlib.org/3.1.0/gallery/lines_bars_and_markers/linestyles.html
+
+    https://stackoverflow.com/questions/22408237/named-colors-in-matplotlib
+
+    """
+    font_size = 9
+    legend_font = 'x-small'
+
+    # this sets a much smaller base fontsize
+    # everything scales off font size
+    plt.rcParams['font.size'] = font_size
+
+    # mpl default is medium
+    plt.rcParams['legend.fontsize'] = legend_font
+
+    # see https://matplotlib.org/stable/gallery/color/named_colors.html
+    plot_face_color = 'lightsteelblue'
+    figure_bg_color = 'aliceblue'
+    # graphics set up
+    plt.rcParams["axes.facecolor"] = plot_face_color
+    # note plt.rc lets you set multiple related properties at once:
+    plt.rc('legend', fc=plot_face_color, ec=plot_face_color)
+    plt.rcParams['figure.facecolor'] = figure_bg_color
+
+    plot_colormap_name = 'cividis'
+
+    # fonts: add some better fonts as earlier defaults
+    mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif']
+    mpl.rcParams['font.sans-serif'] = ['Nirmala UI', 'Myriad Pro', 'Segoe UI', 'DejaVu Sans']
+    mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono']
+    # this matches html output better
+    mpl.rcParams['font.family'] = 'sans-serif'
+    mpl.rcParams['mathtext.fontset'] = 'stixsans'
 
 
 def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
@@ -1867,7 +1926,11 @@ def friendly(df):
             'agg': 'Aggregate',
             'el': 'Expected Loss',
             'm': 'Mean',
-            'cv': 'CV', 'skew': 'Skewness', 'kurt': 'Kurtosis'
+            'cv': 'CV', 'skew': 'Skewness', 'kurt': 'Kurtosis',
+            'L': 'Exp Loss', 'P': 'Premium', 'PQ': 'Leverage',
+            'LR': 'Loss Ratio',
+            'M': 'Margin', 'Q': 'Capital', 'a': 'Assets',
+            'Roe': 'ROE'
         }.get(x,x)
 
     bit = df.rename(index=ur).rename(columns=ur)

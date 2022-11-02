@@ -1884,7 +1884,7 @@ class Portfolio(object):
             # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
-    def plot(self, axd=None):
+    def plot(self, axd=None, figsize=(6, 2.5)):
         """
         Defualt plot of density, survival functions (linear and log)
 
@@ -1902,7 +1902,7 @@ class Portfolio(object):
         """
 
         if axd is None:
-            self.figure, axd = make_mosaic_figure('AB')
+            self.figure, axd = make_mosaic_figure('AB', figsize=figsize)
 
         ax = axd['A']
         xl = self.limits()

@@ -10,22 +10,46 @@
 
 # Contents
 #
-# a. Novice examples interms of dice
-# A. Basic examples using dfreq and dsev notation
-# B. Frequency only fixed sev
-# C. Severity only, fixed freq, different distributions
-# D. Severity transformations: shift, scale, layer, and attachment, unconditional severities
-# E. Specifying exposure
-# F. Mixed severities
-# G. Limit profiles
-# H. Limit profiles with mixed severities
-# I. Reinsurance
-# J. Miscellaneous other novelties, including the Tweedie and the logo-generator
-# K. Examples from books and papers
-# L. Proxies for US Lines
+# A. Novice examples interms of dice
+# B. Basic examples using dfreq and dsev notation
+# C. Frequency only fixed sev
+# D. Severity only, fixed freq, different distributions
+# E. Severity transformations: shift, scale, layer, and attachment, unconditional severities
+# F. Specifying exposure
+# G. Mixed severities
+# H. Limit profiles
+# I. Limit profiles with mixed severities
+# J. Reinsurance
+# K. Tweedie distribution examples
+# L. Examples from papers
+# M. Case Studies from Pricing Insurance Risk book
+# N. Proxies for US Lines
+# O. Novelties (the logo mixed distribution)
 
 # port Weird.Example note{Example with unusual exeqa function.}
 # portfolio.make_awkward
+
+# Editing
+#
+# p = Path.home() / 's/telos/python/aggregate_project/aggregate/agg/test_suite.agg'
+# txt = p.read_text()
+# stxt = txt.split('\n')
+#
+# def f(x):
+#     if x:
+#         m = x.group(0)
+#         letter = m[1]
+#         newletter = chr(ord(letter) + 1)
+#     return f' {newletter}.'
+#
+# ans = []
+# for l in stxt:
+#     if len(l)==0 or l[0] == '#':
+#         ans.append(l)
+#     else:
+#         ans.append(re.sub(r' ([A-Z])\.', f, l))
+# ans = '\n'.join(ans)
+# p.write_text(ans)
 
 # Get this built for future use
 sev One dsev [1]
@@ -34,154 +58,162 @@ sev One dsev [1]
 # How to and Tutorial Examples
 # ============================
 
-# a. Novice Examples
-agg a.Novice.Dice.Roll       dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
-agg a.Novice.Dice.Roll2      dfreq [1]   dsev [1:6]                 note{Same as previous example.}
-agg a.Novice.2.Rolls         dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two die.}
-agg a.Novice.5.Rolls         dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five die.}
-agg a.Novice.1~6.Rolls       dfreq [1:6] dsev [1:6]
-agg a.Novice.Big.Rolls       dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
+# Traffic Example
+agg A.Traffic dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] dsev [1 2 4] [10/16 3/16 3/16]
+agg A.Traffic.Po 1.25 claims                        dsev [1 2 4] [10/16 3/16 3/16] poisson
 
-# A. Basic examples using freq and dsev notation
-agg A.Basic01 dfreq [1] dsev [0 1]                                  note{toss of a single coin}
-agg A.Basic02 dfreq [12] dsev [0 1]                                 note{toss of 12 single coins}
-agg A.Basic03 dfreq [1 2 3] dsev [1 2 10]                           note{1, 2 or 3 claims, sev 1, 2, 10 all equally likely}
-agg A.Basic04 dfreq [1 2 3] [.5 1/4 1/4] dsev [1 2 10]              note{specify probabilities of claims}
-agg A.Basic05 dfreq [1 2 3]   dsev [1 2 10] [.4 .4 .2]              note{specify probabilities of sev}
-agg A.Basic06 dfreq [1 2 3] [.5 1/4 1/4] dsev [1 2 10] [.4 .4 .2]   note{specify both probabilities }
+# Novice Examples
+
+# Basic examples using freq and dsev notation
+agg B.Basic01 dfreq [1] dsev [0 1]                                  note{toss of a single coin}
+agg B.Basic02 dfreq [12] dsev [0 1]                                 note{toss of 12 single coins}
+agg B.Basic03 dfreq [1:3] dsev [1 2 10]                             note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely}
+agg B.Basic03 dfreq [1:11:2] dsev [1 2 10]                          note{1 3...11 claims range and step, sev 1, 2, 10 all equally likely}
+agg B.Basic04 dfreq [1 2 3] [.5 1/4 1/4] dsev [1 2 10]              note{specify probabilities of claims}
+agg B.Basic05 dfreq [1:3]   dsev [1 2 10] [.4 .4 .2]                note{specify probabilities of sev}
+agg B.Basic06 dfreq [1:3] [.5 1/4 1/4] dsev [1 2 10] [.4 .4 .2]     note{specify both probabilities }
 # interaction with usual sev clause
-agg A.Basic07 dfreq [0 1 2] [.5 .3 .2] sev sev.One
-agg A.Basic08 dfreq [0 1 2] [.5 .3 .2] sev.One
-agg A.Basic09 dfreq [0 1 2] [.5 .3 .2] sev lognorm 10 cv .3
+agg B.Basic07 dfreq [0 1 2] [.5 .3 .2] sev sev.One
+agg B.Basic08 dfreq [0 1 2] [.5 .3 .2] sev.One
+agg B.Basic09 dfreq [0 1 2] [.5 .3 .2] sev lognorm 10 cv .3
+# dice roll examples
+agg A.Basic.Dice10 dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
+agg A.Basic.Dice11 dfreq [1]   dsev [1:6]                 note{Same as previous example.}
+agg A.Basic.Dice12 dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two die.}
+agg A.Basic.Dice13 dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five die.}
+agg A.Basic.Dice14 dfreq [1:6] dsev [1:6]                 note{Sum of a dice roll of dice rolls}
+agg A.Basic.Dice15 dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
 
-
-# B. Frequency only, fixed severity
+# Frequency only, fixed severity
 # Using the usual exposure-based frequency clause
-agg B.Freq.Fixed        10 claims sev.One fixed
-agg B.Freq.Poisson      10 claims sev.One poisson
-agg B.Freq.Bernoulli    .8 claims sev.One bernoulli
-agg B.Freq.Binomial     10 claims sev.One binomial 0.5
-agg B.Freq.Binomial     10 claims sev.One geometric
-agg B.Freq.Pascal       10 claims sev.One pascal .8 3
-agg B.Freq.NegBin       10 claims sev.One mixed gamma 0.65
-agg B.Freq.Delaporte    10 claims sev.One mixed delaporte .65 .25
-agg B.Freq.IG           10 claims sev.One mixed ig .65
-agg B.Freq.SIG          10 claims sev.One mixed sig 0.5 0.4
-agg B.Freq.Sichel       10 claims sev.One mixed delaporte .65 -0.25
-agg B.Freq.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25
-agg B.Freq.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25
-agg B.Freq.Beta         10 claims sev.One mixed beta .5 4
+agg C.Freq.Fixed        10 claims sev.One fixed
+agg C.Freq.Poisson      10 claims sev.One poisson
+agg C.Freq.Bernoulli    .8 claims sev.One bernoulli
+agg C.Freq.Binomial     10 claims sev.One binomial 0.5
+agg C.Freq.Geometric    10 claims sev.One geometric
+agg C.Freq.Pascal       10 claims sev.One pascal .8 3
+agg C.Freq.NegBin       10 claims sev.One mixed gamma 0.65
+agg C.Freq.Delaporte    10 claims sev.One mixed delaporte .65 .25
+agg C.Freq.IG           10 claims sev.One mixed ig .65
+agg C.Freq.SIG          10 claims sev.One mixed sig 0.5 0.4
+agg C.Freq.Sichel       10 claims sev.One mixed delaporte .65 -0.25
+agg C.Freq.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25
+agg C.Freq.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25
+agg C.Freq.Beta         10 claims sev.One mixed beta .5 4
 
 
-# C. Severity only, fixed freq, different distributions
+# Severity only, fixed freq, different distributions
 # zero parameter
-agg C.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}
-agg C.Sev02 1 claim sev 100 * expon 1 + 10 fixed
-agg C.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will this work?}
-agg C.Sev04 1 claim sev 100 * norm + 100   fixed
-agg C.Sev05 1 claim sev 100 * uniform + 50 fixed
+agg D.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}
+agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed
+agg D.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will this work?}
+agg D.Sev04 1 claim sev 100 * norm    +100 fixed
+agg D.Sev05 1 claim sev 100 * uniform + 50 fixed
 # one parameter
-agg C.Sev06 1 claim sev 10 * gamma 0.3      fixed
-agg C.Sev07 1 claim sev      gamma 12 cv .3 fixed
-agg C.Sev08 1 claim sev      lognorm 50 cv .3 fixed
-agg C.Sev09 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed          note{mean equals 50 and cv is slightly higher than .3}
-agg C.Sev10 1 claim sev 100 * invgamma 4.07 fixed                   note{remember must set scale or mean}
-agg C.Sev11 1 claim sev 100 * weibull_min 1.5 fixed
-agg C.Sev12 1 claim sev invgauss 10 cv .5 fixed
-agg C.Sev13 1 claim sev 10 * pareto 2.6  + -10 fixed                note{entering Pareto is awkward}
+agg D.Sev06 1 claim sev 10 * gamma 0.3      fixed
+agg D.Sev07 1 claim sev      gamma 12 cv .3 fixed
+agg D.Sev08 1 claim sev      lognorm 50 cv .3 fixed
+agg D.Sev09 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed          note{mean equals 50 and cv is slightly higher than .3}
+agg D.Sev10 1 claim sev 100 * invgamma 4.07 fixed                   note{remember must set scale or mean}
+agg D.Sev11 1 claim sev 100 * weibull_min 1.5 fixed
+agg D.Sev12 1 claim sev invgauss 10 cv .5 fixed
+agg D.Sev13 1 claim sev 10 * pareto 2.6  + -10 fixed                note{entering Pareto is awkward}
 # two parameter distributions
-agg C.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed
+agg D.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed
 
 # empirical severities, continuous and discrete
-agg C.Sev15 1   claim  sev  dhistogram xps [1 10 40] [.5 .3 .2] fixed  note{old notation}
-agg C.Sev16 dfreq [1] dsev [1 10 40] [.5 .3 .2]                        note{preferred new notation}
-agg C.Sev17 1   claim  sev chistogram xps [1 10 40] [.5 .3 .2] fixed   note{continuous version}
+agg D.Sev15 1   claim  sev  dhistogram xps [1 10 40] [.5 .3 .2] fixed  note{old notation}
+agg D.Sev16 dfreq [1] dsev [1 10 40] [.5 .3 .2]                        note{preferred new notation}
+agg D.Sev17 1   claim  sev chistogram xps [1 10 40] [.5 .3 .2] fixed   note{continuous version}
 
-# D. Severity transformations: shift, scale, layer, and attachment, unconditional severities
-agg D.TSev00  1 claim sev      lognorm 10 cv .09 fixed
-agg D.TSev01  1 claim sev 10 * lognorm 10 cv .09 fixed
-agg D.TSev02  1 claim sev      lognorm 10 cv .09 + 20 fixed
-agg D.TSev03  1 claim sev 10 * lognorm 10 cv .09 + 20 fixed
+# Severity transformations: shift, scale, layer, and attachment, unconditional severities
+agg E.TSev00  1 claim sev      lognorm 10 cv .09 fixed
+agg E.TSev01  1 claim sev 10 * lognorm 10 cv .09 fixed
+agg E.TSev02  1 claim sev      lognorm 10 cv .09 + 20 fixed
+agg E.TSev03  1 claim sev 10 * lognorm 10 cv .09 + 20 fixed
 # here, enter shape parameter directly rather than use mean and CV
-agg D.TSev04  1 claim sev 9.559974818331 * lognorm .3 fixed
-agg D.TSev05  1 claim sev 9.559974818331 * lognorm .3 + 5 fixed
+agg E.TSev04  1 claim sev 9.559974818331 * lognorm .3 fixed
+agg E.TSev05  1 claim sev 9.559974818331 * lognorm .3 + 5 fixed
 # with layer and attachments
-agg D.TSev06  1 claim 130 x 20 sev      lognorm 20 cv 0.75     fixed
-agg D.TSev07  1 claim 130 x 20 sev 20 * lognorm 0.75           fixed
-agg D.TSev08  1 claim 130 x 20 sev 20 * lognorm 1 cv 0.75      fixed
-agg D.TSev09  1 claim 130 x 20 sev 20 * lognorm 1 cv 0.75 + 20 fixed
+agg E.TSev06  1 claim 130 x 20 sev      lognorm 20 cv 0.75     fixed
+agg E.TSev07  1 claim 130 x 20 sev 20 * lognorm 0.75           fixed
+agg E.TSev08  1 claim 130 x 20 sev 20 * lognorm 1 cv 0.75      fixed
+agg E.TSev09  1 claim 130 x 20 sev 20 * lognorm 1 cv 0.75 + 20 fixed
 # ground up and unlimited
-agg D.TSev10 10 claims           sev lognorm 10 cv 0.8 poisson
-agg D.TSev11 10 claims  30 xs  0 sev lognorm 10 cv 0.8 poisson
-agg D.TSev12 10 claims 100 xs 10 sev lognorm 10 cv 0.8 poisson
-agg D.TSev13 10 claims inf xs  0 sev lognorm 10 cv 0.8 poisson
-agg D.TSev14 10 claims inf xs 10 sev lognorm 10 cv 0.8 poisson
+agg E.TSev10 10 claims           sev lognorm 10 cv 0.8 poisson
+agg E.TSev11 10 claims  30 xs  0 sev lognorm 10 cv 0.8 poisson
+agg E.TSev12 10 claims 100 xs 10 sev lognorm 10 cv 0.8 poisson
+agg E.TSev13 10 claims inf xs  0 sev lognorm 10 cv 0.8 poisson
+agg E.TSev14 10 claims inf xs 10 sev lognorm 10 cv 0.8 poisson
 # unconditional severity
-agg D.TSev15 5 claims 200 x  0 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}
-agg D.TSev16 5 claims 200 x  0 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}
-agg D.TSev17 5 claims 200 x 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}
-agg D.TSev18 5 claims 200 x 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}
+agg E.TSev15 5 claims 200 x  0 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}
+agg E.TSev16 5 claims 200 x  0 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}
+agg E.TSev17 5 claims 200 x 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}
+agg E.TSev18 5 claims 200 x 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}
 
-# E. Specifying exposure
-agg E.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}
-agg E.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims}
-agg E.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}
-
-
-# F. Mixed severities
-agg F.Mixed01  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wt [.2 .3 .3 .15 .05]             fixed
-agg F.Mixed02  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wts=5                             fixed
-agg F.Mixed03  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0]                                   fixed
-agg F.Mixed04  1  claim  50 xs 0 sev lognorm [2 4 6 8 10] cv 1           wt [.2 .3 .3 .15 .05]             fixed
-agg F.Mixed05  1  claim 250 xs 0 sev lognorm [10 15 20 25 50 100] cv [0.1 0.2 0.4 0.6 0.8 1.0] wts=6       fixed
-agg F.Mixed07  1  claim          sev 100               *  beta [1 200 500 100] [100 800 500 1] wt=4 + 10   fixed
-agg F.Mixed08  1  claim          sev [100 200 250 300] *  beta [1 200 500 100] [100 800 500 1] wt=4 + 10   fixed
-agg F.Mixed09  8  claim          sev      100 * [lognorm expon] [.5 1] wts [0.6 .4]                        fixed           note{different severities}
-agg F.Mixed10  1  claim          sev [50 100] * [lognorm expon]  [2 1]  wt=2         + 10                  fixed
-agg F.Mixed11  1  claim          sev [50 100] * [lognorm expon]  [2 1]               + 10                  fixed
-# illustrates shared mixing
-agg F.Mixed12 50 claims         sev lognorm 12 cv [.75 1 1.25] wt [5/8 2/8 1/8]                           mixed gamma 0.4 note{shared mixing variable}
-
-# G. Limit profiles
-agg G.Limits01               1 claim [1 5 10 20] xs  0              sev lognorm 10 cv 1.2  fixed
-agg G.Limits02               5 claim            100 xs [0 10 50]    sev lognorm 10 cv 1.2  fixed
-agg G.Limits02               5 claim [10 20 50 100] xs [0 0 50 100] sev lognorm 10 cv 2.0  fixed
-agg G.Limits03   [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5]  sev lognorm 10 cv 1.25 fixed
-
-# H. Limit profiles with mixed severities
-agg H.Blend01  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3]                poisson
-agg H.Blend02  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3]                mixed gamma 0.25
-agg H.Blend03  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3] wt=3           mixed gamma 0.25
-agg H.Blend04   1 claims [1 5 10 20] xs  0          sev lognorm 10 cv 1.2 wt [.50 .20 .20 .1]     mixed gamma 0.25
-agg H.Blend05   5 claims [10 20 50 100] xs 10          sev lognorm 10 cv 1.2 wt [.50 .20 .20 .1]  mixed gamma 0.25
-agg H.Blend06 [10 30 15 5]  claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm  10 cv [1.0 1.25 1.5] wts=3         mixed gamma 0.25
-agg H.Blend07   [10 20 30]  claims [100 200 75] xs [0 50 75]    sev lognorm 100 cv [1 2] wts [.6 .4]            mixed gamma 0.4
-agg H.Blend08      [10 30]  claims                              sev lognorm 100 cv [1 2]                        mixed gamma 0.4
-agg H.Blend09  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5
-agg H.Blend10  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
-agg H.Blend11  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5
-agg H.Blend12  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
+# Specifying exposure
+agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}
+agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims}
+agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}
 
 
-# I. Reinsurance
-agg I.Re01  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson
-agg I.Re02  5 claims 100 x 0 sev lognorm 10 cv .75                                                              poisson aggregate net of 50% so 25 x 0 and 75 xs 25
-agg I.Re03  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson aggregate net of 50% so 25 x 0 and 100 xs 25
-agg I.Re04  5 claims 100 x 0 dsev [1:100]          occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson aggregate net of 50% so 25 x 0 and 100 xs 25
-agg I.Re05  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson
-agg I.Re06  5 claims 100 x 0 sev lognorm 10 cv .75                                                              poisson aggregate ceded to 50% so 25 x 0 and 75 xs 25
-agg I.Re07  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson aggregate ceded to 50% so 25 x 0 and 100 xs 25
-agg I.Re08  5 claims 100 x 0 dsev [1:100]          occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson aggregate ceded to 50% so 25 x 0 and 100 xs 25
-agg I.Re09  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 15 x 5 poisson
-agg I.Re10  5 claims 100 x 0 sev lognorm 10 cv .75                            poisson aggregate net of   20 x 0
-agg I.Re11  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 15 x 5 poisson aggregate net of   20 x 0
-agg I.Re12  5 claims 100 x 0 dsev [1:100]          occurrence ceded to 15 x 5 poisson aggregate net of   20 x 0
-agg I.Re13  5 claims 100 x 0 dsev [1:100]          occurrence net of   15 x 5 poisson aggregate ceded to 20 x 0
-agg I.Re14  1000 prem at .5 lr sev lognorm 10 cv [.2 .35 .5] wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 x 2.0      mixed gamma 0.5  aggregate ceded to 1.5 x 1.5 and 5.0 po 10.0 xs 12.5
-agg I.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 x 1 and 2.5 po 5 x 5 and 25% po 30 x 20 and inf xs 100  poisson          aggregate net of 10 x 15
+# Mixed severities
+agg G.Mixed00  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wt [.2 .3 .3 .15 .05]             poisson            note{no shared mixing}
+agg G.Mixed01  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wt [.2 .3 .3 .15 .05]             mixed gamma 0.3    note{shared mixing, compare audit and report dfs}
+agg G.Mixed02  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wts=5                             mixed gamma 0.3
+agg G.Mixed03  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0]                                   mixed gamma 0.3
+agg G.Mixed04  1  claim  50 xs 0 sev lognorm [2 4 6 8 10] cv 1           wt [.2 .3 .3 .15 .05]             mixed gamma 0.3
+agg G.Mixed05  1  claim 250 xs 0 sev lognorm [10 15 20 25 50 100] cv [0.1 0.2 0.4 0.6 0.8 1.0] wts=6       mixed gamma 0.3
+agg G.Mixed07  1  claim          sev 100               *  beta [1 200 500 100] [100 800 500 1] wt=4 + 10   mixed gamma 0.3
+agg G.Mixed08  1  claim          sev [100 200 250 300] *  beta [1 200 500 100] [100 800 500 1] wt=4 + 10   mixed gamma 0.3
+agg G.Mixed09  8  claim          sev      100 * [lognorm expon] [.5 1] wts [0.6 .4]                        mixed gamma 0.3           note{different severities}
+agg G.Mixed10  1  claim          sev [50 100] * [lognorm expon]  [2 1]  wt=2         + 10                  mixed gamma 0.3
+agg G.Mixed11  1  claim          sev [50 100] * [lognorm expon]  [2 1]               + 10                  mixed gamma 0.3
+
+# Limit profiles
+agg H.Limits01               1 claim [1 5 10 20] xs  0              sev lognorm 10 cv 1.2  fixed
+agg H.Limits02               5 claim            100 xs [0 10 50]    sev lognorm 10 cv 1.2  fixed
+agg H.Limits02               5 claim [10 20 50 100] xs [0 0 50 100] sev lognorm 10 cv 2.0  fixed
+agg H.Limits03   [10 10 10 10] claims [inf 10 inf 10] xs [0 0 5 5]  sev lognorm 10 cv 1.25 fixed
+
+# Limit profiles with mixed severities
+agg I.Blend01  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3]                poisson
+agg I.Blend02  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3]                mixed gamma 0.25
+agg I.Blend03  10 claims [5 10 15] x 0                 sev lognorm 12 cv [1 1.5 3] wt=3           mixed gamma 0.25
+agg I.Blend04   1 claims [1 5 10 20] xs  0          sev lognorm 10 cv 1.2 wt [.50 .20 .20 .1]     mixed gamma 0.25
+agg I.Blend05   5 claims [10 20 50 100] xs 10          sev lognorm 10 cv 1.2 wt [.50 .20 .20 .1]  mixed gamma 0.25
+agg I.Blend06 [10 30 15 5]  claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm  10 cv [1.0 1.25 1.5] wts=3         mixed gamma 0.25
+agg I.Blend07   [10 20 30]  claims [100 200 75] xs [0 50 75]    sev lognorm 100 cv [1 2] wts [.6 .4]            mixed gamma 0.4
+agg I.Blend08      [10 30]  claims                              sev lognorm 100 cv [1 2]                        mixed gamma 0.4
+agg I.Blend09  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5
+agg I.Blend10  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
+agg I.Blend11  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5
+agg I.Blend12  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
 
 
-# J. Miscellaneous other novelties, including the Tweedie and the logo-generator
+# Reinsurance
+agg J.Re01  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson
+agg J.Re02  5 claims 100 x 0 sev lognorm 10 cv .75                                                              poisson aggregate net of 50% so 25 x 0 and 75 xs 25
+agg J.Re03  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson aggregate net of 50% so 25 x 0 and 100 xs 25
+agg J.Re04  5 claims 100 x 0 dsev [1:100]          occurrence net of 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20   poisson aggregate net of 50% so 25 x 0 and 100 xs 25
+agg J.Re05  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson
+agg J.Re06  5 claims 100 x 0 sev lognorm 10 cv .75                                                              poisson aggregate ceded to 50% so 25 x 0 and 75 xs 25
+agg J.Re07  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson aggregate ceded to 50% so 25 x 0 and 100 xs 25
+agg J.Re08  5 claims 100 x 0 dsev [1:100]          occurrence ceded to 50% so 5 x 0 and 5 po 15 x 5 and 30 x 20 poisson aggregate ceded to 50% so 25 x 0 and 100 xs 25
+agg J.Re09  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 15 x 5 poisson
+agg J.Re10  5 claims 100 x 0 sev lognorm 10 cv .75                            poisson aggregate net of   20 x 0
+agg J.Re11  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 15 x 5 poisson aggregate net of   20 x 0
+agg J.Re12  5 claims 100 x 0 dsev [1:100]          occurrence ceded to 15 x 5 poisson aggregate net of   20 x 0
+agg J.Re13  5 claims 100 x 0 dsev [1:100]          occurrence net of   15 x 5 poisson aggregate ceded to 20 x 0
+agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv [.2 .35 .5] wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 x 2.0      mixed gamma 0.5  aggregate ceded to 1.5 x 1.5 and 5.0 po 10.0 xs 12.5
+agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 x 1 and 2.5 po 5 x 5 and 25% po 30 x 20 and inf xs 100  poisson          aggregate net of 10 x 15
+# some examples easy to "see" and use of tower
+agg J.Re16 5 claims dsev [0:100] occurrence ceded to tower [10:50:10] poisson
+agg J.Re17 5 claims dsev [0:100] poisson aggregate ceded to tower [200:500:100]
+
+
+
+# Tweedie distributions
 # Tweedies with mu=1, p=1.005 and sigma2=0.1, which is close to Poisson
 #
 # from aggregate import tweedie_convert
@@ -215,60 +247,58 @@ agg I.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence ne
 #     a.object.plot()
 #     plt.gcf().suptitle(a.program)
 
-agg J.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson
-agg J.Tweedie1 10.050251256281404 claims sev 0.0005 * gamma 199 poisson
-agg J.Tweedie2 tweedie 1 1.005 0.1
+agg K.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv}
+agg K.Tweedie1 10.050251256281404 claims sev 0.0005 * gamma 199 poisson                  note{Tweedie defined by claim count, gamma scale and shape}
+agg K.Tweedie2 tweedie 1 1.005 0.1                                                       note{Tweedie defined using mean, p, and dispersion, variance = dispersion x mean**p}
 
-agg J.Logo 1 claim [10 22.632 35.263 47.895 60.526 73.158 85.789 98.421 111.05 123.68 136.32 148.95 161.58 174.21 186.84 199.47 212.11 224.74 237.37 250] xs 0 sev lognorm 100 cv 1 fixed
-
-# K. Examples from books and papers
-port K.BODOFF1 note{Bodoff Thought Experiment No. 1}
+# Examples from books and papers
+port L.Bodoff1 note{Bodoff Thought Experiment No. 1}
     agg wind1  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
     agg quake1 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
-port K.BODOFF2 note{Bodoff Thought Experiment No. 2}
+port L.Bodoff2 note{Bodoff Thought Experiment No. 2}
     agg wind2  1 claim sev dhistogram xps [0,  50] [0.80, 0.20] fixed
     agg quake2 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
-port K.BODOFF3 note{Bodoff Thought Experiment No. 3}
+port L.Bodoff3 note{Bodoff Thought Experiment No. 3}
     agg wind3  1 claim sev dhistogram xps [0,   5] [0.80, 0.20] fixed
     agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
-port K.BODOFF4 note{Bodoff Thought Experiment No. 4 (check!)}
+port L.Bodoff4 note{Bodoff Thought Experiment No. 4 (check!)}
     agg a 0.25 claims sev   4 * expon poisson
     agg b 0.05 claims sev  20 * expon poisson
     agg c 0.05 claims sev 100 * expon poisson
 
 # PIR book case studies
 # hints: reg_p=1, roe=0.10, bs=1, log2=8, padding=1
-port K.PIR.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.}
+port M.PIR.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.}
     agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed
     agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed
 
 # hints: reg_p=.999, roe=0.10, bs=1/64, log2=16, padding=1
-port K.PIR.Tame note{PIR Tame case study. For reinsurance see text.}
+port M.PIR.Tame note{PIR Tame case study. For reinsurance see text.}
     agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed
     agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed
 
 # hints: reg_p=.999, roe=0.10, bs=1/64, log2=16, padding=1
-port K.PIR.CNC.Gross note{PIR Cat-Noncat gross case study.}
+port M.PIR.CNC.Gross note{PIR Cat-Noncat gross case study.}
     agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed
     agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed
 
-port K.PIR.CNC.Net note{PIR Cat-Noncat net case study.}
+port M.PIR.CNC.Net note{PIR Cat-Noncat net case study.}
     agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed
     agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11
 
 # hints: reg_p=.999, roe=0.10, bs=1/4, log2=19, padding=1
-port K.PIR.HuSCS.Gross note{PIR Hurricane SCS gross case study.}
+port M.PIR.HuSCS.Gross note{PIR Hurricane SCS gross case study.}
     agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson
     agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson
 
-port K.PIR.HuSCS.Net note{PIR Hurricane SCS net case study.}
+port M.PIR.HuSCS.Net note{PIR Hurricane SCS net case study.}
     agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson
     agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson
 
-# L. Proxies for US Lines
+# Proxies for US Lines
 
 # for portfolio construction: 10M sized books with "reasonable" severity curves
 # IRS: used cycle adjusted numbers, no further adjustments
@@ -277,29 +307,33 @@ port K.PIR.HuSCS.Net note{PIR Hurricane SCS net case study.}
 # SCS events 3-6 billion; https://www.aon.com/reinsurance/catastropheinsight/global-regional-losses.html?region=United%20States&type=insured
 # shows avg / year about 25B, so mean severity is 25 / 37.5 = 2/3 = 666M
 # sigma 1.75 of  makes 10B a 1 in 16 event; mu mean=666 eq np.log(666e6) - 1.75**2/2 = 18.785550228504665
-agg L.US.Hurricane 1.79 claims 1e12 xs 0 sev exp(19.595) * lognorm 2.581 poisson  note{Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.}
-agg L.US.SCS      37.50 claims 50e9 xs 0 sev exp(18.785550228504665) * lognorm 1.75 poisson note{Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B}
+agg N.US.Hurricane 1.79 claims 1e12 xs 0 sev exp(19.595) * lognorm 2.581 poisson  note{Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.}
+agg N.US.SCS      37.50 claims 50e9 xs 0 sev exp(18.785550228504665) * lognorm 1.75 poisson note{Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B}
 
 # CVs based on sigmas of 1.5 for liab, 1.75 for prof and 1.25 for ppa
 # Average severity selected judgmentally
-agg L.Comm.Liability     10e6 loss 1e6 xs 0   sev lognorm 100e3 cv 3.77 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
-agg L.Comm.Professional  10e6 loss 5e6 xs 0   sev lognorm 850e3 cv 8.48 mixed gamma 0.27 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
-agg L.Personal.Auto            10e6 loss 300e3 xs 0 sev lognorm  45e3 cv 20.4 mixed gamma 0.13 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Comm.Liability     10e6 loss 1e6 xs 0   sev lognorm 100e3 cv 3.77 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Comm.Professional  10e6 loss 5e6 xs 0   sev lognorm 850e3 cv 8.48 mixed gamma 0.27 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Personal.Auto            10e6 loss 300e3 xs 0 sev lognorm  45e3 cv 20.4 mixed gamma 0.13 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
 
 # limits profile low and high limits and attaching book: 1/1, 4/1 and 5/5
 # severity midway between liability and professional
-agg L.Comm.Umbrella [6e6 3e6 1e6] loss [1e6 4e6 5e6] xs [1e6 1e6 5e6] sev lognorm 250e3 cv 5.00 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Comm.Umbrella [6e6 3e6 1e6] loss [1e6 4e6 5e6] xs [1e6 1e6 5e6] sev lognorm 250e3 cv 5.00 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
 
 # property mixed severity property and cat, pass through mixing
 # note on CV of betas: for high cv it becomes a zero / one variable, to the variance maxes out at p (1-p) where p is the mean
 # thus the CV maxes out at 1/sqrt(p(1-p)). For a mean of 0.1 the variance equals 1/sqrt(0.09) = 0.3 and the cv is 0.3 / 0.1 = 3
 # could limit profile too, but keep simple
 # assumes full ITV
-agg L.Comm.Property [7e6 3e6] loss 100e6 xs 0 sev 100e6 * beta 0.1 cv [1.25 2.5] mixed gamma 0.28 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
-agg L.Homeowners          [8e6 2e6] loss 650e3 xs 0 sev 650e3 * beta 0.1 cv [0.75 2.75] mixed gamma 0.37 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Comm.Property [7e6 3e6] loss 100e6 xs 0 sev 100e6 * beta 0.1 cv [1.25 2.5] mixed gamma 0.28 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
+agg N.Homeowners          [8e6 2e6] loss 650e3 xs 0 sev 650e3 * beta 0.1 cv [0.75 2.75] mixed gamma 0.37 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}
 
 # really a severity curve, but you can't mix severity
-agg L.Comm.Auto.MED 1 claim sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] fixed note{Use log2=18 and bs=500 or apply limits. Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022).}
+agg N.Comm.Auto.MED 1 claim sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] fixed note{Use log2=18 and bs=500 or apply limits. Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022).}
+
+
+# Novelties
+agg O.Logo 1 claim [10 22.632 35.263 47.895 60.526 73.158 85.789 98.421 111.05 123.68 136.32 148.95 161.58 174.21 186.84 199.47 212.11 224.74 237.37 250] xs 0 sev lognorm 100 cv 1 fixed
 
 
 

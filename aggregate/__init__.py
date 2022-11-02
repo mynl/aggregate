@@ -22,12 +22,11 @@ del p, base_dir
 
 
 # imports
-from .underwriter import Underwriter, build, actuary_build, student_build, \
-        capital_build, dev_build
+from .underwriter import Underwriter, build, debug_build
 from .portfolio import Portfolio, make_awkward
 from .distributions import Frequency, Severity, Aggregate
 from .spectral import Distortion
-from .utilities import get_fmts, pprint, ft, \
+from .utilities import get_fmts, pprint, pprint_ex, ft, \
     ift, sln_fit, sgamma_fit, estimate_agg_percentile, \
     axiter_factory, AxisManager, lognorm_lev, html_title, \
     sensible_jump, suptitle_and_tight, \
@@ -40,12 +39,13 @@ from .utilities import get_fmts, pprint, ft, \
     iman_conover, rearrangement_algorithm_max_VaR, \
     mu_sigma_from_mean_cv, \
     make_corr_matrix, random_corr_matrix, \
-    LoggerManager
+    LoggerManager, knobble_fonts
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 
 # as a default turn off all logging
 logger_level(30)
+knobble_fonts()
 
 # module level doc-string
 __doc__ = """

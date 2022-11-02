@@ -502,7 +502,7 @@ class Portfolio(object):
         a_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
         a_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
         a_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
-        df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
+        df = pd.DataFrame({'E[X]': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
                            'Skew(X)': [sev_skew, n_skew, a_skew]},
                           index=['Sev', 'Freq', 'Agg'])
         df.index.name = 'X'
@@ -512,13 +512,13 @@ class Portfolio(object):
             esev_cv = np.nan # self.audit_df.loc['total', 'emp_sev_cv']
             ea_m = self.audit_df.loc['total', 'EmpEX1']
             ea_cv = self.audit_df.loc['total', 'EmpCV']
-            df.loc['Sev', 'Est E(X)'] = esev_m
-            df.loc['Agg', 'Est E(X)'] = ea_m
-            df['Err E(X)'] = df['Est E(X)'] / df['E(X)'] - 1
+            df.loc['Sev', 'Est E[X]'] = esev_m
+            df.loc['Agg', 'Est E[X]'] = ea_m
+            df['Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
             df.loc['Sev', 'Est CV(X)'] = esev_cv
             df.loc['Agg', 'Est CV(X)'] = ea_cv
             df['Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
-            df = df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']

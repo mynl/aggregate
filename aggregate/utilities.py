@@ -293,25 +293,76 @@ def make_ceder_netter(reins_list, debug=False):
     """
     Build the netter and ceder functions. It is applied to occ_reins and agg_reins,
     so should be stand-alone.
-    TODO deal with infinity!; limit is inf then share = 1 as percentage not currency amount
+
+    The reinsurance functions are piecewise linear functions from 0 to inf which
+    kinks as needed to express the ceded loss as a function of subject (gross) loss.
+
+    For example, if reins_list = [(1, 10, 0), (0.5, 30, 20)] the program is 10 x 10 and
+    15 part of 30 x 20 (share=0.5). This requires nodes at 0, 10, 20, 50, and inf.
+
+    It is easiest to make the ceder function. Ceded loss at subject loss at x equals
+    the sum of the limits below x plus the cession to the layer in which x lies. The
+    variable `base` keeps track of the layer, `h` of the sum (height) of lower layers.
+    `xs` tracks the knot points, `ys` the values.
+
+         Break (xs)   Ceded (ys)
+              0            0
+             10            0
+             20           10
+             50           25
+            inf           25
+
+
+    For example:
+    ::
+
+        %%sf 1 2
+
+        c, n, x, y = make_ceder_netter([(1, 10, 10), (0.5, 30, 20), (.25, np.inf, 50)], debug=True)
+
+        xs = np.linspace(0,250, 251)
+        ys = c(xs)
+
+        ax0.plot(xs, ys)
+        ax0.plot(xs, xs, ':C7')
+        ax0.set(title='ceded')
+
+        ax1.plot(xs, xs-ys)
+        ax1.plot(xs, xs, 'C7:')
+        ax1.set(title='net')
+
+    :param reins_list: a list of (share of, limit, attach), eg (0.5, 3, 2) means 50% share of 3x2
+    or, equivalently, 1.5 part of 3x2. It is better to store share rather than part
+    because it still works if limit == inf.
+    :param debug: if True, return layer function xs and ys in addition to the interpolation functions.
+
     """
+    # poor mans inf
+    INF = 1e99
     h = 0
     base = 0
     xs = [0]
     ys = [0]
-    for (p, y, a) in reins_list:
+    for (share, y, a) in reins_list:
+        # part of = share of times limit
         if np.isinf(y):
-            raise NotImplementedError('inf not implemented')
-        else:
-            if a > base:
-                xs.append(a)
-                ys.append(h)
-            h += p
-            xs.append(a + y)
+            y = INF
+        p = share * y
+        if a > base:
+            # moved to new layer, write out left-hand knot point
+            xs.append(a)
             ys.append(h)
-            base += (a + y)
-    xs.append(np.inf)
-    ys.append(h)
+        # increment height
+        h += p
+        # write out right-hand knot points
+        xs.append(a + y)
+        ys.append(h)
+        # update left-hand end
+        base += (a + y)
+    # if not at infinity, stay flat from base to end
+    if base < INF:
+        xs.append(np.inf)
+        ys.append(h)
     ceder = interp1d(xs, ys)
     netter = lambda x: x - ceder(x)
     if debug:

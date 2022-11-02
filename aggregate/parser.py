@@ -525,34 +525,27 @@ class UnderwritingParser(Parser):
             f'reins_clause <-- tower', p)
         limit = p.tower[0]
         attach = p.tower[1]
-        return [(1, l, a) for l, a in zip(limit, attach)]
+        return [(1.0, l, a) for l, a in zip(limit, attach)]
 
     @_('expr XS expr')
     def reins_clause(self, p):
         self.logger(
             f'reins_clause <-- expr XS expr {p[0]} xs {p[2]}', p)
-        if np.isinf(p[0]):
-            return (1, p[0], p[2])
-        else:
-            # y p/o y xs a
-            return (p[0], p[0], p[2])
+        return (1.0, p[0], p[2])
 
     @_('expr SHARE_OF expr XS expr')
     def reins_clause(self, p):
         self.logger(
             f'reins_clause <-- expr SHARE_OF expr XS expr {p[0]} s/o {p[2]} xs {p[4]}', p)
-        # here expr is the proportion...
-        # TODO should always store as a proportion; that holds for np.inf
-        if np.isinf(p[2]):
-            return (p[0], p[2], p[4])
-        else:
-            return (p[0] * p[2], p[2], p[4])
+        # here expr is the proportion...always store as a proportion
+        return (p[0], p[2], p[4])
 
     @_('expr PART_OF expr XS expr')
     def reins_clause(self, p):
         self.logger(
             f'reins_clause <-- expr PART_OF expr XS expr {p[0]} p/o {p[2]} xs {p[4]}', p)
-        return (p[0], p[2], p[4])
+        # here expr is the currency amount of cover
+        return (p[0] / p[2], p[2], p[4])
 
     # severity term ============================================
     @_('SEV sev %prec LOW')
@@ -748,6 +741,8 @@ class UnderwritingParser(Parser):
         breaks = p.doutcomes
         if breaks[0] != 0:
             breaks = np.hstack((0., breaks))
+        if not np.isinf(breaks[-1]):
+            breaks = np.hstack((breaks, np.inf))
         limits = np.diff(breaks)
         attach = breaks[:-1]
         # logger.info('\n'.join([f'{x} xs {y}' for x, y in zip(limits, attach)]))

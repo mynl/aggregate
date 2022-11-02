@@ -550,7 +550,7 @@ class Aggregate(Frequency):
     @property
     def reins_audit_df(self):
         """
-        Create and return the _density_df data frame.
+        Create and return the _reins_audit_df data frame.
         Read only property.
 
         :return:
@@ -582,19 +582,24 @@ class Aggregate(Frequency):
         ans = []
         assert self.sev_density is not None
 
+        # reins = self.occ_reins if kind == 'occ' else self.agg_reins
+
         # TODO what about agg?
-        if self.sev_gross_density is None:
-            self.sev_gross_density = self.sev_density
-
-        reins = self.occ_reins if kind == 'occ' else self.agg_reins
-
-        for (s, y, a) in reins:
-            c, n, df = self._apply_reins_work([(s, y, a)], self.sev_gross_density, False)
-            ans.append(df)
-
         if kind == 'occ':
+            if self.sev_gross_density is None:
+                self.sev_gross_density = self.sev_density
+            reins = self.occ_reins
+            for (s, y, a) in reins:
+                c, n, df = self._apply_reins_work([(s, y, a)], self.sev_gross_density, False)
+                ans.append(df)
             ans.append(self.occ_reins_df)
-        else:
+        elif kind == 'agg':
+            if self.agg_gross_density is None:
+                self.agg_gross_density = self.agg_density
+            reins = self.agg_reins
+            for (s, y, a) in reins:
+                c, n, df = self._apply_reins_work([(s, y, a)], self.agg_gross_density, False)
+                ans.append(df)
             ans.append(self.agg_reins_df)
 
         df = pd.concat(ans, keys=reins + [('all', np.inf, 'gup')], names=['share', 'limit', 'attach', 'loss'])
@@ -1147,7 +1152,7 @@ class Aggregate(Frequency):
                 z = ft(self.sev_density, padding, tilt_vector)
                 self.ftagg_density = self.mgf(self.n, z)
                 if np.sum(self.en) == 1 and self.freq_name == 'fixed':
-                    logger.info('FIXED 1: skipping FFT calcul                                                                                                              ation')
+                    logger.info('FIXED 1: skipping FFT calculation')
                     # copy to be safe
                     self.agg_density = self.sev_density.copy()
                 else:
@@ -1299,11 +1304,28 @@ class Aggregate(Frequency):
         # summarized n and c
         sn = reins_df.groupby('loss_net').p_subject.sum()
         sc = reins_df.groupby('loss_ceded').p_subject.sum()
+        # It can be that sn or sc has one row. For example, if the reinsurance cedes everything
+        # then net is 0. That case must be handled separately.
         # -100: this value should never appear. use big value to make it obvious
-        netter_interp = interp1d(sn.index, sn.cumsum(), fill_value=(-100, 1), bounds_error=False)
-        ceder_interp = interp1d(sc.index, sc.cumsum(), fill_value=(-100, 1), bounds_error=False)
-        reins_df['F_net'] = netter_interp(reins_df.loss)
-        reins_df['F_ceded'] = ceder_interp(reins_df.loss)
+        if len(sn) == 1:
+            # net is a fixed value, need a step function
+            loss = sn.index[0]
+            value = sn.iloc[0]
+            logger.warning(f'Only one net value at {loss} with prob = {value}')
+            reins_df['F_net'] = 0.0
+            reins_df.loc[loss:, 'F_net'] = value
+        else:
+            netter_interp = interp1d(sn.index, sn.cumsum(), fill_value=(-100, 1), bounds_error=False)
+            reins_df['F_net'] = netter_interp(reins_df.loss)
+        if len(sc) == 1:
+            loss = sc.index[0]
+            value = sc.iloc[0]
+            logger.warning(f'Only one net value at {loss} with prob = {value}')
+            reins_df['F_ceded'] = 0.0
+            reins_df.loc[loss:, 'F_ceded'] = value
+        else:
+            ceder_interp = interp1d(sc.index, sc.cumsum(), fill_value=(-100, 1), bounds_error=False)
+            reins_df['F_ceded'] = ceder_interp(reins_df.loss)
         reins_df['p_net'] = np.diff(reins_df.F_net, prepend=0)
         reins_df['p_ceded'] = np.diff(reins_df.F_ceded, prepend=0)
 
@@ -2027,7 +2049,7 @@ class Aggregate(Frequency):
         n_cv = st.freq_cv
         a_m = st.agg_m
         a_cv = st.agg_cv
-        df = pd.DataFrame({'E(X)': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
+        df = pd.DataFrame({'E[X]': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
                            'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
                           index=['Sev', 'Freq', 'Agg'])
         df.index.name = 'X'
@@ -2036,14 +2058,15 @@ class Aggregate(Frequency):
             esev_cv = self.audit_df.loc['mixed', 'emp_sev_cv']
             ea_m = self.audit_df.loc['mixed', 'emp_agg_1']
             ea_cv = self.audit_df.loc['mixed', 'emp_agg_cv']
-            df.loc['Sev', 'Est E(X)'] = esev_m
-            df.loc['Agg', 'Est E(X)'] = ea_m
-            df.loc[:, 'Err E(X)'] = df['Est E(X)'] / df['E(X)'] - 1
+            df.loc['Sev', 'Est E[X]'] = esev_m
+            df.loc['Agg', 'Est E[X]'] = ea_m
+            df.loc[:, 'Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
             df.loc['Sev', 'Est CV(X)'] = esev_cv
             df.loc['Agg', 'Est CV(X)'] = ea_cv
             df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
-            df = df[['E(X)', 'Est E(X)', 'Err E(X)', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
         df = df.fillna('')
+        df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
 
     def recommend_bucket(self, log2=10, verbose=False):
@@ -2686,9 +2709,9 @@ class Severity(ss.rv_continuous):
 
         from .portfolio import Portfolio
 
-        ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
-        # I think this is preferred now, but these are the same (probably...)
-        # super().__init__(name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        super().__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        # ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+
         self.program = ''    # may be set externally
         self.limit = exp_limit
         self.attachment = exp_attachment
@@ -2704,7 +2727,7 @@ class Severity(ss.rv_continuous):
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
         logger.debug(
-            f'Severity.__init__  | creating new Severity {self.sev_name} at {super(Severity, self).__repr__()}')
+            f'Severity.__init__  | creating new Severity {self.sev_name} at {super().__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
         # allows you to define fixed with just xs=1 (no log)
         if sev_xs is not None:
@@ -3093,7 +3116,71 @@ class Severity(ss.rv_continuous):
             1  1.180294e+15  1.180294e+15  5.242473e-13    9.669522e+12
             2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
 
+
+        The numerical issues are very sensitive. Goign for a compromise between
+        speed and accuracy. Only an issue for very thick tailed distributions
+        with no upper limit - not a realistic situation.
+        Here is a tester program for two common cases:
+
+        ::
+            logger_level(30) # see what is going on
+            for sh, dist in zip([1,2,3,4, 3.5,2.5,1.5,.5], ['lognorm']*3 + ['pareto']*4):
+                s = Severity(dist, sev_a=sh, sev_scale=1, exp_attachment=0)
+                print(dist,sh, s.moms())
+                if dist == 'lognorm':
+                    print('actual', [(n, np.exp(n*n*sh*sh/2)) for n in range(1,4)])
+
+        :return: vector of moments. ``np.nan`` signals unreliable but finite value.
+            ``np.inf`` is correct, the moment does not exist.
+
         """
+
+        # def safe_integrate(f, lower, upper, level, big):
+        #     """
+        #     Integrate the survival function, pay attention to error messages. Split integral if needed.
+        #     One shot pass.
+        #
+        #     """
+        #
+        #     argkw = dict(limit=100, epsrel=1e-8, full_output=1)
+        #     if upper < big:
+        #         split = 'no'
+        #         ex = quad(f, lower, upper, **argkw)
+        #         ans = ex[0]
+        #         err = ex[1]
+        #         steps = ex[2]['last']
+        #         if len(ex) == 4:
+        #             msg = ex[3][:33]
+        #         else:
+        #             msg = ''
+        #
+        #     else:
+        #         split = 'yes'
+        #         ex = quad(f, lower, big, **argkw)
+        #         ans1 = ex[0]
+        #         err1 = ex[1]
+        #         steps1 = ex[2]['last']
+        #         if len(ex) == 4:
+        #             msg1 = ex[3][:33]
+        #         else:
+        #             msg1 = ''
+        #
+        #         ex2 = quad(f, big, upper, **argkw)
+        #         ans2 = ex2[0]
+        #         err2 = ex2[1]
+        #         steps2 = ex2[2]['last']
+        #         if len(ex2) == 4:
+        #             msg2 = ex2[3][:33]
+        #         else:
+        #             msg2 = ''
+        #
+        #         ans = ans1 + ans2
+        #         err = err1 + err2
+        #         steps = steps1 + steps2
+        #         msg = msg1 + ' ' + msg2
+        #         logger.warning(f'integrals: lhs={ans:,.0f}, rhs={ans2:,.0f}')
+        #     logger.warning(f'E[X^{level}]: split={split}, ansr={ans}, error={err}, steps={steps}; message {msg}')
+        #     return ans
 
         def safe_integrate(f, lower, upper, level):
             """
@@ -3101,28 +3188,32 @@ class Severity(ss.rv_continuous):
 
             """
 
-            argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
+            # argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
+            argkw = dict(limit=100, epsrel=1e-6 if level==1 else 1e-4, full_output=1)
             ex = quad(f, lower, upper, **argkw)
             if len(ex) == 4 or ex[0] == np.inf:  # 'The integral is probably divergent, or slowly convergent.':
                 msg = ex[-1].replace("\n", " ") if ex[-1] == str else "no message"
-                logger.warning(
-                    f'Severity.moms | ansr={ex[0]}, message {msg} ->')
+                logger.info(f'E[X^{level}]: ansr={ex[0]}, error={ex[1]}, steps={ex[2]["last"]}; message {msg} -> splitting integral')
+                # blow off other steps....
+                # use nan to mean "unreliable
+                # return np.nan   #  ex[0]
                 # this is too slow...and we don't really use it...
-                ϵ = 0.001
+                ϵ = 0.0001
                 if lower == 0 and upper > ϵ:
-                    logger.warning(
+                    logger.info(
                         f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                     exa = quad(f, 1e-16, ϵ, **argkw)
                     exb = quad(f, ϵ, upper, **argkw)
-                    if len(exa) == 4:
-                        msg = exa[-1].replace("\n", " ")
-                        logger.warning(f'Severity.moms | [ϵ, 0.01] split EX^{level} integral returned {msg}')
-                    if len(exb) == 4:
-                        msg = exb[-1].replace("\n", " ")
-                        logger.warning(f'Severity.moms | [ϵ, 1] split EX^{level} integral returned {msg}')
+                    logger.info(f'Severity.moms | [1e-16, {ϵ}] split EX^{level}: ansr={exa[0]}, error={exa[1]}, steps={exa[2]["last"]}')
+                    logger.info(f'Severity.moms | [{ϵ}, {upper}] split EX^{level}: ansr={exb[0]}, error={exb[1]}, steps={exb[2]["last"]}')
                     ex = (exa[0] + exb[0], exa[1] + exb[1])
-            ex = ex[0]
-            return ex
+                    # if exa[2]['last'] < argkw['limit'] and exb[2]['last'] < argkw['limit']:
+                    #     ex = (exa[0] + exb[0], exa[1] + exb[1])
+                    # else:
+                    #     # reached limit, unreliable
+                    #     ex = (np.nan, np.nan)
+            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1]/ex[0]}')
+            return ex[:2]
 
         # we integrate isf not q, so upper and lower are swapped
         if self.attachment == 0:
@@ -3140,9 +3231,50 @@ class Severity(ss.rv_continuous):
             ex2 = self.sev2
             ex3 = self.sev3
         else:
-            ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-            ex2 = safe_integrate(lambda x: self.fz.isf(x) ** 2, lower, upper, 2)
-            ex3 = safe_integrate(lambda x: self.fz.isf(x) ** 3, lower, upper, 3)
+            if self.detachment == np.inf:
+                # figure which moments actually exist
+                moments_finite = list(map(lambda x: not (np.isinf(x) or np.isnan(x)), self.fz.stats('mvs')))
+            else:
+                moments_finite = [True, True, True]
+            logger.info(str(moments_finite))
+            continue_calc = True
+            max_rel_error = 1e-3
+            if moments_finite[0]:
+                ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
+                if ex1[1] / ex1[0] < max_rel_error:
+                    ex1 = ex1[0]
+                else:
+                    ex1 = np.nan
+                    continue_calc = False
+            else:
+                logger.info('First moment does not exist.')
+                ex1 = np.inf
+
+            if continue_calc and moments_finite[1]:
+                ex2 = safe_integrate(lambda x: self.fz.isf(x) ** 2, lower, upper, 2)
+                # we know the mean; use that scale to determine if the absolute error is reasonable?
+                if ex2[1] / ex2[0] < max_rel_error: # and ex2[1] < 0.01 * ex1**2:
+                    ex2 = ex2[0]
+                else:
+                    ex2 = np.nan
+                    continue_calc = False
+            elif not continue_calc:
+                ex2 = np.nan
+            else:
+                logger.info('Second moment does not exist.')
+                ex2 = np.inf
+
+            if continue_calc and moments_finite[2]:
+                ex3 = safe_integrate(lambda x: self.fz.isf(x) ** 3, lower, upper, 3)
+                if ex3[1] / ex3[0] < max_rel_error:
+                    ex3 = ex3[0]
+                else:
+                    ex3 = np.nan
+            elif not continue_calc:
+                ex3 = np.nan
+            else:
+                logger.info('Third moment does not exist.')
+                ex3 = np.inf
 
         # adjust
         dma = self.detachment - self.attachment

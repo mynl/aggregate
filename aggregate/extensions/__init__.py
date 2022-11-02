@@ -3,6 +3,8 @@
 
 # imports
 from . basic import *
+from .case_studies import *
+from .samples import *
 
 # module level doc-string
 __doc__ = """

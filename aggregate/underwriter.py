@@ -540,6 +540,8 @@ class Underwriter(object):
                 # figure stuff
                 if log2 == -1:
                     log2_ = 13
+                elif log2 == 0:
+                    log2_ = self.log2
                 else:
                     log2_ = log2
                 if bs == 0:

@@ -86,20 +86,20 @@ agg A.Basic.Dice15 dfreq [1:4] dsev [1:16]                note{Something you can
 
 # Frequency only, fixed severity
 # Using the usual exposure-based frequency clause
-agg C.Freq.Fixed        10 claims sev.One fixed
-agg C.Freq.Poisson      10 claims sev.One poisson
-agg C.Freq.Bernoulli    .8 claims sev.One bernoulli
-agg C.Freq.Binomial     10 claims sev.One binomial 0.5
-agg C.Freq.Geometric    10 claims sev.One geometric
-agg C.Freq.Pascal       10 claims sev.One pascal .8 3
-agg C.Freq.NegBin       10 claims sev.One mixed gamma 0.65
-agg C.Freq.Delaporte    10 claims sev.One mixed delaporte .65 .25
-agg C.Freq.IG           10 claims sev.One mixed ig .65
-agg C.Freq.SIG          10 claims sev.One mixed sig 0.5 0.4
-agg C.Freq.Sichel       10 claims sev.One mixed delaporte .65 -0.25
-agg C.Freq.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25
-agg C.Freq.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25
-agg C.Freq.Beta         10 claims sev.One mixed beta .5 4
+agg C.Freq01.Fixed        10 claims sev.One fixed
+agg C.Freq02.Poisson      10 claims sev.One poisson
+agg C.Freq03.Bernoulli    .8 claims sev.One bernoulli
+agg C.Freq04.Binomial     10 claims sev.One binomial 0.5
+agg C.Freq05.Geometric    10 claims sev.One geometric
+agg C.Freq06.Pascal       10 claims sev.One pascal .8 3
+agg C.Freq07.NegBin       10 claims sev.One mixed gamma 0.65
+agg C.Freq08.Delaporte    10 claims sev.One mixed delaporte .65 .25
+agg C.Freq09.IG           10 claims sev.One mixed ig .65
+agg C.Freq10.SIG          10 claims sev.One mixed sig 0.5 0.4
+agg C.Freq11.Sichel       10 claims sev.One mixed delaporte .65 -0.25
+agg C.Freq12.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25
+agg C.Freq13.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25
+agg C.Freq14.Beta         10 claims sev.One mixed beta .5 4
 
 
 # Severity only, fixed freq, different distributions
@@ -107,8 +107,9 @@ agg C.Freq.Beta         10 claims sev.One mixed beta .5 4
 agg D.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}
 agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed
 agg D.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will this work?}
-agg D.Sev04 1 claim sev 100 * norm    +100 fixed
+agg D.Sev04 1 claim sev 100 * norm    +500 fixed
 agg D.Sev05 1 claim sev 100 * uniform + 50 fixed
+agg D.Sev05b 2 claims sev 100*uniform + 50 fixed
 # one parameter
 agg D.Sev06 1 claim sev 10 * gamma 0.3      fixed
 agg D.Sev07 1 claim sev      gamma 12 cv .3 fixed

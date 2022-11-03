@@ -15,24 +15,12 @@ Table of Contents
 -----------------
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
-   0_quick_start
-   1_Tutorials
-   2_HowTo
-   03_Basic_Examples.ipynb
-   3_Discussion
-   4_Reference
-   5_Langauge_Reference
-   6_Technical
-
-
-Other things to find, ::
-
-   /s/telos/python/examples/snippets/discrete_aggregates.ipynb
-   /s/telos/python/examples/snippets/dice_aggregates.ipynb
-   /s/telos/python/examples/snippets/mixed_exponentials.ipynb
-   /s/telos/python/examples/snippets/Tweedie.ipynb
-   /s/telos/python/examples/snippets/basic_reinsurance.ipynb
-   /s/telos/python/examples/snippets/limit_profiles_mixed_severity_mixing.ipynb
+   1_Getting_Started
+   2_User_Guide
+   3_Reference
+   4_agg_Language_Reference
+   5_Technical_Resources
+   6_Development
 

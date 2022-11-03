@@ -5,7 +5,11 @@ __pycache__/
 
 .idea/
 
-doc/
+# Sphinx documentation
+doc/_build
+doc/_static
+doc/_templates
+doc/_theme
 
 # C extensions
 *.so
@@ -28,7 +32,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-doc
 node_modules/*
 frozen_0.9.2/*
 dm*.*
@@ -109,7 +112,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# Sphinx documentation
-2RM*.*
-doc/_build/html/
 

@@ -1,5 +1,5 @@
 ======================
-5. Technical Resources
+Technical Resources
 ======================
 
 

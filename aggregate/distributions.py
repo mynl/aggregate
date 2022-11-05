@@ -22,7 +22,7 @@ from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    mu_sigma_from_mean_cv, pprint
+    pprint, approximate_work, moms_analytic
 
 from .spectral import Distortion
 
@@ -807,6 +807,8 @@ class Aggregate(Frequency):
         self.sev_calc = ""
         self.discretization_calc = ""
         self.normalize = ""
+        self.approximation = ''
+        self.padding = 0
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
@@ -934,10 +936,43 @@ class Aggregate(Frequency):
 
     def __repr__(self):
         """
-        wrap default with name
+        String version of _repr_html_
         :return:
         """
-        return f'{super(Aggregate, self).__repr__()} name: {self.name}'
+        # [ORIGINALLY] wrap default with name
+        # return f'{super(Aggregate, self).__repr__()} name: {self.name}'
+
+        s = []
+        s.append(f'Aggregate object         {self.name}')
+        s.append(f'Claim count              {self.n:0,.2f}')
+        s.append(f'Frequency distribution   {self.freq_name}')
+        n = len(self.statistics_df)
+        if n == 1:
+            sv = self.sevs[0]
+            if sv.limit == np.inf and sv.attachment == 0:
+                _la = 'unlimited'
+            else:
+                _la = f'{sv.limit:,.0f} xs {sv.attachment:,.0f}'
+            s.append(f'Severity distribution    {sv.long_name}, {_la}.')
+        else:
+            s.append(f'Severity with {n} components.')
+        if self.bs > 0:
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
+            s.append(f'bs                       {bss}')
+            s.append(f'log2                     {self.log2}')
+            s.append(f'padding                  {self.padding}')
+            s.append(f'sev_calc                 {self.sev_calc}')
+            s.append(f'normalize                {self.normalize}')
+            s.append(f'approximation            {self.approximation}')
+            s.append(f'reinsurance              {self.reinsurance_kinds()}')
+            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ")}')
+            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg")}')
+        with pd.option_context('display.width', 140, 'display.float_format', lambda x: f'{x:,.5g}'):
+            # get it on one row
+            s.append('')
+            s.append(str(self.describe))
+        s.append(super().__repr__())
+        return '\n'.join(s)
 
     def __str__(self):
         """
@@ -946,12 +981,14 @@ class Aggregate(Frequency):
         :return:
         """
         # pull out agg statistics_df
-        ags = self.statistics_total_df.loc['mixed', :]
-        s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-            f"{len(self.sevs)} severit{'ies' if len(self.sevs) > 1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
-            f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
-            f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
-        return s
+        return repr(self)
+
+        # ags = self.statistics_total_df.loc['mixed', :]
+        # s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
+        #     f"{len(self.sevs)} severit{'ies' if len(self.sevs) > 1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
+        #     f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
+        #     f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
+        # return s
 
     def html_info_blob(self):
         """
@@ -976,23 +1013,11 @@ class Aggregate(Frequency):
         return '\n'.join(s)
 
     def _repr_html_(self):
-        s = [f'<h3>Aggregate object: {self.name}</h3>']
-        s.append(f'<p>Claim count {self.n:0,.2f}, {self.freq_name} distribution.</p>')
-        n = len(self.statistics_df)
-        if n == 1:
-            sv = self.sevs[0]
-            if sv.limit == np.inf and sv.attachment == 0:
-                _la = 'unlimited'
-            else:
-                _la = f'{sv.limit} xs {sv.attachment}'
-            s.append(f'<p>Severity{sv.long_name} distribution, {_la}.</p>')
-        else:
-            s.append(f'<p>Severity with {n} components.</p>')
-        if self.bs > 0:
-            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1/self.bs:,.0f}'
-            s.append(f'<p>Updated with bucket size {bss} and log2 = {self.log2}.</p>')
-        df = self.describe
-        return self.html_info_blob() + df.to_html()
+        """
+        For IPython.display
+
+        """
+        return self.html_info_blob() + self.describe.to_html()
 
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
@@ -1129,6 +1154,8 @@ class Aggregate(Frequency):
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
+        self.approximation = approximation
+        self.padding = padding
         self.xs = xs
         self.bs = xs[1]
         # WHOA! WTF
@@ -1241,6 +1268,7 @@ class Aggregate(Frequency):
         Compute the density with absolute minimum overhead. Called by port.update_efficiently
         Started with code for update and removed frills
         No tilting!
+
         :param xs:  range of x values used to discretize
         :param padding: for FFT calculation
         :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
@@ -1505,9 +1533,13 @@ class Aggregate(Frequency):
             ans.append(' and '.join(ra))
             ans.append('in the aggregate.')
         if len(ans):
-            reins = 'Reinsurance: ' + ' '.join(ans)
+            # capitalize
+            s = ans[0]
+            s = s[0].upper() + s[1:]
+            ans[0] = s
+            reins = ' '.join(ans)
         else:
-            reins = 'Reinsurance: None'
+            reins = 'No reinsurance'
         return reins
 
     def reinsurance_kinds(self):
@@ -1696,7 +1728,7 @@ class Aggregate(Frequency):
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
                the same scale. Only used on linear scales?
         :param axd:
-        :param **kwargs: passed to make_mosaic_figure
+        :param kwargs: passed to make_mosaic_figure
         :return:
         """
         if axd is None:
@@ -2487,9 +2519,9 @@ class Aggregate(Frequency):
         Use case: exam questions with the normal approacimation!
 
         :param approx_type: norm, lognorn, slognorm (shifted lognormal), gamma, sgamma. If 'all'
-        then returns a dictionary of each approx.
+            then returns a dictionary of each approx.
         :param output: scipy - returns a frozen scipy.stats object; agg returns an Aggregate program;
-        any other value returns the program and created aggregate object with fixed frequency equal to 1.
+            any other value returns the program and created aggregate object with fixed frequency equal to 1.
         :return: as above.
         """
 
@@ -2508,52 +2540,54 @@ class Aggregate(Frequency):
 
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
+        note = f'frozen version of {self.name}'
+        return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
 
-        if approx_type == 'norm':
-            sd = m*cv
-            if output=='scipy':
-                return ss.norm(loc=m, scale=sd)
-            sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-            agg_str += f'{sd} @ norm 1 # {m} '
-
-        elif approx_type == 'lognorm':
-            mu, sigma = mu_sigma_from_mean_cv(m, cv)
-            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
-            if output=='scipy':
-                return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
-            agg_str += f'{np.exp(mu)} * lognorm {sigma} '
-
-        elif approx_type == 'gamma':
-            shape = cv ** -2
-            scale = m / shape
-            if output=='scipy':
-                return ss.gamma(shape, scale=scale)
-            sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
-            agg_str += f'{scale} * gamma {shape} '
-
-        elif approx_type == 'slognorm':
-            shift, mu, sigma = sln_fit(m, cv, skew)
-            if output=='scipy':
-                return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
-            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
-            agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
-
-        elif approx_type == 'sgamma':
-            shift, alpha, theta = sgamma_fit(m, cv, skew)
-            if output=='scipy':
-                return ss.gamma(alpha, loc=shift, scale=theta)
-            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-            agg_str += f'{theta} * gamma {alpha} + {shift} '
-
-        else:
-            raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
-
-        if output == 'agg':
-            agg_str += ' fixed'
-            return agg_str
-        else:
-            return Aggregate(**{'name': name, 'note': f'frozen version of {self.name}',
-                                'exp_en': 1, **sev, 'freq_name': 'fixed'})
+        # if approx_type == 'norm':
+        #     sd = m*cv
+        #     if output=='scipy':
+        #         return ss.norm(loc=m, scale=sd)
+        #     sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+        #     agg_str += f'{sd} @ norm 1 # {m} '
+        #
+        # elif approx_type == 'lognorm':
+        #     mu, sigma = mu_sigma_from_mean_cv(m, cv)
+        #     sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
+        #     if output=='scipy':
+        #         return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
+        #     agg_str += f'{np.exp(mu)} * lognorm {sigma} '
+        #
+        # elif approx_type == 'gamma':
+        #     shape = cv ** -2
+        #     scale = m / shape
+        #     if output=='scipy':
+        #         return ss.gamma(shape, scale=scale)
+        #     sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
+        #     agg_str += f'{scale} * gamma {shape} '
+        #
+        # elif approx_type == 'slognorm':
+        #     shift, mu, sigma = sln_fit(m, cv, skew)
+        #     if output=='scipy':
+        #         return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
+        #     sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+        #     agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+        #
+        # elif approx_type == 'sgamma':
+        #     shift, alpha, theta = sgamma_fit(m, cv, skew)
+        #     if output=='scipy':
+        #         return ss.gamma(alpha, loc=shift, scale=theta)
+        #     sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+        #     agg_str += f'{theta} * gamma {alpha} + {shift} '
+        #
+        # else:
+        #     raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
+        #
+        # if output == 'agg':
+        #     agg_str += ' fixed'
+        #     return agg_str
+        # else:
+        #     return Aggregate(**{'name': name, 'note': f'frozen version of {self.name}',
+        #                         'exp_en': 1, **sev, 'freq_name': 'fixed'})
 
     fit = approximate
 
@@ -2721,8 +2755,6 @@ class Severity(ss.rv_continuous):
         * **sf**
         * **stats**
 
-        TODO numerical integration with infinite support and a low standard deviation.
-
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param exp_attachment:
         :param exp_limit:
@@ -2737,11 +2769,13 @@ class Severity(ss.rv_continuous):
         :param sev_wt: this is not used directly; but it is convenient to pass it in and ignore it because sevs are
                implicitly created with sev_wt=1.
         :param sev_conditional: conditional or unconditional; for severities use conditional
+        :param name:
+        :param note:
         """
 
         from .portfolio import Portfolio
 
-        super().__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
+        super().__init__(self, name=sev_name)
         # ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
 
         self.program = ''    # may be set externally
@@ -2753,8 +2787,10 @@ class Severity(ss.rv_continuous):
         self.pdetach = 0
         self.conditional = sev_conditional
         self.sev_name = sev_name
+        # only used when created as sev ONE blah...
         self.name = name
-        self.long_name = f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]'
+        # distribution name
+        self.long_name = sev_name
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
@@ -2918,16 +2954,16 @@ class Severity(ss.rv_continuous):
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
                 f'{sev_cv} vs {acv}')
 
-        if exp_limit < np.inf or exp_attachment > 0:
-            layer_text = f'[{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
-            layer_text += f' xs {exp_attachment:,.0f}]'
-        else:
-            layer_text = ''
-        try:
-            self.long_name = f'{name}: {sev_name}({self.fz.arg_dict[0]:.2f}){layer_text}'
-        except:
-            # 'rv_histogram' object has no attribute 'arg_dict'
-            self.long_name = f'{name}: {sev_name}{layer_text}'
+        # if exp_limit < np.inf or exp_attachment > 0:
+        #     layer_text = f'[{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
+        #     layer_text += f' xs {exp_attachment:,.0f}]'
+        # else:
+        #     layer_text = ''
+        # try:
+        #     self.long_name = f'{name}: {sev_name}({self.fz.arg_dict[0]:.2f}){layer_text}'
+        # except:
+        #     # 'rv_histogram' object has no attribute 'arg_dict'
+        #     self.long_name = f'{name}: {sev_name}{layer_text}'
 
         assert self.fz is not None
 
@@ -3082,7 +3118,7 @@ class Severity(ss.rv_continuous):
 
             X(a,d) = min(d, (X-a)+)
 
-        ==> E[X(a,d)^n] = int_a^d (x-a)^n f(x) dx + (d-a)^n S(d).
+            ==> E[X(a,d)^n] = int_a^d (x-a)^n f(x) dx + (d-a)^n S(d).
 
         Let x = q(p), F(x) = p, f(x)dx = dp.
 
@@ -3155,6 +3191,7 @@ class Severity(ss.rv_continuous):
         Here is a tester program for two common cases:
 
         ::
+
             logger_level(30) # see what is going on
             for sh, dist in zip([1,2,3,4, 3.5,2.5,1.5,.5], ['lognorm']*3 + ['pareto']*4):
                 s = Severity(dist, sev_a=sh, sev_scale=1, exp_attachment=0)
@@ -3247,6 +3284,7 @@ class Severity(ss.rv_continuous):
             logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1]/ex[0]}')
             return ex[:2]
 
+        ex1a = 0
         # we integrate isf not q, so upper and lower are swapped
         if self.attachment == 0:
             upper = 1
@@ -3257,18 +3295,33 @@ class Severity(ss.rv_continuous):
         else:
             lower = self.fz.sf(self.detachment)
 
+        if self.detachment == np.inf and self.sev_name not in ['chistogram', 'dhistogram']:
+            # figure which moments actually exist
+            moments_finite = list(map(lambda x: not (np.isinf(x) or np.isnan(x)), self.fz.stats('mvs')))
+        else:
+            moments_finite = [True, True, True]
+        # logger.info(str(moments_finite))
+
         # compute moments: histograms are tricky to integrate and we know the answer already...so
         if self.attachment == 0 and self.detachment == np.inf and self.sev_name.endswith('histogram'):
             ex1 = self.sev1
             ex2 = self.sev2
             ex3 = self.sev3
+
+        elif self.sev_name in ['lognorm', 'pareto', 'gamma']:
+            # have exact and note this computes the answer directly
+            # no need for the subsequent adjustment
+            logger.info('Analytic moments')
+            ma = moms_analytic(self.fz, self.limit, self.attachment, 3)
+            ex1a, ex2a, ex3a = ma[1:]
+            if not moments_finite[0]:
+                ex1a = np.inf
+            if not moments_finite[1]:
+                ex2a = np.inf
+            if not moments_finite[2]:
+                ex3a = np.inf
         else:
-            if self.detachment == np.inf:
-                # figure which moments actually exist
-                moments_finite = list(map(lambda x: not (np.isinf(x) or np.isnan(x)), self.fz.stats('mvs')))
-            else:
-                moments_finite = [True, True, True]
-            logger.info(str(moments_finite))
+            logger.info('Numerical moments')
             continue_calc = True
             max_rel_error = 1e-3
             if moments_finite[0]:
@@ -3308,23 +3361,24 @@ class Severity(ss.rv_continuous):
                 logger.info('Third moment does not exist.')
                 ex3 = np.inf
 
-        # adjust
-        dma = self.detachment - self.attachment
-        uml = upper - lower
-        a = self.attachment
-        if a > 0:
-            ex1a = ex1 - a * uml
-            ex2a = ex2 - 2 * a * ex1 + a ** 2 * uml
-            ex3a = ex3 - 3 * a * ex2 + 3 * a ** 2 * ex1 - a ** 3 * uml
-        else:
-            ex1a = ex1
-            ex2a = ex2
-            ex3a = ex3
+        # adjust if not determined by exact formula
+        if ex1a == 0:
+            dma = self.detachment - self.attachment
+            uml = upper - lower
+            a = self.attachment
+            if a > 0:
+                ex1a = ex1 - a * uml
+                ex2a = ex2 - 2 * a * ex1 + a ** 2 * uml
+                ex3a = ex3 - 3 * a * ex2 + 3 * a ** 2 * ex1 - a ** 3 * uml
+            else:
+                ex1a = ex1
+                ex2a = ex2
+                ex3a = ex3
 
-        if self.detachment < np.inf:
-            ex1a += dma * lower
-            ex2a += dma ** 2 * lower
-            ex3a += dma ** 3 * lower
+            if self.detachment < np.inf:
+                ex1a += dma * lower
+                ex2a += dma ** 2 * lower
+                ex3a += dma ** 3 * lower
 
         if self.conditional:
             ex1a /= self.pattach

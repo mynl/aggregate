@@ -186,7 +186,8 @@ class UnderwritingParser(Parser):
     """
 
     # uncomment to write detailed grammar rules
-    debugfile = Path.home() / 'aggregate/parser/parser.out'
+    # debugfile = Path.home() / 'aggregate/parser/parser.out'
+    debugfile = None
     tokens = UnderwritingLexer.tokens
     precedence = (
         # LOW is used to force shift in rules like
@@ -624,7 +625,7 @@ class UnderwritingParser(Parser):
     def sev(self, p):
         self.logger(
             f'sev <-- ids numbers weights', p)
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_wt': p.weights}
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_scale': 1.0,  'sev_wt': p.weights}
 
     # no weights with xps terms
     @_('ids xps')

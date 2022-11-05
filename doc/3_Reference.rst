@@ -1,9 +1,9 @@
 ================
-3. API Reference
+API Reference
 ================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 5
 
    3_x_Underwriter
    3_x_Parser

@@ -654,7 +654,7 @@ class Bounds(object):
             b.principal_extreme_distortion_analysis(gs)
 
         :param gs: either g(s) evaluated on s = cloud_df.index or the name of a calibrated distortion in
-        distribution_spec.dists (created by a call to calibrate_distortions)
+            distribution_spec.dists (created by a call to calibrate_distortions)
         :param pricing: if try, try just using pricing distortions
         :return:
         """

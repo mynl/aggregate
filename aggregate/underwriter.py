@@ -45,15 +45,14 @@ class Underwriter(object):
         Create underwriter object.
 
         :param name: Name of the underwriter object. Default is named after Rory Cline, the best
-        underwriter I know.
+            underwriter I know.
         :param databases: if None: nothing loaded; if 'default' (installed) or 'site' (user,
-        in ~/aggregate/databases) database *.agg files in default or site directory are loaded.
-        If 'all' both default and site databases loaded. A string refers to a single database;
-        an interable of strings is also valid. See `read_database` for search path.
+            in ~/aggregate/databases) database \*.agg files in default or site directory are loaded.
+            If 'all' both default and site databases loaded. A string refers to a single database;
+            an interable of strings is also valid. See `read_database` for search path.
         :param update: If True objects are updated after being created.
         :param log2: Default log2 value.
-        :param debug: run parser in debug mode
-        that are within Portfolios.
+        :param debug: run parser in debug mode that are within Portfolios.
         """
 
         self.name = name
@@ -180,6 +179,15 @@ class Underwriter(object):
             else:
                 raise KeyError(f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
 
+    def __repr__(self):
+        s = []
+        s.append(f'Underwriter   {self.name}')
+        s.append(f'Knowledge     {len(self._knowledge)} programs')
+        for k in ['log2', 'update', 'debug', 'site_dir', 'default_dir']:
+            s.append(f'{k:<14s}{getattr(self, k)}')
+        s.append(super().__repr__())
+        return '\n'.join(s)
+
     def _repr_html_(self):
         s = [f'<p><h3>Underwriter {self.name}</h3>',
              f'Knowledge contains {len(self._knowledge)} programs. '
@@ -254,8 +262,7 @@ class Underwriter(object):
         3. Replace sev.name, agg.name and port.name references with their objects.
         5. If update set, update all created objects.
 
-        Sample input
-
+        Sample input:
         ::
 
             port MY_PORTFOLIO
@@ -474,7 +481,7 @@ class Underwriter(object):
         :param program:
         :param update: build's update
         :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
-        and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
+            and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
         :param log_level:
         :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
@@ -591,12 +598,12 @@ class Underwriter(object):
         filename is a string or Path. If a csv it is read into
         a dataframe, with the first column used as index. If it
         is an agg file (e.g. an agg database), it is preprocessed
-        to remove comments and replace \n\t agg with a space, then
+        to remove comments and replace \\n\\t agg with a space, then
         split on new lines and converted to a dataframe.
         Other file formats are rejected.
 
-        These methods are called interpreter_... rather than
-        interpret_... because they are for testing and debugging
+        These methods are called interpreter\_... rather than
+        interpret\_... because they are for testing and debugging
         the interpreter, not for actually interpreting anything!
 
         """
@@ -724,6 +731,7 @@ class Underwriter(object):
 
         Examples.
         ::
+
             from aggregate.utilities import pprint
             # pretty print all prgrams starting A; no object creation
             build.show('^A.*', 'agg', False, False).program.apply(pprint);

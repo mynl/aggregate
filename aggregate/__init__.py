@@ -4,9 +4,10 @@ __docformat__ = 'restructuredtext'
 __author__ = "Stephen J. Mildenhall"
 __copyright__ = "Copyright 2018-2022, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
-__version__ = "0.9.5"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
+# only need to change here, feeds conf.py (docs) and setup.py (build)
+__version__ = "0.9.5.3"
 
 # set up
 from pathlib import Path
@@ -39,7 +40,8 @@ from .utilities import get_fmts, pprint, pprint_ex, ft, \
     iman_conover, rearrangement_algorithm_max_VaR, \
     mu_sigma_from_mean_cv, \
     make_corr_matrix, random_corr_matrix, \
-    LoggerManager, knobble_fonts
+    LoggerManager, knobble_fonts, approximate_work, \
+    partial_e, partial_e_numeric, moms_analytic
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 
@@ -49,13 +51,12 @@ knobble_fonts()
 
 # module level doc-string
 __doc__ = """
-**aggregate** is a Python package providing fast, accurate, and expressive data
-structures that make working with aggregate (also called compound) probability distributions
+**aggregate** is a Python package providing an expressive language and fast, accurate computations
+to make working with aggregate (compound) probability distributions
 easy and intuitive. It allows students and practitioners to work with realistic 
 real-world distributions that reflect the underlying frequency and severity 
 generating processes. It has applications in insurance, risk management, actuarial 
 science, and related areas.
-
 """
 
 

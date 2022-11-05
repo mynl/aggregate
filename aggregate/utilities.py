@@ -12,10 +12,11 @@ import numpy as np
 import pandas as pd
 import re
 import scipy.stats as ss
+from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
-from scipy.special import kv
+from scipy.special import kv, binom, gamma
 from scipy.stats import multivariate_t
 # from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
@@ -213,6 +214,59 @@ def sgamma_fit(m, cv, skew):
         return shift, alpha, theta
 
 
+def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
+    """
+    Does the work for Portfolio.approxomate and Aggregate.approximate. See their documentaiton.
+
+    """
+    if approx_type == 'norm':
+        sd = m*cv
+        if output=='scipy':
+            return ss.norm(loc=m, scale=sd)
+        sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+        agg_str += f'{sd} @ norm 1 # {m} '
+
+    elif approx_type == 'lognorm':
+        mu, sigma = mu_sigma_from_mean_cv(m, cv)
+        sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
+        if output=='scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
+        agg_str += f'{np.exp(mu)} * lognorm {sigma} '
+
+    elif approx_type == 'gamma':
+        shape = cv ** -2
+        scale = m / shape
+        if output=='scipy':
+            return ss.gamma(shape, scale=scale)
+        sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
+        agg_str += f'{scale} * gamma {shape} '
+
+    elif approx_type == 'slognorm':
+        shift, mu, sigma = sln_fit(m, cv, skew)
+        if output=='scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
+        sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+        agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+
+    elif approx_type == 'sgamma':
+        shift, alpha, theta = sgamma_fit(m, cv, skew)
+        if output=='scipy':
+            return ss.gamma(alpha, loc=shift, scale=theta)
+        sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+        agg_str += f'{theta} * gamma {alpha} + {shift} '
+
+    else:
+        raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
+
+    if output == 'agg':
+        agg_str += ' fixed'
+        return agg_str
+    else:
+        from . distributions import Aggregate
+        return Aggregate(**{'name': name, 'note': note,
+                            'exp_en': 1, **sev, 'freq_name': 'fixed'})
+
+
 def estimate_agg_percentile(m, cv, skew, p=0.999):
     """
     Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
@@ -243,7 +297,7 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
 
 def round_bucket(bs):
     """
-    Compute a decent rounded bucket from an input float bs. ::
+    Compute a decent rounded bucket from an input float ``bs``. ::
 
         if bs > 1 round to 2, 5, 10, ...
 
@@ -309,13 +363,15 @@ def make_ceder_netter(reins_list, debug=False):
     The reinsurance functions are piecewise linear functions from 0 to inf which
     kinks as needed to express the ceded loss as a function of subject (gross) loss.
 
-    For example, if reins_list = [(1, 10, 0), (0.5, 30, 20)] the program is 10 x 10 and
+    For example, if ``reins_list = [(1, 10, 0), (0.5, 30, 20)]`` the program is 10 x 10 and
     15 part of 30 x 20 (share=0.5). This requires nodes at 0, 10, 20, 50, and inf.
 
     It is easiest to make the ceder function. Ceded loss at subject loss at x equals
     the sum of the limits below x plus the cession to the layer in which x lies. The
-    variable `base` keeps track of the layer, `h` of the sum (height) of lower layers.
-    `xs` tracks the knot points, `ys` the values.
+    variable ``base`` keeps track of the layer, ``h`` of the sum (height) of lower layers.
+    ``xs`` tracks the knot points, ``ys`` the values.
+
+    ::
 
          Break (xs)   Ceded (ys)
               0            0
@@ -343,11 +399,11 @@ def make_ceder_netter(reins_list, debug=False):
         ax1.plot(xs, xs, 'C7:')
         ax1.set(title='net')
 
-    :param reins_list: a list of (share of, limit, attach), eg (0.5, 3, 2) means 50% share of 3x2
-    or, equivalently, 1.5 part of 3x2. It is better to store share rather than part
-    because it still works if limit == inf.
+    :param reins_list: a list of (share of, limit, attach), e.g., (0.5, 3, 2) means 50% share of 3x2
+        or, equivalently, 1.5 part of 3 x 2. It is better to store share rather than part
+        because it still works if limit == inf.
     :param debug: if True, return layer function xs and ys in addition to the interpolation functions.
-
+    :return: netter and ceder functions; optionally debug information.
     """
     # poor mans inf
     INF = 1e99
@@ -1589,7 +1645,7 @@ class LoggerManager():
         """
         self.level = level
         self.loggers = [v for k, v in logging.root.manager.loggerDict.items()
-                        if k.find(name) >= 0 and v.getEffectiveLevel() != level]
+                        if isinstance(v, logging.Logger) and k.find(name) >= 0 and v.getEffectiveLevel() != level]
 
         if len(self.loggers) > 0:
             self.base_level = self.loggers[0].getEffectiveLevel()
@@ -1612,6 +1668,7 @@ def logger_level(level=30, name='aggregate', verbose=False):
     find_font, for exapmle.
 
     FWIW, to list all loggers:
+    ::
 
         loggers = [logging.getLogger()]  # get the root logger
         loggers = loggers + [logging.getLogger(name) for name in logging.root.manager.loggerDict]
@@ -2233,6 +2290,7 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
     if dof==0 use normal scores; else you mv t
 
     Sample code:
+    ::
 
         n = 100
         df = pd.DataFrame({ f'line_{i}': ss.lognorm(.1 + .2*np.random.rand(),
@@ -2310,44 +2368,67 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
 
     For loss random variables p is usually close to 1.
 
-    Embrechts, Paul, Giovanni Puccetti, and Ludger Ruschendorf, 2013, Model uncertainty and
-    VaR aggregation, Journal of Banking and Finance 37, 2750–2764.
+    Embrechts, Paul, Giovanni Puccetti, and Ludger Ruschendorf, 2013, *Model uncertainty and
+    VaR aggregation*, Journal of Banking and Finance 37, 2750–2764.
 
-    :param df: Input DataFrame containing samples from each marginal. RA will only combine the
-    top 1-p proportion of values from each marginal.
-    :param p: If p=0 assume df has already truncated to the top p values (for each marginal).
-    Otherwise truncate each at the int(1-p * len(df))
-    :param tau: simulation tolerance
-    :param max_iter: maximum number of iterations to attempt
-    :return:
-
-    ## Worst-Case VaR
+    **Worst-Case VaR**
 
     Worst value at risk arrangement of marginals.
 
-    See [Actuarial Review article](https://ar.casact.org/the-re-arrangement-algorithm).
+    See `Actuarial Review article <https://ar.casact.org/the-re-arrangement-algorithm>`_.
 
-    Worst TVaR / Variance arrangement of bivariate data = pair best with worst, second best with second worst, etc., called **countermonotonic** arangement.
+    Worst TVaR / Variance arrangement of bivariate data = pair best with worst, second best with
+    second worst, etc., called **countermonotonic** arangement.
 
-    More than 2 marginals: can't *make everything negatively correlated with everything else*. If $X$ and $Y$ are negatively correlated and $Y$ and $Z$ are negatively correlated then $X$ and $Z$ will be positively correlated.
+    More than 2 marginals: can’t *make everything negatively correlated with
+    everything else*. If :math:`X` and :math:`Y` are negatively correlated
+    and :math:`Y` and :math:`Z` are negatively correlated then :math:`X` and
+    :math:`Z` will be positively correlated.
 
-    Next best attempt: make $X$ countermonotonic to $Y+Z$, $Y$ to $X+Z$ and $Z$ to $X+Y$. Basis of **rearrangement algorithm**.
+    Next best attempt: make :math:`X` countermonotonic to :math:`Y+Z`,
+    :math:`Y` to :math:`X+Z` and :math:`Z` to :math:`X+Y`. Basis of
+    **rearrangement algorithm**.
 
+    *The Rearrangement Algorithm*
 
-    ### The Rearrangement Algorithm
-
-    1. Randomly permute each column of $X$, the $N\\times d$ matrix of top $1-p$ observations
+    1. Randomly permute each column of :math:`X`, the :math:`N\\times d`
+       matrix of top :math:`1-p` observations
     2. Loop
-        * Create a new matrix $Y$ as follows. For column $j=1,\\dots,d$
-            - Create a temporary matrix $V_j$ by deleting the $j$th column of $X$
-            - Create a column vector $v$ whose $i$th element equals the sum of the elements in the $i$th row of $V_j$
-            - Set the $j$th column of $Y$ equal to the $j$th column of $X$ arranged to have the opposite order to $v$, i.e. the largest element in the $j$th column of $X$ is placed in the row of $Y$ corresponding to the smallest element in $v$, the second largest with second smallest, etc.
-        * Compute $y$, the $N\\times 1$ vector with $i$th element equal to the sum of the elements in the $i$th row of $Y$ and let $y^*=\min(y)$ be the smallest element of $y$ and compute $x^*$ from $X$ similarly
-        * If $y^*-x^* \\ge \\epsilon$  then set $X=Y$ and repeat the loop
-        * If $y^*-x^* < \\epsilon$  then break from the loop
 
-    3. The arrangement $Y$ is an approximation to the worst $\text{VaR}_p$ arrangement of $X$.
+       -  Create a new matrix :math:`Y` as follows. For column
+          :math:`j=1,\\dots,d`
 
+          -  Create a temporary matrix :math:`V_j` by deleting the
+             :math:`j`\ th column of :math:`X`
+          -  Create a column vector :math:`v` whose :math:`i`\ th element
+             equals the sum of the elements in the :math:`i`\ th row of
+             :math:`V_j`
+          -  Set the :math:`j`\ th column of :math:`Y` equal to the
+             :math:`j`\ th column of :math:`X` arranged to have the opposite
+             order to :math:`v`, i.e. the largest element in the
+             :math:`j`\ th column of :math:`X` is placed in the row of
+             :math:`Y` corresponding to the smallest element in :math:`v`,
+             the second largest with second smallest, etc.
+
+       -  Compute :math:`y`, the :math:`N\\times 1` vector with
+          :math:`i`\ th element equal to the sum of the elements in the
+          :math:`i`\ th row of :math:`Y` and let :math:`y^*=\min(y)` be the
+          smallest element of :math:`y` and compute :math:`x^*` from
+          :math:`X` similarly
+       -  If :math:`y^*-x^* \\ge \\epsilon` then set :math:`X=Y` and repeat
+          the loop
+       -  If :math:`y^*-x^* < \\epsilon` then break from the loop
+
+    3. The arrangement :math:`Y` is an approximation to the worst
+       :math:`\text{VaR}_p` arrangement of :math:`X`.
+
+    :param df: Input DataFrame containing samples from each marginal. RA will only combine the
+        top 1-p proportion of values from each marginal.
+    :param p: If ``p==0`` assume df has already truncated to the top p values (for each marginal).
+        Otherwise truncate each at the ``int(1-p * len(df))``
+    :param tau: simulation tolerance
+    :param max_iter: maximum number of iterations to attempt
+    :return:
     """
 
     sorted_marginals = {}
@@ -2396,28 +2477,36 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
 
 
 def make_corr_matrix(vine_spec):
-    """
-    Make a correlation matrix from a vine specification, https://en.wikipedia.org/wiki/Vine_copula
+    r"""
+    Make a correlation matrix from a vine specification, https://en.wikipedia.org/wiki/Vine_copula.
 
-    Vine spececification is
+    A vine spececification is::
 
-    row 0: correl of X0...Xn-1 with X0
-    row 1: correl of X1....Xn-1 with X1 given X0
-    row 2: correl of X2....Xn-1 with X2 given X0, X1
-    etc.
+        row 0: correl of X0...Xn-1 with X0
+        row 1: correl of X1....Xn-1 with X1 given X0
+        row 2: correl of X2....Xn-1 with X2 given X0, X1
+        etc.
 
     For example ::
 
-        vs = np.array([[1,.2,.2,.2,.2],[0,1,.3,.3,.3], [0,0,1,.4, .4], [0,0,0,1,.5], [0,0,0,0,1]])
+        vs = np.array([[1,.2,.2,.2,.2],
+                       [0,1,.3,.3,.3],
+                       [0,0,1,.4, .4],
+                       [0,0,0,1,.5],
+                       [0,0,0,0,1]])
         make_corr_matrix(vs)
 
     Key fact is the partial correlation forumula
 
-        rho(X,Y|Z) = (rho(X,Y) - rho(X,Z)rho(Y,Z)) / sqrt((1-rho(X,Z)^2)(1-rho(Y,Z)^2))
+    .. math::
+
+        \rho(X,Y|Z) = \frac{(\rho(X,Y) - \rho(X,Z)\rho(Y,Z))}{\sqrt{(1-\rho(X,Z)^2)(1-\rho(Y,Z)^2)}}
 
     and therefore
 
-        rho(X,Y) =  rho(X,Z)rho(Y,Z) + rho(X,Y|Z) sqrt((1-rho(XZ)^2)(1-rho(YZ)^2))
+    .. math::
+
+        \rho(X,Y) =  \rho(X,Z)\rho(Y,Z) + \rho(X,Y|Z) \sqrt((1-\rho(XZ)^2)(1-\rho(YZ)^2))
 
     see https://en.wikipedia.org/wiki/Partial_correlation#Using_recursive_formula.
 
@@ -2487,3 +2576,131 @@ def show_fig(f, format='svg', **kwargs):
     else:
         raise ValueError(f'Unknown type {format}')
     plt.close(f)
+
+
+def partial_e(sev_name, fz, a, n):
+    """
+    compute the partial expected value of fz
+
+    .. math:
+
+        \int_0^a x^k fz.pdf(x)dx
+
+    for k=0,...,n as a np.array
+
+    To do: beta? weibull? Burr? invgamma, etc.
+
+    :param sev_name: scipy.stats name for distribution
+    :param fz: frozen scipy.stats instance
+    :param a: double, limit for integral
+    :param n: int, power
+    :return: partial expected value
+    """
+
+    if sev_name not in ['lognorm', 'gamma', 'pareto']:
+        raise NotImplementedError(f'{sev_name} NYI for analytic moments')
+
+    if a == 0:
+        return [0 for k in range(n+1)]
+
+    if sev_name == 'lognorm':
+        m = fz.stats('m')
+        sigma = fz.args[0]
+        mu = np.log(m) - sigma**2 / 2
+        ans = [np.exp(k * mu + (k * sigma)**2 / 2) *
+               (ss.norm.cdf((np.log(a) - mu - k * sigma**2)/sigma) if a < np.inf else 1.0)
+               for k in range(n+1)]
+        return ans
+
+    elif sev_name == 'gamma':
+        shape = fz.args[0]
+        scale = fz.stats('m') / shape
+        # magic ingredient is the norming constant
+        c = lambda sh: scale ** -sh / gamma(sh)
+        ans = [c(shape) / c(shape + k) *
+               (ss.gamma(shape + k, scale=scale).cdf(a) if a < np.inf else 1.0)
+               for k in range(n + 1)]
+        return ans
+
+    elif sev_name == 'pareto':
+        # integrate xf(x) even though nx^n-1 S(x) may be more obvious
+        # former fits into the overall scheme
+        # a Pareto defined by agg is like so: ss.pareto(2.5, scale=1000, loc=-1000)
+        α = fz.args[0]
+        λ = fz.kwds['scale']
+        ans = []
+        logger.error('need to handle inf for Pareto NYI')
+        for k in range(n + 1):
+            b = [α * (-1) ** (k - i) * binom(k, i) * λ ** (k + α - i) *
+                 ((λ + a) ** (i - α) - λ ** (i - α)) / (i - α)
+                 for i in range(k + 1)]
+            ans.append(sum(b))
+        return ans
+
+
+def partial_e_numeric(fz, a, n):
+    """
+    Simple numerical integration version of partial_e for auditing purposes.
+
+    """
+    ans = []
+    for k in range(n+1):
+        temp = quad(lambda x: x ** k * fz.pdf(x), 0, a)
+        if temp[1] > 1e-4:
+            logger.warning('convergence issues with numerical integral')
+        ans.append(temp[0])
+    return ans
+
+
+def moms_analytic(fz, limit, attachment, n, analytic=True):
+    """
+    Return moments of :math:`E[(X-attachment)^+ \wedge limit]^m`
+    for m = 1,2,...,n.
+
+    To check:
+    ::
+
+        # fz = ss.lognorm(1.24)
+        fz = ss.gamma(6.234, scale=100)
+        # fz = ss.pareto(3.4234, scale=100, loc=-100)
+
+        a1 = moms_analytic(fz, 50, 1234, 3)
+        a2 = moms_analytic(fz, 50, 1234, 3, False)
+        a1, a2, a1-a2, (a1-a2) / a1
+
+
+    :param fz: frozen scipy.stats instance
+    :param limit: double, limit (layer width)
+    :param attachment: double, limit
+    :param n: int, power
+    :param analytic: if True use analytic formula, else numerical integrals
+    """
+    # easy
+    if limit == 0:
+        return np.array([0.] * n)
+
+    # don't know how robust this will be...
+    sev_name = str(fz.__dict__['dist']).split('.')[-1].split('_')[0]
+
+    # compute and store the partial_e
+    detachment = attachment + limit
+    if analytic is True:
+        pe_attach = partial_e(sev_name, fz, attachment, n)
+        pe_detach = partial_e(sev_name, fz, detachment, n)
+    else:
+        pe_attach = partial_e_numeric(fz, attachment, n)
+        pe_detach = partial_e_numeric(fz, detachment, n)
+
+    ans1 = np.array([sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * (pe_detach[k] - pe_attach[k])
+                          for k in range(m + 1)])
+                     for m in range(n + 1)])
+
+    if np.isinf(limit):
+        ans2 = np.zeros_like(ans1)
+    else:
+        ans2 = np.array([limit ** m * fz.sf(detachment) for m in range(n+1)])
+
+    ans = ans1 + ans2
+
+    return ans
+

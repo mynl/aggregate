@@ -31,11 +31,14 @@ long_description = read('README.rst')
 
 # agg/*.agg is the parameter and curve files
 
+import aggregate
+version = aggregate.__version__
+
 setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
       license="""BSD""",
-      version='0.9.5.1',
+      version=version,
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",

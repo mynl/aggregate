@@ -1,8 +1,3 @@
-"""
-
-
-"""
-
 import collections
 from collections import namedtuple
 from copy import deepcopy
@@ -33,7 +28,7 @@ from .utilities import ft, \
     axiter_factory, AxisManager, html_title, \
     suptitle_and_tight, \
     MomentAggregator, Answer, subsets, round_bucket, \
-    make_mosaic_figure, iman_conover
+    make_mosaic_figure, iman_conover, approximate_work
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -48,8 +43,7 @@ class Portfolio(object):
     * Model a large account with several sub lines
     * Model a reinsurance portfolio or large treaty
 
-    Notes from Enhance Portfolio
-    ============================
+    **Notes from Enhance Portfolio**
 
     Add all the enhanced exhibits methods to port.
 
@@ -60,70 +54,68 @@ class Portfolio(object):
 
     Added Methods
 
-    Exhibit creators (EX_name)
-    --------------------------
+    *Exhibit creators (EX_name)*
+
         1. DROPPED basic_loss_statistics
         2. DROPPED distortion_information
         3. DROPPED distortion_calibration
         4. premium_capital
         5. multi_premium_capital
         6. accounting_economic_balance_sheet
-            compares best estimate, default adjusted, risk adjusted values
+           compares best estimate, default adjusted, risk adjusted values
 
         Exhibits 7-9 are for reserving
         DROPPED 7. margin_earned (by year)
         DROPPED 8. year_end_option_analysis (implied stand alone vs pooled analysis)
-
         Run a distortion and compare allocations
-        9. DROPPED compare_allocations
-            creates:
+
+        9. DROPPED compare_allocations creates:
+
                 EX_natural_allocation_summary
                 EX_allocated_capital_comparison
                 EX_margin_comparison
                 EX_return_on_allocated_capital_comparison
 
-    Exhibit Utilities
-    -----------------
+    *Exhibit Utilities*
+
         10. make_all
             runs all of 1-9 with sensible defaults
-
         11. show_enhaned_exhibits
             shows all exhibits, with exhibit title
-            uses `self.dir` to find all attributes EX_
-
+            uses `self.dir` to find all attributes EX\_
         12. DROPPED qi
             quick info: the basic_loss_stats plus a density plot
 
-    Graphics
-    --------
-        DROPPED 13. density_plot
+    *Graphics*
+
+        13. DROPPED 13. density_plot
         14. profit_segment_plot
             plots given lines S, gS and shades the profit segment between the two
             lines plotted on a stand-alone basis; optional transs allows shifting up/down
         15. natural_profit_segment_plot
             plot kappa = EX_i|X against F and gF
-            compares the natural allocation with stand alone pricing
-        DROPPED 16. alpha_beta_four_plot
+            compares the natural allocation with stand-alone pricing
+        16. DROPPED 16. alpha_beta_four_plot
             alpha, beta; layer and cumulative margin plots
-        DROPPED 17. alpha_beta_four_plot2 (for two line portfolios )
+        17. DROPPED 17. alpha_beta_four_plot2 (for two line portfolios)
             lee and not lee orientations (lee orientation hard to parse)
             S, aS; gS, b gS separately by line
-            S, aS, gS, bGS  for each line [these are most useful plots]
+            S, aS, gS, bGS  for each line [these are the most useful plots]
         18. biv_contour_plot
             bivariate plot of marginals with some x+y=constant lines
-        DROPPED 19. reserve_story_md
+        19. DROPPED 19. reserve_story_md
 
-    Reserve Template Populators
-    ---------------------------
-        DROPPED 20. reserve_runoff_md
-        DROPPED 21. reserve_two_step_md
+    *Reserve Template Populators*
+
+        20. DROPPED 20. reserve_runoff_md
+        21. DROPPED 21. reserve_two_step_md
         22. nice_program
 
-    Other
-    -----
-        DROPPED 23. show_md
-        DROPPED 24. report_args
-        DROPPED 25. save
+    *Other*
+
+        23. DROPPED 23. show_md
+        24. DROPPED 24. report_args
+        25. DROPPED 25. save
         26. density_sample: stratified sample from density_df
 
     **Sample Runner** ::
@@ -170,21 +162,18 @@ class Portfolio(object):
         bit.loc[bit.exeqa_Thick==0, ['exeqa_Thick', 'exeqa_Thin']] = np.nan
         bit.rename(columns=port.renamer).sort_index(1).plot(ax=a1)
         a1.set(xlim=[0,bigx], ylim=[0,bigx], xlabel='Total Loss', ylabel="Conditional Line Loss");
-        a1.set(aspect='equal', title='Conditional Expectations\nBy Line')
+        a1.set(aspect='equal', title='Conditional Expectations\\nBy Line')
         port.biv_contour_plot(f, a2, 5, bigx, 100, log=False, cmap='viridis_r', min_density=1e-12)
-
-
-    force = do even if exist...force an update
 
     :param name: The name of the portfolio, no spaces or underscores.
     :param spec_list: A list of
 
-           1) dictionary: Aggregate object dictionary specifications or
-           2) Aggregate: An actual aggregate objects or
-           3) tuple (type, dict) as returned by uw['name'] or
-           4) string: Names referencing objects in the optionally passed underwriter
-           5) a single DataFrame: empirical samples (the total column, if present, is ignored);
-              a p_total column is used for probabilities if present
+       1. dictionary: Aggregate object dictionary specifications or
+       2. Aggregate: An actual aggregate objects or
+       3. tuple (type, dict) as returned by uw['name'] or
+       4. string: Names referencing objects in the optionally passed underwriter
+       5. a single DataFrame: empirical samples (the total column, if present, is ignored);
+          a p_total column is used for probabilities if present
 
     :returns:
     """
@@ -314,6 +303,7 @@ class Portfolio(object):
         self.approx_type = ""
         self.approx_freq_ge = 0
         self.discretization_calc = ''
+        self.normalize = None
         # for storing the info about the quantile function
         self.q_temp = None
         self._renamer = None
@@ -339,38 +329,6 @@ class Portfolio(object):
         self.last_a = None
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
-
-    def __str__(self):
-        """
-        Goal: readability
-        :return:
-        """
-        # cannot use ex, etc. because object may not have been updated
-        if self.audit_df is None:
-            ex = self.statistics_df.loc[('agg', 'mean'), 'total']
-            empex = np.nan
-            isupdated = False
-        else:
-            ex = self.get_stat(stat="Mean")
-            empex = self.get_stat()
-            isupdated = True
-        # df = pd.DataFrame(columns=['Statistic', 'Value'])
-        # df = df.set_index('Statistic')
-        # df.loc['Portfolio Name', 'Value'] = self.name
-        # df.loc['Expected loss', 'Value'] = ex
-        # df.loc['Model loss', 'Value'] = empex
-        # df.loc['Error', 'Value'] = ex / empex - 1
-        # print(df)
-        s = f'Portfolio name           {self.name:<15s}\n' \
-            f'Theoretic expected loss  {ex:15,.1f}\n' \
-            f'Actual expected loss     {empex:15,.1f}\n' \
-            f'Error                    {empex / ex - 1:15.6f}\n' \
-            f'Discretization size      {self.log2:15d}\n' \
-            f'Bucket size              {self.bs:15.2f}\n' \
-            f'{object.__repr__(self)}'
-        if not isupdated:
-            s += '\nNOT UPDATED!'
-        return s
 
     @property
     def distortion(self):
@@ -406,24 +364,48 @@ class Portfolio(object):
         """
         # return str(self.to_dict())
         # this messes up when port = self has been enhanced...
-        if isinstance(self, Portfolio):
-            s = [super(Portfolio, self).__repr__(), f"{{ 'name': '{self.name}'"]
+
+        # cannot use ex, etc. because object may not have been updated
+        if self.audit_df is None:
+            ex = self.statistics_df.loc[('agg', 'mean'), 'total']
+            empex = np.nan
+            isupdated = False
         else:
-            s = [f'Non-Portfolio (enhanced) object {{ "name": "{self.name}"']
-        agg_list = [str({k: v for k, v in a.__dict__.items() if k in Aggregate.aggregate_keys})
-                    for a in self.agg_list]
-        s.append(f"'spec': [{', '.join(agg_list)}]")
+            ex = self.get_stat(stat="Mean")
+            empex = self.get_stat()
+            isupdated = True
+
+        s = [f'Portfolio object         {self.name:s}',
+             f'Theoretic expected loss  {ex:,.1f}',
+             f'Estimated expected loss  {empex:,.1f}',
+             f'Error                    {empex / ex - 1:.6g}'
+             ]
+
+        s.append(
+             f'Updated                  {isupdated}'
+        )
+
         if self.bs > 0:
-            s.append(f'"bs": {self.bs}')
-            s.append(f'"log2": {self.log2}')
-            s.append(f'"padding": {self.padding}')
-            s.append(f'"tilt_amount": {self.tilt_amount}')
-            s.append(f'"distortion": "{repr(self._distortion)}"')
-            s.append(f'"sev_calc": "{self.sev_calc}"')
-            s.append(f'"remove_fuzz": {self._remove_fuzz}')
-            s.append(f'"approx_type": "{self.approx_type}"')
-            s.append(f'"approx_freq_ge": {self.approx_freq_ge}')
-        return ', '.join(s) + '}'
+            if self.bs > 1:
+                s.append(f'bs                       {self.bs}')
+            else:
+                s.append(f'bs                       1 / {int(1/self.bs)}')
+            s.append(f'log2                     {self.log2}')
+            s.append(f'padding                  {self.padding}')
+            s.append(f'sev_calc                 {self.sev_calc}')
+            s.append(f'normalize                {self.normalize}')
+            s.append(f'remove_fuzz              {self._remove_fuzz}')
+            s.append(f'approx_type              {self.approx_type}')
+            s.append(f'approx_freq_ge           {self.approx_freq_ge}')
+            s.append(f'distortion               {repr(self._distortion)}')
+
+        if isupdated:
+            with pd.option_context('display.width', 140, 'display.float_format', lambda x: f'{x:,.5g}'):
+                # get it on one row
+                s.append('')
+                s.append(str(self.describe))
+        s.append(super(Portfolio, self).__repr__())
+        return '\n'.join(s)
 
     def _repr_html_(self):
         """
@@ -437,20 +419,10 @@ class Portfolio(object):
             s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
         df = self.describe
         return '\n'.join(s) + df.to_html()
-        # original
-        # s = [f'<h2>Portfolio object: {self.name}</h2>']
-        # _n = len(self.agg_list)
-        # _s = "" if _n <= 1 else "s"
-        # s.append(f'Portfolio contains {_n} aggregate component{_s}')
-        # summary_sl = (slice(None), ['mean', 'cv', 'skew'])
-        # if self.audit_df is not None:
-        #     _df = pd.concat((self.statistics_df.loc[summary_sl, :],
-        #                      self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']].T),
-        #                     sort=True)
-        #     s.append(_df._repr_html_())
-        # else:
-        #     s.append(self.statistics_df.loc[summary_sl, :]._repr_html_())
-        # return '\n'.join(s)
+
+    def __str__(self):
+        """ Default behavior """
+        return repr(self)
 
     def __hash__(self):
         """
@@ -872,7 +844,7 @@ class Portfolio(object):
 
         :param p:
         :param kind:  'interp' = interpolate exgta_total;  'tail' tail integral, 'body' NYI - (ex - body integral)/(1-p)+v
-        'inverse' from capital to p using interp method
+            'inverse' from capital to p using interp method
         :return:
         """
         assert self.density_df is not None
@@ -1055,15 +1027,22 @@ class Portfolio(object):
         return Severity(sev_name=self, sev_a=self.log2, sev_b=self.bs,
                         exp_attachment=attachment, exp_limit=limit, sev_conditional=conditional)
 
-    def fit(self, approx_type='slognorm', output='agg'):
+    def approximate(self, approx_type='slognorm', output='scipy'):
         """
+        Create an approximation to self using method of moments matching.
+
         Returns a dictionary specification of the portfolio aggregate_project.
         If updated uses empirical moments, otherwise uses theoretic moments
 
-        :param approx_type: slognorm | sgamma
+        :param approx_type: slognorm | sgamma | normal
         :param output: return a dict or agg language specification
         :return:
         """
+
+        if approx_type == 'all':
+            return {kind: self.approximate(kind)
+                    for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
+
         if self.audit_df is None:
             # not updated
             m = self.statistics_df.loc[('agg', 'mean'), 'total']
@@ -1075,25 +1054,10 @@ class Portfolio(object):
 
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
+        note = f'frozen version of {self.name}'
+        return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
 
-        if approx_type == 'slognorm':
-            shift, mu, sigma = sln_fit(m, cv, skew)
-            # self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-            sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
-            agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
-        elif approx_type == 'sgamma':
-            shift, alpha, theta = sgamma_fit(m, cv, skew)
-            # self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
-            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-            agg_str += f'{theta} * lognorm {alpha} + {shift} '
-        else:
-            raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
-
-        if output == 'agg':
-            agg_str += ' fixed'
-            return agg_str
-        else:
-            return {'name': name, 'note': f'frozen version of {self.name}', 'exp_en': 1, **sev, 'freq_name': 'fixed'}
+    fit = approximate
 
     def collapse(self, approx_type='slognorm'):
         """
@@ -1201,8 +1165,7 @@ class Portfolio(object):
         :param epds: epd points for priority analysis; if None-> sensible defaults
         :param trim_df: remove unnecessary columns from density_df before returning
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
-        epd info
-
+            epd info
         :return:
         """
 
@@ -1222,6 +1185,7 @@ class Portfolio(object):
         self.approx_type = approx_type
         self.approx_freq_ge = approx_freq_ge
         self.discretization_calc = discretization_calc
+        self.normalize = normalize
 
         if self.hash_rep_at_last_update == hash(self):
             logger.warning(f'Nothing has changed since last update at {self.last_update}')
@@ -1594,17 +1558,17 @@ class Portfolio(object):
 
         :param epsilon: the increment to use; scale is 1+epsilon
         :param kind:    homog[ogeneous] or inhomog: homog computes impact of f((1+epsilon)X_i)-f(X_i). Inhomog
-               scales the frequency and recomputes. Note inhomog will have a slight scale issues with
-               E[Severity]
+            scales the frequency and recomputes. Note inhomog will have a slight scale issues with
+            E[Severity]
         :param method:  forward, central (using epsilon/2) or backwards
         :param distortion: if included derivatives of statistics using the distortion, such as exag are also
-               computed
+            computed
         :param extra_columns: extra columns to compute dervs of. Note there is virtually no overhead of adding additional
-               columns
+            columns
         :param do_swap: force the step to replace line with line+epsilon in all not line2's line2!=line1; whether you need
-               this or not depends on what variables you to be differentiated. E.g. if you ask for exa_total only you don't need
-                to swap. But if you want exa_A, exa_B you do, otherwise the d/dA exa_B won't be correct.
-                TODO: replace with code!
+            this or not depends on what variables you to be differentiated. E.g. if you ask for exa_total only you don't need
+            to swap. But if you want exa_A, exa_B you do, otherwise the d/dA exa_B won't be correct.
+            TODO: replace with code!
         :return:   DataFrame of gradients and audit_df in an Answer class
         """
 
@@ -2198,18 +2162,16 @@ class Portfolio(object):
 
         Alternative approach to exa: use UC=unconditional versions of exlea and exi_xgta:
 
-        * exleaUC = np.cumsum(port.density_df['exeqa_' + col] * port.density_df.p_total)  # unconditional
-        * exixgtaUC =np.cumsum(  self.density_df.loc[::-1, 'exeqa_' + col] / self.density_df.loc[::-1, 'loss']
+        * exleaUC = np.cumsum(port.density_df['exeqa\_' + col] * port.density_df.p_total)  # unconditional
+        * exixgtaUC =np.cumsum(  self.density_df.loc[::-1, 'exeqa\_' + col] / self.density_df.loc[::-1, 'loss']
           * self.density_df.loc[::-1, 'p_total'] )
         * exa = exleaUC + exixgtaUC * self.density_df.loss
 
         :param df: data frame to add to. Initially add_exa was only called by update and wrote to self.density_df. But now
-        it is called by gradient too which writes to gradient_df, so we need to pass in this argument
+            it is called by gradient too which writes to gradient_df, so we need to pass in this argument
         :param details: True = include everything; False = do not include junk around epd etc
-
         :param ft_nots: FFTs of the not lines (computed in gradients) so you don't round trip an FFT; gradients needs
-        to recompute all the not lines each time around and it is stilly to do that twice
-
+            to recompute all the not lines each time around and it is stilly to do that twice
         """
 
         # will need two decorators for epd functions: these handle swapping the arguments and
@@ -2789,8 +2751,8 @@ class Portfolio(object):
         :param r0: for distortions that have a min ROL
         :param df: for tt
         :param strict: if=='ordered' then use the book nice ordering else
-                       if True only use distortions with no mass at zero, otherwise
-                        use anything reasonable for pricing
+            if True only use distortions with no mass at zero, otherwise
+            use anything reasonable for pricing
         :param S_calc:
         :return:
         """
@@ -2928,8 +2890,7 @@ class Portfolio(object):
         1. basic: exag_sumparts, exag_total df.exa_total
         2. extended: the full original set
 
-        The issue with distortions that have a mass at 0
-        ================================================
+        **The issue with distortions that have a mass at 0**
 
         exag is computed as the cumulative integral of beta g(S), which is unaffected by the mass.
 
@@ -3892,6 +3853,7 @@ class Portfolio(object):
 
         Output is an `Answer` class object containing
         ::
+
                 Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1 if plot else None,
                       fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2,
                       audit_df=audit_df)
@@ -4043,8 +4005,7 @@ class Portfolio(object):
 
         Other methods could be added, e.g. a volatility method?
 
-        Note on calculation
-        ===================
+        **Note on calculation**
 
         Each method computes allocated assets a_i (which it calls Q_i) = Li + Mi + Qi
         All methods are constant ROEs for capital
@@ -5003,11 +4964,16 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     def line_renamer(self):
         """
         plausible defaults for nicer looking names
+
         replaces . or : with space and capitalizes (generally don't use . because it messes with
-          analyze distortion....
+        analyze distortion....
+
         leaves : alone
+
         converts X1 to tex
+
         converts XM1 to tex with minus (for reserves)
+
         :return:
         """
         def rename(ln):
@@ -5607,8 +5573,8 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         42 cumul margin
         43 natural profit compare
 
-        Args
-        ====
+        **Args**
+
         self = portfolio or enhanced portfolio object
         p control xlim of plots via quantile; used if xmax=0
         p2 controls ylim for 33 and 34: stand alone M and natural M; used if ymax2=0

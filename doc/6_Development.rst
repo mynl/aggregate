@@ -1,5 +1,5 @@
 ===============
-6. Development
+Development
 ===============
 
 The discussion section explains the *why* of design.

@@ -67,20 +67,22 @@ class Underwriter(object):
         # knowledge - accounts and line known to the underwriter
         self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
             ['kind', 'name'])
+
         if databases == 'all':
             databases = ['default', 'site']
         elif type(databases) == str:
             databases = [databases]
-        # default_dir is installed by pip and contain installation files
-        default_dir = Path(__file__).parent / 'agg'
-        # site dir is in Users's home directory and stores their files
-        site_dir = Path.home() / 'aggregate/databases'
 
-        self.site_dir = site_dir
+        # default_dir is installed by pip and contain installation files
+        self.default_dir = Path(__file__).parent / 'agg'
+
+        # site dir is in Users's home directory and stores their files
+        self.site_dir = Path.home() / 'aggregate/databases'
         # check site dir exists
         self.site_dir.mkdir(parents=True, exist_ok=True)
 
-        self.default_dir = default_dir
+        self.template_dir = self.default_dir.parent / 'templates'
+        self.template_dir.mkdir(parents=True, exist_ok=True)
 
         # make sure all database entries are stored:
         if databases is None:
@@ -90,13 +92,13 @@ class Underwriter(object):
         if 'default' in databases:
             # add all databases in default_dir
             databases.remove('default')
-            for fn in default_dir.glob('*.agg'):
+            for fn in self.default_dir.glob('*.agg'):
                 self.read_database(fn)
 
         if 'site' in databases:
             # add all user databases
             databases.remove('site')
-            databases += list(site_dir.glob('*.agg'))
+            databases += list(self.site_dir.glob('*.agg'))
 
         for fn in databases:
             self.read_database(fn)
@@ -185,7 +187,7 @@ class Underwriter(object):
         s.append(f'Knowledge     {len(self._knowledge)} programs')
         for k in ['log2', 'update', 'debug', 'site_dir', 'default_dir']:
             s.append(f'{k:<14s}{getattr(self, k)}')
-        s.append(super().__repr__())
+        # s.append(super().__repr__())
         return '\n'.join(s)
 
     def _repr_html_(self):

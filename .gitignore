@@ -7,9 +7,8 @@ __pycache__/
 
 # Sphinx documentation
 doc/_build
-doc/_static
-doc/_templates
-doc/_theme
+# doc/_templates
+# doc/_theme
 
 # C extensions
 *.so

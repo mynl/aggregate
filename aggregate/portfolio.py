@@ -404,7 +404,7 @@ class Portfolio(object):
                 # get it on one row
                 s.append('')
                 s.append(str(self.describe))
-        s.append(super(Portfolio, self).__repr__())
+        # s.append(super(Portfolio, self).__repr__())
         return '\n'.join(s)
 
     def _repr_html_(self):

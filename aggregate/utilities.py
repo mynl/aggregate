@@ -16,7 +16,7 @@ from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
-from scipy.special import kv, binom, gamma
+from scipy.special import kv, binom, gamma, loggamma
 from scipy.stats import multivariate_t
 # from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
@@ -2616,8 +2616,10 @@ def partial_e(sev_name, fz, a, n):
         shape = fz.args[0]
         scale = fz.stats('m') / shape
         # magic ingredient is the norming constant
-        c = lambda sh: scale ** -sh / gamma(sh)
-        ans = [c(shape) / c(shape + k) *
+        # c = lambda sh: 1 / (scale ** sh * gamma(sh))
+        # therefore c(shape)/c(shape+k) = scale**k * gamma(shape + k) / gamma(shape)
+        # = scale ** k * exp(loggamma(shape + k) - loggamma(shape)) to avoid errors
+        ans = [scale ** k * np.exp(loggamma(shape + k) - loggamma(shape)) *
                (ss.gamma(shape + k, scale=scale).cdf(a) if a < np.inf else 1.0)
                for k in range(n + 1)]
         return ans

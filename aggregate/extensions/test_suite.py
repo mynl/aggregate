@@ -21,7 +21,7 @@ class TestSuite(object):
     tests = ''
 
     @classmethod
-    def __init__(cls, build=None, fn='test_suite.agg', dir_name='s/telos/blog/agg/generated'):
+    def __init__(cls, build=None, out_dir_name=''):
         """
 
         Run test suite fn. Create specified objects. Save graphics and info to HTML. Wrap
@@ -29,30 +29,47 @@ class TestSuite(object):
 
         TODO: convert wrapping to Jinja!
 
+        To run whole test_suite
+        ::
+
+            python -m aggregate.extensions.test_suite
+
         """
 
         if build is None:
             from .. import build
 
         cls.build = build
-        cls.p = Path.home() / dir_name
 
-        # extract from comments
+        if out_dir_name != '':
+            cls.p = Path(out_dir_name)
+            if cls.p.exists() is False:
+                raise FileExistsError(f'Directory {out_dir_name} does not exist.')
+        else:
+            cls.p = cls.build.site_dir.parent / 'generated'
+            cls.p.mkdir(exist_ok=True)
+            (cls.p / "img").mkdir(exist_ok=True)
+
+        logger.info(f'Output directory {cls.p.resolve()}')
+
+        # extract from comments; this is just FYI
+        fn = 'test_suite.agg'
         suite = build.default_dir / fn
         txt = suite.read_text(encoding='utf-8')
         tests = [i for i in txt.split('\n') if re.match(r'# [A-Z]\.', i)]
         cls.tests = [i.replace("# ", "").split('. ') for i in tests]
 
     @classmethod
-    def run(cls, regex, title, fig_format='svg', fig_size=(8,2.4)):
+    def run(cls, regex, title, fig_prefix, fig_format='svg', fig_size=(8,2.4), **kwargs):
         """
 
         :param regex: regex of tests to run, e.g., 'agg [ABC]\. '
         :param title: title for blob
+        :param fig_prefix: file name prefix for saved immage files (convenience)
         :param fig_format:  html or markdown (md); html uses svg output, markdown uses pdf
         :param fig_size:
+        :param kwargs: passed to savefig
         """
-        fig_prefix = re.sub(r'\^|\$|\[|\]|\*|\+', '', regex)
         logger.warning(f'figure prefix = {fig_prefix}')
 
         ans = []
@@ -64,7 +81,7 @@ class TestSuite(object):
             ans.append('<br>')
             fn = cls.p / f'img/{fig_prefix}_tmp_{hash(a):0x}.{fig_format}'
             a.plot(figsize=fig_size)
-            a.figure.savefig(fn)
+            a.figure.savefig(fn, **kwargs)
             ans.append(f'<img src="{fn.resolve()}" />')
             plt.close(a.figure)
             logger.warning(f'Created {n}, mean {a.agg_m:.2f}')
@@ -74,7 +91,8 @@ class TestSuite(object):
         fn.write_text(blob, encoding='utf-8')
 
         fn2 = cls.p / f'{fn.stem}_wrapped.html'
-        fn3 = cls.p / 'template.html'
+        fn3 = cls.build.template_dir / 'test_suite_template.html'
+        # TODO JINJA!
         template = fn3.read_text()
         template = template.replace('HEADING GOES HERE', title).replace(
             'CONTENTHERE', blob)
@@ -139,3 +157,14 @@ class TestSuite(object):
                 'Skew(X)': f3,
                 'Est Skew(X)': f3}
         return df.style.set_table_styles(all_styles).format(fmts)
+
+
+if __name__ == '__main__':
+    t = TestSuite()
+    # show progress
+    t.build.logger_level(20)
+    print(t.tests)
+    # run all the aggs
+    # TODO FIX for Portfolios
+    # t.run(regex=r'^C\.', title='C only', fig_prefix="auto", fig_format='png', dpi=300)
+    t.run(regex=r'^[A-KNO]\.', title='Full Test Suite', fig_prefix="auto", fig_format='png', dpi=300)

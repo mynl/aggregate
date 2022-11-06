@@ -53,7 +53,7 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
     'sphinx_panels',
-    'jupyter_sphinx.execute'
+    # 'jupyter_sphinx.execute'
     ]
 
 

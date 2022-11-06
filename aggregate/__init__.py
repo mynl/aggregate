@@ -14,7 +14,7 @@ from pathlib import Path
 base_dir = Path.home() / 'aggregate'
 base_dir.mkdir(exist_ok=True)
 
-for p in ['cases', 'parser', 'tests', 'temp']:
+for p in ['cases', 'parser', 'temp', 'generated']:
     (base_dir / p).mkdir(exist_ok=True)
 
 # print('All directories exist')

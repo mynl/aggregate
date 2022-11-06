@@ -971,7 +971,7 @@ class Aggregate(Frequency):
             # get it on one row
             s.append('')
             s.append(str(self.describe))
-        s.append(super().__repr__())
+        # s.append(super().__repr__())
         return '\n'.join(s)
 
     def __str__(self):

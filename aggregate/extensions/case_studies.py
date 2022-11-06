@@ -73,13 +73,14 @@ pd.set_option('display.max_rows', 500)
 # get the logger
 logger = logging.getLogger('aggregate.case_studies')
 
+# up to the user to deal with warnings
 # logging.captureWarnings(True)  -> all warnings emitted by the warnings module
 # will automatically be logged at level WARNING
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=RuntimeWarning)
-warnings.filterwarnings('ignore', category=pd.core.common.SettingWithCopyWarning)
-warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
-warnings.simplefilter(action='ignore', category=FutureWarning)
+# warnings.filterwarnings('ignore', category=UserWarning)
+# warnings.filterwarnings('ignore', category=RuntimeWarning)
+# warnings.filterwarnings('ignore', category=pd.core.common.SettingWithCopyWarning)
+# warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
+# warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # utilities
 stat_renamer = {'L': 'Expected Loss', 'P': "Premium", 'LR': 'Loss Ratio',

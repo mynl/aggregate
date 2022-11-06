@@ -578,33 +578,33 @@ class UnderwritingParser(Parser):
         p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
             p.sev.get('sev_loc', 0))
         sign = 1 if p[1]=='+' else -1
-        p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
-        p.sev['sev_loc'] += sign * p.numbers
+        p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
+        p.sev['sev_loc'] += sign * p_numbers
         return p.sev
 
     @_('numbers TIMES sev')
     def sev(self, p):
         self.logger(f'sev <-- numbers TIMES sev', p)
-        p.numbers = UnderwritingParser._check_vectorizable(p.numbers)
+        p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
         if 'sev_mean' in p.sev:
             p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(
                 p.sev.get('sev_mean', 0))
-            p.sev['sev_mean'] *= p.numbers
+            p.sev['sev_mean'] *= p_numbers
         # only scale if there is a scale (otherwise you double count)
         if 'sev_scale' in p.sev:
             p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(
                 p.sev.get('sev_scale', 0))
-            p.sev['sev_scale'] *= p.numbers
+            p.sev['sev_scale'] *= p_numbers
         if 'sev_mean' not in p.sev:
             # e.g. Pareto has no mean and it is important to set the scale
             # but if there is a mean it handles the scaling and setting scale will
             # confuse the distribution maker
-            p.sev['sev_scale'] = p.numbers
+            p.sev['sev_scale'] = p_numbers
         # if there is a location it needs to scale too --- that's a curious choice!
         if 'sev_loc' in p.sev:
             p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
                 p.sev['sev_loc'])
-            p.sev['sev_loc'] *= p.numbers
+            p.sev['sev_loc'] *= p_numbers
         # logger.error(str(p.sev))
         return p.sev
 

@@ -34,6 +34,8 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
+REM append -a -E for a more ground up rebuild
+
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS%
 goto end
 

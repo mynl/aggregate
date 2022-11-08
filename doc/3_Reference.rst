@@ -14,12 +14,10 @@ API Reference
    3_x_Bounds
    3_x_Extensions
 
+.. Options to autoclass etc.
 
-
-Options to autoclass etc.
-
-* undoc-members: "document" members with no doc strings
-* private-members: doc ``_`` and ``__`` members
-* special-members: doc ``__name__`` members
-* inherited-members
+   * undoc-members: "document" members with no doc strings
+   * private-members: doc ``_`` and ``__`` members
+   * special-members: doc ``__name__`` members
+   * inherited-members
 

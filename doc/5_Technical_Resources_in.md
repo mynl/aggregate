@@ -1,10 +1,29 @@
 6. Technical Resources
 ======================
 
+REMEMBER: WRITE IN MD TRANSLATE INTO RST!!
 
 Probability and Risk Theory
 ============================
 
+
+* References on the background math, actuarial science, and risk management include:
+    - KPW (STAM): Klugman, Stuart A., Harry H. Panjer, and Gordon E. Willmot. *Loss models: from data to decisions*. Vol. 715. John Wiley & Sons, 2012.
+    - Tsi (CAS 8): Tse, Yiu-Kuen. *Nonlife actuarial models: theory, methods and evaluation*. Cambridge University Press, 2009.
+    - Fisher (CAS 8): Fisher, Ginda Kaplan, et al. *Individual Risk Rating*. (2019).
+    - Reinsurance Pricing (CAS 8): Clark, David, *Basics of Reinsurance Pricing*, Actuarial Study Note, 2014.
+    - Distributions monograph (CAS 8): Bahnemann, David. *Distributions for actuaries.* CAS monograph series 2 (2015): 1-200.
+    - Loss Data Analytics, WEB
+    - PIR and associated [PIR website](https://www.pricinginsurancerisk.com)
+    - Bernegger, Stefan. *The Swiss Re Exposure Curves and the MBBEFD Distribution Class*. ASTIN Bulletin: The Journal of the IAA 27.1 (1997): 99-111.
+
+## Technical Appendix
+
+1. Quantiles (VaR, Value at Risk): definition and computation
+2. TVaR (Tail Value at Risk): definition and computation
+3. Cat model PMLs
+4. Numerical integration using `cumsum`
+5. Fast Fourier Transforms (FFTs)
 
 
 Discretizing Severity Distributions

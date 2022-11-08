@@ -10,8 +10,6 @@ aggregate Documentation
 
 .. module:: aggregate
 
-
-
 **Date**: |today| **Version**: |version|
 
 
@@ -19,83 +17,96 @@ aggregate Documentation
 `Binary Installers <https://pypi.org/project/aggregate>`__ |
 `Source Repository <https://github.com/mynl/aggregate>`__
 
-:mod:`aggregate` is an open source, BSD-licensed library providing intuitive natural language, high-performance, and
-easy-to-use tools to work with aggregate probability distributions written in `Python <https://www.python.org/>`__.
+:mod:`aggregate` is an open source, BSD-licensed library providing intuitive natural language, high-performance, easy-to-use tools to work with aggregate probability distributions. It is written in `Python <https://www.python.org/>`__.
 
-Panels at https://sphinx-panels.readthedocs.io/en/latest/
-img-top-cls: pl-5 pr-5
+.. Panels at https://sphinx-panels.readthedocs.io/en/latest/
+   img-top-cls: pl-5 pr-5
+
 
 .. panels::
+   :img-top-cls: width=100px
+
+   ---
+   :img-top: _static/getting_started.png
+
+   Get up and running: installation, create an aggregate distribution, and a quick tour through the package.
+
+   +++
+
+   .. link-button:: 1_Getting_Started
+      :type: ref
+      :text: Getting started
+      :classes: btn-block btn-secondary stretched-link
+
+   ---
+   :img-top: _static/user_guide.PNG
+
+   How to solve real-world actuarial problems using ``aggregate``.
+
+   +++
+
+   .. link-button:: 2_User_Guide
+      :type: ref
+      :text: User guide
+      :classes: btn-block btn-secondary stretched-link
+
+   ---
+   :img-top: _static/api_reference.PNG
 
 
-    ---
-    :img-top: _static/logo.PNG
+   Complete documentation of every class and function. For developers and more advanced users.
 
-    Getting started TL
-    ^^^^^^^^^^^^^^^^^^
+   +++
 
-    New to *aggregate*? Check out the getting started guides. They contain an introduction to *aggregate'* main concepts and links to additional problem-solving tutorials.
+   .. link-button:: 3_Reference
+      :type: ref
+      :text: API reference
+      :classes: btn-block btn-secondary stretched-link
 
-    +++
+   ---
+   :img-top: _static/developer_guide.PNG
 
-    .. link-button:: getting_started
-            :type: ref
-            :text: Getting started
-            :classes: btn-block btn-secondary stretched-link
 
-    ---
-    :img-top: _static/logo.PNG
+   Describes the agg lanaguage for specifying complex aggregate distributions.
 
-    User Guide TR
-    ^^^^^^^^^^^^^^^^^^
+   +++
 
-    New to *pandas*? Check out the getting started guides. They contain an
-    introduction to *pandas'* main concepts and links to additional tutorials.
+   .. link-button:: 4_agg_Language_Reference
+      :type: ref
+      :text: agg language reference
+      :classes: btn-block btn-secondary stretched-link
 
-    +++
+   ---
+   :img-top: _static/developer_guide.PNG
 
-    .. link-button:: getting_started
-            :type: ref
-            :text: User guide
-            :classes: btn-block btn-secondary stretched-link
 
-    ---
-    :img-top: _static/logo.PNG
+   Technical background on probability and the numerical methods employed by ``aggregate``.
 
-    API Reference
-    ^^^^^^^^^^^^^^^^^^
+   +++
 
-    New to *pandas*? Check out the getting started guides. They contain an
-    introduction to *pandas'* main concepts and links to additional tutorials.
+   .. link-button:: 5_Technical_Resources
+      :type: ref
+      :text: Technical Resources
+      :classes: btn-block btn-secondary stretched-link
 
-    +++
+   ---
+   :img-top: _static/developer_guide.PNG
 
-    .. link-button:: getting_started
-            :type: ref
-            :text: API reference
-            :classes: btn-block btn-secondary stretched-link
 
-    ---
-    :img-top: _static/logo.PNG
+   To do list, ideas for future development, design philosophy, historical perspective.
 
-    agg Language Reference
-    ^^^^^^^^^^^^^^^^^^^^^^^
+   +++
 
-    Using the agg lanaguage to specify distributions. The grammar.
-
-    +++
-
-    .. link-button:: getting_started
-            :type: ref
-            :text: agg language reference
-            :classes: btn-block btn-secondary stretched-link
-
+   .. link-button:: 6_Development
+      :type: ref
+      :text: Development
+      :classes: btn-block btn-secondary stretched-link
 
 Table of Contents
 -----------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :titlesonly:
 
    1_Getting_Started
@@ -105,4 +116,3 @@ Table of Contents
    5_Technical_Resources
    6_Development
 
-Can include hidden directive!

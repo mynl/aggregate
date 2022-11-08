@@ -42,17 +42,19 @@ class Underwriter(object):
 
     def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False):
         """
-        Create underwriter object.
+        Create an underwriter object. The underwriter is the interface to the knowledge base
+        of the aggregate system. It is the interface to the parser and the interpreter. It
+        is the interface to the database of curves, portfolios and aggregates.
 
-        :param name: Name of the underwriter object. Default is named after Rory Cline, the best
-            underwriter I know.
-        :param databases: if None: nothing loaded; if 'default' (installed) or 'site' (user,
-            in ~/aggregate/databases) database \*.agg files in default or site directory are loaded.
-            If 'all' both default and site databases loaded. A string refers to a single database;
+        :param name: name of underwriter. Defaults to Rory, after Rory Cline, the best underwriter
+            I know.
+        :param databases: name or list of database files to read in on creation. if None: nothing loaded; if
+            'default' (installed) or 'site' (user, in ~/aggregate/databases) database \\*.agg files in default or site
+            directory are loaded. If 'all' both default and site databases loaded. A string refers to a single database;
             an interable of strings is also valid. See `read_database` for search path.
-        :param update: If True objects are updated after being created.
-        :param log2: Default log2 value.
-        :param debug: run parser in debug mode that are within Portfolios.
+        :param update: if True, update database files with new objects.
+        :param log2: log2 of number of buckets in discrete representation.  10 is 1024 buckets.
+        :param debug: if True, print debug messages.
         """
 
         self.name = name

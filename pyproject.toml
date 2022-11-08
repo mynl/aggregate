@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", 'numpy']
+build-backend = "setuptools.build_meta"
+
+[project]
+name="aggregate"
+dynamic=['version', 'readme', "dependencies"]
+author="Stephen J. Mildenhall"
+author_email="steve@convexrisk.com"
+maintainer="Stephen J. Mildenhall"
+maintainer_email="steve@convexrisk.com"
+license={file="LICENCE"}
+requires-python = ">=3.7"
+description="aggregate - working with aggregate (compound) probability distributions"
+long_description="""**aggregate** is a Python package providing an expressive language and fast,
+  accurate computations to make working with aggregate (compound) probability
+  distributions easy and intuitive. It allows students and practitioners to
+  work with realistic real-world distributions that reflect the underlying
+  frequency and severity generating processes. It has applications in
+  insurance, risk management, actuarial science, and related areas."""
+classifiers=[
+          'Development Status :: 4 - Beta',
+          'Programming Language :: Python :: 3',
+          'License :: OSI Approved :: BSD License',
+          'Topic :: Education',
+          'Topic :: Office/Business :: Financial',
+          'Topic :: Scientific/Engineering :: Mathematics',
+          'Intended Audience :: Financial and Insurance Industry',
+          'Intended Audience :: Education'
+      ]
+keywords=['aggregate', 'compound', 'probability', 'actuarial', 'risk', 'insurance']
+
+[project.scripts]
+agg-test-suite = "aggregate.extensions.test_suite.run_test_suite"
+
+[tools.setuptools.dynamic]
+version={attr="aggregate.__version__"}
+readme={file=['README.rst']}
+dependencies={file=['requirements.txt']}
+
+[project.urls]
+documentation='https://aggregate.readthedocs.io/en/latest/'
+repository="https://github.com/mynl/aggregate"

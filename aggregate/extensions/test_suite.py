@@ -159,12 +159,16 @@ class TestSuite(object):
         return df.style.set_table_styles(all_styles).format(fmts)
 
 
-if __name__ == '__main__':
+def run_test_suite():
     t = TestSuite()
     # show progress
-    t.build.logger_level(20)
+    t.build.logger_level(30)
     print(t.tests)
     # run all the aggs
     # TODO FIX for Portfolios
     # t.run(regex=r'^C\.', title='C only', fig_prefix="auto", fig_format='png', dpi=300)
     t.run(regex=r'^[A-KNO]\.', title='Full Test Suite', fig_prefix="auto", fig_format='png', dpi=300)
+
+
+if __name__ == '__main__':
+    run_test_suite()

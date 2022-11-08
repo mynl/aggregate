@@ -7,29 +7,26 @@
 # May 2022 to upload manually: twine upload dist/aggregate-0.9*.*
 # enter user name and pword (mildenhall) (py... password! not Github)
 
-
 from setuptools import setup
-import os
-from time import time
+from pathlib import Path
 
 tests_require = ['unittest', 'sly']
 install_requires = [
-    'pypandoc',
-    'sly==0.3',
-    'scipy',
-    'matplotlib',
-    'numpy'
-]
+                    'cycler',
+                    'ipykernel',
+                    'jinja2',
+                    'matplotlib',
+                    'numpy',
+                    'pandas',
+                    'psutil',
+                    'pypandoc',
+                    'scipy',
+                    'sly',
+                    'titlecase'
+                    ]
 
 
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
-
-
-long_description = read('README.rst')
-
-
-# agg/*.agg is the parameter and curve files
+long_description = Path('README.rst').read_text(encoding='utf-8')
 
 import aggregate
 version = aggregate.__version__
@@ -58,6 +55,6 @@ setup(name="aggregate",
           'Intended Audience :: Financial and Insurance Industry',
           'Intended Audience :: Education'
       ],
-      project_urls={"Documentation": 'https://www.mynl.com/aggregate/',
+      project_urls={"Documentation": 'https://aggregate.readthedocs.io/en/latest/',
                     "Source Code": "https://github.com/mynl/aggregate"}
       )

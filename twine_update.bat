@@ -1,3 +1,9 @@
 REM mildenhall/ xx for PyPi see keepass
 
-twine upload dist/aggregate-0.9.5.1.*
+REM twine upload dist/aggregate-0.9.5.1.*
+
+REM internet says
+REM twine upload dist/*
+
+
+echo twine -u mildenhall -p %PPPW% upload dist/aggregate-%1%

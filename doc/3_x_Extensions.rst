@@ -2,5 +2,5 @@
 Extensions
 ==========
 
-.. automodule:: aggregate.extensions.basic
+.. automodule:: aggregate.extensions
    :members:

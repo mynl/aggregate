@@ -1,9 +1,9 @@
-===================
+*****************
 Getting Started
-===================
+*****************
 
 Installation
-------------
+=============
 
 Install from PyPI ::
 
@@ -13,23 +13,23 @@ See https://pypi.org/project/aggregate/.
 
 
 Source Code
------------
+===========
 
 The source code is hosted on GitHub, https://github.com/mynl/aggregate.
 
 Prerequisites
--------------
+=============
 
 The help assumes you know how to program in Python, understand probability, and are familiar with the concept of an aggregate distribution. Awareness of the material covered in `SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_ is helpful. The help also assumes you understand insurance terminology like limit, attachment, deductible.
 
 License
--------
+=======
 
 BSD 3
 
 
 Help coding conventions
------------------------
+=======================
 
 Throughout the help, you will see input code inside code blocks such as:
 
@@ -64,7 +64,7 @@ is equivalent to:
 
 
 First steps with ``aggregate``
-------------------------------
+==============================
 
 This is a short introduction to aggregate, for new users.
 

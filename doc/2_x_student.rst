@@ -1,8 +1,164 @@
 .. _2_x_student:
 
-===========================================
 Student
 ===========================================
+
+**Objectives:** Define and give examples of aggregate probability distributions; install and get started using and the `aggregate` library for working with them.
+
+**Audience:** New user with no knowlege of aggregate distributions or insurance.
+
+**Prerequisites:** Basic probability theory; Python and pandas programming.
+
+
+What is an aggregate distribution?
+----------------------------------
+
+**Aggregate distributions** are used to model outcomes generated as the
+sum of an observable quantity over a random number of events.
+
+1. Total insurance claims from a portfolio: number of claims and amount
+   of each claim.
+2. Larvae per unit area (Neyman 1939): number of egg clusters per unit
+   area and number of larvae per egg cluster
+3. Number of occupants passing a point on a road: number of vehicles
+   passing the point and number of occupants per vehicle
+
+Aggregate distributions are used in many fields go by different names
+including compound, generalized, and stopped-sum distributions
+
+In insurance terminology, the number of events is called the
+**frequency** and the amount the **severity**.
+
+The frequency and severity can be determined separately, which is an
+advantage of aggregate distributions.
+
+Formal construction
+-------------------
+
+Let the random variable :math:`N` equal the number of events and let
+:math:`X_i` be a series of iid random variables modeling an observable
+quantity. An **aggregate distribution** is the distribution of the sum
+of the observables
+
+.. math::
+
+
+   A = X_1 + \cdots + X_N.
+
+An observation from :math:`A` is realized by:
+
+1. Sampling (simulating) :math:`N`
+2. For :math:`i=1,\dots, N`, sampling the number of occupants
+   :math:`X_i`
+3. Add the :math:`X_i`
+
+It is usual to assume that the values of :math:`X` and :math:`N` are
+independent. Check this assumption is reasonable for your use case!
+
+Installing ``aggregate``
+------------------------
+
+.. code:: python
+
+
+   !pip install aggregate
+
+   !pip install -U pandas
+
+   from aggregate import build
+
+   build
+
+Parameters for the simple discrete traffic example
+--------------------------------------------------
+
+You observe traffic past a junction over sixteen 1-minute intervals.
+There are 20 vehicles in total, or 20/16=1.25 per minute on average.
+This gives the **frequency distribution** :math:`N`.
+
+================== =================== =====================
+Number of vehicles Number of intervals Probability :math:`N`
+================== =================== =====================
+0                  4                   4/16=0.25
+1                  6                   6/16=0.375
+2                  4                   4/16=0.25
+3                  2                   2/16=0.125
+Total intervals    16
+================== =================== =====================
+
+Separately, you also observe the number of occupants per vehicle for
+sixteen vehicles, giving the **severity distribution** :math:`X`. The
+ability to determine frequency and severity using separate data studies
+is a strength of the aggregate method.
+
+=================== ================== =====================
+Number of occupants Number of vehicles Probability :math:`X`
+=================== ================== =====================
+1                   10                 10/16=0.625
+2                   3                  3/16=0.1875
+3                   0                  0
+4                   3                  3/16=0.1875
+Total vehicles      16
+=================== ================== =====================
+
+The average number of occupants per vehicle equals
+1.75=(10+6+12)/16=28/16=1.75.
+
+From here we can build an aggregate distribution :math:`A` of the number
+of occupants per minute.
+
+You should work out the entire distribution of :math:`A` by hand in a
+spreadsheet!
+
+The package has its own programming language, called the ``agg``
+language for specifying aggregate distributions. It has certain key
+words, like ``select`` and ``group by`` in SQL
+
+Aggregate program for the traffic example
+-----------------------------------------
+
+Here is the ``agg`` program for the traffic example.
+
+.. code:: agg
+
+
+   a = build('agg Traffic dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
+             'dsev [1 2 4] [10/16 3/16 3/16]')
+
+-  ``agg`` is a keyword
+-  Traffic is a user-selected label
+-  ``dfreq`` is a keyword to specify a discrete probability distribution
+   for the number of outcomes in the form ``[outcomes] [probabilities]``
+
+   -  ``[0 1 2 3]`` are the outcomes
+   -  ``[4/16 6/16 4/16 2/16]`` are the probabilities
+   -  Commas are optional
+   -  Only division arithmetic is supported
+
+-  ``dsev`` is a keyword to specify the value of each outcome
+
+   -  ``[1 2 4]`` are the outcomes; there can be gaps
+   -  The probabilities are set equal to 1/6
+
+Create an object. Note Python joins the lines automatically; the program
+has only one line.
+
+.. code:: python
+
+   # if necessary
+   !pip install -U matplotlib>=3.5
+
+   # silence warnings
+   import warnings
+   warnings.filterwarnings("ignore")
+
+
+   a = build('agg Traffic '
+             'dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
+             'dsev [1 2 4] [10/16 3/16 3/16]')
+   a
+
+
 
 
 Simple Discrete Aggregate Distributions

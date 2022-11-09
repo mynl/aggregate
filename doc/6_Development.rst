@@ -1,8 +1,8 @@
 .. _development:
 
-===============
+***************
 Development
-===============
+***************
 
 
 Design philosophy

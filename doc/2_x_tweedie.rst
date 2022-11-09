@@ -1,6 +1,5 @@
 .. _2_x_tweedie:
 
-=================================================
 The Tweedie distribution for working actuaries
 =================================================
 
@@ -8,6 +7,13 @@ The Tweedie distribution for working actuaries
 
 
 Tweedie distributions are a suitable model for pure premiums and are used in GLMs. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
+
+**Objectives** Introduce aggregate probability distributions and the `aggregate` library for working with then in the context of real-world, but basic, actuarial problems
+illustrated using the Tweedie distribution from GLM modeling.
+
+**Audience** Actuaries at the Associate or Fellow level.
+
+**Prerequisites** V02 plus awareness of the use aggregate probability distribution in insurance (as covered on CAS Part 8).
 
 
 Theory

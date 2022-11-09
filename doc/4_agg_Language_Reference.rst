@@ -1,6 +1,6 @@
-=============================
+*****************************
 **agg** Language Reference
-=============================
+*****************************
 
 .. To view the grammar using a railroad diagram paste the specification below into
    the Edit Grammar tab of https://www.bottlecaps.de/rr/ui and then View Diagram.
@@ -8,6 +8,19 @@
 
 Language Overview
 =================
+
+* :doc:`4_x_railroad` shows the railroad diagram.
+* `Railroad diagram <_static/diagram.xhtml>`_ is the railroad diagram.
+
+.. literalinclude:: C:\temp\diag.html
+   :language: html
+
+.. toctree::
+    :hidden:
+
+    4_x_railroad
+
+
 
 
 Pre-processing
@@ -318,10 +331,35 @@ The ```agg``` Language Grammar.
     xs                      ::= "xs|x"
 
 
+Test Suite
+==========
+
+To run the test suite for HTML output, svg graphics.
+
+.. code-block:: python
+
+    from aggregate.extensions.test_suite import TestSuite
+    TestSuite().run('^[A-KNO]', 'All Aggregate Tests', 'svg')
+
+
+.. literalinclude:: ../aggregate/agg/test_suite.agg
+   :language: agg
+
+
+To only parse::
+
+    from aggregate import build
+    filename = build.default_dir / 'test_suite.agg'
+    assert filename.exists()
+
+    build.logger_level(30)
+    df = build.interpreter_file(filename=filename)
+
+    df.query('error != 0')
 
 
 References
-----------
+==========
 
 https://sly.readthedocs.io/en/latest/sly.html
 

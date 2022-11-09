@@ -1,9 +1,9 @@
 .. _portfolio_calculations:
 
-
-======================
 Portfolio Calculations
 ======================
+
+
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class
 computes the densities of each aggregate component as well as the sum,
 and also computes the variables shown in
@@ -26,98 +26,94 @@ emphasizing the importance of knowing :math:`\mathsf{E}[X_i /X \mid X]`.
 
 Densities are computed using FFT in :math:`O(n\log(n))` time.
 
-.. raw:: latex
+.. list-table:: Variables and computational complexity by line :math:`i`
+   :widths: 15 35 35 15
+   :header-rows: 1
 
-   \scriptsize
-
-.. table:: Variables and computational complexity by line :math:`i`
-:raw-latex:`\label{tab:port-deets}`
-
-   +---------------+--------------------+-----------------------+--------+
-   | **Variable**  | **Meaning**        | **Computation**       | **     |
-   |               |                    |                       | Comple |
-   |               |                    |                       | xity** |
-   +===============+====================+=======================+========+
-   | **All lines   |                    |                       |        |
-   | combined**    |                    |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | p_total       | Density of         | FFT Convolution       |        |
-   |               | :math:`X=\sum X_i` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exa_total     | :math:`\mathsf{    | Cumsum of :math:`S`   | :math: |
-   |               | E}[\min(X,a)]=\mat |                       | `O(n)` |
-   |               | hsf{E}[X\wedge a]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exlea_total   | :math:`\mathsf{    |                       |        |
-   |               | E}[X \mid X\le a]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exgta_total   | :math:`\maths      |                       |        |
-   |               | f{E}[X\mid X > a]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   |               |                    |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | **By line**   |                    |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | p_line        | Density of         | FFT computation of    |        |
-   |               | :math:`X_i`        | aggregate using MGF   |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exeqa_line    | :math:`\mathsf     | Conv :math:`xf_i(x)`, | :      |
-   |               | {E}[X_i \mid X=a]` | :math:`f_{\hat i}`    | math:` |
-   |               |                    |                       | O(n\lo |
-   |               |                    |                       | g(n))` |
-   +---------------+--------------------+-----------------------+--------+
-   | lev_line      | :                  | Cumsum of :math:`S_i` | :math: |
-   |               | math:`\mathsf{E}[\ |                       | `O(n)` |
-   |               | min(X_i,a)]=\maths |                       |        |
-   |               | f{E}[X_i\wedge a]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | e2pri_line    | :math:`\math       | Conv                  | :      |
-   |               | sf{E}[X_{i,2}(a)]` | :math:`\mat           | math:` |
-   |               |                    | hsf{E}[X_i\wedge x]`, | O(n\lo |
-   |               |                    | :math:`f_{\hat i}`    | g(n))` |
-   +---------------+--------------------+-----------------------+--------+
-   | exlea_line    | :math:`\mathsf{E}  | Cumsum of             | :math: |
-   |               | [X_i \mid X\le a]` | :math:`E              | `O(n)` |
-   |               |                    | (X_i \mid X=x)f_X(x)` |        |
-   +---------------+--------------------+-----------------------+--------+
-   | e_line        | :math              |                       |        |
-   |               | :`\mathsf{E}[X_i]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exgta_line    | :math:`\mathsf{E}[ | Conditional           |        |
-   |               | X_i \mid X \ge a]` | expectation formula   |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exi_x_line    | :math:`\m          | Sum using conditional |        |
-   |               | athsf{E}[X_i / X]` | expectation           |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exi_xlea_line | :m                 | Cumsum of             |        |
-   |               | ath:`\mathsf{E}[X_ | :math:`\mathsf{E}[    |        |
-   |               | i/X \mid X \le a]` | X_i\mid X=x]f_X(x)/x` |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exi_xgta_line | :math:`\mathsf{E}[ | Conditional           |        |
-   |               | X_i/X \mid X > a]` | expectation formula   |        |
-   +---------------+--------------------+-----------------------+--------+
-   | exa_line      | :math:`\           | Conditional           |        |
-   |               | mathsf{E}[X_i(a)]` | expectation formula   |        |
-   +---------------+--------------------+-----------------------+--------+
-   | epd_i_line    | :math:`(\          | Stand-alone Expected  |        |
-   |               | mathsf{E}[X_i]-\ma | Policyholder Deficit  |        |
-   |               | thsf{E}[X\wedge a) |                       |        |
-   |               | ]/\mathsf{E}[X_i]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | epd_i_line    | :math              | Equal priority EPD    |        |
-   |               | :`(\mathsf{E}[X_i] |                       |        |
-   |               | -\mathsf{E}[X_i(a) |                       |        |
-   |               | ]/\mathsf{E}[X_i]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-   | epd_i_line    | :math:`(\          | Second priority EPD   |        |
-   |               | mathsf{E}[X_i]-\ma |                       |        |
-   |               | thsf{E}[X_{i,2}(a) |                       |        |
-   |               | ]/\mathsf{E}[X_i]` |                       |        |
-   +---------------+--------------------+-----------------------+--------+
-
-.. raw:: latex
-
-   \normalsize
+   * - Variable
+     - Meaning
+     - Computation
+     - Complexity
+   * - All lines combined
+     -
+     -
+     -
+   * - p_total
+     - Density of :math:`X=\sum_i X_i`
+     - FFT Convolution
+     -
+   * - exa_total
+     - :math:`\mathsf E[\min(X,a)]=\mathsf E[X\wedge a]`
+     - Cumsum of :math:`S`
+     - :math:`O(n)`
+   * - exlea_total
+     - :math:`\mathsf E[X \mid X\le a]`
+     -
+     -
+   * - exgta_total
+     - :math:`\mathsf E[X\mid X > a]`
+     -
+     -
+   * - **By line**
+     -
+     -
+     -
+   * - p_line
+     - Density of :math:`X_i`
+     - FFT computation of aggregate using MGF
+     -
+   * - exeqa_line
+     - :math:`\mathsf E[X_i \mid X=a]`
+     - Conv :math:`xf_i(x)`, :math:`f_{\hat i}`
+     - :math:`O(n\log(n))`
+   * - lev_line
+     - :math:`\mathsf E[\min(X_i,a)]=\mathsf E[X_i\wedge a]`
+     - Cumsum of :math:`S_i`
+     - :math:`O(n)`
+   * - e2pri_line
+     - :math:`\mathsf E[X_{i,2}(a)]`
+     - Conv :math:`\mathsf E[X_i\wedge x]`, :math:`f_{\hat i}`
+     - :math:`O(n\log(n))`
+   * - exlea_line
+     - :math:`\mathsf E[X_i \mid X\le a]`
+     - Cumsum of :math:`E(X_i \mid X=x)f_X(x)`
+     - :math:`O(n)`
+   * - e_line
+     - :math:`\mathsf E[X_i]`
+     -
+     -
+   * - exgta_line
+     - :math:`\mathsf E[X_i \mid X \ge a]`
+     - Conditional expectation formula
+     -
+   * - exi_x_line
+     - :math:`\mathsf E[X_i / X]`
+     - Sum using conditional expectation
+     -
+   * - exi_xlea_line
+     - :math:`\mathsf E[X_i/X \mid X \le a]`
+     - Cumsum of :math:`\mathsf E[X_i\mid X=x]f_X(x)/x`
+     -
+   * - exi_xgta_line
+     - :math:`\mathsf E[X_i/X \mid X > a]`
+     - Conditional expectation formula
+     -
+   * - exa_line
+     - :math:`\mathsf E[X_i(a)]`
+     - Conditional expectation formula
+     -
+   * - epd_i_line
+     - :math:`(\mathsf E[X_i]-\mathsf E[X\wedge a)]/\mathsf E[X_i]`
+     - Stand-alone Expected Policyholder Deficit
+     -
+   * - epd_i_line
+     - :math:`(\mathsf E[X_i]-\mathsf E[X_i(a)]/\mathsf E[X_i]`
+     - Equal priority EPD
+     -
+   * - epd_i_line
+     - :math:`(\mathsf E[X_i]-\mathsf E[X_{i,2}(a)]/\mathsf E[X_i]`
+     - Second priority EPD
+     -
 
 **For Total, All Lines :math:`X`**
 
@@ -283,31 +279,30 @@ Let :math:`\mathsf{E}_g` denote expected values with respect to the
 distorted probabilities defined by :math:`g`.
 
 
-.. table:: Variables and computational complexity by line :math:`i`,
-with distorted probabilities. Complexity refers to additional complexity
-beyond values already computed.
+.. list-table:: Variables and computational complexity by line :math:`i`, with distorted probabilities. Complexity refers to additional complexity beyond values already computed.
+    :widths: 25 25 25 25
+    :header-rows: 1
 
-   +--------------+----------------+----------------+----------------+
-   | **Variable** | **Meaning**    | *              | **Complexity** |
-   |              |                | *Computation** |                |
-   +==============+================+================+================+
-   | gS, gF       |                |                | :math:`O(n)`   |
-   |              |:math:`g(S(x))` |                |                |
-   |              | and            |                |                |
-   |              |                |                |                |
-   |              |:math:`1-gS(x))`|                |                |
-   +--------------+----------------+----------------+----------------+
-   | gp_total     | Estimate of    | Difference of  | :math:`O(n)`   |
-   |              | :math:`        | :math:`g(S)`   |                |
-   |              | -d g(S(x))/dx` |                |                |
-   +--------------+----------------+----------------+----------------+
-   | exag_total   | :ma            | Cumulative sum | :math:`O(n)`   |
-   |              | th:`\mathsf{E} | of             |                |
-   |              | _g[X\wedge a]` | :math:`g(S)`   |                |
-   +--------------+----------------+----------------+----------------+
-   | exag_line    | :math:`\mathsf | See below      | :math:`O(n)`   |
-   |              | {E}_g[X_i(a)]` |                |                |
-   +--------------+----------------+----------------+----------------+
+    * - **Variable**
+      - **Meaning**
+      - **Computation**
+      - **Complexity**
+    * - gS, gF
+      - :math:`g(S(x))` and :math:`1-g(S(x))`
+      -
+      - :math:`O(n)`
+    * - gp_total
+      - Estimate of :math:`-d g(S(x))/dx`
+      - Difference of :math:`g(S)`
+      - :math:`O(n)`
+    * - exag_total
+      - :math:`\mathsf E_g[X\wedge a]`
+      - Cumulative sum of :math:`g(S)`
+      - :math:`O(n)`
+    * - exag_line
+      - :math:`\mathsf E_g[X_i(a)]`
+      - See below
+      - :math:`O(n)`
 
 
 -  exag_total is easy to compute as the cumulative sums of :math:`g(S)`

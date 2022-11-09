@@ -1,8 +1,7 @@
 .. _2_x_10mins:
 
-******************************
 10 minute guide to aggregate
-******************************
+==============================
 
 This is a test drive of aggregate. Not everything will make sense the first time round, but it will show some of what you can achieve with the package. It is aimed at users who are programming interactively in Jupyter Lab or a similar REPL interface.
 

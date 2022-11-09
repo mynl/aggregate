@@ -1,6 +1,5 @@
 .. _2_x_limits_and_mixtures:
 
-=====================================
 Limits, Limit Profiles, and Mixtures
 =====================================
 

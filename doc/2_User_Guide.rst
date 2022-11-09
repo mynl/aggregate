@@ -1,6 +1,6 @@
-==============
-User Guide
-==============
+**************
+User Guides
+**************
 
 The User Guide shows how ``aggregate`` can be used to solve a specific actuarial problem. It alternates between problem-based guides and reference guides. Each is in a separate short document. Many of the guides include a video presentation.
 
@@ -35,12 +35,63 @@ Those marked *reference* are learning based and describe how ``aggregate`` works
 <iframe width="1100" height="619" src="https://www.youtube.com/embed/GFP4WgHXqic" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 
++------------+---------------------------------------+---------------+
+| Audience   | Features and Prerequisites            | Problems      |
++============+=======================================+===============+
+| Novice     | Intro to aggregate distributions in   |               |
+|            | general language; simple discrete     |               |
+|            | examples                              |               |
++------------+---------------------------------------+---------------+
+| Actuarial  | Similar to novice but using insurance | SOA STAM, CAS |
+| students   | terminology                           | MAS1, IFOA    |
+|            |                                       | CS2, KPW, LDA |
++------------+---------------------------------------+---------------+
+| Actuaries  | Introduction using the Tweedie        | CAS Part 8    |
+|            | distribution as motivation            |               |
++------------+---------------------------------------+---------------+
+| Individual | LEV, ILFs, layering, aggregate        | CAS Part 8    |
+| risk       | insurance charge (Table L, M);        |               |
+| pricing    | solving problems from CAS             |               |
+| actuary    |                                       |               |
++------------+---------------------------------------+---------------+
+| R          | Exposure rating, swings and slides,   | CAS Part 8    |
+| einsurance | aggregate stop loss                   |               |
+| pricing    |                                       |               |
+| actuary    |                                       |               |
++------------+---------------------------------------+---------------+
+| Reserving  | Loss emergence, IBNR and case reserve |               |
+| actuary    | ranges                                |               |
++------------+---------------------------------------+---------------+
+| Capital    | Use of samples, VaR, TVaR, tail       | CAS Part 9    |
+| modeler    | evaluation, risk drivers;             |               |
+|            | Iman-Conover; rearrangement algorithm |               |
++------------+---------------------------------------+---------------+
+| Strategic  | Capital allocation in a portfolio;    | CAS Part 9    |
+| planning   | alternative pricing methodologies;    |               |
+|            | bounds on net/gross pricing           |               |
++------------+---------------------------------------+---------------+
+| C          | Thick tailed Poisson Pareto and       | CAS Part 9    |
+| atastrophe | lognormal models; aggregate PMLs;     |               |
+| modeler    | occurrence and aggregate layering     |               |
++------------+---------------------------------------+---------------+
+| Act Sci or | Solving text book problems (similar   |               |
+| Risk Mgmt  | to Student intro); generate           |               |
+| professor  | realistic, motivating examples        |               |
++------------+---------------------------------------+---------------+
+| Developer  | Class model, ``agg`` language         |               |
+|            | grammar, internal design              |               |
++------------+---------------------------------------+---------------+
+| Debugger   | Watch inner workings!                 |               |
++------------+---------------------------------------+---------------+
 
-Guides
--------
+
+
+.. Guides
+   -------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
+    :hidden:
 
     2_x_10mins
     2_x_student
@@ -60,4 +111,7 @@ Guides
     2_x_capital
     2_x_distortion
     2_x_strategy
+    2_x_samples_rearrangement
+    2_x_case_studies
+
 

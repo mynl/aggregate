@@ -1,6 +1,5 @@
 .. _2_x_aggregate:
 
-========================
 Aggregate distributions
 ========================
 

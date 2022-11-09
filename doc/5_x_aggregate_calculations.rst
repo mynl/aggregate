@@ -1,7 +1,5 @@
 .. _aggregate_calculations:
 
-
-======================
 Aggregate Calculations
 ======================
 

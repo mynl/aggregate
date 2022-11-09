@@ -1,18 +1,69 @@
 .. _probability:
 
-
-======================
 Probability Background
 ======================
 
 Severity Distributions
-=======================
+-----------------------
 
+
+Computing moments
+~~~~~~~~~~~~~~~~~~
+
+Higher moments of a layer can be computed
+
+.. math::
+
+   \mathsf E[((X-a)^+ \wedge l)^n]
+   &= \int_a^{a+l} (x-a)^n f(x)\,dx + l^nS(a+l) \\
+   &= \sum_{k=0}^n (-1)^k \binom{n}{k} a^{n-k} \int_a^{a+l} x^k f(x)\,dx + l^nS(a+l) \\
+   &= \sum_{k=0}^n (-1)^k \binom{n}{k} a^{n-k} \left(\mathsf E(k; a+l) - \mathsf E(k; a)\right)+ l^nS(a+l)
+
+where
+
+.. math::
+
+
+   \mathsf E(k; a) = \int_0^a x^kf(x)\,dx
+
+is the partial expectation function.
+
+Lognormal
+"""""""""
+
+For the lognormal, the trick for higher moments is to observe that if
+:math:`X` is :math:`\mathit{lognormal}(\mu,\sigma)` then :math:`X^k` is
+:math:`\mathit{lognormal}(k\mu, k\sigma)`. The formula for partial
+expectations of the lognormal is easy to compute by substitution, giving
+
+.. math::
+
+   \mathsf E(k, a) = \exp(k\mu + k^2\sigma^2/2)\Phi\left( \frac{\log x -\mu - k\sigma^2}{\sigma} \right)
+
+Densities of the form :math:`f(x)=x^\alpha c(\alpha)g(x)`
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+.. math::
+
+   \mathsf E(k, a)
+   &= \int_0^a x^k x^\alpha c(\alpha)g(x) \,dx \\
+   &= \frac{c(\alpha)}{c(n+\alpha)}\int_0^a x^{k+\alpha} c(k+\alpha)g(x) \,dx \\
+   &= \frac{c(\alpha)}{c(n+\alpha)}F_{k+\alpha}(a)
+
+are easy to express in terms of the distribution function. This is a broad class including the gamma, XXXX.
+
+Pareto
+"""""""
+
+An easy integral computation, substitute :math:`y=\lambda + x` to express in powers of :math:`y`.
 
 Frequency Distributions
-=======================
+------------------------
 
-<!-- from 05.md -->
+Mixed Frequency Distributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. from 05.md
 
 A random variable :math:`N` is :math:`G`-mixed Poisson if
 :math:`N\mid G` has a Poisson :math:`nG` distribution for some fixed
@@ -69,7 +120,7 @@ We can also assume :math:`G` has mean :math:`n` and work directly with
 both forms mixing distributions.
 
 Interpretation of the Coefficient of Variation of the Mixing Distribution
--------------------------------------------------------------------------
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Per Actuarial Geometry, if :math:`\nu` is the CV of :math:`G` then the
 :math:`\nu` equals the asymptotic coefficient of variation for any
@@ -77,7 +128,7 @@ Per Actuarial Geometry, if :math:`\nu` is the CV of :math:`G` then the
 variance will exist iff the variance of the severity term exists.
 
 Gamma Mixing
-------------
+"""""""""""""
 
 A negative binomial is a gamma-mixed Poisson: if :math:`N \mid G` is
 distributed as a Poisson with mean :math:`G`, and :math:`G` has a gamma
@@ -110,7 +161,7 @@ The corresponding MGF of the gamma is
 :math:`M_G(\zeta) = (1-\theta\zeta)^{-a}`.
 
 Shifted Mixing (General)
-------------------------
+"""""""""""""""""""""""""
 
 We can adjust the skewness of mixing with shifting. In addition to a
 target CV :math:`\nu` assume a proportion :math:`f` of claims are sure
@@ -126,7 +177,7 @@ Since :math:`\text{skew}(G)=\text{skew}(G')` we have
 :math:`g=\text{E}(G^3)=\nu^3 \text{skew}(G')+3c+1`.
 
 Delaporte Mixing (Shifted Gamma)
---------------------------------
+"""""""""""""""""""""""""""""""""
 
 Inputs are target CV :math:`\nu` and proportion of certain claims
 :math:`f`, :math:`0\leq f \leq 1`. Find parameters :math:`f`, :math:`a`
@@ -143,23 +194,22 @@ The skewness of :math:`G` equals the skewness of :math:`G'` equals
 :math:`g=2\nu^4/(1-f)+3c+1`
 
 Poisson Inverse Gaussian Distribution
--------------------------------------
+""""""""""""""""""""""""""""""""""""""
 
 Bernoulli Distribution
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Binomial Distribution
----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 Fixed Distribution
-------------------
+~~~~~~~~~~~~~~~~~~~
 
-
-:math:`(a,b,0)` and :math:`(a,b,1)` classes
--------------------------------------------
+The :math:`(a,b,0)` and :math:`(a,b,1)` classes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 Aggregate Distributions
-=======================
+------------------------
 
 aka compound distributions

@@ -1,8 +1,8 @@
 .. _technical_resources:
 
-======================
+**********************
 Technical Resources
-======================
+**********************
 
 Technical Resources provides theoretical background and details of the calculation methodologies employed by ``aggregate``.
 
@@ -13,11 +13,10 @@ Technical Resources provides theoretical background and details of the calculati
 * :doc:`5_x_quantiles`  computing quantiles (and PMLs)
 * :doc:`5_x_distortions` the :class:`Distortion` object.
 
-Resources
----------
 
 .. toctree::
     :maxdepth: 2
+    :hidden:
 
     5_x_probability
     5_x_aggregate_calculations

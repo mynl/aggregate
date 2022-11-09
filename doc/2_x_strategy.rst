@@ -1,6 +1,5 @@
 .. _2_x_strategy:
 
-===========================================
 Strategy and Portfolio Management Problems
 ===========================================
 

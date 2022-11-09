@@ -1,10 +1,9 @@
 .. _2_x_capital:
 
-==========================
 Capital Modeling Problems
 ==========================
 
-Using samples! Kappa as a risk measure function.
+Kappa as a risk measure function.
 
 
 

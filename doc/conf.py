@@ -96,6 +96,8 @@ htmlhelp_basename = 'aggregatedoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
+# better unicode support
+latex_engine = "xelatex"
 
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').

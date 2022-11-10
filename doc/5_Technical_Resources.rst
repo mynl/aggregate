@@ -7,11 +7,11 @@ Technical Resources
 Technical Resources provides theoretical background and details of the calculation methodologies employed by ``aggregate``.
 
 
-* :doc:`5_x_probability` basic background.
-* :doc:`5_x_aggregate_calculations` the :class:`Aggregate` object.
-* :doc:`5_x_portfolio_calculations` the :class:`Portfolio` object.
-* :doc:`5_x_quantiles`  computing quantiles (and PMLs)
-* :doc:`5_x_distortions` the :class:`Distortion` object.
+* :doc:`5_x_probability`
+* :doc:`5_x_aggregate_calculations` performed by the :class:`Aggregate` object.
+* :doc:`5_x_portfolio_calculations` performed by the :class:`Portfolio` object.
+* :doc:`5_x_quantiles`
+* :doc:`5_x_distortions` and the :class:`Distortion` object.
 
 
 .. toctree::

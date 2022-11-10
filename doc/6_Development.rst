@@ -5,7 +5,7 @@ Development
 ***************
 
 
-Design philosophy
+Design Philosophy
 ====================
 
 * Don't make formatting decisions for the user, use defaults
@@ -28,7 +28,7 @@ Design philosophy
 Development Outline
 ====================
 
-Non programming Enhancements
+Non Programming Enhancements
 ----------------------------
 * Better sample of realistic severity curves
 * Better sample of by line aggregate Blocks in agg format
@@ -36,7 +36,7 @@ Non programming Enhancements
 * Jon Evans note and severity
 * Jed note
 
-Short term
+Short Term
 -----------
 * Different freq dists and freq dist in exact mode, shape a, b
 * Fix test cases!!
@@ -60,7 +60,7 @@ Medium Term
 * Name as a member in dict vs list conniptions (put up with duplication?)
 
 
-Nice to have enhancements
+Nice to Have Enhancements
 -------------------------
 * Agg limit and attachment: NO already have when you can use an agg as a severity
 * How to model two reinstatements?

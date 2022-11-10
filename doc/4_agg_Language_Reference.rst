@@ -9,21 +9,9 @@
 Language Overview
 =================
 
-* :doc:`4_x_railroad` shows the railroad diagram.
-* `Railroad diagram <_static/diagram.xhtml>`_ is the railroad diagram.
-
-.. literalinclude:: C:\temp\diag.html
-   :language: html
-
-.. toctree::
-    :hidden:
-
-    4_x_railroad
 
 
-
-
-Pre-processing
+Pre-Processing
 ==============
 
 Programs are processed one line at a time. Before passing to the lexer, the following pre-processing occurs.
@@ -36,7 +24,7 @@ Programs are processed one line at a time. Before passing to the lexer, the foll
 6. Split on newlines
 
 
-Lexer term definitions
+Lexer Term Definitions
 ======================
 
 Ignored characters: tab, colon, comma, and |. These characters can be used to improve readability.
@@ -127,10 +115,12 @@ Aggregate names must not include underscore. Portfolio names may include undersc
 
 
 
-Language grammar specification
+Language Grammar Specification
 ===============================
 
-The ```agg``` Language Grammar.
+Here is the full ```agg``` Language Grammar.
+`Grammar railroad diagram <_static/diagram.xhtml>`_.
+
 
 ::
 

@@ -1,3 +1,5 @@
+.. 2022-11-10: reviewed
+
 *****************
 Getting Started
 *****************
@@ -9,8 +11,7 @@ Install from PyPI ::
 
    pip install aggregate
 
-See https://pypi.org/project/aggregate/.
-
+See https://pypi.org/project/aggregate/. You must have ``matplotlib>=3.5`` installed, as well as the other packages listed in requirements.txt.
 
 Source Code
 ===========
@@ -20,7 +21,7 @@ The source code is hosted on GitHub, https://github.com/mynl/aggregate.
 Prerequisites
 =============
 
-The help assumes you know how to program in Python, understand probability, and are familiar with the concept of an aggregate distribution. Awareness of the material covered in `SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_ is helpful. The help also assumes you understand insurance terminology like limit, attachment, deductible.
+The help assumes you know how to program in Python, understand probability, and are familiar with the concept of an aggregate distribution. Awareness of insurance terminology such as limit, attachment and deductible, and the material covered in `SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_ is helpful.
 
 License
 =======
@@ -28,7 +29,7 @@ License
 BSD 3
 
 
-Help coding conventions
+Help Coding Conventions
 =======================
 
 Throughout the help, you will see input code inside code blocks such as:
@@ -63,10 +64,8 @@ is equivalent to:
     print(a)
 
 
-First steps with ``aggregate``
-==============================
-
-This is a short introduction to aggregate, for new users.
+``aggregate`` Hello World
+==========================
 
 The only object you need to import to get started is ``build``.
 
@@ -77,10 +76,16 @@ The only object you need to import to get started is ``build``.
 
    build
 
-``build``
-is a :class:`Underwriter` object. It  allows you to create all other objects and  includes a library of examples, called the knowledge.
+``build`` is a :class:`Underwriter` object. It  allows you to create all other
+objects and  includes a library of examples, called the knowledge.
 
-Using build, you can create an :class:`Aggregate` object using a simple ``agg`` language  program. For example, the program ``agg Eg1 dfreq [1:5] dsev [1:3]`` creates an object called ``Eg1`` in the knowledge and specifies the frequency as 1, 2, 3, 4, or 5 all equally likely and the severity as 1, 2, or 3, also equally likely. The mean frequency is 3, mean severity 2, and hence the aggregate has a mean of 6. It is executed:
+Using ``build`` you can create an :class:`Aggregate` object using an ``agg`` language  program. For example, the program
+
+::
+
+    agg Eg1 dfreq [1:5] dsev [1:3]
+
+creates an aggregate distribution called ``Eg1``. The frequency distribution is 1, 2, 3, 4, or 5, all equally likely, and the severity is 1, 2, or 3, also equally likely. The mean frequency is 3, the mean severity 2, and hence the aggregate has a mean of 6. It is built:
 
 .. ipython:: python
     :okwarning:
@@ -88,38 +93,36 @@ Using build, you can create an :class:`Aggregate` object using a simple ``agg`` 
     a = build('agg Eg1 dfreq [1:5] dsev [1:3]')
     a
 
-Printing the object returns information about the frequency and severity stochastic models and how the object was computed. The last DataFrame can be accessed directly as the property ``a.describe``. Creating an object automatically adds its specification to the knowledge.
+Printing the object returns its name, information about the frequency and severity stochastic models, and how the object was computed, followed by a dataframe of statistics. The dataframe can be accessed directly as the property ``a.describe``.
 
-Use :attr:`build.knowledge` to view the knowledge. It is another   DataFrame.
-
-.. ipython:: python
-    :okwarning:
-
-   build.knowledge.head()
-
-Aggregates in the knowledge can be created by name. The next example, from the knowledge, uses the roll of a dice for the frequency and the severity. Its agg program is ``agg B.Dice14 dfreq [1:6] dsev [1:6]``.
+:class:`Aggregate` objects act like a discrete probability distribution. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
 
 .. ipython:: python
     :okwarning:
 
-    a = build('B.Dice14')
-    a
+    a.agg_m, a.agg_sd, a.agg_cv, a.agg_skew
 
-
-:class:`Aggregate` objects act like a discrete probability distribution. They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
+They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
 
 .. ipython:: python
     :okwarning:
 
-    (a.pmf(6), a.cdf(6), a.sf(6), a.q(a.cdf(6)), a.q(0.5),
-    a.agg_m, a.agg_sd, a.agg_skew)
+    a.pmf(6), a.cdf(5), a.sf(6), a.q(a.cdf(6)), a.q(0.5)
 
-It is easy check some of these calculations. The probability of the minimum outcome of one equals 1/36 (1/6 to roll a frequency of 1 and a severity of 1) and the maximum outcome of 36 equals 1/6**7 (1/6 to roll a frequency of 6 and (1/6)**6 to draw severity of 6 on each). The object returns the correct values.
+It is easy check some of these calculations. The probability of the minimum outcome of one equals 1/15 (1/5 for a frequency of 1 and 1/3 for a severity of 1) and the maximum outcome of 15 equals 1/1215 (1/5 for a frequency of 5 and (1/3)**5 to draw severity of 3 on each). The object returns the correct values.
 
 .. ipython:: python
     :okwarning:
 
-    a.pmf(1), 1/36, a.pmf(36), 1/6**7
+    a.pmf(1), 1/15, a.pmf(15), 1/5/3**5, 5*3**5
 
+Creating an object automatically adds its specification to the knowledge, with name ``Eg1``. Use :attr:`build.knowledge` to view the knowledge dataframe.
 
-The :doc:`2_User_Guide` contains more details and examples.
+.. ipython:: python
+    :okwarning:
+
+   print(build.knowledge.head())
+
+   build.knowledge.query('name == "Eg1"')
+
+The :doc:`2_User_Guides` contain more details and examples.

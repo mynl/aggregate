@@ -1,7 +1,7 @@
 .. _2_x_cat:
 
-Catastrophe Modeling Problems
-==============================
+Catastrophe Modeling
+=====================
 
 
 Occ and Agg PMLs.

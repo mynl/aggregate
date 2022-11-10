@@ -1,7 +1,7 @@
 .. _2_x_capital:
 
-Capital Modeling Problems
-==========================
+Capital Modeling
+=================
 
 Kappa as a risk measure function.
 

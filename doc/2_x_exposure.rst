@@ -1,6 +1,6 @@
 .. _2_x_exposure:
 
-Specifying exposure
+Specifying Exposure
 ======================
 
 Marked change.

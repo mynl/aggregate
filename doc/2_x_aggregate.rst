@@ -1,7 +1,7 @@
 .. _2_x_aggregate:
 
-Aggregate distributions
-========================
+The :class:`Aggregate` Class
+=============================
 
 * [QS2] Creating a simple aggregate distribution using the `agg` language (1, 2, or 3 outcomes; simple discrete severity) [cdf, pmf, sf, q, plot, describe, statistics]
 
@@ -23,3 +23,11 @@ Second-level attributes:
 * A ``statistics_df`` and ``statistics_total_df`` dataframes with theoretically derived statistical moments (mean, variance, CV, sknewness, etc.)
 * An ``audit_df`` with information to check if the numerical approximations appear valid. Numerically computed statistics are prefaced ``emp_``.
 
+
+Creating an :class:`Aggregate` from the pre-loaded library
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build
+    a, d = build.show('^B.*1$')

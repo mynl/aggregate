@@ -17,7 +17,7 @@ aggregate Documentation
    :hidden:
 
    1_Getting_Started
-   2_User_Guide
+   2_User_Guides
    3_Reference
    4_agg_Language_Reference
    5_Technical_Resources
@@ -32,7 +32,7 @@ aggregate Documentation
 `Binary Installers <https://pypi.org/project/aggregate>`__ |
 `Source Repository <https://github.com/mynl/aggregate>`__
 
-:mod:`aggregate` is an open source, BSD-licensed Python library providing intuitive natural language, high-performance, easy-to-use tools to work with aggregate probability distributions.
+:mod:`aggregate` is an open source, BSD-licensed Python library providing intuitive natural language and easy-to-use tools to work with aggregate probability distributions.
 
 .. Panels at https://sphinx-panels.readthedocs.io/en/latest/
    img-top-cls: pl-5 pr-5
@@ -44,7 +44,7 @@ aggregate Documentation
    ---
    :img-top: _static/getting_started.png
 
-   Get up and running: installation, create an aggregate distribution, and a quick tour through the package.
+   Get up and running: installation, create a "hello world" aggregate distribution and a glimpse into the functionality.
 
    +++
 
@@ -60,7 +60,7 @@ aggregate Documentation
 
    +++
 
-   .. link-button:: 2_User_Guide
+   .. link-button:: 2_User_Guides
       :type: ref
       :text: User guide
       :classes: btn-block btn-secondary stretched-link
@@ -69,7 +69,7 @@ aggregate Documentation
    :img-top: _static/api_reference.png
 
 
-   Complete documentation of every class and function. For developers and more advanced users.
+   Documentation for every class and function aimed at developers and more advanced users.
 
    +++
 
@@ -82,7 +82,7 @@ aggregate Documentation
    :img-top: _static/developer_guide.png
 
 
-   Describes the agg lanaguage for specifying complex aggregate distributions.
+   Details of the agg lanaguage for specifying aggregate distributions.
 
    +++
 
@@ -105,7 +105,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/developer_guide.PNG
+   :img-top: _static/developer_guide.png
 
 
    To do list, ideas for future development, design philosophy, historical perspective.

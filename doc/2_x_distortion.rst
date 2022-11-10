@@ -1,6 +1,6 @@
 .. _2_x_distortion:
 
-Distortions
+The :class:`Distortion` Class
 ===========================================
 
 

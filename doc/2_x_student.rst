@@ -1,47 +1,38 @@
 .. _2_x_student:
 
+.. reviewed 2022-11-10
+
 Student
-===========================================
+==========
 
-**Objectives:** Define and give examples of aggregate probability distributions; install and get started using and the `aggregate` library for working with them.
+**Objectives:** Define and give examples of aggregate probability distributions; get started using the `aggregate` library.
 
-**Audience:** New user with no knowlege of aggregate distributions or insurance.
+**Audience:** New user without knowledge of aggregate distributions or insurance.
 
 **Prerequisites:** Basic probability theory; Python and pandas programming.
 
 
-What is an aggregate distribution?
+What Is an Aggregate Distribution?
 ----------------------------------
 
 **Aggregate distributions** are used to model outcomes generated as the
 sum of an observable quantity over a random number of events.
 
-1. Total insurance claims from a portfolio: number of claims and amount
-   of each claim.
-2. Larvae per unit area (Neyman 1939): number of egg clusters per unit
-   area and number of larvae per egg cluster
-3. Number of occupants passing a point on a road: number of vehicles
-   passing the point and number of occupants per vehicle
+1. Total insurance claims from a portfolio: number of claims and amount of each claim.
+2. Larvae per unit area (Neyman 1939): number of egg clusters per unit area and number of larvae per egg cluster
+3. Number of vehicle occupants passing a point on the road: number of vehicles passing the point and number of occupants per vehicle
 
-Aggregate distributions are used in many fields go by different names
-including compound, generalized, and stopped-sum distributions
+Aggregate distributions are used in many fields and go by different names, including compound, generalized, and stopped-sum distributions.
 
 In insurance terminology, the number of events is called the
-**frequency** and the amount the **severity**.
+**frequency** and the amount the **severity**. The help always uses that terminology.
 
-The frequency and severity can be determined separately, which is an
-advantage of aggregate distributions.
-
-Formal construction
+Formal Construction
 -------------------
 
-Let the random variable :math:`N` equal the number of events and let
-:math:`X_i` be a series of iid random variables modeling an observable
-quantity. An **aggregate distribution** is the distribution of the sum
-of the observables
+Let the random variable :math:`N` equal the number of events and let :math:`X_i` be a series of iid random variables modeling an observable quantity. An **aggregate distribution** is the distribution of the sum of the observables
 
 .. math::
-
 
    A = X_1 + \cdots + X_N.
 
@@ -52,32 +43,18 @@ An observation from :math:`A` is realized by:
    :math:`X_i`
 3. Add the :math:`X_i`
 
-It is usual to assume that the values of :math:`X` and :math:`N` are
-independent. Check this assumption is reasonable for your use case!
+It is usual to assume that the values of :math:`X` and :math:`N` are independent. Check this assumption is reasonable for your use case!
 
-Installing ``aggregate``
-------------------------
-
-.. code:: python
-
-
-   !pip install aggregate
-
-   !pip install -U pandas
-
-   from aggregate import build
-
-   build
-
-Parameters for the simple discrete traffic example
+Parameters for the Simple Discrete Traffic Example
 --------------------------------------------------
 
 You observe traffic past a junction over sixteen 1-minute intervals.
 There are 20 vehicles in total, or 20/16=1.25 per minute on average.
 This gives the **frequency distribution** :math:`N`.
 
+
 ================== =================== =====================
-Number of vehicles Number of intervals Probability :math:`N`
+Number of vehicles Number of intervals Probability
 ================== =================== =====================
 0                  4                   4/16=0.25
 1                  6                   6/16=0.375
@@ -104,110 +81,72 @@ Total vehicles      16
 The average number of occupants per vehicle equals
 1.75=(10+6+12)/16=28/16=1.75.
 
-From here we can build an aggregate distribution :math:`A` of the number
-of occupants per minute.
+From here we can build an aggregate distribution :math:`A` of the number of occupants per minute. You should work out the entire distribution of :math:`A` by hand in a spreadsheet!
 
-You should work out the entire distribution of :math:`A` by hand in a
-spreadsheet!
-
-The package has its own programming language, called the ``agg``
-language for specifying aggregate distributions. It has certain key
-words, like ``select`` and ``group by`` in SQL
-
-Aggregate program for the traffic example
+Aggregate Program for the Traffic Example
 -----------------------------------------
 
-Here is the ``agg`` program for the traffic example.
+Here is the ``agg`` language program for the traffic example. The program is one line long. Python automatically concatenates strings within parenthesis; it is split for clarity.
 
 .. code:: agg
-
 
    a = build('agg Traffic dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
              'dsev [1 2 4] [10/16 3/16 3/16]')
 
 -  ``agg`` is a keyword
 -  Traffic is a user-selected label
--  ``dfreq`` is a keyword to specify a discrete probability distribution
-   for the number of outcomes in the form ``[outcomes] [probabilities]``
+-  ``dfreq`` is a keyword to specify a discrete probability distribution for the frequency (the number of outcomes). It has the form ``[outcomes] [probabilities]``
 
    -  ``[0 1 2 3]`` are the outcomes
    -  ``[4/16 6/16 4/16 2/16]`` are the probabilities
    -  Commas are optional
    -  Only division arithmetic is supported
 
--  ``dsev`` is a keyword to specify the value of each outcome
+-  ``dsev`` is a keyword to specify the severity (the value of each outcome). It has the same form as ``dfreq``.
 
    -  ``[1 2 4]`` are the outcomes; there can be gaps
-   -  The probabilities are set equal to 1/6
+   -  The probabilities are ``[10/16 3/16 3/16]``.
 
-Create an object. Note Python joins the lines automatically; the program
-has only one line.
+Creating and printing the object yields:
 
-.. code:: python
+.. ipython:: python
+    :okwarning:
 
-   # if necessary
-   !pip install -U matplotlib>=3.5
-
-   # silence warnings
-   import warnings
-   warnings.filterwarnings("ignore")
-
-
-   a = build('agg Traffic '
+    from aggregate import build
+    a = build('agg Traffic '
              'dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
              'dsev [1 2 4] [10/16 3/16 3/16]')
-   a
+    a
 
-
-
-
-Simple Discrete Aggregate Distributions
----------------------------------------
-
-Aggregate Frequency and Severity Models
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Simulation algorithm for insurance losses
-
-::
-
-       for i = 1 to 10000
-           agg = 0
-           simulate number of events n
-           for j = 1 to n
-               simulate loss amount X
-               agg = agg + X
-           output agg for simulation i
-
--  Write :math:`A = X_1 + \cdots X_N`, :math:`X_i` and :math:`N` random
-   and independent, and :math:`X_i` identically distributed
--  Model insured losses via number of claims :math:`N` the **frequency**
-   and the amount :math:`X_i` of each claim, the **severity**
 
 Aggregate statistics: the mean
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  Mean of sum = sum of means
--  :math:`A = X_1 + \cdots + X_N`
--  If :math:`N=n` is fixed then :math:`E[A] = nE(X)`, because all
-   :math:`E[X_i]=E[X]`
--  In general, :math:`E[A] = E[X]E[N]` by conditional probability
+The mean of a sum equals the sum of the means. Let :math:`A = X_1 + \cdots + X_N`. If :math:`N=n` is fixed then :math:`\mathsf E[A] = n\mathsf E(X)`, because all :math:`\mathsf E[X_i]=\mathsf E[X]`. In general,
+
+.. math::
+
+    \mathsf E[A] = \mathsf E[X]\mathsf E[N]
+
+by conditional probability.
 
 Aggregate statistics: the variance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  For independent random variables, variance of sum = sum of variances
--  :math:`A = X_1 + \cdots + X_N`
--  If :math:`N=n` is fixed then :math:`Var(A) = nVar(X)` and
-   :math:`Var(N)=0`
--  If :math:`X=x` is fixed then :math:`Var(A) = x^2Var(N)` and
-   :math:`Var(X)=0`
--  Obvious choices: :math:`n=E[N]`, :math:`x=E[X]`
--  Combine :math:`Var(A) = E[N]Var(X) + E[X]^2Var(N)`
--  Miraculously this is the correct answer!
+or independent random variables, the variance of a sum equals the sum of the variances.  If :math:`N=n` is fixed then :math:`\mathsf{Var}(A) = n\mathsf{Var}(X)` and :math:`\mathsf{Var}(N)=0`. If :math:`X=x` is fixed then :math:`\mathsf{Var}(A) = x^2\mathsf{Var}(N)` and :math:`\mathsf{Var}(X)=0`. Making the obvious choices :math:`n=\mathsf E[N]`, :math:`x=\mathsf E[X]` and guessing gives
+
+.. math::
+
+    \mathsf{Var}(A) = \mathsf E[N]\mathsf{Var}(X) + \mathsf E[X]^2\mathsf{Var}(N)
+
+which is the correct answer!
 
 
-Simple aggregate model example
+
+Exercises - Test Your Understanding
+--------------------------------------
+
+Simple Aggregate Model Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In a given year there can be 1, 2 or 3 events. There is a 50% chance of
@@ -238,17 +177,17 @@ causes a loss of 5, 10 or 15, each with equal probability.
     sam.density_df.query('p_total > 0')[['p_total', 'p_sev']]
 
 
-The largest outcome of 45 has probability $0.25 * (1/3)**3 (1/4)$ one for count, three outcomes of 50); check accuracy:
+The largest outcome of 45 has probability 0.25 * (1/3)**3 (1/4) one for count, three outcomes of 50); check accuracy:
 
 .. ipython:: python
     :okwarning:
 
-    a, e = (1/4) * (1/3)**3, sam.density_df.loc[45, 'p_total']
+    a, e = (1/4) * (1/3)**3, sam.pmf(45)
     pd.DataFrame([a, e, e/a-1],
         index=['Actual worst', 'Computed worst', 'error'], columns=['value'])
 
 
-A more complex aggregate model
+A More Complex Aggregate Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In a given year there can be 1, 2, 3 or 20 events. There is a 45% chance
@@ -281,12 +220,12 @@ The largest outcome of 1000 has probability 0.05 * (1/3)**20 (1/4 one for count,
 .. ipython:: python
     :okwarning:
 
-    a, e = 0.05 * (1/3)**20, cam.density_df.loc[1000, 'p_total']
+    a, e = 0.05 * (1/3)**20, cam.pmf(1000)
     pd.DataFrame([a, e, e/a-1],
         index=['Actual worst', 'Computed worst', 'error'],
         columns=['value'])
 
-Finally, show density.
+Finally, show the density.
 
 .. ipython:: python
     :okwarning:
@@ -295,10 +234,10 @@ Finally, show density.
 
 
 
-Dice-based aggregate examples
------------------------------
+More Aggregate Examples
+-------------------------
 
-Aggregates for one dice roll.
+The aggregate program for one dice roll.
 
 .. ipython:: python
     :okwarning:
@@ -308,7 +247,7 @@ Aggregates for one dice roll.
     @savefig student_onedice.png
     print(one_dice)
 
-Aggregates for two dice rolls, the triangular distgibution.
+The program for two dice rolls, yielding the triangular distribution.
 
 .. ipython:: python
     :okwarning:
@@ -319,8 +258,7 @@ Aggregates for two dice rolls, the triangular distgibution.
     print(two_dice)
     print(two_dice.density_df.query('p_total > 0')[['loss', 'p_total', 'F']])
 
-Aggregates for twelve dice rolls.
-Compare twelve dice roll to a moment-matched normal approximation.
+The aggregate program  for twelve dice rolls, which is much harder to do by hand! The answer is compared to a moment-matched normal approximation.
 
 .. ipython:: python
     :okwarning:

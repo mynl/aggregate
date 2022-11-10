@@ -1,10 +1,7 @@
 .. _2_x_strategy:
 
-Strategy and Portfolio Management Problems
-===========================================
-
-Book case studies.
-
+Strategy and Portfolio Management
+==================================
 
 
 Capital Allocation and Pricing

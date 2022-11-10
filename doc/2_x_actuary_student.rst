@@ -1,15 +1,16 @@
 .. _2_x_actuary_student:
 
+.. reviewed 2022-11-10
+
 Actuarial Student
 ===========================================
 
 
-**Objectives** Introduce aggregate probability distributions and the `aggregate` library for working with them in the context of exam and university courses in actuarial modeling.
+**Objectives** Introduce the `aggregate` library for working with aggregate probability distributions in the context of actuarial society exams and university courses in actuarial modeling.
 
-**Audience** Actuarial science university student or junior analyst working in insurance.
+**Audience** Actuarial science university students or junior actuarial analysts.
 
-**Prerequisites** V01 plus familiarity with aggregate probability distribution (as covered on SOA STAM, CAS MAS I, IFOA CS-2) and basic insurance terminology (insurance company operations).
-
+**Prerequisites** Familiarity with aggregate probability distributions (as covered on SOA STAM, CAS MAS I, IFOA CS-2) and basic insurance terminology (insurance company operations).
 
 
 Realistic Insurance Example
@@ -22,8 +23,7 @@ You are given the following information about a book of liability
 insurance business.
 
 1. Premium equals ¤2000 and the expected loss ratio equals 67.5%.
-2. Ground-up severity has been fit to a lognormal distribution with a
-   mean of ¤50 and a CV (coefficient of variation) of 1.25.
+2. Ground-up severity has been fit to a lognormal distribution with a mean of ¤50 and a CV (coefficient of variation) of 1.25.
 3. All policies have a limit of ¤1000 and no deductible or retention.
 4. Frequency is modeled using a Poisson distribution.
 
@@ -33,16 +33,23 @@ Questions
 ~~~~~~~~~
 
 1. Compute the expected insured severity and expected claim count.
-2. Compute the expected value, standard deviation, CV, and skewness of
-   :math:`X`.
-3. Compute the probability :math:`X` exceeeds the premium.
+2. Compute the expected value, standard deviation, CV, and skewness of :math:`X`.
+3. Compute the probability :math:`X` exceeds the premium.
 4. For :math:`X`, compute:
 
    1. The probability losses exceed ¤2500
-   2. The expected value of lossses limited to ¤2500
+   2. The expected value of losses limited to ¤2500
    3. The expected value of losses in excess of ¤2500
 
-::
+Answers
+~~~~~~~~~
+
+Creating and printing a simple agg language program, and querying its ``density_df`` dataframe reveals all the answers.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build
 
     a = build('agg InsuranceExample '
           '2000 premium at 0.675 lr 1000 xs 0 '
@@ -50,12 +57,12 @@ Questions
           'poisson')
     print(a)
 
-    a.sf(2000), a.sf(2500)
+    print(a.sf(2000), a.sf(2500))
 
     # lev and epd ratio
-    a.density_df.loc[[2500]]
+    print(a.density_df.loc[[2500], ['F', 'lev', 'epd']])
 
-    # epd in  ¤
+    # expected excess losses
     default_agg = a.agg_m - a.density_df.loc[2500, 'lev']
     default_agg
 
@@ -63,12 +70,10 @@ Questions
 Questions (academic version)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Compute the severity lognormal mu and sigma.
+1. Compute the severity lognormal parameters mu and sigma.
 2. Compute the expected insured severity and expected claim count.
-3. Compute the expected value, standard deviation, CV, and skewness of
-   :math:`X`.
-4. Compute the probability :math:`X` exceeds the premium using the
-   following matched-moment approximations:
+3. Compute the expected value, standard deviation, CV, and skewness of :math:`X`.
+4. Compute the probability :math:`X` exceeds the premium using the following matched-moment approximations:
 
    1. normal
    2. gamma
@@ -80,14 +85,17 @@ Questions (academic version)
 6. Using the :math:`X` and a lognormal approximation, compute:
 
    1. The probability losses exceed ¤2500
-   2. The expected value of lossses limited to ¤2500
+   2. The expected value of losses limited to ¤2500
    3. The expected value of losses in excess of ¤2500
 
 
-::
+.. ipython:: python
+    :okwarning:
 
     from aggregate import mu_sigma_from_mean_cv
-    mu_sigma_from_mean_cv(50, 1.25)
+    import pandas as pd
+
+    print(mu_sigma_from_mean_cv(50, 1.25))
 
     fz = a.approximate('all')
     fz['agg'] = a
@@ -96,8 +104,7 @@ Questions (academic version)
                  columns=['Approximation', 'Value']
                 ).set_index("Approximation")
     df['Error'] = df.Value / df.loc['agg', 'Value'] - 1
-    df.sort_values('Value')
-    # .style.format(lambda x: f'{x:.2%}')
+    print(df.sort_values('Value'))
 
     from aggregate import lognorm_lev
 
@@ -107,4 +114,4 @@ Questions (academic version)
     epd = default / a.agg_m
     pd.DataFrame((lev, default, default_agg, epd, default_agg / a.agg_m),
                  index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg Default', 'Lognorm EPD', 'Agg EPD'], name='Item'),
-                 columns=['Value']).style.format(lambda x: f'{x:.3f}')
+                 columns=['Value'])

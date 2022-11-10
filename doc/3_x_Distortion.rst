@@ -1,6 +1,6 @@
 
-Distortion Class
-================
+The Distortion Module
+======================
 
 .. automodule:: aggregate.spectral
    :members:

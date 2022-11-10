@@ -23,7 +23,6 @@ class TestSuite(object):
     @classmethod
     def __init__(cls, build=None, out_dir_name=''):
         """
-
         Run test suite fn. Create specified objects. Save graphics and info to HTML. Wrap
         HTML with template.
 

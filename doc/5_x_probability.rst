@@ -205,7 +205,7 @@ Binomial Distribution
 Fixed Distribution
 ~~~~~~~~~~~~~~~~~~~
 
-The :math:`(a,b,0)` and :math:`(a,b,1)` classes
+The :math:`(a,b,0)` and :math:`(a,b,1)` Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

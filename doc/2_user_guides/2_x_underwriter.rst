@@ -38,11 +38,8 @@ The Underwriter class interprets agg language programs. The scripting language a
 
 
 
-
-
-How `Underwriter` works
------------------------
-
+How :class:`Underwriter` works
+---------------------------------
 
 Each object two properties (kind, name) and three manifestations (spec, program, ob[ject])
 

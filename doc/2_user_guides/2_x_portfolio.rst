@@ -70,36 +70,17 @@ The portfolio can be approximated using FFTs to convolve the aggregates and add 
 The column ``bsN`` correspond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each unit and in total. For example with ``N=16` (i.e., 65,536 buckets) the suggestion is 1727. It is best the bucket size is a divisor of any limits or attachment points, so we select 2000.
 
 
-:class:`Aggregate` objects act like a discrete probability distribution. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
+:class:`Portfolio` objects act like a discrete probability distribution, just like :class:`Aggregate` objects. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
 
 .. ipython:: python
     :okwarning:
 
-    a.agg_m, a.agg_sd, a.agg_cv, a.agg_skew
+    p.agg_m, p.agg_sd, p.agg_cv, p.agg_skew
 
 They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
 
 .. ipython:: python
     :okwarning:
 
-    a.pmf(6), a.cdf(5), a.sf(6), a.q(a.cdf(6)), a.q(0.5)
-
-The portfolio object acts like a discrete probability distribution.
-
-::
-
-    bs = 10000
-    pf.update(13, bs)
-    pf.report('quick')
-    pf.plot('density')
-    pf.plot('density', logy=True)
-    print(pf)
-
-    Portfolio name           MyCompanyBook
-    Theoretic expected loss     10,684,541.2
-    Actual expected loss        10,657,381.1
-    Error                          -0.002542
-    Discretization size                   13
-    Bucket size                     10000.00
-    <aggregate.port.Portfolio object at 0x0000023950683CF8>
+    p.pmf(6), p.cdf(5), p.sf(6), p.q(p.cdf(6)), p.q(0.5)
 

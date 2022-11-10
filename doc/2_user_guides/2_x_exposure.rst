@@ -49,7 +49,7 @@ Conditional and Unconditional Severity
 
 The severity distribution is conditional on a loss to the layer. For an excess layer $y$ xs $a$ the severity is has distribution $X\mid X>$, where $X$ is the specified severity. For a ground-up layer there is no adjustment.
 
-The default behavior can be over-ridden by adding `!` after the severity distribution. For example
+The default behavior can be over-ridden by adding ``!`` after the severity distribution. For example
 
 ::
 
@@ -59,13 +59,3 @@ The default behavior can be over-ridden by adding `!` after the severity distrib
 
 produces conditional and unconditional samples from an excess layer of a lognormal. The latter includes an approximately 0.66 chance of a claim of zero, corresponding to :math:`X\le 10` below the attachment.
 
-Jupyter Workbooks
------------------
-
-Further topics are explored in a series of Jupyter Lab notebooks.
-
-1. Basic Reinsurance
-2. Dice aggregates
-3. Discrete aggregates
-4. Limit profiles and mixed severity LPMS
-5. Mixed exponentials

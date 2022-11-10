@@ -67,7 +67,7 @@ Creating and printing a simple agg language program, and querying its ``density_
     default_agg
 
 
-Questions (academic version)
+Questions (Academic Version)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Compute the severity lognormal parameters mu and sigma.
@@ -113,5 +113,7 @@ Questions (academic version)
     default = a.agg_m - lev
     epd = default / a.agg_m
     pd.DataFrame((lev, default, default_agg, epd, default_agg / a.agg_m),
-                 index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg Default', 'Lognorm EPD', 'Agg EPD'], name='Item'),
+                 index=pd.Index(['Lognorm LEV', 'Lognorm Default',
+                 'Agg Default', 'Lognorm EPD', 'Agg EPD'],
+                 name='Item'),
                  columns=['Value'])

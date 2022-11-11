@@ -27,22 +27,24 @@ Programs are processed one line at a time. Before passing to the lexer, the foll
 Lexer Term Definitions
 ======================
 
-Ignored characters: tab, colon, comma, and |. These characters can be used to improve readability.
+Ignored characters: tab, colon, comma, and pipe. These characters can be used to improve readability.
 
 Aggregate names must not include underscore. Portfolio names may include underscore. Names can include a period, ``A.Basic.01``.
 
 ::
 
+
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, SCALE_MULTIPLY, LOCATION_ADD,
-              LOSS, PREMIUM, AT, LR, CLAIMS, SPECIFIED,
+              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY, # SCALE_MULTIPLY, LOCATION_ADD,
+              LOSS, PREMIUM, AT, LR, CLAIMS,
               XS,
+              DISTORTION,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
-              MIXED, FREQ, EMPIRICAL, TWEEDIE,
-              NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF,
-              AND, PERCENT,
+              MIXED, FREQ, TWEEDIE, ZM, ZT,
+              NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
+              AND,  PERCENT,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
               }
@@ -50,10 +52,12 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ignore = ' \t,\\|'
     literals = {'[', ']', '!', '(', ')'}
 
+    # per manual, need to list longer tokens before shorter ones
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    FREQ = r'binomial|poisson|bernoulli|pascal|geometric|fixed'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed' # |empirical'
+    DISTORTION = 'dist(ortion)?'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
     NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
@@ -63,40 +67,31 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
-    DIVIDE = r'/'
+    DIVIDE = '/'
     PERCENT = '%'
-    SCALE_MULTIPLY = r'@'
-    LOCATION_ADD = '#'
-    EQUAL_WEIGHT = r'='
+    HOMOG_MULTIPLY = '@'
+    EQUAL_WEIGHT = '='
     RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
-
-    ID['dfreq'] = DFREQ
-    ID['dsev'] = DSEV
-
-    # ID['part'] = PART
-    # ID['share'] = SHARE
-    # when using an empirical freq the claim count is specified
-    # must use "specified claims" ... sets e_n = -1
-    ID['specified'] = SPECIFIED
-    ID['empirical'] = EMPIRICAL
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
+    ID['tower'] = TOWER
     ID['mixed'] = MIXED
     ID['unlim'] = INFINITY
+    ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
     ID['ceded'] = CEDED
     ID['claim'] = CLAIMS
+    ID['dfreq'] = DFREQ
+    ID['dsev'] = DSEV
     ID['loss'] = LOSS
-    ID['prem'] = PREMIUM
     ID['port'] = PORT
     ID['net'] = NET
     ID['sev'] = SEV
     ID['agg'] = AGG
-    ID['nps'] = EMPIRICAL
     ID['xps'] = XPS
     ID['wts'] = WEIGHTS
     ID['inf'] = INFINITY
@@ -111,218 +106,22 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ID['to'] = TO
     ID['po'] = PART_OF
     ID['so'] = SHARE_OF
+    ID['zm'] = ZM
+    ID['zt'] = ZT
     ID['x'] = XS
-
-
 
 Language Grammar Specification
 ===============================
 
-Here is the full ```agg``` Language Grammar.
-`Grammar railroad diagram <_static/diagram.xhtml>`_.
+Here is the full ```agg``` Language Grammar and a `grammar railroad diagram <_static/diagram.xhtml>`_.
 
+.. run python aggregate.parser.py to update this file
 
-::
+.. literalinclude:: 4_agg_language_reference/ref_include.rst
 
-    answer                  ::= sev_out
-                             | agg_out
-                             | port_out
-                             | distortion_out
-                             | expr
 
-    distortion_out          ::= DISTORTION name ids expr
-                             | DISTORTION name ID expr "[" numberl "]"
-
-    port_out                ::= PORT name note agg_list
-
-    agg_list                ::= agg_list agg_out
-                             | agg_out
-
-    agg_out                 ::= AGG name exposures layers sev_clause occ_reins freq agg_reins note
-                             | AGG name dfreq layers sev_clause occ_reins agg_reins note
-                             | AGG name TWEEDIE expr expr expr note
-                             | AGG name builtin_agg note
-                             | builtin_agg agg_reins note
-
-    sev_out                 ::= SEV name sev note
-                             | SEV name dsev note
-
-    freq                    ::= freq ZM expr
-                             | freq ZT
-                             | MIXED ID expr expr
-                             | MIXED ID expr
-                             | FREQ expr expr
-                             | FREQ expr
-                             | FREQ
-
-    agg_reins               ::= AGGREGATE NET OF reins_list
-                             | AGGREGATE CEDED TO reins_list
-                             |  %prec LOW
-
-    occ_reins               ::= OCCURRENCE NET OF reins_list
-                             | OCCURRENCE CEDED TO reins_list
-                             |
-
-    reins_list              ::= reins_list AND reins_clause
-                             | reins_clause
-                             | tower
-
-    reins_clause            ::= expr XS expr
-                             | expr SHARE_OF expr XS expr
-                             | expr PART_OF expr XS expr
-
-    sev_clause              ::= SEV sev %prec LOW
-                             | dsev
-                             | BUILTIN_SEV
-
-    sev                     ::= sev "!"
-                             | sev PLUS numbers
-                             | sev MINUS numbers
-                             | numbers TIMES sev
-                             | ids numbers CV numbers weights
-                             | ids numbers numbers weights
-                             | ids numbers weights
-                             | ids xps
-                             | ids
-                             | BUILTIN_SEV
-
-    xps                     ::= XPS doutcomes dprobs
-
-    dsev                    ::= DSEV doutcomes dprobs
-
-    dfreq                   ::= DFREQ doutcomes dprobs
-
-    doutcomes               ::= "[" numberl "]"
-                             | "[" expr RANGE expr "]"
-                             | "[" expr RANGE expr RANGE expr "]"
-
-    dprobs                  ::= "[" numberl "]"
-                             |
-
-    weights                 ::= WEIGHTS EQUAL_WEIGHT expr
-                             | WEIGHTS "[" numberl "]"
-                             |
-
-    layers                  ::= numbers XS numbers
-                             | tower
-                             |
-
-    tower                   ::= TOWER doutcomes
-
-    note                    ::= NOTE
-                             |  %prec LOW
-
-    exposures               ::= numbers CLAIMS
-                             | numbers LOSS
-                             | numbers PREMIUM AT numbers LR
-
-    ids                     ::= "[" idl "]"
-                             | ID
-
-    idl                     ::= idl ID
-                             | ID
-
-    builtin_agg             ::= expr HOMOG_MULTIPLY builtin_agg
-                             | expr TIMES builtin_agg
-                             | builtin_agg PLUS expr
-                             | builtin_agg MINUS expr
-                             | BUILTIN_AGG
-
-    name                    ::= ID
-
-    numbers                 ::= "[" numberl "]"
-                             | expr
-
-    numberl                 ::= numberl expr
-                             | expr
-
-    expr                    ::= term
-
-    term                    ::= term DIVIDE factor
-                             | factor
-
-    factor                  ::= power
-                             | "(" term ")"
-                             | EXP "(" term ")"
-
-    power                   ::= atom EXPONENT factor
-                             | atom
-
-    atom                    ::= NUMBER PERCENT
-                             | INFINITY
-                             | NUMBER
-
-    FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
-
-    BUILTINID               ::= 'sev|agg|port|meta.ID'
-
-    NOTE                    ::= 'note{TEXT}'
-
-    EQUAL_WEIGHT            ::= "="
-
-    AGG                     ::= 'agg'
-
-    AGGREGATE               ::= 'aggregate'
-
-    AND                     ::= 'and'
-
-    AT                      ::= 'at'
-
-    CEDED                   ::= 'ceded'
-
-    CLAIMS                  ::= 'claims|claim'
-
-    CONSTANT                ::= 'constant'
-
-    CV                      ::= 'cv'
-
-    DFREQ                   ::= 'dfreq'
-
-    DSEV                    ::= 'dsev'
-
-    EXP                     ::= 'exp'
-
-    EXPONENT                ::= '^|**'
-
-    HOMOG_MULTIPLY          ::= "@"
-
-    INFINITY                ::= 'inf|unlim|unlimited'
-
-    LOSS                    ::= 'loss'
-
-    LR                      ::= 'lr'
-
-    MIXED                   ::= 'mixed'
-
-    NET                     ::= 'net'
-
-    OCCURRENCE              ::= 'occurrence'
-
-    OF                      ::= 'of'
-
-    PART_OF                 ::= 'po'
-
-    PERCENT                 ::= '%'
-
-    PORT                    ::= 'port'
-
-    PREMIUM                 ::= 'premium|prem'
-
-    SEV                     ::= 'sev'
-
-    SHARE_OF                ::= 'so'
-
-    TO                      ::= 'to'
-
-    WEIGHTS                 ::= 'wts|wt'
-
-    XPS                     ::= 'xps'
-
-    xs                      ::= "xs|x"
-
-
-Test Suite
-==========
+Test Suite Programs
+===================
 
 To run the test suite for HTML output, svg graphics.
 

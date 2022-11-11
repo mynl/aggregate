@@ -1,7 +1,7 @@
 .. _aggregate_calculations:
 
-Aggregate Calculations
-======================
+:class:`Aggregate` Class Calculations
+======================================
 
 Calculations made by ``Aggregate`` objects.
 

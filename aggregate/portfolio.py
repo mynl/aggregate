@@ -37,145 +37,13 @@ logger = logging.getLogger(__name__)
 
 class Portfolio(object):
     """
-    Portfolio creates and manages a portfolio of Aggregate objects. Applications include
+    Portfolio creates and manages a portfolio of Aggregate objects each modeling one
+    unit of business. Applications include
 
-    * Model a book of insurance
-    * Model a large account with several sub lines
-    * Model a reinsurance portfolio or large treaty
+    - Model a book of insurance
+    - Model a large account with several sub lines
+    - Model a reinsurance portfolio or large treaty
 
-    **Notes from Enhance Portfolio**
-
-    Add all the enhanced exhibits methods to port.
-
-    Methods defined within this function.
-
-    From common_scripts.py
-    June 2022 took out options that needed a jinja template (reserve story etc.)
-
-    Added Methods
-
-    *Exhibit creators (EX_name)*
-
-        1. DROPPED basic_loss_statistics
-        2. DROPPED distortion_information
-        3. DROPPED distortion_calibration
-        4. premium_capital
-        5. multi_premium_capital
-        6. accounting_economic_balance_sheet
-           compares best estimate, default adjusted, risk adjusted values
-
-        Exhibits 7-9 are for reserving
-        DROPPED 7. margin_earned (by year)
-        DROPPED 8. year_end_option_analysis (implied stand alone vs pooled analysis)
-        Run a distortion and compare allocations
-
-        9. DROPPED compare_allocations creates:
-
-                EX_natural_allocation_summary
-                EX_allocated_capital_comparison
-                EX_margin_comparison
-                EX_return_on_allocated_capital_comparison
-
-    *Exhibit Utilities*
-
-        10. make_all
-            runs all of 1-9 with sensible defaults
-        11. show_enhaned_exhibits
-            shows all exhibits, with exhibit title
-            uses `self.dir` to find all attributes EX\_
-        12. DROPPED qi
-            quick info: the basic_loss_stats plus a density plot
-
-    *Graphics*
-
-        13. DROPPED 13. density_plot
-        14. profit_segment_plot
-            plots given lines S, gS and shades the profit segment between the two
-            lines plotted on a stand-alone basis; optional transs allows shifting up/down
-        15. natural_profit_segment_plot
-            plot kappa = EX_i|X against F and gF
-            compares the natural allocation with stand-alone pricing
-        16. DROPPED 16. alpha_beta_four_plot
-            alpha, beta; layer and cumulative margin plots
-        17. DROPPED 17. alpha_beta_four_plot2 (for two line portfolios)
-            lee and not lee orientations (lee orientation hard to parse)
-            S, aS; gS, b gS separately by line
-            S, aS, gS, bGS  for each line [these are the most useful plots]
-        18. biv_contour_plot
-            bivariate plot of marginals with some x+y=constant lines
-        19. DROPPED 19. reserve_story_md
-
-    *Reserve Template Populators*
-
-        20. DROPPED 20. reserve_runoff_md
-        21. DROPPED 21. reserve_two_step_md
-        22. nice_program
-
-    *Other*
-
-        23. DROPPED 23. show_md
-        24. DROPPED 24. report_args
-        25. DROPPED 25. save
-        26. density_sample: stratified sample from density_df
-
-    **Sample Runner** ::
-
-        from common_header import *
-        get_ipython().run_line_magic('config', "InlineBackend.figure_format = 'svg'")
-        import common_scripts as cs
-
-        port = cs.TensePortfolio('''
-        port CAS
-            agg Thick 5000 loss 100 x 0 sev lognorm 10 cv 20 mixed sig 0.35 0.6
-            agg Thin 5000 loss 100 x 0 sev lognorm 10 cv 20 poisson
-        ''', dist_name='wang', a=20000, ROE=0.1, log2=16, bs=1, padding=2)
-
-        # port.make_all() will update all exhibits with sensible defaults
-
-        port.premium_capital(a=20000)
-        display(port.EX_premium_capital)
-
-        port.multi_premium_capital(As=[15000, 20000, 25000])
-        display(port.EX_multi_premium_capital)
-
-        port.accounting_economic_balance_sheet(a=20000)
-        display(port.EX_accounting_economic_balance_sheets)
-
-        port.show_enhanced_exhibits()
-
-        port.density_plot(f, ax0, ax1, p=0.999999)
-
-        port.profit_segment_plot(ax, 0.999, ['total', 'Thick', 'Thin'],
-                                     [2,0,1,0], [0,0,0], 'ph')
-
-        port.natural_profit_segment_plot(ax, 0.999, ['total', 'Thick', 'Thin'],
-                                     [2,0,1,0], [0,0,0])
-
-        port.profit_segment_plot(ax, 0.999, ['Thick', 'Thin'],
-                                     [3,4], [0,0], 'wang')
-
-        aug_df = port.augmented_df
-        f, axs = smfig(1,2, (10,5), sharey=True)
-        a1, a2 = axs.flat
-        bigx = 20000
-        bit = aug_df.loc[0:, :].filter(regex='exeqa_(T|t)').copy()
-        bit.loc[bit.exeqa_Thick==0, ['exeqa_Thick', 'exeqa_Thin']] = np.nan
-        bit.rename(columns=port.renamer).sort_index(1).plot(ax=a1)
-        a1.set(xlim=[0,bigx], ylim=[0,bigx], xlabel='Total Loss', ylabel="Conditional Line Loss");
-        a1.set(aspect='equal', title='Conditional Expectations\\nBy Line')
-        port.biv_contour_plot(f, a2, 5, bigx, 100, log=False, cmap='viridis_r', min_density=1e-12)
-
-    :param name: The name of the portfolio, no spaces or underscores.
-    :param spec_list: A list of
-
-       1. dictionary: Aggregate object dictionary specifications or
-       2. Aggregate: An actual aggregate objects or
-       3. tuple (type, dict) as returned by uw['name'] or
-       4. string: Names referencing objects in the optionally passed underwriter
-       5. a single DataFrame: empirical samples (the total column, if present, is ignored);
-          a p_total column is used for probabilities if present
-
-    :returns:
     """
 
     # namer helper classes
@@ -193,6 +61,21 @@ class Portfolio(object):
     }
 
     def __init__(self, name, spec_list, uw=None):
+        """
+        Create a new :class:`Portfolio` object.
+
+        :param name: The name of the portfolio. No spaces or underscores.
+        :param spec_list: A list of
+
+           1. dictionary: Aggregate object dictionary specifications or
+           2. Aggregate: An actual aggregate objects or
+           3. tuple (type, dict) as returned by uw['name'] or
+           4. string: Names referencing objects in the optionally passed underwriter
+           5. a single DataFrame: empirical samples (the total column, if present, is ignored);
+              a p_total column is used for probabilities if present
+
+        :returns:  new :class:`Portfolio` object.
+        """
         self.name = name
         self.agg_list = []
         self.line_names = []

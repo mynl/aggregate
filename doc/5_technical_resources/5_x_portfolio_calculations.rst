@@ -1,7 +1,7 @@
 .. _portfolio_calculations:
 
-Portfolio Calculations
-======================
+:class:`Portfolio` Class Calculations
+======================================
 
 
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class

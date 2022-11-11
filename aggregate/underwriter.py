@@ -23,31 +23,30 @@ logger = logging.getLogger(__name__)
 class Underwriter(object):
     """
     The ``Underwriter`` class manages the creation of Aggregate and Portfolio objects, and
-    maintains a database of standard Severity (curves) and Aggregate (unit or line level) objects.
-    The ``Underwriter`` knows about all the business that is written!
+    maintains a database of standard Severity (curves) and Aggregate (unit or line level) objects
+    called the knowledge base.
 
-    * Handles persistence to and from agg files
-    * Is interface into program parser
-    * Handles safe lookup from database for parser
+    - Handles persistence to and from agg files
+    - Is interface into program parser
+    - Handles safe lookup from the knowledge for parser
 
-    Objects have a kind (agg, port, or sev) and a name. E.g. agg MyAgg ... has kind agg and name MyAgg.
-    They have a representation as a program. When the program is interpreted it produces a string spec
+    Objects have a kind and a name. The kind is one of 'sev', 'agg' or 'port'. The name is a string.
+    They have a representation as a program. When the program is interpreted it produces a dictionary spec
     that can be used to create the object. The static method factory can create any object from the
     (kind, name, spec, program) quartet, though, strictly, program is not needed.
 
     The underwriter knowledge is stored in a dataframe indexed by kind and name with columns
     spec and program.
-
     """
 
     def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False):
         """
         Create an underwriter object. The underwriter is the interface to the knowledge base
-        of the aggregate system. It is the interface to the parser and the interpreter. It
-        is the interface to the database of curves, portfolios and aggregates.
+        of the aggregate system. It is the interface to the parser and the interpreter, and
+        to the database of curves, portfolios and aggregates.
 
         :param name: name of underwriter. Defaults to Rory, after Rory Cline, the best underwriter
-            I know.
+            I know and a supporter of an analytic approach to underwriting.
         :param databases: name or list of database files to read in on creation. if None: nothing loaded; if
             'default' (installed) or 'site' (user, in ~/aggregate/databases) database \\*.agg files in default or site
             directory are loaded. If 'all' both default and site databases loaded. A string refers to a single database;
@@ -104,6 +103,9 @@ class Underwriter(object):
 
         for fn in databases:
             self.read_database(fn)
+
+        # ?! ensure description prints correctly. A bit cheaky.
+        pd.set_option('display.max_colwidth', 100)
 
     def read_database(self, fn):
         """

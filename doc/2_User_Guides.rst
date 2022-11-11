@@ -4,7 +4,7 @@
 User Guides
 **************
 
-The User Guides show how ``aggregate`` can solve various actuarial problems. It alternates between problem-based guides and reference guides. New users should start with the :doc:`2_x_student` guide.
+The User Guides show how ``aggregate`` can solve various actuarial problems. It alternates between problem-based guides and reference guides. New users should start with the :doc:`2_user_guides/2_x_student` guide.
 
 .. Each is in a separate short document. Many of the guides include a video presentation.
 

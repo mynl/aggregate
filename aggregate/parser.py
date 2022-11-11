@@ -29,21 +29,22 @@
 # Calculator is more bother than it is worth... keep exp, ** and /, but drop everything else (use f strings!)
 # Result has SR conflicts but it parses all the test programs
 
-from sly import Lexer, Parser
-import sly
 import logging
 import numpy as np
 from numpy import exp
-import re
 from pathlib import Path
+import re
+from sly import Lexer, Parser
+import sly
 
 logger = logging.getLogger(__name__)
+
 DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
 
 
 class UnderwritingLexer(Lexer):
     """
-    Implements the Lexer for agg language.
+    Implements the Lexer for the agg language.
 
     """
 
@@ -138,7 +139,7 @@ class UnderwritingLexer(Lexer):
         self.lineno += t.value.count('\n')
 
     def error(self, t):
-        print(f"Illegal character '{t.value[0]:s}'")
+        logger.error(f"Illegal character '{t.value[0]:s}'")
         self.index += 1
 
     @staticmethod
@@ -181,7 +182,7 @@ class UnderwritingLexer(Lexer):
 
 class UnderwritingParser(Parser):
     """
-    Implements the Parser for agg language.
+    Implements the Parser for the agg language.
 
     """
 
@@ -230,7 +231,7 @@ class UnderwritingParser(Parser):
     @staticmethod
     def enhance_debugfile(f_out=''):
         """
-        Put links in the parser.out debug file, if DEBUGFILE != ''
+        Put links in the parser.out debug file, if DEBUGFILE != ''.
 
         :param f_out: Path or filename of output. If "" then DEBUGFILE.html used.
         :return:
@@ -258,7 +259,7 @@ class UnderwritingParser(Parser):
     @staticmethod
     def _check_vectorizable(value):
         """
-        check the if value can be vectorized
+        Check the value can be vectorized.
 
         """
         if isinstance(value, (float, int, np.ndarray)):
@@ -1018,29 +1019,22 @@ def grammar(add_to_doc=False, save_to_fn=''):
     """
     Write the grammar at the top of the file as a docstring
 
-    To work with multi rules use ', ' all on one line
+    To work with multi-rules enter them on one line, like so::
+
+        @_('builtin_agg PLUS expr', 'builtin_agg MINUS expr')
+
+    :param add_to_doc: add the grammar to the docstring
+    :param save_to_fn: save the grammar to a file
     """
 
-    start_string = '''Language Specification
-======================
+    pout = Path(__file__).parent / '../doc/4_agg_language_reference/ref_include.rst'
 
-The ```agg``` Language Grammar:
-
-::
-
-'''
-    end_string = '''
-References
-----------
-'''
-    pout = Path(__file__).parent / '../doc/5_Langauge_Reference.rst'
-    pin = Path(__file__)
-
-    txt = pin.read_text(encoding='utf-8')
+    # get the grammar from the top of the file
+    txt = Path(__file__).read_text(encoding='utf-8')
     stxt = txt.split('@_')
     ans = {}
-    # 3:-2 get rid of junk at top and bottom (could change if file changes)
-    for it in stxt[3:-2]:
+    # 3:-3 get rid of junk at top and bottom (could change if file changes)
+    for it in stxt[3:-3]:
         if it.find('# def') >= 0:
             # skip rows with a comment between @_ and def
             pass
@@ -1055,7 +1049,7 @@ References
             try:
                 b1 = b[1].split("(self, p):")[0].strip()
             except:
-                print(it)
+                logger.warning(f'Unexpected multirule behavior {it}')
                 exit()
             if b1 in ans:
                 ans[b1] += b0
@@ -1137,24 +1131,16 @@ WEIGHTS                 ::= 'wts|wt'
 
 XPS                     ::= 'xps'
 
-xs                      ::= "xs|x"
+XS                      ::= "xs|x"
 
 '''
 
-# PLUS =                  ::= '+'
-# MINUS                   ::= '-'
-# TIMES                   ::= '*'
-# DIVIDE                  ::=  '/'
-
     s += lang_words
-    # actually put into this file (uncomment)
+    # create for docs in one file (that gets included by rst)
     if add_to_doc is True:
-        txt = pout.read_text(encoding='utf-8')
-        st = txt.find(start_string) + len(start_string)
-        end = txt.find(end_string)
-        txt = txt[0:st] + s + txt[end:]
-        pout.write_text(txt, encoding='utf-8')
+        pout.write_text(s, encoding='utf-8')
 
+    # save to user folder gammar
     if save_to_fn == '':
         save_to_fn = Path.home() / 'aggregate/parser/grammar.md'
     Path(save_to_fn).write_text(s, encoding='utf-8')

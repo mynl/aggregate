@@ -33,23 +33,23 @@ class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
 
-    * freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
-    * mgf(n, z): returns the moment generating function applied to z when EN=n
+    - freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
+    - mgf(n, z): returns the moment generating function applied to z when EN=n
 
     Frequency distributions are either non-mixture types or mixture types.
 
     **Non-Mixture** Frequency Types
 
-    * ``fixed``: no parameters
-    * ``bernoulli``: exp_en interpreted as a probability, must be < 1
-    * ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
-    * ``poisson``: Poisson(freq_a)
-    * ``poisson``: geometric(freq_a)
-    * ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
-      claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
-      number of claimants per claim (or claims per occurrence). Hence the Poisson component
-      has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
-      cv freq_a
+    - ``fixed``: no parameters
+    - ``bernoulli``: exp_en interpreted as a probability, must be < 1
+    - ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
+    - ``poisson``: Poisson(freq_a)
+    - ``poisson``: geometric(freq_a)
+    - ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
+        claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
+        number of claimants per claim (or claims per occurrence). Hence the Poisson component
+        has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
+        cv freq_a
 
     **Mixture** Frequency Types
 
@@ -60,29 +60,28 @@ class Frequency(object):
     In all cases freq_a is the CV of the mixing distribution which corresponds to the
     asympototic CV of the frequency distribution and of any aggregate when the severity has a variance.
 
-    * ``gamma``: negative binomial, freq_a = cv of gamma distribution
-    * ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
-      certain claims = shift. freq_b must be between 0 and 1.
-    * ``ig``: inverse gaussian, freq_a = cv of mixing distribution
-    * ``sig``: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
-      certain claims = shift. freq_b must be between 0 and 1.
-    * ``sichel``: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
-      freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
-      -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
-      cases are available.
-    * ``sichel.gamma``: generalized inverse gaussian mixture where the parameters match the moments of a
-      delaporte distribution with given freq_a and freq_b
-    * ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
-      shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
-      has poor numerical stability and may fail.
-    * ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
-      method should be used carefully. It has poor numerical stability and can produce bizzare
-      aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
+    - ``gamma``: negative binomial, freq_a = cv of gamma distribution
+    - ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
+        certain claims = shift. freq_b must be between 0 and 1.
+    - ``ig``: inverse gaussian, freq_a = cv of mixing distribution
+    - ``sig``: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
+        certain claims = shift. freq_b must be between 0 and 1.
+    - ``sichel``: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
+        freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
+        -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
+        cases are available.
+    - ``sichel.gamma``: generalized inverse gaussian mixture where the parameters match the moments of a
+        delaporte distribution with given freq_a and freq_b
+    - ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
+        shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
+        has poor numerical stability and may fail.
+    - ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
+        method should be used carefully. It has poor numerical stability and can produce bizzare
+        aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
 
-    :param freq_name:
+    :param freq_name: name of the frequency distribution, poisson, geometric, etc.
     :param freq_a:
     :param freq_b:
-
     """
 
     __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0']
@@ -691,7 +690,7 @@ class Aggregate(Frequency):
                  agg_reins=None, agg_kind='',
                  note=''):
         """
-        Aggregate distribution class manages creation and calculation of aggregate distributions.
+        The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
         can express a limit profile, a mixed severity or both. Mixed frequency types share
         a mixing distribution across all broadcast terms to ensure an appropriate inter-
@@ -2748,29 +2747,29 @@ class Severity(ss.rv_continuous):
         A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``,
         adding layer and attachment functionality. It overrides
 
-        * **cdf**
-        * **pdf**
-        * **isf**
-        * **ppf**
-        * **sf**
-        * **stats**
+        - ``cdf``
+        - ``pdf``
+        - ``isf``
+        - ``ppf``
+        - ``sf``
+        - ``stats``
 
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param exp_attachment:
         :param exp_limit:
         :param sev_mean:
         :param sev_cv:
-        :param sev_a:
-        :param sev_b:
-        :param sev_loc:
-        :param sev_scale:
+        :param sev_a: first shape parameter
+        :param sev_b: second shape parameter (e.g., beta)
+        :param sev_loc: scipy.stats location parameter
+        :param sev_scale: scipy.stats scale parameter
         :param sev_xs: for fixed or histogram classes
         :param sev_ps:
         :param sev_wt: this is not used directly; but it is convenient to pass it in and ignore it because sevs are
                implicitly created with sev_wt=1.
         :param sev_conditional: conditional or unconditional; for severities use conditional
-        :param name:
-        :param note:
+        :param name: name of the severity object
+        :param note: optional note.
         """
 
         from .portfolio import Portfolio

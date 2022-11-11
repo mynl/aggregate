@@ -445,7 +445,7 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         All updating and exhibit generation. No output. For use with command line.
 
         :param self:
-        @return:
+        :return:
         """
 
         logger.info('Start Full Monty Update')
@@ -474,10 +474,10 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
 
     def approx_roe(self, e=1e-15):
         """
-        Make an approx to roe distortion with no mass
+        Make an approximation to the ccoc distortion with no mass, using a slope from ``e`` to 0.
 
         :param e:
-        @return:
+        :return:
         """
         aroe = pd.DataFrame({'col_x': [0, e, 1], 'col_y': [0, self.v * e + self.d, 1]})
         approx_roe_di = agg.Distortion('convex', None, None, df=aroe, col_x='col_x', col_y='col_y', display_name='roe')
@@ -557,7 +557,7 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         :param caption:
         :param ff:
         :param save:
-        @return:
+        :return:
         """
 
         # revised set: used in agg, greys look better
@@ -786,7 +786,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         handles creation (unlike exhibits....?)
 
         :param arvv:
-        @return:
+        :return:
         """
 
         if self.f_discrete is True:
@@ -1096,7 +1096,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         Create relevant extended graphs
         TODO this is over the top and too slow.
 
-        @return:
+        :return:
         """
         if self.f_discrete:
             return
@@ -1304,7 +1304,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         This is different for discrete distributions.
 
         :param self:
-        @return:
+        :return:
         """
 
         logger.info("15.11")
@@ -2744,7 +2744,7 @@ def run_case_in_background(case_id, logLevel=30):
     :param case_id:
     :param base_file:
     :param logLevel:
-    @return:
+    :return:
     """
 
     if platform()[:5] == 'Linux':

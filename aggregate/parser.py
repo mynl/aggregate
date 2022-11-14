@@ -636,7 +636,7 @@ class UnderwritingParser(Parser):
 
     @_('ids')
     def sev(self, p):
-        # for norm expon uniform, zero parameter severities
+        # for norm expon uniform levy, zero parameter severities
         # need to make sure there is a scale
         self.logger(
             f'sev <-- ids, zero parameter severity {p.ids}', p)

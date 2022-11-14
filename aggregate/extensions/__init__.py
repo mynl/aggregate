@@ -6,6 +6,7 @@ from . basic import *
 from .case_studies import *
 from .samples import *
 from .test_suite import *
+from .pir_figures import *
 
 # module level doc-string
 __doc__ = """

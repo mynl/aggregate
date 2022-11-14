@@ -31,6 +31,7 @@ version = release[: len(release) - len(release.lstrip("0123456789."))].rstrip(".
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx_rtd_theme',
     'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
@@ -41,7 +42,7 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
     'sphinx_panels',
-    'jupyter_sphinx'
+    # 'jupyter_sphinx'
     ]
 
 

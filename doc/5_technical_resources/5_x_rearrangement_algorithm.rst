@@ -9,8 +9,7 @@ making each marginal crossed (counter-monotonic) with the sum of the
 other marginal distributions. It is easy to program and suitable for
 problems involving hundreds of variables and millions of simulations.
 
-The Rearrangement Algorithm:raw-latex:`\sindex{algorithm!rearrangement}`
-was introduced in @Puccetti2012 and subsequently improved in
+The Rearrangement Algorithm was introduced in @Puccetti2012 and subsequently improved in
 @Embrechts2013.
 
 

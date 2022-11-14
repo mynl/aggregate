@@ -44,7 +44,7 @@ ensure :math:`\mathsf{S}` has a Choleski decomposition
 .. math:: \mathsf{S}=\mathsf{C}'\mathsf{C}
 
 for some upper triangular matrix :math:`\mathsf{C}`, see Golub
-:raw-latex:`\cite{golub}` or Press et al. :raw-latex:`\cite{nrc}`. Set
+Golub or Press et al. Set
 :math:`\mathsf{T}=\mathsf{M}\mathsf{C}`. The columns of :math:`\mathsf{T}` still have mean zero, because
 they are linear combinations of the columns of :math:`\mathsf{M}` which have
 zero mean by assumption. It is less obvious, but still true, that the
@@ -131,7 +131,7 @@ choices in place of these and they are discussed in Section
 algorithm. The first, called “Simple Algorithm” deals with the various
 matrix operations at a high level. The second “Detailed Algorithm” takes
 a more sophisticated approach to the matrix operations, including
-referencing appropriate Lapack routines :raw-latex:`\cite{lapack}`.
+referencing appropriate Lapack routines.
 Lapack is a standard set of linear algebra functions. Software vendors
 provide very high performance implementations of Lapack, many of which
 are used in CPU benchmarks. Several free Windows implementations are
@@ -173,36 +173,18 @@ and whose approximate correlation matrix is :math:`\mathsf{S}`.
 #. Compute :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}`. The matrix :math:`\mathsf{T}` has exactly the
    desired correlation structure by Equation (`[icCorr] <#icCorr>`__).
 
-#. Let :math:`\mathsf{Y}` be the input matrix :math:`\mathsf{X}` with each column
-   reordered to have exactly the same rank ordering as the corresponding
-   column of :math:`\mathsf{T}`.
+#. Let :math:`\mathsf{Y}` be the input matrix :math:`\mathsf{X}` with each column reordered to have exactly the same rank ordering as the corresponding column of :math:`\mathsf{T}`.
 
-#. Compute the Choleski decomposition of :math:`\mathsf{S}`, :math:`\mathsf{S}=\mathsf{C}'\mathsf{C}`,
-   with :math:`\mathsf{C}` upper triangular. If the Choleski algorithm fails
-   then :math:`\mathsf{S}` is not a valid correlation matrix. Flag an error and
-   exit. Checking :math:`\mathsf{S}` is a correlation matrix in Step 1 avoids
-   performing wasted calculations and allows the routine to exit as
-   quickly as possible. Also check that all the diagonal entries of
-   :math:`\mathsf{S}` are 1 so :math:`\mathsf{S}` has full rank. Again flag an error and
-   exit if not. The Lapack routine DPOTRF can use be used to compute the
-   Choleski decomposition. In the absence of Lapack, :math:`\mathsf{C}=(c_{ij})`
-   can be computed recursively using
+#. Compute the Choleski decomposition of :math:`\mathsf{S}`, :math:`\mathsf{S}=\mathsf{C}'\mathsf{C}`, with :math:`\mathsf{C}` upper triangular. If the Choleski algorithm fails then :math:`\mathsf{S}` is not a valid correlation matrix. Flag an error and exit. Checking :math:`\mathsf{S}` is a correlation matrix in Step 1 avoids performing wasted calculations and allows the routine to exit as quickly as possible. Also check that all the diagonal entries of :math:`\mathsf{S}` are 1 so :math:`\mathsf{S}` has full rank. Again flag an error and exit if not. The Lapack routine DPOTRF can use be used to compute the Choleski decomposition. In the absence of Lapack, :math:`\mathsf{C}=(c_{ij})` can be computed recursively using
 
    .. math::
 
       c_{ij}=\frac{s_{ij}-\sum_{k=1}^{j-1}
         c_{ik}c_{jk}}{\sqrt{1-\sum_{k=1}^{j-1} c_{jk}^2}}\label{chol}
 
-   for :math:`1\le i\le j\le n`—since all the diagonal elements of
-   :math:`S` equal one. The empty sum :math:`\sum_0^0=0` and for
-   :math:`j>i` the denominator of (`[chol] <#chol>`__) equals
-   :math:`c_{ii}` and the elements of :math:`\mathsf{C}` should be calculated
-   from left to right, top to bottom. See Wang
-   :raw-latex:`\cite[p. 889]{bigWang}` or Herzog
-   :raw-latex:`\cite{herzog}`.
+   for :math:`1\le i\le j\le n`—since all the diagonal elements of :math:`S` equal one. The empty sum :math:`\sum_0^0=0` and for :math:`j>i` the denominator of (`[chol] <#chol>`__) equals :math:`c_{ii}` and the elements of :math:`\mathsf{C}` should be calculated from left to right, top to bottom. See Wang or Herzog.
 
-#. Let :math:`m=\lfloor n/2\rfloor` be the largest integer less than or
-   equal to :math:`n/2` and :math:`v_i=\Phi^{-1}(i/(2m+1))` for
+#. Let :math:`m=\lfloor n/2\rfloor` be the largest integer less than or equal to :math:`n/2` and :math:`v_i=\Phi^{-1}(i/(2m+1))` for
    :math:`i=1,\dots,m`.
 
 #. If :math:`n` is odd set
@@ -213,73 +195,24 @@ and whose approximate correlation matrix is :math:`\mathsf{S}`.
 
    .. math:: \mathsf{v}=(v_m,v_{m-1},\dots,v_1,-v_1,\dots,-v_m).
 
-   Here we have chosen to use normal scores. Other distributions could
-   be used in place of the normal, as discussed in Section
-   `1.4.1 <#egScore>`__. Also note that by taking advantage of the
-   symmetry of the normal distribution halves the number of calls to
-   :math:`\Phi^{-1}` which is relatively computationally expensive. If
-   multiple calls will be made to the IC algorithm then store :math:`\mathsf{v}`
-   for use in future calls.
+   Here we have chosen to use normal scores. Other distributions could be used in place of the normal, as discussed in Section `1.4.1 <#egScore>`__. Also note that by taking advantage of the symmetry of the normal distribution halves the number of calls to :math:`\Phi^{-1}` which is relatively computationally expensive. If multiple calls will be made to the IC algorithm then store :math:`\mathsf{v}` for use in future calls.
 
-#. Form the :math:`n\times r` score matrix :math:`\mathsf{M}` from :math:`r`
-   copies of the scores vector :math:`\mathsf{v}`.
+#. Form the :math:`n\times r` score matrix :math:`\mathsf{M}` from :math:`r` copies of the scores vector :math:`\mathsf{v}`.
 
 #. Compute :math:`m_{xx}=n^{-1}\sum_i v_i^2`, the variance of
    :math:`\mathsf{v}`. Note that :math:`\sum_i v_i=0` by construction.
 
-#. Randomly shuffle columns :math:`2,\dots,r` of the score matrix
-   :math:`\mathsf{M}`. Knuth :raw-latex:`\cite[pp.139--41]{Knuth}` gives the
-   following algorithm for a random shuffle, which we have implemented
-   it in Visual Basic.
+#. Randomly shuffle columns :math:`2,\dots,r` of the score matrix.
 
-   | ``”``\ :raw-latex:`\ `\ ``vtemp[0``\ :raw-latex:`\ `\ ``to``\ :raw-latex:`\ `\ ``n-1]``\ :raw-latex:`\ `\ ``is``\ :raw-latex:`\ `\ ``the``\ :raw-latex:`\ `\ ``array``\ :raw-latex:`\ `\ ``being``\ :raw-latex:`\ `\ ``shuffled.``
-   | ``”``\ :raw-latex:`\ `\ ``vtemp[j]``\ :raw-latex:`\ `\ ``is``\ :raw-latex:`\ `\ ``the``\ :raw-latex:`\ `\ ``end,``\ :raw-latex:`\ `\ ``you``\ :raw-latex:`\ `\ ``work``\ :raw-latex:`\ `\ ``backwards``\ :raw-latex:`\ `\ ``up``\ :raw-latex:`\ `\ ``the``
-   | ``”``\ :raw-latex:`\ `\ ``array``\ :raw-latex:`\ `\ ``shuffling``\ :raw-latex:`\ `\ ``each``\ :raw-latex:`\ `\ ``element.``
-   | ``”``\ :raw-latex:`\ `\ ``Rnd()``\ :raw-latex:`\ `\ ``returns``\ :raw-latex:`\ `\ ``a``\ :raw-latex:`\ `\ ``uniform``\ :raw-latex:`\ `\ ``random``\ :raw-latex:`\ `\ ``variable``
-   | ``”``\ :raw-latex:`\ `\ ``between``\ :raw-latex:`\ `\ ``zero``\ :raw-latex:`\ `\ ``and``\ :raw-latex:`\ `\ ``one.``
+#. Compute the correlation matrix :math:`\mathsf{EE}` of the shuffled score matrix :math:`\mathsf{M}`. Each column of :math:`\mathsf{M}` has mean zero, by construction, and variance :math:`m_{xx}`. The correlation matrix is obtained by dividing each element of :math:`\mathsf{M}'\mathsf{M}` by :math:`m_{xx}`. The matrix product can be computed using the Lapack routine DGEMM. If :math:`\mathsf{EE}` is singular repeat step 6.
 
-   | ``dim``\ :raw-latex:`\ `\ ``j``\ :raw-latex:`\ `\ ``as``\ :raw-latex:`\ `\ ``long,``\ :raw-latex:`\ `\ ``vtemp[0``\ :raw-latex:`\ `\ ``to``\ :raw-latex:`\ `\ ``n-1]``\ :raw-latex:`\ `\ ``as``\ :raw-latex:`\ `\ ``double``
-   | ``dim``\ :raw-latex:`\ `\ ``temp``\ :raw-latex:`\ `\ ``as``\ :raw-latex:`\ `\ ``double,``\ :raw-latex:`\ `\ ``u``\ :raw-latex:`\ `\ ``as``\ :raw-latex:`\ `\ ``double``
-   | ``”``
-   | ``”``\ :raw-latex:`\ `\ ``populate``\ :raw-latex:`\ `\ ``vtemp``
-   | ``”``
-   | ``j=n-1``
-   | ``do``\ :raw-latex:`\ `\ ``while``\ :raw-latex:`\ `\ ``j``\ :raw-latex:`\ `\ ``>``\ :raw-latex:`\ `\ ``0``
-   | ``u``\ :raw-latex:`\ `\ ``=``\ :raw-latex:`\ `\ ``Rnd()``
-   | ``k``\ :raw-latex:`\ `\ ``=``\ :raw-latex:`\ `\ ``CLng(j``\ :raw-latex:`\ `\ ``*``\ :raw-latex:`\ `\ ``u)``
-   | ``temp``\ :raw-latex:`\ `\ ``=``\ :raw-latex:`\ `\ ``vtemp[j]``
-   | ``vtemp[j]``\ :raw-latex:`\ `\ ``=``\ :raw-latex:`\ `\ ``vtemp[k]``
-   | ``vtemp[k]``\ :raw-latex:`\ `\ ``=``\ :raw-latex:`\ `\ ``temp``
-   | ``j=j-1``
-   | ``loop``
+#. Determine Choleski decomposition :math:`\mathsf{EE}=\mathsf{F}'\mathsf{F}` of :math:`\mathsf{EE}` using the Lapack routine DPOTRF. Because :math:`\mathsf{EE}` is a correlation matrix it must be symmetric and positive definite and so is guaranteed to have a Choleski root.
 
-#. Compute the correlation matrix :math:`\mathsf{EE}` of the shuffled score
-   matrix :math:`\mathsf{M}`. Each column of :math:`\mathsf{M}` has mean zero, by
-   construction, and variance :math:`m_{xx}`. The correlation matrix is
-   obtained by dividing each element of :math:`\mathsf{M}'\mathsf{M}` by :math:`m_{xx}`.
-   The matrix product can be computed using the Lapack routine DGEMM. If
-   :math:`\mathsf{EE}` is singular repeat step 6.
+#. Compute :math:`\mathsf{F}^{-1}\mathsf{C}` using the Lapack routine DTRTRS to solve the linear equation :math:`\mathsf{F}\mathsf{A}=\mathsf{C}` for :math:`\mathsf{A}`. Solving the linear equation avoids a time consuming matrix inversion and multiplication. The routine DTRTRS is optimized for upper triangular input matrices.
 
-#. Determine Choleski decomposition :math:`\mathsf{EE}=\mathsf{F}'\mathsf{F}` of :math:`\mathsf{EE}`
-   using the Lapack routine DPOTRF. Because :math:`\mathsf{EE}` is a correlation
-   matrix it must be symmetric and positive definite and so is
-   guaranteed to have a Choleski root.
+#. Compute the correlated scores :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}=\mathsf{M}\mathsf{A}` using DGEMM. The matrix :math:`\mathsf{T}` has exactly the desired correlation structure.
 
-#. Compute :math:`\mathsf{F}^{-1}\mathsf{C}` using the Lapack routine DTRTRS to solve
-   the linear equation :math:`\mathsf{F}\mathsf{A}=\mathsf{C}` for :math:`\mathsf{A}`. Solving the
-   linear equation avoids a time consuming matrix inversion and
-   multiplication. The routine DTRTRS is optimized for upper triangular
-   input matrices.
-
-#. Compute the correlated scores :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}=\mathsf{M}\mathsf{A}` using
-   DGEMM. The matrix :math:`\mathsf{T}` has exactly the desired correlation
-   structure.
-
-#. Compute the ranks of the elements of :math:`\mathsf{T}`. Ranks are computed
-   by indexing the columns of :math:`\mathsf{T}` as described in Section 8.4 of
-   :raw-latex:`\cite{nrc}`. Let :math:`r(k)` denote the index of the
-   :math:`k`\ th ranked element of :math:`\mathsf{T}`. See Appendix
-   `[index] <#index>`__ for VBA code to perform indexing.
+#. Compute the ranks of the elements of :math:`\mathsf{T}`. Ranks are computed by indexing the columns of :math:`\mathsf{T}` as described in Section 8.4 of Press et al. Let :math:`r(k)` denote the index of the :math:`k`\ th ranked element of :math:`\mathsf{T}`.
 
 #. Let :math:`\mathsf{Y}` be the :math:`n\times r` matrix with :math:`i`\ th
    column equal to the :math:`i`\ th column of the input matrix
@@ -608,8 +541,8 @@ contoured distributions and asymmetric Laplace distributions, can be
 simulated using the Choleski trick.
 
 Elliptically contoured distributions are a family which extends the
-normal. For a more detailed discussion see Fang and Zhang
-:raw-latex:`\cite{fang}`. The multivariate :math:`t`-distribution and
+normal. For a more detailed discussion see Fang and Zhang.
+The multivariate :math:`t`-distribution and
 symmetric Laplace distributions are in the elliptically contoured
 family. Elliptically contoured distributions must have characteristic
 equations of the form
@@ -638,8 +571,7 @@ multivariate normal distribution with identity covariance matrix. (By
 definition, :math:`\Vert \mathsf{x}\Vert^2=\sum_i x_i^2` has a :math:`\chi^2_r`
 distribution.) Uniform vectors :math:`\mathsf{u}^{(r)}` can also be created by
 applying a random orthogonal matrix to a fixed vector
-:math:`(1,0,\dots,0)` on the sphere. Diaconis
-:raw-latex:`\cite{diaconis}` describes a method for producing random
+:math:`(1,0,\dots,0)` on the sphere. Diaconis describes a method for producing random
 orthogonal matrices.
 
 The :math:`t`-copula with :math:`\nu` degrees of freedom has a
@@ -654,7 +586,7 @@ multivariate normals and then simulating an independent :math:`S` and
 multiplying.
 
 The multivariate Laplace distribution is discussed in Kotz, Kozubowski
-and Podgorski :raw-latex:`\cite{laplace}`. It comes in two flavors:
+and Podgorski. It comes in two flavors:
 symmetric and asymmetric. The symmetric distribution is also an
 elliptically contoured distribution. It has characteristic function of
 the form
@@ -686,8 +618,7 @@ the marginals are normally distributed with mean zero and unit standard
 deviation. The :math:`t`-copula has :math:`\nu=2` degrees of freedom. In
 both figures the marginals are uncorrelated, but in the right the
 marginals are not independent. The :math:`t`-copula has pinched tails,
-similar to Venter’s Heavy Right Tailed copula
-:raw-latex:`\cite{venterCopulas}`
+similar to Venter’s Heavy Right Tailed copulas.
 
 .. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/tCopula.pdf
    :alt: IC samples produced from the same marginal and correlation
@@ -719,8 +650,7 @@ Comparison With the Normal Copula Method
 ----------------------------------------
 
 By the normal copula method we mean the following algorithm, described
-in Wang :raw-latex:`\cite{bigWang}` and Herzog
-:raw-latex:`\cite{herzog}`.
+in Wang  or Herzog.
 
 A set of correlated risks :math:`(X_1,\dots,X_r)` with marginal
 cumulative distribution functions :math:`F_i` and Kendall’s tau
@@ -749,7 +679,7 @@ distribution with prescribed correlation structure and marginals
 :math:`F_i`.
 
 The Normal Copula method works because of the following theorem from
-Wang :raw-latex:`\cite[Theorem 2]{bigWang}`.
+Wang.
 
 .. container:: theorem
 

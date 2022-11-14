@@ -10,10 +10,11 @@ scipy>=1.7
 sly>=0.5
 titlecase>=2.3
 
-setuptools>=62.3.2
-recommonmark>=0.7.1
+docutils=0.16
 jupyter-sphinx
 nbsphinx
+recommonmark>=0.7.1
+setuptools>=62.3.2
 sphinx>=1.4
 sphinx-panels
 IPython>=7.31

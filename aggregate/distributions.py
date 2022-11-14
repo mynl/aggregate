@@ -1136,7 +1136,7 @@ class Aggregate(Frequency):
 
         :param xs: range of x values used to discretize
         :param padding: for FFT calculation
-        :param tilt_vector: tilt_vector = np.exp(self.tilt_amount * np.arange(N)), N=2**log2, and
+        :param tilt_vector: tilt_vector = np.exp(tilt_amount * np.arange(N)), N=2**log2, and
                tilt_amount * N < 20 recommended
         :param approximation: 'exact' = perform frequency / severity convolution using FFTs.
                'slognorm' or 'sgamma' use a shifted lognormal or shifted gamma approximation.
@@ -1159,6 +1159,9 @@ class Aggregate(Frequency):
         self.bs = xs[1]
         # WHOA! WTF
         self.log2 = int(np.log(len(xs)) / np.log(2))
+
+        if type(tilt_vector) == float:
+            tilt_vector = np.exp(-tilt_vector * np.arange(2**self.log2))
 
         # make the severity vector: a claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
@@ -2882,7 +2885,7 @@ class Severity(ss.rv_continuous):
             self.sev2 = np.sum(xs ** 2 * ps)
             self.sev3 = np.sum(xs ** 3 * ps)
 
-        elif sev_name in ['norm', 'expon', 'uniform']:
+        elif sev_name in ['norm', 'expon', 'uniform', 'levy']:
             # distributions with no shape parameters
             #     Normal (and possibly others) does not have a shape parameter
             if sev_loc == 0 and sev_mean > 0:

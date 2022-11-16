@@ -22,6 +22,7 @@ aggregate Documentation
    4_agg_Language_Reference
    5_Technical_Resources
    6_Development
+   7_bibliography
 
 **Date**: |today| | **Version**: |version|
 

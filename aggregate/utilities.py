@@ -1822,7 +1822,7 @@ def knobble_fonts():
     # this matches html output better
     mpl.rcParams['font.family'] = 'sans-serif'
     mpl.rcParams['mathtext.fontset'] = 'stixsans'
-
+    pd.options.display.width = 120
 
 def easy_formatter(ax, which, kind, places=None, power_range=(-3, 3), sep='', unit='', sci=True,
                    mathText=False, offset=True):
@@ -2631,7 +2631,7 @@ def partial_e(sev_name, fz, a, n):
         α = fz.args[0]
         λ = fz.kwds['scale']
         ans = []
-        logger.error('need to handle inf for Pareto NYI')
+        # will return inf if the Pareto does not have the relevant moments
         for k in range(n + 1):
             b = [α * (-1) ** (k - i) * binom(k, i) * λ ** (k + α - i) *
                  ((λ + a) ** (i - α) - λ ** (i - α)) / (i - α)

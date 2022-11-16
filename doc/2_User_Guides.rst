@@ -34,6 +34,7 @@ The User Guides show how ``aggregate`` can solve various actuarial problems. It 
 #. :doc:`2_user_guides/2_x_distortion` (reference): Workings of the :class:`Distortion` object.
 #. :doc:`2_user_guides/2_x_strategy` (problem): Applications to strategy and portfolio management, including margin (capital) allocation, determining benchmark pricing within a portfolio using alternative pricing methodologies, and the evaluation of reinsurance.
 #. :doc:`2_user_guides/2_x_case_studies`: How to reproduce the case study exhibits from the book `Pricing Insurance Risk <https://www.wiley.com/en-us/Pricing+Insurance+Risk:+Theory+and+Practice-p-9781119755678>`_ and build your cases.
+#. :doc:`2_user_guides/2_x_problems`: Solutions using ``aggregate`` to a selection of problems and examples from books (Loss Models, Loss Data Analytics, ), study notes (), and academic papers.
 
 
 Guides marked *problem* are possible driving destinations, whereas *reference* guides describe how to unlock the car, start the engine, and engage a gear. Or, in a cooking analogy, *problems* are recipes, and *references* describe cooking techniques such as broiling or baking.
@@ -74,5 +75,6 @@ Guides marked *problem* are possible driving destinations, whereas *reference* g
     2_user_guides/2_x_distortion
     2_user_guides/2_x_strategy
     2_user_guides/2_x_case_studies
+    2_user_guides/2_x_problems
     2_user_guides/2_x_unused
 

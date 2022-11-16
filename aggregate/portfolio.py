@@ -283,9 +283,9 @@ class Portfolio(object):
             s.append(f'distortion               {repr(self._distortion)}')
 
         if isupdated:
+            s.append('')
             with pd.option_context('display.width', 140, 'display.float_format', lambda x: f'{x:,.5g}'):
                 # get it on one row
-                s.append('')
                 s.append(str(self.describe))
         # s.append(super(Portfolio, self).__repr__())
         return '\n'.join(s)
@@ -377,7 +377,7 @@ class Portfolio(object):
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
-        df = pd.concat(t1, keys=t2, names=['line', 'X']).fillna('')
+        df = pd.concat(t1, keys=t2, names=['unit', 'X']).fillna('')
         return df
 
     @property

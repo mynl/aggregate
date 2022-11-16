@@ -485,13 +485,18 @@ class Aggregate(Frequency):
                 raise ValueError('Update Aggregate before asking for density_df')
 
             # really convenient to have p=p_total to be consistent with Portfolio objects
-            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density, p_total=self.agg_density,
-                                                 p_sev=self.sev_density))
+            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density,
+                                                 p_total=self.agg_density
+                                                 ))
             # remove the fuzz, same method as Portfolio.remove_fuzz
             eps = np.finfo(np.float).eps
             # may not have a severity, remember...
             self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
                 self._density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+
+            # we spend a lot of time computing sev exactly, so don't want to flush that away
+            # with remove fuzz...hence add here
+            self._density_df['p_sev'] = self.sev_density
 
             # reindex
             self._density_df = self._density_df.set_index('loss', drop=False)
@@ -966,9 +971,9 @@ class Aggregate(Frequency):
             s.append(f'reinsurance              {self.reinsurance_kinds()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ")}')
             s.append(f'aggregate reinsurance    {self.reinsurance_description("agg")}')
-        with pd.option_context('display.width', 140, 'display.float_format', lambda x: f'{x:,.5g}'):
-            # get it on one row
             s.append('')
+        with pd.option_context('display.width', 160, 'display.float_format', lambda x: f'{x:,.5g}'):
+            # get it on one row
             s.append(str(self.describe))
         # s.append(super().__repr__())
         return '\n'.join(s)
@@ -2757,6 +2762,17 @@ class Severity(ss.rv_continuous):
         - ``sf``
         - ``stats``
 
+        See `scipy.stats continuous rvs <https://docs.scipy.org/doc/scipy/tutorial/stats/continuous.html>`_ for
+        more details about available distributions. The following distributions with two shape parameters
+        are supported:
+
+        - Burr (``burr``)
+        - Generalized Pareto (``genpareto``)
+        - Generalized gamma (``gengamma``)
+
+        It is easy to add others in the code below. With two shape parameters the mean cv input format
+        is not available.
+
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param exp_attachment:
         :param exp_limit:
@@ -2895,7 +2911,7 @@ class Severity(ss.rv_continuous):
             gen = getattr(ss, sev_name)
             self.fz = gen(loc=sev_loc, scale=sev_scale)
 
-        elif sev_name in ['beta']:
+        elif sev_name in ['beta', 'genpareto', 'gengamma', 'burr']:
             # distributions with two shape parameters
             # require specific inputs
             # for Kent examples input sev_scale=maxl, sev_mean=el and sev_cv as input

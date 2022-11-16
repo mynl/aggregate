@@ -341,9 +341,9 @@ class UnderwritingParser(Parser):
     @_('AGG name dfreq layers sev_clause occ_reins agg_reins note')
     def agg_out(self, p):
         self.logger(
-            f'agg_out <-- AGG name dfreq dsev occ_reins note', p)
+            f'agg_out <-- AGG name dfreq layers sev_clause occ_reins agg_reins note', p)
         # self.out_dict[("agg", p.name)] =
-        return 'agg', p.name, {'name': p.name, **p.dfreq, **p.sev_clause,
+        return 'agg', p.name, {'name': p.name, **p.dfreq, **p.layers, **p.sev_clause,
                                          **p.occ_reins, **p.agg_reins, 'note': p.note}
 
     @_('AGG name TWEEDIE expr expr expr note')

@@ -42,7 +42,7 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
     'sphinx_panels',
-    # 'jupyter_sphinx'
+    'sphinxcontrib.bibtex'
     ]
 
 
@@ -64,6 +64,9 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+# bibtex options
+bibtex_bibfiles = ['extract.bib']
+bibtex_reference_style = 'author_year'
 
 # -- Options for HTML output ----------------------------------------------
 

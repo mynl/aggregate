@@ -1,5 +1,5 @@
-aggregate: a powerful Python aggregate distribution modeling library
-=====================================================================
+aggregate: a powerful aggregate distribution modeling library in Python
+========================================================================
 
 What is it?
 -----------

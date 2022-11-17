@@ -35,17 +35,18 @@ Getting started
 ---------------
 
 ::
+
   from aggregate import build
   # model the sum of the rolls of three dice
   a = build('agg Dice dfreq [3] dsev [1:6]')
   print(a.describe)
   print(f'\nprobability sum < 12 = {a.cdf(12):.3f}\nmedian = {a.q(0.5):.0f}')
 
->>>          E[X] Est E[X]  Err E[X]     CV(X) Est CV(X) Err CV(X) Skew(X) Est Skew(X)
+>>>        E[X] Est E[X]    Err E[X]   CV(X) Est CV(X)   Err CV(X) Skew(X) Est Skew(X)
 >>>  X                                                                                
->>>  Freq   3.000                        0.000                                        
->>>  Sev    3.500    3.500     0.000  487.950m  487.950m -333.067a   0.000      2.853f
->>>  Agg   10.500   10.500 -333.067a  281.718m  281.718m   -8.660f   0.000   -158.125f
+>>>  Freq     3                            0                                          
+>>>  Sev    3.5      3.5           0 0.48795   0.48795 -3.3307e-16       0  2.8529e-15
+>>>  Agg   10.5     10.5 -3.3307e-16 0.28172   0.28172 -8.6597e-15       0 -1.5813e-13
 >>>  
 >>>  probability sum < 12 = 0.741
 >>>  median = 10
@@ -59,24 +60,10 @@ surprised at the form of the density for small p.
 
   # a Tweedie distribution, mean 10, p=1.005, dispersion (phi, sigma^2)=4
   t = build('agg Tweedie tweedie 5 1.005 1')
-  print(t)
+  print(t.describe)
   # check variance
   print(1 * 5**1.005, t.agg_var)
 
->>> Aggregate object         Tweedie
->>> Claim count              4.98
->>> Frequency distribution   poisson
->>> Severity distribution    gamma, unlimited.
->>> bs                       1/4096
->>> log2                     16
->>> padding                  1
->>> sev_calc                 discrete
->>> normalize                True
->>> approximation            exact
->>> reinsurance              None
->>> occurrence reinsurance   No reinsurance
->>> aggregate reinsurance    No reinsurance
->>>
 >>>        E[X] Est E[X]    Err E[X]    CV(X) Est CV(X)   Err CV(X)  Skew(X) Est Skew(X)
 >>> X
 >>> Freq 4.9848                       0.44789                        0.44789

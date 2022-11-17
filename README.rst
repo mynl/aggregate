@@ -7,7 +7,7 @@ What is it?
 **aggregate** is a Python package providing an expressive language and fast,
 accurate computations to make working with aggregate (compound) probability
 distributions easy and intuitive. It allows students and practitioners to
-work with realistic real-world distributions that reflect the underlying
+use realistic real-world distributions that reflect the underlying
 frequency and severity generating processes. It has applications in
 insurance, risk management, actuarial science, and related areas.
 
@@ -35,46 +35,22 @@ Getting started
 ---------------
 
 ::
-
   from aggregate import build
+  # model the sum of the rolls of three dice
+  a = build('agg Dice dfreq [3] dsev [1:6]')
+  print(a.describe)
+  print(f'\nprobability sum < 12 = {a.cdf(12):.3f}\nmedian = {a.q(0.5):.0f}')
 
-  print(build)
+>>>          E[X] Est E[X]  Err E[X]     CV(X) Est CV(X) Err CV(X) Skew(X) Est Skew(X)
+>>>  X                                                                                
+>>>  Freq   3.000                        0.000                                        
+>>>  Sev    3.500    3.500     0.000  487.950m  487.950m -333.067a   0.000      2.853f
+>>>  Agg   10.500   10.500 -333.067a  281.718m  281.718m   -8.660f   0.000   -158.125f
+>>>  
+>>>  probability sum < 12 = 0.741
+>>>  median = 10
 
->>> Underwriter   Rory
->>> Knowledge     138 programs
->>> log2          16
->>> update        True
->>> debug         False
->>> site_dir      C:\Users\steve\aggregate\databases
->>> default_dir   C:\Users\steve\documents\cloudstation\telos\python\aggregate_project\aggregate\agg
-
-::
-
-  # model of the roll of a single dice
-  a = build('agg DICE dfreq [1] dsev [1:6]')
-  print(a)
-
->>> Aggregate object         DICE
->>> Claim count              1.00
->>> Frequency distribution   empirical
->>> Severity distribution    dhistogram, unlimited.
->>> bs                       1
->>> log2                     4
->>> padding                  1
->>> sev_calc                 discrete
->>> normalize                True
->>> approximation            exact
->>> reinsurance              None
->>> occurrence reinsurance   No reinsurance
->>> aggregate reinsurance    No reinsurance
->>>
->>>       E[X] Est E[X]    Err E[X]   CV(X) Est CV(X)   Err CV(X) Skew(X) Est Skew(X)
->>> X
->>> Freq     1                            0
->>> Sev    3.5      3.5           0 0.48795   0.48795 -3.3307e-16       0  2.8529e-15
->>> Agg    3.5      3.5 -1.1102e-16 0.48795   0.48795  2.2204e-16       0  2.8529e-15
-
-The DataFrame compares exact mean, CV and skewness with ``aggregate`` computation for the
+The DataFrame ``describe`` compares exact mean, CV and skewness with the ``aggregate`` computation for the
 frequency, severity, and aggregate components. The Tweedie distribution is a common error
 term in GLM modeling. It is a compound Poisson aggregate with gamma severity. Users may be
 surprised at the form of the density for small p.

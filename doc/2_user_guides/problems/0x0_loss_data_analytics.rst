@@ -127,7 +127,6 @@ In this case we must use unconditional severity to include the  possibility that
 .. ipython:: python
     :okwarning:
 
-    #from aggregate import build
     import numpy as np
     a = build('agg lda.3.4.1 1 claim '
               'inf xs 100 sev 1000 * expon 1 ! '
@@ -161,7 +160,6 @@ The trick here is to realize that :math:`X` is a beta variable with :math:`\alph
 .. ipython:: python
     :okwarning:
 
-    #from aggregate import build
     a = build('agg lda.3.4.2 1 claim 6 x 4 sev 10 * beta 2 1 fixed')
     print(a)
     print(a.agg_m)
@@ -214,6 +212,8 @@ The ground up loss random variable for a health insurance policy in 2006 is mode
 
 .. ipython:: python
     :okwarning:
+
+    import pandas as pd
 
     a06 = build('agg X06 1 claim 500 x 100 sev 1000 * expon fixed', update=False)
     a07 = build('agg X07 1 claim 500 x 100 sev 1050 * expon fixed', update=False)
@@ -597,7 +597,7 @@ so that your retained risk is :math:`Y_{retained}= X - Y_{insurer} = \min(X_1,M_
 
 **Solution.** Begin by figuring the gamma and Pareto parameters. For a gamma, the mean equals shape times scale, so shape equals 2 for building and motor. For a Pareto, the mean equals scale / (shape - 1), so shape equals 2 (no variance) for D&O and 3 for cyber (no third moment). We model the results using three :class:`Portfolio` objects, one for the retention, one for the insured amount, and one total. In each case the distribution gives total losses; the frequency component is trivial.
 
-Since the insured and total aggregates have no variance it is hard to estimate an appropriate bucket size. The default method uses the standard deviation as a scale factor. We must use judgement (or trial and error), and select ``log2=18`` and ``bs=1`` to ensure there is enough "space". Checking the describe dataframe shows these values match the means well by unit and in total.
+Since the insured and total aggregates have no variance it is hard to estimate an appropriate bucket size. The default method uses the standard deviation as a scale factor. We must use judgement (or trial and error), and select ``log2=18`` and ``bs=1`` to ensure there is enough "space". Checking the describe dataframe shows these values match the means well by unit and in total. The insured severity must be made unconditional.
 
 
 .. ipython:: python
@@ -616,8 +616,8 @@ Since the insured and total aggregates have no variance it is hard to estimate a
         print(retained.describe)
 
     insured = build('''port insured
-        agg building 1 claim inf xs 100 sev 100 * gamma 2 fixed
-        agg motor    1 claim inf xs 200 sev 200 * gamma 2 fixed
+        agg building 1 claim inf xs 100 sev 100 * gamma 2 ! fixed
+        agg motor    1 claim inf xs 200 sev 200 * gamma 2 ! fixed
         agg d.and.o  1 claim            sev 1000 * pareto 2 - 1000 fixed
         agg cyber    1 claim            sev 2000 * pareto 3 - 2000 fixed
     ''', log2=18, bs=1)

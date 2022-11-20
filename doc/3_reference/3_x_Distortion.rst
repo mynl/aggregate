@@ -1,6 +1,6 @@
 
-The Distortion Module
-======================
+Distortion Module
+==================
 
 .. automodule:: aggregate.spectral
    :members:

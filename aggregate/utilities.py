@@ -1,15 +1,19 @@
 from cycler import cycler
+import decimal
 from functools import lru_cache
 from io import StringIO, BytesIO
 import itertools
 from itertools import product
 import logging.handlers
 import logging
+import math
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from numbers import Number
 import numpy as np
 import pandas as pd
+from pandas.io.formats.format import EngFormatter
 import re
 import scipy.stats as ss
 from scipy.integrate import quad
@@ -20,6 +24,7 @@ from scipy.special import kv, binom, gamma, loggamma
 from scipy.stats import multivariate_t
 # from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
+
 
 
 logger = logging.getLogger(__name__)
@@ -172,6 +177,7 @@ def mu_sigma_from_mean_cv(m, cv):
     mu = np.log(m) - sigma**2 / 2
     return mu, sigma
 
+ln_fit = mu_sigma_from_mean_cv
 
 def sln_fit(m, cv, skew):
     """
@@ -212,6 +218,14 @@ def sgamma_fit(m, cv, skew):
         theta = cv * m * skew / 2
         shift = m - alpha * theta
         return shift, alpha, theta
+
+def gamma_fit(m, cv):
+    """
+
+    """
+    alpha = cv**-2
+    beta = m / alpha
+    return alpha, beta
 
 
 def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
@@ -271,6 +285,12 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     """
     Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
 
+    Updated Nov 2022 with a way to estimate p based on lognormal results. How far in the
+    tail you need to go to get an accurate estimate of the mean. See 2_x_approximation_error
+    in the help.
+
+    Retain p param for backwards compatibility.
+
     :param m:
     :param cv:
     :param skew:
@@ -278,17 +298,32 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     :return:
     """
 
+    # p_estimator = interp1d([0.53294, 0.86894, 1.9418, 7.3211, 22.738, 90.012, 457.14, 2981],
+    #                        [3,       4,       5,      7,      8,      9,      11,     12],
+    #                        assume_sorted=True, bounds_error=False, fill_value=(3, 13))
+    # p = 1 - 10**-p_estimator(cv)
+
+    if np.isinf(cv):
+        raise ValueError('Infinite variance passed to estimate_agg_percentile')
+
     pn = pl = pg = 0
     if skew <= 0:
         # neither sln nor sgamma works, use a normal
         # for negative skewness the right tail will be thin anyway so normal not outrageous
         fzn = ss.norm(scale=m * cv, loc=m)
         pn = fzn.isf(1 - p)
-    else:
+    elif not np.isinf(skew):
         shift, mu, sigma = sln_fit(m, cv, skew)
         fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
         shift, alpha, theta = sgamma_fit(m, cv, skew)
         fzg = ss.gamma(alpha, scale=theta, loc=shift)
+        pl = fzl.isf(1 - p)
+        pg = fzg.isf(1 - p)
+    else:
+        mu, sigma = ln_fit(m, cv)
+        fzl = ss.lognorm(sigma, scale=np.exp(mu))
+        alpha, theta = gamma_fit(m, cv)
+        fzg = ss.gamma(alpha, scale=theta)
         pl = fzl.isf(1 - p)
         pg = fzg.isf(1 - p)
     # throw in a mean + 3 sd approx too...
@@ -1011,7 +1046,11 @@ class MomentAggregator(object):
                                          (['ex1', 'ex2', 'ex3'] + ['mean', 'cv', 'skew']) * 3 + ['limit', 'P99.9e']],
                                         names=['component', 'measure'])
         all_stats = self.get_fsa_stats(total=True, remix=remix)
-        p999e = estimate_agg_percentile(*all_stats[15:18], pvalue)
+        try:
+            p999e = estimate_agg_percentile(*all_stats[15:18], pvalue)
+        except ValueError:
+            # if no cv this is a value error
+            p999e = np.inf
         return pd.Series([*all_stats, limit, p999e], name=name, index=idx)
 
 
@@ -2706,3 +2745,147 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
 
     return ans
 
+def qd(*argv):
+    """
+    Endless quest for a robust display format!
+
+    Quick display (qd) a list of objects.
+    Dataframes handled in text with reasonable defaults.
+    For use in documentation.
+
+    """
+    ff = sEngFormatter(accuracy=1, min_prefix=0, max_prefix=12, align=True)
+    for x in argv:
+        if isinstance(x, pd.DataFrame):
+            if x.shape[1] > 10:
+                # need denser format
+                ff = sEngFormatter(accuracy=1, min_prefix=0, max_prefix=12, align=False)
+            with pd.option_context('display.width', 110, 'display.float_format', ff):
+                print(x)
+            # print(x.to_string(formatters={c: f for c in x.columns}))
+        elif isinstance(x, int):
+            print(x)
+        elif isinstance(x, Number):
+            print(ff(x))
+        else:
+            print(x)
+
+
+class sEngFormatter:
+    """
+    Formats float values according to engineering format inside a range
+    of exponents, and standard scientific notation outside.
+
+    Uses the same number of significant digits throughout.
+    Optionally aligns at decimal point. That takes up more horizontal
+    space but produces easier to read output.
+
+    Based on matplotlib.ticker.EngFormatter and pandas EngFormatter.
+    Converts to scientific notation outside (smaller) range of prefixes.
+    Uses same number of significant digits?
+
+    Tester::
+        test = [1.23456789 * 10**n for n in range(-20,20)]
+        test = [-i for i in test] + test
+        [sEngFormatter(1, -3, 9)(i) for i in test]
+    """
+
+    # The SI engineering prefixes
+    ENG_PREFIXES = {
+        -24: "y",
+        -21: "z",
+        -18: "a",
+        -15: "f",
+        -12: "p",
+        -9: "n",
+        -6: "μ",
+        -3: "m",
+        0: " ",
+        3: "k",
+        6: "M",
+        9: "G",
+        12: "T",
+        15: "P",
+        18: "E",
+        21: "Z",
+        24: "Y",
+    }
+
+    def __init__(self, accuracy, min_prefix=-6, max_prefix=12, align=True):
+        self.accuracy = accuracy
+        self.align = align
+        self.ENG_PREFIXES = {k: v for k, v in sEngFormatter.ENG_PREFIXES.items() if min_prefix <= k <= max_prefix}
+
+    def __call__(self, num):
+        """
+        Formats a number in engineering notation, appending a letter
+        representing the power of 1000 of the original number. Some examples:
+
+        :param num: the value to represent
+        :type num: either a numeric value or a string that can be converted to
+                   a numeric value (as per decimal.Decimal constructor)
+
+        :return: engineering formatted string
+        """
+        dnum = decimal.Decimal(str(num))
+
+        if decimal.Decimal.is_nan(dnum):
+            return "NaN"
+
+        if decimal.Decimal.is_infinite(dnum):
+            return "inf"
+
+        sign = 1
+
+        if dnum < 0:  # pragma: no cover
+            sign = -1
+            dnum = -dnum
+
+        if dnum != 0:
+            pow10 = decimal.Decimal(int(math.floor(dnum.log10() / 3) * 3))
+            # extra accuracy
+            if dnum >= 1:
+                ex_acc = 2 - (int(dnum.log10()) % 3)
+            else:
+                ex_acc = abs(int(dnum.log10())) % 3
+        else:
+            pow10 = decimal.Decimal(0)
+            ex_acc = 0
+        int_pow10 = int(pow10)
+
+        sci = False
+        if pow10 > max(self.ENG_PREFIXES.keys()) or pow10 < min(self.ENG_PREFIXES.keys()):
+            sci = True
+
+        if sci:
+            if 0.01 <= dnum <= 10:
+                format_str = f'{{dnum: .{self.accuracy + 2}f}}'
+            else:
+                format_str = f'{{dnum: .{self.accuracy + 2}e}}'
+            formatted = format_str.format(dnum=sign * dnum)
+            formatted = remove_trailing_zeros(formatted)
+        else:
+            prefix = self.ENG_PREFIXES[int_pow10]
+
+            mant = sign * dnum / (10**pow10)
+            if self.align:
+                if self.accuracy + ex_acc == 0:
+                    format_str = f"{{mant: 6.0f}}.{{prefix}}"
+                else:
+                    format_str = f"{{mant: {(7+self.accuracy+ex_acc)}.{self.accuracy + ex_acc:d}f}}{{prefix}}"
+                    # format_str = f"{{mant: .{self.accuracy + ex_acc:d}f}}{{prefix}}"
+            else:
+                    format_str = f"{{mant: .{self.accuracy:d}f}}{{prefix}}"
+            formatted = format_str.format(mant=mant, prefix=prefix)
+            formatted = remove_trailing_zeros(formatted)
+            if ex_acc == 0:
+                formatted += '  '
+            elif ex_acc == 1:
+                formatted += ' '
+
+        return formatted
+
+def remove_trailing_zeros(x):
+    r = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)$')
+    f = lambda x: f'{x[1]}.{x[2]}{" "*len(x[3])}'
+    return r.sub(f, x)

@@ -1,10 +1,8 @@
-Problems and Examples from Books, Study Notes, and Papers
-===========================================================
+Published Problems and Examples
+=================================
 
-Other papers to review include
 
-- :cite:t:`Hyndman1996`
-- :cite:t:`Denuit2019`
+Other papers to review include :cite:t:`Hyndman1996` and :cite:t:`Denuit2019`.
 
 .. Use glob and star in contents. No caching!
 

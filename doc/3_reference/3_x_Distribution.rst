@@ -1,6 +1,6 @@
 
-The Distributions Module
-==========================
+Distributions Module
+======================
 
 
 Frequency Class

@@ -1,7 +1,7 @@
 .. _2_x_tweedie:
 
-The Tweedie Distribution for Working Actuaries
-=================================================
+The Tweedie Distribution
+=========================
 
 .. Below is the code from the snippet.
 

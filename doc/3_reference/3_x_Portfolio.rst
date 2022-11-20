@@ -1,6 +1,6 @@
 
-The Portfolio Module
-=====================
+Portfolio Module
+=================
 
 Portfolio Class
 ---------------

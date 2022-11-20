@@ -13,7 +13,7 @@ aggregate Documentation
 #######################
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    1_Getting_Started
@@ -45,7 +45,7 @@ aggregate Documentation
    ---
    :img-top: _static/getting_started.png
 
-   Get up and running: installation, create a "hello world" aggregate distribution and a glimpse into the functionality.
+   Get up and running: installation, ``aggregate`` "hello world", and a glimpse into the functionality.
 
    +++
 
@@ -70,7 +70,7 @@ aggregate Documentation
    :img-top: _static/api_reference.png
 
 
-   Documentation for every class and function aimed at developers and more advanced users.
+   Documentation for every class and function, for developers and more advanced users.
 
    +++
 
@@ -83,7 +83,7 @@ aggregate Documentation
    :img-top: _static/developer_guide.png
 
 
-   Details of the agg lanaguage for specifying aggregate distributions.
+   The ``agg`` lanaguage syntax and grammar for specifying aggregate distributions.
 
    +++
 
@@ -108,8 +108,7 @@ aggregate Documentation
    ---
    :img-top: _static/developer_guide.png
 
-
-   To do list, ideas for future development, design philosophy, historical perspective.
+   Design philosophy, competing products, future development, todo list, historical perspective.
 
    +++
 

@@ -36,7 +36,7 @@ frequency distribution with MGF
 where :math:`P_i=\beta n_i`, :math:`P=\sum_i P_i` and :math:`Q=1+P`.
 Equation (`[nmnmgf] <#nmnmgf>`__) is the moment generating function for
 a negative multinomial distribution, as defined in Johnson, Kotz and
-Kemp :raw-latex:`\cite{kjbdmv}`. The negative multinomial distribution
+Kemp. The negative multinomial distribution
 has positively correlated marginals as expected given its construction
 with a common contagion :math:`G`.
 
@@ -80,7 +80,7 @@ expected proportion of ultimate losses paid at time :math:`t`, so
 which is closer to the problem actually faced by the reserving actuary.
 Our :math:`\pi_t`\ ’s are prior estimates assumed known at time 0. These
 types of differences have interesting implications for actuarial methods
-and they are explored further in Mack :raw-latex:`\cite{Mack}`.) Now we
+and they are explored further in Mack.) Now we
 seek a decomposition
 
 .. math:: A=D_1+D_2+\cdots+D_T\label{decomp}
@@ -123,7 +123,6 @@ difference in average severity :math:`\mathsf{E}(X)` vs. :math:`\mathsf{E}(X_t)
 where :math:`X'` is a mixture of the :math:`X_t` with weights
 :math:`\pi_t'`. Equation (`[CPDecomp2] <#CPDecomp2>`__) is a standard
 result in actuarial science, see Bowers et al.
-:raw-latex:`\cite{bowersEtAl}`.
 
 If we try to replicate the compound Poisson argument using a negative
 binomial distribution for :math:`N` we will clearly fail. However if
@@ -145,7 +144,7 @@ and so
 
 where :math:`P_t:=\pi_t P`. Equation (`[nmn1] <#nmn1>`__) is the MGF for
 a negative multinomial distribution, as defined in the previous section
-and Johnson, Kotz and Kemp :raw-latex:`\cite{kjbdmv}`. As we have seen
+and Johnson, Kotz and Kemp. As we have seen
 the negative multinomial distribution has positively correlated
 marginals, in line with our prior notions of liability dynamics. It
 therefore provides a good model for the decomposition of ultimate losses
@@ -178,8 +177,7 @@ Poissons. The MGF is
    K_{\gamma}(\omega)(1-2\beta(e^{\zeta}-1))^{\gamma/2}}.
 
 The mean and variance are given in Johnson, Kotz and Kemp
-:raw-latex:`\cite[page
-456]{jkk}`. Clearly we can apply the same techniques to get another
+[page 456]. Clearly we can apply the same techniques to get another
 multivariate frequency distribution.
 
 The Poisson-Pascal distribution is a Poisson-stopped sum of negative

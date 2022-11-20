@@ -42,7 +42,8 @@ from .utilities import get_fmts, pprint, pprint_ex, ft, \
     mu_sigma_from_mean_cv, \
     make_corr_matrix, random_corr_matrix, \
     LoggerManager, knobble_fonts, approximate_work, \
-    partial_e, partial_e_numeric, moms_analytic
+    partial_e, partial_e_numeric, moms_analytic, qd, \
+    sEngFormatter
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 

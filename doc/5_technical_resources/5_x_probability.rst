@@ -1,4 +1,4 @@
-.. _probability:
+.. _5_x_probability:
 
 Probability Background
 ======================
@@ -11,6 +11,10 @@ Probability Background
 
 **Notation.** The variance of a random variable :math:`X` is :math:`\mathsf{var}(X)=\mathsf{E}[X^2]-\mathsf{E}[X]^2`. The standard deviation is :math:`\sigma(X)=\sqrt{\mathsf{var}(X)}`. The coefficient of variation (CV) of :math:`X` is :math:`\mathsf{CV}(X)=\sigma(X)/\mathsf{E}[X]`. The skewness of :math:`X` is :math:`\mathsf{E}[(X-\mathsf{E}[X])^3]/\sigma(X)^3`.
 
+Types
+------
+
+TODO
 
 Moment Generating Functions
 ---------------------------
@@ -148,6 +152,8 @@ An easy integral computation, substitute :math:`y=\lambda + x` to express in pow
 Frequency Distributions
 ------------------------
 
+.. _mixed frequency distributions:
+
 Mixed Frequency Distributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -228,8 +234,7 @@ variation of the mixing distribution. Then
 
 The non-central moments of the gamma distribution are
 :math:`\text{E}(G^r)=\theta^r\Gamma(a+r)/\Gamma(a)`. Therefore
-:math:`Var(G) = a\theta^2` and :math:`E(G-E(G))^3 = 2a\theta^3`. The
-skewness of :math:`G` is :math:`\gamma = 2/\sqrt(a) = 2\nu`.
+:math:`Var(G) = a\theta^2` and :math:`E(G-E(G))^3 = 2a\theta^3`. The skewness of :math:`G` is :math:`\gamma = 2/\sqrt(a) = 2\nu`.
 
 Applying the general formula for the third central moment of :math:`N`
 we get an expression for the skewness

@@ -268,8 +268,7 @@ class Underwriter(object):
         3. Replace sev.name, agg.name and port.name references with their objects.
         5. If update set, update all created objects.
 
-        Sample input:
-        ::
+        Sample input::
 
             port MY_PORTFOLIO
                 agg Line1 20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4

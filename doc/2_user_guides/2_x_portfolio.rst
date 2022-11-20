@@ -15,8 +15,9 @@ Use :attr:`build.knowledge` and :meth:`build.qshow` to view the knowledge.
 .. ipython:: python
     :okwarning:
 
-   build.knowledge.head()
-   build.qshow('^E\.')
+    from aggregate import build
+    build.knowledge.head()
+    build.qshow('^E\.')
 
 .. note::
 
@@ -67,7 +68,7 @@ The portfolio can be approximated using FFTs to convolve the aggregates and add 
     print(p.recommend_bucket().iloc[:, [0,3,6,10]])
     p.best_bucket(16)
 
-The column ``bsN`` correspond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each unit and in total. For example with ``N=16` (i.e., 65,536 buckets) the suggestion is 1727. It is best the bucket size is a divisor of any limits or attachment points, so we select 2000.
+The column ``bsN`` correspond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each unit and in total. For example with ``N=16`` (i.e., 65,536 buckets) the suggestion is 1727. It is best the bucket size is a divisor of any limits or attachment points, so we select 2000.
 
 
 :class:`Portfolio` objects act like a discrete probability distribution, just like :class:`Aggregate` objects. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.

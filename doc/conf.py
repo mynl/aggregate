@@ -42,7 +42,8 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
     'sphinx_panels',
-    'sphinxcontrib.bibtex'
+    'sphinxcontrib.bibtex',
+    'sphinx_rtd_dark_mode'
     ]
 
 
@@ -67,6 +68,9 @@ todo_include_todos = False
 # bibtex options
 bibtex_bibfiles = ['extract.bib']
 bibtex_reference_style = 'author_year'
+
+# user starts in light mode
+default_dark_mode = False
 
 # -- Options for HTML output ----------------------------------------------
 

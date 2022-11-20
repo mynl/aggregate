@@ -5,10 +5,4 @@ Capital Modeling
 
 Kappa as a risk measure function.
 
-
-
-
-Capital Modeling
-----------------
-
-*  Portfolio level probability of default, EPD, Var and TVaR statistics
+* Portfolio level probability of default, EPD, Var and TVaR statistics

@@ -782,6 +782,7 @@ class Aggregate(Frequency):
         self._inverse_tail_var = None
         # self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._linear_quantile_function = None
+        self._sev_linear_quantile_function = None
         self._cdf = None
         self._pdf = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
@@ -792,6 +793,7 @@ class Aggregate(Frequency):
         self._density_df = None
         self._reins_audit_df = None
         self.q_temp = None
+        self.q_temp_sev = None
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
         self.occ_netter = None
@@ -946,33 +948,8 @@ class Aggregate(Frequency):
         # [ORIGINALLY] wrap default with name
         # return f'{super(Aggregate, self).__repr__()} name: {self.name}'
 
-        s = []
-        s.append(f'Aggregate object         {self.name}')
-        s.append(f'Claim count              {self.n:0,.2f}')
-        s.append(f'Frequency distribution   {self.freq_name}')
-        n = len(self.statistics_df)
-        if n == 1:
-            sv = self.sevs[0]
-            if sv.limit == np.inf and sv.attachment == 0:
-                _la = 'unlimited'
-            else:
-                _la = f'{sv.limit:,.0f} xs {sv.attachment:,.0f}'
-            s.append(f'Severity distribution    {sv.long_name}, {_la}.')
-        else:
-            s.append(f'Severity with {n} components.')
-        if self.bs > 0:
-            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
-            s.append(f'bs                       {bss}')
-            s.append(f'log2                     {self.log2}')
-            s.append(f'padding                  {self.padding}')
-            s.append(f'sev_calc                 {self.sev_calc}')
-            s.append(f'normalize                {self.normalize}')
-            s.append(f'approximation            {self.approximation}')
-            s.append(f'reinsurance              {self.reinsurance_kinds()}')
-            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ")}')
-            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg")}')
-            s.append('')
-        with pd.option_context('display.width', 160, 'display.float_format', lambda x: f'{x:,.5g}'):
+        s = [self.info]
+        with pd.option_context('display.width', 200, 'display.float_format', lambda x: f'{x:,.5g}'):
             # get it on one row
             s.append(str(self.describe))
         # s.append(super().__repr__())
@@ -993,6 +970,36 @@ class Aggregate(Frequency):
         #     f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
         #     f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         # return s
+
+    @property
+    def info(self):
+        s = []
+        s.append(f'Aggregate object         {self.name}')
+        s.append(f'claim count              {self.n:0,.2f}')
+        s.append(f'frequency distribution   {self.freq_name}')
+        n = len(self.statistics_df)
+        if n == 1:
+            sv = self.sevs[0]
+            if sv.limit == np.inf and sv.attachment == 0:
+                _la = 'unlimited'
+            else:
+                _la = f'{sv.limit:,.0f} xs {sv.attachment:,.0f}'
+            s.append(f'severity distribution    {sv.long_name}, {_la}.')
+        else:
+            s.append(f'severity distribution    {n} components')
+        if self.bs > 0:
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
+            s.append(f'bs                       {bss}')
+            s.append(f'log2                     {self.log2}')
+            s.append(f'padding                  {self.padding}')
+            s.append(f'sev_calc                 {self.sev_calc}')
+            s.append(f'normalize                {self.normalize}')
+            s.append(f'approximation            {self.approximation}')
+            s.append(f'reinsurance              {self.reinsurance_kinds()}')
+            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ")}')
+            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg")}')
+            s.append('')
+        return '\n'.join(s)
 
     def html_info_blob(self):
         """
@@ -1155,6 +1162,7 @@ class Aggregate(Frequency):
         """
         self._density_df = None  # invalidate
         self._linear_quantile_function = None
+        self._sev_linear_quantile_function = None
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
@@ -2140,16 +2148,19 @@ class Aggregate(Frequency):
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
 
-    def recommend_bucket(self, log2=10, verbose=False):
+    def recommend_bucket(self, log2=10, p=1-1e-6, verbose=False):
         """
         Recommend a bucket size given 2**N buckets. Not rounded.
+
+        If no second moment, throws a ValueError. You just can't guess
+        in that situation.
 
         :param log2: log2 of number of buckets. log2=10 is default.
         :return:
         """
         N = 1 << log2
         if not verbose:
-            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew) / N
+            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
             limit_est = self.limit.max() / N
             if limit_est == np.inf:
                 limit_est = 0
@@ -2160,9 +2171,9 @@ class Aggregate(Frequency):
                 rb = self.recommend_bucket(n)
                 if n == log2:
                     rbr = rb
-                print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.0f}')
+                print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.3f}')
             if self.bs != 0:
-                print(f'Bucket size set with {N} buckets at {self.bs:,.0f}')
+                print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
             return rbr
 
     # def q_old(self, p):
@@ -2230,6 +2241,35 @@ class Aggregate(Frequency):
         # because we are not interpolating the returned value must (should) be in the index...
         if not (kind == 'middle' or l in self.density_df.index):
             logger.error(f'Unexpected weirdness in {self.name} quantile...computed {p}th {kind} percentile as {l} '
+                         'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
+        return l
+
+    def q_sev(self, p):
+        """
+        Compute quantile of severity distribution, returning element in the index.
+        Very similar code to q, but only lower quantiles.
+
+        :param p:
+        :return:
+        """
+        if self._sev_linear_quantile_function is None:
+            try:
+                self._sev_linear_quantile_function = {}
+                self.q_temp_sev = self.density_df[['loss', 'F_sev']].groupby('F_sev').agg({'loss': np.min})
+                self.q_temp_sev.loc[1, 'loss'] = self.q_temp_sev.loss.iloc[-1]
+                self.q_temp_sev.loc[0, 'loss'] = 0
+                self.q_temp_sev = self.q_temp_sev.sort_index()
+                self._sev_linear_quantile_function = \
+                    interpolate.interp1d(self.q_temp_sev.index, self.q_temp_sev.loss, kind='next', bounds_error=False,
+                                         fill_value='extrapolate')
+            except Exception as e:
+                # if fails reset in case this code is within a try .... except block
+                self._sev_linear_quantile_function = None
+                raise e
+        l = float(self._sev_linear_quantile_function(p))
+        # because we are not interpolating the returned value must (should) be in the index...
+        if l not in self.density_df.index:
+            logger.error(f'Unexpected weirdness in {self.name} severity quantile...computed {p}th percentile as {l} '
                          'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
         return l
 
@@ -2773,6 +2813,8 @@ class Severity(ss.rv_continuous):
         It is easy to add others in the code below. With two shape parameters the mean cv input format
         is not available.
 
+        See code in Problems and Solutions to extract distributions from scipy stats by introsepection.
+
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
         :param exp_attachment:
         :param exp_limit:
@@ -2901,7 +2943,10 @@ class Severity(ss.rv_continuous):
             self.sev2 = np.sum(xs ** 2 * ps)
             self.sev3 = np.sum(xs ** 3 * ps)
 
-        elif sev_name in ['norm', 'expon', 'uniform', 'levy']:
+        elif sev_name in ['anglit', 'arcsine', 'cauchy', 'cosine', 'expon', 'gilbrat', 'gumbel_l',
+                          'gumbel_r', 'halfcauchy', 'halflogistic', 'halfnorm', 'hypsecant',
+                          'kstwobign', 'laplace', 'levy', 'levy_l', 'logistic', 'maxwell', 'moyal',
+                          'norm', 'rayleigh', 'semicircular', 'uniform', 'wald']:
             # distributions with no shape parameters
             #     Normal (and possibly others) does not have a shape parameter
             if sev_loc == 0 and sev_mean > 0:
@@ -2911,8 +2956,11 @@ class Severity(ss.rv_continuous):
             gen = getattr(ss, sev_name)
             self.fz = gen(loc=sev_loc, scale=sev_scale)
 
-        elif sev_name in ['beta', 'genpareto', 'gengamma', 'burr']:
-            # distributions with two shape parameters
+        elif sev_name in ['beta', 'betaprime', 'burr', 'burr12', 'crystalball', 'exponweib', 'f', 'gengamma',
+                          'geninvgauss', 'johnsonsb', 'johnsonsu', 'kappa4', 'levy_stable', 'loguniform',
+                          'mielke', 'nct', 'ncx2', 'norminvgauss', 'powerlognorm', 'reciprocal',
+                          'studentized_range', 'trapezoid', 'trapz', 'truncnorm']:
+            #             # distributions with zero or two shape parameters
             # require specific inputs
             # for Kent examples input sev_scale=maxl, sev_mean=el and sev_cv as input
             #     beta sev_a and sev_b params given expected loss, max loss exposure and sev_cv
@@ -2930,6 +2978,14 @@ class Severity(ss.rv_continuous):
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
         else:
             # distributions with one shape parameter, which either comes from sev_a or sev_cv
+            assert sev_name in ['alpha', 'argus', 'bradford', 'chi', 'chi2', 'dgamma', 'dweibull', 'erlang',
+                                'exponnorm', 'exponpow', 'fatiguelife', 'fisk', 'foldcauchy', 'foldnorm',
+                                'gamma', 'genextreme', 'genhalflogistic', 'genlogistic', 'gennorm', 'genpareto',
+                                'gompertz', 'halfgennorm', 'invgamma', 'invgauss', 'invweibull', 'kappa3', 'ksone',
+                                'kstwo', 'laplace_asymmetric', 'loggamma', 'loglaplace', 'lognorm', 'lomax',
+                                'nakagami', 'pareto', 'pearson3', 'powerlaw', 'powernorm', 'rdist', 'recipinvgauss',
+                                'rice', 'skewcauchy', 'skewnorm', 't', 'triang', 'truncexpon', 'tukeylambda',
+                                'vonmises', 'vonmises_line', 'weibull_max', 'weibull_min', 'wrapcauchy']
             if np.isnan(sev_a) and sev_cv > 0:
                 sev_a, _ = self.cv_to_shape(sev_cv)
                 logger.info(f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')

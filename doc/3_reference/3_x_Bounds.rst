@@ -1,6 +1,6 @@
 
-The Bounds Module
-==================
+Bounds Module
+==============
 
 .. autoclass:: aggregate.bounds.Bounds
    :members:

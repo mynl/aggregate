@@ -18,8 +18,6 @@ multivariate reference distributions with given correlation structure.
 Section `1.2 <#algorithm>`__ gives a formal algorithmic description of
 the IC method.
 
-.. _theory:
-
 Theoretical Derivation
 ----------------------
 

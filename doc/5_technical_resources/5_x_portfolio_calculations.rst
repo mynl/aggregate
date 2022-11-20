@@ -6,8 +6,8 @@
 
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class
 computes the densities of each aggregate component as well as the sum,
-and also computes the variables shown in
-:raw-latex:`\cref{tab:port-deets}`. These variables are central to many
+and also computes the variables shown in XXXX.
+These variables are central to many
 allocation algorithms. All computations use FFTs to compute relevant
 convolutions and surface integrals. :math:`X_i(a` represents recoveries
 to line :math:`i` when total capital is :math:`a` and lines have equal
@@ -222,7 +222,6 @@ For Individual Lines :math:`X_i`
 
       X_{i,2}(a,\hat X_i) = \max(0, \min(X_{i,2}, a-\hat X_i)) = X_{i,2} \wedge (a-\hat X_i)^+
 
-   .. :raw-latex:`\begin{equation}\label{eq:subordinated}
    which can be computed as
 
    .. math::

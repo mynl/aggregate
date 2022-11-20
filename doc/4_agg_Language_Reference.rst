@@ -2,14 +2,15 @@
 **agg** Language Reference
 *****************************
 
-.. To view the grammar using a railroad diagram paste the specification below into
+.. To view the grammar using a railroad diagram paste the
+   specification below into
    the Edit Grammar tab of https://www.bottlecaps.de/rr/ui and then View Diagram.
    (Site diagram uses #DDDDDD as the base color.)
 
-Language Overview
-=================
 
+This section describes how an ``agg`` program is pre-processed, lexed, and parsed according to the grammar specification. It reports the results of interpreting the builtin test suite of NNN programs.
 
+The ``agg`` language :ref:`introduction <design and purpose>` describes its design and purpose.
 
 Pre-Processing
 ==============
@@ -119,6 +120,7 @@ Here is the full ```agg``` Language Grammar and a `grammar railroad diagram <_st
 
 .. literalinclude:: 4_agg_language_reference/ref_include.rst
 
+.. _test suite programs:
 
 Test Suite Programs
 ===================
@@ -147,8 +149,8 @@ To only parse::
     df.query('error != 0')
 
 
-References
-==========
+Parser References
+==================
 
 https://sly.readthedocs.io/en/latest/sly.html
 

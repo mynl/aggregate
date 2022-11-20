@@ -15,8 +15,8 @@ Basic
    :undoc-members:
 
 
-Case Studies
---------------
+Case Study Support
+---------------------
 
 .. automodule:: aggregate.extensions.case_studies
    :members:

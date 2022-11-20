@@ -5,7 +5,6 @@
 Actuarial Student
 ===========================================
 
-
 **Objectives** Introduce the `aggregate` library for working with aggregate probability distributions in the context of actuarial society exams and university courses in actuarial modeling.
 
 **Audience** Actuarial science university students or junior actuarial analysts.

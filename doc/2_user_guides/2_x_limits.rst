@@ -1,11 +1,24 @@
-.. _2_x_limits_and_mixtures:
+.. _2_x_limits:
 
-Limits, Limit Profiles, and Mixtures
-=====================================
+Limits and Limit Profiles
+=========================
 
 
-Limit Profiles
---------------
+
+::
+
+    [250 250 500 1000 3000] xs [0 250 500 1000 2000]
+
+describes a tower 250 xs 0, 250 xs 250, 500 xs 500, 1000 xs 1000, and 3000 xs 2000.
+Towers are common in structuring larger accounts and higher limits. This tower
+can also be entered by specifying the layer break points::
+
+    tower [0 250 500 1000 2000 5000]
+
+
+
+Specifying Limit Profiles
+---------------------------
 
 The exposure variables can be vectors to express a *limit profile*.
 All ```exp_[en|prem|loss|count]``` related elements are broadcast against one-another.
@@ -17,24 +30,24 @@ expresses a limit profile with 100 of premium at 1000 x 1000; 200 at 2000 x 1000
 400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all the loss ratios are
 the same, but they could vary too, as could the attachments.
 
-Mixtures
---------
+Specifying Mixtures
+----------------------
 
-The severity variables can be vectors to express a *mixed severity*. All ``sev_``
-elements are broadcast against one-another. For example ::
+We :ref:`have already seen <2_x_mixtures>` how to make the severity variables
+vectors to express a *mixed severity*. All ``sev_`` elements are broadcast
+against one-another. For example ::
 
     sev lognorm 1000 cv [0.75 1.0 1.25 1.5 2] wts [0.4, 0.2, 0.1, 0.1, 0.1]
 
 expresses a mixture of five lognormals with a mean of 1000 and CVs as indicated with
-weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be express as wts=[5], or the
-relevant number of components.
+weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights can be expressed as wts=[5].
 
 
-Limit Profiles and Mixtures
----------------------------
+Specifying Limit Profiles and Mixtures
+---------------------------------------
 
 Limit profiles and mixtures can be combined. Each mixed severity is applied to each
-limit profile component. For example ::
+limit profile component. For example::
 
     ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]
         sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')```
@@ -57,13 +70,13 @@ creates an aggregate with six severity subcomponents.
 | 5 |  75   | 75         | 12     |
 +---+-------+------------+--------+
 
-Circumventing Products
-----------------------
+Controlling and Circumventing Products
+---------------------------------------
 
 It is sometimes desirable to enter two or more lines each with a different severity but
-with a shared mixing variable. For example to model the current accident year and a run-
+with a shared mixing variable. For example, to model the current accident year and a run-
 off reserve, where the current year is gamma mean 100 cv 1 and the reserves are
-larger lognormal mean 150 cv 0.5 claims requires ::
+larger lognormal mean 150 cv 0.5 claims requires::
 
     agg MixedPremReserve [100 200] claims sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.4
 
@@ -128,7 +141,6 @@ aggregate CV is quite marked.
     import aggregate as agg
     # uw appropriate for snippet
     build = agg.Underwriter(name='Mixtures', update=True, log2=16)
-    build.logger_level(30)
 
 .. code:: ipython3
 
@@ -263,48 +275,32 @@ the desired behavior.) **TODO: what is wts sum to neither?**
                 'poisson')
     eg4m.report_df
 
-Frequency mixing
-~~~~~~~~~~~~~~~~
 
-All severity components in an aggregate share the same frequency mixing
-value, inducing correlation between the parts. For example, to model the
-current accident year and prior year reserves.
+Example: Mixed Exponential Distributions (continued)
+-----------------------------------------------------
 
-::
+We can combine the mixed exponential from :ref:`med example` with a limits profile.
 
-   agg Egn [100 200] claims sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.4
+.. ipython:: python
+    :okwarning:
 
-``Egn`` models the current accident year is gamma mean 100 cv 1 and a
-run-off reserve lognormal mean 150 cv 0.5.
+    from aggregate import build, qd
+    lim_prof = build('agg LIM_PROF [20 8 4 2] claims [1e6, 2e6 5e6 10e6] xs 0 '
+                     'sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * '
+                     'expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] fixed',
+                     log2=18, bs=500)
+    qd(lim_prof.describe)
+    #@savefig lim_mix1.png
+    lim_prof.plot()
 
-.. code:: ipython3
 
-    # mixed frequency, negative binomial cv 0.4
-    eg4x = build('agg Eg4x [1000 500 200 100] premium at [0.85 .75 .65 .55] lr '
-                '[1000 2000 5000 10000] xs 1000 '
-                'sev lognorm 100 cv .75 '
-                'mixed gamma 0.4')
-    eg4x.report_df
+The ``report_df`` shows all 20 components: 4 limits x 5 mixture components.
 
-.. code:: ipython3
+.. ipython:: python
+    :okwarning:
 
-    # model of current AY (gamma) and reserves(lognormal) with shared gamma mixing
-    eg5 = build('agg Eg5 [100 200] claims 5000 x 0 sev [gamma lognorm] [100 150] cv [1 0.5] mixed gamma 0.5',
-               log2=16, bs=2.5)
-    eg5.report_df
+    qd(lim_prof.report_df.T)
 
-.. code:: ipython3
 
-    # Delaporte (shifted) gamma mixing often produces more realistic output, avoiding very good years
-    eg5d = build('agg Eg5d [100 200] claims 5000 x 0 sev [gamma lognorm] [100 150] cv [1 0.5] mixed delaporte 0.5 0.6',
-                log2=18, bs=2.5)
-    eg5d.report_df
 
-.. code:: ipython3
-
-    eg5.plot()
-
-.. code:: ipython3
-
-    eg5d.plot()
 

@@ -98,3 +98,112 @@ Since bs is  based on the p999, it will fail when confronting and extreme tail.
 
 Based on above graph we can come up with an (empirical) relationship between the CV and the required percentile for decent coverage.
 
+More code... test different n for rec bucket, different methods.
+
+::
+
+    from aggregate import build, qd, Aggregate, Severity, round_bucket
+
+    a = build('agg TEST 1 claim sev lognorm 1 cv 50 fixed', update=False)
+
+    for n in range(3,11):
+        a.update(recommend_p=n, log2=16)
+        qd(a.describe)
+        print(f'recommend n = {n}, bucket size = 1 / {1/a.bs}')
+        print('-'*100)
+        print()
+    print(a.info)
+
+    ans = {}
+    for m in ['backward', 'round', 'forward']:
+        a.update(bs=1/4, sev_calc=m, log2=16, normalize=False)
+        print(m)
+        qd(a.describe)
+        print('-'*100)
+        print()
+        ans[m] = a.density_df[['p', 'F', 'S']]
+
+    df = pd.concat(ans.values(), keys=ans.keys(), axis=1)
+
+    df.xs('S', axis=1, level=1).plot(xlim=[-1, a.q(0.99)], logy=True, ylim=[1e-2, 1], lw=.5, figsize=(3.5,5))
+
+
+Explicit Error Quantification for a Tweedie
+-----------------------------------------------
+
+There is a series expansion for the pdf of a Tweedie computed by conditioning on the number of claims and using that a convolution of gammas with the same scale parameter is again gamma. For a Tweedie with expected frequency :math:`\lambda`, gamma shape :math:`\alpha` and scale :math:`\beta`, it is given by
+
+.. math::
+
+    f(x) = \sum_{n \ge 1} e^{-\lambda}\frac{\lambda^n}{n!}\frac{x^{n\alpha-1}e^{-x/\beta}}{\Gamma(n\alpha)\beta^{{n\alpha}}}
+
+for :math:`x>0` and :math:`f(x)=\exp(-\lambda)`. The exact function shows the FFT method is very accurate.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import tweedie_convert, build, qd
+    from scipy.special import loggamma
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from pandas import option_context
+
+    a = build('agg Tw tweedie 10 1.01 1')
+    qd(a.describe)
+
+    @savefig tweedie_test_1.png
+    a.plot()
+
+A Tweedie with :math:`p` close to 1 is approximates a Poisson. Its gamma severity is very peaked around its mean (high :math:`\alpha` and offsetting small :math:`\beta`).
+
+The next function provides a transparent, if not maximally efficient, implementation of the Tweedie density.
+
+.. ipython:: python
+    :okwarning:
+
+    def tweedie_density(x, mean, p, disp):
+        pars = tweedie_convert(p=p, μ=mean, σ2=disp)
+        λ = pars['λ']
+        α = pars['α']
+        β = pars['β']
+        if x == 0:
+            return np.exp(-λ)
+        logl = np.log(λ)
+        logx = np.log(x)
+        logb = np.log(β)
+        logbase = -λ
+        log_term = 100
+        const = -λ - x / β
+        ans = 0.0
+        for n in range(1, 2000): #while log_term > -20:
+            log_term = (const  +
+                        + n * logl  +
+                        + (n * α - 1) * logx +
+                        - loggamma(n+1) +
+                        - loggamma(n * α) +
+                        - n * α * logb)
+            ans += np.exp(log_term)
+            if n > 20 and log_term < -227:
+                break
+        return ans
+
+
+The following graphs show that the FFT approximation is excellent, across a wide range, just as its good moment-matching performance suggests it would be.
+
+.. ipython:: python
+    :okwarning:
+
+    bit = a.density_df.loc[5:a.q(0.99):256, ['p']]
+    bit['exact'] = [tweedie_density(i, 10, 1.01, 1) for i in bit.index]
+    bit['p'] /= a.bs
+
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
+    ax0, ax1 = axs.flat
+
+    bit.plot(ax=ax0);
+    ax0.set(ylabel='density');
+    bit['err'] = bit.p / bit.exact - 1
+    bit.err.plot(ax=ax1);
+    @savefig tweedie_test_2.png
+    ax1.set(ylabel='relative error', ylim=[-1e-5, 1e-5]);
+

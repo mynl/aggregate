@@ -97,6 +97,7 @@ Guides marked *problem* are possible driving destinations, whereas *reference* g
     2_user_guides/2_x_mixtures
     2_user_guides/2_x_limits
     2_user_guides/2_x_vectorization
+    2_user_guides/2_x_reinsurance
     2_user_guides/2_x_tweedie
     2_user_guides/2_x_ir_pricing
     2_user_guides/2_x_re_pricing

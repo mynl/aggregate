@@ -235,7 +235,7 @@ def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
     """
     if approx_type == 'norm':
         sd = m*cv
-        if output=='scipy':
+        if output == 'scipy':
             return ss.norm(loc=m, scale=sd)
         sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
         agg_str += f'{sd} @ norm 1 # {m} '
@@ -243,28 +243,28 @@ def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
     elif approx_type == 'lognorm':
         mu, sigma = mu_sigma_from_mean_cv(m, cv)
         sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
-        if output=='scipy':
-            return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
+        if output == 'scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu))
         agg_str += f'{np.exp(mu)} * lognorm {sigma} '
 
     elif approx_type == 'gamma':
         shape = cv ** -2
         scale = m / shape
-        if output=='scipy':
+        if output == 'scipy':
             return ss.gamma(shape, scale=scale)
         sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
         agg_str += f'{scale} * gamma {shape} '
 
     elif approx_type == 'slognorm':
         shift, mu, sigma = sln_fit(m, cv, skew)
-        if output=='scipy':
-            return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
+        if output == 'scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
         sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
         agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
 
     elif approx_type == 'sgamma':
         shift, alpha, theta = sgamma_fit(m, cv, skew)
-        if output=='scipy':
+        if output == 'scipy':
             return ss.gamma(alpha, loc=shift, scale=theta)
         sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
         agg_str += f'{theta} * gamma {alpha} + {shift} '
@@ -294,7 +294,7 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     :param m:
     :param cv:
     :param skew:
-    :param p:
+    :param p: if > 1 converted to 1 - 10**-n
     :return:
     """
 
@@ -305,6 +305,9 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
 
     if np.isinf(cv):
         raise ValueError('Infinite variance passed to estimate_agg_percentile')
+
+    if p > 1:
+        p = 1 - 10 ** -p
 
     pn = pl = pg = 0
     if skew <= 0:
@@ -2745,7 +2748,7 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
 
     return ans
 
-def qd(*argv):
+def qd(*argv, accuracy=3):
     """
     Endless quest for a robust display format!
 
@@ -2754,13 +2757,13 @@ def qd(*argv):
     For use in documentation.
 
     """
-    ff = sEngFormatter(accuracy=1, min_prefix=0, max_prefix=12, align=True)
+    ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=True)
     for x in argv:
         if isinstance(x, pd.DataFrame):
             if x.shape[1] > 10:
                 # need denser format
-                ff = sEngFormatter(accuracy=1, min_prefix=0, max_prefix=12, align=False)
-            with pd.option_context('display.width', 110, 'display.float_format', ff):
+                ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=False)
+            with pd.option_context('display.width', 150, 'display.max_columns', 15, 'display.float_format', ff):
                 print(x)
             # print(x.to_string(formatters={c: f for c in x.columns}))
         elif isinstance(x, int):

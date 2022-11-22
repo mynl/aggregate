@@ -306,3 +306,21 @@ Create the same distribution without shorthand notation and using more basic ``a
                    ' sev dhistogram xps [1 2 3 4 5 6] [1/6 1/6 1/6 1/6 1/6 1/6]')
 
 
+Advantages of Modeling with Aggregate Distributions
+------------------------------------------------------
+
+KPW list seven advantages.
+
+1. Only the expected claim count changes with volume. The severity distribution is a characteristic of the line of business.
+
+2. Inflation hits ground-up severity but not claim count. The situation is more complicated when limits and deductibles apply.
+
+3. Coverage terms impact occurrence limits and deductibles, which affect severity.
+
+4. The impact on claims frequencies of changing deductibles is better understood.
+
+5. Severity curves can be estimated from homogeneous data. Kaplan-Meier and related methods can adjust for censoring and truncation caused by limits and deductibles.
+
+6. Retained, insured, ceded, and net losses can be modeled consistently.
+
+7. Understanding properties of frequency and severity separately illuminates the shape of the aggregate.

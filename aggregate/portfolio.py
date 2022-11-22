@@ -1001,21 +1001,25 @@ class Portfolio(object):
         df.loc['total', :] = df.sum()
         return df
 
-    def best_bucket(self, log2=16):
+    def best_bucket(self, log2=16, recommend_p=0.999):
         """
         Recommend the best bucket. Rounded recommended bucket for log2 points.
 
         TODO: Is this really the best approach?!
 
         :param log2:
+        :param recommend_p:
         :return:
         """
-        bs = sum([a.recommend_bucket(log2) for a in self])
+
+        # bs = sum([a.recommend_bucket(log2, p=recommend_p) for a in self])
+        bs = sum([a.recommend_bucket(log2, p=recommend_p) ** 2 for a in self]) ** 0.5
+
         return round_bucket(bs)
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, add_exa=True, force_severity=True, debug=False):
+               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, debug=False):
         """
 
         TODO: currently debug doesn't do anything...
@@ -1049,6 +1053,8 @@ class Portfolio(object):
         :param trim_df: remove unnecessary columns from density_df before returning
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
             epd info
+        :param force_severity: force computation of severities for aggregate components even when approximating
+        :param recommend_p: percentile to use for bucket recommendation.
         :return:
         """
 
@@ -1056,7 +1062,7 @@ class Portfolio(object):
             raise ValueError('log2 must be >= 0')
         self.log2 = log2
         if bs == 0:
-            self.bs = self.best_bucket(log2)
+            self.bs = self.best_bucket(log2, recommend_p)
             logger.info(f'bs=0 enterered, setting bs={bs:.6g} using self.best_bucket rounded to binary fraction.')
         else:
             self.bs = bs

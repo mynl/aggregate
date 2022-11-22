@@ -6,6 +6,10 @@ Other papers to review include :cite:t:`Hyndman1996` and :cite:t:`Denuit2019`.
 
 .. Use glob and star in contents. No caching!
 
+Any of the following problems:
+
+* Given frequency and severity compute the moments, distribution, approximate the distribution, compute anything from the distribution (layers, etc.)
+
 .. toctree::
     :maxdepth: 2
 

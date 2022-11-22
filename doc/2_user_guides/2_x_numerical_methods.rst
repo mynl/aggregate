@@ -11,7 +11,54 @@ Numerical Methods and FFT Convolution
 
 **See also.**  :ref:`aggregate <2_x_aggregate>`.
 
+Fast, Accurate, and Flexible
+------------------------------
+
+Numerical analysts face a trilemma
+
+   **Fast, accurate, and flexible: pick two!**
+
+
+
+Simulation methods are always flexible, but trade speed and accuracy. Fewer simulations is faster but provides lower accuracy; many simulations improves accuracy at the cost of speed.
+
+FFT-based methods provide speed and accuracy but at some cost in flexibility. Their accuracy is other-worldy compared to simulation, see REF.
+
+``aggregate`` relies on one-dimensional FFT methods which can **track only one variable** at a time. Thus, FFT-based methods can model
+
+* Gross, ceded, or net position
+* A sum of independent lines (other methods are available for correlation)
+* A sum of dependent lines, where the dependence structure is driven by common mixing variables.
+
+FFT-methods shine for thick tailed distributions where accuracy is important. For example:
+
+* Catastrophe risk PMLs, AEP, OEP points
+* Individual line pricing with underlying, e.g., large account retention with specific and aggregate covers.
+* Covers with low expected loss rates which are hard to simulate with sufficient accuracy.
+
+The downside is less flexibility. FFT-based methods cannot model the
+
+* Joint distribution of ceded and net loss.
+* Total cession to specific and aggregate covers because it requires the bivariate distribution. It can model the sum of the parts.
+
+Flexibility can be improved using higher dimensional FFT methods, for example to track ceded and net positions simultaneously, but they soon run afoul of the limits of practical computation. See CAS WP ref for an example using 2-dimensional FFTs.
+
+
+
+Other notes
+----------------
+
 How FFT works is technical appendix. Using it to compute aggs goes here.
+
+Emb Fr paper on moment matching
+
+KPW on moment matching p. 182.
+
+Panjer and Lutek [97] found that two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, the **rounding method and the first-moment method (p = 1) had similar errors**, while the second-moment method (p = 2) provided significant improvement. The specific formulas for the method of rounding and the method of matching the first moment are given in Appendix E. A reason to favor matching zero or one moment is that the resulting probabilities will always be **nonnegative**. When matching two or more moments, this cannot be guaranteed.
+
+The methods described here are qualitatively similar to numerical methods used to solve Volterra integral equations such as (9.26) developed in numerical analysis (see, e.g. Baker [10]).
+
+Ex 9.41 gives the formulas for weights in terms of LEVs.
 
 Parameters
 -----------
@@ -25,17 +72,48 @@ Parameters
 * numerical *fuzz*
 
 
+.. _sev calc:
 
-Discretizing Severity Distributions
------------------------------------
+Discretizing the Severity Distribution
+-------------------------------------------
 
-There are two simple ways to discretize a continuous distribution.
+Discretizing approximates the severity with a purely discrete distribution supported at points :math:`x_k=x_0+kb`, :math:`k=0,1,\dots, N`, where :math:`b` is called the **bucket size** or the **bandwidth**. The corresponding discrete probabilities can be computed in four ways.
 
-1. Approximate the distribution with a purely discrete distribution
-   supported at points :math:`x_k=x_0+kb`, :math:`k=0,1,\dots, N`. Call
-   :math:`b` the bucket size. The discrete probabilities are
-   :math:`p_k=P(x_k - b/2 < X \le x_k+b/2)`. To create a rv_histogram
-   variable from ``xs`` and corresponding ``p`` values use:
+#. The **round** or **discrete** method assigns probability
+
+   .. math:: p_k = \Pr(x_k - b/2 < X \le x_k+b/2)
+
+   to the :math:`k`th bucket.
+
+#. The **forward** difference assigns
+
+   .. math:: p_k = \Pr(x_k - b/2 < X \le x_{k+1} )
+
+#. The **backward** difference assigns
+
+   .. math:: p_k = \Pr(x_{k-1} - b/2 < X \le x_k )
+
+   with (?) :math:`p_0=0`.
+
+#. The **moment** difference (Gerber, KPW) assigns
+
+   .. math::
+
+      p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b} \\
+      p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b}
+
+   It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
+
+Call the discrete approximation :math:`X_b^d` where :math:`d=r,\ f,\ b,\ m` describes the discretization. It is clear that :math:`X_b` converges weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution using :math:`X` as severity for the rounding, forward and backward methods. Further, the rounding approximation is sandwiched between the forward and backwards methods (REF EF.p499).
+
+
+EF comment on moment method:
+
+   In this light, Gerber (1982) suggests a procedure that locally matches the first k moments. Practically interesting is only the case k = 1; for k ≥ 2 the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is much more involved than the rounding method in terms of implementation; we need to calculate limited expected values. Apart from that, the gain is rather modest; moment matching only pays off for large bandwidths, and after all, the rounding method is to be preferred. This is further reinforced by the work of Grübel and Hermesmeier (2000): if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{h,j} / h`, an approximation for the compound density, can be quadratically extrapolated.
+
+Need quad to work...bot not positive. Explore adjusting the first couple of buckets.
+
+To create a rv_histogram variable from ``xs`` and corresponding ``p`` values use:
 
    ::
 
@@ -43,28 +121,17 @@ There are two simple ways to discretize a continuous distribution.
        pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
        fz_discr = ss.rv_histogram((pss, xss))
 
-The value 1e-5 just needs to be smaller than the resolution requested,
-i.e. do not “split the bucket”. Generally histograms will be
-downsampled, not upsampled, so this is not a restriction.
+The value 1e-5 just needs to be smaller than the resolution requested, i.e. do not “split the bucket”. Generally histograms will be downsampled, not upsampled, so this is not a restriction.
 
-2. Approximate the distribution with a continuous “histogram”
-   distribution that is uniform on :math:`(x_k, x_{k+1}]`. The discrete
-   proababilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a
-   rv_histogram variable is much easier, just use:
+Continuous Approximation to Severity (Ogive)
+---------------------------------------------
 
-   ::
+Approximate the distribution with a continuous “histogram” distribution that is uniform on :math:`(x_k, x_{k+1}]`. The discrete proababilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a rv_histogram variable is much easier, just use::
 
-       xs2 = np.hstack((xs, xs[-1] + xs[1]))
-       fz_cts = ss.rv_histogram((ps2, xs2))
+    xs2 = np.hstack((xs, xs[-1] + xs[1]))
+    fz_cts = ss.rv_histogram((ps2, xs2))
 
-The first method we call **discrete** and the second **histogram**. The
-discrete method is appropriate when the distribution will be used and
-interpreted as fully discrete, which is the assumption the FFT method
-makes. The histogram method is useful if the distribution will be used
-to create a scipy.stats rv_histogram variable. If the historgram method
-is interpreted as discrete and if the mean is computed appropriately for
-a discrete variable as :math:`\sum_i p_k x_k`, then the mean will be
-under-estimated by :math:`b/2`.
+The first method we call **discrete** and the second **histogram**. The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes. The histogram method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the historgram method is interpreted as discrete and if the mean is computed appropriately for a discrete variable as :math:`\sum_i p_k x_k`, then the mean will be under-estimated by :math:`b/2`.
 
 
 

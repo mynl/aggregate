@@ -1034,7 +1034,11 @@ class Aggregate(Frequency):
         """
         Discretize the severity distributions and weight.
 
-        `sev_calc='continuous'` is used when you think of the resulting distribution as continuous across the buckets
+        ``sev_calc`` describes how the severity is discretize, see `Discretizing the Severity Distribution`_. The
+        options are discrete=round, forward, backward or moment.
+
+        ``sev_calc='continuous'`` (same as forward, kept for backwards compatibility) is used when
+        you think of the resulting distribution as continuous across the buckets
         (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X \le b_i)`.
         Note that :math:`b_{i-1}=-bs/2` is prepended.
 
@@ -1048,7 +1052,7 @@ class Aggregate(Frequency):
         other alternative is to use endpoint = 1 bucket beyond the last, which avoids this problem but can leave
         the probabilities short. We opt here for the latter and normalize (rescale).
 
-        `discretization_calc` controls whether individual probabilities are computed using backward-differences of
+        ``discretization_calc`` controls whether individual probabilities are computed using backward-differences of
         the survival function or forward differences of the distribution function, or both. The former is most
         accurate in the right-tail and the latter for the left-tail of the distribution. We are usually concerned
         with the right-tail, so prefer `survival`. Using `both` takes the greater of the two esimates giving the best
@@ -1057,7 +1061,7 @@ class Aggregate(Frequency):
 
         Sensible defaults: sev_calc=discrete, discretization_calc=survival, normalize=True.
 
-        :param sev_calc:  continuous or discrete or raw (for...);
+        :param sev_calc:  discrete=round, forward, backward, or continuous
                and method becomes discrete otherwise
         :param discretization_calc:  survival, distribution or both; in addition
                the method then becomes survival
@@ -1066,15 +1070,19 @@ class Aggregate(Frequency):
         :return:
         """
 
-        if sev_calc == 'continuous':
-            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
-        elif sev_calc == 'discrete':
+        if sev_calc == 'discrete' or sev_calc == 'round':
             # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
             # mass at the end undesirable. can be put in with reinsurance layer in spec
             # note the first bucket is negative
             adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
-        elif sev_calc == 'raw':
-            adj_xs = self.xs
+        elif sev_calc == 'forward' or sev_calc == 'continuous':
+            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs ))
+        elif sev_calc == 'backward':
+            adj_xs = np.hstack((-self.bs, self.xs[:-1], np.inf))
+        elif sev_calc == 'moment':
+            raise NotImplementedError('moment discretization not implemented')
+            #
+            # adj_xs = np.hstack((self.xs, np.inf))
         else:
             raise ValueError(
                 f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
@@ -1110,20 +1118,21 @@ class Aggregate(Frequency):
         ix = self.density_df.index.get_loc(x, 'nearest')
         return self.density_df.iat[ix, 0]
 
-    def update(self, log2=13, bs=0, debug=False, **kwargs):
+    def update(self, log2=13, bs=0, recommend_p=0.999, debug=False, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
 
         :param log2:
         :param bs:
+        :param recommend_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
         :param debug:
         :param kwargs:  passed through to update
         :return:
         """
         # guess bucket and update
         if bs == 0:
-            bs = round_bucket(self.recommend_bucket(log2))
+            bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
             if self.n > 100:
@@ -1202,7 +1211,7 @@ class Aggregate(Frequency):
                 logger.warning(f'Claim count {self.n} is high; consider an approximation ')
 
             if self.n == 0:
-                # for dynamics it is helpful to have a zero risk return zero appropriately
+                # for dynamics, it is helpful to have a zero risk return zero appropriately
                 # z = ft(self.sev_density, padding, tilt_vector)
                 self.agg_density = np.zeros_like(self.xs)
                 self.agg_density[0] = 1
@@ -1211,7 +1220,7 @@ class Aggregate(Frequency):
             else:
                 # usual calculation...this is where the magic happens!
                 # have already dealt with per occ reinsurance
-                # don't loose accuracy and time by going through this step if freq is fixed 1
+                # don't lose accuracy and time by going through this step if freq is fixed 1
                 # these are needed when agg is part of a portfolio
                 z = ft(self.sev_density, padding, tilt_vector)
                 self.ftagg_density = self.mgf(self.n, z)
@@ -2148,14 +2157,17 @@ class Aggregate(Frequency):
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
 
-    def recommend_bucket(self, log2=10, p=1-1e-6, verbose=False):
+    def recommend_bucket(self, log2=10, p=0.999, verbose=False):
         """
         Recommend a bucket size given 2**N buckets. Not rounded.
+
+        For thick tailed distributions need higher p, try p=1-1e-8.
 
         If no second moment, throws a ValueError. You just can't guess
         in that situation.
 
         :param log2: log2 of number of buckets. log2=10 is default.
+        :param p: percentile to use to determine needed range. Default is 0.999. if > 1 converted to 1-10**-n.
         :return:
         """
         N = 1 << log2

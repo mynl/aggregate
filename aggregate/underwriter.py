@@ -281,11 +281,10 @@ class Underwriter(object):
 
         Reasonable kwargs:
 
-        * **bs**
-        * **log2**
-        * **update** overrides class default
         * **add_exa** should port.add_exa add the exa related columns to the output?
 
+        :param log2:
+        :param bs:
         :param portfolio_program:
         :param update: override class default
         :param kwargs: passed to object's update method if update==True
@@ -474,7 +473,7 @@ class Underwriter(object):
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, log2=0, bs=0, log_level=None, **kwargs):
+    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.999, log_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -488,7 +487,8 @@ class Underwriter(object):
         :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
             and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
-        :param log_level:
+        :param log_level: temporary log(ger) level for this build
+        :param recommend_p: passed to recommend bucket functions. Increase (closer to 1) for thick tailed distributions.
         :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
         :return: created object(s)
         """
@@ -535,7 +535,7 @@ class Underwriter(object):
                     else:
                         log2_ = log2
                     if bs == 0:
-                        bs_ = round_bucket(answer.object.recommend_bucket(log2_))
+                        bs_ = round_bucket(answer.object.recommend_bucket(log2_, p=recommend_p))
                     else:
                         bs_ = bs
                     logger.info(f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} (1/{1/bs_}) and log2={log2_}')

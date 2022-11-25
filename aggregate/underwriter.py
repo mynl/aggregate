@@ -722,9 +722,9 @@ class Underwriter(object):
 
         """
 
-        return self.show(regex, kind='', plot=False, show=False)
+        return self.show(regex, kind='', plot=False, describe=False)
 
-    def show(self, regex, kind='agg', plot=True, show=True, logger_level=30):
+    def show(self, regex, kind='agg', plot=True, describe=True, logger_level=30):
         """
         Create from knowledge by name or match to name.
         Optionally plot. Returns the created object plus dataframe with more detailed information.
@@ -748,7 +748,8 @@ class Underwriter(object):
 
         :param regex: for filtering name
         :param kind: the kind of object, port, agg, etc.
-        :param plot:
+        :param plot:    if True, plot   (default True)
+        :param describe: if True, print the describe dataframe
         :param logger_level: work silently!
         :return: dictionary of created objects and DataFrame with info about each.
         """
@@ -763,7 +764,7 @@ class Underwriter(object):
         else:
             df = self.knowledge.loc[kind].filter(regex=regex, axis=0).copy()
 
-        if plot is False and show is False:
+        if plot is False and describe is False:
             # just act like a filtered listing on knowledge
             return df.sort_values('name')
 
@@ -785,15 +786,15 @@ class Underwriter(object):
             except NotImplementedError:
                 logger.error(f'skipping {n}...element not implemented')
             else:
-                if show:
-                    display(a)
+                if describe:
+                    display(a.describe)
                     display(HTML('<h4>Program</h4>'))
                     pprint(p)
                 if plot is True:
                     a.plot(figsize=(8, 2.4))
                     display(HTML('<h4>Density and Quantiles</h4>'))
                     show_fig(a.figure, format='svg')
-                if show:
+                if describe:
                     display(HTML('<br>'))
                 # info
                 if isinstance(a, Portfolio):

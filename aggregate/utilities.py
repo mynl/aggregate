@@ -2759,30 +2759,16 @@ def qd(*argv, accuracy=3, align=True, trim=True):
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
-    ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=align, trim=trim)
+    ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
             qd(x.describe, accuracy=accuracy)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
             print(f'log2 = {x.log2}, bs = {bss}')
         elif isinstance(x, pd.DataFrame):
-            # see if index is ints; this stops it being formatted as floats
-            x = x.copy()
-            try:
-                if np.allclose(x.index, x.index.astype(int)):
-                    num_digits = int(np.log10(np.max(x.index))) + 1
-                    num_commas = num_digits // 3
-                    num = num_commas + num_digits
-                    fmt_str = f'{{i:>{num},d}}'
-                    nm = x.index.name
-                    x.index = [fmt_str.format(i=i)  for i in x.index.astype(int)]
-                    x.index.name = nm
-                    # x.index = x.index.astype(int)
-            except TypeError:
-                pass
             if x.shape[1] > 10:
                 # need denser format
-                ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=False, trim=trim)
+                ff = sEngFormatter(accuracy=accuracy, min_prefix=0, max_prefix=12, align=False, trim=trim)
             with pd.option_context('display.width', 150, 'display.max_columns', 15, 'display.float_format', ff):
                 print(x)
             # print(x.to_string(formatters={c: f for c in x.columns}))
@@ -2869,7 +2855,7 @@ class sEngFormatter:
         21: "Z",
         24: "Y",
     }
-    regex = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)( *)$')
+    regex = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)([yzafpnμmkMGTPEZY]*)( *)$')
 
     def __init__(self, accuracy, min_prefix=-6, max_prefix=12, align=True, trim=True):
         self.accuracy = accuracy
@@ -2973,4 +2959,18 @@ class sEngFormatter:
             return str_x
 
     def regex_replace(self, x):
-        return f'{x[1]}.{x[2]}{" "*(len(x[3])+len(x[4]))}'
+        # x is a match object (1 before period, 2 after period, 3 trailing zeros, 4 prefix, 5 spaces)
+        # regex = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)([yzafpnμmkMGTPEZY]*)( *)$')
+
+        # return x  # f'{x[1]}.{x[2]}{x[4]}{" "*(len(x[3])+len(x[5]))}'
+        if len(x[4]) == 0:
+            # no prefix, kMGT etc.
+            return f'{x[1]}.{x[2]}{" "*(len(x[3])+len(x[5]))}'
+        else:
+            if x[2] == '':
+                # turns 2.M into 2.0M
+                # return f'{x[1]}.0{x[4]}{" "*(len(x[3])+len(x[5]))}'
+                # turns 2.M into 2M
+                return f'{x[1]}{x[4]}{" "*(1+len(x[3])+len(x[5]))}'
+            else:
+                return f'{x[1]}.{x[2]}{x[4]}{" "*(len(x[3])+len(x[5]))}'

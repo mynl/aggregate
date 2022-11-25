@@ -42,7 +42,7 @@ The observed mean (and standard deviation) of the number of claims and the indiv
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build, qd, MomentAggregator, round_bucket
+    from aggregate import build, qd, mv, MomentAggregator, round_bucket
     import scipy.stats as ss
     import pandas as pd
     import numpy as np
@@ -104,9 +104,8 @@ Determine the mean and standard deviation of total payments per employee.
                     'dfreq  [0:8] [0.05, 0.1, 0.15, 0.2, 0.25, 0.15, 0.06, 0.03, 0.01] '
                     'dsev [1:10] [0.15, 0.2, 0.25, 0.125, 0.075, 0.05, 0.05, 0.05, 0.025, 0.025]')
 
-    qd(kpw_9_5.describe)
-    print(f'mean     = {kpw_9_5.agg_m:.6g}\n'
-          f'variance = {kpw_9_5.agg_var:.7g}')
+    qd(kpw_9_5)
+    mv(kpw_9_5)
 
 The probability distributions are in the ``density_df`` dataframe.
 
@@ -137,7 +136,7 @@ that the ratio of aggregate claims to expected claims will exceed 3.0.
 
     kpw_9_19 = build('agg KPW.9.19 dfreq [0 1 3] [.5 .4 .1] '
                     'dsev [1 10] [.9 .1]')
-    qd(kpw_9_19.describe)
+    qd(kpw_9_19)
     m = kpw_9_19.agg_m
     print(f'mean        {m:.5g}\nprobability {kpw_9_19.sf(3 * m):.4g}')
 
@@ -152,8 +151,7 @@ Determine the probability that aggregate claims exceed 100.
 
     kpw_9_23 = build('agg KPW.9.23 dfreq [0:3] [1/2 1/5 1/5 1/10] '
                     'sev 3 * norm + 100')
-    qd(kpw_9_23.describe)
-
+    qd(kpw_9_23)
     qd(kpw_9_23.density_df.loc[90:110:64, ['p', 'F', 'S']])
 
 .. _exercise 9_24:
@@ -171,7 +169,7 @@ The employer purchases aggregate stop-loss coverage that limits the employer’s
     kpw_9_24 = build('agg KPW.9.24 dfreq [0:4] [1/16 1/4 3/8 1/4 1/16] '
                     'dsev [2 3] [0.4 0.6] '
                     'aggregate net of inf xs 5')
-    qd(kpw_9_24.describe)
+    qd(kpw_9_24)
 
     net = kpw_9_24.describe.iloc[-1, 1]
     print(f'\ngross loss    {kpw_9_24.agg_m:.5g}\nretained loss {net:.5g}\n'
@@ -199,8 +197,7 @@ claim.
                      'sev [1000 200] * uniform '
                      'occurrence ceded to inf xs 100 '
                      'poisson')
-    qd(kpw_9_31.describe)
-
+    qd(kpw_9_31)
     qd(kpw_9_31.reins_audit_df.stack(0).head(3))
 
 Could also compute impact of aggregate reinsurance structures.
@@ -215,7 +212,7 @@ Could also compute impact of aggregate reinsurance structures.
     kpw_9_34 = build('agg KPW.9.34 5 claims '
                      'dsev [1 5 10] [.8 .16 .04] '
                      'poisson')
-    qd(kpw_9_34.describe)
+    qd(kpw_9_34)
     print(f'{kpw_9_34.pmf(6):.6g}')
     kpw_9_34.density_df.index = kpw_9_34.density_df.index.astype(int)
     qd(kpw_9_34.density_df.query('p > 0.001')[['p', 'F', 'S']], accuracy=5)
@@ -236,9 +233,8 @@ Hence the mixing cv equals 0.25. The premium is the 95%ile of the aggregate dist
     kpw_9_35 = build('agg KPW.9.35 96 claims '
                      'sev 8 * uniform '
                      'mixed gamma 0.25')
-    qd(kpw_9_35.describe)
-    print(f'mean     = {kpw_9_35.agg_m:.6g}\n'
-          f'variance = {kpw_9_35.agg_var:,.3f}')
+    qd(kpw_9_35)
+    mv(kpw_9_35)
     appx = kpw_9_35.approximate('all')
     ans = {k: v.isf(0.05) for k, v in appx.items()}
     ans['FFT'] = kpw_9_35.q(0.95)
@@ -262,8 +258,8 @@ A matter of converting parameterizations. This is the ``scipy.stats`` ``burr12``
     kpw_9_36 = build('agg KPW.9.36 3 claims '
                      'sev 2 * burr12 1 3 '
                      'poisson')
-    qd(kpw_9_36.describe)
-    print(f'{kpw_9_36.agg_var:.6g}')
+    qd(kpw_9_36)
+    mv(kpw_9_36)
     @savefig burr.png
     kpw_9_36.plot()
 
@@ -284,7 +280,7 @@ Figure the weighted severity by hand.
     kpw_9_9 = build('agg KPW.9.9 3 claims '
                      'dsev [1 2 3] [1.9/3 .8/3 .3/3] '
                      'poisson')
-    qd(kpw_9_9.describe)
+    qd(kpw_9_9)
     print(f'{kpw_9_9.pmf(2):.6g}')
     kpw_9_9.density_df.index = kpw_9_9.density_df.index.astype(int)
     bit = kpw_9_9.density_df.query('p > 0.001')[['p', 'F', 'S']]
@@ -301,7 +297,7 @@ Alternatively, use the :class:`Portfolio` class.
     p = build('port KPW.9.9.p '
               'agg A 2 claims dsev [1 2] [.6 .4] poisson '
                'agg B 1 claims dsev [1 3] [.7 .3] poisson')
-    qd(p.describe)
+    qd(p)
 
 .. _exercise 9_39:
 
@@ -314,7 +310,7 @@ Assume 1.2 expected claims. Work in hundreds.
 
     kpw_9_39 = build('agg KPW.9.39 1.2 claims '
                      'sev expon binomial 0.4')
-    qd(kpw_9_39.describe)
+    qd(kpw_9_39)
     print(f'probability = {kpw_9_39.cdf(3):.6g}')
 
 .. _exercise 9_40:
@@ -330,7 +326,7 @@ Must use a :class:`Portfolio`. Work in thousands.
                      '\tagg A 50 claims dsev [10] poisson\n'
                      '\tagg B 60 claims dsev [20] poisson\n'
                      '\tagg C 30 claims dsev [40] poisson\n')
-    qd(kpw_9_40.describe)
+    qd(kpw_9_40)
     qd(pd.Series({'expected payment': kpw_9_40.agg_m,
                  'sd payment': kpw_9_40.agg_sd,
                  'Pr > 3000': kpw_9_40.sf(3000)}).to_frame('value'),
@@ -365,8 +361,7 @@ TODO implement ZM and ZT.
 
     kpw_9_45 = build('agg KPW.9.45 6 claims '
                      'dsev [1 2 4] poisson')
-    qd(kpw_9_45.describe)
-    kpw_9_45.density_df.index = kpw_9_45.density_df.index.astype(int)
+    qd(kpw_9_45)
     qd(kpw_9_45.density_df.query('p > 0.001')[['p', 'F', 'S']], accuracy=5)
 
 
@@ -378,9 +373,8 @@ For a premium of 6, an insurer covers aggregate claims and agrees to pay a divid
 
     kpw_9_47 = build('agg KPW.9.47 2 claims '
                      'dsev [1 2] [1/4 3/4] poisson')
-    qd(kpw_9_47.describe)
+    qd(kpw_9_47)
 
-    kpw_9_47.density_df.index = kpw_9_47.density_df.index.astype(int)
     bit = kpw_9_47.density_df.query('p > 0')[['p', 'F', 'S']]
     bit['dividend'] = np.maximum(0.75 * 6 - bit.index, 0)
     qd(bit.head(10), accuracy=4)
@@ -406,15 +400,14 @@ CV = sqrt(1/6)
 
     kpw_9_57 = build('agg KPW.9.57 3 claims '
                      'dsev [1:4] [.4 .3 .2 .1] poisson')
-    qd(kpw_9_57.describe)
+    qd(kpw_9_57)
     kpw_9_58 = build('agg KPW.9.58 3 claims '
                      'dsev [1:4] [.4 .3 .2 .1] mixed gamma 6**-0.5')
-    qd(kpw_9_58.describe)
+    qd(kpw_9_58)
 
     bit = pd.concat((kpw_9_57.density_df[['p', 'F', 'S']],
                      kpw_9_58.density_df[['p', 'F', 'S']]),
                     keys=('Po', 'NB'), axis=1)
-    bit.index = bit.index.astype(int)
     qd(bit.head(16), accuracy=5)
 
 .. _exercise 9_59:
@@ -427,7 +420,7 @@ CV = sqrt(1/6)
     kpw_9_59 = build('agg KPW.9.59 5 claims '
                      'sev 2500 * gamma 0.5 '
                      'poisson')
-    qd(kpw_9_59.describe)
+    qd(kpw_9_59)
     print(f'pr(loss >= 20000) = {kpw_9_59.sf(20000):.6g}')
 
 
@@ -456,7 +449,7 @@ The covered layer is 18 xs 6, in which the insured pays 25% because of the coins
                      'sev 10 * pareto 4 - 10 ! '
                      'occurrence net of 0.25 so inf xs 0 '
                      'poisson')
-    qd(kpw_9_14.describe)
+    qd(kpw_9_14)
     print(f'variance = {kpw_9_14.describe.iloc[-1,[1, 4]].prod()**2:.6g}\ncomputed with bs=1/{1/kpw_9_14.bs:.0f} and log2={kpw_9_14.log2}')
     qd(kpw_9_14.density_df.loc[[0, 1, 2, 3], ['p', 'F', 'S']])
     @savefig kpw_9_14.png
@@ -486,10 +479,8 @@ Negative binomial :math:`c=1/2` and hence mixing cv :math:`\sqrt{c}`, and the me
                      '125 xs 50 '
                      'sev 100 * gamma 2 ! '
                      'mixed gamma 2**-0.5')
-    qd(kpw_9_63.describe)
-    qd(f'bs = 1/{1/kpw_9_63.bs:.0f}')
-    print(f'mean     = {kpw_9_63.agg_m:.6g}\n'
-          f'variance = {kpw_9_63.agg_var:,.6f}')
+    qd(kpw_9_63)
+    mv(kpw_9_63)
     qd(kpw_9_63.density_df.loc[:400:40*64,
         ['p', 'F', 'S', 'p_sev', 'F_sev', 'S_sev']],
         accuracy=5)
@@ -500,7 +491,7 @@ Next, calculations performed with the requested broader ``bs=40``.
     :okwarning:
 
     kpw_9_63.update(log2=8, bs=40)
-    qd(kpw_9_63.describe)
+    qd(kpw_9_63)
     qd(kpw_9_63.density_df.loc[:400,
         ['p', 'F', 'S', 'p_sev', 'F_sev', 'S_sev']],
         accuracy=5)
@@ -526,9 +517,8 @@ The :class:`Portfolio` solution, working in thousands.
                       'agg B 0.25 claims '
                           'dsev [75 150] [0.7 0.3] '
                           'binomial 0.01 ')
-    qd(kpw_9_15p.describe)
-    print(f'mean     = {kpw_9_15p.agg_m:.6g}\n'
-          f'variance = {kpw_9_15p.agg_var:,.6f}')
+    qd(kpw_9_15p)
+    mv(kpw_9_15p)
 
 
 The ``density_df`` dataframe contains the exact aggregate distribution, which is not easy to compute by other means. KPW says (emphasis added)
@@ -546,9 +536,8 @@ However, the sum of binomials is not binomial, and so the frequencies can't be i
                      'dsev [50 75 100 150] '
                      '[0.35/0.75, 0.175/0.75, 0.15/0.75, 0.075/0.75] '
                      'binomial 0.01 ')
-    qd(kpw_9_15w.describe)
-    print(f'mean     = {kpw_9_15w.agg_m:.6g}\n'
-          f'variance = {kpw_9_15w.agg_var:,.3f}')
+    qd(kpw_9_15w)
+    mv(kpw_9_15w)
 
 The compound Poisson approximation matches the mean but its variance is slightly off.
 
@@ -560,9 +549,8 @@ The compound Poisson approximation matches the mean but its variance is slightly
                      'dsev [50 75 100 150] '
                      '[0.35/0.75, 0.175/0.75, 0.15/0.75, 0.075/0.75] '
                      'poisson ')
-    qd(kpw_9_15cp.describe)
-    print(f'mean     = {kpw_9_15cp.agg_m:.6g}\n'
-          f'variance = {kpw_9_15cp.agg_var:,.3f}')
+    qd(kpw_9_15cp)
+    mv(kpw_9_15cp)
 
 Comparing probabilities shows that all three distributions are very close.
 
@@ -576,7 +564,6 @@ Comparing probabilities shows that all three distributions are very close.
                     keys=('exact', 'compound Po', 'wrong'), axis=1).rename(columns={'p_total': 'p'})
     bit = bit.droplevel(1, axis=1)
     bit.index.name = 'loss'
-    bit.index = bit.index.astype(int)
     qd(bit, accuracy=5)
 
 .. _example 9_16 and 9_17:
@@ -707,10 +694,8 @@ Here are the FFT-exact, and various approximations to the required probability. 
 
     kpw_9_16p = Portfolio('KPW.9.16p', a)
     kpw_9_16p.update(log2=8, bs=1, remove_fuzz=True)
-    qd(kpw_9_16p.describe)
-    print(f'mean     = {kpw_9_16p.agg_m:.6g}\n'
-          f'variance = {kpw_9_16p.agg_var:,.3f}')
-
+    qd(kpw_9_16p)
+    mv(kpw_9_16p)
     appx = kpw_9_16p.approximate('all')
     premium = 1.45 * kpw_9_16p.agg_m
     ans = {k: v.sf(premium) for k, v in appx.items()}
@@ -733,7 +718,7 @@ Here is a sample from the distribution and the mean-matched compound Poisson (fo
                        f'{df.q.sum()} claims '
                        f'dsev {sev.Benefit.values /  1000} {sev.q.values} '
                        'poisson', bs=1, log2=10)
-    qd(kpw_9_16cp.describe)
+    qd(kpw_9_16cp)
     bit = pd.concat((kpw_9_16p.density_df.query('p_total > 0')[['p_total', 'F', 'S']],
                      kpw_9_16cp.density_df.query('p_total > 0')[['p_total', 'F', 'S']]),
                     keys=['exact', 'comp Po'], axis=1)
@@ -827,7 +812,7 @@ Next, build the exact solution for the gross book as a :class:`Portfolio` (extra
 
     p = Portfolio('KPW.9.73p', a)
     p.update(log2=10, bs=1, remove_fuzz=True)
-    qd(p.describe)
+    qd(p)
 
 Build the reinsurer's loss distribution exactly, as ``p_ceded``, a :class:`Portfolio`, and the compound Poisson approximation ``cp_ceded``, an :class:`Aggregate`. The temporary variable ``bit`` is used to calculate the mixed severity distribution.
 
@@ -841,7 +826,7 @@ Build the reinsurer's loss distribution exactly, as ``p_ceded``, a :class:`Portf
 
     p_ceded = Portfolio('KPW.9.73pc', a_ceded)
     p_ceded.update(log2=10, bs=1, remove_fuzz=True)
-    qd(p_ceded.describe)
+    qd(p_ceded)
 
     bit = df.query('Benefit > 100000')
     bit['Claims'] = bit.q * bit.Number
@@ -850,7 +835,7 @@ Build the reinsurer's loss distribution exactly, as ``p_ceded``, a :class:`Portf
                      f'{bit.Claims.sum()} claims '
                      f'dsev [1 2] [0.9 0.1] '
                      'poisson')
-    qd(cp_ceded.describe)
+    qd(cp_ceded)
 
 Compute the various estimated premiums, the 95%iles of the aggregate loss distribution.
 
@@ -878,9 +863,8 @@ Compute the various estimated premiums, the 95%iles of the aggregate loss distri
                       'agg A 10. claims sev  500 * expon binomial 0.02 '
                       'agg B 7.5 claims sev  750 * expon binomial 0.03 '
                       'agg C 10. claims sev 1000 * expon binomial 0.04 ')
-    qd(kpw_9_74p.describe)
-    print(f'mean     = {kpw_9_74p.agg_m:.9g}\n'
-          f'variance = {kpw_9_74p.agg_var:,.3f}')
+    qd(kpw_9_74p)
+    mv(kpw_9_74p)
 
 Compound Poisson approximation is easy to construct as a mixture.
 
@@ -888,6 +872,5 @@ Compound Poisson approximation is easy to construct as a mixture.
     :okwarning:
 
     kpw_9_74cp = build('agg KPW.9.74.cp [10 7.5 10] claims sev [500 750 1000] * expon poisson')
-    qd(kpw_9_74cp.describe)
-    print(f'mean     = {kpw_9_74cp.agg_m:.9g}\n'
-          f'variance = {kpw_9_74cp.agg_var:,.3f}')
+    qd(kpw_9_74cp)
+    mv(kpw_9_74cp)

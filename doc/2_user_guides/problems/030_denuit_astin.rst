@@ -13,7 +13,7 @@ Poisson/Discrete Example (6.1)
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build
+    from aggregate import build, qd
 
     p = build('''
     port Denuit6.1
@@ -22,7 +22,7 @@ Poisson/Discrete Example (6.1)
         agg P3 0.10 claims dsev [1 2 3 4] [.1  .2  .4 .3] poisson
         agg P4 0.10 claims dsev [1 2 3 4] [.15 .25 .3 .3] poisson
     ''', bs=1, log2=10)
-    p
+    qd(p)
 
 Computation of :math:`\mathsf{E}[X_i\mid X=x]` and :math:`\mathsf{E}[X_i\mid X=x]/x` as a function of :math:`x`.
 The first function, called :math:`\kappa_i(x)` in PIR, is computed automatically by the :class:`portfolio` class as
@@ -54,16 +54,14 @@ All the values are available as a table. These are consistent with numbers menti
         lambda x: x / bit.loss.to_numpy(), axis=0)
     b.index = b.index.astype(int)
     b.index.name = 'a'
-    with option_context('display.float_format', lambda x: f'{x:.4f}'):
-        print(b)
+    qd(b)
 
 Proportion of expected loss by unit.
 
 .. ipython:: python
 
     bb = p.describe.xs('Agg', axis=0, level=1)[['E[X]']]
-    with option_context('display.float_format', lambda x: f'{x:.4f}'):
-        print(bb / bb.iloc[-1,0])
+    qd(bb / bb.iloc[-1,0])
 
 
 

@@ -11,7 +11,7 @@ Consider a :math:`\mathit{Po}(\lambda)\vee\mathit{Pareto}(\alpha, \beta)`, :math
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build
+    from aggregate import build, qd
     from pandas import option_context
 
     alpha = 4
@@ -21,8 +21,7 @@ Consider a :math:`\mathit{Po}(\lambda)\vee\mathit{Pareto}(\alpha, \beta)`, :math
               f'sev {beta} * pareto {alpha} - {beta} '
                'poisson', bs=1/8, log2=8, padding=0, normalize=False)
 
-    with option_context('display.float_format', lambda x: f'{x:.4g}', 'display.width', 120):
-        print(a.describe)
+    qd(a)
 
 The last dataframe shows poor accuracy. Try different ways to compute the aggregate: padding, tilting, and more buckets.
 
@@ -45,8 +44,7 @@ The last dataframe shows poor accuracy. Try different ways to compute the aggreg
     a.update(bs=1/32, log2=16, padding=1, normalize=False)
     bit = a.density_df[['p_total']].rename(columns={'p_total': 'log2 16, pad 1, tilt 0'})
 
-    with option_context('display.float_format', lambda x: f'{x:.4g}', 'display.width', 120):
-        print(a.describe)
+    qd(a)
 
 The last dataframe shows a good approximation.
 
@@ -107,5 +105,4 @@ This example replicates parts of Table 1. As well as the 99.9%ile it shows the 9
         ans.append([log2, 1/bs, a.q(0.999), a.q(1-1e-6)])
 
     df = pd.DataFrame(ans, columns=['log2', '1/bs', 'p999', 'p999999'])
-    with pd.option_context('display.float_format', lambda x: f'{x:.4g}', 'display.width', 120):
-        print(df)
+    qd(df, accuracy=4)

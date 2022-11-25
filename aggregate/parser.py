@@ -69,10 +69,10 @@ class UnderwritingLexer(Lexer):
     # per manual, need to list longer tokens before shorter ones
     # simple but effective notes
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
+    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
+    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
     # PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed' # |empirical'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?' # |empirical'
     DISTORTION = 'dist(ortion)?'
 
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.

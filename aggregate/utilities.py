@@ -2748,7 +2748,7 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
 
     return ans
 
-def qd(*argv, accuracy=3):
+def qd(*argv, accuracy=3, align=True, trim=True):
     """
     Endless quest for a robust display format!
 
@@ -2757,12 +2757,32 @@ def qd(*argv, accuracy=3):
     For use in documentation.
 
     """
-    ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=True)
+    from .distributions import Aggregate
+    from .portfolio import Portfolio
+    ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=align, trim=trim)
     for x in argv:
-        if isinstance(x, pd.DataFrame):
+        if isinstance(x, (Aggregate, Portfolio)):
+            qd(x.describe, accuracy=accuracy)
+            bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
+            print(f'log2 = {x.log2}, bs = {bss}')
+        elif isinstance(x, pd.DataFrame):
+            # see if index is ints; this stops it being formatted as floats
+            x = x.copy()
+            try:
+                if np.allclose(x.index, x.index.astype(int)):
+                    num_digits = int(np.log10(np.max(x.index))) + 1
+                    num_commas = num_digits // 3
+                    num = num_commas + num_digits
+                    fmt_str = f'{{i:>{num},d}}'
+                    nm = x.index.name
+                    x.index = [fmt_str.format(i=i)  for i in x.index.astype(int)]
+                    x.index.name = nm
+                    # x.index = x.index.astype(int)
+            except TypeError:
+                pass
             if x.shape[1] > 10:
                 # need denser format
-                ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=False)
+                ff = sEngFormatter(accuracy=accuracy-2, min_prefix=0, max_prefix=12, align=False, trim=trim)
             with pd.option_context('display.width', 150, 'display.max_columns', 15, 'display.float_format', ff):
                 print(x)
             # print(x.to_string(formatters={c: f for c in x.columns}))
@@ -2772,6 +2792,29 @@ def qd(*argv, accuracy=3):
             print(ff(x))
         else:
             print(x)
+
+
+def mv(x, y=None):
+    """
+    Nice display of mean and variance for Aggregate or Portfolios or
+    entered values.
+
+    R style function, no return value.
+
+    :param x: Aggregate or Portfolio or float
+    :param y: float, if x is a float
+    :return: None
+    """
+    from .distributions import Aggregate
+    from .portfolio import Portfolio
+    if y is None and isinstance(x, (Aggregate, Portfolio)):
+        print(f'mean     = {x.agg_m:.6g}')
+        print(f'variance = {x.agg_var:.7g}')
+        print(f'std dev  = {x.agg_var**.5:.6g}')
+    else:
+        print(f'mean     = {x:.6g}')
+        print(f'variance = {y:.7g}')
+        print(f'std dev  = {y**.5:.6g}')
 
 
 class sEngFormatter:
@@ -2787,10 +2830,23 @@ class sEngFormatter:
     Converts to scientific notation outside (smaller) range of prefixes.
     Uses same number of significant digits?
 
-    Tester::
-        test = [1.23456789 * 10**n for n in range(-20,20)]
+    Testers::
+
+        sef1 = sEngFormatter(accuracy=5, min_prefix=0, max_prefix=12, align=True, trim=True)
+        sef2 = sEngFormatter(accuracy=5, min_prefix=0, max_prefix=12, align=False, trim=True)
+        sef3 = sEngFormatter(accuracy=5, min_prefix=0, max_prefix=12, align=True, trim=False)
+        sef4 = sEngFormatter(accuracy=5, min_prefix=0, max_prefix=12, align=False, trim=False)
+        test = [1.234 * 10**n for n in range(-20,20)]
         test = [-i for i in test] + test
-        [sEngFormatter(1, -3, 9)(i) for i in test]
+        for sef in [sef1, sef2, sef3, sef4]:
+            print('\n'.join([sef(i) for i in test]))
+            print('\n\n')
+        print('===============')
+        test = [1.234 * 10**n + 3e-16 for n in range(-20,20)]
+        test = [-i for i in test] + test
+        for sef in [sef1, sef2, sef3, sef4]:
+            print('\n'.join([sef(i) for i in test]))
+
     """
 
     # The SI engineering prefixes
@@ -2813,10 +2869,12 @@ class sEngFormatter:
         21: "Z",
         24: "Y",
     }
+    regex = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)( *)$')
 
-    def __init__(self, accuracy, min_prefix=-6, max_prefix=12, align=True):
+    def __init__(self, accuracy, min_prefix=-6, max_prefix=12, align=True, trim=True):
         self.accuracy = accuracy
         self.align = align
+        self.trim = trim
         self.ENG_PREFIXES = {k: v for k, v in sEngFormatter.ENG_PREFIXES.items() if min_prefix <= k <= max_prefix}
 
     def __call__(self, num):
@@ -2861,26 +2919,32 @@ class sEngFormatter:
             sci = True
 
         if sci:
-            if 0.01 <= dnum <= 10:
-                format_str = f'{{dnum: .{self.accuracy + 2}f}}'
+            if 0.01 <= dnum < 10:
+                # in this case need the max ex_acc=2 to get the right number of sig figs
+                if self.align:
+                    format_str = f"{{dnum: {(7 + self.accuracy + 2)}.{self.accuracy + 2:d}f}} "
+                else:
+                    format_str = f'{{dnum: .{self.accuracy + 2}f}}'
+                formatted = format_str.format(dnum=sign * dnum)
+                formatted = self.remove_trailing_zeros(formatted, num, self.accuracy + 2)
             else:
                 format_str = f'{{dnum: .{self.accuracy + 2}e}}'
-            formatted = format_str.format(dnum=sign * dnum)
-            formatted = remove_trailing_zeros(formatted)
+                formatted = format_str.format(dnum=sign * dnum)
         else:
-            prefix = self.ENG_PREFIXES[int_pow10]
-
+            prefix = self.ENG_PREFIXES.get(int_pow10, ' ')
             mant = sign * dnum / (10**pow10)
             if self.align:
                 if self.accuracy + ex_acc == 0:
+                    # if .0f then you don't get the period. hence have to add that, width 6 + . = 7
                     format_str = f"{{mant: 6.0f}}.{{prefix}}"
                 else:
                     format_str = f"{{mant: {(7+self.accuracy+ex_acc)}.{self.accuracy + ex_acc:d}f}}{{prefix}}"
-                    # format_str = f"{{mant: .{self.accuracy + ex_acc:d}f}}{{prefix}}"
+                formatted = format_str.format(mant=mant, prefix=prefix)
+                formatted = self.remove_trailing_zeros(formatted, num, self.accuracy + ex_acc)
             else:
-                    format_str = f"{{mant: .{self.accuracy:d}f}}{{prefix}}"
-            formatted = format_str.format(mant=mant, prefix=prefix)
-            formatted = remove_trailing_zeros(formatted)
+                format_str = f"{{mant: .{self.accuracy:d}f}}{{prefix}}"
+                formatted = format_str.format(mant=mant, prefix=prefix)
+                formatted = self.remove_trailing_zeros(formatted, num, self.accuracy)
             if ex_acc == 0:
                 formatted += '  '
             elif ex_acc == 1:
@@ -2888,7 +2952,25 @@ class sEngFormatter:
 
         return formatted
 
-def remove_trailing_zeros(x):
-    r = re.compile(r'^([^.]*?)\.([0-9]*?)(0+)$')
-    f = lambda x: f'{x[1]}.{x[2]}{" "*len(x[3])}'
-    return r.sub(f, x)
+    def remove_trailing_zeros(self, str_x, x, dps):
+        """
+        Remove trailing zeros from a string representation ``str_x`` of a number ``x``.
+        The number of decimal places is ``dps``. If the number is in scientific notation
+        then there is no change.  Eg with dps == 3, 1.2000 becomes 1.2, 1.000 becomes 1,
+        but 1.200 when x=1.20000001 is unchanged.
+
+        """
+        if self.trim is True:
+            if abs(x - np.round(x, dps)) < 5 * np.finfo(float).eps:
+                try:
+                    return self.regex.sub(self.regex_replace, str_x)
+                except TypeError as e:
+                    print(e)
+                    return str_x
+            else:
+                return str_x
+        else:
+            return str_x
+
+    def regex_replace(self, x):
+        return f'{x[1]}.{x[2]}{" "*(len(x[3])+len(x[4]))}'

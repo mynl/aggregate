@@ -112,7 +112,7 @@ class Frequency(object):
         self.freq_p0 = freq_p0
 
         if freq_zm is True:
-            # add implemented methdods here....
+            # add implemented methods here....
             if freq_name not in ('poisson', 'gamma'):
                 raise NotImplementedError(f'Zero modification not implemented for {freq_name}')
 
@@ -202,6 +202,22 @@ class Frequency(object):
                 θ = κ * c
                 λ = n / κ  # poisson parameter for number of claims
                 return np.exp(λ * ((1 - θ * (z - 1)) ** -a - 1))
+
+        elif self.freq_name in ['neyman', 'neymana', 'neymanA']:
+            # Neyman A, Panjer Willmot green book. p. 324?
+            m2 = self.freq_a  # number of outcomes per cluster, mean n = m1 m2
+            def _freq_moms(n):
+                # central
+                # freq_2 = n * (1 + m2)
+                # freq_3 = n * (1 + m2 * (3 + m2))
+                # non central
+                freq_2 = n * ((1 + m2) + n)
+                freq_3 = n * ((1 + m2 * (3 + m2)) + 3 * freq_2 - 2 * n ** 2)
+                return n, freq_2, freq_3
+
+            def mgf(n, z):
+                m1 = n / m2
+                return np.exp(m1 * (np.exp(m2 * (z - 1)) - 1))
 
         elif self.freq_name == 'empirical':
             # stated en here...need to reach up to agg to set that?!
@@ -949,7 +965,9 @@ class Aggregate(Frequency):
         # return f'{super(Aggregate, self).__repr__()} name: {self.name}'
 
         s = [self.info]
-        with pd.option_context('display.width', 200, 'display.float_format', lambda x: f'{x:,.5g}'):
+        with pd.option_context('display.width', 200,
+                               'display.max_columns', 15,
+                               'display.float_format', lambda x: f'{x:,.5g}'):
             # get it on one row
             s.append(str(self.describe))
         # s.append(super().__repr__())

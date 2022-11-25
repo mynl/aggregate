@@ -447,7 +447,9 @@ class Underwriter(object):
         :return:
         """
 
-        kind, name = buildinid.split('.')
+        # allow for sev.WC.1 name
+        kind, *name = buildinid.split('.')
+        name = '.'.join(name)
         try:
             # lookup in Underwriter
             answer = self[(kind, name)]

@@ -35,6 +35,7 @@ Parametric Frequency
 * ``binomial SHAPE``, the shape determines :math:`p` and :math:`n=\mathsf{E}[N]/p`.
 * ``pascal SHAPE1 SHAPE2`` (the generalized Poisson-Pascal, see REF), where ``SHAPE1``
   gives the cv and ``SHAPE2`` the number of claims per occurrence.
+* ``neyman SHAPE`` (nor ``neymana`` or ``neymanA``), the Neyman A Poisson-compound Poisson. The shape variable gives the average number of claimants per claim. See JKK. REF
 
 Mixed Frequency
 ~~~~~~~~~~~~~~~~

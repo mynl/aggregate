@@ -21,8 +21,7 @@ The other models use ``log2=10``, no padding, and varying amounts of tilting.
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build
-    from pandas import option_context
+    from aggregate import build, qd
     from scipy.stats import levy
 
     a = build('agg L 20 claim sev levy poisson', update=False)
@@ -55,8 +54,7 @@ The other models use ``log2=10``, no padding, and varying amounts of tilting.
             tilt = 0
         df[f'tilt {tilt:.4f}'] = a.density_df.loc[[1, 10, 100, 1000], ['p_total']]/a.bs
 
-    with option_context('display.float_format', lambda x: f'{x:.3e}', 'display.width', 120):
-        display(df.iloc[:, [1,0,2,3,4, 5]])
+    qd(df.iloc[:, [1,0,2,3,4, 5]], accuracy=3)
 
 This table is identical to the table shown in the paper.
 

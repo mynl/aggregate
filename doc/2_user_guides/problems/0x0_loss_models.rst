@@ -23,6 +23,7 @@ Contents
 * :ref:`Exercise 9.45  <exercise 9_45>`
 * :ref:`Exercise 9.57 and 58  <exercise 9_57 and 9_58>`
 * :ref:`Exercise 9.59  <exercise 9_59>`
+* :ref:`Exercise 9.60  <exercise 9_60>`
 * :ref:`Example 9.14  <example 9_14>`
 * :ref:`Exercise 9.63  <exercise 9_63>`
 * :ref:`Example 9.15 and 18  <example 9_15 and 9_18>`
@@ -431,6 +432,24 @@ Repeated at the requested span of 100.
 
     kpw_9_59.update(log2=10, bs=100)
     print(f'pr(loss >= 20000) = {kpw_9_59.sf(20000):.6g}')
+
+
+.. _exercise 9_60:
+
+**Exercise 9.60.** An individual has purchased health insurance, for which they pay 10 for each physician visit and 5 for each prescription. The probability that a payment will be 10 is 0.25, and the probability that it will be 5 is 0.75. The total number of payments per year has the Poisson–Poisson (Neyman Type A) distribution with primary mean 10 and secondary mean 4. Determine the probability that total payments in one year will exceed 400. Compare your answer to a normal approximation.
+
+.. ipython:: python
+    :okwarning:
+
+    kpw_9_60 = build('agg KPW.9.60 40 claims '
+                     'dsev [5 10] [3/4 1/4] '
+                     'neyman 4')
+    qd(kpw_9_60)
+
+    fz = kpw_9_60.approximate('norm')
+    print(f'FFT            {kpw_9_60.sf(400):.5g}\n'
+          f'Normal approx  {fz.sf(400):.5g}')
+
 
 .. _example 9_14:
 

@@ -604,7 +604,6 @@ class Aggregate(Frequency):
 
         # reins = self.occ_reins if kind == 'occ' else self.agg_reins
 
-        # TODO what about agg?
         if kind == 'occ':
             if self.sev_gross_density is None:
                 self.sev_gross_density = self.sev_density

@@ -1233,6 +1233,40 @@ def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=N
                     index=['μ', 'p', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
     return ans
 
+
+def tweedie_density(x, *, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
+    """
+    Exact density of Tweedie distribution from series expansion.
+    Use any parameterization and convert between them with Tweedie convert.
+    Coded for clarity and flexibility not speed. See ``tweedie_convert``
+    for parameterization.
+
+    """
+    pars = tweedie_convert(p=p, μ=μ, σ2=σ2, λ=λ, α=α, β=β, m=m, cv=cv)
+    λ = pars['λ']
+    α = pars['α']
+    β = pars['β']
+    if x == 0:
+        return np.exp(-λ)
+    # reasonable max n from normal approx to Poisson
+    maxn = λ + 4 * λ ** 0.5
+    logl = np.log(λ)
+    logx = np.log(x)
+    logb = np.log(β)
+    const = -λ - x / β
+    ans = 0.0
+    for n in range(1, 2000):
+        log_term = (const +
+                    + n * logl +
+                    + (n * α - 1) * logx +
+                    - loggamma(n+1) +
+                    - loggamma(n * α) +
+                    - n * α * logb)
+        ans += np.exp(log_term)
+        if n > maxn or (n >λ and log_term < -227):
+            break
+    return ans
+
 def power_variance_family():
     """
     Graph to illustrate the power variance exponential family distributions.
@@ -2796,7 +2830,7 @@ def mv(x, y=None):
     if y is None and isinstance(x, (Aggregate, Portfolio)):
         print(f'mean     = {x.agg_m:.6g}')
         print(f'variance = {x.agg_var:.7g}')
-        print(f'std dev  = {x.agg_var**.5:.6g}')
+        print(f'std dev  = {x.agg_sd:.6g}')
     else:
         print(f'mean     = {x:.6g}')
         print(f'variance = {y:.7g}')

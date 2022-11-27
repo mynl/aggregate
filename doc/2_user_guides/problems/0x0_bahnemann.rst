@@ -6,8 +6,8 @@ Contents
 
 Chapter 4: Aggregate Claims
 
-* :ref:`Example 4.1 discrete-discrete<example 4_1>`
-* :ref:`Example 4.2, Poisson-gamma <example 4_2>`
+* :ref:`Example 4.1 Simple Discrete-Discrete Aggregate <example 4_1>`
+* :ref:`Example 4.2, Poisson-Gamma (Tweedie) Aggregate <example 4_2>`
 * :ref:`Example 4.3, Tweedie Approximations <example 4_3>`
 * :ref:`Example 4.4, Poisson-Discrete Approximation <example 4_4>`
 * :ref:`Example 4.5, Poisson-Gamma Approximation <example 4_5>`
@@ -56,7 +56,7 @@ Display all possible outcomes. Compare with the table on p. 107.
 
 .. _example 4_2:
 
-Tweedie (Poisson-Gamma) Aggregate, Example 4.2
+Poisson-Gamma (Tweedie) Aggregate, Example 4.2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The text considers a Tweedie with expected claim count :math:`\lambda=2.5` and gammma shape 3 and scale 400. It computes the mean, variance and skewness, and uses the series expansion for the distribution to compute the CDF at various points (Table 4.1). These results can be replicated as follows.
@@ -388,7 +388,7 @@ Aggregate Premiums, Example 6.6
 
 (Continues :ref:`Example 6.3 <example 6_3>`.) Compute expected losses across a variety of occurrence and aggregate limit combinations. Assume 20% ALAE outside the limits, expected claim count 1.2 with contagion parameter 0.1 (cv of mixing :math:`\sqrt{0.1}`), and lognormal severity :math:`(\mu, \sigma) = (7.6, 2.4)` (see errata).
 
-The following code calculates Table 6.3 using FFT aggregate distributions. The last column, showing unlimited aggregate losses, agrees, but the other columns are slightly different because Bahnemann uses a shifted gamma approximation.
+The following code calculates Table 6.4 using FFT aggregate distributions. The last column, showing unlimited aggregate losses, agrees, but the other columns are slightly different because Bahnemann uses a shifted gamma approximation.
 
 First, we compute all the aggregates.
 
@@ -428,6 +428,18 @@ Next, manipulate the output to determine layer loss costs using the ``reins_audi
     table = pd.concat((el, el / el.loc[500000, np.inf]),
                       keys=['Loss', 'ILF'])
     qd(table.fillna(' - '), accuracy=4)
+
+Here is a reconciliation to Table 6.4 of the 2M per claim and 2M aggregate limit expected loss, using the shifted gamma approximation. The limited aggregate loss is computed using the integral of the survival function ``fz.sf``.  ``quad`` is a general purpose numerical integration routine. It returns the integral and estimated error.
+
+.. ipython:: python
+    :okwarning:
+
+    fz = b[2000000].approximate('sgamma')
+    print(fz.stats())
+    mv(b[2000000])
+    from scipy.integrate import quad
+    quad(fz.sf, 0, 2000000)
+
 
 .. _example 6_7:
 

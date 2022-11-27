@@ -462,9 +462,9 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.logger(
             f'freq <-- FREQ expr {p.FREQ}', p)
-        if p.FREQ != 'binomial':
+        if p.FREQ not in ['binomial', 'neyman', 'neymana', 'neymanA']:
             logger.warning(
-                f'Illogical choice of frequency {p.FREQ}, expected binomial')
+                f'Illogical choice of frequency {p.FREQ}, expected binomial or neyman A')
         return {'freq_name': p.FREQ, 'freq_a': p.expr}
 
     @_('FREQ')

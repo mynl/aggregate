@@ -45,7 +45,7 @@ Exposure: the Volume of Insurance
        1000 loss
        1000 premium at 0.7 lr
 
-When using the ``agg`` language this choice presents no ambiguity. But if you create the
+This choice presents no ambiguity when using DecL. But if you create the
 object directly, the input arguments could conflict. Here is the order in which the
 exposure arguments are used:
 

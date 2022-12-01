@@ -86,7 +86,7 @@ From here we can build an aggregate distribution :math:`A` of the number of occu
 Aggregate Program for the Traffic Example
 -----------------------------------------
 
-Here is the ``agg`` language program for the traffic example. The program is one line long. Python automatically concatenates strings within parenthesis; it is split for clarity.
+Here is the DecL program for the traffic example. The program is one line long. Python automatically concatenates strings within parenthesis; it is split for clarity.
 
 .. code:: agg
 
@@ -298,7 +298,7 @@ The largest  outcome of 36 has probability 6**-7; check accuracy
         index=['Actual worst', 'Computed worst', 'error'],
         columns=['value'])
 
-Create the same distribution without shorthand notation and using more basic ``agg`` language.
+Create the same distribution without shorthand notation and using more basic DecL.
 
 .. code:: ipython3
 

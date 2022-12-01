@@ -1,3 +1,4 @@
+from collections import namedtuple
 from cycler import cycler
 import decimal
 from functools import lru_cache
@@ -24,7 +25,6 @@ from scipy.special import kv, binom, gamma, loggamma
 from scipy.stats import multivariate_t
 # from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
-
 
 
 logger = logging.getLogger(__name__)
@@ -3008,3 +3008,167 @@ class sEngFormatter:
                 return f'{x[1]}{x[4]}{" "*(1+len(x[3])+len(x[5]))}'
             else:
                 return f'{x[1]}.{x[2]}{x[4]}{" "*(len(x[3])+len(x[5]))}'
+
+
+def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, debug=False):
+    """
+    Adjust the layer unconditional expected losses to target. You need int xf(x)dx, but
+    that is fraught when f is a mixed distribution. So we only use the int S version.
+    ``fz`` was initially a frozen continuous distribution; but adjustd to cdf function
+    and dropped need for pdf function. 
+
+    See notes for how the parts are defined. Notice that::
+
+        np.allclose(p.layers.v - p.layers.f, p.layers.l - p.layers.e)
+
+    is true.
+
+    :param attachments: array of layer attachment points, in ascending order (bottom to top). a[0]>0
+    :param layer_loss_picks: Target means. If ``len(layer_loss_picks)==len(attachments)`` then the bottom layer, 0 to a[0],
+      is added. Can be input as unconditional layer severity (i.e., :math:`\\mathbb{E}[(X-a)^+\wedge y]`) or as the
+      layer loss pick (i.e., :math:`\\mathbb{E}[(X-a)^+\wedge y]'times n` where *n* is the number of ground-up (to the
+      insurer) claims. Multiplying and dividing by :math:`S(a)` shows this equals conditional severity in the layer
+      times the number of claims in the layer.) Actuaries usually estimate the loss pick to the layer in pricing. When
+      called from :class:`Aggregate` the number of ground up claims is known.
+    :param en: ground-up expected claims. Target is divided by ``en``.
+    :param xs: x values for discretization
+    :param sev_density: Series of existing severity density from Aggregate.
+    :param fz: frozen scipy.stats.rv_continuous object (optional); used to compute exact levs and m parts
+    :param debug: if True, return debug information (layers, density with adjusted probs, audit
+      of layer expected values.
+    """
+
+    # want xs, attachments, and sev_density to be numpy arrays
+    xs = np.array(xs)
+    attachments = np.array(attachments)
+    # target is the unconditional layer expected loss, E[(X-a)^+ ^ y]
+    target = np.array(layer_loss_picks) / n
+    # print(n, layer_loss_picks, target)
+    sev_density = np.array(sev_density)
+    # figure bucket size
+    bs = xs[1] - xs[0]
+
+    # dataframe of adjusted probabilties, starts here
+    density = pd.DataFrame({'x': xs, 'p': sev_density}).set_index('x', drop=False)
+    fill_value = max(0, 1. - density.p.sum())
+    density['S'] = density.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
+
+    # data frame of layer statistics from input density
+    exact = None
+    if fz is not None:
+        logger.warning('fz passed in; computing exact layer statistics')
+        exact = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'],
+                             index=range(1, 1+len(attachments)), dtype=float)
+        for i, x in enumerate(attachments):
+            ix = quad(fz.sf, 0, x)
+            ix2 = quad(lambda t: t * fz.pdf(t), 0, x)
+            # check errors both small
+            assert max(ix[1], ix2[1]) < 1e-6
+            exact.loc[i+1, :] = [x, ix[0], ix2[0],  x * fz.sf(x) if x < np.inf else 0.0, fz.sf(x)]
+
+    # numerical integrals - these match
+    layers = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'], index=range(1, 1+len(attachments)),
+                          dtype=float)
+    for i, x in enumerate(attachments):
+        ix = density.loc[0:x-bs, 'S'].sum() * bs
+        ix2 = density.loc[0:x-bs, ['x', 'p']].prod(axis=1).sum()
+        layers.loc[i+1, :] = [x, ix, ix2, x * density.loc[x, 'S'] if x < np.inf else 0.0, density.loc[x, 'S']]
+
+    # prob of loss in layer
+    layers['p'] = layers.S.shift(1, fill_value=1) - layers.S
+    # unconditional expected loss in layer
+    layers['l'] = layers.lev - layers.lev.shift(1, fill_value=0)
+    layers.index.name = 'layer'
+    # bottom of layer
+    layers['a_bottom'] = layers.a.shift(1, fill_value=0)
+    # width of layer
+    layers['y'] = layers.a - layers.a_bottom
+    # e = rectangle to right in int S computation
+    layers['e'] = layers.S * layers.y
+    # f = rectangle below attachment in int xf computation
+    layers['f'] = layers.p * layers.a_bottom
+    # int f dx in layer
+    layers['v'] = layers.int_fdx - layers.int_fdx.shift(1, fill_value=0)
+    # m-bit: int S - e == int xf - f
+    layers['check1'] = layers.l - layers.e
+    layers['check2'] = layers.v - layers.f
+    logger.warning(f'Max diff calc1 and calc2 = {(layers.check1 - layers.check2).abs().max()}')
+    logger.warning(str(np.vstack((layers.check1, layers.check2))))
+
+    # these are two versions of m (unconditional)
+    layers['m'] = layers.check1 # (layers.check1 + layers.check2) / 2
+    # and conditional vertical loss in layer
+    layers['v_c'] = layers.v / layers.p
+    layers = layers[['a_bottom', 'a', 'y', 'lev', 'S', 'p', 'l', 'v', 'v_c', 'm', 'e', 'f']]
+
+    # add weights w and offsets=omega, computed from the top layer down
+    layers['t'] = target
+    layers['w'] = 0.0
+    layers['ω'] = 0.0
+
+    # this computation leaves the tail unchanged and uses the same "adjust the curve" method
+    # in all layers
+    ω = layers.loc[len(layers), 'S']
+    for i in layers.index[::-1]:
+        layers.loc[i, 'w'] = (layers.loc[i, 't'] - ω * layers.loc[i, 'y']) / layers.loc[i, 'm']
+        layers.loc[i, 'ω'] = ω
+        ω += layers.loc[i, 'p'] * layers.loc[i, 'w']
+
+    # adjusted S: bins -> layer number; add in offsets
+    density['bin'] = pd.cut(density.x, np.hstack((0, layers.a.values)), include_lowest=True, right=True)
+    # layer description returned by cut to layer number in layers
+    mapper = {i:j+1 for j, i in enumerate(density.bin.unique())}
+    density['layer'] = density.bin.map(mapper.get)
+
+    density['ω'] = density.layer.map(layers.ω).astype(float)
+    # S(a_n-1)
+    density['Sa'] = density.layer.map(layers.S).astype(float)
+    density['w'] = density.layer.map(layers.w).astype(float)
+
+    density['S_adj'] = np.minimum(1, density.ω + (density.S - density.Sa) * density.w)
+    # no change in the tail
+    density.loc[attachments[-1]:, 'S_adj'] = density.loc[attachments[-1]:, 'S']
+    # adj probs as difference of S
+    density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
+    achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
+    # display(achieved)
+    if abs(achieved.iloc[0] - target[0]) > 1e-3:
+        # issues with hitting 1
+        logger.warning(f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
+        # take top right corner off
+        if target[0] > attachments[0]:
+            raise ValueError(f'target[0] = {target[0]} > first attachment[0] = {attachments[0]} which is impossible.')
+        s0 = 2 * (attachments[0] - target[0]) / (1 - layers.loc[1, 'ω'])
+        # snap to index
+        s0 = bs * np.round(s0 / bs, 0)
+        # convert to probability
+        s = attachments[0] - s0
+        density.loc[0:s, 'S_adj'] = 1.0
+        temp = np.array(density.loc[s+bs:attachments[0]].index)
+        wts = (temp - s) / s0
+        density.loc[s+bs:attachments[0], 'S_adj'] = 1 - wts + layers.loc[1, 'ω'] * wts
+        # update
+        density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
+        achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
+        logger.warning(f'Revised layer 1 achieved = {achieved.iloc[0]}')
+
+    density['diff S'] = density['S'] - density['Sa']
+
+    if debug is False:
+        return density['p_adj'].values
+
+    if exact is None:
+        l = layers.l
+        ln = 'layers'
+    else:
+        l = exact.lev - exact.lev.shift(1, fill_value=0)
+        ln = 'exact'
+
+    t = pd.concat((l,
+                   density.groupby(density.layer.shift(-1)).apply(lambda g: g['S'].sum() * bs),
+                   achieved,
+                   ), keys=[ln, 'computed', 'adj'], axis=1)
+    t.loc['sum'] = t.sum()
+    Picks = namedtuple('picks', ['layers', 'exact', 'density', 'audit'])
+    return Picks(layers=layers, exact=exact, density=density, audit=t)
+

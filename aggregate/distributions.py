@@ -22,7 +22,7 @@ from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint, approximate_work, moms_analytic
+    pprint, approximate_work, moms_analytic, picks_work
 
 from .spectral import Distortion
 
@@ -705,6 +705,7 @@ class Aggregate(Frequency):
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
                  sev_name='', sev_a=np.nan, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True,
+                 sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='',
                  freq_name='', freq_a=0, freq_b=0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
@@ -734,6 +735,8 @@ class Aggregate(Frequency):
         :param sev_ps:          ps are the probability densities within each bucket; if buckets equal size no adjustments needed
         :param sev_wt:          weight for mixed distribution
         :param sev_conditional: if True, severity is conditional, else unconditional.
+        :param sev_pick_attachments:  if not None, a list of attachment points to define picks
+        :param sev_pick_losses:  if not None, a list of losses by layer
         :param occ_reins:       layers: share po layer xs attach or XXXX
         :param occ_kind:        ceded to or net of
         :param freq_name:       name of frequency distribution
@@ -800,6 +803,9 @@ class Aggregate(Frequency):
         self._sev_linear_quantile_function = None
         self._cdf = None
         self._pdf = None
+        self._sev_cdf = None
+        self._sev_sf = None
+        self._sev_pdf = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
@@ -822,6 +828,8 @@ class Aggregate(Frequency):
         self.sev_ceded_density = None
         self.sev_net_density = None
         self.sev_gross_density = None
+        self.sev_pick_attachments = sev_pick_attachments
+        self.sev_pick_losses = sev_pick_losses
         self.agg_ceded_density = None
         self.agg_net_density = None
         self.agg_gross_density = None
@@ -1162,7 +1170,7 @@ class Aggregate(Frequency):
     easy_update = update
 
     def update_work(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
-               discretization_calc='survival', normalize=True, force_severity=False, debug=False):
+                    discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
         Compute a discrete approximation to the aggregate density.
 
@@ -1210,14 +1218,20 @@ class Aggregate(Frequency):
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
                 self.sev_density += temp * w
 
+            # adjust for picks if necessary
+            if self.sev_pick_attachments is not None:
+                logger.warning('Adjusting for picks.')
+                self.sev_density = self.picks(self.sev_pick_attachments, self.sev_pick_losses)
+
         if force_severity == 'yes':
             # only asking for severity (used by plot)
             return
 
         # deal with per occ reinsurance
         # TODO issues with force_severity = False.... get rid of that option entirely?
+        # reinsurance converts sev_density to a Series from np.array
         if self.occ_reins is not None:
-            logger.info('Applying occurrence reinsurance.')
+            logger.warning(f'Applying occurrence reinsurance type of sev density {type(self.sev_density)}')
             if self.sev_gross_density is not None:
                 # make the function an involution...
                 self.sev_density = self.sev_gross_density
@@ -1368,6 +1382,21 @@ class Aggregate(Frequency):
         self.nearest_quantile_function = None
         self._cdf = None
         self.verbose_audit_df = None
+
+    def picks(self, attachments, layer_loss_picks, debug=False):
+        """
+        Adjust the computed severity to hit picks targets in layers defined by a.
+        Delegates work to ``utilities.picks_work``. See that function for details.
+
+        """
+        # always want to work off gross severity
+        if self.sev_gross_density is not None:
+            logger.warning('Using GROSS severity in picks')
+            sd = self.sev_gross_density
+        else:
+            sd = self.sev_density
+        return picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
+                          fz=self.sevs[0] if len(self.sevs) == 1 else self.sev_cdf, debug=debug)
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
@@ -2508,23 +2537,48 @@ class Aggregate(Frequency):
         # i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
         # return q + (i1 + i2) / (1 - p)
 
-    def sev_cdf(self, x, verbose=False):
-        """
-        Direct access to the underlying severity, exact computation.
 
+    def _make_exact_cdfs(self):
         """
-        ans = []
-        F = 0
-        for s in self.sevs:
-            w = s.sev_wt
-            c = s.cdf(x)
-            F += w * c
-            ans.append([s.sev_name, c, w])
-
-        if verbose is True:
-            return F, pd.DataFrame(ans, columns=['name', 'cdf', 'wt'])
+        Make exact sf, cdf and pdfs
+        """
+        if len(self.sevs) == 1:
+            self._sev_cdf = self.sevs[0].cdf
         else:
-            return F
+            # multiple severites, needs more work
+            wts = np.array([i.sev_wt for i in self.sevs])
+            # for non-broadcast weights the sum is n = number of components; rescale
+            if wts.sum() == len(self.sevs):
+                wts = self.statistics_df.freq_1.values
+            wts = wts / wts.sum()
+            def _sev_cdf(x):
+                return np.sum([wts[i] * self.sevs[i].cdf(x) for i in range(len(self.sevs))], axis=0)
+            self._sev_cdf = _sev_cdf
+            def _sev_sf(x):
+                return np.sum([wts[i] * self.sevs[i].sf(x) for i in range(len(self.sevs))], axis=0)
+            self._sev_sf = _sev_sf
+            def _sev_pdf(x):
+                return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
+            self._sev_pdf = _sev_pdf
+
+    def sev_cdf(self, x):
+        """
+        Direct access to the underlying weighted severity, exact computation.
+
+        """
+        if self._sev_cdf is None:
+            self._make_exact_cdfs()
+        return self._sev_cdf(x)
+
+    def sev_sf(self, x):
+        if self._sev_cdf is None:
+            self._make_exact_cdfs()
+        return self._sev_sf(x)
+
+    def sev_pdf(self, x):
+        if self._sev_cdf is None:
+            self._make_exact_cdfs()
+        return self._sev_pdf(x)
 
     def cdf(self, x, kind='previous'):
         """
@@ -3153,7 +3207,7 @@ class Severity(ss.rv_continuous):
 
     def _pdf(self, x, *args):
         if self.conditional:
-            return np.where(x > self.limit, 0,
+            return np.where(x >= self.limit, 0,
                             np.where(x == self.limit, np.inf if self.pdetach > 0 else 0,
                                      self.fz.pdf(x + self.attachment) / self.pattach))
         else:
@@ -3171,7 +3225,7 @@ class Severity(ss.rv_continuous):
 
     def _cdf(self, x, *args):
         if self.conditional:
-            return np.where(x > self.limit, 1,
+            return np.where(x >= self.limit, 1,
                             np.where(x < 0, 0,
                                      (self.fz.cdf(x + self.attachment) - (1 - self.pattach)) / self.pattach))
         else:
@@ -3182,7 +3236,7 @@ class Severity(ss.rv_continuous):
 
     def _sf(self, x, *args):
         if self.conditional:
-            return np.where(x > self.limit, 0,
+            return np.where(x >= self.limit, 0,
                             np.where(x < 0, 1,
                                      self.fz.sf(x + self.attachment, *args) / self.pattach))
         else:

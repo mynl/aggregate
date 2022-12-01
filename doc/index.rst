@@ -19,7 +19,7 @@ aggregate Documentation
    1_Getting_Started
    2_User_Guides
    3_Reference
-   4_agg_Language_Reference
+   4_dec_Language_Reference
    5_Technical_Resources
    6_Development
    7_bibliography
@@ -83,7 +83,7 @@ aggregate Documentation
    :img-top: _static/developer_guide.png
 
 
-   The ``agg`` lanaguage syntax and grammar for specifying aggregate distributions.
+   The Dec lanaguage (DecL)  for specifying aggregate distributions.
 
    +++
 

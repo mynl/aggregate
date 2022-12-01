@@ -1,11 +1,15 @@
 # TODO stack
 
+0. Add exposure / rate keywords for 10 exposure at 1200 rate ?
+
 1. qd looks for like columns / column format guesser?
 2. poisson poisson distribution  = neyman type a
 3. ZM and ZT
 3. cat paper; match Jewson; ILW pricing?
 4. rec bucket - do some testing to determine a good p.
 5. Update efficiently - used anywhere?
+6. Aggregate.en is unreliable; where/how is it used
+7. sev_cdf etc. are unrealiable for pdfs when there are masses
 
 * Papers
     - Clark re -> re pricing

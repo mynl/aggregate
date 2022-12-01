@@ -117,7 +117,7 @@ See requirements.txt.
 License
 -------
 
-[BSD 3](LICENSE)
+:ref:`BSD 3 licence <LICENSE>`
 
 Contributing to aggregate
 -------------------------

@@ -52,8 +52,8 @@ class UnderwritingLexer(Lexer):
               SEV, AGG, PORT,
               NUMBER, INFINITY,
               PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY, # SCALE_MULTIPLY, LOCATION_ADD,
-              LOSS, PREMIUM, AT, LR, CLAIMS,
-              XS,
+              LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
+              XS, PICKS,
               DISTORTION,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
@@ -95,11 +95,13 @@ class UnderwritingLexer(Lexer):
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
+    ID['exposure'] = EXPOSURE
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['tower'] = TOWER
     ID['mixed'] = MIXED
     ID['unlim'] = INFINITY
+    ID['picks'] = PICKS
     ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
     ID['ceded'] = CEDED
@@ -108,6 +110,7 @@ class UnderwritingLexer(Lexer):
     ID['dsev'] = DSEV
     ID['loss'] = LOSS
     ID['port'] = PORT
+    ID['rate'] = RATE
     ID['net'] = NET
     ID['sev'] = SEV
     ID['agg'] = AGG
@@ -567,6 +570,11 @@ class UnderwritingParser(Parser):
             del built_in_dict['name']
         return built_in_dict
 
+    @_('sev picks')
+    def sev(self, p):
+        self.logger(f'sev <-- sev picks', p)
+        return {**p.sev, **p.picks}
+
     @_('sev "!"')
     def sev(self, p):
         self.logger(f'sev <-- unconditional (conditional=False) flag set', p)
@@ -670,6 +678,12 @@ class UnderwritingParser(Parser):
         else:
             b = p.dprobs
         return {'freq_name': 'empirical', 'freq_a': p.doutcomes, 'freq_b': b, 'exp_en': -1}
+
+    @_('PICKS "[" numberl "]" "[" numberl "]"')
+    def picks(self, p):
+        self.logger('picks <-- PICKS "[" numberl "]" "[" numberl "]"', p)
+
+        return {'sev_pick_attachments': p[2], 'sev_pick_losses': p[5]}
 
     # never valid for this to be a single number not in [], using this
     # format rather than numbers enforces an actual list
@@ -778,6 +792,11 @@ class UnderwritingParser(Parser):
     def exposures(self, p):
         self.logger(
             f'exposures <-- numbers PREMIUM AT numbers LR', p)
+        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
+
+    @_('numbers EXPOSURE AT numbers RATE')
+    def exposures(self, p):
+        self.logger(f'exposures <-- numbers EXPOSURE AT numbers RATE', p)
         return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
 
     # ID =======================================================

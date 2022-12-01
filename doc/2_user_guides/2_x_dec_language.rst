@@ -1,9 +1,9 @@
-.. _2_x_agg_language:
+.. _2_x_dec_language:
 
-The ``agg`` Language
+The Dec Language
 ======================
 
-**Objectives:** Introduce the ``agg`` language grammar.
+**Objectives:** Introduce the Dec language (DecL) grammar.
 
 **Audience:** User who wants to use it to build realistic aggregates.
 
@@ -19,7 +19,7 @@ The ``agg`` Language
 Design and Purpose
 -------------------
 
-The ``agg`` language is designed to make it easy to go from "dec page to distribution" (or, with less alliteration, from reinsurance slip to distribution). Coverage expressed concisely in words can be hard to program. Consider
+The Dec language, or simply DecL, is designed to make it easy to go from "dec page to distribution" (or, with less alliteration, from reinsurance slip to distribution). Coverage expressed concisely in words can be hard to program. Consider
 
     A trucking policy with a loss pick 4500, a limit of 1000, and a retention 50.
 
@@ -31,7 +31,7 @@ To estimate the aggregate distribution the actuary must
 #. Select a suitable frequency distribution, say Poisson
 #. Calculate a numerical approximation to the resulting compound-Poisson aggregate distribution
 
-The ``agg`` program takes care of many of these details based on the simple program::
+The DecL program takes care of many of these details based on the simple program::
 
     agg Trucking 4500 loss 1000 xs 50 sev lognorm 50 1.75 poisson
 
@@ -43,7 +43,7 @@ The program specifies the distributions selected in steps 1 and 4; these require
 Specifying an Aggregate Distribution
 -------------------------------------
 
-Aggregate distributions are specified using :ref:`seven clauses <seven clauses>`, entered in the ``aggregate`` language as::
+Aggregate distributions are specified using :ref:`seven clauses <seven clauses>`, entered in DecL as::
 
     agg label               \
         exposure <limit>    \
@@ -53,15 +53,20 @@ Aggregate distributions are specified using :ref:`seven clauses <seven clauses>`
         <aggregate re>      \
         <note>
 
-All programs are one line long.
-A backslash is a newline continuation (like Python) and is used only for readability.
-Horizontal white space is ignored.
-The entries are as follows.
+All programs are one line long and horizontal white space is ignored.
+A backslash is a newline continuation (like Python) and is used only for readability. Python automatically concatenates strings between parenthesis, so it is often easiest and clearest to enter a program as::
+
+    build('agg Trucking '
+          '4500 loss 1000 xs 50 '
+          'sev lognorm 50 1.75 '
+          'poisson')
+
+Python ``f``-strings allow variables to be passed into DecL. The entries are as follows.
 
 
 * ``agg`` is the keyword used to create an aggregate distribution. Keywords are part of the language, like ``if/then/else`` in VBA, R or Python, or ``select`` in SQL.
 
-* ``label`` (``Trucking`` in the prior example) is a string label. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be an ``agg`` language keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
+* ``label`` (``Trucking`` in the prior example) is a string label. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be a DecL keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
 
 * The ``exposure`` clause, ``4500 loss 1000 xs 50``, determines the volume of insurance, see :ref:`exposure <2_agg_class_exposure_clause>`. It optionally includes a ``layers`` :ref:`subclause <2_agg_class_layers_subclause>` (``1000 xs 50``) to set policy occurrence limits and deductibles. The exposure clause can also use the ``dfreq`` keyword REF.
 

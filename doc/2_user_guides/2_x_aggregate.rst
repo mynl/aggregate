@@ -46,7 +46,7 @@ for example.
 Specifying an Aggregate Distribution
 -------------------------------------
 
-As a precursor do describing the ``agg`` language, this section lays out the information needed to fully specify an aggregate loss distributions that typically occur in insurance. Here are some examples::
+As a precursor do describing DecL, this section lays out the information needed to fully specify an aggregate loss distributions that typically occur in insurance. Here are some examples::
 
 |    basic
 |    basic with limit and ded
@@ -78,7 +78,7 @@ Abstracting the details, the structure that emerges has seven parts
 Creating an Aggregate Distribution
 -------------------------------------
 
-The ``agg`` language is the easiest way to create an :class:`Aggregate` object, via ``build``.
+DecL is the easiest way to create an :class:`Aggregate` object, via ``build``.
 
 They can also be created directly using ``kwargs``, see :ref:`Aggregate Class`.
 

@@ -44,7 +44,7 @@ from .utilities import get_fmts, pprint, pprint_ex, ft, \
     make_corr_matrix, random_corr_matrix, \
     LoggerManager, knobble_fonts, approximate_work, \
     partial_e, partial_e_numeric, moms_analytic, qd, \
-    sEngFormatter, mv
+    sEngFormatter, mv, picks_work
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
 from .bounds import Bounds, plot_max_min, plot_lee
 

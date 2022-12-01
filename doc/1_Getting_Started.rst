@@ -79,7 +79,7 @@ The only object you need to import to get started is ``build``.
 ``build`` is a :class:`Underwriter` object. It  allows you to create all other
 objects and  includes a library of examples, called the knowledge.
 
-Using ``build`` you can create an :class:`Aggregate` object using an ``agg`` language  program. For example, the program
+Using ``build`` you can create an :class:`Aggregate` object using an DecL  program. For example, the program
 
 ::
 

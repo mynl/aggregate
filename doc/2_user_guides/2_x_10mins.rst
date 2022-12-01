@@ -10,7 +10,7 @@ The most important classes in the library are
 - :class:`Aggregate`, which models a single **unit** of business. The unit refers to a line, business unit, geography, operating division, etc.
 - :class:`Portfolio`, which models multiple units. Broadly includes all the functionality in :class:`Aggregate` and adds pricing, calibration, and allocation methods.
 - :class:`Severity`, which models a size of loss distribution
-- :class:`Underwriter`, which keeps track of everything in its ``knowledge`` dataframe, interprets ``agg`` language programs, and acts as a helper.
+- :class:`Underwriter`, which keeps track of everything in its ``knowledge`` dataframe, interprets DecL programs, and acts as a helper.
 
 To get started, import ``build``, a pre-configured :class:`Underwriter`.
 

@@ -22,7 +22,7 @@ The User Guides show how ``aggregate`` can solve various actuarial problems. It 
 
 #. :doc:`2_user_guides/2_x_aggregate` (reference): Specifying, creating and working with the :class:`Aggregate` object.
 
-#. :doc:`2_user_guides/2_x_agg_language` (reference): Specification of the ``agg`` language to build aggregate distributions using familiar insurance terminology. The next reference guides expand on different parts of language specific to creating aggregate distributions.
+#. :doc:`2_user_guides/2_x_dec_language` (reference): Specification of the Dec language (DecL) to build aggregate distributions using familiar insurance terminology. The next reference guides expand on different parts of language specific to creating aggregate distributions.
 
    #. :doc:`2_user_guides/2_x_frequency` (reference): Description of available frequency distributions.
 
@@ -52,7 +52,7 @@ The User Guides show how ``aggregate`` can solve various actuarial problems. It 
 
 #. :doc:`2_user_guides/2_x_distortion` (reference): Workings of the :class:`Distortion` class.
 
-#. :doc:`2_user_guides/2_x_portfolio` (reference): Specifying, creating and working with the :class:`Portfolio` class, including ``agg`` language options. The next guides give applications of the :class:`Portfolio` and :class:`Distortion`classes.
+#. :doc:`2_user_guides/2_x_portfolio` (reference): Specifying, creating and working with the :class:`Portfolio` class, including DecL options. The next guides give applications of the :class:`Portfolio` and :class:`Distortion`classes.
 
    #. :doc:`2_user_guides/2_x_capital` (problem): Applications to capital modeling, including VaR, TVaR, and risk visualization and quantification. Covers material on CAS Part 9.
 

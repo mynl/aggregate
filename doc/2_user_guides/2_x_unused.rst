@@ -7,7 +7,7 @@ Material Not Used
 Main Features
 -------------
 
-- Human readable input with the simple ``agg`` language
+- Human readable input with the simple DecL
 - Built in library of insurance severity curves for both catastrophe and non
   catastrophe lines
 - Built in parameterization for most major lines of insurance in the US, making it

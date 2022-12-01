@@ -66,3 +66,38 @@ Proportion of expected loss by unit.
 
 
 
+Mortality Example and Figure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+1. ASTIN 2022 Mortality Credits with Large Survivor Funds (D, Hieber, Roberts) [Fig 5 done]
+
+Description...
+
+
+.. ipython:: python
+    :okwarning:
+
+    import matplotlib.pyplot as plt; import pandas as pd
+    wl = 0.6; wh = 1 - wl; ql = .1; qh = .2; al = 1; ah = 3
+    ports = {}
+    for n in (10, 20, 50, 100):
+        ports[n] = build(f'port DR.4.3 '
+              f'agg Low.q  {wl * n * ql} claims dsev [{al}] binomial {ql}'
+              f'agg High.q {wh * n * qh} claims dsev [{ah}] binomial {qh}'
+             , bs=1, log2=8)
+
+    audit = pd.concat([i.describe for i in ports.values()], keys=ports.keys(), names=['n', 'unit', 'X'])
+    qd(audit.xs('Agg', axis=0, level=2)['E[X]'].unstack(1))
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 3.5), constrained_layout=True, squeeze=True)
+    for ax, (n, port), mx, t in zip(axs.flat, ports.items(), [20, 25, 40, 60], [2, 5, 10, 10]):
+        lm = [-1, mx]
+        # lm = [-1, port.q(1)+1]
+        port.density_df.query('p_total > 0').filter(regex='exeqa_[LHt]').plot(ax=ax, xlim=lm, ylim=lm)
+        ax.set_xticks(range(0, mx, t))
+        ax.set_yticks(range(0, mx, t))
+        ax.grid(lw=.25, c='w')
+        ax.set(title=f'{n} risks')
+    @savefig denuit_45.png
+    fig.suptitle('Denuit Figure 4.5')
+

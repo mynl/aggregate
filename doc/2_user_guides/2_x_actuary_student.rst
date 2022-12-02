@@ -43,7 +43,7 @@ Questions
 Answers
 ~~~~~~~~~
 
-Creating and printing a simple agg language program, and querying its ``density_df`` dataframe reveals all the answers.
+Creating and printing a simple Dec language program, and querying its ``density_df`` dataframe reveals all the answers.
 
 .. ipython:: python
     :okwarning:

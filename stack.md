@@ -10,6 +10,9 @@
 5. Update efficiently - used anywhere?
 6. Aggregate.en is unreliable; where/how is it used
 7. sev_cdf etc. are unrealiable for pdfs when there are masses
+8. with picks the analytic severities are not altered...be careful!
+9. with picks you should invalidate / reompute statistics etc.
+10. with cession you should recompute statistics? or make clear it is gross/
 
 * Papers
     - Clark re -> re pricing

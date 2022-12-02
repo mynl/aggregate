@@ -143,16 +143,16 @@ A collection of insurance policies consists of two types. 25% of policies are Ty
               'fixed',
               normalize=False)
     qd(a)
-    a.sev_cdf(100), 0.25 * (1 - np.exp(-0.5)) + 0.75 * (1 - (2/3)**3)
+    a.sev.cdf(100), 0.25 * (1 - np.exp(-0.5)) + 0.75 * (1 - (2/3)**3)
 
 This example has a very thick tailed severity and it is best to specify ``normalized=False`` for the most accurate severity estimates. With default settings,
-``aggregate`` suffers considerable discretization error, with an estimated mean well below the actual 125. The ``sev_cdf`` method exposes the actual underlying
+``aggregate`` suffers considerable discretization error, with an estimated mean well below the actual 125. The ``sev.cdf`` method exposes the actual underlying
 severity distribution cdf functions and reproduces the requested probability exactly. The object cdf function relies on the discretization and so is shifted by
-half a bucket size.
+half a bucket size. (Also available: ``sev.sf`` and ``sev.pdf``.)
 
 .. ipython:: python
 
-    a.cdf(100), a.sev_cdf(100 + a.bs/2)
+    a.cdf(100), a.sev.cdf(100 + a.bs/2)
 
 .. _coverage modifications:
 
@@ -232,7 +232,7 @@ where :math:`x` is measured in millions. Calculate the total amount, in millions
     @savefig lda_344.png
     fig
 
-When the empirical distribution has many entries it is faster to build the ``Aggregate`` object directly, rather than use the agg language. The moments of the severity and aggregate distribution are computed from the numerical approximation during creation. There is no need to update the object.
+When the empirical distribution has many entries it is faster to build the ``Aggregate`` object directly, rather than use DecL. The moments of the severity and aggregate distribution are computed from the numerical approximation during creation. There is no need to update the object.
 
 .. ipython:: python
     :okwarning:

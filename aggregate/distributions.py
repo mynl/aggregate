@@ -1,4 +1,5 @@
 import collections
+from collections import namedtuple
 import json
 import inspect
 import itertools
@@ -803,9 +804,10 @@ class Aggregate(Frequency):
         self._sev_linear_quantile_function = None
         self._cdf = None
         self._pdf = None
-        self._sev_cdf = None
-        self._sev_sf = None
-        self._sev_pdf = None
+        self._sev = None
+        # self._sev_cdf = None
+        # self._sev_sf = None
+        # self._sev_pdf = None
         self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
@@ -1314,7 +1316,6 @@ class Aggregate(Frequency):
         self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
 
         # invalidate stored functions
-        self.nearest_quantile_function = None
         self._cdf = None
 
     def update_efficiently(self, xs, padding=1, approximation='exact', sev_calc='discrete',
@@ -1327,13 +1328,14 @@ class Aggregate(Frequency):
         :param xs:  range of x values used to discretize
         :param padding: for FFT calculation
         :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
-                sgamma apply shifted lognormal or shifted gamma approximations.
+          sgamma apply shifted lognormal or shifted gamma approximations.
         :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
         :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
+        :param normalize:  if True, normalize the density to sum to 1. For thick tail distributions, this may not
+          be appropriate and should be set to False.
         :return:
         """
 
-        r = 0
         self.xs = xs
         self.bs = xs[1]
         self.log2 = int(np.log(len(xs)) / np.log(2))
@@ -1379,7 +1381,6 @@ class Aggregate(Frequency):
             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
 
         # invalidate stored functions
-        self.nearest_quantile_function = None
         self._cdf = None
         self.verbose_audit_df = None
 
@@ -1396,7 +1397,7 @@ class Aggregate(Frequency):
         else:
             sd = self.sev_density
         return picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
-                          fz=self.sevs[0] if len(self.sevs) == 1 else self.sev_cdf, debug=debug)
+                          sf=self.sev.sf, debug=debug)
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
@@ -2538,47 +2539,51 @@ class Aggregate(Frequency):
         # return q + (i1 + i2) / (1 - p)
 
 
-    def _make_exact_cdfs(self):
+    @property
+    def sev(self):
         """
-        Make exact sf, cdf and pdfs
+        Make exact sf, cdf and pdfs and store in namedtuple for use as sev.cdf etc.
         """
-        if len(self.sevs) == 1:
-            self._sev_cdf = self.sevs[0].cdf
-        else:
-            # multiple severites, needs more work
-            wts = np.array([i.sev_wt for i in self.sevs])
-            # for non-broadcast weights the sum is n = number of components; rescale
-            if wts.sum() == len(self.sevs):
-                wts = self.statistics_df.freq_1.values
-            wts = wts / wts.sum()
-            def _sev_cdf(x):
-                return np.sum([wts[i] * self.sevs[i].cdf(x) for i in range(len(self.sevs))], axis=0)
-            self._sev_cdf = _sev_cdf
-            def _sev_sf(x):
-                return np.sum([wts[i] * self.sevs[i].sf(x) for i in range(len(self.sevs))], axis=0)
-            self._sev_sf = _sev_sf
-            def _sev_pdf(x):
-                return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
-            self._sev_pdf = _sev_pdf
-
-    def sev_cdf(self, x):
-        """
-        Direct access to the underlying weighted severity, exact computation.
-
-        """
-        if self._sev_cdf is None:
-            self._make_exact_cdfs()
-        return self._sev_cdf(x)
-
-    def sev_sf(self, x):
-        if self._sev_cdf is None:
-            self._make_exact_cdfs()
-        return self._sev_sf(x)
-
-    def sev_pdf(self, x):
-        if self._sev_cdf is None:
-            self._make_exact_cdfs()
-        return self._sev_pdf(x)
+        if self._sev is None:
+            SevFunctions = namedtuple('SevFunctions', ['cdf', 'sf', 'pdf'])
+            if len(self.sevs) == 1:
+                self._sev = SevFunctions(cdf=self.sevs[0].cdf, sf=self.sevs[0].sf,
+                                         pdf=self.sevs[0].pdf)
+            else:
+                # multiple severites, needs more work
+                wts = np.array([i.sev_wt for i in self.sevs])
+                # for non-broadcast weights the sum is n = number of components; rescale
+                if wts.sum() == len(self.sevs):
+                    wts = self.statistics_df.freq_1.values
+                wts = wts / wts.sum()
+                # tried a couple of different approaches here and this is as fast as any
+                def _sev_cdf(x):
+                    return np.sum([wts[i] * self.sevs[i].cdf(x) for i in range(len(self.sevs))], axis=0)
+                def _sev_sf(x):
+                    return np.sum([wts[i] * self.sevs[i].sf(x) for i in range(len(self.sevs))], axis=0)
+                def _sev_pdf(x):
+                    return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
+                self._sev = SevFunctions(cdf=_sev_cdf, sf=_sev_sf, pdf=_sev_pdf)
+        return self._sev
+    #
+    # def sev_cdf(self, x):
+    #     """
+    #     Direct access to the underlying weighted severity, exact computation.
+    #
+    #     """
+    #     if self._sev_cdf is None:
+    #         self._make_exact_cdfs()
+    #     return self._sev_cdf(x)
+    #
+    # def sev_sf(self, x):
+    #     if self._sev_cdf is None:
+    #         self._make_exact_cdfs()
+    #     return self._sev_sf(x)
+    #
+    # def sev_pdf(self, x):
+    #     if self._sev_cdf is None:
+    #         self._make_exact_cdfs()
+    #     return self._sev_pdf(x)
 
     def cdf(self, x, kind='previous'):
         """

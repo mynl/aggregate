@@ -39,7 +39,7 @@ Medium Term
 * More consistent and informative reports and plots (e.g. include severity match in agg)
 * Convex Hull distortion built from pricing
 * Delete items easily from the database
-* Save / load from non-YAML, persist the database; dict to agg language converter? Get rid of YAML dependence
+* Save / load from non-YAML, persist the database; dict to Dec language converter? Get rid of YAML dependence
 * Using agg as a severity (how!)
 * Name as a member in dict vs list conniptions (put up with duplication?)
 

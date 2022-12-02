@@ -3010,12 +3010,12 @@ class sEngFormatter:
                 return f'{x[1]}.{x[2]}{x[4]}{" "*(len(x[3])+len(x[5]))}'
 
 
-def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, debug=False):
+def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, debug=False):
     """
     Adjust the layer unconditional expected losses to target. You need int xf(x)dx, but
     that is fraught when f is a mixed distribution. So we only use the int S version.
-    ``fz`` was initially a frozen continuous distribution; but adjustd to cdf function
-    and dropped need for pdf function. 
+    ``fz`` was initially a frozen continuous distribution; but adjusted to sf function
+    and dropped need for pdf function.
 
     See notes for how the parts are defined. Notice that::
 
@@ -3033,7 +3033,7 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, deb
     :param en: ground-up expected claims. Target is divided by ``en``.
     :param xs: x values for discretization
     :param sev_density: Series of existing severity density from Aggregate.
-    :param fz: frozen scipy.stats.rv_continuous object (optional); used to compute exact levs and m parts
+    :param sf: cdf function for the severity distribution.
     :param debug: if True, return debug information (layers, density with adjusted probs, audit
       of layer expected values.
     """
@@ -3052,19 +3052,6 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, deb
     density = pd.DataFrame({'x': xs, 'p': sev_density}).set_index('x', drop=False)
     fill_value = max(0, 1. - density.p.sum())
     density['S'] = density.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
-
-    # data frame of layer statistics from input density
-    exact = None
-    if fz is not None:
-        logger.warning('fz passed in; computing exact layer statistics')
-        exact = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'],
-                             index=range(1, 1+len(attachments)), dtype=float)
-        for i, x in enumerate(attachments):
-            ix = quad(fz.sf, 0, x)
-            ix2 = quad(lambda t: t * fz.pdf(t), 0, x)
-            # check errors both small
-            assert max(ix[1], ix2[1]) < 1e-6
-            exact.loc[i+1, :] = [x, ix[0], ix2[0],  x * fz.sf(x) if x < np.inf else 0.0, fz.sf(x)]
 
     # numerical integrals - these match
     layers = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'], index=range(1, 1+len(attachments)),
@@ -3087,16 +3074,11 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, deb
     layers['e'] = layers.S * layers.y
     # f = rectangle below attachment in int xf computation
     layers['f'] = layers.p * layers.a_bottom
-    # int f dx in layer
-    layers['v'] = layers.int_fdx - layers.int_fdx.shift(1, fill_value=0)
-    # m-bit: int S - e == int xf - f
-    layers['check1'] = layers.l - layers.e
-    layers['check2'] = layers.v - layers.f
-    logger.warning(f'Max diff calc1 and calc2 = {(layers.check1 - layers.check2).abs().max()}')
-    logger.warning(str(np.vstack((layers.check1, layers.check2))))
-
     # these are two versions of m (unconditional)
-    layers['m'] = layers.check1 # (layers.check1 + layers.check2) / 2
+    # m-bit: int S - e == int xf - f
+    layers['m'] = layers.l - layers.e
+    # int f dx in layer
+    layers['v'] = layers.f + layers.m
     # and conditional vertical loss in layer
     layers['v_c'] = layers.v / layers.p
     layers = layers[['a_bottom', 'a', 'y', 'lev', 'S', 'p', 'l', 'v', 'v_c', 'm', 'e', 'f']]
@@ -3156,6 +3138,19 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, fz=None, deb
 
     if debug is False:
         return density['p_adj'].values
+
+    # data frame of layer statistics from input density
+    exact = None
+    if sf is not None:
+        logger.warning('sf passed in; computing exact layer statistics')
+        exact = pd.DataFrame(columns=['a', 'lev', 'aS', 'S'],
+                             index=range(1, 1+len(attachments)), dtype=float)
+        for i, x in enumerate(attachments):
+            ix = quad(sf, 0, x)
+            # check error is small
+            assert ix[1] < 1e-6
+            sf_ = sf(x)
+            exact.loc[i+1, :] = [x, ix[0], x * sf_ if x < np.inf else 0.0, sf_]
 
     if exact is None:
         l = layers.l

@@ -34,7 +34,7 @@ and created as a Python object using
     a = build('A.Traffic')
     a
 
-The Underwriter class interprets agg language programs. The scripting language allows severities, aggregates and portfolios to be created using standard insurance language, see XXXX.
+The Underwriter class interprets DecL programs. The scripting language allows severities, aggregates and portfolios to be created using standard insurance language, see XXXX.
 
 
 

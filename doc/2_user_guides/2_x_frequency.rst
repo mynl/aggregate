@@ -9,7 +9,7 @@ Frequency Distributions
 
 **Prerequisites.** Building aggregates using ``build``. Using ``scipy.stats``. Probability theory behind discrete distributions, especially mixed-Poisson distributions and processes.
 
-**See also.** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`agg language <2_x_agg_language>`.
+**See also.** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
 
 Specifying Frequency
 ---------------------

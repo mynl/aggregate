@@ -22,7 +22,7 @@ To get started, import ``build``, a pre-configured :class:`Underwriter`.
 
 ``build`` reports the size of its knowledge, the aggregates and portfolios it knows how to construct, and other basic information.
 
-``build`` can create all other objects using the agg language. To make an ``aggregate`` with a Poisson frequency and lognormal severity with mean 10 and cv 1 simply run
+``build`` can create all other objects using the Dec language. To make an ``aggregate`` with a Poisson frequency and lognormal severity with mean 10 and cv 1 simply run
 
 
 .. ipython:: python

@@ -9,7 +9,7 @@ The :class:`Aggregate` Class
 
 **Prerequisites:** Familiar with building aggregates using ``build``. Understand probability theory behind aggregate distributions. Insurance and reinsurance terminology.
 
-**See also:** :ref:`The aggregate language <2_x_agg_language>`.
+**See also:** :ref:`The Dec language <2_x_dec_language>`.
 
 
 How ``aggregate`` specifies and represents a distribution

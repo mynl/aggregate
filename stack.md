@@ -13,6 +13,7 @@
 8. with picks the analytic severities are not altered...be careful!
 9. with picks you should invalidate / reompute statistics etc.
 10. with cession you should recompute statistics? or make clear it is gross/
+11. Formatting for MultiIndex with gup (reins_audit_df) messed up because not float
 
 * Papers
     - Clark re -> re pricing

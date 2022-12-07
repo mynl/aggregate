@@ -1,6 +1,6 @@
 .. _2_x_vectorization:
 
-Vectorization
+DecL: Vectorization
 =====================
 
 **Objectives:** Describe how ``aggregate`` vectorizes exposure, limit, and severity parameters.  to catastrophe risk management, including calculation of occurrence and aggregate exceeding probability (OEP, AEP) values, and loss costs for ILWs.
@@ -8,7 +8,6 @@ Vectorization
 **Audience:** Individual risk and reinsurance pricing actuaries, CAS Part 8 candidates.
 
 **Prerequisites:** :ref:`Mixed severity distributions <2_x_mixtures>`, :ref:`limits <2_x_limits>`.
-
 
 **See also:** :ref:`Reinsurance exposure rating <2_x_re_pricing>`.
 

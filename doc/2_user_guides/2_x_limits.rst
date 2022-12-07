@@ -1,9 +1,15 @@
 .. _2_x_limits:
 
-Limits and Limit Profiles
-=========================
+DecL: Limits and Limit Profiles
+=================================
 
+**Objectives:**
 
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
 
 ::
 

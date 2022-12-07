@@ -1,6 +1,6 @@
 .. _2_x_severity:
 
-Severity Distributions
+DecL: Severity Distributions
 =============================
 
 **Objectives:** Describe the severity distributions available in ``aggregate``.

@@ -3,6 +3,13 @@
 :class:`Portfolio` Class Calculations
 ======================================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
 
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class
 computes the densities of each aggregate component as well as the sum,

@@ -3,6 +3,14 @@
 Case Studies
 ===================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
 The book  `Pricing Insurance Risk <https://www.wiley.com/en-us/Pricing+Insurance+Risk:+Theory+and+Practice-p-9781119755678>`_  (PIR) presents four Case Studies. In this section we show how to reproduce all the exhibits shown in the book for each case and how users can create their own custom cases.
 
 Four Book Case Studies

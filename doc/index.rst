@@ -87,7 +87,7 @@ aggregate Documentation
 
    +++
 
-   .. link-button:: 4_agg_Language_Reference
+   .. link-button:: 4_dec_Language_Reference
       :type: ref
       :text: DecL reference
       :classes: btn-block btn-secondary stretched-link

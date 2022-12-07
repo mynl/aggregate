@@ -3,6 +3,13 @@
 Strategy and Portfolio Management
 ==================================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
 
 Capital Allocation and Pricing
 ------------------------------

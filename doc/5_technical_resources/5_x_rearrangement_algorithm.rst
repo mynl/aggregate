@@ -3,6 +3,14 @@
 The Rearrangement Algorithm
 ===========================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
 The Rearrangement Algorithm (RA) is a practical and straightforward
 method to determine the worst-VaR sum. The RA works by iteratively
 making each marginal crossed (counter-monotonic) with the sum of the

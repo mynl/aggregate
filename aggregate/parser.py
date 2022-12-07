@@ -51,7 +51,7 @@ class UnderwritingLexer(Lexer):
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY, # SCALE_MULTIPLY, LOCATION_ADD,
+              PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
               LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
               XS, PICKS,
               DISTORTION,
@@ -88,7 +88,7 @@ class UnderwritingLexer(Lexer):
     TIMES = r'\*'
     DIVIDE = '/'
     PERCENT = '%'
-    HOMOG_MULTIPLY = '@'
+    INHOMOG_MULTIPLY = '@'
     EQUAL_WEIGHT = '='
     RANGE = ':'
 
@@ -195,11 +195,8 @@ class UnderwritingParser(Parser):
     tokens = UnderwritingLexer.tokens
     precedence = (
         # LOW is used to force shift in rules like
-        # expr <- sum or expr <- sum + expr, and empty rules
         ('nonassoc', LOW),
-        # ('nonassoc', LOCATION_ADD),
-        # ('nonassoc', SCALE_MULTIPLY, HOMOG_MULTIPLY),
-        ('nonassoc', HOMOG_MULTIPLY),
+        ('nonassoc', INHOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
         ('left', TIMES, DIVIDE),
         ('right', EXP),
@@ -380,17 +377,18 @@ class UnderwritingParser(Parser):
         # self.out_dict[('agg', p.name)] = dout
         return 'agg', p.name, dout
 
-    @_('AGG name builtin_agg note')
+    @_('AGG name builtin_agg agg_reins note')
     def agg_out(self, p):
         # for use when you change the agg and/or  want a new name
         self.logger(
             f'agg_out <-- AGG name builtin_aggregate note', p)
-        # self.out_dict[("agg", p.name)] =
-        return 'agg', p.name, {'name': p.name, **p.builtin_agg, 'note': p.note}
+        # rename; NOTE!! the code below will overwrite the new name!
+        del p.builtin_agg['name']
+        return 'agg', p.name, {'name': p.name, **p.builtin_agg, **p.agg_reins, 'note': p.note}
 
     @_('builtin_agg agg_reins note')
     def agg_out(self, p):
-        # no change to the built in agg, allows agg.A as a legitimate agg (called A)
+        # no change to the builtin agg, allows agg.A as a legitimate agg (called A)
         self.logger(
             f'agg_out <-- builtin_agg agg_reins note', p)
         # print(p.builtin_agg)
@@ -824,16 +822,17 @@ class UnderwritingParser(Parser):
         return p.ID
 
     # elements made from named portfolios ========================
-    @_('expr HOMOG_MULTIPLY builtin_agg')
+    @_('expr INHOMOG_MULTIPLY builtin_agg')
     def builtin_agg(self, p):
         """  inhomogeneous change of scale """
         self.logger(
-            f'builtin_agg <-- expr HOMOG_MULTIPLY builtin_agg', p)
+            f'builtin_agg <-- expr INHOMOG_MULTIPLY builtin_agg', p)
         bid = p.builtin_agg.copy()
         bid['name'] += '_i_scaled'
-        bid['exp_en'] = bid.get('exp_en', 0) * p.expr
-        bid['exp_el'] = bid.get('exp_el', 0) * p.expr
-        bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
+
+        bid['exp_en'] = self._check_vectorizable(bid.get('exp_en', 0)) * p.expr
+        bid['exp_el'] = self._check_vectorizable(bid.get('exp_el', 0)) * p.expr
+        bid['exp_premium'] = self._check_vectorizable(bid.get('exp_premium', 0)) * p.expr
         return bid
 
     @_('expr TIMES builtin_agg')
@@ -844,15 +843,15 @@ class UnderwritingParser(Parser):
         bid = p.builtin_agg
         bid['name'] += '_homog_scaled'
         if 'sev_mean' in bid:
-            bid['sev_mean'] = bid['sev_mean'] * p.expr
+            bid['sev_mean'] = self._check_vectorizable(bid['sev_mean']) * p.expr
         if 'sev_scale' in bid:
-            bid['sev_scale'] = bid['sev_scale'] * p.expr
+            bid['sev_scale'] = self._check_vectorizable(bid['sev_scale']) * p.expr
         if 'sev_loc' in bid:
-            bid['sev_loc'] = bid['sev_loc'] * p.expr
-        bid['exp_attachment'] = bid.get('exp_attachment', 0) * p.expr
-        bid['exp_limit'] = bid.get('exp_limit', np.inf) * p.expr
-        bid['exp_el'] = bid.get('exp_el', 0) * p.expr
-        bid['exp_premium'] = bid.get('exp_premium', 0) * p.expr
+            bid['sev_loc'] = self._check_vectorizable(bid['sev_loc']) * p.expr
+        bid['exp_attachment'] = self._check_vectorizable(bid.get('exp_attachment', 0)) * p.expr
+        bid['exp_limit'] = self._check_vectorizable(bid.get('exp_limit', np.inf)) * p.expr
+        bid['exp_el'] = self._check_vectorizable(bid.get('exp_el', 0)) * p.expr
+        bid['exp_premium'] = self._check_vectorizable(bid.get('exp_premium', 0)) * p.expr
         return bid
 
     @_('builtin_agg PLUS expr', 'builtin_agg MINUS expr')
@@ -1116,7 +1115,7 @@ EXP                     ::= 'exp'
 
 EXPONENT                ::= '^|**'
 
-HOMOG_MULTIPLY          ::= "@"
+INHOMOG_MULTIPLY        ::= "@"
 
 INFINITY                ::= 'inf|unlim|unlimited'
 

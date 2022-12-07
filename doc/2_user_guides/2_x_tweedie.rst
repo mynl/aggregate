@@ -5,19 +5,18 @@ The Tweedie Distribution
 
 .. Below is the code from the snippet.
 
+**Objectives:** Introduce aggregate probability distributions and the `aggregate` library for working with then in the context of real-world, but basic, actuarial problems illustrated using the Tweedie distribution from GLM modeling.
 
-Tweedie distributions are a suitable model for pure premiums and are used in GLMs. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
+**Audience:** Actuaries at the Associate or Fellow level.
 
-**Objectives** Introduce aggregate probability distributions and the `aggregate` library for working with then in the context of real-world, but basic, actuarial problems
-illustrated using the Tweedie distribution from GLM modeling.
+**Prerequisites:** V02 plus awareness of the use aggregate probability distribution in insurance (as covered on CAS Part 8).
 
-**Audience** Actuaries at the Associate or Fellow level.
-
-**Prerequisites** V02 plus awareness of the use aggregate probability distribution in insurance (as covered on CAS Part 8).
-
+**See also:**
 
 Theory
 -------
+
+Tweedie distributions are a suitable model for pure premiums and are used in GLMs. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
 
 The **Tweedie** family of distributions is a three-parameter exponential family. It is used as unit distribution in GLMs. A variable :math:`X \sim \mathrm{Tw}_p(\mu, \sigma^2)` when
 :math:`\mathsf E[X] = \mu` and

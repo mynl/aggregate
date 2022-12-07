@@ -1,6 +1,14 @@
 Published Problems and Examples
 =================================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
 This chapter shows how to use ``aggregate`` to replicate worked problems and examples from a number of textbooks and papers. The objectives are twofold. First, to show how to use ``aggregate`` to solve each type of problem, and second, to verify it gives the same answer as the published reference.
 
 **Contents**

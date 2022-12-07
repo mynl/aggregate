@@ -3,13 +3,15 @@
 Probability Background
 ======================
 
-**Objectives.** Statement and limited explanation of important probability concepts that underlie ``aggregate`` calculations.
+**Objectives:** Statement and limited explanation of important probability concepts that underlie ``aggregate`` calculations.
 
-**Audience.**
+**Audience:**
 
-**Prerequisites.** Knowledge of probability and calculus (real analysis).
+**Prerequisites:** Knowledge of probability and calculus (real analysis).
 
-**Notation.** The variance of a random variable :math:`X` is :math:`\mathsf{var}(X)=\mathsf{E}[X^2]-\mathsf{E}[X]^2`. The standard deviation is :math:`\sigma(X)=\sqrt{\mathsf{var}(X)}`. The coefficient of variation (CV) of :math:`X` is :math:`\mathsf{CV}(X)=\sigma(X)/\mathsf{E}[X]`. The skewness of :math:`X` is :math:`\mathsf{E}[(X-\mathsf{E}[X])^3]/\sigma(X)^3`.
+**See also:**
+
+**Notation:** The variance of a random variable :math:`X` is :math:`\mathsf{var}(X)=\mathsf{E}[X^2]-\mathsf{E}[X]^2`. The standard deviation is :math:`\sigma(X)=\sqrt{\mathsf{var}(X)}`. The coefficient of variation (CV) of :math:`X` is :math:`\mathsf{CV}(X)=\sigma(X)/\mathsf{E}[X]`. The skewness of :math:`X` is :math:`\mathsf{E}[(X-\mathsf{E}[X])^3]/\sigma(X)^3`.
 
 Types
 ------
@@ -241,7 +243,6 @@ we get an expression for the skewness
 
 .. math::
 
-
    \text{skew}(N) = \frac{n^3(\gamma -3c -1) + n^2(3c+2) + n}{(n(1+cn))^{3/2}}.
 
 The corresponding MGF of the gamma is
@@ -255,8 +256,6 @@ gamma distribution, then the unconditional distribution of :math:`N` is
 a negative binomial. Both the gamma and negative binomial occur in the
 literature with many different parameterizations. The main ones are
 shown in the next three tables.
-
-
 
 
 .. list-table:: Parameterizations of the Gamma Distribution
@@ -402,6 +401,20 @@ and its application in modeling is discussed in Clark and Thayer, and Verrall.
 
 
 dddddd
+
+.. _prob variance mult:
+
+The Variance Multiplier
+"""""""""""""""""""""""""
+
+The variance of a mixed Poisson equals :math:`n(1+cn)` where :math:`c` equals the variance of the mixing distribution. Thus the variance equals :math:`v=1+cn` times the mean :math:`n`, where :math:`v` is called the **variance multiplier**. The variance multiplier specification is used by some US rating bureaus. The dictionary to variance and mix CV is
+
+.. math::
+
+  c = (v-1) / n \\
+  \mathit{cv} = \sqrt{(v-1)/n}.
+
+The frequency for an excess layer attaching at :math:`a` equals :math:`nS(a)`. For fixed :math:`c`, the implied variance multiplier :math:`v=1+cnS(a)` decreases and the excess claim count distribution converges to a Poisson. This is an example of the law of small numbers.
 
 Shifted Mixing (General)
 """""""""""""""""""""""""

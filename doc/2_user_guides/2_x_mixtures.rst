@@ -1,15 +1,15 @@
 .. _2_x_mixtures: 
 
-Mixed Severity Distributions
-===============================
+DecL: Mixed Severity Distributions
+====================================
 
-**Objectives**  Describe specification of a mixed severity distribution.
+**Objectives:**  Describe specification of a mixed severity distribution.
 
-**Audience** Actuaries working with mixed severity distributions or multi-unit portfolios.
+**Audience:** Actuaries working with mixed severity distributions or multi-unit portfolios.
 
-**Prerequisites** Knowledge of mixed probability distributions.
+**Prerequisites:** Knowledge of mixed probability distributions.
 
-
+**See also:**
 
 Mixtures
 --------

@@ -1,16 +1,16 @@
 .. _2_x_exposure:
 
-Specifying Exposure
-======================
+DecL: Specifying Exposure
+===========================
 
 
-**Objectives.**  Describe the frequency distributions available in ``aggregate``.
+**Objectives:**  Describe the frequency distributions available in ``aggregate``.
 
-**Audience.** User who wants to build an aggregate with a range of frequency distributions.
+**Audience:** User who wants to build an aggregate with a range of frequency distributions.
 
-**Prerequisites.** Building aggregates using ``build``. Using ``scipy.stats``. Probability theory behind discrete distributions, especially mixed-Poisson distributions and processes.
+**Prerequisites:** Building aggregates using ``build``. Using ``scipy.stats``. Probability theory behind discrete distributions, especially mixed-Poisson distributions and processes.
 
-**See also.** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
+**See also:** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
 
 
 

@@ -3,13 +3,13 @@
 Numerical Methods and FFT Convolution
 =======================================
 
-**Objectives.**  Describe FFT numerical convolution, the basis of all computations in ``aggregate``.
+**Objectives:**  Describe FFT numerical convolution, the basis of all computations in ``aggregate``.
 
-**Audience.** User who wants to understand the computation options and parameters.
+**Audience:** User who wants to understand the computation options and parameters.
 
-**Prerequisites.** Probability theory behind aggregate distributions. Basic complex numbers and matrix multiplication. Basics of numerical analysis, especially numerical integration.
+**Prerequisites:** Probability theory behind aggregate distributions. Basic complex numbers and matrix multiplication. Basics of numerical analysis, especially numerical integration.
 
-**See also.**  :ref:`aggregate <2_x_aggregate>`.
+**See also:**  :ref:`aggregate <2_x_aggregate>`.
 
 Fast, Accurate, and Flexible
 ------------------------------

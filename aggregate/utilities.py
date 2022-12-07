@@ -29,6 +29,7 @@ from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
 
 logger = logging.getLogger(__name__)
 
+GCN = namedtuple('GCN', ['gross', 'net', 'ceded'])
 
 # TODO take out timer stuff
 last_time = first_time = 0
@@ -697,6 +698,16 @@ def lognorm_lev(mu, sigma, n, limit):
         phi_l2 = phi((ll - mu - n * sigma2) / sigma)
         unlimited = np.exp(n * mu + n * n * sigma2 / 2)
         return unlimited * phi_l2 + limit ** n * (1 - phi_l)
+
+
+def lognorm_approx(ser):
+    """
+    Lognormal approximation to series, index = loss values, values = density.
+    """
+    m, cv = xsden_to_meancv(ser.index, ser.values)
+    mu, sigma = mu_sigma_from_mean_cv(m, cv)
+    fz = ss.lognorm(sigma, scale=np.exp(mu))
+    return fz
 
 
 # display related
@@ -1815,7 +1826,7 @@ class GreatFormatter(ticker.ScalarFormatter):
         self.orderOfMagnitude = int(3 * np.floor(self.orderOfMagnitude / 3))
 
 
-def make_mosaic_figure(mosaic, figsize=None, w=2.0, h=2.4, xfmt='great', yfmt='great',
+def make_mosaic_figure(mosaic, figsize=None, w=3.5, h=2.45, xfmt='great', yfmt='great',
                        places=None, power_range=(-3, 3), sep='', unit='', sci=True,
                        mathText=False, offset=True, return_array=False):
     """
@@ -2074,7 +2085,7 @@ def friendly(df):
 
 class FigureManager():
     def __init__(self, cycle='c', lw=1.5, color_mode='mono', k=0.8, font_size=12,
-                 legend_font='small', default_figsize=(5, 3.5)):
+                 legend_font='small', default_figsize=(3.5, 2.45)):
         """
         Another figure/plotter manager: manages cycles for color/black and white
         from Great utilities.py, edited and stripped down
@@ -2677,7 +2688,7 @@ def partial_e(sev_name, fz, a, n):
         raise NotImplementedError(f'{sev_name} NYI for analytic moments')
 
     if a == 0:
-        return [0 for k in range(n+1)]
+        return [0] * (n+1) # for k in range(n+1)]
 
     if sev_name == 'lognorm':
         m = fz.stats('m')
@@ -2706,8 +2717,16 @@ def partial_e(sev_name, fz, a, n):
         # a Pareto defined by agg is like so: ss.pareto(2.5, scale=1000, loc=-1000)
         α = fz.args[0]
         λ = fz.kwds['scale']
+        loc = fz.kwds.get('loc', 0.0)
+        # regular Pareto is scale=lambda, loc=-lambda, so this has no effect
+        # single parameter Pareto is scale=lambda, loc=0
+        # these formulae for regular pareto, hence
+        if λ + loc != 0:
+            logger.warning('Pareto not shifted to x>0 range...using numeric moments.')
+            return partial_e_numeric(fz, a, n)
         ans = []
         # will return inf if the Pareto does not have the relevant moments
+        # TODO: formula for shape=1,2,3
         for k in range(n + 1):
             b = [α * (-1) ** (k - i) * binom(k, i) * λ ** (k + α - i) *
                  ((λ + a) ** (i - α) - λ ** (i - α)) / (i - α)
@@ -2725,7 +2744,7 @@ def partial_e_numeric(fz, a, n):
     for k in range(n+1):
         temp = quad(lambda x: x ** k * fz.pdf(x), 0, a)
         if temp[1] > 1e-4:
-            logger.warning('convergence issues with numerical integral')
+            logger.warning('Potential convergence issues with numerical integral')
         ans.append(temp[0])
     return ans
 
@@ -2796,7 +2815,11 @@ def qd(*argv, accuracy=3, align=True, trim=True):
     ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
-            qd(x.describe, accuracy=accuracy)
+            if 'Err CV(X)' in x.describe.columns:
+                qd(x.describe.drop(columns=['Err CV(X)']), accuracy=accuracy)
+            else:
+                # object not updated
+                qd(x.describe, accuracy=accuracy)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
             print(f'log2 = {x.log2}, bs = {bss}')
         elif isinstance(x, pd.DataFrame):

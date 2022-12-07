@@ -67,12 +67,12 @@ is equivalent to:
 ``aggregate`` Hello World
 ==========================
 
-The only object you need to import to get started is ``build``.
+The only object you need to import to get started is ``build``. ``qd`` (quick display) is a nice-to-have utility function that handles printing with sensible defaults.
 
 .. ipython:: python
     :okwarning:
 
-   from aggregate import build
+   from aggregate import build, qd
 
    build
 
@@ -85,15 +85,13 @@ Using ``build`` you can create an :class:`Aggregate` object using an DecL  progr
 
     agg Eg1 dfreq [1:5] dsev [1:3]
 
-creates an aggregate distribution called ``Eg1``. The frequency distribution is 1, 2, 3, 4, or 5, all equally likely, and the severity is 1, 2, or 3, also equally likely. The mean frequency is 3, the mean severity 2, and hence the aggregate has a mean of 6. It is built:
+creates an aggregate distribution called ``Eg1``. The frequency distribution is 1, 2, 3, 4, or 5, all equally likely, and the severity is 1, 2, or 3, also equally likely. The mean frequency is 3, the mean severity 2, and hence the aggregate has a mean of 6. It is built and displayed like so:
 
 .. ipython:: python
     :okwarning:
 
     a = build('agg Eg1 dfreq [1:5] dsev [1:3]')
-    a
-
-Printing the object returns its name, information about the frequency and severity stochastic models, and how the object was computed, followed by a dataframe of statistics. The dataframe can be accessed directly as the property ``a.describe``.
+    qd(a)
 
 :class:`Aggregate` objects act like a discrete probability distribution. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
 

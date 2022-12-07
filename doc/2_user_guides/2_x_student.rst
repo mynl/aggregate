@@ -5,12 +5,13 @@
 Student
 ==========
 
-**Objectives:** Define and give examples of aggregate probability distributions; get started using the `aggregate` library.
+**Objectives:** Define and give examples of aggregate probability distributions; get started using the ``aggregate``.
 
-**Audience:** New user without knowledge of aggregate distributions or insurance.
+**Audience:** New user, with no knowledge of aggregate distributions or insurance.
 
 **Prerequisites:** Basic probability theory; Python and pandas programming.
 
+**See also:**
 
 What Is an Aggregate Distribution?
 ----------------------------------

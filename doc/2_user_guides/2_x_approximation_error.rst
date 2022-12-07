@@ -3,13 +3,13 @@
 Approximations and Errors
 ===========================
 
-**Objectives.**  
+**Objectives:**
 
-**Audience.**
+**Audience:**
 
-**Prerequisites.** 
+**Prerequisites:**
 
-**See also.**
+**See also:**
 
 * Simulation error of mean
 * Simulation error of percentiles

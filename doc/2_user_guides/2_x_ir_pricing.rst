@@ -3,6 +3,13 @@
 Individual Risk Pricing
 ==========================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
 
 Insurance Pricing Applications
 ------------------------------

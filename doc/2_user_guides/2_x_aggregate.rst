@@ -11,6 +11,7 @@ The :class:`Aggregate` Class
 
 **See also:** :ref:`The Dec language <2_x_dec_language>`.
 
+homog and inhomog multiply of built in aggs!! See Treaty 5 from Bear and Nemlick.
 
 How ``aggregate`` specifies and represents a distribution
 ----------------------------------------------------------
@@ -129,3 +130,6 @@ An :class:`Aggregate` object has the following important methods and properties.
 - ``price`` to apply distortion (spectral) risk measure pricing rules with a variety of capital standards, see XXXX.
 - ``snap`` to round an input number to the index of ``density_df``.
 
+Create and print some? Print vs. qd.
+
+Printing the object returns its name, information about the frequency and severity stochastic models, and how the object was computed, followed by a dataframe of statistics. The dataframe can be accessed directly as the property ``a.describe``.

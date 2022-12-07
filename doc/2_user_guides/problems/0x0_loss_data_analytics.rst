@@ -48,6 +48,7 @@ Distribution Examples
 **Gamma distribution**
 
 .. ipython:: python
+    :okwarning:
 
     import scipy.stats as ss
     import numpy as np
@@ -55,7 +56,7 @@ Distribution Examples
 
     xs = np.linspace(0, 1000, 1001)
 
-    fig, axs = plt.subplots(1, 2, figsize=(8, 3.5), constrained_layout=True, squeeze=True)
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
 
     for scale in [100, 150, 200, 250]:
@@ -64,22 +65,22 @@ Distribution Examples
     for shape in [2, 3, 4, 5]:
         ax1.plot(xs, ss.gamma(shape, scale=100).pdf(xs), label=f'shape = {shape}')
 
+    @savefig lda_gamma.svg
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='gamma density', xlabel='x')
 
-    @savefig lda_gamma.png
-    fig
 
 .. _lda pareto:
 
 **Pareto distribution**
 
 .. ipython:: python
+    :okwarning:
 
     xs = np.linspace(0, 3000, 3001)
 
-    fig, axs = plt.subplots(1, 2, figsize=(8, 3.5), constrained_layout=True, squeeze=True)
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
 
     for scale in [2000, 2500, 3000, 3500]:
@@ -88,22 +89,22 @@ Distribution Examples
     for shape in [1,2,3,4]:
         ax1.plot(xs, ss.pareto(shape, scale=2000, loc=-2000).pdf(xs), label=f'shape = {shape}')
 
+    @savefig lda_pareto.svg
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='Pareto density', xlabel='x')
 
-    @savefig lda_pareto.png
-    fig
 
 .. _lda weibull:
 
 **Weibull distribution**
 
 .. ipython:: python
+    :okwarning:
 
     xs = np.linspace(0, 3000, 3001)
 
-    fig, axs = plt.subplots(1, 2, figsize=(8, 3.5), constrained_layout=True, squeeze=True)
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
 
     for scale in [2000, 2500, 3000, 3500]:
@@ -112,12 +113,11 @@ Distribution Examples
     for shape in [1,2,3,4]:
         ax1.plot(xs, ss.pareto(shape, scale=2000, loc=-2000).pdf(xs), label=f'shape = {shape}')
 
+    @savefig lda_weibull.svg
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='Pareto density', xlabel='x')
 
-    @savefig lda_weibull.png
-    fig
 
 .. _mixture example:
 
@@ -137,6 +137,12 @@ A collection of insurance policies consists of two types. 25% of policies are Ty
     def pmv(m, v):
         print(f'mean     = {m:.6g}\n'
               f'variance = {v:.7g}')
+
+Create the :class:`Aggregate` object, display its ``describe`` dataframe and compare the cdf with the exact computation.
+
+.. ipython:: python
+    :okwarning:
+
     a = build('agg lda.3.3.5 '
               '1 claim '
               'sev [200 200] * [expon pareto] [1 3] wts [.25 .75] + [0 -200] '
@@ -176,8 +182,7 @@ A claim severity distribution is exponential with mean 1000. An insurance compan
               'fixed', update=False)
     qd(a)
     m = 1000 * np.exp(-0.1)
-    print('Actual and numerical mean and variance.')
-    pmv(a.agg_m, a.agg_var)
+    mv(a)
     pmv(m, (2 * 1000**2 * np.exp(-0.1)) - m**2)
 
 **Deductible Example (3.4.2)**
@@ -203,7 +208,7 @@ For an insurance:
 
     a = build('agg lda.3.4.2 1 claim 6 x 4 sev 10 * beta 2 1 fixed')
     qd(a)
-    pmv(a.agg_m, a.agg_var)
+    mv(a)
 
 .. _lda limits:
 
@@ -228,9 +233,8 @@ where :math:`x` is measured in millions. Calculate the total amount, in millions
     F = np.where(xs<3,(xs * xs  * (2 - xs / 3)) / 9, 1)
     ps = np.diff(F, append=1)
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
+    @savefig lda_344.svg
     ax.plot(xs, ps)
-    @savefig lda_344.png
-    fig
 
 When the empirical distribution has many entries it is faster to build the ``Aggregate`` object directly, rather than use DecL. The moments of the severity and aggregate distribution are computed from the numerical approximation during creation. There is no need to update the object.
 
@@ -448,7 +452,7 @@ Here is a comparison of the FFT model with the normal approximation. Example 5.4
     (a.density_df.p / a.bs).plot(label='Exact', ax=ax)
     ax.plot(a.xs, fz.pdf(a.xs), label='Normal approx')
     ax.set(xlim=[0, 3000], title='Normal approximation')
-    @savefig lda_normal.png
+    @savefig lda_normal.svg
     ax.legend(loc='upper right');
 
 .. _lda geom discrete:
@@ -558,7 +562,7 @@ Here is a comparison of the two densities.
     a1.density_df.p_total.plot(ax=ax, label='Adjusted')
 
     ax.set(xlim=[-10, 1.25 * a0.q(0.9999)])
-    @savefig lda_5_5_5.png
+    @savefig lda_5_5_5.svg
     ax.legend(loc='upper right')
 
 .. _lda poisson exponential:
@@ -707,11 +711,10 @@ Finally, plot the densities. Compared to the text plot, the FFT reveals a discon
         if pf is retained:
             ax.set(ylabel='density')
 
+    @savefig lda_10.svg
     for ax, pf in zip(axs.flat[3:], pfs):
         pf.density_df.F.plot(ax=ax)
         ax.set(xlim=xl[hash(pf)], title=pf.name.title() + ' distribution', xlabel='loss')
         if pf is retained:
             ax.set(ylabel='density')
 
-    @savefig lda_10.png
-    fig

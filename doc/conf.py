@@ -66,7 +66,7 @@ pygments_style = 'sphinx'
 todo_include_todos = False
 
 # bibtex options
-bibtex_bibfiles = ['extract.bib']
+bibtex_bibfiles = ['extract.bib', 'books.bib']
 bibtex_reference_style = 'author_year'
 
 # user starts in light mode

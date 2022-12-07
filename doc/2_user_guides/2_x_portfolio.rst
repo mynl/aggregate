@@ -3,6 +3,13 @@
 The :class:`Portfolio` Class
 ==============================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
 
 
 Viewing data

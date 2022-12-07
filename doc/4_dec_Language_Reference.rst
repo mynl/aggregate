@@ -1,6 +1,6 @@
-*****************************
-**agg** Language Reference
-*****************************
+***********************************
+**Dec** Language (DecL) Reference
+***********************************
 
 .. To view the grammar using a railroad diagram paste the
    specification below into
@@ -8,27 +8,26 @@
    (Site diagram uses #DDDDDD as the base color.)
 
 
-This section describes how an ``agg`` program is pre-processed, lexed, and parsed according to the grammar specification. It reports the results of interpreting the builtin test suite of NNN programs.
+This section describes how a DecL program is pre-processed, lexed, and parsed according to the grammar specification. It reports the results of interpreting the builtin test suite of programs.
 
-The ``agg`` language :ref:`introduction <design and purpose>` describes its design and purpose.
+The DecL :ref:`introduction <design and purpose>` describes its design and purpose.
 
 Pre-Processing
 ==============
 
 Programs are processed one line at a time. Before passing to the lexer, the following pre-processing occurs.
 
-1. Remove C++ style  // comments, through end of line
-2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)    }'``
-3. Semicolons are mapped to newline
-4. Backslash (Python sytle line continuations) are mapped to space
-5. \\n\\t is replaced with space, supporting the tabbed indented Portfolio layout
-6. Split on newlines
-
+1. Remove Python and C++ style  ``#`` or ``//`` comments, through end of line
+2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
+3. Map semicolons to newline
+4. Map backslash newline (Python line continuations) to space
+5. Replace \\n\\t  with space, to support the tabbed indented Portfolio layout
+6. Split on remaining newlines
 
 Lexer Term Definitions
 ======================
 
-Ignored characters: tab, colon, comma, and pipe. These characters can be used to improve readability.
+Ignored characters: tab (remaining after pre-processing), colon, comma, and pipe. These characters can be used to improve readability.
 
 Aggregate names must not include underscore. Portfolio names may include underscore. Names can include a period, ``A.Basic.01``.
 
@@ -38,7 +37,7 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY, # SCALE_MULTIPLY, LOCATION_ADD,
+              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY,
               LOSS, PREMIUM, AT, LR, CLAIMS,
               XS,
               DISTORTION,
@@ -111,10 +110,10 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ID['zt'] = ZT
     ID['x'] = XS
 
-Language Grammar Specification
-===============================
+Dec Language Grammar Specification
+===================================
 
-Here is the full ```agg``` Language Grammar and a `grammar railroad diagram <_static/diagram.xhtml>`_.
+Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.xhtml>`_.
 
 .. run python aggregate.parser.py to update this file
 
@@ -149,9 +148,9 @@ To only parse::
     df.query('error != 0')
 
 
-Parser References
+``sly`` Parser
 ==================
 
-https://sly.readthedocs.io/en/latest/sly.html
+The parser is built using the ``sly`` package, https://sly.readthedocs.io/en/latest/sly.html.
 
 

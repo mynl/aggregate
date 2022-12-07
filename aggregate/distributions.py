@@ -23,7 +23,7 @@ from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint, approximate_work, moms_analytic, picks_work
+    pprint, approximate_work, moms_analytic, picks_work, GCN
 
 from .spectral import Distortion
 
@@ -569,6 +569,59 @@ class Aggregate(Frequency):
         return self._density_df
 
     @property
+    def reinsurance_df(self):
+        """
+        Version of density_df tailored to reinsurance. Several cases
+
+        * occ program only: agg_density_.. is recomputed manually for all three outcomes
+        * agg program only: sev_density_... not set for gcn
+        * both programs: agg is gcn for the agg program applied to the requested occ output
+
+
+
+        ``_apply_reins_work``
+        """
+        if self.occ_reins is None and self.agg_reins is None:
+            logger.warning('Asking for reinsurance_df but no reinsuarance specified. Returning None.')
+            return None
+
+        if self._reinsurance_df is None:
+            self._reinsurance_df = \
+                pd.DataFrame({'loss': self.xs,
+                              'p_sev_gross': self.sev_density_gross if
+                              self.sev_density_gross is not None else self.sev_density,
+                              'p_sev_ceded': self.sev_density_ceded,
+                              'p_sev_net': self.sev_density_net
+                              },
+                             index=pd.Index(self.xs, name='loss'))
+            if self.occ_reins is not None:
+                # add agg with gcn occ
+                # TODO sort out
+                logger.warning('Computing aggregates with gcn severities; assumes approx=exact '
+                               'and duplicates one of the three computations.')
+                for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
+                                   [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
+                    z = ft(sv, self.padding, None)
+                    ftz = self.mgf(self.n, z)
+                    if np.sum(self.en) == 1 and self.freq_name == 'fixed':
+                        ad = sv.copy()
+                    else:
+                        ad = np.real(ift(ftz, self.padding, None))
+                    self._reinsurance_df[gcn] = ad
+            if self.agg_density_gross is None:
+                # no agg program
+                self._reinsurance_df['p_agg_gross'] = self.agg_density
+                self._reinsurance_df['p_agg_ceded'] = None
+                self._reinsurance_df['p_agg_net'] = None
+            else:
+                # agg program
+                self._reinsurance_df['p_agg_gross'] = self.agg_density_gross
+                self._reinsurance_df['p_agg_ceded'] = self.agg_density_ceded
+                self._reinsurance_df['p_agg_net'] = self.agg_density_net
+
+        return self._reinsurance_df
+
+    @property
     def reins_audit_df(self):
         """
         Create and return the _reins_audit_df data frame.
@@ -606,22 +659,23 @@ class Aggregate(Frequency):
         # reins = self.occ_reins if kind == 'occ' else self.agg_reins
 
         if kind == 'occ':
-            if self.sev_gross_density is None:
-                self.sev_gross_density = self.sev_density
+            if self.sev_density_gross is None:
+                self.sev_density_gross = self.sev_density
             reins = self.occ_reins
             for (s, y, a) in reins:
-                c, n, df = self._apply_reins_work([(s, y, a)], self.sev_gross_density, False)
+                c, n, df = self._apply_reins_work([(s, y, a)], self.sev_density_gross, False)
                 ans.append(df)
             ans.append(self.occ_reins_df)
         elif kind == 'agg':
-            if self.agg_gross_density is None:
-                self.agg_gross_density = self.agg_density
+            if self.agg_density_gross is None:
+                self.agg_density_gross = self.agg_density
             reins = self.agg_reins
             for (s, y, a) in reins:
-                c, n, df = self._apply_reins_work([(s, y, a)], self.agg_gross_density, False)
+                c, n, df = self._apply_reins_work([(s, y, a)], self.agg_density_gross, False)
                 ans.append(df)
             ans.append(self.agg_reins_df)
 
+        # gup here even though it messes up things later becasuse of sort order
         df = pd.concat(ans, keys=reins + [('all', np.inf, 'gup')], names=['share', 'limit', 'attach', 'loss'])
         # subset and reindex
         df = df.filter(regex='^(F|p)')
@@ -783,7 +837,11 @@ class Aggregate(Frequency):
         self.xs = None
         self.bs = 0
         self.log2 = 0
-        self.ex = 0
+        # self.ex = 0 --> est_m
+        self.est_m = 0
+        self.est_cv = 0
+        self.est_sd = 0
+        self.est_skew = 0
         self.note = note
         self.program = ''  # can be set externally
         self.en = None     # this is for a sublayer e.g. for limit profile
@@ -815,6 +873,7 @@ class Aggregate(Frequency):
         self._careful_q = None
         self._density_df = None
         self._reins_audit_df = None
+        self._reinsurance_df = None
         self.q_temp = None
         self.q_temp_sev = None
         self.occ_reins = occ_reins
@@ -827,14 +886,14 @@ class Aggregate(Frequency):
         self.agg_netter = None
         self.agg_ceder = None
         self.agg_reins_df = None
-        self.sev_ceded_density = None
-        self.sev_net_density = None
-        self.sev_gross_density = None
+        self.sev_density_ceded = None
+        self.sev_density_net = None
+        self.sev_density_gross = None
+        self.agg_density_ceded = None
+        self.agg_density_net = None
+        self.agg_density_gross = None
         self.sev_pick_attachments = sev_pick_attachments
         self.sev_pick_losses = sev_pick_losses
-        self.agg_ceded_density = None
-        self.agg_net_density = None
-        self.agg_gross_density = None
         self.sev_calc = ""
         self.discretization_calc = ""
         self.normalize = ""
@@ -1233,10 +1292,9 @@ class Aggregate(Frequency):
         # TODO issues with force_severity = False.... get rid of that option entirely?
         # reinsurance converts sev_density to a Series from np.array
         if self.occ_reins is not None:
-            logger.warning(f'Applying occurrence reinsurance type of sev density {type(self.sev_density)}')
-            if self.sev_gross_density is not None:
+            if self.sev_density_gross is not None:
                 # make the function an involution...
-                self.sev_density = self.sev_gross_density
+                self.sev_density = self.sev_density_gross
             self.apply_occ_reins(debug)
 
         if approximation == 'exact':
@@ -1311,7 +1369,10 @@ class Aggregate(Frequency):
         self.audit_df.loc['mixed', 'emp_sev_skew'] = _sk
         _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.agg_density)
         self.audit_df.loc['mixed', 'emp_agg_1'] = _m
-        self.ex = _m
+        self.est_m = _m
+        self.est_cv = _cv
+        self.est_sd = _m * _cv
+        self.est_skew = _sk
         self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
         self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
 
@@ -1391,9 +1452,9 @@ class Aggregate(Frequency):
 
         """
         # always want to work off gross severity
-        if self.sev_gross_density is not None:
+        if self.sev_density_gross is not None:
             logger.warning('Using GROSS severity in picks')
-            sd = self.sev_gross_density
+            sd = self.sev_density_gross
         else:
             sd = self.sev_density
         return picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
@@ -1498,7 +1559,7 @@ class Aggregate(Frequency):
         """
         Apply the entire occ reins structure and save output
         For by layer detail create reins_audit_df
-        Makes sev_gross_density, sev_net_density and sev_ceded_density, and updates sev_density to the requested view.
+        Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
         Treatment in stats?
 
@@ -1511,13 +1572,13 @@ class Aggregate(Frequency):
         occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
         # store stuff
         self.occ_reins_df = occ_reins_df
-        self.sev_gross_density = self.sev_density
-        self.sev_net_density = occ_reins_df['p_net']
-        self.sev_ceded_density = occ_reins_df['p_ceded']
+        self.sev_density_gross = self.sev_density
+        self.sev_density_net = occ_reins_df['p_net']
+        self.sev_density_ceded = occ_reins_df['p_ceded']
         if self.occ_kind == 'ceded to':
-            self.sev_density = self.sev_ceded_density
+            self.sev_density = self.sev_density_ceded
         elif self.occ_kind == 'net of':
-            self.sev_density = self.sev_net_density
+            self.sev_density = self.sev_density_net
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
 
@@ -1525,7 +1586,7 @@ class Aggregate(Frequency):
         """
         Apply the entire agg reins structure and save output
         For by layer detail create reins_audit_df
-        Makes sev_gross_density, sev_net_density and sev_ceded_density, and updates sev_density to the requested view.
+        Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
         Treatment in stats?
 
@@ -1544,13 +1605,13 @@ class Aggregate(Frequency):
 
         # store stuff
         self.agg_reins_df = agg_reins_df
-        self.agg_gross_density = self.agg_density
-        self.agg_net_density = agg_reins_df['p_net']
-        self.agg_ceded_density = agg_reins_df['p_ceded']
+        self.agg_density_gross = self.agg_density
+        self.agg_density_net = agg_reins_df['p_net']
+        self.agg_density_ceded = agg_reins_df['p_ceded']
         if self.agg_kind == 'ceded to':
-            self.agg_density = self.agg_ceded_density
+            self.agg_density = self.agg_density_ceded
         elif self.agg_kind == 'net of':
-            self.agg_density = self.agg_net_density
+            self.agg_density = self.agg_density_net
         else:
             raise ValueError(f'Unexpected kind of agg reinsurance, {self.agg_kind}')
 
@@ -1558,10 +1619,13 @@ class Aggregate(Frequency):
         self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
 
         # see impact on moments
-        _m2, _cv2 = xsden_to_meancv(self.xs, self.agg_density)
+        _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.agg_density)
         # self.audit_df.loc['mixed', 'emp_agg_1'] = _m
         # old_m = self.ex
-        self.ex = _m2
+        self.est_m = _m2
+        self.est_cv = _cv2
+        self.est_sd = _m2 * _cv2
+        self.est_skew = _sk2
         # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
         # invalidate quantile function
 
@@ -1807,7 +1871,7 @@ class Aggregate(Frequency):
         else:
             self.figure = axd['A'].figure
 
-        if self.bs == 1 and self.ex < 1025:
+        if self.bs == 1 and self.est_m < 1025:
             # treat as discrete
             if xmax > 0:
                 mx = xmax
@@ -2504,13 +2568,13 @@ class Aggregate(Frequency):
                 if p0 > 0:
                     ps = np.linspace(0, p0, 200, endpoint=False)
                     tempx = np.hstack((ps, _x))
-                    tempy = np.hstack((self.ex / (1 - ps), _y))
+                    tempy = np.hstack((self.est_m / (1 - ps), _y))
                     self._tail_var = interpolate.interp1d(tempx, tempy,
                                                           kind='linear', bounds_error=False,
-                                                          fill_value=(self.ex, sup))
+                                                          fill_value=(self.est_m, sup))
                 else:
                     self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
-                                                          fill_value=(self.ex, sup))
+                                                          fill_value=(self.est_m, sup))
             if type(p) in [float, np.float]:
                 return float(self._tail_var(p))
             else:

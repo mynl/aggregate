@@ -3,6 +3,14 @@
 :class:`Aggregate` Class Calculations
 ======================================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
 Calculations made by ``Aggregate`` objects.
 
 

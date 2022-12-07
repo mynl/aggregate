@@ -5,12 +5,13 @@
 Actuarial Student
 ===========================================
 
-**Objectives** Introduce the `aggregate` library for working with aggregate probability distributions in the context of actuarial society exams and university courses in actuarial modeling.
+**Objectives:** Introduce the `aggregate` library for working with aggregate probability distributions in the context of actuarial society exams and university courses in actuarial modeling.
 
-**Audience** Actuarial science university students or junior actuarial analysts.
+**Audience:** Actuarial science university students or junior actuarial analysts.
 
-**Prerequisites** Familiarity with aggregate probability distributions (as covered on SOA STAM, CAS MAS I, IFOA CS-2) and basic insurance terminology (insurance company operations).
+**Prerequisites:** Familiarity with aggregate probability distributions (as covered on SOA STAM, CAS MAS I, IFOA CS-2) and basic insurance terminology (insurance company operations).
 
+**See also:**
 
 Realistic Insurance Example
 ---------------------------

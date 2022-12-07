@@ -2,6 +2,17 @@
 The Iman-Conover Method
 =======================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
+Basic Idea
+------------
+
 Here is the basic idea of the Iman-Conover method. Given samples of
 :math:`n` values from two known marginal distributions :math:`X` and
 :math:`Y` and a desired correlation :math:`\rho` between them, re-order

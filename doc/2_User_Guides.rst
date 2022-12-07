@@ -90,7 +90,7 @@ Guides marked *problem* are possible driving destinations, whereas *reference* g
     2_user_guides/2_x_underwriter
     2_user_guides/2_x_numerical_methods
     2_user_guides/2_x_aggregate
-    2_user_guides/2_x_agg_language
+    2_user_guides/2_x_dec_language
     2_user_guides/2_x_frequency
     2_user_guides/2_x_severity
     2_user_guides/2_x_exposure

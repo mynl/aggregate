@@ -3,6 +3,14 @@
 The :class:`Underwriter` Class
 ===============================
 
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
 The Underwriter is an interface into the computational functionality of aggregate. It can
 
 * Maintain a libraries of severity curves.

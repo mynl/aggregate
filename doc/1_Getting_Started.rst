@@ -26,8 +26,21 @@ The help assumes you know how to program in Python, understand probability, and 
 License
 =======
 
-BSD 3
+:ref:`BSD 3<../LICENCE>`
 
+Help Structure
+===============
+
+The help structured around **access**, **application**, **theory**, and **implementation**. There are six parts.
+
+#. Getting Started (this document).
+#. :doc:`2_User_Guides`, explaining how to **access** functionality and practical guides explaining how to **apply** it.
+#. :doc:`3_Reference`: all functions, classes, methods, and properties.
+#. :doc:`4_dec_Language_Reference`: syntax and grammar.
+#. :doc:`5_Technical_Guides`, covering the underlying **theory** and its specific **implementation**.
+#. :doc:`6_Development`, giving some history, the design philosophy, and ideas for future development.
+
+There is also a :doc:`7_bibliography`.
 
 Help Coding Conventions
 =======================

@@ -94,5 +94,7 @@ These distributions have a high claim count, hence specify ``approximation='exac
     wc.density_df[var].plot(ax=ax2,label=wc.name);
     ax2.legend();
     xl2 = [-50, 1050]
-    @savefig re_pricing_comps.svg
+    @savefig re_pricing_comps.png
     ax2.set(xlim=xl2, yscale=sc, ylim=ax0.get_ylim(), title='WC insurance charge distribution');
+
+

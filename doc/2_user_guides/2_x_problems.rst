@@ -1,17 +1,16 @@
 Published Problems and Examples
 =================================
 
-**Objectives:**
+**Objectives:** Use ``aggregate`` to replicate worked problems and examples from published references. Demonstrate method of solution and verify correctness.
 
-**Audience:**
+**Audience:** Academics and researchers and actuarial students reading the cited works.
 
-**Prerequisites:**
+**Prerequisites:** ``aggregate`` programming; risk theory.
 
-**See also:**
+**See also:** Bear and Nemlick and Mata et al. examples in :doc:`2_x_re_pricing`.
 
-This chapter shows how to use ``aggregate`` to replicate worked problems and examples from a number of textbooks and papers. The objectives are twofold. First, to show how to use ``aggregate`` to solve each type of problem, and second, to verify it gives the same answer as the published reference.
-
-**Contents**
+Contents
+---------
 
 .. toctree::
     :maxdepth: 2
@@ -30,5 +29,3 @@ Any of the following problems:
 
 * Given frequency and severity compute the moments, distribution, approximate the distribution, compute anything from the distribution (layers, etc.)
 
-..    problems/0x0_fisher
-    problems/0x0_clark_reinsurance

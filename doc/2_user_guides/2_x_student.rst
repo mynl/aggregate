@@ -5,119 +5,130 @@
 Student
 ==========
 
-**Objectives:** Define and give examples of aggregate probability distributions; get started using the ``aggregate``.
+**Objectives:** Define and give examples of aggregate probability distributions; get started using ``aggregate``.
 
-**Audience:** New user, with no knowledge of aggregate distributions or insurance.
+**Audience:** New user, with no knowledge of aggregate distributions or insurance terminology.
 
 **Prerequisites:** Basic probability theory; Python and pandas programming.
 
-**See also:**
+**See also:** :doc:`../2_User_Guides`.
 
-What Is an Aggregate Distribution?
-----------------------------------
+Contents
+----------
 
-**Aggregate distributions** are used to model outcomes generated as the
-sum of an observable quantity over a random number of events.
+* :ref:`st what is`
+* :ref:`Formal Construction`
+* :ref:`Simple Example`
+* :ref:`Exercise - Test Your Understanding`
+* :ref:`Dice Rolls`
 
-1. Total insurance claims from a portfolio: number of claims and amount of each claim.
-2. Larvae per unit area (Neyman 1939): number of egg clusters per unit area and number of larvae per egg cluster
-3. Number of vehicle occupants passing a point on the road: number of vehicles passing the point and number of occupants per vehicle
 
-Aggregate distributions are used in many fields and go by different names, including compound, generalized, and stopped-sum distributions.
+.. _st what is:
 
-In insurance terminology, the number of events is called the
-**frequency** and the amount the **severity**. The help always uses that terminology.
+What Is an Aggregate Probability Distribution?
+-----------------------------------------------
+
+An **aggregate probability distribution** describes the sum of a random number of identically distributed outcome random variables. The distribution of the number called the **frequency** distribution and of the outcome the **severity** distribution.
+
+**Examples.**
+
+1. Total insurance claims from a portfolio: frequency equals the number of claims and the severity outcome is the amount of each claim.
+2. Larvae per unit area (Neyman 1939): frequency is the number of egg clusters per unit area and severity is the number of larvae per egg cluster.
+3. Number of vehicle occupants passing a point on the road: frequency is the number of vehicles passing the point and severity is the number of occupants per vehicle.
+4. Total transaction value in an exchange: frequency is the number of transactions and severity is the amount of each transaction.
+
+Aggregate distributions are used in many fields and go by different names, including compound distributions, generalized distributions, and stopped-sum distributions.
+
 
 Formal Construction
 -------------------
 
-Let the random variable :math:`N` equal the number of events and let :math:`X_i` be a series of iid random variables modeling an observable quantity. An **aggregate distribution** is the distribution of the sum of the observables
+Let :math:`N` be a discrete random variable taking non-negative integer values. Its outcomes give the frequency (number) of events. Let :math:`X_i` be a series of iid severity random variables modeling an outcome. An **aggregate distribution** is the distribution of the random sum
 
 .. math::
 
    A = X_1 + \cdots + X_N.
 
+:math:`N` is called the frequency component of the aggregate and :math:`X` the severity.
+
 An observation from :math:`A` is realized by:
 
-1. Sampling (simulating) :math:`N`
-2. For :math:`i=1,\dots, N`, sampling the number of occupants
-   :math:`X_i`
-3. Add the :math:`X_i`
+1. Sample (or simulate) an outcome :math:`n` from :math:`N`
+2. For :math:`i=1,\dots, n`, sample :math:`X_i`
+3. Return :math:`A:=X_1 + \cdots + X_n`
 
 It is usual to assume that the values of :math:`X` and :math:`N` are independent. Check this assumption is reasonable for your use case!
 
-Parameters for the Simple Discrete Traffic Example
---------------------------------------------------
+Simple Example
+----------------
 
-You observe traffic past a junction over sixteen 1-minute intervals.
-There are 20 vehicles in total, or 20/16=1.25 per minute on average.
-This gives the **frequency distribution** :math:`N`.
+Frequency :math:`N` can equal 1, 2, or 3, with probabilities 1/2, 1/4, and 1/4.
 
+Severity :math:`X` can equal 1, 2, or 4, with probabilities 5/8, 1/4, and 1/8.
 
-================== =================== =====================
-Number of vehicles Number of intervals Probability
-================== =================== =====================
-0                  4                   4/16=0.25
-1                  6                   6/16=0.375
-2                  4                   4/16=0.25
-3                  2                   2/16=0.125
-Total intervals    16
-================== =================== =====================
+Aggregate :math:`A = X_1 + \cdots + X_N`.
 
-Separately, you also observe the number of occupants per vehicle for
-sixteen vehicles, giving the **severity distribution** :math:`X`. The
-ability to determine frequency and severity using separate data studies
-is a strength of the aggregate method.
+**Exercise.**
 
-=================== ================== =====================
-Number of occupants Number of vehicles Probability :math:`X`
-=================== ================== =====================
-1                   10                 10/16=0.625
-2                   3                  3/16=0.1875
-3                   0                  0
-4                   3                  3/16=0.1875
-Total vehicles      16
-=================== ================== =====================
+#. What are the expected value and CV of :math:`N`?
+#. What are the expected value and CV of :math:`X`?
+#. What are the expected value and CV of :math:`A`?
+#. What possible values can :math:`A` take? What are the probabilities of each?
 
-The average number of occupants per vehicle equals
-1.75=(10+6+12)/16=28/16=1.75.
+.. warning::
 
-From here we can build an aggregate distribution :math:`A` of the number of occupants per minute. You should work out the entire distribution of :math:`A` by hand in a spreadsheet!
+    Stop and solve the exercise!
 
-Aggregate Program for the Traffic Example
------------------------------------------
-
-Here is the DecL program for the traffic example. The program is one line long. Python automatically concatenates strings within parenthesis; it is split for clarity.
-
-.. code:: agg
-
-   a = build('agg Traffic dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
-             'dsev [1 2 4] [10/16 3/16 3/16]')
-
--  ``agg`` is a keyword
--  Traffic is a user-selected label
--  ``dfreq`` is a keyword to specify a discrete probability distribution for the frequency (the number of outcomes). It has the form ``[outcomes] [probabilities]``
-
-   -  ``[0 1 2 3]`` are the outcomes
-   -  ``[4/16 6/16 4/16 2/16]`` are the probabilities
-   -  Commas are optional
-   -  Only division arithmetic is supported
-
--  ``dsev`` is a keyword to specify the severity (the value of each outcome). It has the same form as ``dfreq``.
-
-   -  ``[1 2 4]`` are the outcomes; there can be gaps
-   -  The probabilities are ``[10/16 3/16 3/16]``.
-
-Creating and printing the object yields:
+The exercise is not difficult, but it requires careful bookkeeping and attention to detail. It would soon become impractical to solve by hand if there were more outcomes for frequency or severity. This is where ``aggregate`` comes in. It can solve exercise in the following few lines of code, which we now go through step-by-step.
 
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build
-    a = build('agg Traffic '
-             'dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] '
-             'dsev [1 2 4] [10/16 3/16 3/16]')
-    a
+    from aggregate import build, qd
+
+The first line imports ``build`` and a helper "quick display" function ``qd``. You almost always want to start this way. The next three lines specify the aggregate using a Dec Language (DecL) program to describe its frequency and severity components.
+
+.. ipython:: python
+    :okwarning:
+
+    a = build('agg Simple '
+              'dfreq [1 2 3] [1/2 1/4 1/4] '
+              'dsev [1 2 4] [5/8 1/4 1/8]')
+
+The DecL program has three parts:
+
+-  ``agg`` is a keyword and ``Simple`` is a user-selected name. This clause declares that  we are building an aggregate distribution.
+-  ``dfreq`` is a keyword to specify the frequency distribution. The next two blocks of numbers are the outcomes ``[1 2 3]`` and their probabilities ``[1/2 1/4 1/4]``. Commas are optional in the lists and only division arithmetic is supported.
+-  ``dsev`` is a keyword to specify the a discrete severity distribution. It has the same outcomes-probabilities form as ``dfreq``.
+
+The program string is only one line long because Python automatically concatenates strings within parenthesis; it is split up for clarity. It is recommended that DecL programs be split in this way. Note the spaces at the end of each line.
+
+Use ``qd`` to print a dataframe of statistics with answers the first three questions: the mean and CV for the frequency (``Freq``), severity (``Sev``) and aggregate (``Agg``) distributions.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a)
+
+The columns ``E[X]``, ``CV(X)``, and ``Skew(X)`` report the mean, CV, and skewness for each component, and they are computed analytically.
+The columns ``Est E[X]``, ``Est CV(X)``, and ``Est Skew(X)`` are computed numerically by ``aggregate``. For discrete models they equal the analytic answer because the only error introduced by ``aggregate`` comes from discretizing the severity distribution, and that is why there are no estimates for frequency. ``Err E[X]`` shows the absolute error in the mean. This handy dataframe can be accessed directly via the property ``a.describe``. The note ``log2 = 5, bs = 1`` describe the inner workings, discussed in REF.
+
+It remains to give the aggregate probability mass function. It is available in the dataframe ``a.density_df``. Here are the probability masses, and distribution and survival functions evaluated for all possible aggregate outcomes.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
+
+The possible outcomes range from 1 (frequency 1, outcome 1) to 12 (frequency 3, all outcomes 4). It is easy to check the reported probabilities are correct. It is impossible to obtain an outcome of 11.
+
+For extra credit, here is a plot of the pmf, cdf, and the outcome Lee diagram, showing the severity and aggregate. These are produced automatically by ``a.plot()`` from the ``density_df`` dataframe.
+
+.. ipython:: python
+    :okwarning:
+
+    @savefig simple.png
+    a.plot()
 
 
 Aggregate statistics: the mean
@@ -134,194 +145,120 @@ by conditional probability.
 Aggregate statistics: the variance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-or independent random variables, the variance of a sum equals the sum of the variances.  If :math:`N=n` is fixed then :math:`\mathsf{Var}(A) = n\mathsf{Var}(X)` and :math:`\mathsf{Var}(N)=0`. If :math:`X=x` is fixed then :math:`\mathsf{Var}(A) = x^2\mathsf{Var}(N)` and :math:`\mathsf{Var}(X)=0`. Making the obvious choices :math:`n=\mathsf E[N]`, :math:`x=\mathsf E[X]` and guessing gives
+The variance of a sum of independent random variables equals the sum of the variances.  If :math:`N=n` is fixed then :math:`\mathsf{Var}(A) = n\mathsf{Var}(X)` and :math:`\mathsf{Var}(N)=0`. If :math:`X=x` is fixed then :math:`\mathsf{Var}(A) = x^2\mathsf{Var}(N)` and :math:`\mathsf{Var}(X)=0`. Making the obvious associations :math:`n\leftrightarrow\mathsf E[N]`, :math:`x\leftrightarrow\mathsf E[X]` suggests
 
 .. math::
 
-    \mathsf{Var}(A) = \mathsf E[N]\mathsf{Var}(X) + \mathsf E[X]^2\mathsf{Var}(N)
+    \mathsf{Var}(A) = \mathsf E[N]\mathsf{Var}(X) + \mathsf E[X]^2\mathsf{Var}(N).
 
-which is the correct answer!
+Using conditional expectations and conditioning on the value of :math:`N` shows this  is the correct answer!
+
+**Exercise.** Confirm the formulas for an aggregate mean and variance hold for the :ref:`Simple Example`.
 
 
-
-Exercises - Test Your Understanding
+Exercise - Test Your Understanding
 --------------------------------------
 
-Simple Aggregate Model Example
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Frequency: 1, 2 or 3 events; 50% chance of 1 event, 25% chance of 2, and 25% chance of 3. Severity: 1, 2, 4, 8 or 16, each with equal probability.
 
-In a given year there can be 1, 2 or 3 events. There is a 50% chance of
-1 event, 25% chance of 2, and 25% chance of 3. Each event randomly
-causes a loss of 5, 10 or 15, each with equal probability.
+1. What is the average frequency?
+2. What is the average severity?
+3. What are the average aggregate?
+4. What is the aggregate coefficient of variation?
+5. Tabulate the probability of all possible aggregate outcomes.
 
-1. What is the average annual event frequency?
-2. What is the average event severity?
-3. What are the average losses each year?
-4. What is the coefficient of variation of losses for each year?
-5. Create a table showing all possible outcomes from the model
-6. What is the probability of an annual loss of 5? How can it occur?
-7. What is the probability of an annual loss of 10? How can it occur?
-8. What is the highest amount of total losses that can occur in one
-   year? What is the chances that occurs?
+Try by hand and using ``aggregate``.
 
-
+Here is the ``aggregate`` solution. The probability clause in ``dsev`` can be omitted when all outcomes are equally likely.
 
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build
-    import pandas as pd
-    sam = build('agg SAM dfreq [1 2 3] [.5 .25 .25] dsev [5 10 15]')
-    sam.plot()
-    @savefig student_sam.png
-    print(sam)
-    sam.density_df.query('p_total > 0')[['p_total', 'p_sev']]
+    a1 = build('agg Less.Simple '
+               'dfreq [1 2 3] [.5 .25 .25] '
+               'dsev [1 2 4 8 16] ')
+    qd(a1)
+    qd(a1.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
+    @savefig less_simple.png
+    a1.plot()
 
 
-The largest outcome of 45 has probability 0.25 * (1/3)**3 (1/4) one for count, three outcomes of 50); check accuracy:
-
-.. ipython:: python
-    :okwarning:
-
-    a, e = (1/4) * (1/3)**3, sam.pmf(45)
-    pd.DataFrame([a, e, e/a-1],
-        index=['Actual worst', 'Computed worst', 'error'], columns=['value'])
+The largest outcome of 48 has probability 1/4 * (1/5)**3 = 1/500 = 0.002.
 
 
-A More Complex Aggregate Model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dice Rolls
+-------------
 
-In a given year there can be 1, 2, 3 or 20 events. There is a 45% chance
-of 1 event, 25% chance of 2, 25% chance of 3, and 5% chance of 100
-events. Each event randomly causes a loss of 5, 10 or 50, each with
-equal probability.
+This section presents a series of examples involving dice rolls. The early examples are useful because you know the answer and can see ``aggregate`` is correct.
 
-1. What is the average annual event frequency?
-2. What are the average losses each year?
-3. What is the coefficient of variation of losses for each year?
-4. What are the probabilities of each possible outcome?
-5. What are the 99 and 99.6 percentiles of aggregate losses?
-6. What is the probability of a maximum loss of 1000?
+The DecL program for one dice roll. We write the simple DecL on one line.
 
 .. ipython:: python
     :okwarning:
 
-    cam = build('agg CAM dfreq [1 2 3 20] [.45 .25 .25 0.05] '
-                'dsev [5 10 50] [1/3 1/3 1/3]', log2=11, bs=1)
-    cam.plot()
-    @savefig student_cam.png
-    print(cam)
-
-    # percentiles
-    cam.q(0.99), cam.q(0.996), cam.cdf(570)
-
-
-The largest outcome of 1000 has probability 0.05 * (1/3)**20 (1/4 one for count, three outcomes of 50); check accuracy:
-
-.. ipython:: python
-    :okwarning:
-
-    a, e = 0.05 * (1/3)**20, cam.pmf(1000)
-    pd.DataFrame([a, e, e/a-1],
-        index=['Actual worst', 'Computed worst', 'error'],
-        columns=['value'])
-
-Finally, show the density.
-
-.. ipython:: python
-    :okwarning:
-
-    cam.density_df.query('p_total > 0')[['p_total', 'p_sev', 'F', 'S']]
-
-
-
-More Aggregate Examples
--------------------------
-
-The aggregate program for one dice roll.
-
-.. ipython:: python
-    :okwarning:
-
-    one_dice = build('agg OneDice dfreq [1] dsev [1:6]')
+    one_dice = build('agg Dice.1 dfreq [1] dsev [1:6]')
     one_dice.plot()
     @savefig student_onedice.png
-    print(one_dice)
+    qd(one_dice)
 
 The program for two dice rolls, yielding the triangular distribution.
 
 .. ipython:: python
     :okwarning:
 
-    two_dice = build('agg TwoDice dfreq [2] dsev [1:6]')
+    two_dice = build('agg Dice.2 dfreq [2] dsev [1:6]')
     two_dice.plot()
     @savefig student_twodice.png
-    print(two_dice)
-    print(two_dice.density_df.query('p_total > 0')[['loss', 'p_total', 'F']])
+    qd(two_dice)
+    bit = two_dice.density_df.query('p_total > 0')[['p_total', 'F', 'S']]
+    bit['p/12'] = bit.p_total * 12
+    bit['p/12'] = bit['p/12'].astype(int)
+    qd(bit)
 
-The aggregate program  for twelve dice rolls, which is much harder to do by hand! The answer is compared to a moment-matched normal approximation.
+The aggregate program for twelve dice rolls, which is much harder to compute by hand! The distribution is compared to a moment-matched normal approximation. ``fz`` is a ``scipy.stats`` normal random variable created using the ``approximate`` method.
 
 .. ipython:: python
     :okwarning:
 
     import numpy as np
-    twelve_dice = build('agg TwelveDice dfreq [12] dsev [1:6]')
-    print(twelve_dice)
+    import matplotlib.pyplot as plt
+
+    twelve_dice = build('agg Dice.12 dfreq [12] dsev [1:6]')
+    qd(twelve_dice)
 
     fz = twelve_dice.approximate('norm')
-    # model dataframe and append normal approx
-    df = twelve_dice.density_df[['loss', 'p_total']]
-    df['normal'] = np.diff(fz.cdf(df.loss + 0.5), prepend=0)
-    print(df) # .iloc[32:52])
-    df.drop(columns=['loss']).plot(xlim=[22, 64])
+    df = twelve_dice.density_df[['p_total', 'F', 'S']]
+    df['normal'] = np.diff(fz.cdf(df.index + 0.5), prepend=0)
+    qd(df.iloc[32:52])
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True)
+    ax0, ax1 = axs.flat
+    df[['p_total', 'normal']].plot(xlim=[22, 64], ax=ax0);
+    ax0.set(ylabel='pmf');
+    df[['p_total', 'normal']].cumsum().plot(xlim=[22, 64], ax=ax1);
     @savefig student_norm12.png
-    pass
+    ax1.set(ylabel='Distribution');
 
+The last two plots show very good convergence to the central limit theorem normal distribution.
 
-Finally, a dice roll of dice rolls: throw a dice, then throw that many die.
+Finally, a dice roll of dice rolls: throw a dice, then throw that many dice and add up the dots. The result ranges from 1 (throw 1 first, then 1 again) to 36 (throw 6 first, then 6 for each of the six die).
 
 .. ipython:: python
     :okwarning:
 
-    dice2 = build('agg Dice2 dfreq [1:6] dsev [1:6]')
-    dice2.plot()
+    dd = build('agg DD dfreq [1:6] dsev [1:6]')
+    qd(dd)
     @savefig student_rollroll.png
-    dice2
+    dd.plot()
 
-
-The largest  outcome of 36 has probability 6**-7; check accuracy
+The largest outcome of 36 has probability 6**-7. Here is a check of the accuracy.
 
 .. ipython:: python
     :okwarning:
 
-    a, e = (1/6)**7, dice2.density_df.loc[36, 'p_total']
+    import pandas as pd
+    a, e = (1/6)**7, dd.density_df.loc[36, 'p_total']
     pd.DataFrame([a, e, e/a-1],
         index=['Actual worst', 'Computed worst', 'error'],
         columns=['value'])
 
-Create the same distribution without shorthand notation and using more basic DecL.
-
-.. code:: ipython3
-
-    dice21 = build('agg Dice2b dfreq [1 2 3 4 5 6]  [1/6 1/6 1/6 1/6 1/6 1/6] '
-                   ' sev dhistogram xps [1 2 3 4 5 6] [1/6 1/6 1/6 1/6 1/6 1/6]')
-
-
-Advantages of Modeling with Aggregate Distributions
-------------------------------------------------------
-
-KPW list seven advantages.
-
-1. Only the expected claim count changes with volume. The severity distribution is a characteristic of the line of business.
-
-2. Inflation hits ground-up severity but not claim count. The situation is more complicated when limits and deductibles apply.
-
-3. Coverage terms impact occurrence limits and deductibles, which affect severity.
-
-4. The impact on claims frequencies of changing deductibles is better understood.
-
-5. Severity curves can be estimated from homogeneous data. Kaplan-Meier and related methods can adjust for censoring and truncation caused by limits and deductibles.
-
-6. Retained, insured, ceded, and net losses can be modeled consistently.
-
-7. Understanding properties of frequency and severity separately illuminates the shape of the aggregate.
+We return to this example in Reinsurance Pricing, :ref:`re basic examples`.

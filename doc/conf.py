@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
 import aggregate as agg
 
+import matplotlib.pyplot as plt
+
+# graphics defaults - better res graphics
+plt.rcParams['figure.dpi'] = 300
+
 # -- Project information -----------------------------------------------------
 project = agg.__project__
 copyright = agg.__copyright__
@@ -24,7 +29,8 @@ author = agg.__author__
 #
 # The short X.Y version.
 release = agg.__version__
-version = release[: len(release) - len(release.lstrip("0123456789."))].rstrip(".")
+version = release[: len(release) -
+                  len(release.lstrip("0123456789."))].rstrip(".")
 
 # -- General configuration ------------------------------------------------
 # Add any Sphinx extension module names here, as strings. They can be
@@ -38,13 +44,15 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'sphinx.ext.autosectionlabel',
+    'sphinx_copybutton',
+    'sphinx_toggleprompt',
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
     'sphinx_panels',
     'sphinxcontrib.bibtex',
     'sphinx_rtd_dark_mode'
-    ]
+]
 
 
 # Add any paths that contain templates here, relative to this directory.
@@ -64,6 +72,9 @@ pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
+
+# https://sphinx-toggleprompt.readthedocs.io/en/stable/#offset
+toggleprompt_offset_right = 35
 
 # bibtex options
 bibtex_bibfiles = ['extract.bib', 'books.bib']

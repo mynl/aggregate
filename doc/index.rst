@@ -20,7 +20,7 @@ aggregate Documentation
    2_User_Guides
    3_Reference
    4_dec_Language_Reference
-   5_Technical_Resources
+   5_Technical_Guides
    6_Development
    7_bibliography
 
@@ -33,7 +33,7 @@ aggregate Documentation
 `Binary Installers <https://pypi.org/project/aggregate>`__ |
 `Source Repository <https://github.com/mynl/aggregate>`__
 
-:mod:`aggregate` is an open source, BSD-licensed Python library providing intuitive natural language and easy-to-use tools to work with aggregate probability distributions.
+:mod:`aggregate` is an open source, BSD-licensed Python library providing easy-to-use intuitive natural language tools to work with aggregate probability distributions.
 
 .. Panels at https://sphinx-panels.readthedocs.io/en/latest/
    img-top-cls: pl-5 pr-5
@@ -83,7 +83,7 @@ aggregate Documentation
    :img-top: _static/developer_guide.png
 
 
-   The Dec lanaguage (DecL)  for specifying aggregate distributions.
+   The Dec Language (DecL)  for specifying aggregate distributions.
 
    +++
 
@@ -93,22 +93,22 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/developer_guide.png
+   :img-top: _static/technical_resources.png
 
 
-   Technical background on probability and the numerical methods employed by ``aggregate``.
+   Probability theory background and the numerical implementation methods employed by ``aggregate``.
 
    +++
 
-   .. link-button:: 5_Technical_Resources
+   .. link-button:: 5_Technical_Guides
       :type: ref
-      :text: Technical Resources
+      :text: Technical Guides
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/developer_guide.png
+   :img-top: _static/development.png
 
-   Design philosophy, competing products, future development, todo list, historical perspective.
+   Design philosophy, competing products, future development ideas, and historical perspective.
 
    +++
 

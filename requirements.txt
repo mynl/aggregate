@@ -19,4 +19,6 @@ sphinx>=1.4
 sphinx-panels
 sphinx-rtd-dark-mode
 sphinxcontrib-bibtex
+sphinx-copybutton
+sphinx-toggleprompt
 IPython>=7.31

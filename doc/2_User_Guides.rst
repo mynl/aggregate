@@ -4,13 +4,9 @@
 User Guides
 **************
 
-The User Guides show how ``aggregate`` can solve various actuarial problems. It alternates between problem-based guides and reference guides. New users should start with the :doc:`2_user_guides/2_x_student` guide.
+The User Guides show how to **access** ``aggregate`` functionality and **apply** it to solve various actuarial problems. It alternates between application problem-based guides and access reference guides. New users should start with the :doc:`2_user_guides/2_x_student` guide. See :doc:`../5_Techncial_Guides` for the theory and implementation details.
 
-.. Each is in a separate short document. Many of the guides include a video presentation.
-
-.. 17 files
-
-#. :doc:`2_user_guides/2_x_10mins`: A lightning tour---don't expect to understand everything the first time! Follows the `pandas <https://pandas.pydata.org/docs/user_guide/10min.html>`_ model, a long 10 minutes.
+#. :doc:`2_user_guides/2_x_10mins`: A whirlwind tour---don't expect to understand everything the first time! Follows the `pandas <https://pandas.pydata.org/docs/user_guide/10min.html>`_ model, a *long* 10 minutes.
 
 #. :doc:`2_user_guides/2_x_student` (problem): Introduction to aggregate distributions using simple discrete examples for actuarial science majors and STAM, MAS-I, CS-2 candidates.
 
@@ -68,17 +64,7 @@ The User Guides show how ``aggregate`` can solve various actuarial problems. It 
 
 Guides marked *problem* are possible driving destinations, whereas *reference* guides describe how to unlock the car, start the engine, and engage a gear. Or, in a cooking analogy, *problems* are recipes, and *references* describe cooking techniques such as broiling or baking.
 
-.. Table M and Table L!
-.. https://www.wcirb.com/content/california-retrospective-rating-plan
-.. ISO Retro Rating Plan
-.. Fisher et al case study spreadsheet...
-
 .. <iframe width="1100" height="619" src="https://www.youtube.com/embed/GFP4WgHXqic" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-
-
-
-.. Guides
-   -------
 
 .. toctree::
     :maxdepth: 1

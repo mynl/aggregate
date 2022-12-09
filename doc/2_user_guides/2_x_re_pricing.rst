@@ -65,7 +65,7 @@ Here are some basic examples. They are not realistic, but it is easy to see what
     import pandas as pd
     from aggregate import build, qd
     d = build('agg DD dfreq [1 2 3 4 5 6] dsev [1 2 3 4 5 6] ')
-    @savefig DD_1.svg
+    @savefig DD_1.png
     d.plot()
     qd(d)
     print(f'Pr D = 1:  {d.pmf(1) : 11.6g} = {d.pmf(1) * 36:.0f} / 36\n'
@@ -83,7 +83,7 @@ Requesting ``net of`` propagates losses net of the cover through to the aggregat
     d_occ = build('agg DD.2x4 dfreq [1:6] dsev [1:6] '
                      'occurrence net of 2 xs 4')
     d_occ.plot()
-    @savefig DD_2x4.svg
+    @savefig DD_2x4.png
     qd(d_occ)
 
 Note the use ``[1:6]`` as shorthand for ``[1,2,3,4,5,6]``.
@@ -108,7 +108,7 @@ Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Re
     d_ag = build('agg DD.12x24 agg.DD '
                  'aggregate ceded to 12 x 24')
     d_ag.plot()
-    @savefig DD_12x24a.svg
+    @savefig DD_12x24a.png
     qd(d_ag)
     qd(d_ag.reins_audit_df.stack(0))
 
@@ -120,7 +120,7 @@ Both occurrence and aggregate programs can be applied at once. The ``ceded to`` 
     d_re = build('agg DD.nn dfreq [1:6] dsev [1:6] '
                  'occurrence net of 2 x 4 '
                  'aggregate net of 6 xs 16')
-    @savefig DD_nn.svg
+    @savefig DD_nn.png
     d_re.plot()
     qd(d_re)
     qd(d_re.reins_audit_df['ceded'])
@@ -143,7 +143,7 @@ These concepts are illustrated in the next example. Note the bucket size.
                  'occurrence net of 0.5 so 2 x 2 and 2 x 4 '
                  'aggregate net of 1 po 4 x 10 '
                  , bs=1/512, log2=16)
-    @savefig DD_nn2.svg
+    @savefig DD_nn2.png
     d_mre.plot()
     qd(d_mre)
     qd(d_mre.reins_audit_df['ceded'])
@@ -282,7 +282,7 @@ Here are the base curves, compare Figure 4.2 in :cite:t:`Bernegger1997`. The cur
         gs = G(ps, c)
         ax.plot(ps, gs, label=f'c={c}')
         ans.append([c, *xsden_to_meancv(ps[1:], np.diff(gs))])
-    @savefig prop_ch1.svg
+    @savefig prop_ch1.png
     ax.legend(loc='lower right');
 
 Next, approximate these curves with a beta distribution to make them easier for us to use in ``aggregate``. Here are the parameters and fit graphs for each curve.
@@ -311,7 +311,7 @@ Next, approximate these curves with a beta distribution to make them easier for 
         ax.plot(ps, fz.cdf(ps), label=f'beta fit')
         ans.append([c, *xsden_to_meancv(ps[1:], np.diff(gs))])
         ax.legend(loc='lower right');
-    @savefig prop_ch2.svg
+    @savefig prop_ch2.png
     fig.suptitle('Beta approximations to Swiss Re property curves');
 
 Work on a property schedule with the following TIVs and deductibles. The premium rate is 0.35 per 100 and the loss ratio is 55%.
@@ -383,7 +383,7 @@ Add plots of gross, ceded, and net severity with the placed program, 4000 xs 100
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[-50, 2000], ylim=[0.8e-6, 1] , ax=ax0);
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[0, 50000], ylim=[0.8e-6, 1], ax=ax1);
     ax0.set(xlabel='loss (zoom)', ylabel='Log density');
-    @savefig prop_g1.svg
+    @savefig prop_g1.png
     ax1.set(xlabel='loss', ylabel='');
 
 And finally, the corresponding aggregate distributions.
@@ -401,7 +401,7 @@ And finally, the corresponding aggregate distributions.
     ax0.set(xlabel='', ylabel='Log density');
     ax1.set(xlabel='', ylabel='');
     ax2.set(xlabel='loss (zoom)', ylabel='Log survival');
-    @savefig prop_g2.svg
+    @savefig prop_g2.png
     ax3.set(xlabel='loss', ylabel='');
 
 
@@ -930,7 +930,7 @@ The function giving the slide payoff is easy to create, using a Python ``lambda`
     ax1.set(xlabel='Loss ratio', ylabel='"Net"')
 
     ax2.plot(lrs, slide)
-    @savefig bn_nc.svg
+    @savefig bn_nc.png
     ax2.set(xlabel='Loss ratio', ylabel='Slide commission')
 
     for ax in axs.flat:
@@ -998,7 +998,7 @@ The lognormal distribution is not a great fit to the specified distribution.
         for lr in [.35, .55, .65]:
             ax.axvline(lr, lw=.5, c='C7')
     ax0.set(ylabel='Probability density or mass');
-    @savefig bn_t6.svg
+    @savefig bn_t6.png
     ax1.set(ylabel='Probability distribution');
 
 TODO: investigate differences!
@@ -1090,7 +1090,7 @@ Mata et al. pay careful attention to the implied severity in each ceded layer, a
     ((a.density_df.F_sev - a.sev.cdf(1000)) / (a.sev.cdf(2000) - a.sev.cdf(1000))).plot(xlim=[1000, 2005], ylim=[-0.05, 1.05], ax=ax3);
     for ax, y in zip(axs.flat, ['Log density', 'Log density', 'Density', 'Density']):
         ax.set(ylabel=y);
-    @savefig mata_2_3.svg
+    @savefig mata_2_3.png
     fig.suptitle('Layer loss log density and distribution');
 
 Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance layers. The estimated statistics refer to the net portfolio and reflect a pure exposure rating approach. Gross, ceded, and net expected losses are reported last.
@@ -1162,7 +1162,7 @@ Here is an extract from the aggregate distributions, followed by the density and
         ax.set(xlim=[0, 12500]);
     ax0.set(ylabel='Mixed density');
     ax1.set(ylabel='Log mixed density');
-    @savefig mata_agg_gcn.svg
+    @savefig mata_agg_gcn.png
     ax2.set(ylabel='Distribution');
 
 Any desired risk management evaluation can be computed from ``reinsurance_df``, which contains the gross, ceded, and net distributions. For example, here is a tail return period plot and a dataframe of summary statistics.
@@ -1179,7 +1179,7 @@ Any desired risk management evaluation can be computed from ``reinsurance_df``, 
     ax0.xaxis.set_major_locator(ticker.MultipleLocator(0.25))
     ax0.set(ylim=[0, agcn.q(1-1e-10)], title='$x$ vs $F(x)$', xlabel='$F(x)$', ylabel='Outcome, $x$');
     ax1.set(xscale='log', xlim=[1, 1e10], ylim=[0, agcn.q(1-1e-10)], xlabel='Log return period');
-    @savefig mata_gcn_tail.svg
+    @savefig mata_gcn_tail.png
     ax0.legend(loc='upper left');
     df = pd.DataFrame({c.split('_')[2]: xsden_to_meancvskew(bit.index, bit[c]) for c in bit.columns},
                  index=['mean', 'cv', 'skew'])
@@ -1222,7 +1222,7 @@ Mata Figures 4, 5, 6 and 7 show the aggregate mixed density and distribution fun
     ax0.set(xlim=[-50, 5000], xlabel=None, ylabel='500 xs 500 density'); \
     ax2.set(xlim=[-50, 5000], ylabel='500 xs 500 distribution'); \
     ax1.set(xlim=[-50, 5000], xlabel=None, ylabel='1M xs 1M density');
-    @savefig mata_l1l2.svg
+    @savefig mata_l1l2.png
     ax3.set(xlim=[-50, 5000], ylabel='1M xs 1M distribution');
 
 .. _re loss picks:
@@ -1302,7 +1302,7 @@ These quantities are illustrated in the next figure.
     :okwarning:
 
     from aggregate.extensions.pir_figures import adjusting_layer_losses
-    @savefig picks.svg
+    @savefig picks.png
     adjusting_layer_losses();
 
 There is no adjustment to :math:`S` for :math:`x\ge a_n`. In the top
@@ -1338,3 +1338,9 @@ The function ``utilities.picks_work`` computes the adjusted severity. In
 debug mode, it returns useful layer information. A severity can be
 adjusted on-the-fly by ``Aggregate`` using the ``picks`` keyword after
 the severity specification and before any occurrence reinsurance.
+
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')

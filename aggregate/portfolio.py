@@ -1737,7 +1737,7 @@ class Portfolio(object):
             # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
-    def plot(self, axd=None, figsize=(6, 2.5)):
+    def plot(self, axd=None, figsize=(2 * 3.5, 2.45)):
         """
         Defualt plot of density, survival functions (linear and log)
 
@@ -3106,7 +3106,7 @@ class Portfolio(object):
             # critical insight is the layer ROEs are the same for all lines by law invariance
             # lhopital's rule estimate of g'(1) = ROE(1)
             # this could blow up...
-            ϵ = 1e-10
+            ϵ = 1e-4
             gprime1 = (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
             df['M.ROE_total'] = np.where(df['M.Q_total']!=0,
                                                 df['M.M_total'] / df['M.Q_total'],

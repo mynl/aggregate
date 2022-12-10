@@ -43,7 +43,7 @@ aggregate Documentation
    :img-top-cls: height=100px bg-success
 
    ---
-   :img-top: _static/getting_started.png
+   :img-top: _static/gs.jpeg
 
    Get up and running: installation, ``aggregate`` "hello world", and a glimpse into the functionality.
 
@@ -55,7 +55,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/user_guide.png
+   :img-top: _static/ug.jpeg
 
    How to solve real-world actuarial problems using ``aggregate``.
 
@@ -67,7 +67,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/api_reference.png
+   :img-top: _static/api.jpeg
 
 
    Documentation for every class and function, for developers and more advanced users.
@@ -80,7 +80,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/developer_guide.png
+   :img-top: _static/dev.jpeg
 
 
    The Dec Language (DecL)  for specifying aggregate distributions.
@@ -93,7 +93,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/technical_resources.png
+   :img-top: _static/tech.jpeg
 
 
    Probability theory background and the numerical implementation methods employed by ``aggregate``.
@@ -106,7 +106,7 @@ aggregate Documentation
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/development.png
+   :img-top: _static/dev.jpeg
 
    Design philosophy, competing products, future development ideas, and historical perspective.
 

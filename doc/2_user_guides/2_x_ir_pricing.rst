@@ -3,25 +3,37 @@
 Individual Risk Pricing
 ==========================
 
-**Objectives:**
+**Objectives:** Use ``aggregate`` to determine the loss pick and technical premium for large account structures, including aggregate charges for limited losses (called Table L and M charges in the US).
 
-**Audience:**
+**Audience:** Individual risk large account pricing, broker, or risk retention actuary.
 
-**Prerequisites:**
+**Prerequisites:** DecL, underwriting and insurance terminology, aggregate distributions, risk measures.
 
-**See also:**
+**See also:** :doc:`2_x_re_pricing`, :doc:`DecL/080_reinsurance`. For other related examples see :doc:`2_x_problems`, especially :doc:`problems/0x0_bahnemann`.
 
-Insurance Pricing Applications
-------------------------------
+The examples in this section are illustrative. ``aggregate`` gives you the gross, ceded, and net distributions and with those in hand, the analytic world is your oyster. You can answer any reasonable question about a large account program.
 
-*  Large accounts: insurance savings and charge for WC
-*  Specific and aggregate covers
+Contents
+----------
+
+* :ref:`Helpful references <ir references>`
+* :ref:`Modes of Large Account Analysis`
+* :ref:`Stop Loss Insurance<ir stop loss>`
+
+.. _ir references:
+
+Helpful references
+--------------------
+
+* Fisher study note, Bahnemann, :cite:t:`Fisher2019`, :cite:t:`Bahnemann2015`
+* WCIRB Table L
+* ISO retro rating plan
+* CAS Exam 8 readings
 
 .. Table M and Table L!
 .. https://www.wcirb.com/content/california-retrospective-rating-plan
 .. ISO Retro Rating Plan
 .. Fisher et al case study spreadsheet...
-
 
 Modes of Large Account Analysis
 --------------------------------
@@ -30,6 +42,10 @@ IR pricing is based on an estimated loss pick, possibly supplemented by distribu
 
 The IR, or its risk retention vehicle, is concerned with the loss pick and understanding the impact of the insurance contract on the distribution of retained losses. IR pricing actuaries often want the full gross and retained (net, after insurance) outcome distributions.
 
-Helpful references for this section.
 
-.. * CAS Exam 8 readings * :cite:t:`Fisher2019`, :cite:t:`Bahnemann2015`.
+.. _ir stop loss:
+
+Retention Stop Loss (Table L)
+------------------------------
+
+*Not yet implemented.*

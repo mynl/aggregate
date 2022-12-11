@@ -26,7 +26,7 @@ The help assumes you know how to program in Python, understand probability, and 
 License
 =======
 
-:ref:`BSD 3<../LICENCE>`
+:doc:`BSD 3<../LICENCE>`
 
 Help Structure
 ===============

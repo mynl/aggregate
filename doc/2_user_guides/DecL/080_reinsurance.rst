@@ -1,140 +1,100 @@
 .. _2_x_reinsurance:
-
-DecL: Reinsurance
-======================
-
-
-**Objectives:** How to specify occurrence and aggregate reinsurance in DecL.
-
-**Audience:** User who wants to build an aggregate with parametric or discrete frequency and severity distributions.
-
-**Prerequisites:** Familiar with building aggregates using ``build``. Probability theory behind aggregate distributions. Reinsurance terminology.
-
-**See also:** :doc:`2_x_frequency`, :doc:`2_x_severity`, :doc:`2_x_exposure`, :doc:`2_x_mixtures`, :doc:`2_x_limits`, :doc:`2_x_vectorization`, :doc:`../4_dec_Language_Reference`.
-
-
-
 .. _2_agg_class_reinsurance_clause:
 
 The ``reinsurance`` Clauses
 ----------------------------
 
-Occurrence and aggregate reinsurance can be specified in the same way as limits and deductibles.
-Both clauses are optional.
-The ceded or net position can be output. Layers can be stacked and can include co-participations. For example, the three programs (the last displayed over four lines):
+**Prerequisites:**  Excess of loss reinsurance terminology.
 
-    agg Trucking 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence net of 750 xs 250 poisson
+Occurrence and aggregate reinsurance can be specified in a way similar to
+limits and deductibles. Both clauses are optional. The ceded or net position
+can be output. Layers can be stacked and can include co-participations. The
+syntax is best illustrated with some examples.
 
-    agg WorkComp 15000 loss 500 xs 0 sev lognorm 50 cv 1.75 poisson aggregate ceded to 50% so 2000 xs 15000
+**Examples.** 1. The DecL::
 
-    agg Trucking 5000 loss 1000 xs 0 \
-    sev lognorm 50 cv 1.75 \
-    occurrence net of 50% so 250 xs 250 and 500 xs 500 poisson \
-    aggregate net of 250 po 1000 xs 4000 and 5000 xs 5000
+    agg Trucking
+    5000 loss 1000 xs 0
+    sev lognorm 50 cv 1.75
+    occurrence net of 750 xs 250
+    poisson
 
-specify the following:
+specifies the distribution of losses to the net position on the Trucking policy after a per occurrence cession of the 750 xs 250 layer. This net position could also be written without reinsurance as::
 
-1. The distribution of losses to the net position on the Trucking policy after a per occurrence cession of the 750 xs 250 layer. This net position could also be written without reinsurance as
+    agg Trucking
+    ?? loss
+    250 xs 0
+    sev lognorm 50 1.75
+    poisson
 
-    agg Trucking 4500 loss  250 xs 50 sev lognorm 50 1.75 poisson
+for some level of losses. Running::
 
-  All occurrence reinsurance has free and unlimited reinstatements. Running
+    agg Trucking
+    5000 loss 1000 xs 0
+    sev lognorm 50 cv 1.75
+    occurrence ceded to 750 xs 250
+    poisson
 
-    agg Trucking 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence ceded to 750 xs 250 poisson
+models ceded losses.
 
-  would model ceded losses.
+2. The DecL::
 
-2. The distribution of losses to an aggregate protection for the 2000 xs 15000 layer of total losses, limited to 500. The underlying business could be an SIR on a large account Workers Compensation policy, and the aggregate is a part of the insurance charge (Table L, M).
-
-3. Back to Trucking. Now we apply two occurrence layers. The first, 250 xs 250, is only 50% placed (so stands for share of), and the second is 100% of 500 xs 500. The net of these programs flows through to aggregate layers, 250 part of of 1000 xs 4000 (25% placement), and 100% of the 5000 xs 5000 aggregate layers. The modeled outcome is net of all four layers. In this case, it is not possible to write the net of occurrence using limits and attachments.
-
-The distributions for these models are shown  in `realistic examples`_.
-
-See :ref:`reinsurance pricing examples <2_x_re_pricing>` more examples, including an approach to reinstatements.
-
-
-.. _realistic examples:
-
-Basic Examples
-----------------------
-
-Here are models of the four examples from `2_agg_class_reinsurance_clause`_. TODO how does that show up?
-
-
-    agg Trucking.Gross 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 poisson
-
-    agg Trucking.Net   5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence net of 750 xs 250 poisson
-
-    agg Trucking.Ceded 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence ceded to 750 xs 250 poisson
-
-    agg Trucking.Retention 5000 loss 1000 xs 0 \
-    sev lognorm 50 cv 1.75 \
-    occurrence net of 50% so 250 xs 250 and 500 xs 500 poisson \
-    aggregate net of 250 po 1000 xs 4000 and 5000 xs 5000
-
-    agg WorkComp.InsChrg 15000 loss 500 xs 0 sev lognorm 50 cv 1.75 poisson aggregate ceded to 50% so 2000 xs 15000
-
-
-.. ipython:: python
-    :okwarning:
-
-    from aggregate import build, qd
-    import matplotlib.pyplot as plt
-
-    ans = build('''
-    agg Trucking.Gross 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 poisson
-    agg Trucking.Net   5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence net of 750 xs 250 poisson
-    agg Trucking.Ceded 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence ceded to 750 xs 250 poisson
-    agg Trucking.Retention \
-    5000 loss \
-    1000 xs 0 \
-    sev lognorm 50 cv 1.75 \
-    occurrence net of 50% so 250 xs 250 and 500 xs 500 \
-    poisson \
-    aggregate net of 250 po 1000 xs 4000 and 5000 xs 5000
-    agg WorkComp.InsChrg 15000 loss 500 xs 0 sev lognorm 50 cv 1.75 poisson \
+    agg WorkComp
+    15000 loss
+    500 xs 0
+    sev lognorm 50 cv 1.75
+    poisson
     aggregate ceded to 50% so 2000 xs 15000
-    ''', approximation='exact')
 
-    for a in ans:
-        qd(a.name)
-        qd(a.object)
-        print('-'*80 + '\n')
+specifies the distribution of losses to an aggregate protection for the 2000 xs 15000 (the loss pick) layer of total losses, with occurrences limited to 500. The underlying business could be an SIR on a large account Workers Compensation policy, and the aggregate is a part of the insurance charge (Table L, M).
 
-These distributions have a high claim count, hence specify ``approximation='exact'``.
+3. The DecL::
 
-.. ipython:: python
-    :okwarning:
+    agg Trucking 5000
+    loss 1000 xs 0
+    sev lognorm 50 cv 1.75
+    occurrence net of 50% so 250 xs 250 and 500 xs 500
+    poisson
+    aggregate net of 250 po 1000 xs 4000 and 5000 xs 5000
 
-    fig, axs = plt.subplots(1, 3, figsize=(3 * 3.5, 2.45), constrained_layout=True, squeeze=True)
-    ax0, ax1, ax2 = axs.flat
+applies two occurrence and two aggregate layers to the Trucking portfolio. The 250 xs 250 occurrence layer  is only 50% placed (``so`` stands for share of), and the second is 100% (by default) of 500 xs 500. The net of the occurrence programs flows through to aggregate layers, 250 part of 1000 xs 4000 (25% placement), and 100% share of the 5000 xs 5000 aggregate layers. The modeled outcome is net of all four layers. In this case, it is not possible to write the net of occurrence using limits and attachments.
 
-    sc = 'linear'
-    var = 'F'
+All occurrence reinsurance has free and unlimited reinstatements.
 
-    tg = ans[0].object
-    tn = ans[1].object
-    tc = ans[2].object
-    tr = ans[3].object
-    wc = ans[4].object
+The occurrence reinsurance clause comes after severity but before frequency, because you need to know severity but not frequency. The aggregate clause comes after frequency. If frequency is specified using ``dfreq`` the occurrence clause comes before the aggregate clause.
 
-    tg.density_df[var].plot(ax=ax0, label=tg.name);
-    tn.density_df[var].plot(ax=ax0, label=tn.name);
-    tc.density_df[var].plot(ax=ax0, label=tc.name);
-    ax0.legend()
-    mx = tg.q(0.9995)
-    xl = [-mx/50, mx]
-    ax0.set(xlim=xl, yscale=sc, title='Trucking: gross, ceded, net');
+The options for both clauses are:
 
-    tr.density_df[var].plot(ax=ax1, label=tr.name);
-    tg.density_df[var].plot(ax=ax1, label=tg.name);
-    ax1.legend();
-    ax1.set(xlim=xl, yscale=sc, title='Trucking: gross and retained');
+* ``ceded to`` or ``net of`` determines which losses flow out of the
+  reinsurance.
+* fraction ``po`` limit ``xs`` attachment describes a partial placement, e.g.,
+  ``0.5 so 3 xs 2``.
+* participation ``so`` limit ``xs`` attachment describes a partial placement
+  by the ceded limit, e.g., ``1 po 3 xs 2``. This syntax is equivalent to
+  ``0.333 so 3 xs 2``.
 
-    wc.density_df[var].plot(ax=ax2,label=wc.name);
-    ax2.legend();
-    xl2 = [-50, 1050]
-    @savefig re_pricing_comps.png
-    ax2.set(xlim=xl2, yscale=sc, ylim=ax0.get_ylim(), title='WC insurance charge distribution');
+An unlimited cover is denoted ``inf``. Shares of unlimited covers must be expressed as shares, for obvious reasons.
 
+Layers can be stacked using the ``and`` keyword. The initial ``net of`` or ``ceded to`` applies to all layers in the tower.
+
+
+Underwriters are often interested in layering out losses from ground-up to the
+policy limit. For example, a 5M limit may be layered as 250 xs 0, 250 xs 250,
+500 xs 500, 1000 xs 1000, and 3000 xs 2000. A tower can be input manually::
+
+    occurrence ceded to 250 xs 0 and 250 xs 250 and 500 xs 500  \
+        and 1000 xs 1000 and 3000 xs 2000
+
+(note the Python \ line break). However, since layering is quite common, there
+is also a shorthand. They can be entered by specifying just the layer break
+points using the ``tower`` keyword::
+
+    tower [0 250 500 1000 2000 5000]
+
+The initial 0 is optional; the tower does not have to start at 0. It does not
+have to exhaust the entire policy limit. Towers can be applied to occurrence
+and aggregate reinsurance.
+
+See :ref:`reinsurance pricing<2_x_re_pricing>` for more examples, including an
+approach to reinstatements.
 

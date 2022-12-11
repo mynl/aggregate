@@ -13,6 +13,7 @@ Consider a :math:`\mathit{Po}(\lambda)\vee\mathit{Pareto}(\alpha, \beta)`, :math
 
     from aggregate import build, qd
     from pandas import option_context
+    import matplotlib.pyplot as plt
 
     alpha = 4
     beta = 3
@@ -106,3 +107,10 @@ This example replicates parts of Table 1. As well as the 99.9%ile it shows the 9
 
     df = pd.DataFrame(ans, columns=['log2', '1/bs', 'p999', 'p999999'])
     qd(df, accuracy=4)
+
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')
+

@@ -597,7 +597,7 @@ class Aggregate(Frequency):
             if self.occ_reins is not None:
                 # add agg with gcn occ
                 # TODO sort out
-                logger.warning('Computing aggregates with gcn severities; assumes approx=exact')
+                logger.info('Computing aggregates with gcn severities; assumes approx=exact')
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
                     z = ft(sv, self.padding, None)
@@ -632,7 +632,7 @@ class Aggregate(Frequency):
         bit1['ceded'] = [self.n if i == 'gup' else self.n * self.sev.sf(i)
                          for i in bit1.index.get_level_values('attach')]
         bit2 = pd.DataFrame(index=bit.index)
-        # i = (share, layer, attach) 
+        # i = (share, layer, attach)
         bit2['ceded'] = [v.ceded if i[-1] == 'gup' else v.ceded / self.sev.sf(i[-1] / i[0])
                          for i, v in bit0[['ceded']].iterrows()]
         ans = pd.concat((
@@ -1521,7 +1521,7 @@ class Aggregate(Frequency):
         """
         # always want to work off gross severity
         if self.sev_density_gross is not None:
-            logger.warning('Using GROSS severity in picks')
+            logger.info('Using GROSS severity in picks')
             sd = self.sev_density_gross
         else:
             sd = self.sev_density
@@ -1561,7 +1561,7 @@ class Aggregate(Frequency):
             # net is a fixed value, need a step function
             loss = sn.index[0]
             value = sn.iloc[0]
-            logger.warning(f'Only one net value at {loss} with prob = {value}')
+            logger.info(f'Only one net value at {loss} with prob = {value}')
             reins_df['F_net'] = 0.0
             reins_df.loc[loss:, 'F_net'] = value
         else:
@@ -1570,7 +1570,7 @@ class Aggregate(Frequency):
         if len(sc) == 1:
             loss = sc.index[0]
             value = sc.iloc[0]
-            logger.warning(f'Only one net value at {loss} with prob = {value}')
+            logger.info(f'Only one net value at {loss} with prob = {value}')
             reins_df['F_ceded'] = 0.0
             reins_df.loc[loss:, 'F_ceded'] = value
         else:
@@ -1636,7 +1636,7 @@ class Aggregate(Frequency):
         # generic function makes netter and ceder functions
         if self.occ_reins is None:
             return
-        logger.warning('running apply_occ_reins')
+        logger.info('running apply_occ_reins')
         occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
         # store stuff
         self.occ_ceder = occ_ceder
@@ -1672,7 +1672,7 @@ class Aggregate(Frequency):
         _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-        logger.warning('running apply_agg_reins')
+        logger.info('running apply_agg_reins')
         # store stuff
         self.agg_ceder = agg_ceder
         self.agg_netter = agg_netter

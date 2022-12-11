@@ -3,13 +3,24 @@
 The :class:`Portfolio` Class
 ==============================
 
-**Objectives:**
+**Objectives:** Creating multi-unit :class:`Portfolio` objects. Principal methods and properties.
 
-**Audience:**
+**Audience:** Pricing, capital modeling, ERM actuaries.
 
-**Prerequisites:**
+**Prerequisites:** DecL, :class:`Aggregate`,  aggregate distributions, risk measures.
 
-**See also:**
+**See also:** :doc:`2_x_strategy`, :doc:`2_x_capital`.
+
+
+Helpful references
+--------------------
+
+* PIR chapter 17.
+* Solvency II approach.
+
+
+*Not yet implemented.*
+
 
 
 Viewing data

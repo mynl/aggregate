@@ -344,7 +344,7 @@ Risk Loads, Example 6.5
 
 Example 6.5, computes risk loads as a percentage of standard deviation. ``aggregate`` can compute multiple limits at once, and the ``report_df`` dataframe returns individual severity and aggregate distribution statistics. The risk loads can be deduced from these. The risk load can be computed as ``k' * ex2`` or ``k * agg_cv`` (not shown).
 
-The following code reproduces Table 6.3. First, define the controlling variables, and then set up the tower of limits within one object, using :doc:`2_x_vectorization`.
+The following code reproduces Table 6.3. First, define the controlling variables, and then set up the tower of limits within one object, using :doc:`../DecL/070_vectorization`.
 
 .. ipython:: python
     :okwarning:

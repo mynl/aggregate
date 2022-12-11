@@ -1,8 +1,37 @@
 .. _development:
 
-*************************
+************************
 Design and Development
-*************************
+************************
+
+
+Help Structure
+===============
+
+.. figure:: _static/Help_Structure.jpeg
+
+    Documentation roadmap.
+
+The documentation is structured around application, access, implementation, and theory.
+
+* Application: destinations, where you can go with the code and problems you can solve.
+
+    - User Guides problem sections
+
+* Access: operating manual, how you access the functions you need to solve your problems
+
+    - User Guides problem sections
+    - API Reference (traditional documentation)
+    - DecL Reference
+
+* Implementation: how the functionality is coded; algorithms.
+
+    - Technical Guides
+
+* Theory: underlying mathematics.
+
+    - Technical Guides
+
 
 Design Philosophy
 ====================

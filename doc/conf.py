@@ -97,7 +97,7 @@ html_theme_options = {
     'style_external_links': True,
     'collapse_navigation': True,
     'sticky_navigation': True,
-    'navigation_depth': 5,
+    'navigation_depth': 3,
     'includehidden': True,
     'titles_only': False,
 }

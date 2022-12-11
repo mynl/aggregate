@@ -1,99 +1,65 @@
 .. _2_x_exposure:
 
-DecL: Specifying Exposure
-===========================
+The Exposure Clause
+-------------------
 
+The exposure clause has two parts: exposures and an optional layers sub-clause (see See :doc:`030_limits`).
 
-**Objectives:**  Describe the frequency distributions available in ``aggregate``.
+Exposures specifies the volume of insurance.
+There are four forms:
 
-**Audience:** User who wants to build an aggregate with a range of frequency distributions.
-
-**Prerequisites:** Building aggregates using ``build``. Using ``scipy.stats``. Probability theory behind discrete distributions, especially mixed-Poisson distributions and processes.
-
-**See also:** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
-
-
-.. _2_agg_class_exposure_clause:
-
-The ``exposure`` Clause
---------------------------
-
-The ``exposure`` clause has two parts ``exposures <layers>``. The first specifies
-the volume of insurance, the second adjusts the ground-up severity. Exposures can be specified in
-four ways
-
--  Stated expected loss and severity (claim count derived)
--  Premium and loss ratio and severity (expected loss and claim count
-   derived)
--  Claim count times severity (expected loss derived)
--  Using the ``dfreq`` keyword to directly enter the frequency distribution
+-  Expected loss
+-  Premium and loss ratio
+-  Claim count
+-  Using the ``dfreq`` keyword to enter the frequency distribution directly
 
 For example::
 
-       123  claims
        1000 loss
        1000 premium at 0.7 lr
+       123 claims
        dfreq [1 2 3] [3/4 3/16 1/16]
 
 
-* ``123 claims`` directly specifies the expected claim count; the last letter ``s`` on ``claims`` is optional.
-* ``1000 loss`` directly specifies expected loss. The claim count is derived from average severity.
-  It is typical for an actuary to estimate the loss pick and select a severity curve and then
-  derive frequency.
-* ``1000 premium at 0.7 lr`` directly specifies premium and a loss ratio. The claim count is again derived
-  from severity. The final ``lr`` is optional and used just for clarity. Again, actuaries
-  often take plan premiums and apply loss ratio picks to determine losses, rather than
-  starting with a loss pick. This idiom supports that approach.
-* ``dfreq [1 2 3] [3/4 3/16 1/16]`` specifies frequency outcomes and probabilities directly. It is described in `nonparametric frequency`_.
+* ``1000 loss`` directly specifies expected loss. The claim count is derived
+  from average severity. It is typical for an actuary to estimate the loss
+  pick and select a severity curve and then derive frequency.
+* ``1000 premium at 0.7 lr`` directly specifies premium and a loss ratio.
+  Expected losses equal the product. The claim count is again derived from
+  severity. The final ``lr`` is optional and used just for clarity. Again,
+  actuaries often take plan premiums and apply loss ratio picks to determine
+  losses, rather than starting with a loss pick. This idiom supports that
+  approach.
+* ``123 claims`` directly specifies the expected claim count; the last letter
+  ``s`` on ``claims`` is optional, allowing ``1 claim``. Expected losses
+  equal claim count times average severity.
+* ``dfreq [1 2 3] [3/4 3/16 1/16]`` specifies frequency outcomes and
+  probabilities directly. It is described in :ref:`nonparametric frequency`.
 
-All values in the first three specifications can be :ref:`vectorized <2_x_vectorization>`.
-
-See :doc:`2_x_exposure` for more details.
-
+All values in the first three specifications can be :doc:`070_vectorization`.
 
 Determining Expected Claim Count
---------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Variables are used in the following order to determine overall expected
 losses.
 
--  If ``count`` is given it is used
--  If ``loss`` is given then count is derived from the severity
--  If ``prem[ium]`` and ``[at] 0.7 lr`` are given then the loss is
-   derived and counts from severity
-
-In addition:
-
--  If ``prem`` is given the loss ratio is computed
--  Claim count is conditional but severity can have a mass at zero
--  X is the GROUND UP severity, so X \| X > attachment is used and
-   generates n claims **really?**
-
-
-
-Exposure: the Volume of Insurance
-----------------------------------
-
-:ref:`As already discussed <2_agg_class_exposure_clause>` exposure can be specified in three ways:
-
-::
-
-       123 claims
-       1000 loss
-       1000 premium at 0.7 lr
-
-This choice presents no ambiguity when using DecL. But if you create the
-object directly, the input arguments could conflict. Here is the order in which the
-exposure arguments are used:
-
 * If ``count`` is given it is used and loss is derived from severity.
 * Else if ``loss`` is given, then count is derived from the severity.
-* Else if ``premium at xx lr`` are given, then the loss is derived by multiplication and counts from severity.
+* Else if ``premium at xx lr`` are given, then the loss is derived by
+  multiplication and counts from severity.
 * In all cases, if ``premium`` is given the loss ratio is computed
+
+These choices present no ambiguity when using DecL. But the input arguments
+could conflict if you create the object directly.
+
+Remember, claim count is conditional on a loss to the layer by default, but severity can have a mass at zero.
 
 .. distributions.py about line 880
 
-In terms of ``exp_en``, ``exp_el``, ``exp_premium``, and ``exp_lr`` the first step is:
+**Details.**
+
+In terms of ``exp_en``, ``exp_el``, ``exp_premium``, and ``exp_lr`` the second and third steps are::
 
     exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
 
@@ -113,28 +79,5 @@ Finally,
 * Else if ``exp_lr > 0`` the premium is computed
 
 Thus, if only ``exp_en`` or ``exp_loss`` is entered, the object knows loss, but not premium or loss ratio.
-
-As usual, all of these values can be vectorized.
-
-Conditional and Unconditional Severity
---------------------------------------
-
-By default, claim count is conditional  on a loss to the layer, meaning that :math:`X` is the ground up severity.
-Thus :math:`X \mid X > \mathit{attachment}` generates the input number of claims.
-Conditional severity can have a mass at zero.
-
-Unconditional severity with a mass at zero lowers the effective claim count.
-It is specified by adding ``!`` after the severity distribution.
-
-.. ipython:: python
-    :okwarning:
-
-    from aggregate import build, qd
-
-    cond = build('agg Conditional   10 claims 10 x 10 sev 5 * expon   poisson')
-    uncd = build('agg Unconditional 10 claims 10 x 10 sev 5 * expon ! poisson')
-    qd(cond.describe)
-    qd(uncd.describe)
-    print(cond.sevs[0].sf(10), uncd.agg_m / cond.agg_m)
 
 

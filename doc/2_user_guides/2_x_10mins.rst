@@ -11,6 +11,8 @@
 
 **See also:** :doc:`../2_User_Guides`.
 
+The objective of the ``aggregate`` package is to make working with aggregate probability distributions as straightforward as working with parametric distributions (e.g., those built into ``scipy.stats``), even though their densities rarely have a closed form expression.
+
 Contents
 ---------
 

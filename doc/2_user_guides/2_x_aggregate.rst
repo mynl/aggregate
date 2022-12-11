@@ -13,13 +13,8 @@ The :class:`Aggregate` Class
 
 homog and inhomog multiply of built in aggs!! See Treaty 5 from Bear and Nemlick.
 
-How ``aggregate`` specifies and represents a distribution
-----------------------------------------------------------
-
-The objective of the ``aggregate`` package is to make working with aggregate probability distributions as straightforward as working with parametric distributions (e.g., those built into ``scipy.stats``), even though their densities rarely have a closed form expression. How should the aggregate be specified and represented?
-
-The *specification* is an unambiguous definition of the distribution, analogous to "normal with mean 100 and standard deviation 20". It could be based on an insurance declaration (dec) page or reinsurance slip description. These are human-oriented business shorthand but are may be ambiguous and rarely explicitly specify the frequency and severity distributions, though they could be implicit in a risk classification (e.g., NY light/medium trucking).
-:doc:`agg_language` remedies these deficiencies, providing a precise specification that is also human readable. Neither specification can be used directly for computation.
+How ``aggregate`` represents a distribution
+--------------------------------------------
 
 The *representation* is amenable to computation. It should provide a cumulative distribution function and other probability functions. These can be analytical, such as the normal cdf or Weibull distribution function. However, aggregates rarely have closed form expressions. Therefore we use a numerical approximation to the exact pdf or pmf.
 
@@ -44,37 +39,6 @@ All subsequent computations assume that this approximation **is** the aggregate 
 
 for example.
 
-Specifying an Aggregate Distribution
--------------------------------------
-
-As a precursor do describing DecL, this section lays out the information needed to fully specify an aggregate loss distributions that typically occur in insurance. Here are some examples::
-
-|    basic
-|    basic with limit and ded
-|    occ re
-|    agg re
-|
-|    A trucking policy with a loss pick 4500, a limit of 1000, and a retention 50.
-|
-|    Coverage is 1M part of 3M xs 2M and 90% of 5M xs 5M and 20% of 10M xs 10M. (Excess or specific)
-|
-|    Covered losses are limited to 250K and subject to a 5M annual aggregate deductible. In no event shall the insurer |pay more than 15M. (aggregate cover)
-|
-|    Policy limit is 10M with an annual aggregate limit of 25M
-
-
-
-Abstracting the details, the structure that emerges has seven parts
-
-.. _seven clauses:
-
-1. A label
-2. The Exposure, optionally including occurrence limits and deductibles
-3. The ground-up severity distribution
-4. Occurrence reinsurance (optional)
-5. The frequency distribution
-6. Aggregate reinsurance (optional)
-7. Additional notes (optional)
 
 Creating an Aggregate Distribution
 -------------------------------------

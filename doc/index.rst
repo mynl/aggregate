@@ -13,7 +13,7 @@ aggregate Documentation
 #######################
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :hidden:
 
    1_Getting_Started

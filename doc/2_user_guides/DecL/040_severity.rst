@@ -1,52 +1,17 @@
 .. _2_x_severity:
 
-DecL: Severity Distributions
-=============================
-
-**Objectives:** Describe the severity distributions available in ``aggregate``.
-
-**Audience:** User who wants to build an aggregate with a range of parametric severity distributions.
-
-**Prerequisites:** Building aggregates using ``build``. Using ``scipy.stats``. Probability theory behind continuous distributions.
-
-**See also:** :ref:`Specifying exposures <2_x_exposure>`.
-
-
-
 .. _2_agg_class_severity_clause:
 
-The ``severity`` Clause
--------------------------
+The Severity Clause
+----------------------
 
-The severity clause specifies the ground-up severity ("curve"). It is very flexible. Its design follows the ``scipy.stats`` package's specification of random variables using shape, location, and scale factors, see :ref:`probability background <5_x_probability>`. The syntax is different for parametric continuous and discrete severity curves.
+The severity clause specifies the ground-up severity distribution, or "curve" as it is sometimes known. It is a very flexible clause. Its design follows the ``scipy.stats`` package's specification of random variables using shape, location, and scale factors, see :ref:`probability background <5_x_probability>`. The syntax is different for non-parametric discrete distributions and parametric continuous distributions.
 
-Parametric Severity
-~~~~~~~~~~~~~~~~~~~~~~
-
-The two parametric specifications are::
-
-    sev DIST_NAME MEAN cv CV
-    sev DIST_NAME <SHAPE1> <SHAPE2>
-
-where
-
-* ``sev`` is a keyword indicating the severity specification.
-* ``DIST_NAME`` is the ``scipy.stats`` distribution name, such as our favorites ``lognorm``, ``gamma``, ``pareto``, ``expon``, ``beta``, ``unif``.
-* ``MEAN`` is the expected loss.
-* ``CV`` is the loss coefficient of variation.
-* ``SHAPE1``, ``SHAPE2`` are the shape variables.
-
-The first form directly enters the expected ground-up severity and cv. It is available for distributions with only one shape parameter and the beta distribution. ``aggregate`` uses a formula (lognormal, gamma, beta) or numerical method to solve for the shape parameter to achieve the correct cv and then scales to the desired mean. The second form directly enters the shape variable(s). Shape parameters entered for zero parameter distributions are ignored.
-
-``DIST_NAME`` can be any zero, one, or two shape parameter ``scipy.stats`` continuous distribution.
-They have (mostly) easy to guess names.
-See :doc:`2_x_severity` for a full list.
 
 .. _nonparametric severity:
 
 Non-Parametric Severity Distributions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Discrete distributions (supported on a finite number of outcomes)
 can be directly entered as a severity using the ``dsev`` keyword followed by
@@ -82,36 +47,43 @@ specify
 .. warning::
     Use binary fractions (denominator a power of two) to avoid rounding errors!
 
-When executed, an discrete severity specification is converted into a ``scipy.stats`` ``histogram`` class. Internally there are discrete and continuous (ogive) histograms, sees REF.
 
-
-Discrete Non-Parametric Severity
----------------------------------
-
-A discrete severity clause is specified with the ``dsev`` keyword::
-
-    dsev [outcomes] <[probabilities]>
-
-It **cannot** be shifted or scaled.
-If that is required use a Python f-string to adjust the outcomes::
-
-    f'dsev [{5 * outcomes + 10}] [probabilities]'
-
-A ``dsev`` clause is converted by the parser into a ``dhistogram``::
+A ``dsev`` clause is converted by the parser into a ``dhistogram`` step distribution::
 
     sev dhistogram xps [outcomes] [probabilities]
 
-In rare cases you want a continuous version::
+In rare cases you want a continuous (ogive, piecewise linear distribution) version::
 
     sev chistogram xps [outcomes] [probabilities]
 
-Built-In Severity
-------------------
+When executed, these are both converted into a ``scipy.stats`` ``histogram`` class.
 
 
 Parametric Severity
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
+A parametric distribution can be specified in two ways::
+
+    sev DIST_NAME MEAN cv CV
+    sev DIST_NAME <SHAPE1> <SHAPE2>
+
+where
+
+* ``sev`` is a keyword indicating the severity specification,
+* ``DIST_NAME`` is the ``scipy.stats`` distribution name, see :ref:`available sev dists`,
+* ``MEAN`` is the expected loss,
+* ``cv`` (lowercase) is sa keyword indicating entry of the CV,
+* ``CV`` is the loss coefficient of variation, and
+* ``SHAPE1``, ``SHAPE2`` are the shape variables.
+
+The first form enters the expected ground-up severity and CV directly. It is available for distributions with only one shape parameter and the beta distribution on :math:`[0,1]`. ``aggregate`` uses a formula (lognormal, gamma, beta) or numerical method (all others) to solve for the shape parameter to achieve the correct CV and then scales to the desired mean. The second form directly enters the shape variable(s). Shape parameters entered for zero parameter distributions are ignored.
+
+**Example.** Entering ``sev lognorm 10 cv 0.2`` produces a lognormal
+distribution with a mean of 10 and a CV of 0.2. Entering ``lognorm 0.2`` produces a lognormal
+with :math:`\mu=0` and :math:`\sigma=0.2`. It can then be :ref:`scaled and shifted<dec shift scale>`.
+
+``DIST_NAME`` can be any zero, one, or two shape parameter ``scipy.stats`` continuous distribution.
+They have (mostly) easy to guess names:
 
 * No shape parameters
 
@@ -122,120 +94,91 @@ Parametric Severity
 * One shape parameter
 
     - ``pareto``
-    - ``gamma``
     - ``lognorm``
+    - ``gamma``
+    - ``invgamma``
     - ``loggamma``
+    - ``weibull`` WHAT?
 
 * Two shape parameters
 
     - ``beta``
-    - ``gengamma``
+    - ``gengamma``, generalized gamma
+
+See :ref:`available sev dists` for a full list.
+
+Finally, ``dhistogram`` and ``chistogram`` can be used to create discrete
+(point mass) and continuous (ogive) empirical distributions. ``chistogram``
+is rarely used and ``dhistogram`` is easier to input using ``dsev``,
+:ref:`nonparametric severity`.
 
 
-See the ``scipy.stats`` `documentation <https://docs.scipy.org/doc/scipy/reference/stats.html>`_ for more details.
-
-The severity distribution is specified by name. Any ``scipy.stats``
-continuous distribution with one shape parameter can be used, including
-the gamma, lognormal, Pareto, Weibull etc. The exponential and normal
-variables, with no shape parameters, and the beta with two shape
-parameters are also available. Most distributions can be entered via
-mean and CV, or specified by their shape parameters and then scaled and
-shifted, using the standard ``scipy.stats`` ``scale`` and ``loc``
-notations, see . Finally ``dhistogram`` and ``chistogram`` can be used
-to create discrete (point mass) and continuous (ogive) empirical
-distributions. Here are some examples.
-
-
-
-Specifying Parametric Distributions
------------------------------------
-
-Parametric distributions can be specified in two different ways.
-
-1. As ``sev DISTNAME MEAN cv CV`` where ``DISTNAME`` is the distribution name, chosen from the list below, ``MEAN`` is the expected loss and ``CV`` is the loss coefficient of
-variation.
-2. As ``sev SCALE * DISTNAME SHAPE`` where ``SCALE`` and ``SHAPE`` are the ``scipy.stats`` parameters. For zero parameter distributions ``SHAPE`` is omitted. Two parameter distributions are ``sev SCALE * DISTNAME SHAPE1 SHAPE2``.
-
-
-Available distributions:
-
--  ``lognorm``: lognormal
--  ``gamma``: gamma
--  ``invgamma``: invgamma
-
-All continuous, one parameter distributions in scipy.stat are available
-by name. See below for details on using a Pareto, normal, exponential,
-or beta distribution.
-
-**Example.** Entering ``sev lognorm 10 cv 0.2`` produces a lognormal
-distribution with a mean of 10 and a CV of 0.2.
-
-When executed, a sev specification is converted into full aggregate
-program form.
+.. _dec shift scale:
 
 Shifting and Scaling Severity
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A parametric severity clause can be transformed by scaling and location (shifting or translation) factors.
+A parametric severity clause can be transformed by scaling and location (shifting or translation) factors,
+using the standard ``scipy.stats`` ``scale`` and ``loc``::
 
-These produce
+    sev SCALE * DISTNAME SHAPE + LOC
+    sev SCALE * DISTNAME SHAPE - LOC
 
-* An exponential scaled to have mean 100.
-* A scaled and shifted variable, uniform on [5, 15] (the base uniform is on [0, 1]).
-* A variable :math:`10X + 100` where :math:`X` has a lognormal distribution with :math:`\sigma=2`. It has mean :math:`100+10\exp(\sigma^2/2)`.
-* A Pareto with shape 1.2 and scale 1200, with survival function :math:`S(x)=(1200 / (1200+ x))^{1.2}`.
-* A beta variable with shape parameters 1 and 2, scaled by 20.
+For zero
+parameter distributions ``SHAPE`` is omitted. Two parameter distributions are
+``sev SCALE * DISTNAME SHAPE1 SHAPE2 + LOC``.
 
-The scale and location parameters can be :ref:`vectors <2_x_limits_and_mixtures>`.
+**Examples.**
 
+* ``sev lognorm 10 cv 3``: lognormal, mean 10, cv 0.
 
-.. list-table::
-  :widths: 40 20 40
-  :header-rows: 1
+* ``sev 10 * lognorm 1.75``: lognormal, :math:`10X`, :math:`X \sim \mathrm{lognormal}(\mu=0,\sigma=1.75)`
 
-  * - Code
-    - Distribution
-    - Meaning
-  * - ``sev lognorm 10 cv 3``
-    - lognormal
-    - mean 10, cv 0.
-  * - ``sev 10 * lognorm 1.75``
-    - lognormal
-    - 10:math:`X`, :math:`X` lognormal(:math:`\mu`=0, :math:`\sigma`=1.75
-  * - ``sev 10 * lognorm 1.75 + 20``
-    - lognormal
-    - 10:math:`X` + 20
-  * - ``sev 10 * lognorm 1 cv 3 + 50``
-    - lognormal
-    - 10:math:`Y` + 50, :math:`Y` lognormal mean 1, cv 3
-  * - ``sev 100 * pareto 1.3 - 100``
-    - Pareto
-    - Shape (:math:`\alpha`) 3, scale (:math:`\lambda`) 100
-  * - ``sev 50 * norm + 100``
-    - normal
-    - mean (location) 100, std dev (scale) 50
-  * - ``sev 5 * expon``
-    - exponential
-    - mean (scale) 5
-  * - ``sev 5 * uniform + 1``
-    - uniform
-    - uniform between 1 and 6 (scale 5, location 1)
-  * - ``sev 50 * beta 2 3``
-    - beta
-    - 50:math:`Z`, :math:`Z` beta shape parameters 2, 3
+* ``sev 10 * lognorm 1.75 + 20``: lognormal, :math:`10X + 20`
 
-The Pareto has survival function :math:`S(x)=(100 / (100 + x))^{1.3}`.
+* ``sev 10 * lognorm 1 cv 3 + 50``: lognormal: :math:`10Y + 50`, :math:`Y\sim` lognormal mean 1, cv 3
+
+* ``sev 100 * pareto 1.3 - 100``: Pareto, shape (:math:`\alpha`) 3, scale (:math:`\lambda`) 100
+
+* ``sev 100 * pareto 1.3``: Single parameter Pareto for :math:`x \ge 100`, Shape (:math:`\alpha`) 3, scale (:math:`\lambda`) 100
+
+* ``sev 50 * norm + 100``: normal, mean (location) 100, standard deviation (scale) 50. No shape parameters.
+
+* ``sev 5 * expon``: exponential, mean (scale) 5. No shape parameters.
+
+* ``sev 5 * uniform + 1``: uniform between 1 and 6, scale 5, location 1. No shape parameters.
+
+* ``sev 50 * beta 2 3``: beta: :math:`50Z`, :math:`Z \sim \beta(2,3)`, shape parameters 2, 3, scale 50.
+
+With this parameterization, the Pareto has survival function :math:`S(x)=(100 / (100 + x))^{1.3}`.
+
+The scale and location parameters can be :doc:`vectors<070_vectorization>`.
+
+.. warning::
+    ``dsev`` severities **cannot** be shifted or scaled.
+    If that is required use a Python f-string to adjust the outcomes::
+
+        f'dsev [{{5 * outcomes + 10}}] [probabilities]'
+
+.. warning::
+    Shifting left (negative shift) must be written with space ``sev 10 * lognorm 1.5 - 10`` not
+    ``sev 10 * lognorm 1.5 -10``. The lexer binds uniary minus to the number, so the latter omits the operator.
+
 
 Unconditional Severity
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
-The severity distribution is conditional on a loss to the layer. For an
-excess layer :math:`y` xs :math:`a` the severity is has distribution :math:`X \mid X > a`,
-where :math:`X` is the specified severity. For a ground-up layer there is no
-adjustment.
+The severity clause is ground-up and it is converted to a distribution
+conditional on a loss to the layer if there is a limits sub-clause. Thus, for
+an excess layer :math:`y` xs :math:`a` severity has a
+distribution :math:`X \mid X > a`, where :math:`X` is specified in the
+``sev`` clause. For a ground-up (or missing) layer there is no adjustment.
 
 The default behavior can be over-ridden by adding ``!`` after the
-severity distribution. For example
+severity distribution.
+
+
+**Example.**
 
 ::
 
@@ -246,9 +189,24 @@ produces conditional and unconditional samples from an excess layer of a
 lognormal. The latter includes an approximately 0.66 chance of a claim
 of zero, corresponding to :math:`X \le 10` below the attachment.
 
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build, qd
+
+    cond = build('agg Conditional   1 claim 10 x 10 sev 5 * expon   fixed')
+    uncd = build('agg Unconditional 1 claim 10 x 10 sev 5 * expon ! fixed')
+    qd(cond.describe)
+    qd(uncd.describe)
+    print(uncd.sevs[0].fz.sf(10), uncd.agg_m / cond.agg_m)
+
+Here ``uncd.sevs[0].fz`` is ``sev 5 * expon`` ground-up.
+
+
+.. _available sev dists:
 
 ``scipy.stats`` Continuous Random Variables
---------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All ``scipy.stats`` continuous random variable classes can be used as severity distributions. As always, with great power comes
 great responsibility.
@@ -260,6 +218,7 @@ great responsibility.
     careful out there!**
 
 The information below was extracted from the `scipy help for continuous distributions <https://docs.scipy.org/doc/scipy/reference/stats.html#continuous-distributions>`_. The basic list can be created by introspection---wonderful Python!
+
 
 .. ipython:: python
     :okwarning:
@@ -817,7 +776,7 @@ The information below was extracted from the `scipy help for continuous distribu
 
 .. _dist gengamma:
 
-* ``gengamma`` **Generalized gamma** (`help <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gengamma.html>`_). The probability density function for `gengamma` is ([1]_):
+* ``gengamma`` **Generalized gamma** (`help <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gengamma.html>`_). The probability density function for `gengamma` is:
 
     .. math::
 
@@ -875,7 +834,7 @@ The information below was extracted from the `scipy help for continuous distribu
 
         f(x, p, b) = x^{p-1} \exp(-b (x + 1/x) / 2) / (2 K_p(b))
 
-    where `x > 0`, and the parameters `p, b` satisfy `b > 0` ([1]_).
+    where `x > 0`, and the parameters `p, b` satisfy `b > 0`.
     :math:`K_p` is the modified Bessel function of second kind of order `p`
     (`scipy.special.kv`).
 
@@ -1327,7 +1286,7 @@ The information below was extracted from the `scipy help for continuous distribu
         f(x, k, s) = \frac{k x^{k-1}}{(1+x^s)^{1+k/s}}
 
     for :math:`x > 0` and :math:`k, s > 0`. The distribution is sometimes
-    called Dagum distribution ([2]_). It was already defined in, called
+    called Dagum distribution. It was already defined in, called
     a Burr Type III distribution (`burr` with parameters ``c=s`` and
     ``d=k/s``).
 

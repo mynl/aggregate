@@ -1,14 +1,29 @@
 .. _2_x_distortion:
 
 The :class:`Distortion` Class
-===========================================
+=================================
 
-**Objectives:**
+**Objectives:** Use ``aggregate`` to create and visualize a distortion function and associated spectral risk measure.
 
-**Audience:**
+**Audience:** Pricing, capital modeling, ERM actuaries.
 
-**Prerequisites:**
+**Prerequisites:** Risk measures, distortions, DecL.
 
-**See also:**
+**See also:** :doc:`2_x_strategy`, :doc:`2_x_capital`.
 
-*  [B4] Distortions, examples, plotting
+
+Helpful references
+--------------------
+
+* PIR chapter XX.
+* Wang
+
+Creating a :class:`Distortion`
+----------------------------------
+
+*Not yet implemented.*
+
+Parametric Families of Distortions
+-----------------------------------
+
+*Not yet implemented.*

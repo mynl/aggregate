@@ -1,79 +1,122 @@
 .. _2_x_vectorization:
 
-DecL: Vectorization
-=====================
+Vectorization: Limit Profiles and Severity Mixtures
+-----------------------------------------------------
 
-**Objectives:** Describe how ``aggregate`` vectorizes exposure, limit, and severity parameters.  to catastrophe risk management, including calculation of occurrence and aggregate exceeding probability (OEP, AEP) values, and loss costs for ILWs.
+**Prerequisites:**  Examples use ``build`` and ``qd``, and basic :class:`Aggregate` output.
 
-**Audience:** Individual risk and reinsurance pricing actuaries, CAS Part 8 candidates.
+Limit profiles (:doc:`060_mixed_severity`) and severity mixtures
+(:doc:`065_limit_profiles`) can be combined. Each mixed severity is applied
+to each limit profile component. For example, three limit bands and a
+severity with two mixture components creates an aggregate with six severity
+sub-components.
+The ``report_df`` dataframe shows the components.
 
-**Prerequisites:** :ref:`Mixed severity distributions <2_x_mixtures>`, :ref:`limits <2_x_limits>`.
+.. ipython:: python
+    :okwarning:
 
-**See also:** :ref:`Reinsurance exposure rating <2_x_re_pricing>`.
-
-
-
-
-Limit Profiles
----------------
-
-The exposure variables can be vectors to express a *limit profile*. All
-``exp_[en|prem|loss|count]`` related elements are broadcast against
-one-another. For example
-
-::
-
-       [100 200 400 100] premium at 0.65 lr [1000 2000 5000 10000] xs 1000
-
-expresses a limit profile with 100 of premium at 1000 x 1000; 200 at
-2000 x 1000 400 at 5000 x 1000 and 100 at 10000 x 1000. In this case all
-the loss ratios are the same, but they could vary too, as could the
-attachments.
+    from aggregate import build, qd
+    eg = build('agg Eg '
+               '[10 20 30] claims '
+               '[100 200 75] xs [0 50 75] '
+               'sev lognorm 100 cv [1 2] wts [0.6 0.4] '
+               'poisson')
+    qd(eg)
+    qd(eg.report_df.loc[['limit', 'attachment', 'freq_m',
+      'agg_m', 'agg_cv']].T.iloc[:-4])
 
 
+**Example.** We can combine the mixed exponential from :ref:`med example`
+with a limits profile.
 
-Limit Profiles and Mixtures
----------------------------
+.. ipython:: python
+    :okwarning:
 
-Limit profiles and mixtures can be combined. Each mixed severity is
-applied to each limit profile component. For example
+    from aggregate import build, qd
+    lim_prof = build('agg LIM_PROF [20 8 4 2] claims [1e6, 2e6 5e6 10e6] xs 0 '
+                     'sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * '
+                     'expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] fixed',
+                     log2=18, bs=500)
+    qd(lim_prof)
 
-::
 
-           ag = uw('agg multiExp [10 20 30] claims [100 200 75] xs [0 50 75]
-               sev lognorm 100 cv [1 2] wts [.6 .4] mixed gamma 0.4')```
+The ``report_df`` shows all 20 components: 4 limits x 5 mixture components.
 
-creates an aggregate with six severity subcomponents.
+.. ipython:: python
+    :okwarning:
 
-= ========= ============== ==========
-# **Limit** **Attachment** **Claims**
-= ========= ============== ==========
-0 100       0              6
-1 100       0              4
-2 200       50             12
-3 200       50             8
-4 75        75             18
-5 75        75             12
-= ========= ============== ==========
+    qd(lim_prof.report_df.loc[['limit', 'attachment', 'freq_m',
+      'agg_m', 'agg_cv']].T.iloc[:-4])
+
+
+
 
 Circumventing Products
 ----------------------
 
-It is sometimes desirable to enter two or more lines each with a
-different severity but with a shared mixing variable. For example to
-model the current accident year and a run- off reserve, where the
-current year is gamma mean 100 cv 1 and the reserves are larger
-lognormal mean 150 cv 0.5 claims requires
+It is sometimes undesirable to take the product of every limit with every
+severity mixture component. There are two cases where we actually want to
+enter a series of limits each with their own severity.
 
-::
+#. Two or more units each with a different severity but with a shared mixing
+   variable. For example, to model two units with expected losses 100 and
+   200, one with a gamma mean 10 CV 1 severity and the other lognormal mean
+   15 CV 1.5 and both sharing a gamma mixing variable::
 
-           agg MixedPremReserve [100 200] claims \
-             sev [gamma lognorm] [100 150] cv [1 0.5] \
-             mixed gamma 0.4
+      agg MixedPremReserve
+      [100 200] claims
+      sev [gamma lognorm] [10 15] cv [1 1.5]
+      mixed gamma 0.4
 
-so that the result is not the four-way exposure / severity product but
-just a two-way combination. These two cases are distinguished looking at
-the total weights. If the weights sum to one then the result is an
-exposure / severity product. If the weights are missing or sum to the
-number of severity components (i.e. are all equal to 1) then the result
-is a row by row combination.
+   The result should be the two-way combination, not the four-way exposure and
+   severity product.
+
+#. Exposures with different limits may have different severity curves. Again,
+   the limit profile and severity curves should all be broadcast together at
+   once, rather than broadcasting limits and severities separately and then
+   taking the outer product::
+
+      agg Eg4
+      [10 10 10] claims
+      [1000 2000 5000] xs 0
+      sev lognorm [50 100 150] cv [0.1 0.15 0.2]
+      poisson
+
+If the weights sum to one then the result is an exposure / severity outer
+product, treated as a mixed severity. If the weights are missing or
+sum to the number of severity components (e.g. are all equal to 1) then the
+result is an item by item combination, circumvented the outer product.
+
+
+**Example.** The next two examples illustrate the different behavior. First,
+there two units with different limits and severities and no weights.
+``report_df`` shows there are only two components modeled.
+
+.. ipython:: python
+   :okwarning:
+
+   a1 = build('agg TwoUnits '
+              '[10 20] claims '
+              '[1000 2000] xs 0 '
+              'sev [gamma lognorm] [10 15] cv [1 1.5] '
+              'mixed gamma 0.4 ')
+   qd(a1)
+   qd(a1.report_df.loc[['limit', 'attachment', 'freq_m',
+      'agg_m', 'agg_cv']].T.iloc[:-4])
+
+
+Adding weights results in a mixed severity, 80% for the gamma and 20% for lognormal. Now ``report_df``
+shows that each limit band is combined with each severity, resulting in four modeled components.
+
+.. ipython:: python
+   :okwarning:
+
+   a2 = build('agg LimitProfile '
+              '[10 20] claims '
+              '[1000 2000] xs 0 '
+              'sev [gamma lognorm] [10 15] cv [1 1.5] wts [.8 .2] '
+              'mixed gamma 0.4 ')
+   qd(a2)
+      qd(a2.report_df.loc[['limit', 'attachment', 'freq_m',
+      'agg_m', 'agg_cv']].T.iloc[:-4])
+

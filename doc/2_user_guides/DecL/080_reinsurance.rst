@@ -13,6 +13,46 @@ DecL: Reinsurance
 **See also:** :doc:`2_x_frequency`, :doc:`2_x_severity`, :doc:`2_x_exposure`, :doc:`2_x_mixtures`, :doc:`2_x_limits`, :doc:`2_x_vectorization`, :doc:`../4_dec_Language_Reference`.
 
 
+
+.. _2_agg_class_reinsurance_clause:
+
+The ``reinsurance`` Clauses
+----------------------------
+
+Occurrence and aggregate reinsurance can be specified in the same way as limits and deductibles.
+Both clauses are optional.
+The ceded or net position can be output. Layers can be stacked and can include co-participations. For example, the three programs (the last displayed over four lines):
+
+    agg Trucking 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence net of 750 xs 250 poisson
+
+    agg WorkComp 15000 loss 500 xs 0 sev lognorm 50 cv 1.75 poisson aggregate ceded to 50% so 2000 xs 15000
+
+    agg Trucking 5000 loss 1000 xs 0 \
+    sev lognorm 50 cv 1.75 \
+    occurrence net of 50% so 250 xs 250 and 500 xs 500 poisson \
+    aggregate net of 250 po 1000 xs 4000 and 5000 xs 5000
+
+specify the following:
+
+1. The distribution of losses to the net position on the Trucking policy after a per occurrence cession of the 750 xs 250 layer. This net position could also be written without reinsurance as
+
+    agg Trucking 4500 loss  250 xs 50 sev lognorm 50 1.75 poisson
+
+  All occurrence reinsurance has free and unlimited reinstatements. Running
+
+    agg Trucking 5000 loss 1000 xs 0 sev lognorm 50 cv 1.75 occurrence ceded to 750 xs 250 poisson
+
+  would model ceded losses.
+
+2. The distribution of losses to an aggregate protection for the 2000 xs 15000 layer of total losses, limited to 500. The underlying business could be an SIR on a large account Workers Compensation policy, and the aggregate is a part of the insurance charge (Table L, M).
+
+3. Back to Trucking. Now we apply two occurrence layers. The first, 250 xs 250, is only 50% placed (so stands for share of), and the second is 100% of 500 xs 500. The net of these programs flows through to aggregate layers, 250 part of of 1000 xs 4000 (25% placement), and 100% of the 5000 xs 5000 aggregate layers. The modeled outcome is net of all four layers. In this case, it is not possible to write the net of occurrence using limits and attachments.
+
+The distributions for these models are shown  in `realistic examples`_.
+
+See :ref:`reinsurance pricing examples <2_x_re_pricing>` more examples, including an approach to reinstatements.
+
+
 .. _realistic examples:
 
 Basic Examples

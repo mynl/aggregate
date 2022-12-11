@@ -13,6 +13,43 @@ DecL: Specifying Exposure
 **See also:** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
 
 
+.. _2_agg_class_exposure_clause:
+
+The ``exposure`` Clause
+--------------------------
+
+The ``exposure`` clause has two parts ``exposures <layers>``. The first specifies
+the volume of insurance, the second adjusts the ground-up severity. Exposures can be specified in
+four ways
+
+-  Stated expected loss and severity (claim count derived)
+-  Premium and loss ratio and severity (expected loss and claim count
+   derived)
+-  Claim count times severity (expected loss derived)
+-  Using the ``dfreq`` keyword to directly enter the frequency distribution
+
+For example::
+
+       123  claims
+       1000 loss
+       1000 premium at 0.7 lr
+       dfreq [1 2 3] [3/4 3/16 1/16]
+
+
+* ``123 claims`` directly specifies the expected claim count; the last letter ``s`` on ``claims`` is optional.
+* ``1000 loss`` directly specifies expected loss. The claim count is derived from average severity.
+  It is typical for an actuary to estimate the loss pick and select a severity curve and then
+  derive frequency.
+* ``1000 premium at 0.7 lr`` directly specifies premium and a loss ratio. The claim count is again derived
+  from severity. The final ``lr`` is optional and used just for clarity. Again, actuaries
+  often take plan premiums and apply loss ratio picks to determine losses, rather than
+  starting with a loss pick. This idiom supports that approach.
+* ``dfreq [1 2 3] [3/4 3/16 1/16]`` specifies frequency outcomes and probabilities directly. It is described in `nonparametric frequency`_.
+
+All values in the first three specifications can be :ref:`vectorized <2_x_vectorization>`.
+
+See :doc:`2_x_exposure` for more details.
+
 
 Determining Expected Claim Count
 --------------------------------

@@ -11,6 +11,80 @@ DecL: Severity Distributions
 
 **See also:** :ref:`Specifying exposures <2_x_exposure>`.
 
+
+
+.. _2_agg_class_severity_clause:
+
+The ``severity`` Clause
+-------------------------
+
+The severity clause specifies the ground-up severity ("curve"). It is very flexible. Its design follows the ``scipy.stats`` package's specification of random variables using shape, location, and scale factors, see :ref:`probability background <5_x_probability>`. The syntax is different for parametric continuous and discrete severity curves.
+
+Parametric Severity
+~~~~~~~~~~~~~~~~~~~~~~
+
+The two parametric specifications are::
+
+    sev DIST_NAME MEAN cv CV
+    sev DIST_NAME <SHAPE1> <SHAPE2>
+
+where
+
+* ``sev`` is a keyword indicating the severity specification.
+* ``DIST_NAME`` is the ``scipy.stats`` distribution name, such as our favorites ``lognorm``, ``gamma``, ``pareto``, ``expon``, ``beta``, ``unif``.
+* ``MEAN`` is the expected loss.
+* ``CV`` is the loss coefficient of variation.
+* ``SHAPE1``, ``SHAPE2`` are the shape variables.
+
+The first form directly enters the expected ground-up severity and cv. It is available for distributions with only one shape parameter and the beta distribution. ``aggregate`` uses a formula (lognormal, gamma, beta) or numerical method to solve for the shape parameter to achieve the correct cv and then scales to the desired mean. The second form directly enters the shape variable(s). Shape parameters entered for zero parameter distributions are ignored.
+
+``DIST_NAME`` can be any zero, one, or two shape parameter ``scipy.stats`` continuous distribution.
+They have (mostly) easy to guess names.
+See :doc:`2_x_severity` for a full list.
+
+.. _nonparametric severity:
+
+Non-Parametric Severity Distributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Discrete distributions (supported on a finite number of outcomes)
+can be directly entered as a severity using the ``dsev`` keyword followed by
+two equal-length rows vectors. The first gives the outcomes and the second the
+probabilities.
+
+::
+
+    dsev [outcomes] <[probabilities]>
+
+The horizontal layout is irrelevant and commas are optional.
+If the ``probabilities`` vector is omitted then all probabilities are set equal to
+the reciprocal of the length of the ``outcomes`` vector.
+A Python-like colon notation is available for ranges.
+Probabilities can be entered as fractions, but no other arithmetic operation is supported.
+
+The five examples::
+
+    dsev [0 9 10] [0.5 0.3 0.2]
+    dsev [0 9 10]
+    dsev [1:6]
+    dsev [0:100:25]
+    dsev [1:6] [1/4 1/4 1/8 1/8 1/8 1/8]
+
+specify
+
+#. A severity with a 0.5 chance of taking the value 0, 0.3 chance of 9, and 0.2 of 10.
+#. Equally likely outcomes of 0, 9, or 10;
+#. Equally likely outcomes 1, 2, 3, 4, 5, 6;
+#. Equally likely outcomes 0, 25, 50, 100; and
+#. Outcomes 1 or 2 with probability 0.25 or 3-6 with probability 0.125.
+
+.. warning::
+    Use binary fractions (denominator a power of two) to avoid rounding errors!
+
+When executed, an discrete severity specification is converted into a ``scipy.stats`` ``histogram`` class. Internally there are discrete and continuous (ogive) histograms, sees REF.
+
+
 Discrete Non-Parametric Severity
 ---------------------------------
 

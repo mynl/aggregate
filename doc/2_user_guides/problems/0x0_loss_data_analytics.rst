@@ -484,7 +484,7 @@ The number of projects and the number of overtime hours are independent. You wil
               'aggregate net of 15 x 0')
     qd(a)
 
-Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that using an aggregate tower. The ``reins_audit_df`` provides ceded and net statistics by layer. Here we extract just the ceded part to get the excess (overtime).
+Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that using an aggregate tower. The ``reinsurance_audit_df`` provides ceded and net statistics by layer. Here we extract just the ceded part to get the excess (overtime).
 
 .. ipython:: python
     :okwarning:
@@ -493,7 +493,7 @@ Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that 
               'dsev [5 10 20] [.2 .3 .5] geometric '
               'aggregate net of tower [0 5 10 15 inf]')
 
-    b = a1.reins_audit_df.xs('ceded', axis=1, level=0)
+    b = a1.reinsurance_audit_df.xs('ceded', axis=1, level=0)
     # reverse cumulative sum, minus mean from last row
     b['cumul ex'] = b.ex[::-1].cumsum() - a.agg_m
     qd(b, accuracy=4)

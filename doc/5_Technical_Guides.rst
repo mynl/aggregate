@@ -14,6 +14,7 @@ Technical Guides covers theory and implementation. How calculations work in theo
 * :doc:`5_technical_guides/5_x_aggregate_calculations` performed by the :class:`Aggregate` object.
 * :doc:`5_technical_guides/5_x_portfolio_calculations` performed by the :class:`Portfolio` object.
 * :doc:`5_technical_guides/5_x_distortions` and the :class:`Distortion` object.
+* :doc:`5_technical_guides/5_x_multivariate`
 
 
 .. toctree::

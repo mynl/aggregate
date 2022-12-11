@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats as ss
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+from .. import build
 
 def fig_4_1():
     """
@@ -53,7 +54,7 @@ def fig_4_1():
     return fig
 
 
-# non-PIR book figures
+# non-PIR book figures ============================================
 def adjusting_layer_losses():
     """
     Figure to illustrate the process of adjusting layer losses.
@@ -94,4 +95,73 @@ def adjusting_layer_losses():
                 arrowprops={'arrowstyle': '->', 'linewidth': .5}
                )
     return f
+
+
+def mixing_convergence(freq_cv, sev_cv, bs=1/64):
+    """
+    Illustrate convergence of mixed distributions to the mixing distribution.
+
+    """
+
+    # make the two dataframes of distributions
+    a = build('agg M '
+              '1 claims '
+              f'sev gamma 1 cv {sev_cv} '
+              f'mixed gamma {freq_cv} ', log2=16, bs=bs, approximation='exact')
+    dfnb = a.density_df[['p']].rename(columns={'p': 1})
+    assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+    # print("1", a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
+
+    for freq in [2, 5, 10, 20, 50, 100, 200]:
+        a = build('agg M '
+              f'{freq} claims '
+              f'sev gamma 1 cv {sev_cv} '
+              f'mixed gamma {freq_cv} ', log2=16, bs=bs, approximation='exact')
+        dfnb[freq] = a.density_df[['p']]
+        assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+        # print(freq, a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
+
+    a = build('agg M '
+              '1 claims '
+              f'sev gamma 1 cv {sev_cv} '
+              'poisson ', log2=16, bs=bs, approximation='exact')
+    dfp = a.density_df[['p']].rename(columns={'p': 1})
+    assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+    # print("1", a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
+
+    for freq in [2, 5, 10, 20, 50, 100, 200]:
+        a = build('agg M '
+              f'{freq} claims '
+              f'sev gamma 1 cv {sev_cv} '
+              'poisson ', log2=16, bs=bs, approximation='exact')
+        dfp[freq] = a.density_df[['p']]
+        assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+        # print(freq, a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
+
+    # plotting
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True)
+    axi = iter(axs.flat)
+
+    for lbl, df in zip(['Poisson distribution', 'Mixed frequency distribution'], [dfp, dfnb]):
+        ax0 = next(axi)
+        ax1 = next(axi)
+        for c in df:
+            ax0.plot(df.index/c, c*df[c],       lw=1, label=str(c))
+            ax1.plot(df.index/c, df[c].cumsum(),lw=1, label=str(c))
+
+        if ax0 is axs.flat[0]:
+            ax0.legend()
+        ax0.set(ylim=[0, 1e-1], xlim=[-0.25, 5])
+        ax1.set(ylim=[-0.05, 1.05], xlim=[-0.25, 5])
+
+        ax0.set(ylabel='Density', xlabel='Normalized loss', title=lbl)
+        ax1.set(ylabel='Distribution', xlabel='Normalized loss', title=lbl)
+
+    # add convergence to mixing
+    alpha = freq_cv**-2
+    fz = ss.gamma(alpha, scale=1/alpha)
+    ps = np.linspace(0, 5, 501)
+    ax = axs.flat[-1]
+    ax.plot(ps, fz.cdf(ps), lw=2, alpha=.5, c='k', label='Mixing')
+    ax.legend(loc='lower right')
 

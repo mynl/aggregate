@@ -828,43 +828,32 @@ assumptions on the mean and variance of :math:`X` guarantee
 :math:`M_X'(0)=x=\mathsf{E}[X]` and that the remainder term in Taylor’s
 expansion actually is :math:`O(t^2)`. The second part is trivial.
 
-PYTHONIZE
-
-.. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/LRDistsPoisson.pdf
-   :alt: Theoretical distribution of scaled aggregate losses with no
-   parameter or structure uncertainty and Poisson frequency.
-   :name: fig:LRDistsPoisson
-
-   Theoretical distribution of scaled aggregate losses with no parameter
-   or structure uncertainty and Poisson frequency.
-
-.. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/LRDistsGamma.pdf
-   :alt: Theoretical distribution envelope of scaled aggregate losses
-   with a gamma mixed Poisson frequency with mixing variance
-   :math:`c=0.0625`.
-   :name: fig:LRDistsGamma
-
-   Theoretical distribution envelope of scaled aggregate losses with a
-   gamma mixed Poisson frequency with mixing variance :math:`c=0.0625`.
-
 The proposition implies that if the frequency distribution is actually a
-Poisson, so the mixing distribution :math:`G` is :math:`G=1` with
+Poisson, so the mixing distribution :math:`G=1` with
 probability 1, then the loss ratio distribution of a very large book
 will tend to the distribution concentrated at the expected, hence the
 expression that “with no parameter risk the process risk completely
 diversifies away.”
 
-Figures `1.3 <#fig:LRDistsPoisson>`__ and `1.4 <#fig:LRDistsGamma>`__
-illustrate the proposition, showing how aggregates change shape as
-expected counts increase.
+The next figure illustrate the proposition, showing how aggregates change
+shape as expected counts increase.
 
-In Figure `1.3 <#fig:LRDistsPoisson>`__ :math:`G=1` and the claim count
-is Poisson. Here the scaled distributions get more and more concentrated
-about the expected value (scaled to 1.0).
+.. ipython:: python
+    :okwarning:
 
-In Figure `1.4 <#fig:LRDistsGamma>`__ :math:`G` has a gamma distribution
-with variance :math:`0.0625` (asymptotic CV of 25%). Now the scaled
-aggregate distributions converge to :math:`G`.
+    from aggregate.extensions import mixing_convergence
+    @savefig tr_prob_convg.png
+    mixing_convergence(0.25, 0.5)
+
+On the top, :math:`G=1` and the claim count is Poisson. Here the scaled
+distributions get more and more concentrated about the expected value
+(scaled to 1.0). Notice that the density peaks (left) are getting *further
+apart* as the claim count increases. The distribution (right) is converging
+to a Dirac delta step function at 1.
+
+On the bottom, :math:`G` has a gamma distribution
+with variance :math:`0.0625` (asymptotic CV of 25%). The density peaks are getting closer, converging to the mixing gamma. The scaled
+aggregate distributions converge to :math:`G` (thick line, right).
 
 It is also interesting to compute the correlation between :math:`A` and
 :math:`G`. We have

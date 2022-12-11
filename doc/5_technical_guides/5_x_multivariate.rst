@@ -1,4 +1,28 @@
-Negative Multinomial Distribution and Related Frequency Distributions\*
+Multivariate Methods
+=======================
+
+**Objectives:**
+
+**Audience:**
+
+**Prerequisites:**
+
+**See also:**
+
+Two Shortcomings
+-------------------
+
+Occ cat program with reinstatements: can't model net.
+
+Spec and agg: can model cession
+
+These are dual problems.
+
+See agg/reinstatements.ipynb
+
+
+
+Negative Multinomial Distribution and Related Frequency Distributions
 -----------------------------------------------------------------------
 
 When we consider mixed Poisson distributions we often regard :math:`G`
@@ -13,11 +37,12 @@ distribution will be
 
 .. math::
 
-   M(\zeta_1,\zeta_2)&=& \mathsf{E}(e^{\zeta_1N_1+\zeta_2N_2}) \notag \\
-   &=& \mathsf{E}(\mathsf{E}(e^{\zeta_1N_1+\zeta_2N_2}|G ) ) \notag \\
-   &=& \mathsf{E}_G(\mathsf{E}(e^{\zeta_1N_1}|G ) \mathsf{E}(e^{\zeta_2N_2}|G ) ) \notag \\
-   &=& \mathsf{E}_G(\exp(G(n_1(e^{\zeta_1}-1)+n_2(e^{\zeta_2}-1)))) \notag \\
-   &=& M_G(n_1(e^{\zeta_1}-1) +  n_2(e^{\zeta_2}-1)).
+   M(\zeta_1,\zeta_2)
+   &= \mathsf{E}(e^{\zeta_1N_1+\zeta_2N_2}) \notag \\
+   &= \mathsf{E}(\mathsf{E}(e^{\zeta_1N_1+\zeta_2N_2}|G ) ) \notag \\
+   &= \mathsf{E}_G(\mathsf{E}(e^{\zeta_1N_1}|G ) \mathsf{E}(e^{\zeta_2N_2}|G ) ) \notag \\
+   &= \mathsf{E}_G(\exp(G(n_1(e^{\zeta_1}-1)+n_2(e^{\zeta_2}-1)))) \notag \\
+   &= M_G(n_1(e^{\zeta_1}-1) +  n_2(e^{\zeta_2}-1)).
 
 For example, if :math:`G` is a gamma random variable with MGF
 
@@ -28,10 +53,10 @@ frequency distribution with MGF
 
 .. math::
 
-   M(\zeta_1,\zeta_2) &=& [1- \beta(n_1(e^{\zeta_1}-1) +
+   M(\zeta_1,\zeta_2) &= [1- \beta(n_1(e^{\zeta_1}-1) +
      n_2(e^{\zeta_2}-1))]^{-k} \notag \\
-   &=&[1+\beta \sum_i n_i -\beta \sum_i n_ie^{\zeta_i}]^{-k}  \notag \\
-   &=&(Q -\sum_i P_ie^{\zeta_i})^{-k}
+   &=[1+\beta \sum_i n_i -\beta \sum_i n_ie^{\zeta_i}]^{-k}  \notag \\
+   &=(Q -\sum_i P_ie^{\zeta_i})^{-k}
 
 where :math:`P_i=\beta n_i`, :math:`P=\sum_i P_i` and :math:`Q=1+P`.
 Equation (`[nmnmgf] <#nmnmgf>`__) is the moment generating function for
@@ -94,7 +119,8 @@ assume that severity :math:`X` is independent of time and that
 
 .. math::
 
-   M_{D_1+\cdots+D_T}(\zeta) &= \prod_t \exp( \pi_t n(M_X(\zeta)-1)) \notag \\
+   M_{D_1+\cdots+D_T}(\zeta)
+   &= \prod_t \exp( \pi_t n(M_X(\zeta)-1)) \notag \\
    & = \exp(n(\sum_t \pi_t M_X(\zeta)-1)) \notag \\
    &= \exp(n(M_X(\zeta)-1)) \notag \\
    & = M_A(\zeta).
@@ -115,7 +141,8 @@ difference in average severity :math:`\mathsf{E}(X)` vs. :math:`\mathsf{E}(X_t)
 
 .. math::
 
-   M_{D_1+\cdots+D_T}(\zeta) &= \prod_t \exp( \pi_t' n(M_{X_t}(\zeta)-1)) \notag \\
+   M_{D_1+\cdots+D_T}(\zeta)
+   &= \prod_t \exp( \pi_t' n(M_{X_t}(\zeta)-1)) \notag \\
    & = \exp(n(\sum_t \pi_t' M_{X_t}(\zeta)-1)) \notag \\
    &= \exp(n(M_{X'}(\zeta)-1)) \notag \\
    & = M_A(\zeta)
@@ -402,13 +429,13 @@ Therefore, since :math:`\mathsf{E}(G)=1` and :math:`\mathsf{E}(G^2)=1+c`,
 
 .. math::
 
-   E(AB) &=& \frac{\partial^2
+   E(AB) &= \frac{\partial^2
      M_{(A,B)}}{\partial\zeta\partial\tau}\Big\vert_{(0,0)} \notag \\
-   &=& M_G''(0)n^2\frac{\partial M_{(X,Y)}}{\partial\zeta}
+   &= M_G''(0)n^2\frac{\partial M_{(X,Y)}}{\partial\zeta}
    \frac{\partial M_{(X,Y)}}{\partial\zeta} + M_G'(0)n
    \frac{\partial^2 M_{(X,Y)}}{\partial\zeta\partial\tau} \notag \\
-   &=&(1+c)n^2xy + n\mathsf{E}(XY) \notag \\
-   &=&(1+c)n^2xy + n\mathsf{cov}(X,Y) + nxy.
+   &=(1+c)n^2xy + n\mathsf{E}(XY) \notag \\
+   &=(1+c)n^2xy + n\mathsf{cov}(X,Y) + nxy.
 
 The value of :math:`\mathsf{cov}(X,Y)` will depend on the particular bivarate
 severity distribution.
@@ -439,12 +466,12 @@ partial derivatives at zero, we get
 
 .. math::
 
-   \mathsf{E}(AB) &=& \frac{\partial^2 M}{\partial\zeta\partial\eta} \notag \\
-   &=& \frac{\partial^2 M_G}{\partial t^2}
+   \mathsf{E}(AB) &= \frac{\partial^2 M}{\partial\zeta\partial\eta} \notag \\
+   &= \frac{\partial^2 M_G}{\partial t^2}
    \frac{\partial \psi}{\partial\zeta} \frac{\partial \psi}{\partial\eta}
    + \frac{\partial M_G}{\partial t}
    \frac{\partial^2 \psi}{\partial\zeta\partial\eta}  \notag \\
-   &=& (1+c)mxny.
+   &= (1+c)mxny.
 
 Hence
 

@@ -412,12 +412,12 @@ First, we compute all the aggregates.
         accuracy=4)
 
 
-Next, manipulate the output to determine layer loss costs using the ``reins_audit_df`` dataframe. It tracks statistics for gross, ceded, and net loss across all requested layers, separately for occurrence and aggregate. In this case there are no occurrence layers. This step takes longer than computing the aggregates!
+Next, manipulate the output to determine layer loss costs using the ``reinsurance_audit_df`` dataframe. It tracks statistics for gross, ceded, and net loss across all requested layers, separately for occurrence and aggregate. In this case there are no occurrence layers. This step takes longer than computing the aggregates!
 
 .. ipython:: python
     :okwarning:
 
-    bit = pd.concat([i.reins_audit_df['ceded'].iloc[:-1]
+    bit = pd.concat([i.reinsurance_audit_df['ceded'].iloc[:-1]
                     for i in b.values()], keys=b.keys(),
                     names=['Occ limit', 'kind', 'share', 'limit', 'attach'])
     bit['Agg limit'] = bit.index.get_level_values('limit') + bit.index.get_level_values('attach')

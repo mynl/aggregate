@@ -88,19 +88,19 @@ Requesting ``net of`` propagates losses net of the cover through to the aggregat
 
 Note the use ``[1:6]`` as shorthand for ``[1,2,3,4,5,6]``.
 
-The ``reins_audit_df`` dataframe shows unconditional (per ground up claim) severity statistics by layer. Multiply by the claim count ``d_occ.n`` to get layer loss picks. The severity, ``ex``, equals (1 + 2) / 6 = 0.5 (first block). The expected loss to the layer equals 0.5 * 3.5 = 1.75 (second block).
+The ``reinsurance_audit_df`` dataframe shows unconditional (per ground up claim) severity statistics by layer. Multiply by the claim count ``d_occ.n`` to get layer loss picks. The severity, ``ex``, equals (1 + 2) / 6 = 0.5 (first block). The expected loss to the layer equals 0.5 * 3.5 = 1.75 (second block).
 
 .. ipython:: python
     :okwarning:
 
-    qd(d_occ.reins_audit_df['ceded'])
-    qd(d_occ.reins_audit_df['ceded'][['ex']] * d_occ.n)
+    qd(d_occ.reinsurance_audit_df['ceded'])
+    qd(d_occ.reinsurance_audit_df['ceded'][['ex']] * d_occ.n)
 
 An **aggregate excess of loss** reinsurance layer, 12 xs 24, is specified after the frequency clause (you need to know frequency)::
 
     aggregate ceded to 12 xs 34.
 
-Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.DD`` by name as a shorthand. ``reins_audit_df`` reports expected loss to the aggregate layer.
+Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.DD`` by name as a shorthand. ``reinsurance_audit_df`` reports expected loss to the aggregate layer.
 
 .. ipython:: python
     :okwarning:
@@ -110,7 +110,7 @@ Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Re
     d_ag.plot()
     @savefig DD_12x24a.png
     qd(d_ag)
-    qd(d_ag.reins_audit_df.stack(0))
+    qd(d_ag.reinsurance_audit_df.stack(0))
 
 Both occurrence and aggregate programs can be applied at once. The ``ceded to`` and ``net of`` clauses can be mixed. You cannot refer to ``agg.DD`` by name because you need to see into the object to apply the occurrence reinsurance.
 
@@ -123,7 +123,7 @@ Both occurrence and aggregate programs can be applied at once. The ``ceded to`` 
     @savefig DD_nn.png
     d_re.plot()
     qd(d_re)
-    qd(d_re.reins_audit_df['ceded'])
+    qd(d_re.reinsurance_audit_df['ceded'])
 
 Multiple layers can be applied at once. Layers can be specified as a **share of**  or **part of** to account for coinsurance (partial placement) of the layer:
 
@@ -146,7 +146,7 @@ These concepts are illustrated in the next example. Note the bucket size.
     @savefig DD_nn2.png
     d_mre.plot()
     qd(d_mre)
-    qd(d_mre.reins_audit_df['ceded'])
+    qd(d_mre.reinsurance_audit_df['ceded'])
 
 A **tower** of limits can be specified by giving the attachment points of each layer. The shorthand::
 
@@ -166,7 +166,7 @@ Here is a summary of these examples. The audit dataframe gives a layering of agg
     d_tower.plot()
     qd(d_tower)
     with pd.option_context('display.multi_sparse', False):
-        qd(d_tower.reins_audit_df['ceded'])
+        qd(d_tower.reinsurance_audit_df['ceded'])
 
 
 
@@ -222,13 +222,13 @@ Why are there special options in ``build``? The claim count is high: 292.7. To f
 
 shows aliasing, i.e., not enough space in the answer. Adjust by increasing ``log2`` from 16 to 18 and leaving ``bs=1/2``.
 
-To summarize the analysis, extract the ceded layering from ``reins_audit_df`` into ``layers``. The column ``layers.ex`` shows unconditional expected layer loss (per ground-up claim); ``layers.severity`` shows layer severity conditional on the layer attaching; ``layers.aal`` shows the layer expected loss; ``layers.proportion`` shows the proportion of loss by layer.  ``cas.n`` is the expected claim count. The index of ``layers`` is replaced so it formats as numbers, not strings---purely cosmetic.
+To summarize the analysis, extract the ceded layering from ``reinsurance_audit_df`` into ``layers``. The column ``layers.ex`` shows unconditional expected layer loss (per ground-up claim); ``layers.severity`` shows layer severity conditional on the layer attaching; ``layers.aal`` shows the layer expected loss; ``layers.proportion`` shows the proportion of loss by layer.  ``cas.n`` is the expected claim count. The index of ``layers`` is replaced so it formats as numbers, not strings---purely cosmetic.
 
 .. ipython:: python
     :okwarning:
 
     import numpy as np
-    layers = cas.reins_audit_df['ceded'][['ex']].droplevel([0,1])
+    layers = cas.reinsurance_audit_df['ceded'][['ex']].droplevel([0,1])
     layers['severity'] = layers.ex / [cas.sev.sf(0 if type(i)==str else i)
             for i in layers.index.get_level_values(1)]
     layers['aal'] = layers.ex * cas.n
@@ -352,12 +352,12 @@ The shared mixing increases the frequency and aggregate CV and skewness.
         ['freq_m', 'freq_cv', 'freq_skew', 'agg_cv', 'agg_skew'],
         ['independent', 'mixed']])
 
-To summarize the analysis, extract the ceded layering from ``reins_audit_df`` into ``layers`` as for Casualty.
+To summarize the analysis, extract the ceded layering from ``reinsurance_audit_df`` into ``layers`` as for Casualty.
 
 .. ipython:: python
     :okwarning:
 
-    layers = a.reins_audit_df['ceded'][['ex']]
+    layers = a.reinsurance_audit_df['ceded'][['ex']]
     layers['severity'] = layers.ex / [a.sev.sf(0 if i=='gup' else i)
                           for i in layers.index.get_level_values('attach')]
     layers['aal'] = layers['ex'] * a.n
@@ -1109,12 +1109,12 @@ Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance 
           f'Ceded expected loss {a.est_m - agcn.est_m:,.1f}\n'
           f'Net expected loss   {agcn.est_m:,.1f}')
 
-The ``reins_audit_df`` dataframe summarizes ground-up (unconditional) layer loss statistics for occurrence covers. Thus, ``ex`` reports the layer severity per ground-up claim. The subject (gross) row is the same for all layers and replicates the gross severity statistics shown above for ``a``.
+The ``reinsurance_audit_df`` dataframe summarizes ground-up (unconditional) layer loss statistics for occurrence covers. Thus, ``ex`` reports the layer severity per ground-up claim. The subject (gross) row is the same for all layers and replicates the gross severity statistics shown above for ``a``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(agcn.reins_audit_df.stack(0))
+    qd(agcn.reinsurance_audit_df.stack(0))
 
 Divide by the probability of attachment to convert to layer severity.
 Multiply by the expected ground-up claim count to convert to expected layer losses, ``el``. The last row shows the sum over all cessions.
@@ -1122,7 +1122,7 @@ Multiply by the expected ground-up claim count to convert to expected layer loss
 .. ipython:: python
     :okwarning:
 
-    bit = agcn.reins_audit_df['ceded'][['ex']]
+    bit = agcn.reinsurance_audit_df['ceded'][['ex']]
     bit['severity'] = bit.ex / np.array([a.sev.sf(i) for i in [500, 1000, 0]])
     bit['count'] = np.array([a.sev.sf(i) for i in [500, 1000, 0]]) * a.n
     bit['el'] = bit.ex * a.n

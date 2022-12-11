@@ -11,6 +11,51 @@ DecL: Frequency Distributions
 
 **See also:** :ref:`Severity <2_x_severity>`, :ref:`aggregate <2_x_aggregate>`, :ref:`Dec language <2_x_dec_language>`.
 
+
+.. _2_agg_class_frequency_clause:
+
+The ``frequency`` Clause
+--------------------------
+
+The exposure and severity clauses determine the expected claim count. The ``frequency`` clause specifies the other particulars of the claim count distribution. As with severity, the syntax is different for parametric and non-parametric discrete distributions.
+
+Parametric Frequency Distributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following parametric frequency distributions are supported. Remember that the ``exposure`` clause determines the expected claim count.
+
+* ``poisson``, no additional parameters required
+* ``geometric``, no additional parameters required
+* ``fixed``, no additional parameters required
+* ``bernoulli``, expected claim count must be :math:`\le 1`.
+* ``binomial SHAPE``, the shape determines :math:`p` and :math:`n=\mathsf{E}[N]/p`.
+* ``pascal SHAPE1 SHAPE2`` (the generalized Poisson-Pascal, see REF), where ``SHAPE1``
+  gives the cv and ``SHAPE2`` the number of claims per occurrence.
+
+In addition, a :math:`G`-mixed Poisson frequency (see `mixed frequency distributions`_, remember :math:`G` must have expectation 1) can be specified using the ``mixed`` keyword, followed by the name and shape parameters of the mixing distribution::
+
+    mixed DIST_NAME SHAPE1 <SHAPE2>
+
+For example::
+
+    agg 5 claims dsev [1] mixed gamma 0.16
+
+produces a negative binomial (gamma-mixed Poisson) distribution with variance :math:`5\times (1 + 0.16^2 \times 5)`.
+
+See :doc:`2_x_frequency` for more details.
+
+.. _nonparametric frequency:
+
+Non-Parametric Frequency Distributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An exposure clause::
+
+    dfreq [outcomes] <[probabilities]>
+
+directly specifies the frequency distribution. The ``outcomes`` and ``probabilities`` are specified as in `nonparametric severity`_.
+
+
 Specifying Frequency
 ---------------------
 

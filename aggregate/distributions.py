@@ -582,7 +582,7 @@ class Aggregate(Frequency):
         ``_apply_reins_work``
         """
         if self.occ_reins is None and self.agg_reins is None:
-            logger.warning('Asking for reinsurance_df but no reinsuarance specified. Returning None.')
+            logger.warning('Asking for reinsurance_df, but no reinsurance specified. Returning None.')
             return None
 
         if self._reinsurance_df is None:
@@ -597,8 +597,7 @@ class Aggregate(Frequency):
             if self.occ_reins is not None:
                 # add agg with gcn occ
                 # TODO sort out
-                logger.warning('Computing aggregates with gcn severities; assumes approx=exact '
-                               'and duplicates one of the three computations.')
+                logger.warning('Computing aggregates with gcn severities; assumes approx=exact')
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
                     z = ft(sv, self.padding, None)
@@ -622,14 +621,82 @@ class Aggregate(Frequency):
         return self._reinsurance_df
 
     @property
-    def reins_audit_df(self):
+    def reinsurance_occ_layer_df(self):
+        """
+        How losses are layered by the occurrence reinsurance. Expected loss,
+        CV layer loss, and expected counts to layers. 
+        """
+        bit0 = self.reinsurance_audit_df.loc['occ'].xs('ex', axis=1, level=1)
+        bit = self.reinsurance_audit_df.loc['occ'].xs('cv', axis=1, level=1)
+        bit1 = pd.DataFrame(index=bit.index)
+        bit1['ceded'] = [self.n if i == 'gup' else self.n * self.sev.sf(i)
+                         for i in bit1.index.get_level_values('attach')]
+        bit2 = pd.DataFrame(index=bit.index)
+        # i = (share, layer, attach) 
+        bit2['ceded'] = [v.ceded if i[-1] == 'gup' else v.ceded / self.sev.sf(i[-1] / i[0])
+                         for i, v in bit0[['ceded']].iterrows()]
+        ans = pd.concat((
+            bit0 * self.n,
+            bit, bit1, bit2),
+            axis=1, keys=['ex', 'cv', 'en', 'severity'],
+            names=['stat', 'view'])
+        return ans 
+
+    @property
+    def reinsurance_report_df(self):
+        """
+        Create and return a dataframe with the reinsurance report.
+        TODO: sort out the overlap with reinsurance_audit_df (occ and agg)
+        What this function adds is the ceded/net of occ aggregates before
+        application of the agg reinsurance. The pure occ and agg parts are in
+        reinsurance_audit_df.
+        """
+        if self._reinsurance_report_df is None:
+            bit = self.reinsurance_df
+            self._reinsurance_report_df = pd.DataFrame({c: xsden_to_meancvskew(bit.loss, bit[c])
+                                                        for c in bit.columns[1:]},
+                                                       index=['mean', 'cv', 'skew'])
+            self._reinsurance_report_df.loc['sd'] = self._reinsurance_report_df.loc['cv'] * \
+                                                    self._reinsurance_report_df.loc['mean']
+        return self._reinsurance_report_df
+
+    def reinsurance_occ_plot(self, axs=None):
+        """
+        Plots for occurrence reinsurance: occurrence log density and aggregate quantile plot.
+        """
+        if axs is None:
+            fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True)
+        ax0, ax1 = axs.flat
+
+        self.occ_reins_df.filter(regex='p_[scn]').rename(columns=lambda x: x[2:]).plot(ax=ax0, logy=True)
+        # TODO: better limit
+        xl = ax0.get_xlim()
+        l = self.spec['exp_limit']
+        if type(l) != float:
+            l = np.max(l)
+        if l < np.inf:
+            xl = [-l / 50, l * 1.025]
+        ax0.set(xlim=xl, xlabel='Loss', ylabel='Occurrence log density', title='Occurrence')
+
+        y = self.reinsurance_df.loss.values
+        for c in ['gross', 'ceded', 'net']:
+            s = self.reinsurance_df[f'p_agg_{c}_occ']
+            s[np.abs(s) < 1e-15] = 0
+            s = s[::-1].cumsum()[::-1].values
+            s[s == 0] = np.nan
+            ax1.plot(1 - s, y, label=c)
+        ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
+        ax1.legend()
+
+    @property
+    def reinsurance_audit_df(self):
         """
         Create and return the _reins_audit_df data frame.
         Read only property.
 
         :return:
         """
-        if self._reins_audit_df is None:
+        if self._reinsurance_audit_df is None:
             # really should have one of these anyway...
             if self.agg_density is None:
                 raise ValueError('Update Aggregate before asking for density_df')
@@ -644,9 +711,9 @@ class Aggregate(Frequency):
                 keys.append('agg')
 
             if len(ans):
-                self._reins_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
+                self._reinsurance_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
 
-        return self._reins_audit_df
+        return self._reinsurance_audit_df
 
     def _reins_audit_df_work(self, kind='occ'):
         """
@@ -872,7 +939,8 @@ class Aggregate(Frequency):
         self.verbose_audit_df = None
         self._careful_q = None
         self._density_df = None
-        self._reins_audit_df = None
+        self._reinsurance_audit_df = None
+        self._reinsurance_report_df = None
         self._reinsurance_df = None
         self.q_temp = None
         self.q_temp_sev = None
@@ -1568,9 +1636,11 @@ class Aggregate(Frequency):
         # generic function makes netter and ceder functions
         if self.occ_reins is None:
             return
-
+        logger.warning('running apply_occ_reins')
         occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
         # store stuff
+        self.occ_ceder = occ_ceder
+        self.occ_netter = occ_netter
         self.occ_reins_df = occ_reins_df
         self.sev_density_gross = self.sev_density
         self.sev_density_net = occ_reins_df['p_net']
@@ -1602,8 +1672,10 @@ class Aggregate(Frequency):
         _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-
+        logger.warning('running apply_agg_reins')
         # store stuff
+        self.agg_ceder = agg_ceder
+        self.agg_netter = agg_netter
         self.agg_reins_df = agg_reins_df
         self.agg_density_gross = self.agg_density
         self.agg_density_net = agg_reins_df['p_net']

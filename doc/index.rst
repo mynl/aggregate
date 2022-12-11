@@ -51,7 +51,7 @@ aggregate Documentation
 
    .. link-button:: 1_Getting_Started
       :type: ref
-      :text: Getting started
+      :text: Getting Started
       :classes: btn-block btn-secondary stretched-link
 
    ---
@@ -63,7 +63,7 @@ aggregate Documentation
 
    .. link-button:: 2_User_Guides
       :type: ref
-      :text: User guide
+      :text: User Guides
       :classes: btn-block btn-secondary stretched-link
 
    ---
@@ -76,11 +76,11 @@ aggregate Documentation
 
    .. link-button:: 3_Reference
       :type: ref
-      :text: API reference
+      :text: API Reference
       :classes: btn-block btn-secondary stretched-link
 
    ---
-   :img-top: _static/dev.jpeg
+   :img-top: _static/decl.jpeg
 
 
    The Dec Language (DecL)  for specifying aggregate distributions.
@@ -89,7 +89,7 @@ aggregate Documentation
 
    .. link-button:: 4_dec_Language_Reference
       :type: ref
-      :text: DecL reference
+      :text: DecL Reference
       :classes: btn-block btn-secondary stretched-link
 
    ---

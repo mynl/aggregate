@@ -340,8 +340,7 @@ You are the producer of a television quiz show that gives cash prizes. The numbe
 
 Your budget for prizes equals the expected aggregate cash prizes plus the standard deviation of aggregate cash prizes. Calculate your budget.
 
-**Solution.** Just a matter of translating into the ``agg`` program. No need to
-update the object.
+**Solution.** Just a matter of translating into DecL. No need to update the object.
 
 .. ipython:: python
     :okwarning:

@@ -2,7 +2,7 @@
 
 .. _2_agg_class_frequency_clause:
 
-The ``frequency`` Clause
+The Frequency Clause
 -------------------------
 
 The exposure and severity clauses determine the expected claim count. The ``frequency`` clause specifies the other particulars of the claim count distribution. As with severity, the syntax is different for non-parametric and parametric distributions.

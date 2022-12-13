@@ -14,6 +14,11 @@
 9. with picks you should invalidate / reompute statistics etc.
 10. with cession you should recompute statistics? or make clear it is gross/
 11. Formatting for MultiIndex with gup (reins_audit_df) messed up because not float
+12. Install in Ubuntu
+13. Add script for intall from source into readme.rst
+14. References!!!!
+15. This fails:  s = build('sev LG loggamma 10 cv .5') and for Pareto
+16. dot in names fuck up things eg analyze_distortion (seems colon works)
 
 * Papers
     - Clark re -> re pricing

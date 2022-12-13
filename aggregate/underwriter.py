@@ -138,11 +138,14 @@ class Underwriter(object):
 
         try:
             program = db_path.read_text(encoding='utf-8')
-        except:
+        except Exception as e:
             logger.error(f'Error reading requested database {db_path.name}. Ignoring.')
         else:
             # read in, parse, save to sev/agg/port dictionaries
             # throw away answer...not creating anything
+            # get rid of cosmetic spaces, but keep newline tabs (2 or more spaces)
+            program = re.sub('^  +', '\t', program, flags=re.MULTILINE)
+            program = re.sub(' +', ' ', program)
             logger.info(f'Reading database {fn}...')
             n = len(self._knowledge)
             self.interpret_program(program)

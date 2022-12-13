@@ -206,6 +206,8 @@ class Portfolio(object):
         # variance and sd come up in exam questions
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
+        # these are set when the object is updated
+        self.est_m = self.est_cv = self.est_skew = self.est_sd = self.est_var = 0
 
         # enhanced portfolio items
         self.EX_premium_capital = None
@@ -340,6 +342,22 @@ class Portfolio(object):
         :return:
         """
         return self.statistics_df
+
+    @property
+    def info(self):
+        s = []
+        s.append(f'portfolio object name    {self.name}')
+        s.append(f'aggregate objects        {len(self.line_names):d}')
+        if self.bs > 0:
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
+            s.append(f'bs                       {bss}')
+            s.append(f'log2                     {self.log2}')
+            s.append(f'padding                  {self.padding}')
+            s.append(f'sev_calc                 {self.sev_calc}')
+            s.append(f'normalize                {self.normalize}')
+            s.append(f'last update              {self.last_update}')
+            s.append(f'hash                     {self.hash_rep_at_last_update}')
+        return '\n'.join(s)
 
     @property
     def describe(self):
@@ -1201,6 +1219,11 @@ class Portfolio(object):
             self.density_df['S'] = 1 - self.density_df.F
 
         self.ex = self.audit_df.loc['total', 'EmpMean']
+        # pull out estimated stats to match Aggergate
+        self.est_m, self.est_cv, self.est_skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
+        self.est_sd = self.est_m * self.est_cv
+        self.est_var = self.est_sd ** 2
+
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
         if trim_df:
@@ -2673,7 +2696,8 @@ class Portfolio(object):
                 delta = iota / (1 + iota)
                 nu = 1 - delta
                 if strict == 'ordered':
-                    d_list = ['roe', 'ph', 'wang', 'dual', 'tvar']
+                    # d_list = ['roe', 'ph', 'wang', 'dual', 'tvar']
+                    d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
                 else:
                     d_list = Distortion.available_distortions(pricing=True, strict=strict)
 
@@ -3660,7 +3684,7 @@ class Portfolio(object):
     def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None,
                             regex='', add_comps=True):
         """
-        run analyze_distortion on self.dists
+        Run analyze_distortion on self.dists
 
         :param a:
         :param p: the percentile of capital that the distortions are calibrated to
@@ -3772,7 +3796,7 @@ class Portfolio(object):
         :param use_self:  if true use self.augmented and self.distortion...else recompute
         :param plot:
         :param a_max_p: percentile to use to set the right hand end of plots
-        :param add_comps: add old-fashioned method comparables (included =True as default to make backwards comp.
+        :param add_comps: add old-fashioned method comparables (included = True as default to make backwards comp.)
         :param mass_hints: for apply_distortion
         :param efficient:
         :return: various dataframes in an Answer class object
@@ -5963,6 +5987,15 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             df = df.set_index('total')
         return df
 
+    @property
+    def unit_names(self):
+        # what these should have been called!
+        return self.line_names
+
+    @property
+    def unit_names_ex(self):
+        # what these should have been called!
+        return self.line_names_ex
 
 
 def check01(s):

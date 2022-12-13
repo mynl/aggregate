@@ -4,7 +4,7 @@ REM to this by hand
 REM call makerst
 
 REM pushd stores the current directory and sets the cwd to its argument
-REM perent i is the i-th argument
+REM percent i is the i-th argument
 REM percent tilde i expands the argument and removes any quotes
 REM See https://stackoverflow.com/questions/5034076/what-does-dp0-mean-and-how-does-it-work
 

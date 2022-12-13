@@ -1,7 +1,7 @@
 .. _2_x_reinsurance:
 .. _2_agg_class_reinsurance_clause:
 
-The ``reinsurance`` Clauses
+The Reinsurance Clauses
 ----------------------------
 
 **Prerequisites:**  Excess of loss reinsurance terminology.

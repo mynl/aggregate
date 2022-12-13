@@ -29,14 +29,14 @@ A DecL program, which can be built with ``aggregate``, takes care of many of the
 It specifies the loss ratio and distributions selected in steps 1, 2 and 5; these require actuarial judgment and cannot be automated. Based on this input, the ``aggregate`` package computes the rest of steps 1, 3, 4, and 6. The details of the program are explained in the rest of this chapter.
 
 
-Specifies a Realistic Aggregate Distribution
+Specifying a Realistic Aggregate Distribution
 ----------------------------------------------
 
 The trucking example hints at the complexity of specifying a realistic insurance aggregate distribution. Abstracting the details, a complete specification has seven parts
 
 .. _seven clauses:
 
-1. A label
+1. A name
 2. The exposure, optionally including occurrence limits and deductibles
 3. The ground-up severity distribution
 4. Occurrence reinsurance (optional)
@@ -46,7 +46,7 @@ The trucking example hints at the complexity of specifying a realistic insurance
 
 DecL follows this pattern and specifies an aggregate distribution using :ref:`seven clauses <seven clauses>`
 
-|    agg label
+|    agg name
 |        exposure <limit>
 |        severity
 |        <occurrence re>
@@ -67,7 +67,7 @@ The entries in this example are as follows.
 
 * ``agg`` is the DecL keyword used to create an aggregate distribution. Keywords are part of the language, like ``if/then/else`` in VBA, R or Python, or ``select`` in SQL.
 
-* ``Trucking`` is a string label. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be a DecL keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
+* ``Trucking`` is a string name. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be a DecL keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
 
 * The exposure clause is ``5000 premium at 65% lr 1000 xs 50``. It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 50``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
 
@@ -84,12 +84,12 @@ Python ``f``-strings allow variables to be passed into DecL programs, ``f'sev lo
 
 There are two other specifications for different situations::
 
-    agg LABEL BUILTIN_AGG
+    agg NAME BUILTIN_AGG
 
     BUILTIN_AGG
 
 These reference a distribution from the ``knowledge`` database.
-``BUILTIN_AGG`` has the form ``agg.LABEL`` where ``agg`` identifies an aggregate object and ``LABEL`` refers to one that has already been built. For example, ``agg.Trucking`` or ``agg.Exampe1``.
-The first format gives ``BUILTIN_AGG`` a new label and the second uses its existing label. See the :doc:`../../4_dec_Language_Reference`.
+``BUILTIN_AGG`` has the form ``agg.NAME`` where ``agg`` identifies an aggregate object and ``NAME`` refers to one that has already been built. For example, ``agg.Trucking`` or ``agg.Exampe1``.
+The first format gives ``BUILTIN_AGG`` a new name and the second uses its existing name. See the :doc:`../../4_dec_Language_Reference`.
 
 The rest of this Chapter describes the basic features of each clause.

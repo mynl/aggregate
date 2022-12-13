@@ -2,7 +2,7 @@
 
 .. _2_agg_class_note_clause:
 
-The ``note`` Clause
+The Note Clause
 ---------------------
 
 An optional note or comment on the distribution can be added at the end, as

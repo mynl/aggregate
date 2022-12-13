@@ -44,6 +44,36 @@ The downside is less flexibility. FFT-based methods cannot model the
 Flexibility can be improved using higher dimensional FFT methods, for example to track ceded and net positions simultaneously, but they soon run afoul of the limits of practical computation. See CAS WP ref for an example using 2-dimensional FFTs.
 
 
+.. _num how agg reps a dist:
+
+How ``aggregate`` represents a distribution
+--------------------------------------------
+
+The *representation* is amenable to computation. It should provide a cumulative distribution function and other probability functions. These can be analytical, such as the normal cdf or Weibull distribution function. However, aggregates rarely have closed form expressions. Therefore we use a numerical approximation to the exact pdf or pmf.
+
+There are two obvious ways to construct a numerical approximation:
+
+#. As a discrete (arithmetic, lattice) distribution supported on :math:`0, b, 2b, \dots`.
+
+#. As a continuous random variable with a piecewise linear distribution function.
+
+The second approach assumes the aggregate is actually a continuous random variable, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed. When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts when using a numerical approximation. The large jumps are obvious but the small ones are not.
+
+We live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi;
+at the same time, we can be prejudiced in favor of analytic solutions. Computers, however, definitely favor numerical ones.
+
+.. version of this in 10 mins
+
+For all of these reasons we use a discrete numerical approximation. To "know or compute an aggregate" means that we have a discrete approximation to its distribution function that is concentrated on integer multiples of a fixed bandwidth or bucket size :math:`b`. Concretely, this specifies the aggregate as the value :math:`b` and a vector of probabilities :math:`(p_0,p_1,\dots, p_{n-1})` with the interpretation
+
+.. math:: \Pr(X=kb)=p_k.
+
+All subsequent computations assume that this approximation **is** the aggregate distribution. Thus, moments can be estimated via
+
+.. math:: \sum_k k^r p_i b
+
+for example.
+
 
 Other notes
 ----------------

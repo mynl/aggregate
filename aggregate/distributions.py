@@ -533,8 +533,12 @@ class Aggregate(Frequency):
             # the left (int of S). Upshot: need to pick the fill value carefully. Here is what
             # Portfolio does
             # fill_value = min(self._density_df.p_total.iloc[-1], max(0, 1. - (self._density_df.F.iloc[-1])))
-            fill_value = max(0, 1. - (self._density_df.F.iloc[-1]))
-            self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
+            fill_value = min(max(0, 1. - (self._density_df.F.iloc[-1])),
+                             max(0, 1. - (self._density_df.p_total.iloc[1:].sum())))
+            # expect next two rwos to be the same...but they are not in certain situations...
+            # the second is more on point.
+            # self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
+            self._density_df['S'] = fill_value + self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
             fill_value = max(0, 1. - (self._density_df.F_sev.iloc[-1]))
             self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=fill_value)[::-1].cumsum()
 
@@ -1128,7 +1132,7 @@ class Aggregate(Frequency):
     @property
     def info(self):
         s = []
-        s.append(f'Aggregate object         {self.name}')
+        s.append(f'aggregate object name    {self.name}')
         s.append(f'claim count              {self.n:0,.2f}')
         s.append(f'frequency distribution   {self.freq_name}')
         n = len(self.statistics_df)
@@ -3252,17 +3256,6 @@ class Severity(ss.rv_continuous):
                 f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
                 f'{sev_cv} vs {acv}')
 
-        # if exp_limit < np.inf or exp_attachment > 0:
-        #     layer_text = f'[{exp_limit:,.0f}' if exp_limit != np.inf else "Unlimited"
-        #     layer_text += f' xs {exp_attachment:,.0f}]'
-        # else:
-        #     layer_text = ''
-        # try:
-        #     self.long_name = f'{name}: {sev_name}({self.fz.arg_dict[0]:.2f}){layer_text}'
-        # except:
-        #     # 'rv_histogram' object has no attribute 'arg_dict'
-        #     self.long_name = f'{name}: {sev_name}{layer_text}'
-
         assert self.fz is not None
 
     def __repr__(self):
@@ -3685,139 +3678,46 @@ class Severity(ss.rv_continuous):
 
         return ex1a, ex2a, ex3a
 
-    # def update(self, log2=0, bs=0, **kwargs):
-    #     """
-    #     This is a convenience function so that update can be called on any kind of object.
-    #     It has no effect.
-    #
-    #     :param log2:
-    #     :param bs:
-    #     :param kwargs:
-    #     :return:
-    #     """
-    #     pass
-
-    def plot(self, N=100, figsize=(12, 3)):
+    def plot(self, n=100, axd=None, figsize=(2 * 3.5, 2 * 2.45), layout='AB\nCD'):
         """
         Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
 
         TODO better coordination of figsize! Better axis formats and ranges.
 
-        :param N:
-        :param figsize:
+        :param n: number of points to plot.
+        :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
+        :param figsize: (width, height) in inches.
+        :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
         :return:
         """
 
-        xs = np.linspace(0, self._isf(1e-4), N)
-        xs2 = np.linspace(0, self._isf(1e-12), N)
+        xs = np.linspace(0, self._isf(1e-4), n)
+        xs2 = np.linspace(0, self._isf(1e-12), n)
 
-        f = plt.figure(constrained_layout=True, figsize=figsize)
-        axd = f.subplot_mosaic('ABCD')
+        if axd is None:
+            f = plt.figure(constrained_layout=True, figsize=figsize)
+            axd = f.subplot_mosaic(layout)
 
         ds = 'steps-post' if self.sev_name == 'dhistogram' else 'default'
 
         ax = axd['A']
         ys = self._pdf(xs)
-        ax.plot(xs, ys, drawstyle=ds, lw=1)
+        ax.plot(xs, ys, drawstyle=ds)
         ax.set(title='Probability density', xlabel='Loss')
         yl = ax.get_ylim()
 
         ax = axd['B']
         ys2 = self._pdf(xs2)
-        ax.plot(xs2, ys2, drawstyle=ds, lw=1)
+        ax.plot(xs2, ys2, drawstyle=ds)
         ax.set(title='Log density', xlabel='Loss', yscale='log', ylim=[1e-14, 2 * yl[1]])
 
         ax = axd['C']
         ys = self._cdf(xs)
-        ax.plot(xs, ys, drawstyle=ds, lw=1)
+        ax.plot(xs, ys, drawstyle=ds)
         ax.set(title='Probability distribution', xlabel='Loss', ylim=[-0.025, 1.025])
 
         ax = axd['D']
-        ax.plot(ys, xs, drawstyle=ds, lw=1)
-        ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability p (or ω)', xlim=[-0.025, 1.025])
+        ax.plot(ys, xs, drawstyle=ds)
+        ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$', xlim=[-0.025, 1.025])
 
-
-# class CarefulInverse(object):
-#     """
-#     From SRM_Examples Noise: careful inverse functions.
-#
-#     """
-#
-#     @staticmethod
-#     def make1d(xs, ys, agg_fun=None, kind='linear', **kwargs):
-#         """
-#         Wrapper to make a reasonable 1d interpolation function with reasonable extrapolation
-#         Does NOT handle inverse functions, for those use dist_inv1d
-#         :param xs:
-#         :param ys:
-#         :param agg_fun:
-#         :param kind:
-#         :param kwargs:
-#         :return:
-#         """
-#         temp = pd.DataFrame(dict(x=xs, y=ys))
-#         if agg_fun:
-#             temp = temp.groupby('x').agg(agg_fun)
-#             fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
-#             f = interpolate.interp1d(temp.index, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
-#         else:
-#             fill_value = ((temp.y.iloc[0]), (temp.y.iloc[-1]))
-#             f = interpolate.interp1d(temp.x, temp.y, kind=kind, bounds_error=False, fill_value=fill_value, **kwargs)
-#         return f
-#
-#     @staticmethod
-#     def dist_inv1d(xs, fx, kind='linear', max_Fx=1.):
-#         """
-#         Careful inverse of distribution function with jumps. Assumes xs is evenly spaced.
-#         Assumes that if there are two or more xs values between changes in dist it is a jump,
-#         otherwise is is a continuous part. Puts in -eps values to make steps around jumps.
-#
-#         :param xs:
-#         :param fx:  density
-#         :param kind:
-#         :param max_Fx: what is the max allowable value of F(x)?
-#         :return:
-#         """
-#
-#         # make dataframe to allow summarization
-#         df = pd.DataFrame(dict(x=xs, fx=fx))
-#         # lots of problems with noise...strip it off
-#         df['fx'] = np.where(np.abs(df.fx) < 1e-16, 0, df.fx)
-#         # compute cumulative probabilities
-#         df['Fx'] = df.fx.cumsum()
-#         gs = df.groupby('Fx').agg({'x': [np.min, np.max, len]})
-#         gs.columns = ['mn', 'mx', 'n']
-#         # figure if a jump or not
-#         gs['jump'] = 0
-#         gs.loc[gs.n > 1, 'jump'] = 1
-#         gs = gs.reset_index(drop=False)
-#         # figure the right hand end of the jump
-#         gs['nextFx'] = gs.Fx.shift(-1, fill_value=1)
-#
-#         # space for answer
-#         ans = np.zeros((2 * len(gs), 2))
-#         rn = 0
-#         eps = 1e-10
-#         max_Fx -= eps / 100
-#         # write out known (x, y) points for lin interp
-#         for n, r in gs.iterrows():
-#             ans[rn, 0] = r.Fx
-#             ans[rn, 1] = r.mn if r.Fx >= max_Fx else r.mx
-#             rn += 1
-#             if r.Fx >= max_Fx:
-#                 break
-#             if r.jump:
-#                 if r.nextFx >= max_Fx:
-#                     break
-#                 ans[rn, 0] = r.nextFx - eps
-#                 ans[rn, 1] = r.mx
-#                 rn += 1
-#         # trim up ans
-#         ans = ans[:rn, :]
-#
-#         # make interpolation function and return
-#         fv = ((ans[0, 1]), (ans[-1, 1]))
-#         ff = interpolate.interp1d(ans[:, 0], ans[:, 1], bounds_error=False, fill_value=fv, kind=kind)
-#         # df = input in data frame; gs = grouped df, ans = carefully selected points for inverse
-#         return ff

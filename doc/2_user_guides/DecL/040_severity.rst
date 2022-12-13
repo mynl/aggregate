@@ -251,6 +251,7 @@ The information below was extracted from the `scipy help for continuous distribu
             'a': 'Min range' , 'b': 'Max range', 'params': 'Parameters'}).\
             set_index('Distribution').to_string(float_format=lambda x: f'{x:.4g}'))
 
+.. _list of distributions:
 
 .. _dist alpha:
 

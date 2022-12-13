@@ -28,5 +28,6 @@ The Dec Language
     DecL/070_vectorization
     DecL/080_reinsurance
     DecL/090_notes
+    DecL/100_tweedie
 
 

@@ -2812,7 +2812,8 @@ def qd(*argv, accuracy=3, align=True, trim=True):
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
-    ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
+    # ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
+    ff = lambda x: f'{x:.5g}'
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
             if 'Err CV(X)' in x.describe.columns:
@@ -2825,9 +2826,10 @@ def qd(*argv, accuracy=3, align=True, trim=True):
         elif isinstance(x, pd.DataFrame):
             if x.shape[1] > 10:
                 # need denser format
-                ff = sEngFormatter(accuracy=accuracy, min_prefix=0, max_prefix=12, align=False, trim=trim)
+                # ff = sEngFormatter(accuracy=accuracy, min_prefix=0, max_prefix=12, align=False, trim=trim)
+                pass
             with pd.option_context('display.width', 150, 'display.max_columns', 15, 'display.float_format', ff):
-                print(x)
+                print(x.to_string())
             # print(x.to_string(formatters={c: f for c in x.columns}))
         elif isinstance(x, int):
             print(x)

@@ -26,7 +26,7 @@ install_requires = [
                     ]
 
 
-long_description = Path('README.rst').read_text(encoding='utf-8')
+long_description = Path('Long_description.rst').read_text(encoding='utf-8')
 
 import aggregate
 version = aggregate.__version__

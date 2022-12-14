@@ -7,28 +7,41 @@
 # May 2022 to upload manually: twine upload dist/aggregate-0.9*.*
 # enter user name and pword (mildenhall) (py... password! not Github)
 
+import aggregate
 from setuptools import setup
 from pathlib import Path
 
 tests_require = ['unittest', 'sly']
 install_requires = [
-                    'cycler',
-                    'ipykernel',
-                    'jinja2',
-                    'matplotlib',
-                    'numpy',
-                    'pandas',
-                    'psutil',
-                    'pypandoc',
-                    'scipy',
-                    'sly',
-                    'titlecase'
-                    ]
+    'cycler',
+    'ipykernel',
+    'jinja2',
+    'matplotlib',
+    'numpy',
+    'pandas',
+    'psutil',
+    'pypandoc',
+    'scipy',
+    'sly',
+    'titlecase',
+    # docs
+    'docutils',
+    'jupyter-sphinx',
+    'nbsphinx',
+    'recommonmark',
+    'setuptools',
+    'sphinx',
+    'sphinx-panels',
+    'sphinx-rtd-dark-mode',
+    'sphinxcontrib-bibtex',
+    'sphinx-copybutton',
+    'sphinx-toggleprompt',
+    'IPython'
+]
 
 
 long_description = Path('Long_description.rst').read_text(encoding='utf-8')
 
-import aggregate
 version = aggregate.__version__
 
 setup(name="aggregate",

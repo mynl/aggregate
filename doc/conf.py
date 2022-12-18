@@ -5,15 +5,14 @@
 # containing dir.
 #
 # allow RTD to find aggregate
+sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../'))
+
 import matplotlib.pyplot as plt
 import aggregate as agg
 import sys
 import os
 from recommonmark.parser import CommonMarkParser
-
-sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../'))
-
 
 # graphics defaults - better res graphics
 plt.rcParams['figure.dpi'] = 300

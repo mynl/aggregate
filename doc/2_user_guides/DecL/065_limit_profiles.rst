@@ -39,13 +39,13 @@ aggregate CV is quite marked.
     :okwarning:
 
     from aggregate import build, qd
-    eg1 = build('agg Eg1 [1000 2000 4000 1000] premium at 0.65 lr '
+    a10 = build('agg DecL:10 [1000 2000 4000 1000] premium at 0.65 lr '
                 '[1000 2000 5000 4000] xs [0 0 0 1000] '
                 'sev lognorm 500 cv 1.25 '
                 'mixed gamma 0.6')
-    qd(eg1)
-    qd(eg1.report_df.iloc[:, :-2])
-    eg1.plot()
+    qd(a10)
+    qd(a10.report_df.iloc[:, :-2])
+    a10.plot()
 
 
 .. tidy up

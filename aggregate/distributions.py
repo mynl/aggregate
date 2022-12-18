@@ -19,11 +19,12 @@ from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 
+from .constants import *
 from .utilities import sln_fit, sgamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint, approximate_work, moms_analytic, picks_work, GCN
+    pprint_ex, approximate_work, moms_analytic, picks_work, GCN
 
 from .spectral import Distortion
 
@@ -502,9 +503,8 @@ class Aggregate(Frequency):
                 raise ValueError('Update Aggregate before asking for density_df')
 
             # really convenient to have p=p_total to be consistent with Portfolio objects
-            self._density_df = pd.DataFrame(dict(loss=self.xs, p=self.agg_density,
-                                                 p_total=self.agg_density
-                                                 ))
+            self._density_df = pd.DataFrame(dict(loss=self.xs, p_total=self.agg_density))
+            self._density_df['p'] = self._density_df.p_total
             # remove the fuzz, same method as Portfolio.remove_fuzz
             eps = np.finfo(np.float).eps
             # may not have a severity, remember...
@@ -535,7 +535,7 @@ class Aggregate(Frequency):
             # fill_value = min(self._density_df.p_total.iloc[-1], max(0, 1. - (self._density_df.F.iloc[-1])))
             fill_value = min(max(0, 1. - (self._density_df.F.iloc[-1])),
                              max(0, 1. - (self._density_df.p_total.iloc[1:].sum())))
-            # expect next two rwos to be the same...but they are not in certain situations...
+            # expect next two rows to be the same...but they are not in certain situations...
             # the second is more on point.
             # self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
             self._density_df['S'] = fill_value + self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
@@ -547,22 +547,25 @@ class Aggregate(Frequency):
             self._density_df['exa'] = self._density_df['lev']
             self._density_df['exlea'] = \
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
+
             # fix very small values, see port add_exa
-            n_ = self._density_df.shape[0]
-            if n_ < 1100:
-                mult = 1
-            elif n_ < 15000:
-                mult = 10
-            else:
-                mult = 100
-            loss_max = self._density_df[['loss', 'exlea']].query(' exlea > loss ').loss.max()
-            if np.isnan(loss_max):
-                loss_max = 0
-            else:
-                loss_max += mult * self.bs
-            self._density_df.loc[0:loss_max, 'exlea'] = 0
+            # well, well, well. WTF is this?
+            # n_ = self._density_df.shape[0]
+            # if n_ < 1100:
+            #     mult = 1
+            # elif n_ < 15000:
+            #     mult = 10
+            # else:
+            #     mult = 100
+            # loss_max = self._density_df[['loss', 'exlea']].query(' exlea > loss ').loss.max()
+            # if np.isnan(loss_max):
+            #     loss_max = 0
+            # else:
+            #     loss_max += mult * self.bs
+            # self._density_df.loc[0:loss_max, 'exlea'] = 0
+
             # expected value and epd
-            self._density_df['e'] = np.sum(self._density_df.p * self._density_df.loss)
+            self._density_df['e'] = self.est_m # np.sum(self._density_df.p * self._density_df.loss)
             self._density_df.loc[:, 'epd'] = \
                 np.maximum(0, (self._density_df.loc[:, 'e'] - self._density_df.loc[:, 'lev'])) / \
                 self._density_df.loc[:, 'e']
@@ -669,7 +672,7 @@ class Aggregate(Frequency):
         Plots for occurrence reinsurance: occurrence log density and aggregate quantile plot.
         """
         if axs is None:
-            fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True)
+            fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H), constrained_layout=True)
         ax0, ax1 = axs.flat
 
         self.occ_reins_df.filter(regex='p_[scn]').rename(columns=lambda x: x[2:]).plot(ax=ax0, logy=True)
@@ -2305,7 +2308,7 @@ class Aggregate(Frequency):
         """
         pretty print the program to html
         """
-        pprint(self.program)
+        pprint_ex(self.program, 20)
 
     @property
     def describe(self):
@@ -3678,7 +3681,7 @@ class Severity(ss.rv_continuous):
 
         return ex1a, ex2a, ex3a
 
-    def plot(self, n=100, axd=None, figsize=(2 * 3.5, 2 * 2.45), layout='AB\nCD'):
+    def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD'):
         """
         Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.

@@ -1,7 +1,7 @@
 Published Problems and Examples
 =================================
 
-**Objectives:** Use ``aggregate`` to replicate worked problems and examples from published references. Demonstrate method of solution and verify correctness.
+**Objectives:** Use ``aggregate`` to replicate worked problems and examples from published references. Demonstrate method of solution and verify correctness of ``aggregate`` calculations.
 
 **Audience:** Academics and researchers and actuarial students reading the cited works.
 
@@ -9,10 +9,9 @@ Published Problems and Examples
 
 **See also:** Bear and Nemlick and Mata et al. examples in :doc:`2_x_re_pricing`.
 
-.. rubric:: Contents
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 4
 
     problems/010_gh_example
     problems/020_ef_example

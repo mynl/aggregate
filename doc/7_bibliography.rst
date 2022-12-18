@@ -2,18 +2,13 @@
 Bibliography
 ####################################
 
-Quoted References
-==================
-
 .. bibliography::
     :cited:
     :list: enumerated
 
-All References
-================
 
-Should be the same if the bib extract file is up to date.
+.. Should be the same if the bib extract file is up to date.
 
-.. bibliography::
+.. bibliography
     :all:
     :list: enumerated

@@ -3,15 +3,19 @@
 The Tweedie Distribution: Theory
 ==================================
 
-.. Below is the code from the snippet.
-
 **Objectives:** Introduce aggregate probability distributions and the `aggregate` library for working with then in the context of real-world, but basic, actuarial problems illustrated using the Tweedie distribution from GLM modeling.
 
 **Audience:** Actuaries at the Associate or Fellow level.
 
-**Prerequisites:** V02 plus awareness of the use aggregate probability distribution in insurance (as covered on CAS Part 8).
+**Prerequisites:** GLM modeling, Tweedie distributions.
 
-**See also:**
+**See also:** :doc:`../2_user_guides/DecL/100_tweedie`.
+
+Helpful References
+-------------------
+
+Jørgensen, Bent. 1997. The theory of dispersion models. CRC Press.
+
 
 Theory
 -------
@@ -88,14 +92,6 @@ where :math:`w = \sum_i w_i`. The weights :math:`w_i` represents volume
 in cell :math:`i` and :math:`X_i` represents the pure premium. The sum
 on the left represents the total pure premium.
 
-References
-~~~~~~~~~~
-
-Jørgensen, Bent. 1997. The theory of dispersion models. CRC Press.
-
-
-Practice
---------
 
 
 The Power Variance Exponential Family of Distributions

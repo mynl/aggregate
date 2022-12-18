@@ -11,6 +11,9 @@ Numerical Methods and FFT Convolution
 
 **See also:**  :ref:`aggregate <2_x_aggregate>`.
 
+For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
+
+
 Fast, Accurate, and Flexible
 ------------------------------
 

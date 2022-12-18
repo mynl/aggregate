@@ -21,4 +21,5 @@ sphinx-rtd-dark-mode
 sphinxcontrib-bibtex
 sphinx-copybutton
 sphinx-toggleprompt
+sphinx-multitoc-numbering
 IPython>=7.31

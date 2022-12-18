@@ -15,9 +15,9 @@ parameters :math:`\mu, p, \sigma`, since these are most natural for GLM modeling
     :okwarning:
 
     from aggregate import build, qd, mv
-    tw1 = build('agg TW1 tweedie 2 1.05 5')
-    qd(tw1)
-    mv(tw1)
+    a15 = build('agg DecL:15 tweedie 2 1.05 5')
+    qd(a15)
+    mv(a15)
     print(f'Expected variance = disp x mean ** p = {2**1.05 * 5:.5f}')
 
 Inspecting the (non-trivial parts of the) specification shows the parser converts it into the additive form:
@@ -25,7 +25,7 @@ Inspecting the (non-trivial parts of the) specification shows the parser convert
 .. ipython:: python
     :okwarning:
 
-    {k: v for k,v in tw1.spec.items()
+    {k: v for k,v in a15.spec.items()
         if v!=0 and v is not None and v!=''}
 
 
@@ -62,9 +62,9 @@ Three different ways of specifying the same Tweedie distribution.
     :okwarning:
 
     program = f'''
-    agg Tw0 {λ} claims sev gamma {sev_m:.8g} cv {sev_cv} poisson
-    agg Tw1 {λ} claims sev {β:.4g} * gamma {α:.4g} poisson
-    agg Tw1 tweedie {μ} {p} {σ2}
+    agg DecL:16 {λ} claims sev gamma {sev_m:.8g} cv {sev_cv} poisson
+    agg DecL:17 {λ} claims sev {β:.4g} * gamma {α:.4g} poisson
+    agg DecL:18 tweedie {μ} {p} {σ2}
     '''
     tweedies = build(program)
     for a in tweedies:
@@ -91,22 +91,22 @@ Build a Tweedie using reproductive parameters, ``p``, ``mu``, ``sigma2``.
 .. ipython:: python
     :okwarning:
 
-    tw1 = build('agg TW1 tweedie 2 1.05 5')
-    @savefig tweedie_tw1.png
-    tw1.plot()
-    qd(tw1)
-    print(tw1.spec)
-    print(tw1.cdf(0), np.exp(-.40671))
+    a19 = build('agg DecL:19 tweedie 2 1.05 5')
+    @savefig tweedie_a19.png
+    a19.plot()
+    qd(a19)
+    print(a19.spec)
+    print(a19.cdf(0), np.exp(-.40671))
 
 When ``p`` is close to 1, the Tweedie approaches a Poisson. Here mean = 10 and sigma2 = 1, so the distribution is not over-dispersed.  The gamma severity has mean 1 and a very small CV; it acts like degenerate distribution at 1.
 
 .. ipython:: python
     :okwarning:
 
-    tw2 = build('agg TW2 tweedie 10 1.0001 1')
-    @savefig tweedie_tw2.png
-    tw2.plot()
-    qd(tw2)
+    a20 = build('agg DecL:20 tweedie 10 1.0001 1')
+    @savefig tweedie_a20.png
+    a20.plot()
+    qd(a20)
     tweedie_convert(p=1.0001, μ=10, σ2=1)
 
 When ``p`` is close to 2, the Tweedie approaches a Gamma. Here mean = 10, and sigma2=0.04.
@@ -115,10 +115,10 @@ The variance equals ``sigma2 mu^2``, so CV = sigma = 0.2
 .. ipython:: python
     :okwarning:
 
-    tw3 = build('agg TW3 tweedie 10 1.999 0.04', log2=16, bs=1/256)
-    @savefig tweedie_tw3.png
-    tw3.plot()
-    qd(tw3)
+    a21 = build('agg DecL:21 tweedie 10 1.999 0.04', log2=16, bs=1/256)
+    @savefig tweedie_a21.png
+    a21.plot()
+    qd(a21)
 
 Build the same distribution explicitly from gamma severities. Here the gamma is built using mean and CV or shape and scale.
 
@@ -141,3 +141,15 @@ Build the same distribution explicitly from gamma severities. Here the gamma is 
     import matplotlib.pyplot as plt
     plt.close('all')
 
+Summary of Objects Created by DecL
+-------------------------------------
+
+Objects created by :meth:`build` in the DecL guide.
+
+.. ipython:: python
+    :okwarning:
+    :okexcept:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^DecL:').iterrows():
+        pprint_ex(r.program, split=20)

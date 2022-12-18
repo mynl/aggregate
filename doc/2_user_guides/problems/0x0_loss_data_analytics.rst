@@ -65,7 +65,7 @@ Distribution Examples
     for shape in [2, 3, 4, 5]:
         ax1.plot(xs, ss.gamma(shape, scale=100).pdf(xs), label=f'shape = {shape}')
 
-    @savefig lda_gamma.png
+    @savefig lda_gamma.png scale=20
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='gamma density', xlabel='x')
@@ -89,7 +89,7 @@ Distribution Examples
     for shape in [1,2,3,4]:
         ax1.plot(xs, ss.pareto(shape, scale=2000, loc=-2000).pdf(xs), label=f'shape = {shape}')
 
-    @savefig lda_pareto.png
+    @savefig lda_pareto.png scale=20
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='Pareto density', xlabel='x')
@@ -99,25 +99,25 @@ Distribution Examples
 
 **Weibull distribution**
 
+``scipy.stats`` includes Weibull min (for positive :math:`x`) and Weibull max (for negative :math:`x`) distributions. We want the min version.
+
 .. ipython:: python
     :okwarning:
 
-    xs = np.linspace(0, 3000, 3001)
+    xs = np.linspace(0, 400, 401)
 
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
+
     ax0, ax1 = axs.flat
 
-    for scale in [2000, 2500, 3000, 3500]:
-        ax0.plot(xs, ss.pareto(3, scale=scale, loc=-scale).pdf(xs), label=f'scale = {scale}')
-
-    for shape in [1,2,3,4]:
-        ax1.plot(xs, ss.pareto(shape, scale=2000, loc=-2000).pdf(xs), label=f'shape = {shape}')
-
-    @savefig lda_weibull.png
+    for scale in [50, 100, 150, 200]:
+        ax0.plot(xs, ss.weibull_min(3, scale=scale).pdf(xs), label=f'scale = {scale}')
+    for shape in [1.5, 2, 2.5, 3]:
+        ax1.plot(xs, ss.weibull_min(shape, scale=100).pdf(xs), label=f'shape = {shape}')
+    @savefig lda_pareto.png scale=20
     for ax in axs.flat:
         ax.legend(loc='upper right')
-        ax.set(ylabel='Pareto density', xlabel='x')
-
+        ax.set(ylabel='Weibull_min density', xlabel='x')
 
 .. _mixture example:
 
@@ -233,7 +233,7 @@ where :math:`x` is measured in millions. Calculate the total amount, in millions
     F = np.where(xs<3,(xs * xs  * (2 - xs / 3)) / 9, 1)
     ps = np.diff(F, append=1)
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
-    @savefig lda_344.png
+    @savefig lda_344.png scale=20
     ax.plot(xs, ps)
 
 When the empirical distribution has many entries it is faster to build the ``Aggregate`` object directly, rather than use DecL. The moments of the severity and aggregate distribution are computed from the numerical approximation during creation. There is no need to update the object.
@@ -451,7 +451,7 @@ Here is a comparison of the FFT model with the normal approximation. Example 5.4
     (a.density_df.p / a.bs).plot(label='Exact', ax=ax)
     ax.plot(a.xs, fz.pdf(a.xs), label='Normal approx')
     ax.set(xlim=[0, 3000], title='Normal approximation')
-    @savefig lda_normal.png
+    @savefig lda_normal.png scale=20
     ax.legend(loc='upper right');
 
 .. _lda geom discrete:
@@ -491,7 +491,6 @@ Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that 
     a1 = build('agg Projects.1 2 claims '
               'dsev [5 10 20] [.2 .3 .5] geometric '
               'aggregate net of tower [0 5 10 15 inf]')
-
     b = a1.reinsurance_audit_df.xs('ceded', axis=1, level=0)
     # reverse cumulative sum, minus mean from last row
     b['cumul ex'] = b.ex[::-1].cumsum() - a.agg_m
@@ -556,12 +555,10 @@ Here is a comparison of the two densities.
     :okwarning:
 
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
-
     a0.density_df.p_total.plot(ax=ax, label='Original')
     a1.density_df.p_total.plot(ax=ax, label='Adjusted')
-
     ax.set(xlim=[-10, 1.25 * a0.q(0.9999)])
-    @savefig lda_5_5_5.png
+    @savefig lda_5_5_5.png scale=20
     ax.legend(loc='upper right')
 
 .. _lda poisson exponential:

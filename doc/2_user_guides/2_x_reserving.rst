@@ -11,19 +11,29 @@ Reserving
 
 **See also:**
 
-Helpful references
+Contents
+-----------
+
+* :ref:`Helpful References`
+* :ref:`res modeling`
+* :ref:`res resolution`
+
+Helpful References
 --------------------
 
 * PIR chapter 17.
-* Solvency II approach.
+* Solvency II Cost of Capital Risk Margin.
 
+.. _res modeling:
 
-The Current Accident and Reserves
-----------------------------------
+Modeling the Current Accident Year, Case and IBRN Reserves
+------------------------------------------------------------
 
-*Not yet implemented.*
+*Documentation to follow.*
 
-The Resolution of Uncertainty Over Time
-----------------------------------------
+.. _res resolution:
 
-*Not yet implemented.*
+The Resolution of Reserve Uncertainty Over Time
+---------------------------------------------------------------
+
+*Documentation to follow.*

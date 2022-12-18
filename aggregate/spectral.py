@@ -8,6 +8,8 @@ import pandas as pd
 from textwrap import fill
 import logging
 
+from .constants import *
+
 logger = logging.getLogger(__name__)
 
 
@@ -361,7 +363,7 @@ class Distortion(object):
             y2 = self.g_inv(xs)
 
         if ax is None:
-            ax = plt.gca()
+            fig, ax = plt.subplots(1,1, figsize=(FIG_H, FIG_H), constrained_layout=True)
 
         if scale == 'linear':
             ax.plot(xs, y1, c='C0', label='$g$', **kwargs)

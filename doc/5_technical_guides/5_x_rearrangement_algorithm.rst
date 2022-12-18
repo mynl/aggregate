@@ -3,13 +3,31 @@
 The Rearrangement Algorithm
 ===========================
 
-**Objectives:**
+**Objectives:** Describe the Rearrangement Algorithm for finding the worst-VaR dependence relation.
 
 **Audience:**
 
-**Prerequisites:**
+**Prerequisites:** Risk measures, VaR, probability.
 
 **See also:**
+
+Contents
+-----------
+
+* :ref:`Helpful References`
+* :ref:`strat margin alloc`
+
+Helpful References
+--------------------
+
+* PIR Section 4.2.5.
+* :cite:t:`Puccetti2012`
+* :cite:t:`Embrechts2013`
+
+.. _strat margin alloc:
+
+The Rearrangement Algorithm
+-----------------------------
 
 The Rearrangement Algorithm (RA) is a practical and straightforward
 method to determine the worst-VaR sum. The RA works by iteratively
@@ -17,8 +35,8 @@ making each marginal crossed (counter-monotonic) with the sum of the
 other marginal distributions. It is easy to program and suitable for
 problems involving hundreds of variables and millions of simulations.
 
-The Rearrangement Algorithm was introduced in @Puccetti2012 and subsequently improved in
-@Embrechts2013.
+The Rearrangement Algorithm was introduced in :cite:t:`Puccetti2012` and subsequently improved in
+:cite:t:`Embrechts2013`.
 
 
 **Algorithm Input:** Input samples are arranged in a matrix
@@ -79,11 +97,16 @@ recomputed. The statistics :math:`x^{\ast}` and :math:`y^{\ast}` can be
 replaced with the variance of the row-sums of :math:`X` and :math:`Y`
 and yield essentially the same results.
 
-@Embrechts2013 report that while there is no analytic proof the
+:cite:t:`Embrechts2013` report that while there is no analytic proof the
 algorithm always works, it performs very well based on examples and
 tests where we can compute the answer analytically.
 
-**Example.** Compute the worst
+.. _ra worked example:
+
+Worked Example
+----------------
+
+**Setup.** Compute the worst
 :math:`\mathsf{VaR}_{0.99}` of the sum of lognormal distributions with mean 10
 and coefficient of variations 1, 2, and 3 by applying the Rearrangement
 Algorithm to a stratified sample of :math:`N=40` observations at and

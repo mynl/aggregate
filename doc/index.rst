@@ -15,6 +15,7 @@ aggregate Documentation
 .. toctree::
    :maxdepth: 3
    :hidden:
+   :numbered:
 
    1_Getting_Started
    2_User_Guides

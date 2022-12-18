@@ -16,6 +16,9 @@ Approximations and Errors
 * Moments of a lognormal (Mandlebrot)
 * Implications for bs and log2
 
+Based on an analysis of the relative error, select ``log2=18`` and ``bs=1/16``, see :ref:`../5_technical_guides/5_x_approximation_error`. The reported statistics are close to the theoretic numbers implied by the (limited) stochastic model.
+
+
 Estimation of the variance of
 percentile estimates; Morton B. BROWN and Robert A. WOLFE
 

@@ -18,11 +18,11 @@ Contents
 
 * :ref:`Helpful references <ir references>`
 * :ref:`Modes of Large Account Analysis`
-* :ref:`Stop Loss Insurance<ir stop loss>`
+* :ref:`ir stop loss`
 
 .. _ir references:
 
-Helpful references
+Helpful References
 --------------------
 
 * Fisher study note, Bahnemann, :cite:t:`Fisher2019`, :cite:t:`Bahnemann2015`
@@ -45,7 +45,7 @@ The IR, or its risk retention vehicle, is concerned with the loss pick and under
 
 .. _ir stop loss:
 
-Retention Stop Loss (Table L)
-------------------------------
+Large Deductible Stop Loss Insurance (Table L and M)
+---------------------------------------------------------------
 
-*Not yet implemented.*
+*Documentation to follow.*

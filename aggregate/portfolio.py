@@ -21,6 +21,8 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from textwrap import fill
 from IPython.core.display import HTML, display
+
+from .constants import *
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .utilities import ft, \
@@ -356,7 +358,7 @@ class Portfolio(object):
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
             s.append(f'last update              {self.last_update}')
-            s.append(f'hash                     {self.hash_rep_at_last_update}')
+            s.append(f'hash                     {self.hash_rep_at_last_update:x}')
         return '\n'.join(s)
 
     @property
@@ -1760,7 +1762,7 @@ class Portfolio(object):
             # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
-    def plot(self, axd=None, figsize=(2 * 3.5, 2.45)):
+    def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
         """
         Defualt plot of density, survival functions (linear and log)
 

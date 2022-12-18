@@ -1,14 +1,12 @@
 .. _distortions:
 
-Distortions
-======================
+Distortions and :class:`Distortion` Class Calculations
+=======================================================
 
-**Objectives:**
+**Objectives:** Define distortions, examples of parametric families, describe calculations performed by the :class:`Distortion` class.
 
 **Audience:**
 
-**Prerequisites:**
+**Prerequisites:** DecL, general use of ``aggregate``, probability.
 
-**See also:**
-
-Calculations made by ``Portfolio`` objects.
+**See also:** :doc:`5_x_aggregate_calculations`, :doc:`5_x_portfolio_calculations`.

@@ -21,6 +21,7 @@ Contents
 * :ref:`Simple Example`
 * :ref:`Exercise - Test Your Understanding`
 * :ref:`Dice Rolls`
+* :ref:`student summary`
 
 
 .. _st what is:
@@ -91,7 +92,7 @@ The first line imports ``build`` and a helper "quick display" function ``qd``. Y
 .. ipython:: python
     :okwarning:
 
-    a = build('agg Simple '
+    a01 = build('agg Student:01 '
               'dfreq [1 2 3] [1/2 1/4 1/4] '
               'dsev [1 2 4] [5/8 1/4 1/8]')
 
@@ -108,27 +109,27 @@ Use ``qd`` to print a dataframe of statistics with answers the first three quest
 .. ipython:: python
     :okwarning:
 
-    qd(a)
+    qd(a01)
 
 The columns ``E[X]``, ``CV(X)``, and ``Skew(X)`` report the mean, CV, and skewness for each component, and they are computed analytically.
-The columns ``Est E[X]``, ``Est CV(X)``, and ``Est Skew(X)`` are computed numerically by ``aggregate``. For discrete models they equal the analytic answer because the only error introduced by ``aggregate`` comes from discretizing the severity distribution, and that is why there are no estimates for frequency. ``Err E[X]`` shows the absolute error in the mean. This handy dataframe can be accessed directly via the property ``a.describe``. The note ``log2 = 5, bs = 1`` describe the inner workings, discussed in REF.
+The columns ``Est E[X]``, ``Est CV(X)``, and ``Est Skew(X)`` are computed numerically by ``aggregate``. For discrete models they equal the analytic answer because the only error introduced by ``aggregate`` comes from discretizing the severity distribution, and that is why there are no estimates for frequency. ``Err E[X]`` shows the absolute error in the mean. This handy dataframe can be accessed directly via the property ``a01.describe``. The note ``log2 = 5, bs = 1`` describe the inner workings, discussed in REF.
 
-It remains to give the aggregate probability mass function. It is available in the dataframe ``a.density_df``. Here are the probability masses, and distribution and survival functions evaluated for all possible aggregate outcomes.
+It remains to give the aggregate probability mass function. It is available in the dataframe ``a01.density_df``. Here are the probability masses, and distribution and survival functions evaluated for all possible aggregate outcomes.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
+    qd(a01.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
 
 The possible outcomes range from 1 (frequency 1, outcome 1) to 12 (frequency 3, all outcomes 4). It is easy to check the reported probabilities are correct. It is impossible to obtain an outcome of 11.
 
-For extra credit, here is a plot of the pmf, cdf, and the outcome Lee diagram, showing the severity and aggregate. These are produced automatically by ``a.plot()`` from the ``density_df`` dataframe.
+For extra credit, here is a plot of the pmf, cdf, and the outcome Lee diagram, showing the severity and aggregate. These are produced automatically by ``a01.plot()`` from the ``density_df`` dataframe.
 
 .. ipython:: python
     :okwarning:
 
     @savefig simple.png
-    a.plot()
+    a01.plot()
 
 
 Aggregate statistics: the mean
@@ -174,13 +175,13 @@ Here is the ``aggregate`` solution. The probability clause in ``dsev`` can be om
 .. ipython:: python
     :okwarning:
 
-    a1 = build('agg Less.Simple '
+    a02 = build('agg Student:02 '
                'dfreq [1 2 3] [.5 .25 .25] '
                'dsev [1 2 4 8 16] ')
-    qd(a1)
-    qd(a1.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
+    qd(a02)
+    qd(a02.density_df.query('p_total > 0')[['p_total', 'F', 'S']])
     @savefig less_simple.png
-    a1.plot()
+    a02.plot()
 
 
 The largest outcome of 48 has probability 1/4 * (1/5)**3 = 1/500 = 0.002.
@@ -196,7 +197,7 @@ The DecL program for one dice roll. We write the simple DecL on one line.
 .. ipython:: python
     :okwarning:
 
-    one_dice = build('agg Dice.1 dfreq [1] dsev [1:6]')
+    one_dice = build('agg Student:01Dice dfreq [1] dsev [1:6]')
     one_dice.plot()
     @savefig student_onedice.png
     qd(one_dice)
@@ -206,7 +207,7 @@ The program for two dice rolls, yielding the triangular distribution.
 .. ipython:: python
     :okwarning:
 
-    two_dice = build('agg Dice.2 dfreq [2] dsev [1:6]')
+    two_dice = build('agg Student:02Dice dfreq [2] dsev [1:6]')
     two_dice.plot()
     @savefig student_twodice.png
     qd(two_dice)
@@ -223,7 +224,7 @@ The aggregate program for twelve dice rolls, which is much harder to compute by 
     import numpy as np
     import matplotlib.pyplot as plt
 
-    twelve_dice = build('agg Dice.12 dfreq [12] dsev [1:6]')
+    twelve_dice = build('agg Student:12Dice dfreq [12] dsev [1:6]')
     qd(twelve_dice)
 
     fz = twelve_dice.approximate('norm')
@@ -245,7 +246,7 @@ Finally, a dice roll of dice rolls: throw a dice, then throw that many dice and 
 .. ipython:: python
     :okwarning:
 
-    dd = build('agg DD dfreq [1:6] dsev [1:6]')
+    dd = build('agg Student:DD dfreq [1:6] dsev [1:6]')
     qd(dd)
     @savefig student_rollroll.png
     dd.plot()
@@ -262,3 +263,24 @@ The largest outcome of 36 has probability 6**-7. Here is a check of the accuracy
         columns=['value'])
 
 We return to this example in Reinsurance Pricing, :ref:`re basic examples`.
+
+.. _student summary:
+
+Summary of Objects Created by DecL
+-------------------------------------
+
+Objects created by :meth:`build` in this guide.
+
+.. ipython:: python
+    :okwarning:
+    :okexcept:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^Student:').iterrows():
+        pprint_ex(r.program, split=20)
+
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')

@@ -23,6 +23,7 @@ Contents
 * :ref:`Exercise - Test Your Understanding`
 * :ref:`Dice Rolls`
 * :ref:`Advantages of Modeling with Aggregate Distributions`
+* :ref:`actuary summary`
 
 Realistic Insurance Example
 ---------------------------
@@ -58,26 +59,26 @@ Building an aggregate object using simple DecL program, and then querying its ``
 
     from aggregate import build, qd
 
-    a = build('agg InsuranceExample '
+    a01 = build('agg Actuary:01 '
               '2000 premium at 0.675 lr 1000 xs 0 '
               'sev lognorm 50 cv 1.25 '
               'poisson')
-    qd(a)
+    qd(a01)
 
-The dataframe ``a.describe``, printed and formatted automatically by the helper function ``qd`` gives the answers to questions 1 and 2. The survival function ``a.sf`` answers 3.1 and 3.2. Again, ``qd`` is used to print with reasonable defaults.
-
-.. ipython:: python
-    :okwarning:
-
-    qd(a.sf(2000), a.sf(2500))
-    qd(a.density_df.loc[[2500], ['F', 'lev', 'epd']])
-
-The dataframe ``a.density_df`` computes limited expected values (levs), indexed by loss level. The value ``a.agg_m`` is the mean.
+The dataframe ``a01.describe``, printed and formatted automatically by the helper function ``qd`` gives the answers to questions 1 and 2. The survival function ``a01.sf`` answers 3.1 and 3.2. Again, ``qd`` is used to print with reasonable defaults.
 
 .. ipython:: python
     :okwarning:
 
-    default_agg = a.agg_m - a.density_df.loc[2500, 'lev']
+    qd(a01.sf(2000), a01.sf(2500))
+    qd(a01.density_df.loc[[2500], ['F', 'lev', 'epd']])
+
+The dataframe ``a01.density_df`` computes limited expected values (levs), indexed by loss level. The value ``a01.agg_m`` is the mean.
+
+.. ipython:: python
+    :okwarning:
+
+    default_agg = a01.agg_m - a01.density_df.loc[2500, 'lev']
     default_agg
 
 
@@ -112,13 +113,13 @@ The code below provides all the answers. ``mu_sigma_from_mean_cv`` computes the 
 
     print(mu_sigma_from_mean_cv(50, 1.25))
 
-The function ``a.approximate`` parameterizes all the requested matched moment approximations, returning frozen ``scipy.stats`` distribution objects that expose ``cdf`` methods. The :class:`Aggregate` class object ``a`` also has a ``cdf`` method. Using these functions, we can assemble a dataframe to answer question 3.
+The function ``a01.approximate`` parameterizes all the requested matched moment approximations, returning frozen ``scipy.stats`` distribution objects that expose ``cdf`` methods. The :class:`Aggregate` class object ``a`` also has a ``cdf`` method. Using these functions, we can assemble a dataframe to answer question 3.
 
 .. ipython:: python
     :okwarning:
 
-    fz = a.approximate('all')
-    fz['agg'] = a
+    fz = a01.approximate('all')
+    fz['agg'] = a01
 
     df = pd.DataFrame({k: v.sf(2000) for k, v in fz.items()}.items(),
                  columns=['Approximation', 'Value']
@@ -133,11 +134,11 @@ The function ``lognorm_lev`` computes limited expected values for the lognormal.
 
     from aggregate import lognorm_lev
 
-    mu, sigma = mu_sigma_from_mean_cv(a.agg_m, a.agg_cv)
+    mu, sigma = mu_sigma_from_mean_cv(a01.agg_m, a01.agg_cv)
     lev = lognorm_lev(mu, sigma, 1, 2500)
-    default = a.agg_m - lev
-    epd = default / a.agg_m
-    pd.DataFrame((lev, default, default_agg, epd, default_agg / a.agg_m),
+    default = a01.agg_m - lev
+    epd = default / a01.agg_m
+    pd.DataFrame((lev, default, default_agg, epd, default_agg / a01.agg_m),
                  index=pd.Index(['Lognorm LEV', 'Lognorm Default',
                  'Agg Default', 'Lognorm EPD', 'Agg EPD'],
                  name='Item'),
@@ -164,3 +165,23 @@ Aggregate distributions provide a powerful modeling paradigm. It separates the a
 
 7. Understanding properties of frequency and severity separately illuminates the shape of the aggregate.
 
+.. _actuary summary:
+
+Summary of Objects Created by DecL
+-------------------------------------
+
+Objects created by :meth:`build` in this guide.
+
+.. ipython:: python
+    :okwarning:
+    :okexcept:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^(TenM|Student|Actuary):').iterrows():
+        pprint_ex(r.program, split=20)
+
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')

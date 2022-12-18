@@ -36,7 +36,7 @@ For example::
 * ``dfreq [1 2 3] [3/4 3/16 1/16]`` specifies frequency outcomes and
   probabilities directly. It is described in :ref:`nonparametric frequency`.
 
-All values in the first three specifications can be :doc:`070_vectorization`.
+All values in the first three specifications can be vectorized, see :doc:`070_vectorization`.
 
 Determining Expected Claim Count
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,7 +53,7 @@ losses.
 These choices present no ambiguity when using DecL. But the input arguments
 could conflict if you create the object directly.
 
-Remember, claim count is conditional on a loss to the layer by default, but severity can have a mass at zero.
+By default, claim count is conditional on a loss to the layer, but severity can have a mass at zero. The severity can be specified to be unconditional, see :ref:`sev uncond sev`.
 
 .. distributions.py about line 880
 

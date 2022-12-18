@@ -37,8 +37,8 @@ The following parametric frequency distributions are supported. Remember that th
 * ``geometric``, no additional parameters required
 * ``fixed``, no additional parameters required, expected claim count must be an integer.
 * ``bernoulli``, no additional parameters required, expected claim count must be :math:`\le 1`.
-* ``binomial SHAPE``, the shape determines :math:`p` and :math:`n=\mathsf{E}[N]/p`.
-* ``neyman SHAPE`` (nor ``neymana`` or ``neymanA``), the Neyman A
+* ``binomial SHAPE``, the shape parameter sets :math:`p` and :math:`n=\mathsf{E}[N]/p`.
+* ``neyman SHAPE`` (or ``neymana`` or ``neymanA``), the Neyman A
   Poisson-compound Poisson. The shape variable gives the average number of
   claimants per claim. See JKK. REF
 * ``pascal SHAPE1 SHAPE2`` (the generalized Poisson-Pascal, see REF), where ``SHAPE1``
@@ -87,4 +87,4 @@ produces a negative binomial (gamma-mixed Poisson) distribution with variance :m
 Zero Modification and Zero Truncation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Not yet implemented.
+*Not yet implemented*

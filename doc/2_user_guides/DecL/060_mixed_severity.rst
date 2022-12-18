@@ -14,7 +14,7 @@ distribution. All elements are broadcast against one-another. For example::
 
 expresses a mixture of five lognormals with a mean of 1000 and CVs as
 indicated with weights 0.4, 0.2, 0.1, 0.1, 0.1. Equal weights are expressed
-as wts=[5], or the relevant number of components. A missing weights clause is
+as ``wts=5``, or the relevant number of components (note equals sign). A missing weights clause is
 interpreted as giving each severity weight 1 which results in five times the
 total loss. Commas in the lists are optional.
 
@@ -25,51 +25,57 @@ total loss. Commas in the lists are optional.
 
     from aggregate import build, qd
 
-    eg = build('agg Eg '
+    a01 = build('agg DecL:01 '
                '1000 loss '
                '1000 xs 0 '
                'sev lognorm 100 cv [0.75 1.0 1.25 1.5 2] '
                'wts [0.4, 0.2, 0.1, 0.1, 0.1] '
                'poisson')
-    qd(eg)
-    qd(eg.report_df.iloc[:, :-4])
+    qd(a01)
 
 Mixed severity with Poisson frequency is the same as the sum of five independent components. The ``report_df`` shows the mixture details.
 
 .. ipython:: python
     :okwarning:
 
-    egPort = build('port Eg.Port '
+    qd(a01.report_df.iloc[:, :-4])
+
+This aggregate can also be built as a :class:`Portfolio`.
+
+.. ipython:: python
+    :okwarning:
+
+    a02 = build('port DecL:02 '
                         'agg Unit1 400 loss 1000 xs 0 sev lognorm 100 cv 0.75 poisson '
                         'agg Unit2 200 loss 1000 xs 0 sev lognorm 100 cv 1.00 poisson '
                         'agg Unit3 100 loss 1000 xs 0 sev lognorm 100 cv 1.25 poisson '
                         'agg Unit4 100 loss 1000 xs 0 sev lognorm 100 cv 1.50 poisson '
                         'agg Unit5 100 loss 1000 xs 0 sev lognorm 100 cv 2.00 poisson ')
-    qd(egPort)
+    qd(a02)
 
 Actual frequency equals total frequency times weight. Setting ``wts=5`` results in equal weights, here 0.2.
 
 .. ipython:: python
     :okwarning:
 
-    eg2eq = build('agg Eg.eq '
+    a03 = build('agg DecL:03 '
                   '1000 loss '
                   '1000 xs 0 '
                   'sev lognorm 100 cv [0.75 1.0 1.25 1.5 2] wts=5 '
                   'poisson')
-    qd(eg2eq)
+    qd(a03)
 
 Missing weights set to 1 resulting in five times loss. This behavior is generally not what you want!
 
 .. ipython:: python
     :okwarning:
 
-    eg2m = build('agg Eg.m '
+    a04 = build('agg DecL:04 '
                   '1000 loss '
                   '1000 xs 0 '
                   'sev lognorm 100 cv [0.75 1.0 1.25 1.5 2] '
                   'poisson')
-    qd(eg2m)
+    qd(a04)
 
 
 .. _med example:
@@ -109,7 +115,7 @@ take a shape.
 .. ipython:: python
     :okwarning:
 
-    med = build('agg MED 1 claim '
+    med = build('agg Decl:MED 1 claim '
                 'sev [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * '
                 'expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071] '
                 'fixed')
@@ -168,11 +174,11 @@ We can save the MED severity in the knowledge and then refer to it by name.
     build('sev COMMAUTO [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * '
           ' expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071]');
 
-    lim_prof2 = build('agg LIM_PROF2 [20 8 4 2] claims [1e6, 2e6 5e6 10e6] xs 0 '
+    a05 = build('agg DecL:05 [20 8 4 2] claims [1e6, 2e6 5e6 10e6] xs 0 '
                       'sev sev.COMMAUTO fixed',
                       log2=18, bs=500)
 
-    qd(lim_prof2)
+    qd(a05)
 
 Different Distributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,22 +192,22 @@ than a gamma, avoiding very good years.
 .. ipython:: python
     :okwarning:
 
-    dd = build('agg DD [100 200] claims '
+    a06 = build('agg DecL:06 [100 200] claims '
                 '5000 x 0 '
                 'sev [gamma lognorm] [100 150] cv [1 0.5] '
                 'mixed gamma 0.5',
                 log2=16, bs=2.5)
-    qd(dd.report_df)
-    dd2 = build('agg DD.del [100 200] claims '
+    qd(a06.report_df)
+    a07 = build('agg DecL:07 [100 200] claims '
                  '5000 x 0 '
                  'sev [gamma lognorm] [100 150] cv [1 0.5] '
                  'mixed delaporte 0.5 0.6',
                 log2=18, bs=2.5)
-    qd(dd2.report_df)
+    qd(a07.report_df)
     @savefig mix_3.png
-    dd.plot()
+    a06.plot()
     @savefig mix_4.png
-    dd2.plot()
+    a07.plot()
 
 
 
@@ -220,17 +226,17 @@ is too low.
 .. ipython:: python
     :okwarning:
 
-    med_po = build('agg ABC.Account.Po 50 claim '
+    a08 = build('agg DecL:08 50 claim '
                     '500000 xs 0 sev sev.COMMAUTO '
                     'poisson'
                     , bs=250)
-    med_mx = build('agg ABC.Account.Po 50 claim '
+    a09 = build('agg DecL:09 50 claim '
                     '500000 xs 0 sev sev.COMMAUTO '
                     'mixed gamma 0.25'
                     , bs=250)
-    qd(med_po)
-    qd(med_mx)
-    qd(med_mx.report_df.drop(['name']).iloc[:, :-2])
+    qd(a08)
+    qd(a09)
+    qd(a09.report_df.drop(['name']).iloc[:, :-2])
 
 
 .. tidy up

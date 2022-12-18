@@ -26,6 +26,7 @@ from scipy.stats import multivariate_t
 # from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
 
+from .constants import *
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
         clean = re.sub(r'[ \t]+', ' ', t.strip())
         clean = re.sub(r' note\{[^}]*\}', '', clean)
         if split > 0 and len(clean) > split:
-            clean = re.sub(r'\b(sev|occurrence|agg|aggregate|mixed|poisson|fixed)', r'\n\t\1', clean)
+            clean = re.sub(r' (d?sev|occurrence|agg|aggregate|mixed|poisson|fixed)', r'\n    \1', clean)
             s = clean.split(' ')
             clean = ' '.join(s[:2]) + '\n\t' + ' '.join(s[2:])
         ans.append(clean)
@@ -1826,7 +1827,7 @@ class GreatFormatter(ticker.ScalarFormatter):
         self.orderOfMagnitude = int(3 * np.floor(self.orderOfMagnitude / 3))
 
 
-def make_mosaic_figure(mosaic, figsize=None, w=3.5, h=2.45, xfmt='great', yfmt='great',
+def make_mosaic_figure(mosaic, figsize=None, w=FIG_W, h=FIG_H, xfmt='great', yfmt='great',
                        places=None, power_range=(-3, 3), sep='', unit='', sci=True,
                        mathText=False, offset=True, return_array=False):
     """
@@ -2085,7 +2086,7 @@ def friendly(df):
 
 class FigureManager():
     def __init__(self, cycle='c', lw=1.5, color_mode='mono', k=0.8, font_size=12,
-                 legend_font='small', default_figsize=(3.5, 2.45)):
+                 legend_font='small', default_figsize=(FIG_W, FIG_H)):
         """
         Another figure/plotter manager: manages cycles for color/black and white
         from Great utilities.py, edited and stripped down

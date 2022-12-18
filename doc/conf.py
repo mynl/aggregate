@@ -5,15 +5,15 @@
 # containing dir.
 #
 # allow RTD to find aggregate
+import matplotlib.pyplot as plt
+import aggregate as agg
 import sys
 import os
 from recommonmark.parser import CommonMarkParser
 
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
-import aggregate as agg
 
-import matplotlib.pyplot as plt
 
 # graphics defaults - better res graphics
 plt.rcParams['figure.dpi'] = 300
@@ -22,6 +22,9 @@ plt.rcParams['figure.dpi'] = 300
 project = agg.__project__
 copyright = agg.__copyright__
 author = agg.__author__
+
+# generally want warning to be an error, but helpful at times.
+ipython_warning_is_error = True
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -51,6 +54,7 @@ extensions = [
     'nbsphinx',
     'sphinx_panels',
     'sphinxcontrib.bibtex',
+    'sphinx_multitoc_numbering',
     'sphinx_rtd_dark_mode'
 ]
 
@@ -102,6 +106,8 @@ html_theme_options = {
     'titles_only': False,
 }
 
+html_logo = '_static/agg_logo.png'
+html_favicon = '_static/agg_favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

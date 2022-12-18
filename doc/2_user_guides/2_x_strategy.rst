@@ -3,17 +3,31 @@
 Strategy and Portfolio Management
 ==================================
 
-**Objectives:**
+**Objectives:** Use spectral risk measures to allocate total margin by unit.
 
-**Audience:**
+**Audience:** Planning and strategy, ERM, capital modeling, risk management actuaries.
 
-**Prerequisites:**
+**Prerequisites:** DecL, aggregate distributions, risk measures.
 
-**See also:**
+**See also:**  :doc:`2_x_cat`, :doc:`2_x_capital`, :doc:`2_x_case_studies`.
 
-Capital Allocation and Pricing
-------------------------------
 
-*  Many and varied
-*  Application of distortion risk measures
-*  ...
+Contents
+-----------
+
+* :ref:`Helpful References`
+* :ref:`strat margin alloc`
+
+Helpful References
+--------------------
+
+* PIR chapter 14, 15.
+
+.. _strat margin alloc:
+
+Margin Allocation Using Spectral Risk Measures
+-------------------------------------------------------
+
+*Documentation to follow.*
+
+

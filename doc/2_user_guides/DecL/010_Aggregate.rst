@@ -21,7 +21,7 @@ To estimate the distribution of aggregate loss outcomes for this policy, the act
 A DecL program, which can be built with ``aggregate``, takes care of many of these details. The program corresponding to the trucking policy is simply::
 
     agg Trucking
-        5000 premium at 65% lr loss
+        5000 premium at 0.65 lr loss
         1000 xs 50
         sev lognorm 50 1.75
         poisson
@@ -44,21 +44,21 @@ The trucking example hints at the complexity of specifying a realistic insurance
 6. Aggregate reinsurance (optional)
 7. Additional notes (optional)
 
-DecL follows this pattern and specifies an aggregate distribution using :ref:`seven clauses <seven clauses>`
+DecL follows this pattern and specifies an aggregate distribution using :ref:`seven clauses <seven clauses>`::
 
-|    agg name
-|        exposure <limit>
-|        severity
-|        <occurrence re>
-|        <frequency>
-|        <aggregate re>
-|        <note>
+    agg name
+        exposure <limit>
+        severity
+        <occurrence re>
+        <frequency>
+        <aggregate re>
+        <note>
 
 where <clause> is optional. All programs are one line long and horizontal white space is ignored. The program is built (interpreted) using the ``build`` function.
 Python automatically concatenates strings between parenthesis, so it is easiest and clearest to enter a program as::
 
     build('agg Trucking '
-          '5000 premium at 65% lr 1000 xs 50 '
+          '5000 premium at 0.65 lr 1000 xs 50 '
           'sev lognorm 50 1.75 '
           'poisson')
 
@@ -69,7 +69,7 @@ The entries in this example are as follows.
 
 * ``Trucking`` is a string name. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be a DecL keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
 
-* The exposure clause is ``5000 premium at 65% lr 1000 xs 50``. It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 50``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
+* The exposure clause is ``5000 premium at 0.65 lr 1000 xs 50``. (Percent notation is acceptable: the loss ratio can be entered as ``65% lr``.) It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 50``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
 
 * The severity clause ``sev lognorm 50 1.75`` determines the *ground-up* severity, see :ref:`severity <2_agg_class_severity_clause>`. ``sev`` is a keyword
 
@@ -89,7 +89,11 @@ There are two other specifications for different situations::
     BUILTIN_AGG
 
 These reference a distribution from the ``knowledge`` database.
-``BUILTIN_AGG`` has the form ``agg.NAME`` where ``agg`` identifies an aggregate object and ``NAME`` refers to one that has already been built. For example, ``agg.Trucking`` or ``agg.Exampe1``.
-The first format gives ``BUILTIN_AGG`` a new name and the second uses its existing name. See the :doc:`../../4_dec_Language_Reference`.
+``BUILTIN_AGG`` has the form ``agg.NAME`` meaning an :class:`Aggregate` object called ``NAME``. For example, ``Trucking`` (defined above) can be replicated using either of the following forms::
+
+    build('agg NewTruckingAccount agg.Trucking')
+    build('agg.Trucking')
+
+Both create new objects; the former is called ``NewTruckingAccount`` and the latter uses the existing name. See the :doc:`../../4_dec_Language_Reference`.
 
 The rest of this Chapter describes the basic features of each clause.

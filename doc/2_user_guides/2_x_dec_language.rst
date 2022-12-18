@@ -13,10 +13,9 @@ The Dec Language
 
 **Notation:** ``<item>`` denotes an optional term.
 
-.. rubric:: Contents
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 4
 
     DecL/010_Aggregate
     DecL/020_exposure

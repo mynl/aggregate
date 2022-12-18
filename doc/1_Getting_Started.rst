@@ -76,6 +76,7 @@ is equivalent to:
     a = 1
     print(a)
 
+The Python line continuation ``\`` is used to create compact input.
 
 ``aggregate`` Hello World
 ==========================

@@ -5,13 +5,21 @@
 Quantiles and Related Measures
 ==============================
 
-**Objectives:**
+**Objectives:** Definition and calculation of quantiles and related risk measures.
 
 **Audience:**
 
-**Prerequisites:**
+**Prerequisites:** Risk measures, probability.
 
 **See also:**
+
+Contents
+-----------
+
+Helpful References
+--------------------
+
+* PIR Chapter 4
 
 -  Quantiles are the fundamental building block risk measure.
 -  Value at risk (VaR) = quantiles when used as a risk measure.

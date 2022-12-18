@@ -1,7 +1,16 @@
 # TODO stack
 
-0. Add exposure / rate keywords for 10 exposure at 1200 rate ?
+`np.newaxis`, x=x[:, np.newaxis]
 
+
+* Extract Python from rst
+* reins summaries in re section? [rather than by hand]; describe in DecL section
+* scale all graph plots! what are standards?
+* constants module in agg?
+
+0. Add exposure / rate keywords for 10 exposure at 1200 rate ? Is that in docs?
+0. Uncertainty principle for bs: too small not enough space; too large miss features of sev; for given n there is a min possible error
+1.
 1. qd looks for like columns / column format guesser?
 2. poisson poisson distribution  = neyman type a
 3. ZM and ZT
@@ -19,6 +28,7 @@
 14. References!!!!
 15. This fails:  s = build('sev LG loggamma 10 cv .5') and for Pareto
 16. dot in names fuck up things eg analyze_distortion (seems colon works)
+17. Update reins section for latest re object attributes
 
 * Papers
     - Clark re -> re pricing

@@ -37,10 +37,11 @@ Contents
 
 * :ref:`Outwards analysis <re outwards analysis>`
 * :ref:`Adjusting layer loss picks <re loss picks>`
+* :ref:`re summary`
 
 .. _re references:
 
-Helpful references
+Helpful References
 --------------------
 
 * General reinsurance: :cite:t:`Strain1997`, :cite:t:`Carter2013`, :cite:t:`Albrecher2017`
@@ -64,12 +65,12 @@ Here are some basic examples. They are not realistic, but it is easy to see what
 
     import pandas as pd
     from aggregate import build, qd
-    d = build('agg DD dfreq [1 2 3 4 5 6] dsev [1 2 3 4 5 6] ')
-    @savefig DD_1.png
-    d.plot()
-    qd(d)
-    print(f'Pr D = 1:  {d.pmf(1) : 11.6g} = {d.pmf(1) * 36:.0f} / 36\n'
-          f'Pr D = 36: {d.pmf(36):8.6g} = {d.pmf(36) * 6**7:.0f} / 6**7')
+    a01 = build('agg Re:01 dfreq [1 2 3 4 5 6] dsev [1 2 3 4 5 6] ')
+    @savefig DD_1.png scale=16
+    a01.plot()
+    qd(a01)
+    print(f'Pr D = 1:  {a01.pmf(1) : 11.6g} = {a01.pmf(1) * 36:.0f} / 36\n'
+          f'Pr D = 36: {a01.pmf(36):8.6g} = {a01.pmf(36) * 6**7:.0f} / 6**7')
 
 An **occurrence excess of loss** reinsurance layer, 2 xs 4, is specified between the severity and frequency clauses (you need to know severity but not frequency)::
 
@@ -80,50 +81,50 @@ Requesting ``net of`` propagates losses net of the cover through to the aggregat
 .. ipython:: python
     :okwarning:
 
-    d_occ = build('agg DD.2x4 dfreq [1:6] dsev [1:6] '
+    a02 = build('agg Re:02 dfreq [1:6] dsev [1:6] '
                      'occurrence net of 2 xs 4')
-    d_occ.plot()
-    @savefig DD_2x4.png
-    qd(d_occ)
+    a02.plot()
+    @savefig DD_2x4.png scale=16
+    qd(a02)
 
 Note the use ``[1:6]`` as shorthand for ``[1,2,3,4,5,6]``.
 
-The ``reinsurance_audit_df`` dataframe shows unconditional (per ground up claim) severity statistics by layer. Multiply by the claim count ``d_occ.n`` to get layer loss picks. The severity, ``ex``, equals (1 + 2) / 6 = 0.5 (first block). The expected loss to the layer equals 0.5 * 3.5 = 1.75 (second block).
+The ``reinsurance_audit_df`` dataframe shows unconditional (per ground up claim) severity statistics by layer. Multiply by the claim count ``a02.n`` to get layer loss picks. The severity, ``ex``, equals (1 + 2) / 6 = 0.5 (first block). The expected loss to the layer equals 0.5 * 3.5 = 1.75 (second block).
 
 .. ipython:: python
     :okwarning:
 
-    qd(d_occ.reinsurance_audit_df['ceded'])
-    qd(d_occ.reinsurance_audit_df['ceded'][['ex']] * d_occ.n)
+    qd(a02.reinsurance_audit_df['ceded'])
+    qd(a02.reinsurance_audit_df['ceded'][['ex']] * a02.n)
 
 An **aggregate excess of loss** reinsurance layer, 12 xs 24, is specified after the frequency clause (you need to know frequency)::
 
     aggregate ceded to 12 xs 34.
 
-Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.DD`` by name as a shorthand. ``reinsurance_audit_df`` reports expected loss to the aggregate layer.
+Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.Re:01`` by name as a shorthand. ``reinsurance_audit_df`` reports expected loss to the aggregate layer.
 
 .. ipython:: python
     :okwarning:
 
-    d_ag = build('agg DD.12x24 agg.DD '
+    a03 = build('agg Re:03 agg.Re:01 '
                  'aggregate ceded to 12 x 24')
-    d_ag.plot()
-    @savefig DD_12x24a.png
-    qd(d_ag)
-    qd(d_ag.reinsurance_audit_df.stack(0))
+    a03.plot()
+    @savefig DD_12x24a.png scale=16
+    qd(a03)
+    qd(a03.reinsurance_audit_df.stack(0))
 
-Both occurrence and aggregate programs can be applied at once. The ``ceded to`` and ``net of`` clauses can be mixed. You cannot refer to ``agg.DD`` by name because you need to see into the object to apply the occurrence reinsurance.
+Both occurrence and aggregate programs can be applied at once. The ``ceded to`` and ``net of`` clauses can be mixed. You cannot refer to ``agg.Re:01`` by name because you need to see into the object to apply the occurrence reinsurance.
 
 .. ipython:: python
     :okwarning:
 
-    d_re = build('agg DD.nn dfreq [1:6] dsev [1:6] '
+    a04 = build('agg Re:04 dfreq [1:6] dsev [1:6] '
                  'occurrence net of 2 x 4 '
                  'aggregate net of 6 xs 16')
-    @savefig DD_nn.png
-    d_re.plot()
-    qd(d_re)
-    qd(d_re.reinsurance_audit_df['ceded'])
+    @savefig DD_nn.png scale=16
+    a04.plot()
+    qd(a04)
+    qd(a04.reinsurance_audit_df['ceded'])
 
 Multiple layers can be applied at once. Layers can be specified as a **share of**  or **part of** to account for coinsurance (partial placement) of the layer:
 
@@ -139,14 +140,14 @@ These concepts are illustrated in the next example. Note the bucket size.
 .. ipython:: python
     :okwarning:
 
-    d_mre = build('agg DD.nn dfreq [1:6] dsev [1:6] '
+    a05 = build('agg Re:05 dfreq [1:6] dsev [1:6] '
                  'occurrence net of 0.5 so 2 x 2 and 2 x 4 '
                  'aggregate net of 1 po 4 x 10 '
                  , bs=1/512, log2=16)
-    @savefig DD_nn2.png
-    d_mre.plot()
-    qd(d_mre)
-    qd(d_mre.reinsurance_audit_df['ceded'])
+    @savefig DD_nn2.png scale=16
+    a05.plot()
+    qd(a05)
+    qd(a05.reinsurance_audit_df['ceded'])
 
 A **tower** of limits can be specified by giving the attachment points of each layer. The shorthand::
 
@@ -161,12 +162,12 @@ Here is a summary of these examples. The audit dataframe gives a layering of agg
 .. ipython:: python
     :okwarning:
 
-    d_tower = build('agg DD.tower agg.DD '
+    a06 = build('agg Re:06 agg.Re:01 '
                     'aggregate ceded to tower [0 1 2 5 10 20 36]')
-    d_tower.plot()
-    qd(d_tower)
+    a06.plot()
+    qd(a06)
     with pd.option_context('display.multi_sparse', False):
-        qd(d_tower.reinsurance_audit_df['ceded'])
+        qd(a06.reinsurance_audit_df['ceded'])
 
 
 
@@ -207,31 +208,31 @@ There layering analysis across a typical XOL tower up to 10M is created using a 
 .. ipython:: python
     :okwarning:
 
-    cas = build('agg Auto '
+    a07 = build('agg Re:07 '
                 f'{profile.premium.values} premium at {profile.lr.values} lr '
                 f'{profile.limit.values} xs {profile.ded.values} '
                 'sev lognorm 50 cv 10 '
                 'occurrence ceded to tower [0 250 500 1000 2000 5000 10000] '
                 'poisson ', approximation='exact', log2=18, bs=1/2)
-    qd(cas)
+    qd(a07)
 
 
 Why are there special options in ``build``? The claim count is high: 292.7. To force a convolution use ``approximation='exact'``. Reviewing the default ``bs=1/2`` and ``log2=16`` shows a moderate error. Looking at the density via::
 
-    cas.density_df.p_total.plot(logy=True)
+    a07.density_df.p_total.plot(logy=True)
 
 shows aliasing, i.e., not enough space in the answer. Adjust by increasing ``log2`` from 16 to 18 and leaving ``bs=1/2``.
 
-To summarize the analysis, extract the ceded layering from ``reinsurance_audit_df`` into ``layers``. The column ``layers.ex`` shows unconditional expected layer loss (per ground-up claim); ``layers.severity`` shows layer severity conditional on the layer attaching; ``layers.aal`` shows the layer expected loss; ``layers.proportion`` shows the proportion of loss by layer.  ``cas.n`` is the expected claim count. The index of ``layers`` is replaced so it formats as numbers, not strings---purely cosmetic.
+To summarize the analysis, extract the ceded layering from ``reinsurance_audit_df`` into ``layers``. The column ``layers.ex`` shows unconditional expected layer loss (per ground-up claim); ``layers.severity`` shows layer severity conditional on the layer attaching; ``layers.aal`` shows the layer expected loss; ``layers.proportion`` shows the proportion of loss by layer.  ``a07.n`` is the expected claim count. The index of ``layers`` is replaced so it formats as numbers, not strings---purely cosmetic.
 
 .. ipython:: python
     :okwarning:
 
     import numpy as np
-    layers = cas.reinsurance_audit_df['ceded'][['ex']].droplevel([0,1])
-    layers['severity'] = layers.ex / [cas.sev.sf(0 if type(i)==str else i)
+    layers = a07.reinsurance_audit_df['ceded'][['ex']].droplevel([0,1])
+    layers['severity'] = layers.ex / [a07.sev.sf(0 if type(i)==str else i)
             for i in layers.index.get_level_values(1)]
-    layers['aal'] = layers.ex * cas.n
+    layers['aal'] = layers.ex * a07.n
     layers['proportion'] = layers.aal / layers.aal.iloc[:-1].sum()
     idx = layers.index; nms = idx.names
     layers.index = pd.MultiIndex.from_tuples(
@@ -275,15 +276,17 @@ Here are the base curves, compare Figure 4.2 in :cite:t:`Bernegger1997`. The cur
 .. ipython:: python
     :okwarning:
 
-    fig, ax = plt.subplots(1, 1, figsize=(3.5, 3.5))
+    fig, ax = plt.subplots(1, 1, figsize=(2.45, 2.55))
     ans = []
     ps = np.linspace(0,1,101)
     for c in [0, 1, 2, 3, 4, 5]:
         gs = G(ps, c)
         ax.plot(ps, gs, label=f'c={c}')
         ans.append([c, *xsden_to_meancv(ps[1:], np.diff(gs))])
-    @savefig prop_ch1.png
     ax.legend(loc='lower right');
+    @savefig prop_ch1.png scale=20
+    ax.set(xlabel='Proportion of limit', ylabel='Proportion of expected loss',
+           title='Swiss Re property scales');
 
 Next, approximate these curves with a beta distribution to make them easier for us to use in ``aggregate``. Here are the parameters and fit graphs for each curve.
 
@@ -311,7 +314,7 @@ Next, approximate these curves with a beta distribution to make them easier for 
         ax.plot(ps, fz.cdf(ps), label=f'beta fit')
         ans.append([c, *xsden_to_meancv(ps[1:], np.diff(gs))])
         ax.legend(loc='lower right');
-    @savefig prop_ch2.png
+    @savefig prop_ch2.png scale=20
     fig.suptitle('Beta approximations to Swiss Re property curves');
 
 Work on a property schedule with the following TIVs and deductibles. The premium rate is 0.35 per 100 and the loss ratio is 55%.
@@ -334,21 +337,21 @@ Build the stochastic model using a Swiss Re ``c=3`` scale. Use a gamma mixed Poi
     :okwarning:
 
     beta_a, beta_b = swiss.loc[3, ['a', 'b']]
-    a = build('agg Property '
+    a08 = build('agg Re:08 '
               f'{schedule.premium.values} premium at {schedule.lr.values} lr '
               f'{schedule.tiv.values} xs {schedule.ded.values} '
               f'sev {schedule.tiv.values} * beta {beta_a} {beta_b} ! '
                'occurrence ceded to tower [0 1000 5000 10000 20000 inf] '
                'mixed gamma 2 ',
                bs=2)
-    qd(a)
+    qd(a08)
 
 The shared mixing increases the frequency and aggregate CV and skewness.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.report_df.loc[
+    qd(a08.report_df.loc[
         ['freq_m', 'freq_cv', 'freq_skew', 'agg_cv', 'agg_skew'],
         ['independent', 'mixed']])
 
@@ -357,10 +360,10 @@ To summarize the analysis, extract the ceded layering from ``reinsurance_audit_d
 .. ipython:: python
     :okwarning:
 
-    layers = a.reinsurance_audit_df['ceded'][['ex']]
-    layers['severity'] = layers.ex / [a.sev.sf(0 if i=='gup' else i)
+    layers = a08.reinsurance_audit_df['ceded'][['ex']]
+    layers['severity'] = layers.ex / [a08.sev.sf(0 if i=='gup' else i)
                           for i in layers.index.get_level_values('attach')]
-    layers['aal'] = layers['ex'] * a.n
+    layers['aal'] = layers['ex'] * a08.n
     layers['proportion'] = layers.aal / layers.aal.iloc[:-1].sum()
     qd(layers.droplevel([0,1]))
 
@@ -370,20 +373,20 @@ Add plots of gross, ceded, and net severity with the placed program, 4000 xs 100
 .. ipython:: python
     :okwarning:
 
-    a_placed = build('agg Property '
+    a09 = build('agg Re:09 '
               f'{schedule.premium.values} premium at {schedule.lr.values} lr '
               f'{schedule.tiv.values} xs {schedule.ded.values} '
               f'sev {schedule.tiv.values} * beta {beta_a} {beta_b} ! '
                'occurrence ceded to 4000 xs 1000 and 5000 xs 5000 '
                'mixed gamma 2 ', bs=2)
-    qd(a_placed)
+    qd(a09)
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True)
     ax0, ax1 = axs.flat
-    df = a_placed.reinsurance_df
+    df = a09.reinsurance_df
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[-50, 2000], ylim=[0.8e-6, 1] , ax=ax0);
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[0, 50000], ylim=[0.8e-6, 1], ax=ax1);
     ax0.set(xlabel='loss (zoom)', ylabel='Log density');
-    @savefig prop_g1.png
+    @savefig prop_g1.png scale=20
     ax1.set(xlabel='loss', ylabel='');
 
 And finally, the corresponding aggregate distributions.
@@ -401,7 +404,7 @@ And finally, the corresponding aggregate distributions.
     ax0.set(xlabel='', ylabel='Log density');
     ax1.set(xlabel='', ylabel='');
     ax2.set(xlabel='loss (zoom)', ylabel='Log survival');
-    @savefig prop_g2.png
+    @savefig prop_g2.png scale=20
     ax3.set(xlabel='loss', ylabel='');
 
 
@@ -534,12 +537,12 @@ Setup the gross portfolio.
 
     mix_cv = ((1.036-1)/5.154)**.5; mix_cv
 
-    a = build('agg Treaty.1 '
+    a10 = build('agg Re:BN1 '
               '[9000 3000] exposure at [0.04 0.03] rate '
               '160 x 0 '
               'sev 40 * pareto [0.9 0.95] - 40 '
               f'mixed gamma {mix_cv} ')
-    qd(a)
+    qd(a10)
 
 The portfolio CV matches 0.528, reported in Bear and Nemlick Appendix F, Exhibit 1.
 
@@ -550,7 +553,7 @@ By hand, adjust losses and use the distribution of outcomes from ``a.density_df`
 .. ipython:: python
     :okwarning:
 
-    bit = a.density_df[['loss', 'p_total']]
+    bit = a10.density_df[['loss', 'p_total']]
     bit['loss'] = np.maximum(0, bit.loss - 360)
     bit.prod(axis=1).sum()
 
@@ -559,15 +562,15 @@ More in the spirit of ``aggregate``: create a new :class:`Aggregate` applying th
 .. ipython:: python
     :okwarning:
 
-    a_aad = build('agg Treaty.1a '
+    a11 = build('agg Re:BN1a '
               '[9000 3000] exposure at [0.04 0.03] rate '
               '160 x 0 '
               'sev 40 * pareto [0.9 0.95] - 40 '
               f'mixed gamma {mix_cv} '
               'aggregate net of 360 x 0 ')
-    qd(a_aad)
+    qd(a11)
 
-    gross = a_aad.agg_m; net = a_aad.est_m; ins_charge = net / gross
+    gross = a11.agg_m; net = a11.est_m; ins_charge = net / gross
     net, ins_charge
 
 Bear and Nemlick use a lognormal approximation to the aggregate.
@@ -575,17 +578,17 @@ Bear and Nemlick use a lognormal approximation to the aggregate.
 .. ipython:: python
     :okwarning:
 
-    mu, sigma = mu_sigma_from_mean_cv(a.agg_m, a.agg_cv)
+    mu, sigma = mu_sigma_from_mean_cv(a10.agg_m, a10.agg_cv)
     elim_approx = lognorm_lev(mu, sigma, 1, 360)
-    a.agg_m - elim_approx, 1 - elim_approx / a.agg_m
+    a11.agg_m - elim_approx, 1 - elim_approx / a11.agg_m
 
 The lognormal overstates the value of the AAD, resulting in a lower net premium. This is because the approximating lognormal is much more skewed.
 
 .. ipython:: python
     :okwarning:
 
-    fz = a_aad.approximate('lognorm')
-    fz.stats('s'), a_aad.est_skew
+    fz = a11.approximate('lognorm')
+    fz.stats('s'), a11.est_skew
 
 Bear and Nemlick report the Poisson approximation and a Heckman-Meyers convolution with mixing and contagion equal 0.05. We can compute the Poisson exactly and approximate Heckman-Meyers with contagion but no mixing. Changing 0.05 to 0.10 is close to the b=0.1 column.
 
@@ -593,21 +596,21 @@ Bear and Nemlick report the Poisson approximation and a Heckman-Meyers convoluti
 .. ipython:: python
     :okwarning:
 
-    a_poisson = build('agg Treaty.1p '
+    a12 = build('agg Re:BN1p '
               '[9000 3000] exposure at [0.04 0.03] rate '
               '160 x 0 '
               'sev 40 * pareto [0.9 0.95] - 40 '
               f'poisson '
               'aggregate net of 360 x 0 ')
-    qd(a_poisson)
+    qd(a12)
 
-    a_aad2 = build('agg Treaty.1c '
+    a13 = build('agg Re:BN1c '
               '[9000 3000] exposure at [0.04 0.03] rate '
               '160 x 0 '
               'sev 40 * pareto [0.9 0.95] - 40 '
               'mixed gamma 0.05**.5 '
               'aggregate net of 360 x 0 ')
-    qd(a_aad2)
+    qd(a13)
 
 
 Here is a summary of the different methods, compare Bear and Nemlick Table 1, row 1, page 75.
@@ -615,11 +618,11 @@ Here is a summary of the different methods, compare Bear and Nemlick Table 1, ro
 .. ipython:: python
     :okwarning:
 
-    bit = pd.DataFrame([a.agg_m,
-        a_aad.describe.iloc[-1, 1],
-        a_poisson.describe.iloc[-1, 1],
-        a_aad2.describe.iloc[-1, 1],
-        a.agg_m - elim_approx],
+    bit = pd.DataFrame([a10.agg_m,
+        a11.describe.iloc[-1, 1],
+        a12.describe.iloc[-1, 1],
+        a13.describe.iloc[-1, 1],
+        a11.agg_m - elim_approx],
         columns=['Loss cost'],
         index=pd.Index(['Gross', 'NB', 'Poisson', 'c=0.05', 'lognorm'],
                       name='Method'))
@@ -639,13 +642,13 @@ Setup the gross portfolio.
 .. ipython:: python
     :okwarning:
 
-    a2 = build('agg Treaty.2 '
+    a14 = build('agg Re:BN2 '
                '[2000 2000 2000] exposure at [.1 .14 .21] rate '
                '700 xs 0 '
                'sev 300 * pareto [1.5 1.3 1.1] - 300 '
                'mixed gamma 0.07 '
                , bs=1/8)
-    qd(a2)
+    qd(a14)
 
 Specify ``bs=1/8`` since the error was too high with the default ``bs=1/16``.
 The portfolio CV matches 0.770, reported in Bear and Nemlick Appendix G, Exhibit 1. The easiest way to value the aggregate limit to use an ``aggregate ceded to`` clause.
@@ -653,21 +656,21 @@ The portfolio CV matches 0.770, reported in Bear and Nemlick Appendix G, Exhibit
 .. ipython:: python
     :okwarning:
 
-    a2n = build('agg Treaty.2 '
+    a14n = build('agg Re:BN2a '
                '[2000 2000 2000] exposure at [.1 .14 .21] rate '
                '700 xs 0 '
                'sev 300 * pareto [1.5 1.3 1.1] - 300 '
                'mixed gamma 0.07 '
                'aggregate ceded to 2800 xs 0'
                , bs=1/8)
-    qd(a2n)
+    qd(a14n)
 
 Applying a 20% coinsurance and grossing up by 100/60 produces the premium and rate. Using Poisson frequency, or mixed gamma with mix :math:`\sqrt{0.05}` or :math:`\sqrt{0.1}` ties closely to Table I, row 2.
 
 .. ipython:: python
     :okwarning:
 
-    p = a2n.est_m * (1 - 0.2) * 100 / 60
+    p = a14n.est_m * (1 - 0.2) * 100 / 60
     p, p / 6000
 
 
@@ -676,7 +679,7 @@ Applying a 20% coinsurance and grossing up by 100/60 produces the premium and ra
 .. ipython:: python
     :okwarning:
 
-    qd(a2.report_df.iloc[:, :-2])
+    qd(a14.report_df.iloc[:, :-2])
 
 
 .. _re bear 3:
@@ -691,25 +694,25 @@ Setup the gross portfolio with CV 0.905. Use a larger ``bs`` to reduce error.
 .. ipython:: python
     :okwarning:
 
-    a3 = build('agg Treaty.3 '
+    a15 = build('agg Re:BN3 '
                '[4500 4500 1000] exposure at [.032 .038 .035] rate '
                '400 xs 0 '
                'sev 100 * pareto 1.1 - 100 '
                'poisson', bs=1/16)
-    qd(a3)
+    qd(a15)
 
 There are several ways to model a loss corridor, but the most natural is to use an ``aggregate net of 350 xs 350`` clause; expected layer loss equals 350.
 
 .. ipython:: python
     :okwarning:
 
-    a3_lc = build('agg Treaty.3lc '
+    a15_lc = build('agg Re:BN3lc '
                '[4500 4500 1000] exposure at [.032 .038 .035] rate '
                '400 xs 0 '
                'sev 100 * pareto 1.1 - 100 '
                'poisson '
                'aggregate net of 350 xs 350 ', bs=1/16)
-    qd(a3_lc)
+    qd(a15_lc)
 
 Compare the results with the lognormal approximation, see Table 1 line 3.
 
@@ -718,9 +721,9 @@ Compare the results with the lognormal approximation, see Table 1 line 3.
 
     mu, sigma = mu_sigma_from_mean_cv(1, 0.905)
     ler = lognorm_lev(mu, sigma, 1, 2) - lognorm_lev(mu, sigma, 1, 1)
-    p = a3_lc.est_m * 100 / 70
+    p = a15_lc.est_m * 100 / 70
     bit = pd.DataFrame(
-        [a3_lc.est_m, 1 - a3_lc.est_m / a3.est_m, ler, p, p/10000,
+        [a15_lc.est_m, 1 - a15_lc.est_m / a15.est_m, ler, p, p/10000,
          350 * (1 - ler) * 100 / 70 / 10000, 350 * 100 / 70 / 10000],
         index=pd.Index(['Loss cost', 'LER', 'Lognorm LER', 'Premium',
                        'Rate', 'Lognorm rate', 'Unadjusted rate'],name='Item'),
@@ -739,19 +742,19 @@ The gross portfolio is the same as Treaty 1. Use Poisson frequency.
 .. ipython:: python
     :okwarning:
 
-    a4 = build('agg Treaty.4 '
+    a16 = build('agg Re:BN4 '
           '[9000 3000] exposure at [0.04 0.03] rate '
           '160 x 0 '
           'sev 40 * pareto [0.9 0.95] - 40 '
           'poisson ')
-    qd(a4)
+    qd(a16)
 
 The estimated retro premium (``erp``) and corresponding rate are easy to compute.
 
 .. ipython:: python
     :okwarning:
 
-    bit = a4.density_df[['loss', 'p_total']]
+    bit = a16.density_df[['loss', 'p_total']]
     subject = 12000; min_rate = 0.03; max_rate = 0.10; lcf = 100 / 75
     bit['premium'] = np.minimum(max_rate * subject,
                                 np.maximum(min_rate * subject, lcf * bit.loss))
@@ -764,7 +767,7 @@ Bear and Nemlick also report the lognormal approximation.
     :okwarning:
 
     from scipy.integrate import quad
-    fz = a4.approximate('lognorm')
+    fz = a16.approximate('lognorm')
     lognorm_approx = quad(lambda x: min(max_rate * subject,
                           max(min_rate * subject, lcf * x)) * fz.pdf(x),
                          0, np.inf)
@@ -798,19 +801,19 @@ Use a :class:`Portfolio` object to aggregate the three years. It is convenient t
 .. ipython:: python
     :okwarning:
 
-    a2p = build('agg Treaty.2p '
+    a17 = build('agg Re:BN2p '
                '[2000 2000 2000] exposure at [.1 .14 .21] rate '
                '700 xs 0 '
                'sev 300 * pareto [1.5 1.3 1.1] - 300 '
                'poisson'
                )
 
-    p5 = build('port Treaty.5 '
-               'agg Year.1 agg.Treaty.2p '
-               'agg Year.2 agg.Treaty.2p '
-               'agg Year.3 agg.Treaty.2p '
+    p17 = build('port Treaty.5 '
+               'agg Year.1 agg.Re:BN2p '
+               'agg Year.2 agg.Re:BN2p '
+               'agg Year.3 agg.Re:BN2p '
                , bs=1/4)
-    qd(p5)
+    qd(p17)
 
 The three-year total CV equals 0.443 with Poisson frequency. Bear and Nemlick Appendix J, Exhibit 2, shows 0.444 with negative binomial frequency.
 
@@ -821,7 +824,7 @@ Compute the estimated profit share payment by hand.
 
     subject_premium = 18000; coinsurance = 0.2; re_rate = 0.25
     pc_share = 0.25; pc_expense = 0.2
-    bit = p5.density_df[['loss', 'p_total']]
+    bit = p17.density_df[['loss', 'p_total']]
     bit['lr'] = bit.loss * (1 - coinsurance) / (re_rate * subject_premium)
     bit['pc_rate'] = np.maximum(0, pc_share * (1 - pc_expense - bit.lr))
     pc_pmt = (bit.pc_rate * bit.p_total).sum()
@@ -843,39 +846,39 @@ Here is an extreme example to illustrate the differences. Homogeneous scaling do
 .. ipython:: python
     :okwarning:
 
-    p5growing = build('port Treaty.5 '
-               'agg Year.1 agg.Treaty.2p '
-               'agg Year.2 2 @ agg.Treaty.2p '
-               'agg Year.3 2 * agg.Treaty.2p '
+    p17growing = build('port Treaty.5 '
+               'agg Year.1 agg.Re:BN2p '
+               'agg Year.2 2 @ agg.Re:BN2p '
+               'agg Year.3 2 * agg.Re:BN2p '
                , bs=1/4)
-    qd(p5growing)
+    qd(p17growing)
 
 
-**Note.** The following DecL program will produce the same answer as the ``Portfolio`` called ``p5`` above.
+**Note.** The following DecL program will produce the same answer as the ``Portfolio`` called ``p17`` above. The exposure has been tripled.
 
 .. ipython:: python
     :okwarning:
 
-    a6p = build('agg Treaty.2b '
+    a17p= build('agg Re:BN6p '
                '[6000 6000 6000] exposure at [.1 .14 .21] rate '
                '700 xs 0 '
                'sev 300 * pareto [1.5 1.3 1.1] - 300 '
                'poisson'
                , bs=1/4)
-    qd(a6p)
+    qd(a17p)
 
 However, for a mixed frequency the answers are different, because mixing is shared mixing across class and year, producing a higher CV and skewness.
 
 .. ipython:: python
     :okwarning:
 
-    a6nb = build('agg Treaty.2c '
+    a17nb = build('agg Re:BN6c '
                '[6000 6000 6000] exposure at [.1 .14 .21] rate '
                '700 xs 0 '
                'sev 300 * pareto [1.5 1.3 1.1] - 300 '
                'mixed gamma 0.1**.5'
                , bs=1/4)
-    qd(a6nb)
+    qd(a17nb)
 
 
 .. _re bear 6:
@@ -895,12 +898,12 @@ The underlying portfolio is specified only as a 900 xs 100 layer on 25M premium 
 .. ipython:: python
     :okwarning:
 
-    a6 = build('agg Treaty.6 '
+    a18 = build('agg Re:BN5 '
                '25000 exposure at 0.1 rate '
                '900 xs 0 '
                'sev 100 * pareto 1.05 - 100 '
                'mixed gamma 0.095')
-    qd(a6)
+    qd(a18)
 
 We use the function  ``make_ceder_netter`` to model the commission function. It takes a list of triples ``(s, y, a)`` as argument, interpreted as a share ``s`` of the layer ``y`` excess ``a``. It returns two functions, a netter and a ceder, that map a subject loss to net or ceded. Multiple non-overlapping layers can be provided. They are combined into a single function. We will model the slide as the maximum 40% commission minus a cession to two layers with different shares. The required layer descriptions, in loss ratio points, are
 
@@ -917,21 +920,19 @@ The function giving the slide payoff is easy to create, using a Python ``lambda`
     from matplotlib import ticker
 
     c, n = make_ceder_netter([(0.25, .2, .35), (0.5, .1, .55)])
-    f = lambda x: 0.4 - c(x)
-    lrs = np.linspace(0.2, 0.8, 61)
-    slide = f(lrs)
-    fig, axs = plt.subplots(1,3,figsize=(3*3.5, 2.45), constrained_layout=True)
+    f = lambda x: 0.4 - c(x);                \
+    lrs = np.linspace(0.2, 0.8, 61);         \
+    slide = f(lrs);
+    fig, axs = plt.subplots(1,3,figsize=(3*3.5, 2.45), constrained_layout=True); \
     ax0, ax1, ax2 = axs.flat
 
-    ax0.plot(lrs, c(lrs))
-    ax0.set(xlabel='Loss ratio', ylabel='"Ceded"')
+    ax0.plot(lrs, c(lrs));
+    ax0.set(xlabel='Loss ratio', ylabel='"Ceded"');
 
-    ax1.plot(lrs, n(lrs))
-    ax1.set(xlabel='Loss ratio', ylabel='"Net"')
+    ax1.plot(lrs, n(lrs));
+    ax1.set(xlabel='Loss ratio', ylabel='"Net"');
 
-    ax2.plot(lrs, slide)
-    @savefig bn_nc.png
-    ax2.set(xlabel='Loss ratio', ylabel='Slide commission')
+    ax2.plot(lrs, slide);
 
     for ax in axs.flat:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
@@ -946,13 +947,16 @@ The function giving the slide payoff is easy to create, using a Python ``lambda`
             ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.025))
         ax.grid(lw=.25, c='w')
 
+    @savefig bn_nc.png scale=16
+    ax2.set(xlabel='Loss ratio', ylabel='Slide commission');
+
 The expected commission across the estimated aggregate distribution can be computed by hand.
 
 .. ipython:: python
     :okwarning:
 
     subject = 25000;  re_rate = 0.2;  re_premium = subject * re_rate
-    bit = a6.density_df[['loss', 'p_total']]
+    bit = a18.density_df[['loss', 'p_total']]
     bit['lr'] = bit.loss / re_premium
     bit['slide'] = f(bit.lr)
     (bit.slide * bit.p_total).sum()
@@ -998,7 +1002,7 @@ The lognormal distribution is not a great fit to the specified distribution.
         for lr in [.35, .55, .65]:
             ax.axvline(lr, lw=.5, c='C7')
     ax0.set(ylabel='Probability density or mass');
-    @savefig bn_t6.png
+    @savefig bn_t6.png scale=20
     ax1.set(ylabel='Probability distribution');
 
 TODO: investigate differences!
@@ -1061,20 +1065,20 @@ The basic stochastic model is as follows. Work in 000s. Using ``bs=1/2`` results
 .. ipython:: python
     :okwarning:
 
-    a = build('agg MFV.4.1 '
+    a19 = build('agg Re:MFV41 '
               '[1000 2000 2000 3000] premium at [.65 .65 .75 .75] lr '
               '[750 1000 1500 2000] xs [10 25 50 50] '
               'sev [exp(8)/1000 exp(8)/1000 exp(9)/1000 exp(9)/1000] '
               '* lognorm [2.5 2.5 3 3]  '
               'poisson', bs=1/2)
-    qd(a)
+    qd(a19)
 
 The ``report_df`` dataframe shows the theoretic and empirical (i.e., modeled) statistics for each unit.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.report_df.iloc[:, [0,1,2,3,4,-2]])
+    qd(a19.report_df.iloc[:, [0,1,2,3,4,-2]])
 
 
 Mata et al. pay careful attention to the implied severity in each ceded layer, accounting for probability masses. They do this by considering losses in small intervals and weighting the underlying severity curves. ``aggregate`` automatically performs the same calculations to estimate the total layer severity. In this example, it uses a smaller bucket size of 0.5K compared to 2.5K in the original paper. The next plots reproduce [TODO Differences?!] Figures 2 and 3. The masses (spikes in density; jumps in distribution) occur when the lower limit unit has only limit losses.
@@ -1084,13 +1088,13 @@ Mata et al. pay careful attention to the implied severity in each ceded layer, a
 
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True)
     ax0, ax1, ax2, ax3 = axs.flat
-    (a.density_df.p_sev / a.sev.sf(500)).plot(xlim=[500, 1005],   logy=True, ax=ax0);
-    (a.density_df.p_sev / a.sev.sf(1000)).plot(xlim=[1000, 2005], logy=True, ax=ax1);
-    ((a.density_df.F_sev - a.sev.cdf(500)) / (a.sev.cdf(1000) - a.sev.cdf(500))).plot(xlim=[500, 1005], ylim=[-0.05, 1.05], ax=ax2);
-    ((a.density_df.F_sev - a.sev.cdf(1000)) / (a.sev.cdf(2000) - a.sev.cdf(1000))).plot(xlim=[1000, 2005], ylim=[-0.05, 1.05], ax=ax3);
+    (a19.density_df.p_sev / a19.sev.sf(500)).plot(xlim=[500, 1005],   logy=True, ax=ax0);
+    (a19.density_df.p_sev / a19.sev.sf(1000)).plot(xlim=[1000, 2005], logy=True, ax=ax1);
+    ((a19.density_df.F_sev - a19.sev.cdf(500)) / (a19.sev.cdf(1000) - a19.sev.cdf(500))).plot(xlim=[500, 1005], ylim=[-0.05, 1.05], ax=ax2);
+    ((a19.density_df.F_sev - a19.sev.cdf(1000)) / (a19.sev.cdf(2000) - a19.sev.cdf(1000))).plot(xlim=[1000, 2005], ylim=[-0.05, 1.05], ax=ax3);
     for ax, y in zip(axs.flat, ['Log density', 'Log density', 'Density', 'Density']):
         ax.set(ylabel=y);
-    @savefig mata_2_3.png
+    @savefig mata_2_3.png scale=20
     fig.suptitle('Layer loss log density and distribution');
 
 Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance layers. The estimated statistics refer to the net portfolio and reflect a pure exposure rating approach. Gross, ceded, and net expected losses are reported last.
@@ -1098,23 +1102,23 @@ Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance 
 .. ipython:: python
     :okwarning:
 
-    agcn = build('agg MFV.4.1n '
+    a19n = build('agg Re:MFV41n '
               '[1000 2000 2000 3000] premium at [.65 .65 .75 .75] lr '
               '[750 1000 1500 2000] xs [10 25 50 50] '
               'sev [exp(8)/1000 exp(8)/1000 exp(9)/1000 exp(9)/1000] * lognorm [2.5 2.5 3 3]  '
               'occurrence net of 500 xs 500 and 1000 xs 1000 '
               'poisson', bs=1/2)
-    qd(agcn)
-    print(f'Gross expected loss {a.est_m:,.1f}\n'
-          f'Ceded expected loss {a.est_m - agcn.est_m:,.1f}\n'
-          f'Net expected loss   {agcn.est_m:,.1f}')
+    qd(a19n)
+    print(f'Gross expected loss {a19.est_m:,.1f}\n'
+          f'Ceded expected loss {a19.est_m - a19n.est_m:,.1f}\n'
+          f'Net expected loss   {a19n.est_m:,.1f}')
 
 The ``reinsurance_audit_df`` dataframe summarizes ground-up (unconditional) layer loss statistics for occurrence covers. Thus, ``ex`` reports the layer severity per ground-up claim. The subject (gross) row is the same for all layers and replicates the gross severity statistics shown above for ``a``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(agcn.reinsurance_audit_df.stack(0))
+    qd(a19n.reinsurance_audit_df.stack(0))
 
 Divide by the probability of attachment to convert to layer severity.
 Multiply by the expected ground-up claim count to convert to expected layer losses, ``el``. The last row shows the sum over all cessions.
@@ -1122,10 +1126,10 @@ Multiply by the expected ground-up claim count to convert to expected layer loss
 .. ipython:: python
     :okwarning:
 
-    bit = agcn.reinsurance_audit_df['ceded'][['ex']]
-    bit['severity'] = bit.ex / np.array([a.sev.sf(i) for i in [500, 1000, 0]])
-    bit['count'] = np.array([a.sev.sf(i) for i in [500, 1000, 0]]) * a.n
-    bit['el'] = bit.ex * a.n
+    bit = a19n.reinsurance_audit_df['ceded'][['ex']]
+    bit['severity'] = bit.ex / np.array([a19.sev.sf(i) for i in [500, 1000, 0]])
+    bit['count'] = np.array([a19.sev.sf(i) for i in [500, 1000, 0]]) * a19.n
+    bit['el'] = bit.ex * a19.n
     qd(bit)
 
 The layer severities show above differ slightly from Mata et al. Table 3. The ``aggregate`` computation is closest to Method 3. The reported severities are 351.1 and 628.8.
@@ -1141,7 +1145,7 @@ Here is an extract from the severity distributions. Ceded severity is at most 15
 .. ipython:: python
     :okwarning:
 
-    qd(agcn.reinsurance_df.loc[0:2000:250,
+    qd(a19n.reinsurance_df.loc[0:2000:250,
         ['p_sev_gross', 'p_sev_ceded', 'p_sev_net']])
 
 Here is an extract from the aggregate distributions, followed by the density and distribution plots. The masses are caused by outcomes involving only limit losses.
@@ -1149,12 +1153,12 @@ Here is an extract from the aggregate distributions, followed by the density and
 .. ipython:: python
     :okwarning:
 
-    qd(agcn.reinsurance_df.loc[3000:6000:500,
+    qd(a19n.reinsurance_df.loc[3000:6000:500,
         ['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ']])
 
     fig, axs = plt.subplots(1, 3, figsize=(3 * 3.5, 2.45), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
-    bit = agcn.reinsurance_df[['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ']]
+    bit = a19n.reinsurance_df[['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ']]
     bit.plot(ax=ax0);
     bit.plot(logy=True, ax=ax1);
     bit.cumsum().plot(ax=ax2);
@@ -1162,7 +1166,7 @@ Here is an extract from the aggregate distributions, followed by the density and
         ax.set(xlim=[0, 12500]);
     ax0.set(ylabel='Mixed density');
     ax1.set(ylabel='Log mixed density');
-    @savefig mata_agg_gcn.png
+    @savefig mata_agg_gcn.png scale=16
     ax2.set(ylabel='Distribution');
 
 Any desired risk management evaluation can be computed from ``reinsurance_df``, which contains the gross, ceded, and net distributions. For example, here is a tail return period plot and a dataframe of summary statistics.
@@ -1177,9 +1181,9 @@ Any desired risk management evaluation can be computed from ``reinsurance_df``, 
         rp = 1 / (1 - bit[c].cumsum())
         ax1.plot(rp, bit.index, label=c)
     ax0.xaxis.set_major_locator(ticker.MultipleLocator(0.25))
-    ax0.set(ylim=[0, agcn.q(1-1e-10)], title='$x$ vs $F(x)$', xlabel='$F(x)$', ylabel='Outcome, $x$');
-    ax1.set(xscale='log', xlim=[1, 1e10], ylim=[0, agcn.q(1-1e-10)], xlabel='Log return period');
-    @savefig mata_gcn_tail.png
+    ax0.set(ylim=[0, a19n.q(1-1e-10)], title='$x$ vs $F(x)$', xlabel='$F(x)$', ylabel='Outcome, $x$');
+    ax1.set(xscale='log', xlim=[1, 1e10], ylim=[0, a19n.q(1-1e-10)], xlabel='Log return period');
+    @savefig mata_gcn_tail.png scale=20
     ax0.legend(loc='upper left');
     df = pd.DataFrame({c.split('_')[2]: xsden_to_meancvskew(bit.index, bit[c]) for c in bit.columns},
                  index=['mean', 'cv', 'skew'])
@@ -1191,39 +1195,55 @@ Mata Figures 4, 5, 6 and 7 show the aggregate mixed density and distribution fun
     :okwarning:
 
     from aggregate import lognorm_approx
-    vm = 2.0; c = (vm - 1) / a.n; cv = c**0.5
-    al1 = build('agg MFV.4.1n1 '
+    vm = 2.0; c = (vm - 1) / a19.n; cv = c**0.5
+    a20 = build('agg Re:MFV41n1 '
               '[1000 2000 2000 3000] premium at [.65 .65 .75 .75] lr '
               '[750 1000 1500 2000] xs [10 25 50 50] '
               'sev [exp(8)/1000 exp(8)/1000 exp(9)/1000 exp(9)/1000] * lognorm [2.5 2.5 3 3]  '
               'occurrence net of 500 xs 500 '
               f'mixed gamma {cv}', bs=1/2)
-    al2 = build('agg MFV.4.1n2 '
+    a21 = build('agg Re:MFV41n2 '
               '[1000 2000 2000 3000] premium at [.65 .65 .75 .75] lr '
               '[750 1000 1500 2000] xs [10 25 50 50] '
               'sev [exp(8)/1000 exp(8)/1000 exp(9)/1000 exp(9)/1000] * lognorm [2.5 2.5 3 3]  '
               'occurrence net of 1000 xs 1000 '
               f'mixed gamma {cv}', bs=1/2)
-    qd(al1)
-    qd(al2)
+    qd(a20)
+    qd(a21)
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True); \
     ax0, ax1, ax2, ax3 = axs.flat; \
-    al1.reinsurance_df.p_agg_ceded_occ.plot(ax=ax0); \
-    al1.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax2); \
-    al2.reinsurance_df.p_agg_ceded_occ.plot(ax=ax1); \
-    al2.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax3); \
+    a20.reinsurance_df.p_agg_ceded_occ.plot(ax=ax0); \
+    a20.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax2); \
+    a21.reinsurance_df.p_agg_ceded_occ.plot(ax=ax1); \
+    a21.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax3); \
     xs = np.linspace(0, 5000, 501); \
-    fz = lognorm_approx(al1.reinsurance_df.p_agg_ceded_occ); \
+    fz = lognorm_approx(a20.reinsurance_df.p_agg_ceded_occ); \
     ax2.plot(xs, fz.cdf(xs), label='lognorm approx'); \
-    fz = lognorm_approx(al2.reinsurance_df.p_agg_ceded_occ); \
+    fz = lognorm_approx(a21.reinsurance_df.p_agg_ceded_occ); \
     ax3.plot(xs, fz.cdf(xs), label='lognorm approx'); \
     ax2.legend(); \
     ax3.legend(); \
     ax0.set(xlim=[-50, 5000], xlabel=None, ylabel='500 xs 500 density'); \
     ax2.set(xlim=[-50, 5000], ylabel='500 xs 500 distribution'); \
     ax1.set(xlim=[-50, 5000], xlabel=None, ylabel='1M xs 1M density');
-    @savefig mata_l1l2.png
+    @savefig mata_l1l2.png scale=20
     ax3.set(xlim=[-50, 5000], ylabel='1M xs 1M distribution');
+
+.. _re summary:
+
+Summary of Objects Created by DecL
+-------------------------------------
+
+Objects created by :meth:`build` in this guide.
+
+.. ipython:: python
+    :okwarning:
+    :okexcept:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^(Re):').iterrows():
+        pprint_ex(r.program, split=20)
+
 
 .. ipython:: python
     :suppress:

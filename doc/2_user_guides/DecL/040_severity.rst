@@ -15,7 +15,7 @@ Non-Parametric Severity Distributions
 
 Discrete distributions (supported on a finite number of outcomes)
 can be directly entered as a severity using the ``dsev`` keyword followed by
-two equal-length rows vectors. The first gives the outcomes and the second the
+two equal-length row vectors. The first gives the outcomes and the (optional) second gives the
 probabilities.
 
 ::
@@ -62,7 +62,7 @@ When executed, these are both converted into a ``scipy.stats`` ``histogram`` cla
 Parametric Severity
 ~~~~~~~~~~~~~~~~~~~~~
 
-A parametric distribution can be specified in two ways::
+A parametric distribution can be specified in two ways (``<SHAPE1>`` denotes an optional argument)::
 
     sev DIST_NAME MEAN cv CV
     sev DIST_NAME <SHAPE1> <SHAPE2>
@@ -72,7 +72,7 @@ where
 * ``sev`` is a keyword indicating the severity specification,
 * ``DIST_NAME`` is the ``scipy.stats`` distribution name, see :ref:`available sev dists`,
 * ``MEAN`` is the expected loss,
-* ``cv`` (lowercase) is sa keyword indicating entry of the CV,
+* ``cv`` (lowercase) is a keyword indicating entry of the CV,
 * ``CV`` is the loss coefficient of variation, and
 * ``SHAPE1``, ``SHAPE2`` are the shape variables.
 
@@ -83,27 +83,16 @@ distribution with a mean of 10 and a CV of 0.2. Entering ``lognorm 0.2`` produce
 with :math:`\mu=0` and :math:`\sigma=0.2`. It can then be :ref:`scaled and shifted<dec shift scale>`.
 
 ``DIST_NAME`` can be any zero, one, or two shape parameter ``scipy.stats`` continuous distribution.
-They have (mostly) easy to guess names:
+They have (mostly) easy to guess names. For example:
 
-* No shape parameters
+* Distributions with no shape parameters include:
+  ``norm``, Gaussian normal; ``unif``, uniform; and ``expon``, the exponential.
 
-    - ``norm``, Gaussian normal
-    - ``unif``, uniform
-    - ``expon``, the exponential
+* Distributions with one shape parameter include:
+  ``pareto``, ``lognorm``, ``gamma``, ``invgamma``, ``loggamma``, and ``weibull_min``
 
-* One shape parameter
-
-    - ``pareto``
-    - ``lognorm``
-    - ``gamma``
-    - ``invgamma``
-    - ``loggamma``
-    - ``weibull`` WHAT?
-
-* Two shape parameters
-
-    - ``beta``
-    - ``gengamma``, generalized gamma
+* Distributions with two shape parameters include:
+  ``beta`` and ``gengamma``, the generalized gamma.
 
 See :ref:`available sev dists` for a full list.
 
@@ -162,8 +151,9 @@ The scale and location parameters can be :doc:`vectors<070_vectorization>`.
 
 .. warning::
     Shifting left (negative shift) must be written with space ``sev 10 * lognorm 1.5 - 10`` not
-    ``sev 10 * lognorm 1.5 -10``. The lexer binds uniary minus to the number, so the latter omits the operator.
+    ``sev 10 * lognorm 1.5 -10``. The lexer binds uniary minus to the number, so the latter omits the operator. ``sev 10 * lognorm 1.5 + -10``, ``sev 10 * lognorm 1.5 +10`` and ``sev 10 * lognorm 1.5 + 10`` are all acceptable because there is no unary ``+``. This is a known bug and is insidious: the ``-10`` will be interpreted as a second shape parameter and ignored. You will not get the answer you expect.
 
+.. _sev uncond sev:
 
 Unconditional Severity
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -194,8 +184,8 @@ of zero, corresponding to :math:`X \le 10` below the attachment.
 
     from aggregate import build, qd
 
-    cond = build('agg Conditional   1 claim 10 x 10 sev 5 * expon   fixed')
-    uncd = build('agg Unconditional 1 claim 10 x 10 sev 5 * expon ! fixed')
+    cond = build('agg DecL:Conditional   1 claim 10 x 10 sev 5 * expon   fixed')
+    uncd = build('agg DecL:Unconditional 1 claim 10 x 10 sev 5 * expon ! fixed')
     qd(cond.describe)
     qd(uncd.describe)
     print(uncd.sevs[0].fz.sf(10), uncd.agg_m / cond.agg_m)

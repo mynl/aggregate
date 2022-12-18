@@ -13,7 +13,8 @@
 
 The ``aggregate`` package makes working with aggregate probability distributions as straightforward as working with parametric distributions (e.g., those built into ``scipy.stats``), even though their densities rarely have a closed form expression. See :doc:`../3_Reference` for more.
 
-.. rubric:: Contents
+Contents
+---------
 
 * :ref:`Principal Classes`
 * :ref:`10 min Underwriter`
@@ -28,8 +29,8 @@ The ``aggregate`` package makes working with aggregate probability distributions
 
     - :ref:`Creating an Aggregate Distribution`
     - :ref:`10 min accessing`
+    - :ref:`10 min reinsurance`
 
-* :ref:`10 min reinsurance`
 * :ref:`10 min Distortion`
 * :ref:`10 min Portfolio`
 * :ref:`10 min common`
@@ -57,6 +58,8 @@ The ``aggregate`` package makes working with aggregate probability distributions
     - :ref:`Analyze Distortions`
     - :ref:`Twelve Plot`
 
+* :ref:`10 min extensions`
+* :ref:`10 min summary`
 
 Principal Classes
 ------------------
@@ -87,19 +90,19 @@ To get started, import ``build``, a pre-configured :class:`Underwriter` and :fun
 .. ipython:: python
     :okwarning:
 
-   from aggregate import build, qd
-   import pandas as pd, numpy as np, matplotlib.pyplot as plt
+    from aggregate import build, qd
+    import pandas as pd, numpy as np, matplotlib.pyplot as plt
 
 Printing ``build`` reports its name, the number of objects in its knowledge, and other information about hyper-parameter default values. ``site_dir`` is where various outputs will be stored. ``default_dir`` is for internal package data. The ``build`` object loads an extensive test suite of DecL programs with over 130 entries.
 
 .. ipython:: python
     :okwarning:
 
-   build
+    build
 
 .. _10 mins create from decl:
 
-Object Creation Using DecL and ``build``
+Object Creation Using DecL and :meth:`build`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Underwriter class interprets DecL programs (:doc:`2_x_dec_language`). These allow severities, aggregates and portfolios to be created using standard insurance language.
@@ -109,12 +112,12 @@ For example, to build an :class:`Aggregate` directly from DecL run:
 .. ipython:: python
     :okwarning:
 
-    a = build('agg UnitA '
+    a01 = build('agg TenM:01 '
               '100 claims '
               '100 xs 0 '
               'sev lognorm 10 cv 1.25 '
               'poisson')
-    qd(a)
+    qd(a01)
 
 DecL is supposed to be human-readable, so I hope you can guess what the program creates. The block under it reports key statistics for frequency, severity, and in the aggregate. Think of the units as 1000s of USD, EUR, GBP, etc.
 
@@ -122,7 +125,7 @@ DecL was created as a shorthand. The alternative is to use positional arguments 
 
 .. note::
 
-    :class:`Aggregate` and :class:`Portfolio` objects need to be updated after they have been created. Updating builds out discrete numerical approximations, analogous to simulation. By default, ``build`` handles updating automatically.
+    :class:`Aggregate` and :class:`Portfolio` objects need to be updated after they have been created. Updating builds out discrete numerical approximations, analogous to simulation. By default, :meth:`build` handles updating automatically.
 
 Object Creation from the Knowledge Database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -158,10 +161,10 @@ A row in the knowledge can be created as a Python object using:
 .. ipython:: python
     :okwarning:
 
-    a = build('B.Dice10')
-    qd(a)
+    aDice = build('B.Dice10')
+    qd(aDice)
 
-The argument in this case is passed through to the function ``Underwriter.build``, which first looks for ``B.Dice10`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
+The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``B.Dice10`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
 
 The method :meth:`build.qshow` (quick show) searches the knowledge using a regex applied to the names, returning a dataframe of specifications.
 
@@ -279,16 +282,16 @@ The first form is a knowledge lookup for ``BUILTIN_ID``. ``DISTAME`` is the name
 .. ipython:: python
     :okwarning:
 
-    s0 = build(f'sev Sev.1 lognorm 80 cv .5')
-    s1 = build(f'sev Sev.2 10 * lognorm 4 cv .5 + 40')
+    s0 = build(f'sev TenM:Sev.1 lognorm 80 cv .5')
+    s1 = build(f'sev TenM:Sev.2 10 * lognorm 4 cv .5 + 40')
     mf, vf = s0.fz.stats(); m, v = s0.stats()
     s0.plot(figsize=(4*3.5, 2.6), layout='ABCD');
-    @savefig 10min_sev0.png
+    @savefig 10min_sev0.png scale=16
     plt.gcf().suptitle(f'{s0.name}, mean {m:.2f}, CV {v**.5/m:.2f} ({mf:.2f}, {vf**.5/mf:.2f})');
 
     mf, vf = s1.fz.stats(); m, v = s1.stats()
     s1.plot(figsize=(4*3.5, 2.6), layout='ABCD');
-    @savefig 10min_sev1.png
+    @savefig 10min_sev1.png scale=16
     plt.gcf().suptitle(f'{s1.name}, mean {m:.2f}, CV {v**.5/m:.2f} ({mf:.2f}, {vf**.5/mf:.2f})');
 
 The next example shows the shapes of gamma, inverse Gaussian, lognormal, and inverse gamma severities with the same mean and CV. First, a short function to create the examples.
@@ -297,7 +300,7 @@ The next example shows the shapes of gamma, inverse Gaussian, lognormal, and inv
     :okwarning:
 
     def plot_example(dist_name):
-        s = build(f'sev {dist_name.title()} {dist_name} 10 cv .5')
+        s = build(f'sev TenM:{dist_name.title()} {dist_name} 10 cv .5')
         m, v, sk, k = s.fz.stats('mvsk')
         s.plot(figsize=(4*3.5, 2.6), layout='ABCD')
         plt.gcf().suptitle(f'{dist_name.title()}, mean {m:.2f}, '
@@ -308,13 +311,13 @@ Execute on the desired distributions.
 .. ipython:: python
     :okwarning:
 
-    @savefig 10min_sev2.png
+    @savefig 10min_sev2.png scale=16
     plot_example('gamma')
-    @savefig 10min_sev3.png
+    @savefig 10min_sev3.png scale=16
     plot_example('invgauss')
-    @savefig 10min_sev4.png
+    @savefig 10min_sev4.png scale=16
     plot_example('lognorm')
-    @savefig 10min_sev5.png
+    @savefig 10min_sev5.png scale=16
     plot_example('invgamma')
 
 
@@ -325,10 +328,10 @@ Limits and attachments determine exposure in DecL and they belong to the :class:
     :okwarning:
 
     limit, attach = 15, 5
-    s2 = build(f'agg SevLayer 1 claim {limit} xs {attach} sev gamma 10 cv .5 fixed')
+    s2 = build(f'agg TenM:SevLayer 1 claim {limit} xs {attach} sev gamma 10 cv .5 fixed')
     m, v, sk, k = s2.sevs[0].fz.stats('mvsk')
     s2.sevs[0].plot(n=401, figsize=(4*3.5, 2.9), layout='ABCD')
-    @savefig 10min_sev6.png
+    @savefig 10min_sev6.png scale=16
     plt.gcf().suptitle(f'Ground-up severity\nGround-up gamma mean {m:.2f}, CV {v**0.5/m:.2f}, skew {sk:.2f}, kurt {k:.2f}\n'
                        f'{limit} xs {attach} excess layer mean {s2.est_m:.2f}, CV {s2.est_cv:.2f}, skew {s2.est_skew:.2f}, kurt {k:.2f}');
 
@@ -342,13 +345,13 @@ Another way is to create the  :class:`Severity` directly using ``args`` and ``kw
     s3 = Severity('gamma', attach, limit, 10, 0.5)
     s3.plot(n=401, figsize=(4*3.5, 2.6), layout='ABCD')
     m, v = s3.stats()
-    @savefig 10min_sev6.png
+    @savefig 10min_sev6.png scale=16
     plt.gcf().suptitle(f'{limit} xs {attach} excess layer mean {m:.2f}, CV {v**.5/m:.2f}');
 
     s4 = Severity('gamma', attach, limit, 10, 0.5, sev_conditional=False)
     s4.plot(figsize=(4*3.5, 2.6), layout='ABCD')
     m, v = s4.stats()
-    @savefig 10min_sev7.png
+    @savefig 10min_sev7.png scale=16
     plt.gcf().suptitle(f'Unconditional {limit} xs {attach} excess layer mean {m:.2f}, CV {v**.5/m:.2f}');
     print(f'Probability of attaching layer {s4.fz.cdf(attach):.3f}')
 
@@ -377,16 +380,16 @@ Objects in the knowledge can be :ref:`created by name<10mins create from knowled
 Advanced users and programmers can create :class:`Aggregate` objects directly using ``kwargs``, see :ref:`Aggregate Class`.
 
 
-**Example.** This example uses ``build`` to make an :class:`Aggregate` with a Poisson frequency, mean 5, and gamma severity with mean 10 and CV 1 . It includes more discussion than the example above. The line breaks improve readability but are cosmetic.
+**Example.** This example uses :meth:`build` to make an :class:`Aggregate` with a Poisson frequency, mean 5, and gamma severity with mean 10 and CV 1 . It includes more discussion than the example above. The line breaks improve readability but are cosmetic.
 
 .. ipython:: python
     :okwarning:
 
-    a = build('agg Example1 '
+    a02 = build('agg TenM:02 '
               '5 claims '
               'sev gamma 10 cv 1 '
               'poisson')
-    qd(a)
+    qd(a02)
 
 The quick display reports summary exact and estimated frequency, severity, and aggregate statistics. These make it easy to see if the numerical estimation appears valid. Look for a small error in the mean and close second (CV) and third (skew) moments. ``qd`` displays the dataframe ``a.describe``.
 
@@ -395,12 +398,12 @@ In this case, the aggregate mean error is too high because the discretization bu
 .. ipython:: python
     :okwarning:
 
-    a = build('agg Example1 '
+    a03 = build('agg TenM:03 '
           '5 claims '
           'sev gamma 10 cv 1 '
           'poisson'
           , bs=1/128)
-    qd(a)
+    qd(a03)
 
 
 A :class:`Aggregate` object acts like a discrete probability distribution. There are properties for the mean, standard deviation, coefficient of variation, and skewness, both computed exactly and numerically estimated.
@@ -408,15 +411,15 @@ A :class:`Aggregate` object acts like a discrete probability distribution. There
 .. ipython:: python
     :okwarning:
 
-    print(a.agg_m, a.agg_sd, a.agg_cv, a.agg_skew)
-    print(a.est_m, a.est_sd, a.est_cv, a.est_skew)
+    print(a03.agg_m, a03.agg_sd, a03.agg_cv, a03.agg_skew)
+    print(a03.est_m, a03.est_sd, a03.est_cv, a03.est_skew)
 
 They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
 
 .. ipython:: python
     :okwarning:
 
-    a.pmf(60), a.cdf(50), a.sf(60), a.q(a.cdf(60)), a.q(0.5)
+    a03.pmf(60), a03.cdf(50), a03.sf(60), a03.q(a03.cdf(60)), a03.q(0.5)
 
 .. warning::
 
@@ -438,37 +441,37 @@ most interesting when the object has a mixed severity.
 .. ipython:: python
     :okwarning:
 
-    mix = build('agg Mix '
+    a04 = build('agg TenM:04 '
                 '25 claims '
                 'sev [gamma lognorm invgamma] [5 10 10] cv [0.5 0.75 1.5] '
                 'wts [.5 .25 .25] + [0 10 20] '
                 'mixed gamma 0.5'
                , bs=1/16)
-    qd(mix)
-    for s in mix.sevs:
+    qd(a04)
+    for s in a04.sevs:
         print(s.sev_name, s.fz.args, s.fz.kwds)
 
-The property ``mix.sev`` is a ``namedtuple`` exposing the exact weighted pdf,
+The property ``a04.sev`` is a ``namedtuple`` exposing the exact weighted pdf,
 cdf, and sf of the underlying :class:`Severity` objects.
 
 .. ipython:: python
     :okwarning:
 
-    mix.sev.pdf(20), mix.sev.cdf(20), mix.sev.sf(20)
+    a04.sev.pdf(20), a04.sev.cdf(20), a04.sev.sf(20)
 
-The component weights are proportional to ``mix.en`` and ``mix.sev.cdf`` is computed as
+The component weights are proportional to ``a04.en`` and ``a04.sev.cdf`` is computed as
 
 .. ipython:: python
     :okwarning:
 
-    (np.array([s.cdf(20) for s in mix.sevs]) * mix.en).sum() / mix.en.sum()
+    (np.array([s.cdf(20) for s in a04.sevs]) * a04.en).sum() / a04.en.sum()
 
 The following are equal using the defaut discretization method.
 
 .. ipython:: python
     :okwarning:
 
-    mix.density_df.loc[20, 'F_sev'], mix.sev.cdf(20 + mix.bs/2)
+    a04.density_df.loc[20, 'F_sev'], a04.sev.cdf(20 + a04.bs/2)
 
 .. _10 min reinsurance:
 
@@ -482,8 +485,8 @@ Reinsurance
 .. ipython:: python
     :okwarning:
 
-    bg = build('agg Gross dfreq [2] dsev [1:10]')
-    qd(bg)
+    a05g = build('agg TenM:05g dfreq [2] dsev [1:10]')
+    qd(a05g)
 
 
 **Net of occurrence:** Apply 3 xs 7 occurrence reinsurance to cap individual losses at 7.
@@ -491,9 +494,9 @@ Reinsurance
 .. ipython:: python
     :okwarning:
 
-    bno = build('agg NetOcc dfreq [2] dsev [1:10] '
+    a05no = build('agg TenM:05no dfreq [2] dsev [1:10] '
                 'occurrence net of 3 x 7')
-    qd(bno)
+    qd(a05no)
 
 .. warning::
 
@@ -504,10 +507,10 @@ Reinsurance
 .. ipython:: python
     :okwarning:
 
-    bn = build('agg Net dfreq [2] dsev [1:10] '
+    a05n = build('agg TenM:05n dfreq [2] dsev [1:10] '
                'occurrence net of 3 xs 7 '
                'aggregate net of 4 xs 8')
-    qd(bn)
+    qd(a05n)
 
 See :ref:`10 min plot` for plots of the different distributions.
 
@@ -523,11 +526,11 @@ A :class:`Distortion` can be created using DecL.
 .. ipython:: python
     :okwarning:
 
-    d = build('distortion G dual 3')
-    @savefig 10mins_dist.png
-    d.plot();
-    qd(d.g(.2), d.g_inv(.2), d.g_dual(0.2),
-    d.g(.8), d.g_inv(.992), d)
+    d06 = build('distortion TenM:06 dual 3')
+    qd(d06.g(.2), d06.g_inv(.2), d06.g_dual(0.2),
+    d06.g(.8), d06.g_inv(.992), d06)
+    @savefig 10mins_dist.png scale=20
+    d06.plot();
 
 
 A :class:`Distortion` object has methods for ``g``, the distortion function, along with its dual ``g_dual(s)=1-g(1-s)`` and inverse ``g_inv``. The :meth:`plot` method shows ``g`` (above the diagonal) and ``g_inv`` (below).
@@ -566,7 +569,7 @@ where ``AGG1`` is an aggregate specification. Portfolios can have one or more un
 .. ipython:: python
     :okwarning:
 
-    p = build('port Account '
+    p07 = build('port TenM:07 '
                 'agg A '
                     '100 claims '
                     '100 xs 0 '
@@ -582,10 +585,10 @@ where ``AGG1`` is an aggregate specification. Portfolios can have one or more un
                     '1e5 xs 0 '
                     'sev 500 * pareto 1.8 - 500 '
                     'poisson')
-    qd(p)
+    qd(p07)
 
 
-The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p.describe``, which concatenates each unit's ``describe`` and adds the same statistics for the total.
+The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p07.describe``, which concatenates each unit's ``describe`` and adds the same statistics for the total.
 
 * Unit A has 100 (expected) claims, each pulled from a lognormal distribution with mean of 30 and coefficient of variation 1.25 within the layer 100 xs 0 (i.e., losses are limited at 100). The frequency distribution is Poisson.
 * Unit B is similar.
@@ -596,8 +599,8 @@ The portfolio total (i.e., the sum of the units) is computed using FFTs to convo
 .. ipython:: python
     :okwarning:
 
-    print(p.recommend_bucket().iloc[:, [0,3,6,10]])
-    p.best_bucket(16)
+    print(p07.recommend_bucket().iloc[:, [0,3,6,10]])
+    p07.best_bucket(16)
 
 The column ``bsN`` correspond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each unit and in total. For example with ``N=16`` (i.e., 65,536 buckets) the suggestion is 1.727. It is best the bucket size is a divisor of any limits or attachment points. :meth:`best_bucket` takes this into account and suggests 2.
 
@@ -606,24 +609,24 @@ A :class:`Portfolio` object acts like a discrete probability distribution, the s
 .. ipython:: python
     :okwarning:
 
-    print(p.agg_m, p.agg_sd, p.agg_cv, p.agg_skew)
-    print(p.est_m, p.est_sd, p.est_cv, p.est_skew)
+    print(p07.agg_m, p07.agg_sd, p07.agg_cv, p07.agg_skew)
+    print(p07.est_m, p07.est_sd, p07.est_cv, p07.est_skew)
 
 They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
 
 .. ipython:: python
     :okwarning:
 
-    p.pmf(12000), p.cdf(11000), p.sf(12000), p.q(p.cdf(12000)), p.q(0.5)
+    p07.pmf(12000), p07.cdf(11000), p07.sf(12000), p07.q(p07.cdf(12000)), p07.q(0.5)
 
 
-The names of the units in a :class:`Portfolio` are in a list called ``p.unit_names`` or ``p.unit_names_ex`` including ``total``.
+The names of the units in a :class:`Portfolio` are in a list called ``p07.unit_names`` or ``p07.unit_names_ex`` including ``total``.
 The :class:`Aggregate` objects in the :class:`Portfolio` can be iterated over.
 
 .. ipython:: python
     :okwarning:
 
-    for u in p:
+    for u in p07:
         print(u.name, u.agg_m, u.est_m)
 
 
@@ -635,11 +638,11 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 :class:`Aggregate` and :class:`Portfolio` both have the following methods and properties. See :ref:`Aggregate Class` and :ref:`Portfolio Class` for full lists.
 
-- ``describe`` and ``info`` are dataframes with statistics and other information; they are printed with the object.
+- ``info`` and  ``describe`` are dataframes with statistics and other information; they are printed with the object.
 
 - ``density_df`` a dataframe containing estimated probability distributions and other expected value information.
 
-- ``statistics_df`` and ``statistics_total_df`` dataframes with analytically computed mean, variance, CV, and sknewness.
+- The :attr:`statistics` dataframe shows analytically computed mean, variance, CV, and sknewness for each unit and in total.
 
 - ``report_df`` are dataframe with information to test if the numerical approximations appear valid. Numerically estimated statistics are prefaced ``est_`` or ``empirical``.
 
@@ -678,23 +681,23 @@ The ``info`` dataframe contains information about the frequency and severity sto
 .. ipython:: python
     :okwarning:
 
-    print(bg.info)
-    print(p.info)
+    print(a05n.info)
+    print(p07.info)
 
 .. _10 min describe:
 
 The ``describe`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``describe`` dataframe contains gross analytic and estimated (net or ceded) statistics. When there is no reinsurance, comparison of analytic and estimated moments provides a test of computational accuracy. It should always be reviewed after updating.
+The ``describe`` dataframe contains gross analytic and estimated (net or ceded) statistics. When there is no reinsurance, comparison of analytic and estimated moments provides a test of computational accuracy (first case). It should always be reviewed after updating. When there is reinsurance, empirical is net (second case).
 
 .. ipython:: python
     :okwarning:
 
-    qd(bg.describe)
+    qd(a05g.describe)
     with pd.option_context('display.max_columns', 15):
-        print(bg.describe)
-    qd(p.describe)
+        print(a05n.describe)
+    qd(p07.describe)
 
 Printing with default settings shows what ``qd`` adds.
 
@@ -716,36 +719,34 @@ In an :class:`Aggregate`, ``p`` and ``p_total`` are identical, the latter includ
 .. ipython:: python
     :okwarning:
 
-    print(bg.density_df.shape)
-    print(bg.density_df.columns)
-    with pd.option_context('display.max_columns', bg.density_df.shape[1]):
-        print(bg.density_df.head())
+    print(a05g.density_df.shape)
+    print(a05g.density_df.columns)
+    with pd.option_context('display.max_columns', a05g.density_df.shape[1]):
+        print(a05g.density_df.head())
 
 The :class:`Portfolio` version is more exhaustive. It includes a variety of columns for each unit, suffixed ``_unit``, and for the complement of each unit (sum of everything but that unit) suffixed ``_ημ_unit``. The totals are suffixed ``_total``. The most important columns are ``exeqa_unit``, :ref:`Conditional Expected Values`. All the column names and a subset of ``density_df`` are shown next.
 
 .. ipython:: python
     :okwarning:
 
-    print(p.density_df.shape)
-    print(p.density_df.columns)
-    with pd.option_context('display.max_columns', p.density_df.shape[1]):
-        print(p.density_df.filter(regex=r'[aipex012]_A').head())
+    print(p07.density_df.shape)
+    print(p07.density_df.columns)
+    with pd.option_context('display.max_columns', p07.density_df.shape[1]):
+        print(p07.density_df.filter(regex=r'[aipex012]_A').head())
 
 .. _10 min stats:
 
 The ``statistics`` Series and Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``statistics`` series (for :class:`Aggregate`) or dataframe
-(for :class:`Portfolio`) shows the analytically computed mean, variance, CV, and sknewness, indexed by
+The ``statistics`` dataframe shows analytically computed mean, variance, CV, and sknewness. It is indexed by
 
 - severity name, limit and attachment,
 - ``freq1, freq2, freq3`` non-central frequency moments,
 - ``sev1, sev2, sev3`` non-central severity moments, and
 - the mean, cv and skew(ness).
 
-They apply to the **gross** outcome when there is reinsurance,
-so the results for ``bg`` and ``bno`` are the same.
+It applies to the **gross** outcome when there is reinsurance, so the results for ``a05g`` and ``a05no`` are the same.
 
 .. ipython:: python
     :okwarning:
@@ -753,16 +754,16 @@ so the results for ``bg`` and ``bno`` are the same.
     oco = ['display.width', 150, 'display.max_columns', 15,
             'display.float_format', lambda x: f'{x:.5g}']
     with pd.option_context(*oco):
-        print(bg.statistics)
+        print(a05g.statistics)
         print('\n')
-        print(p.statistics)
+        print(p07.statistics)
 
 .. _10 min report:
 
 The ``report_df`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``report_df`` dataframe combines information from ``statistics_df`` with
+The ``report_df`` dataframe combines information from ``statistics`` with
 estimated moments to test if the numerical approximations appear valid. It
 is an expanded version of ``describe``. Numerically estimated statistics are
 prefaced ``est`` or ``empirical``.
@@ -771,16 +772,17 @@ prefaced ``est`` or ``empirical``.
     :okwarning:
 
     with pd.option_context(*oco):
-        print(bg.report_df)
+        print(a05g.report_df)
         print('\n')
-        print(p.report_df)
+        print(p07.report_df)
 
 The ``report_df`` provides extra information when there is a mixed severity.
 
 .. ipython:: python
     :okwarning:
 
-    mix.report_df
+    with pd.option_context(*oco):
+        print(a04.report_df)
 
 The dataframe shows statistics for each mixture component, columns ``0,1,2``,
 their sum if they are added independently and their sum if there is a shared
@@ -811,7 +813,7 @@ object. For example, if ``a`` is an :class:`Aggregate`, then ``Aggregate
     :okwarning:
 
     from pprint import pprint
-    pprint(bg.spec)
+    pprint(a05n.spec)
 
 .. _10 min decl program:
 
@@ -819,21 +821,21 @@ The DecL Program
 ~~~~~~~~~~~~~~~~~~
 
 The ``program`` property returns the DecL program used to create the object.
-It is blank if the object was not created using DecL.
+It is blank if the object was not created using DecL. The helper function :func:`pprint_ex` pretty prints a program.
 
 .. ipython:: python
     :okwarning:
 
-    import re
-    print(re.sub('(dfreq|dsev|occurrence|aggregate)', r'\n\t\1', bn.program))
-    print(re.sub('(agg|sev|poisson)', r'\n\t\1', p.program))
+    from aggregate import pprint_ex
+    pprint_ex(a05n.program, split=20)
+    pprint_ex(p07.program, split=20)
 
 .. _10 min update:
 
 The :meth:`update` Method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After an :class:`Aggregate` or a :class:`Portfolio` object has been created it needs to be updated to populate its ``density_df`` dataframe. ``build`` automatically updates the objects it creates with default hyper-parameter values. Sometimes it is necessary to re-update with different hyper-parameters. The :meth:`update` method takes arguments ``log2=13``, ``bs=0``, and ``recommend_p=0.999``. The first two control the number and size of buckets. When ``bs==0`` it is estimated using the method :meth:`recommend_bucket`. If ``bs!=0`` then ``recommend_p`` is ignored.
+After an :class:`Aggregate` or a :class:`Portfolio` object has been created it needs to be updated to populate its ``density_df`` dataframe. :meth:`build` automatically updates the objects it creates with default hyper-parameter values. Sometimes it is necessary to re-update with different hyper-parameters. The :meth:`update` method takes arguments ``log2=13``, ``bs=0``, and ``recommend_p=0.999``. The first two control the number and size of buckets. When ``bs==0`` it is estimated using the method :meth:`recommend_bucket`. If ``bs!=0`` then ``recommend_p`` is ignored.
 
 Further control over updating is available, as described in REF.
 
@@ -884,16 +886,16 @@ For example:
 .. ipython:: python
     :okwarning:
 
-    print(a.pmf(2), a.pmf(2.2), a.pmf(3), a.cdf(2), a.cdf(2.2))
-    print(1 - a.cdf(2), a.sf(2))
-    print(a.q(a.cdf(2)))
+    qd(a05g.pmf(2), a05g.pmf(2.2), a05g.pmf(3), a05g.cdf(2), a05g.cdf(2.2))
+    print(1 - a05g.cdf(2), a05g.sf(2))
+    print(a05g.q(a05g.cdf(2)))
 
 The last line illustrates that :meth:`q` and :meth:`cdf` are inverses. The :meth:`var_dict` function computes tail statistics for all units, return in a dictionary.
 
 .. ipython:: python
     :okwarning:
 
-    p.var_dict(0.99), p.var_dict(0.99, kind='tvar')
+    p07.var_dict(0.99), p07.var_dict(0.99, kind='tvar')
 
 .. _10 min plot:
 
@@ -905,24 +907,24 @@ The :meth:`plot` method provides basic visualization.
 Discrete :class:`Aggregate` objects are plotted differently than continuous ones.
 The reinsurance examples show the discrete output format. The plots show the
 gross, net of occurrence, and net severity and aggregate pmf (left) and cdf
-(middle), and the quantile (Lee) plot (right). The property ``bg.figure``
+(middle), and the quantile (Lee) plot (right). The property ``a05g.figure``
 returns the last figure made by the object as a convenience. You could also
-use ``plt.gcf()``.
+use :meth:`plt.gcf`.
 
 .. ipython:: python
     :okwarning:
 
-    bg.plot()
-    @savefig 10min_gross.png
-    bg.figure.suptitle('Gross - discrete format');
+    a05g.plot()
+    @savefig 10min_gross.png scale=16
+    a05g.figure.suptitle('Gross - discrete format');
 
-    bno.plot()
-    @savefig 10min_no.png
-    bno.figure.suptitle('Net of occurrence');
+    a05no.plot()
+    @savefig 10min_no.png scale=16
+    a05no.figure.suptitle('Net of occurrence');
 
-    bn.plot()
-    @savefig 10min_noa.png
-    bn.figure.suptitle('Net of occurrence and aggregate');
+    a05n.plot()
+    @savefig 10min_noa.png scale=16
+    a05n.figure.suptitle('Net of occurrence and aggregate');
 
 
 Continuous distribution substitute the log density for the distribution in the
@@ -931,9 +933,9 @@ middle.
 .. ipython:: python
     :okwarning:
 
-    a.plot()
-    @savefig 10min_cts.png
-    a.figure.suptitle('Continuous format');
+    a04.plot()
+    @savefig 10min_cts.png scale=16
+    a04.figure.suptitle('Continuous format');
 
 
 A :class:`Portfolio` object plots the density and log density of each unit and
@@ -942,9 +944,9 @@ the total.
 .. ipython:: python
     :okwarning:
 
-    p.plot()
-    @savefig 10min_p.png
-    p.figure.suptitle('Portfolio plot');
+    p07.plot()
+    @savefig 10min_p07.png scale=16
+    p07.figure.suptitle('Portfolio plot');
 
 .. _10 min price:
 
@@ -958,17 +960,17 @@ Distortions can be built using DecL. The plot shows :math:`g` and its dual.
 .. ipython:: python
     :okwarning:
 
-    g = build('distortion Pricer dual 3')
-    @savefig 10min_g.png
-    g.plot();
-    qd(mix.q(0.999))
+    d08 = build('distortion TenM:08 dual 3')
+    @savefig 10min_d08.png scale=20
+    d08.plot();
+    qd(a04.q(0.999))
 
 The last line computes the 99.9%ile outcome that can be used to specify regulatory assets :math:`a`. :meth:`price` applies to :math:`X\wedge a`.
 
 .. ipython:: python
     :okwarning:
 
-    qd(mix.price(0.999, g).T)
+    qd(a04.price(0.999, d08).T)
 
 The :meth:`price` method output reports expected limited losses ``L``, the risk adjusted premium ``P``, the margin ``M = P - L``, the capital ``Q = a - P``, the loss ratio, leverage as premium to capital ``PQ``, and return on capital ``ROE``.
 
@@ -977,7 +979,7 @@ When :meth:`price` is applied to a :class:`Portfolio` it returns the total premi
 .. ipython:: python
     :okwarning:
 
-    qd(p.price(0.999, g).df.T)
+    qd(p07.price(0.999, d08).df.T)
 
 The ROE varies by unit, reflecting different consumption and cost of capital by layer. The less risky unit A runs at a higher loss ratio (cheaper insurance) but higher ROE than unit B because it consumes more expensive, equity-like lower layer capital but less capital overall (higher leverage).
 
@@ -998,7 +1000,7 @@ The :meth:`approximate` method creates an analytic approximation fit using momen
 .. ipython:: python
     :okwarning:
 
-    fzs = mix.approximate('all')
+    fzs = a04.approximate('all')
     d = pd.DataFrame({k: fz.stats('mvs') for k, fz in fzs.items()},
              index=pd.Index(['mean', 'var', 'skew'], name='stat'),
                     dtype=float)
@@ -1039,14 +1041,14 @@ Here are some values and graph for ``p``. Looking at its
 
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45)); \
     ax0, ax1 = axs.flat;
-    lm = p.limits(); \
-    bit = p.density_df.filter(regex='exeqa_[ABCt]'); \
+    lm = p07.limits(); \
+    bit = p07.density_df.filter(regex='exeqa_[ABCt]'); \
     bit.index.name = 'Loss'; \
     bit.plot(xlim=lm, ylim=lm, ax=ax0); \
     ax0.set(ylabel=r'$E[X_i\mid X]$', aspect='equal'); \
     ax0.axhline(bit['exeqa_A'].max(), lw=.5, c='C7');
-    @savefig 10mins_exa.png
-    p.density_df.filter(regex='p_[ABCt]').plot(ax=ax1, xlim=lm, logy=True); \
+    @savefig 10mins_exa.png scale=20
+    p07.density_df.filter(regex='p_[ABCt]').plot(ax=ax1, xlim=lm, logy=True); \
     ax1.set(ylabel='Log density');
     bit['Pct A'] = bit['exeqa_A'] / bit.index
     qd(bit.loc[:lm[1]:1024])
@@ -1063,25 +1065,23 @@ The :meth:`calibrate_distortions` method calibrates distortions to achieve reque
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    p.calibrate_distortions(Ps=[0.996], ROEs=[0.15], strict='ordered');
-    qd(p.dist_ans)
-    pprint(p.dists)
+    p07.calibrate_distortions(Ps=[0.996], ROEs=[0.15], strict='ordered');
+    qd(p07.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    pprint(p07.dists)
 
-The answer is returned in the ``dist_ans`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p.dists`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
+The answer is returned in the ``dist_ans`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.dists`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
 
 Analyze Distortions
 ~~~~~~~~~~~~~~~~~~~~
 
-The :meth:`analyze_distortions` method applies the distortions in ``p.dists`` at a given capital level and summarizes the implied (lifted) natural allocations across units. Optionally, it applies a number of traditional (bullshit) pricing methods. The answer dataframe includes premium, margin, expected loss, return, loss ratio and leverage statistics for each unit and method. Here is a snippet, again at the 99.6% capital level.
+The :meth:`analyze_distortions` method applies the distortions in ``p07.dists`` at a given capital level and summarizes the implied (lifted) natural allocations across units. Optionally, it applies a number of traditional (bullshit) pricing methods. The answer dataframe includes premium, margin, expected loss, return, loss ratio and leverage statistics for each unit and method. Here is a snippet, again at the 99.6% capital level.
 
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    ans = p.analyze_distortions(p=0.996)
+    ans = p07.analyze_distortions(p=0.996)
     print(ans.comp_df.xs('LR', axis=0, level=1).
          to_string(float_format=lambda x: f'{x:.1%}'))
 
@@ -1095,20 +1095,19 @@ First, the case of a thin-tailed and a thick-tailed line. Here, the thick tailed
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    portA = build('port ThickThin '
+    p09 = build('port TenM:09 '
                   'agg X1 1 claim sev gamma 1 cv 0.25 fixed '
                   'agg X2 1 claim sev 0.7 * lognorm 1 cv 1.25 + 0.3 fixed'
                  , bs=1/1024)
-    qd(portA)
-    print(f'Asset P value {portA.cdf(12.5):.5g}')
-    portA.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
-    qd(portA.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
-    portA.apply_distortion('dual');
+    qd(p09)
+    print(f'Asset P value {p09.cdf(12.5):.5g}')
+    p09.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
+    qd(p09.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    p09.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
-    @savefig 10mins_twelve_portA.png
-    portA.twelve_plot(fig, axs, p=0.999, p2=0.999)
+    @savefig 10mins_twelve_p09.png scale=16
+    p09.twelve_plot(fig, axs, p=0.999, p2=0.999)
 
 
 There is a lot of information here. We refer to the charts as
@@ -1221,9 +1220,8 @@ Applying the same distortion on a stand-alone basis produces:
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    a = portA.stand_alone_pricing(portA.dists['dual'], p=portA.cdf(12.5))
+    a = p09.stand_alone_pricing(p09.dists['dual'], p=p09.cdf(12.5))
     print(a.iloc[:8])
 
 The lifted natural allocation (diversified pricing) is given next. These numbers
@@ -1233,9 +1231,8 @@ by X2 and so X2 receives a disproportionate share of the assets in default.
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    a2 = portA.analyze_distortion('dual', ROE=0.1, p=portA.cdf(12.5))
+    a2 = p09.analyze_distortion('dual', ROE=0.1, p=p09.cdf(12.5))
     print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
 
 The second portfolio has been selected with two thick tailed units. A appears riskier at lower return periods and B at higher. Pricing is calibrated to a 15% ROE at a 99.6% capital level.
@@ -1243,9 +1240,8 @@ The second portfolio has been selected with two thick tailed units. A appears ri
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    portB = build('port Account '
+    p10 = build('port TenM:10 '
                  'agg A '
                      '30 claims '
                      '1000 xs 0 '
@@ -1257,40 +1253,66 @@ The second portfolio has been selected with two thick tailed units. A appears ri
                      'sev lognorm 25 cv 3.0 '
                      'poisson'
                 , bs=1)
-    qd(portB)
-    portB.calibrate_distortions(ROEs=[0.15], Ps=[0.996], strict='ordered');
-    qd(portB.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    qd(p10)
+    p10.calibrate_distortions(ROEs=[0.15], Ps=[0.996], strict='ordered');
+    qd(p10.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
 
 Apply the dual distortion and then create the twelve plot.
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    portB.apply_distortion('dual');
+    p10.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
-    @savefig 10min_twelve_plot.png
-    portB.twelve_plot(fig, axs, p=0.999995, p2=0.999999)
+    @savefig 10min_twelve_plot.png scale=16
+    p10.twelve_plot(fig, axs, p=0.999995, p2=0.999999)
 
 
 Applying the same distortion on a stand-alone basis produces:
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    assets = portB.q(0.996)
-    a = portB.stand_alone_pricing(portB.dists['dual'], p=portB.cdf(assets))
+    assets = p10.q(0.996)
+    a = p10.stand_alone_pricing(p10.dists['dual'], p=p10.cdf(assets))
     print(a.iloc[:8])
 
 The lifted natural allocation (diversified pricing) is given next.
 
 .. ipython:: python
     :okwarning:
-    :okexcept:
 
-    a2 = portB.analyze_distortion('dual', ROE=0.1, p=portB.cdf(assets))
+    a2 = p10.analyze_distortion('dual', ROE=0.1, p=p10.cdf(assets))
     print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
+
+
+.. _10 min extensions:
+
+Extensions
+-----------
+
+The ``extensions`` sub-package contains additional classes and functions that are either peripheral to the main project or still under development (and subject to change). Currently, ``extensions`` includes:
+
+* ``case_studies`` for creating and managing PIR case studies (see :doc:`2_x_case_studies`).
+* ``pir_figures`` for creating various exhibits and figures in PIR.
+* ``figures`` for creating various other exhibits and figures.
+* ``samples`` includes functions for working with samples and executing a switcheroo. Eventually, these will be integrated into :class:`Portfolio`.
+
+.. test suite is dead...
+
+.. _10 min summary:
+
+Summary of Objects Created by DecL
+-------------------------------------
+
+Each of the objects created by :meth:`build` is automatically stored in the knowledge. We can list them out now.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^TenM:').iterrows():
+        pprint_ex(r.program, split=20)
 
 
 .. ipython:: python

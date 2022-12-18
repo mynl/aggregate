@@ -1,13 +1,27 @@
 Multivariate Methods
 =======================
 
-**Objectives:**
+**Objectives:** Multivariate distributions from shared mixing variables; 2 dimensional FFT techniques.
 
 **Audience:**
 
-**Prerequisites:**
+**Prerequisites:** DecL, general use of ``aggregate``, probability.
 
 **See also:**
+
+Contents
+-----------
+
+* :ref:`Helpful References`
+* :ref:`strat margin alloc`
+
+Helpful References
+--------------------
+
+* PIR chapter 14, 15.
+
+.. _strat margin alloc:
+
 
 Two Shortcomings
 -------------------

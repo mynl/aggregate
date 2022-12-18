@@ -11,7 +11,7 @@ from scipy.sparse import coo_matrix
 
 # from aggregate.utilities import FigureManager
 from . import Portfolio, Aggregate, Distortion, Underwriter, FigureManager
-
+from . constants import *
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,8 @@ class Bounds(object):
     # from common_scripts.cs
 
     def __init__(self, distribution_spec):
-        assert isinstance(distribution_spec, (pd.Series, pd.DataFrame, Portfolio, Aggregate))
+        assert isinstance(distribution_spec, (pd.Series,
+                          pd.DataFrame, Portfolio, Aggregate))
         self.distribution_spec = distribution_spec
         # although passed as input to certain functions (tvar with bounds) b is actually fixed
         self.b = 0
@@ -73,7 +74,8 @@ class Bounds(object):
     @property
     def tvar_df(self):
         if self._tvar_df is None:
-            self._tvar_df = pd.DataFrame({'p': self.tps, 'tvar': self.tvars}).set_index('p')
+            self._tvar_df = pd.DataFrame(
+                {'p': self.tps, 'tvar': self.tvars}).set_index('p')
         return self._tvar_df
 
     @property
@@ -109,13 +111,15 @@ class Bounds(object):
                 ag = getattr(self.distribution_spec, line)
                 self.tvar_function = ag.tvar
                 self.Fb = ag.cdf(b)
-            if np.isinf(b): self.Fb = 1.0
+            if np.isinf(b):
+                self.Fb = 1.0
             return
 
         elif isinstance(self.distribution_spec, Aggregate):
             self.tvar_function = self.distribution_spec.tvar
             self.Fb = self.distribution_spec.cdf(b)
-            if np.isinf(b): self.Fb = 1.0
+            if np.isinf(b):
+                self.Fb = 1.0
             return
 
         elif isinstance(self.distribution_spec, pd.DataFrame):
@@ -135,17 +139,20 @@ class Bounds(object):
         else:
             self.Fb = F[b]
 
-        S = p_total.shift(-1, fill_value=min(p_total.iloc[-1], max(0, 1. - (p_total.sum()))))[::-1].cumsum()[::-1]
+        S = p_total.shift(-1, fill_value=min(p_total.iloc[-1], max(
+            0, 1. - (p_total.sum()))))[::-1].cumsum()[::-1]
         lev = S.shift(1, fill_value=0).cumsum() * bs
         ex1 = lev.iloc[-1]
         ex = np.sum(p_total * p_total.index)
-        logger.info(f'Computed mean loss for {line} = {ex:,.15f} (diff {ex - ex1:,.15f}) max F = {max(F)}')
+        logger.info(
+            f'Computed mean loss for {line} = {ex:,.15f} (diff {ex - ex1:,.15f}) max F = {max(F)}')
         exgta = (ex - lev) / S + S.index
         sup = (p_total[::-1] > 0).idxmax()
         if sup == p_total.index[-1]:
             sup = np.inf
         exgta[S == 0] = sup
-        logger.info(f'sup={sup}, max = {(p_total[::-1] > 0).idxmax()} "inf" = {p_total.index[-1]}')
+        logger.info(
+            f'sup={sup}, max = {(p_total[::-1] > 0).idxmax()} "inf" = {p_total.index[-1]}')
 
         def _tvar(p, kind='interp'):
             """
@@ -234,10 +241,13 @@ class Bounds(object):
                 # subtract S(a)(TVaR(F(a)) - a)
                 # do all at once here - do not call self.tvar_with_bounds function
                 self.tvars = np.where(self.tps <= self.Fb,
-                                      self.tvars - (1 - self.Fb) * (self.tvar_function(self.Fb) - b) / (1 - self.tps),
+                                      self.tvars -
+                                      (1 - self.Fb) * (self.tvar_function(self.Fb) -
+                                                       b) / (1 - self.tps),
                                       b)
         elif kind == 'tail':
-            self.tvars = np.array([self.tvar_with_bound(i, b, kind) for i in self.tps])
+            self.tvars = np.array(
+                [self.tvar_with_bound(i, b, kind) for i in self.tps])
 
     def p_star(self, line, premium, b=np.inf, kind='interp'):
         """
@@ -261,7 +271,8 @@ class Bounds(object):
         """
         assert kind in ('interp', 'tail')
         if premium > b:
-            raise ValueError(f'p_star must have premium ({premium}) <= largest loss bound ({b})')
+            raise ValueError(
+                f'p_star must have premium ({premium}) <= largest loss bound ({b})')
 
         if kind == 'interp':
 
@@ -294,7 +305,8 @@ class Bounds(object):
                         p = (1 + p) / 2
 
                 if iters == 20:
-                    logger.warning(f'Questionable convergence solving for p_star, last error {fp}.')
+                    logger.warning(
+                        f'Questionable convergence solving for p_star, last error {fp}.')
                 p_star = p
 
         elif kind == 'tail':
@@ -318,7 +330,8 @@ class Bounds(object):
                     p = (1 + p) / 2
 
             if iters == 20:
-                logger.warning(f'Questionable convergence solving for p_star, last error {fp}.')
+                logger.warning(
+                    f'Questionable convergence solving for p_star, last error {fp}.')
             p_star = p
 
         return p_star
@@ -343,7 +356,8 @@ class Bounds(object):
             tvar = self.tvar_function(p)
             if not np.isinf(b):
                 if p < self.Fb:
-                    tvar = tvar - (1 - self.Fb) * (self.tvar_function(self.Fb) - b) / (1 - p)
+                    tvar = tvar - (1 - self.Fb) * \
+                        (self.tvar_function(self.Fb) - b) / (1 - p)
                 else:
                     tvar = b
         elif kind == 'tail':
@@ -351,7 +365,9 @@ class Bounds(object):
             tvar = self.distribution_spec.tvar(p, 'tail')
             if not np.isinf(b):
                 if p < self.Fb:
-                    tvar = tvar - (1 - self.Fb) * (self.distribution_spec.tvar(self.Fb, 'tail') - b) / (1 - p)
+                    tvar = tvar - \
+                        (1 - self.Fb) * \
+                        (self.distribution_spec.tvar(self.Fb, 'tail') - b) / (1 - p)
                 else:
                     tvar = b
         return tvar
@@ -445,7 +461,8 @@ class Bounds(object):
         :return:
         """
 
-        self.hinges = coo_matrix(np.minimum(1.0, s.reshape(1, len(s)) / (1.0 - self.tps.reshape(len(self.tps), 1))))
+        self.hinges = coo_matrix(np.minimum(1.0, s.reshape(
+            1, len(s)) / (1.0 - self.tps.reshape(len(self.tps), 1))))
 
     def tvar_cloud(self, line, premium, a, n_tps, s, kind='interp'):
         """
@@ -477,9 +494,11 @@ class Bounds(object):
                         shape=(len(self.weight_df), len(self.tps)))
         m = ml + mr
 
-        logger.info(f'm shape = {m.shape}, hinges shape = {self.hinges.shape}, types {type(m)}, {type(self.hinges)}')
+        logger.info(
+            f'm shape = {m.shape}, hinges shape = {self.hinges.shape}, types {type(m)}, {type(self.hinges)}')
 
-        self.cloud_df = pd.DataFrame((m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
+        self.cloud_df = pd.DataFrame(
+            (m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
         self.cloud_df.index.name = 's'
 
     def cloud_view(self, axs, n_resamples, scale='linear', alpha=0.05, pricing=True, distortions=None,
@@ -505,36 +524,45 @@ class Bounds(object):
         assert scale in ['linear', 'return']
         assert not distortions or (len(axs.flat) > 1)
         bit = None
-        if check: n_resamples = min(n_resamples, 5)
+        if check:
+            n_resamples = min(n_resamples, 5)
         norm = mpl.colors.Normalize(0, 1)
         cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
         mapper = cm.get_cmap()
         s = np.linspace(0, 1, 1001)
 
         def plot_max_min(ax):
-            ax.fill_between(self.cloud_df.index, self.cloud_df.min(1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-            self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=1, ls='-', c='k')
-            self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=1, ls='-', c='k')
+            ax.fill_between(self.cloud_df.index, self.cloud_df.min(
+                1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
+            self.cloud_df.min(1).plot(
+                ax=ax, label='_nolegend_', lw=1, ls='-', c='k')
+            self.cloud_df.max(1).plot(
+                ax=ax, label="_nolegend_", lw=1, ls='-', c='k')
 
         logger.info('starting cloudview...')
         if scale == 'linear':
             ax = axs[0]
             if n_resamples > 0:
                 if pricing:
-                    bit = self.weight_df.xs(0, drop_level=False).sample(n=n_resamples, replace=True).reset_index()
+                    bit = self.weight_df.xs(0, drop_level=False).sample(
+                        n=n_resamples, replace=True).reset_index()
                 else:
-                    bit = self.weight_df.sample(n=n_resamples, replace=True).reset_index()
+                    bit = self.weight_df.sample(
+                        n=n_resamples, replace=True).reset_index()
                 logger.info('cloudview...done 1')
                 # display(bit)
                 for i in bit.index:
                     pl, pu, tl, tu, w = bit.loc[i]
-                    self.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w), alpha=alpha, label=None)
+                    self.cloud_df[(pl, pu)].plot(
+                        ax=ax, lw=1, c=mapper(w), alpha=alpha, label=None)
                     if check:
                         # put in actual for each sample
                         d = Distortion('wtdtvar', w, df=[pl, pu])
                         gs = d.g(s)
-                        ax.plot(s, gs, c=mapper(w), lw=2, ls='--', alpha=.5, label=f'ma ({pl:.3f}, {pu:.3f}) ')
-                ax.get_figure().colorbar(cm, ax=ax, shrink=.5, aspect=16, label='Weight to Higher Threshold')
+                        ax.plot(s, gs, c=mapper(w), lw=2, ls='--',
+                                alpha=.5, label=f'ma ({pl:.3f}, {pu:.3f}) ')
+                ax.get_figure().colorbar(cm, ax=ax, shrink=.5, aspect=16,
+                                         label='Weight to Higher Threshold')
             else:
                 logger.info('cloudview: no resamples, skipping 1')
             logger.info('cloudview: start max/min')
@@ -552,12 +580,14 @@ class Bounds(object):
             if distortions == 'space':
                 ax = axs[1]
                 plot_max_min(ax)
-                ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-', label='_nolegend_')
+                ax.plot([0, 1], [0, 1], c='k', lw=.25,
+                        ls='-', label='_nolegend_')
                 ax.legend(loc='lower right', ncol=3, fontsize='large')
                 ax.set(xlim=lim, ylim=lim, aspect='equal')
             elif type(distortions) == list:
                 logger.info('cloudview: start 4 adding distortions')
-                name_mapper = {'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
+                name_mapper = {
+                    'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
                 lss = list(mpl.lines.lineStyles.keys())
                 for ax, dist_dict in zip(axs[1:], distortions):
                     ii = 1
@@ -567,7 +597,8 @@ class Bounds(object):
                         ax.plot(s, gs, lw=1, ls=lss[ii], label=k)
                         ii += 1
                     plot_max_min(ax)
-                    ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-', label='_nolegend_')
+                    ax.plot([0, 1], [0, 1], c='k', lw=.25,
+                            ls='-', label='_nolegend_')
                     ax.legend(loc='lower right', ncol=3, fontsize='large')
                     ax.set(xlim=lim, ylim=lim, aspect='equal')
             else:
@@ -595,7 +626,8 @@ class Bounds(object):
 
     def weight_image(self, ax, levels=20, colorbar=True):
         bit = self.weight_df.weight.unstack()
-        img = ax.contourf(bit.columns, bit.index, bit, cmap='viridis_r', levels=levels)
+        img = ax.contourf(bit.columns, bit.index, bit,
+                          cmap='viridis_r', levels=levels)
         ax.set(xlabel='p1', ylabel='p0', title='Weight for p1', aspect='equal')
         if colorbar:
             ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='Weight to p_upper')
@@ -620,9 +652,10 @@ class Bounds(object):
             bs = df.index[1]
         else:
             raise NotImplemented('Must input Aggregate, Portfolio, or DataFrame, '
-                            f'not type {type(self.distribution_spec)}')
+                                 f'not type {type(self.distribution_spec)}')
 
-        temp = distortion.g(df.p_total.shift(-1, fill_value=0)[::-1].cumsum())[::-1]
+        temp = distortion.g(
+            df.p_total.shift(-1, fill_value=0)[::-1].cumsum())[::-1]
 
         if isinstance(temp, np.ndarray):
             # not all g functions return Series (you can't guarantee it is called on something with an index)
@@ -694,20 +727,23 @@ class Bounds(object):
         self.lprs = lprs
 
         lpip = linprog(c, A_eq=A, b_eq=b_eq, method='interior-point')
-        logger.info(f'Interior point solved...\nSum of added variables={np.sum(lpip.x[n:])}')
+        logger.info(
+            f'Interior point solved...\nSum of added variables={np.sum(lpip.x[n:])}')
         self.lpip = lpip
 
         print(lprs.x, lpip.x)
 
         # consolidate answers
-        self.pedw_df = pd.DataFrame({'w_mp': mp, 'w_rs': lprs.x[:n], 'w_ip': lpip.x[:n]}, index=idx)
+        self.pedw_df = pd.DataFrame(
+            {'w_mp': mp, 'w_rs': lprs.x[:n], 'w_ip': lpip.x[:n]}, index=idx)
         self.pedw_df['w_upper'] = self.weight_df.weight
 
         # diagnostics
         for c in self.pedw_df.columns[:-1]:
             answer = self.pedw_df[c].values
             ganswer = answer[answer > 1e-16]
-            logger.info(f'Method {c}\tMinimum parameter {np.min(answer)}\tNumber non-zero {len(ganswer)}')
+            logger.info(
+                f'Method {c}\tMinimum parameter {np.min(answer)}\tNumber non-zero {len(ganswer)}')
 
         return gs
 
@@ -849,7 +885,7 @@ def similar_risks_example():
     p_star = bounds.p_star('total', prem, kind='interp')
 
     smfig = FigureManager(cycle='c', color_mode='color', font_size=10, legend_font='small',
-                          default_figsize=(5, 3.5))
+                          default_figsize=(FIG_W, FIG_H))
 
     f, axs = smfig(1, 3, (18.0, 6.0), )
     ax0, ax1, ax2 = axs.flat
@@ -875,7 +911,7 @@ def similar_risks_example():
         #
         # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts=3 fixed
         # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts[.375 .375 .25] fixed
-    
+
     '''
     p_new = uw.write(program)
     p_new.update(11, 1 / 1024, remove_fuzz=True)
@@ -898,7 +934,8 @@ def plot_max_min(self, ax):
     """
     Extracted from bounds, self=Bounds object
     """
-    ax.fill_between(self.cloud_df.index, self.cloud_df.min(1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
+    ax.fill_between(self.cloud_df.index, self.cloud_df.min(
+        1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
     self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='w')
     self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=0.5, ls='-', c='w')
 
@@ -910,5 +947,5 @@ def plot_lee(port, ax, c, lw=2):
     p_ = np.linspace(0, 1, 1001)
     qs = [port.q(p) for p in p_]
     ax.step(p_, qs, lw=lw, c=c)
-    ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, max(qs) + .05], title=f'Lee Diagram {port.name}', aspect='equal')
-
+    ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, max(qs) + .05],
+           title=f'Lee Diagram {port.name}', aspect='equal')

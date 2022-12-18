@@ -3,6 +3,15 @@
 Adjusting Layer Loss Picks
 ===========================
 
+**Objectives:** Describe how to adjust severity distributions to achieve selected loss picks by layer in an excess of loss reinsurance or layered insurance program.
+
+**Audience:** Reinsurance and large account actuaries.
+
+**Prerequisites:** DecL, general use of ``aggregate``, probability.
+
+**See also:**
+
+
 Reinsurance actuaries apply experience and exposure rating to excess of
 loss programs. Experience rating trends and develops layer losses to
 estimate loss costs. Exposure rating starts with a (ground-up) severity
@@ -74,7 +83,7 @@ These quantities are illustrated in the next figure.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import adjusting_layer_losses
+    from aggregate.extensions.figures import adjusting_layer_losses
     @savefig picks.png
     adjusting_layer_losses();
 

@@ -66,6 +66,8 @@ import warnings
 
 from IPython.display import HTML, display
 
+from .. constants import *
+
 # general set up
 pd.set_option("display.float_format", EngFormatter(3, True))
 pd.set_option('display.max_rows', 500)
@@ -240,8 +242,8 @@ class CaseStudy(object):
         self.padding = 1
 
         # graphics defaults
-        self.fw = 3.5 * 1.333
-        self.fh = 3.5
+        self.fw = FIG_W
+        self.fh = FIG_H
         color_mode = 'color'
         cycle_mode = 'c'
         self.smfig = FigureManager(cycle=cycle_mode, color_mode=color_mode, font_size=10, legend_font='small',

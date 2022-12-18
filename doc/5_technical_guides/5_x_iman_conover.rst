@@ -2,13 +2,31 @@
 The Iman-Conover Method
 =======================
 
-**Objectives:**
+**Objectives:** Describe the Iman-Conover algorithm for inducing correlation in a sample.
 
 **Audience:**
 
-**Prerequisites:**
+**Prerequisites:** Probability, measures of association, multivariate distributions, matrix algebra.
 
 **See also:**
+
+Contents
+-----------
+
+* :ref:`Helpful References`
+* :ref:`Basic Idea`
+* :ref:`Theoretical Derivation`
+* :ref:`Algorithm`
+* :ref:`ic simple example`
+* :ref:`ic extensions`
+* :ref:`ic normal copula`
+
+Helpful References
+--------------------
+
+* PIR chapter 14, 15.
+* SM WC paper.
+
 
 Basic Idea
 ------------
@@ -235,7 +253,7 @@ is a permutation of the corresponding column of the input matrix
 :math:`\mathsf{X}`. The rank correlation matrix of :math:`\mathsf{Y}` is identical to
 that of a multivariate distribution with correlation matrix :math:`\mathsf{S}`.
 
-.. _egs:
+.. _ic simple example:
 
 Simple Example of Iman-Conover
 ------------------------------
@@ -451,7 +469,7 @@ sized samples the IC method typically produces a very close
 approximation to the required correlation matrix, especially when the
 marginal distributions are reasonably symmetric.
 
-.. _icExt:
+.. _ic extensions:
 
 Extensions of Iman-Conover
 --------------------------
@@ -653,7 +671,7 @@ distribution for each row and multiply each component by the resulting
 number, resulting in an adjusted :math:`\mathsf{T}` matrix. Then complete steps
 11 and 12 of the detailed algorithm.
 
-.. _normalCopula:
+.. _ic normal copula:
 
 Comparison With the Normal Copula Method
 ----------------------------------------

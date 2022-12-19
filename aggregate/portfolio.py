@@ -383,17 +383,16 @@ class Portfolio(object):
         df.index.name = 'X'
 
         if self.audit_df is not None:
-            esev_m = np.nan # self.audit_df.loc['total', 'emp_sev_1']
-            esev_cv = np.nan # self.audit_df.loc['total', 'emp_sev_cv']
-            ea_m = self.audit_df.loc['total', 'EmpEX1']
-            ea_cv = self.audit_df.loc['total', 'EmpCV']
-            df.loc['Sev', 'Est E[X]'] = esev_m
-            df.loc['Agg', 'Est E[X]'] = ea_m
+            df.loc['Sev', 'Est E[X]'] = np.nan
+            df.loc['Agg', 'Est E[X]'] = self.est_m
             df['Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
-            df.loc['Sev', 'Est CV(X)'] = esev_cv
-            df.loc['Agg', 'Est CV(X)'] = ea_cv
+            df.loc['Sev', 'Est CV(X)'] = np.nan
+            df.loc['Agg', 'Est CV(X)'] = self.est_cv
             df['Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)']]
+            df.loc['Sev', 'Est Skew(X)'] = np.nan
+            df.loc['Agg', 'Est Skew(X)'] = self.est_skew
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)',
+                     'Est Skew(X)']]
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
@@ -1039,7 +1038,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
-               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, debug=False):
+               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, approximation=None, debug=False):
         """
 
         TODO: currently debug doesn't do anything...
@@ -1075,8 +1074,14 @@ class Portfolio(object):
             epd info
         :param force_severity: force computation of severities for aggregate components even when approximating
         :param recommend_p: percentile to use for bucket recommendation.
+        :param approximation: if not None, use these instructions ('exact')
+        :param debug: if True, print debug information
         :return:
         """
+
+        if approximation is not None:
+            if approximation == 'exact':
+                approx_freq_ge = 1e9
 
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
@@ -2713,6 +2718,21 @@ class Portfolio(object):
         self.dists = dists
         return ans
 
+    @property
+    def distortion_df(self):
+        """
+        Nicely formatted version of self.dist_ans (that exhibited several bad choices!).
+
+        ROE returned as COC in modern parlance.
+        """
+        if self.dist_ans is None:
+            return None
+
+        df = self.dist_ans.iloc[:, [0,4,5,6,7,8,9,10]].copy()
+        df.index.names = ['a', 'LR', 'method']
+        df.columns = ['S', 'EL', 'P', 'PQ', 'Q', 'COC', 'param', 'error']
+        return df
+
     def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1, efficient=False):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
@@ -3252,7 +3272,7 @@ class Portfolio(object):
         if plots:
             if 'basic' in plots:
                 f_distortion, ax = plt.subplots(1, 1, figsize=(4, 4))
-                ax.plot(df.exag_sumparts, label='Sum of Parts')
+                ax.plot(df.filter(regex='^exag_[^η]').sum(axis=1), label='Sum of Parts')
                 ax.plot(df.exag_total, label='Total')
                 ax.plot(df.exa_total, label='Loss')
                 ax.legend()
@@ -3300,14 +3320,16 @@ class Portfolio(object):
                         ax.set_ylim(-0.025, 1.025)
 
                 ax = next(axiter)
-                df_plot.filter(regex='^exa_.*_pcttotal$').sort_index(axis=1).plot(ax=ax)
+                # _ = df_plot[[f'exa_{i}' for i in self.line_names]] / df.exa_total
+                # _.sort_index(axis=1).plot(ax=ax)
                 ax.set_title('Proportion of loss: T.L_line / T.L_total')
                 ax.set_ylim(0, 1.05)
                 ax.legend(loc='upper left')
                 ax.grid()
 
                 ax = next(axiter)
-                df_plot.filter(regex='^exag_.*_pcttotal$').sort_index(axis=1).plot(ax=ax)
+                # _ = df_plot[[f'exag_{i}' for i in self.line_names]] / df.exag_total
+                # _.sort_index(axis=1).plot(ax=ax)
                 ax.set_title('Proportion of premium: T.P_line / T.P_total')
                 # ax.set_ylim(0, 1.05)
                 ax.legend(loc='upper left')

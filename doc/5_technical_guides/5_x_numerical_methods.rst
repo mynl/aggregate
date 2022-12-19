@@ -47,6 +47,19 @@ The downside is less flexibility. FFT-based methods cannot model the
 Flexibility can be improved using higher dimensional FFT methods, for example to track ceded and net positions simultaneously, but they soon run afoul of the limits of practical computation. See CAS WP ref for an example using 2-dimensional FFTs.
 
 
+Floats
+---------
+
+Floating point arithmetic is not associative.
+
+.. ipython:: python
+
+   x,y = 4.41 + (2.36 + 1.53), (4.41 + 2.36) + 1.53
+   x, y, x.as_integer_ratio(), y.as_integer_ratio()
+
+
+
+
 .. _num how agg reps a dist:
 
 How ``aggregate`` represents a distribution

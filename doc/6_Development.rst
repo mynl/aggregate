@@ -14,81 +14,48 @@ Help Structure
 
 The documentation is structured around application, access, implementation, and theory.
 
-* Application: destinations, where you can go with the code and problems you can solve.
+* **Application**: destinations, where you can go with the code and problems you can solve.
 
-    - User Guides problem sections
+    - :doc:`2_User_Guides`, problem sections
 
-* Access: operating manual, how you access the functions you need to solve your problems
+* **Access**: operating manual, how you access the functions you need to solve your problems
 
-    - User Guides problem sections
-    - API Reference (traditional documentation)
-    - DecL Reference
+    - :doc:`2_User_Guides`, problem sections
+    - :doc:`3_Reference`, traditional API reference documentation
+    - :doc:`4_dec_Language_Reference`
 
-* Implementation: how the functionality is coded; algorithms.
+* **Implementation**: how the functionality is coded; algorithms.
 
-    - Technical Guides
+    - :doc:`5_Technical_Guides`
 
-* Theory: underlying mathematics.
+* **Theory**:  the underlying mathematics.
 
-    - Technical Guides
+    - :doc:`5_Technical_Guides`
 
 
 Design Philosophy
 ====================
 
-* Work at the optimal big-O order, but don't worry about speed until it becomes a problem
+* Work at the correct speed order...
+* ...but don't worry about speed until it becomes a problem
 * Save everything until space becomes an issue
-* Sensible defaults for everything
-* Don't make formatting decisions for the user, use defaults
-* Offer dataframe styles and renamers for dataframes but do not apply automatically
+* Offer sensible defaults for (almost) everything
+* Separate internal naming from user naming and offer standard dataframe renamer dictionaries
 * Use sensible number formats
-
-
-Development Outline (TODOs)
-===============================
-
-Non Programming Enhancements
-----------------------------
-* Library of realistic severity curves by line and country
-* By line industry aggregate distributions in agg format from method of moments fits to historical data, per PIRC
-* Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing?
-* Jon Evans note and severity??
-* Jed note??
-
-Short Term
------------
-* Width of printed output
-* Understand output for collateral and priority!
-* Output Levy measure
-* Funky objects from JacodS? Simple jump examples
-
-Medium Term
-------------
-* recommend_bucket function when passed infinity?
-* More consistent and informative reports and plots (e.g. include severity match in agg)
-* Convex Hull distortion built from pricing
-* Delete items easily from the database
-* Save / load from non-YAML, persist the database; dict to Dec language converter? Get rid of YAML dependence
-* Using agg as a severity (how!)
-* Name as a member in dict vs list conniptions (put up with duplication?)
-
-Nice to Have Enhancements
--------------------------
-* How to model two reinstatements?
-
-
 
 History
 =========
 
-I have built several iterations of software to work with aggregate distributions, the first in 1997.
+I have built several iterations of software to work with aggregate distributions.
 
-*  A Matlab version for CNA Re with a graphical interface. Computed aggregates by business unit and the portfolio total. Used to discover the shocking fact there was only a 53 percent chance of achieving plan...which is obvious in hindsight but was a surprise at the time.
-*  A C++ version of the Matlab code called SADCo in 1997-99. This code sits behing [MALT](http://www.mynl.com/MALT/home.html).
-*  Another C++ version with an implementation of the Iman Conover method to combine aggregates with correlation using the (gasp) normal copula, [SCARE](http://www.mynl.com/wp/default.html)
-*  At Aon Re I worked on their simulation based tools called ALG (Aggregate Loss Generator) which simulated losses and Prime/Re which manipulated the simulations and applied various reinsurance structures. ALG used a shared mixing variables approach to correlation.
-*  At Aon Re I also built related tools
+* Late 1990s: a Matlab tool for CNA Re with a graphical interface. Computed aggregates by business unit and the portfolio total. Used to discover the shocking fact there was only a 53 percent chance of achieving plan...which is obvious in hindsight but was a surprise at the time.
+* Late 1990s: a C++ version of the Matlab code called SADCo in 1997-99. This code sits behind `MALT <http://www.mynl.com/old/MALT/home.html>`_. It won the CAS award for an online contribution.
+* Early 2000s: another C++ version with an implementation of the Iman-Conover method to combine aggregates with correlation using the (gasp) normal copula, `SCARE <http://www.mynl.com/old/wp/default.html>`_. Used by SCOR.
+* 2003-2005: I worked on Aon Re Services' simulation based tools called the ALG (Aggregate Loss Generator) which simulated losses, and Prime/Re which manipulated the simulations and applied various reinsurance structures. ALG used a shared mixing variables approach to correlation.
+* Late 2000s:  At Aon Re, I also built related tools
+
   -  The Levy measure maker
   -  A simple approach to multi-year modeling based on re-scaling a base year, convolving using FFTs and tracking (and stopping) in default scenarios
-*  At Aon Benfield I was involved with [ReMetric](http://www.aon.com/reinsurance/analytics-(1)/remetrica.jsp), a very sophisticated, general purpose DFA/ERM simulation tool,
+
+*  2010s: At Aon Benfield, I was involved with `ReMetrica <https://www.aon.com/reinsurance/remetrica/default.jsp>`_, a very sophisticated, general purpose DFA/ERM simulation tool.
 

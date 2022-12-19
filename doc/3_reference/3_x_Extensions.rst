@@ -31,12 +31,26 @@ Samples
    :undoc-members:
 
 
+Figures
+---------
+
+.. automodule:: aggregate.extensions.figures
+   :members:
+   :undoc-members:
+
+
+
+PIR Figures
+-------------
+
+.. automodule:: aggregate.extensions.pir_figures
+   :members:
+   :undoc-members:
+
+
 
 Test Suite
 -----------
-
-
-
 
 .. automodule:: aggregate.extensions.test_suite
    :members:

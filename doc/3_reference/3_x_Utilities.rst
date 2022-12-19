@@ -31,3 +31,11 @@ Utilities Module
    :undoc-members:
    :private-members:
 
+
+Constants
+----------
+
+.. automodule:: aggregate.constants
+   :members:
+   :undoc-members:
+   :private-members:

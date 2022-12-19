@@ -1067,7 +1067,7 @@ The :meth:`calibrate_distortions` method calibrates distortions to achieve reque
     :okwarning:
 
     p07.calibrate_distortions(Ps=[0.996], ROEs=[0.15], strict='ordered');
-    qd(p07.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    qd(p07.distortion_df)
     pprint(p07.dists)
 
 The answer is returned in the ``dist_ans`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.dists`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
@@ -1103,7 +1103,7 @@ First, the case of a thin-tailed and a thick-tailed line. Here, the thick tailed
     qd(p09)
     print(f'Asset P value {p09.cdf(12.5):.5g}')
     p09.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
-    qd(p09.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    qd(p09.distortion_df)
     p09.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10mins_twelve_p09.png scale=16
@@ -1255,7 +1255,7 @@ The second portfolio has been selected with two thick tailed units. A appears ri
                 , bs=1)
     qd(p10)
     p10.calibrate_distortions(ROEs=[0.15], Ps=[0.996], strict='ordered');
-    qd(p10.dist_ans.iloc[:, [0,4,5,6,-2,-1]])
+    qd(p10.distortion_df)
 
 Apply the dual distortion and then create the twelve plot.
 

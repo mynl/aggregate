@@ -8,6 +8,7 @@
 * scale all graph plots! what are standards?
 * constants module in agg?
 
+
 0. Add exposure / rate keywords for 10 exposure at 1200 rate ? Is that in docs?
 0. Uncertainty principle for bs: too small not enough space; too large miss features of sev; for given n there is a min possible error
 1.
@@ -29,6 +30,45 @@
 15. This fails:  s = build('sev LG loggamma 10 cv .5') and for Pareto
 16. dot in names fuck up things eg analyze_distortion (seems colon works)
 17. Update reins section for latest re object attributes
+
+
+
+Development Outline (TODOs) from Ch 6
+=========================================
+
+Non-Programming Enhancements
+----------------------------
+* Add a library of realistic severity curves by line and country
+* Add by-line industry aggregate distributions in DecL based on a method of moments fit to historical data
+
+Programming Enhancements
+-------------------------
+
+.. * Credit modeling: what is distortion implied by bond credit curve? By cat bond pricing?
+.. * Jon Evans note and severity??
+.. * Jed note??
+
+.. Short Term
+.. -----------
+.. * Width of printed output
+.. * Understand output for collateral and priority!
+.. * Output Levy measure
+.. * Funky objects from JacodS? Simple jump examples
+
+.. Medium Term
+.. ------------
+.. * recommend_bucket function when passed infinity?
+.. * More consistent and informative reports and plots (e.g. include severity match in agg)
+.. * Convex Hull distortion built from pricing
+.. * Delete items easily from the database
+.. * Save / load from non-YAML, persist the database; dict to Dec language converter? Get rid of YAML dependence
+.. * Using agg as a severity (how!)
+.. * Name as a member in dict vs list conniptions (put up with duplication?)
+
+.. Nice to Have Enhancements
+.. -------------------------
+.. * How to model two reinstatements?
+
 
 * Papers
     - Clark re -> re pricing

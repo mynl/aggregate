@@ -23,6 +23,7 @@ Contents
 * :ref:`Helpful references <re references>`
 * :ref:`Basic examples <re basic examples>`
 * :ref:`Modes of reinsurance analysis <re modes>`
+* :ref:`re functions`
 * :ref:`Casualty exposure rating <re casualty exposure>`
 * :ref:`Property exposure rating <re property exposure>`
 * :ref:`Variable features <re variable>`
@@ -182,6 +183,79 @@ Inwards reinsurance pricing is begins with an estimated loss pick, possibly supp
 2. The impact of treaty **variable features** that are derived from the full aggregate distribution of ceded losses and expenses---a showcase application.
 
 Outwards reinsurance is evaluated based on the loss pick and the impact of the cession on the distribution of retained losses. Ceded re and broker actuaries often want the full gross and net outcome distributions.
+
+.. _re functions:
+
+Reinsurance Functions
+-----------------------
+
+This section demonstrates :class:`Aggregate` methods and properties for reinsurance analysis. These are:
+
+* :meth:`reinsurance_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
+* :meth:`reinsurance_description` a text description of the layers and shares, by kind.
+* :meth:`reinsurance_occ_plot` plots subject (usually gross), ceded, and net severity, and aggregates created from each. Does not consider aggregate reinsurance.
+* ``reinsurance_audit_df`` dataframe summary by ceded, net, and subject, showing mean, CV, SD, and skewness of occurrence loss by layer and in total by kind.
+* ``reinsurance_occ_layer_df`` dataframe showing an expected loss layering analysis for occurrence reinsurance.
+* ``reinsurance_df`` dataframe showing all possible densities.
+* ``reinsurance_report_df`` dataframe showing mean, CV, skew, and SD statistics for each column in ``reinsurance_df``.
+
+
+These are illustrated using the next example that includes occurrence and aggregate reinsurance. Notice that the occurrence program just layers gross (subject) losses. Gross losses are then passed through to the aggregate program. This is done to illustrate the functions below. In a real-world application is is likely the bottom few occurrence layers would be dropped and you would pass the net of through to the aggregate.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build, qd
+
+    a = build('agg ReTester '
+              '10 claims '
+              '5000 xs 0 '
+              'sev lognorm 100 cv 5 '
+              'occurrence ceded to 250 xs 0 and 250 xs 250 and 500 xs 500 and 1000 xs 1000 and 3000 xs 2000 '
+              'poisson '
+              'aggregate ceded to 250 xs 750 and 1500 xs 1000 '
+             )
+    qd(a)
+    print(a.reinsurance_kinds())
+    print(a.reinsurance_description())
+
+Plot showing the impact of occurrence reinsurance on severity and aggregate losses, and the ceded severity and aggregate.
+
+.. ipython:: python
+    :okwarning:
+
+    @savefig reins_oa.png scale=20
+    a.reinsurance_occ_plot()
+
+The ``reinsurance_audit_df``.  All statistics show unconditional layer severity that "add-up" to the total layer severity; compare the total with the severity statistics in description above. These only match when the reinsurance layers exhaust the ground-up limit.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a.reinsurance_audit_df, sparsify=False)
+
+
+The ``reinsurance_occ_layer_df``. The blocks ``ex`` and ``cv`` show unconditional layer statistics (equal to values from  ``audit_df`` times expected claim counts); ``en`` shows claim counts by layer, ``severity`` shows the implied layer severity (equals expected loss from  ``audit_df`` divided by the probability of attaching the layer).
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a.reinsurance_occ_layer_df, sparsify=False)
+
+The ``reinsurance_df`` density dataframe showing subject, ceded, and net occurrence (severity); aggregates created from each (without aggregate reinsurance); and subject, ceded, and net of requested aggregate reinsurance.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a.reinsurance_df, max_rows=20)
+
+The ``reinsurance_report_df`` showing statistics for the densities in ``reinsurance_df``. The ``p_agg_gross`` column matches the theoretical (gross) output shown in ``qd(a)`` at the top and the ``p_agg_ceded`` column matches the estimated output because the aggregate program requested ``ceded to`` output. The net column is the difference.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a.reinsurance_report_df)
+
 
 
 .. _re casualty exposure:

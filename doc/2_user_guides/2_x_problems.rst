@@ -19,6 +19,7 @@ Published Problems and Examples
     problems/0x0_loss_data_analytics
     problems/0x0_loss_models
     problems/0x0_bahnemann
+    problems/0x0_enterprise_risk_analysis
 
 
 Other papers to review include :cite:t:`Hyndman1996` and :cite:t:`Denuit2019`.

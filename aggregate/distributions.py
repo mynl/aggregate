@@ -18,6 +18,7 @@ from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
+from textwrap import fill
 
 from .constants import *
 from .utilities import sln_fit, sgamma_fit, ft, ift, \
@@ -665,6 +666,7 @@ class Aggregate(Frequency):
                                                        index=['mean', 'cv', 'skew'])
             self._reinsurance_report_df.loc['sd'] = self._reinsurance_report_df.loc['cv'] * \
                                                     self._reinsurance_report_df.loc['mean']
+            self._reinsurance_report_df = self._reinsurance_report_df.iloc[[0, 1, 3, 2], :]
         return self._reinsurance_report_df
 
     def reinsurance_occ_plot(self, axs=None):
@@ -1711,11 +1713,12 @@ class Aggregate(Frequency):
         logger.info(f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
                     f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
 
-    def reinsurance_description(self, kind='both'):
+    def reinsurance_description(self, kind='both', width=70):
         """
         Text description of the reinsurance.
 
         :param kind: both, occ, or agg
+        :param width: width of text for textwrap.fill
         """
         ans = []
         if self.occ_reins is not None and kind in ['occ', 'both']:
@@ -1754,6 +1757,7 @@ class Aggregate(Frequency):
             reins = ' '.join(ans)
         else:
             reins = 'No reinsurance'
+        reins = fill(reins, width)
         return reins
 
     def reinsurance_kinds(self):

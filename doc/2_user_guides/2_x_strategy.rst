@@ -28,6 +28,6 @@ Helpful References
 Margin Allocation Using Spectral Risk Measures
 -------------------------------------------------------
 
-*Documentation to follow.*
+*Documentation to follow.* In the meantime, see examples in :doc:`2_x_case_studies`.
 
 

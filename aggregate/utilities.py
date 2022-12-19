@@ -2802,13 +2802,18 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
 
     return ans
 
-def qd(*argv, accuracy=3, align=True, trim=True):
+def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     """
     Endless quest for a robust display format!
 
     Quick display (qd) a list of objects.
     Dataframes handled in text with reasonable defaults.
     For use in documentation.
+
+    :param: argv: list of objects to print
+    :param: accuracy: number of decimal places to display
+    :param: align: if True, align columns at decimal point (sEngFormatter)
+    :kwargs: passed to pd.DataFrame.to_string for dataframes only. e.g., pass dict of formatters by column.
 
     """
     from .distributions import Aggregate
@@ -2818,19 +2823,25 @@ def qd(*argv, accuracy=3, align=True, trim=True):
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
             if 'Err CV(X)' in x.describe.columns:
-                qd(x.describe.drop(columns=['Err CV(X)']), accuracy=accuracy)
+                qd(x.describe.drop(columns=['Err CV(X)']), accuracy=accuracy, **kwargs)
             else:
                 # object not updated
-                qd(x.describe, accuracy=accuracy)
+                qd(x.describe, accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
             print(f'log2 = {x.log2}, bs = {bss}')
         elif isinstance(x, pd.DataFrame):
-            if x.shape[1] > 10:
-                # need denser format
-                # ff = sEngFormatter(accuracy=accuracy, min_prefix=0, max_prefix=12, align=False, trim=trim)
-                pass
-            with pd.option_context('display.width', 150, 'display.max_columns', 15, 'display.float_format', ff):
-                print(x.to_string())
+            # 100 line width matches rtd html format
+            args = {'line_width': 100,
+                    'max_cols': 35,
+                    'max_rows': 25,
+                    'float_format': ff,
+                    # needs to be larger for text output
+                    # 'max_colwidth': 10,
+                    'sparsify': True,
+                    'justify': None
+                    }
+            args.update(kwargs)
+            print(x.to_string(**args))
             # print(x.to_string(formatters={c: f for c in x.columns}))
         elif isinstance(x, int):
             print(x)

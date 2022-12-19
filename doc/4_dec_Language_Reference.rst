@@ -1,5 +1,5 @@
 ***********************************
-**Dec** Language (DecL) Reference
+**Dec** Language  Reference
 ***********************************
 
 .. To view the grammar using a railroad diagram paste the

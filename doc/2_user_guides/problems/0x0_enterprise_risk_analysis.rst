@@ -373,7 +373,7 @@ probabilities (high losses), whereas TVaR is fattest on the right.
     fig, axs = plt.subplots(1, 5, figsize=(10.0, 2.1), constrained_layout=True)
     for ax, (k, v) in zip(axs.flat, abcd.dists.items()):
         v.plot(ax=ax)
-    @subplots gc_dist.png
+    @savefig gc_dist.png
     fig.suptitle('Comparison of distortion functions giving current market premium in total')
 
 Analyze Implied Pricing

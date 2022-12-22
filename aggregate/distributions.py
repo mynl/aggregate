@@ -21,11 +21,11 @@ from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import *
-from .utilities import sln_fit, sgamma_fit, ft, ift, \
+from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint_ex, approximate_work, moms_analytic, picks_work, GCN
+    pprint_ex, approximate_work, moms_analytic, picks_work
 
 from .spectral import Distortion
 
@@ -1104,10 +1104,10 @@ class Aggregate(Frequency):
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
         # severity exact moments
-        self.agg_sev_m, self.agg_sev_cv, self.agg_sev_skew = self.statistics_total_df.loc['mixed',
+        self.sev_m, self.sev_cv, self.sev_skew = self.statistics_total_df.loc['mixed',
                                                                                           ['sev_m', 'sev_cv', 'sev_skew']]
-        self.agg_sev_sd = self.agg_sev_m * self.agg_sev_cv
-        self.agg_sev_var = self.agg_sev_sd * self.agg_sev_sd
+        self.sev_sd = self.sev_m * self.sev_cv
+        self.sev_var = self.sev_sd * self.sev_sd
 
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
@@ -1421,16 +1421,29 @@ class Aggregate(Frequency):
         else:
             # regardless of request if skew == 0 have to use normal
             # must check there is no per occ reinsurance... it won't work
-            assert self.occ_reins is None
+            if self.occ_reins is not None:
+                raise ValueError('Per occ reinsurance not supported with approximation')
+            if not np.isfinite(self.agg_cv):
+                raise ValueError('Cannot fit a distribution with infinite second moment.')
+            if self.agg_skew < 0:
+                logger.warning('Negative skewness, ignoring and fitting unshifted distribution.')
 
             if self.agg_skew == 0:
                 self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)
             elif approximation == 'slognorm':
-                shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
-                self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+                if np.isfinite(self.agg_skew) and self.agg_skew > 0:
+                    shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
+                    self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+                else:
+                    mu, sigma = ln_fit(self.agg_m, self.agg_cv)
+                    self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu))
             elif approximation == 'sgamma':
-                shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
-                self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
+                if np.isfinite(self.agg_skew) and self.agg_skew > 0:
+                    shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
+                    self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
+                else:
+                    alpha, theta = gamma_fit(self.agg_m, self.agg_cv)
+                    self.fzapprox = ss.gamma(alpha, scale=theta)
             else:
                 raise ValueError(f'Invalid approximation {approximation} option passed to CAgg density. '
                                  'Allowable options are: exact | slogorm | sgamma')

@@ -134,7 +134,7 @@ Important: Formatting a DecL Program
 
     **All DecL programs are one line long.**
 
-It is best to break DecL up to make it more readable. The fact that Python automatically concatenates strings between parenthesis makes this easy. The program above is always entered in the help as::
+It is best to break a DecL program up to make it more readable. The fact that Python automatically concatenates strings between parenthesis makes this easy. The program above is always entered in the help as::
 
     a01 = build('agg TenM:01 '
                 '100 claims '
@@ -898,12 +898,14 @@ Statistical Functions
 
 * ``agg_m``, ``agg_cv``, ``agg_sd``, ``agg_var`` (variance), and ``agg_skew``
 
-and prefixed ``emp`` are based on the estimated numerical statistics:
+and prefixed ``est`` are based on the estimated numerical statistics:
 
-* ``emp_m``, ``emp_cv``, ``emp_sd``, ``emp_var``, and ``emp_skew``.
+* ``est_m``, ``est_cv``, ``est_sd``, ``est_var``, and ``est_skew``.
 
-In addition, :class:`Aggregate` has similar series prefixed ``agg_sev`` and ``emp_sev`` for the severity.
-These attributes are just conveniences; they are all available in (or derivable from) ``report_df``.
+In addition, :class:`Aggregate` has similar series prefixed ``sev`` and
+``est_sev`` for the exact and estimated numerical severity. These attributes
+are just conveniences; they are all available in (or derivable from)
+``report_df``.
 
 :class:`Aggregate` and :class:`Portfolio` objects act like ``scipy.stats`` (continuous) frozen random variable objects and include the following statistical functions.
 

@@ -13,6 +13,7 @@ The Dec Language
 
 **Notation:** ``<item>`` denotes an optional term.
 
+See the note :ref:`10 mins formatting` for important information about how DecL programs are formatted and laid out in the help.
 
 .. toctree::
     :maxdepth: 4

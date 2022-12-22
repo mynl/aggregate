@@ -917,7 +917,14 @@ class Aggregate(Frequency):
         self.est_m = 0
         self.est_cv = 0
         self.est_sd = 0
+        self.est_var = 0
         self.est_skew = 0
+        self.est_sev_m = 0
+        self.est_sev_cv = 0
+        self.est_sev_sd = 0
+        self.est_sev_var = 0
+        self.est_sev_skew = 0
+
         self.note = note
         self.program = ''  # can be set externally
         self.en = None     # this is for a sublayer e.g. for limit profile
@@ -1096,6 +1103,12 @@ class Aggregate(Frequency):
         # variance and sd come up in exam questions
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
+        # severity exact moments
+        self.agg_sev_m, self.agg_sev_cv, self.agg_sev_skew = self.statistics_total_df.loc['mixed',
+                                                                                          ['sev_m', 'sev_cv', 'sev_skew']]
+        self.agg_sev_sd = self.agg_sev_m * self.agg_sev_cv
+        self.agg_sev_var = self.agg_sev_sd * self.agg_sev_sd
+
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
         self._middle_q = None
@@ -1351,6 +1364,8 @@ class Aggregate(Frequency):
         # make the severity vector: a claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
             wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
+            if self.en.sum() == 0:
+                self.en = self.statistics_df.freq_1.values
             self.sev_density = np.zeros_like(xs)
             beds = self.discretize(sev_calc, discretization_calc, normalize)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
@@ -1376,7 +1391,7 @@ class Aggregate(Frequency):
 
         if approximation == 'exact':
             if self.n > 100:
-                logger.warning(f'Claim count {self.n} is high; consider an approximation ')
+                logger.info(f'Claim count {self.n} is high; consider an approximation ')
 
             if self.n == 0:
                 # for dynamics, it is helpful to have a zero risk return zero appropriately
@@ -1434,7 +1449,7 @@ class Aggregate(Frequency):
         self.audit_df = pd.concat((self.statistics_df[cols],
                                    self.statistics_total_df.loc[['mixed'], cols]),
                                   axis=0)
-        # add empirical stats
+        # add empirical sev stats
         if self.sev_density is not None:
             _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.sev_density)
         else:
@@ -1444,14 +1459,19 @@ class Aggregate(Frequency):
         self.audit_df.loc['mixed', 'emp_sev_1'] = _m
         self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
         self.audit_df.loc['mixed', 'emp_sev_skew'] = _sk
+        self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _m, _cv, _sk
+        self.est_sev_sd = self.est_sev_m * self.est_sev_cv
+        self.est_sev_var = self.est_sev_sd * self.est_sev_sd
+        # add empirical agg stats
         _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.agg_density)
         self.audit_df.loc['mixed', 'emp_agg_1'] = _m
+        self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
+        self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
         self.est_m = _m
         self.est_cv = _cv
         self.est_sd = _m * _cv
+        self.est_var = self.est_sd ** 2
         self.est_skew = _sk
-        self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
-        self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
 
         # invalidate stored functions
         self._cdf = None
@@ -1661,6 +1681,14 @@ class Aggregate(Frequency):
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
 
+        # see impact on severity moments
+        _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.sev_density)
+        self.est_sev_m = _m2
+        self.est_sev_cv = _cv2
+        self.est_sev_sd = _m2 * _cv2
+        self.est_sev_var = self.est_sev_sd ** 2
+        self.est_sev_skew = _sk2
+
     def apply_agg_reins(self, debug=False, padding=1, tilt_vector=None):
         """
         Apply the entire agg reins structure and save output
@@ -1706,6 +1734,7 @@ class Aggregate(Frequency):
         self.est_m = _m2
         self.est_cv = _cv2
         self.est_sd = _m2 * _cv2
+        self.est_var = self.est_sd ** 2
         self.est_skew = _sk2
         # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
         # invalidate quantile function

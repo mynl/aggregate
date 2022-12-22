@@ -19,7 +19,7 @@ syntax is best illustrated with some examples.
     occurrence net of 750 xs 250
     poisson
 
-specifies the distribution of losses to the net position on the Trucking policy after a per occurrence cession of the 750 xs 250 layer. This net position could also be written without reinsurance as::
+specifies the distribution of losses to the net position on the Trucking policy after a per occurrence cession of the 750 xs 250 layer. This net position can also be written using limits and attachments rather than reinsurance::
 
     agg Trucking
     ?? loss

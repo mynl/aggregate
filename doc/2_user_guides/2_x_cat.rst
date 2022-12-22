@@ -27,6 +27,7 @@ Helpful References
 
 * Jewson
 * Mitchell Wallace cat modeling book.
+* :cite:t:`Anderson1988`
 
 .. _cat jewsons pml estimates:
 

@@ -8,12 +8,11 @@ Vectorization: Limit Profiles and Mixed Severity
 Using Limit Profile with Mixed Severity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Limit profiles (:doc:`060_mixed_severity`) and severity mixtures
-(:doc:`065_limit_profiles`) can be combined. Each mixed severity is applied
+Limit profiles (:doc:`065_limit_profiles`) and severity mixtures
+(:doc:`060_mixed_severity`) can be combined. Each mixed severity is applied
 to each limit profile component. For example, three limit bands and a
 severity with two mixture components creates an aggregate with six severity
-sub-components.
-The ``report_df`` dataframe shows the components.
+sub-components. The ``report_df`` dataframe shows the components.
 
 .. ipython:: python
     :okwarning:
@@ -57,9 +56,16 @@ The ``report_df`` shows all 20 components: 4 limits x 5 mixture components.
 Circumventing Products: Modeling Multiple Units in One Aggregate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-It is sometimes undesirable to take the product of every limit with every
-severity mixture component. There are two cases where we actually want to
-enter a series of limits each with their own severity.
+
+If the weights sum to one then the result is an exposure / severity outer
+product, treated as a mixed severity. If the weights are missing or
+sum to the number of severity components (e.g. are all equal to 1) then the
+result is an item by item combination, circumventing the outer product.
+
+It is sometimes desirable circumventing the outer product rather than taking
+the product of every limit with every severity mixture component. There are
+two cases where we actually want to enter a series of limits each with their
+own severity.
 
 #. Two or more units each with a different severity but with a shared mixing
    variable. For example, to model two units with expected losses 100 and
@@ -85,10 +91,6 @@ enter a series of limits each with their own severity.
       sev lognorm [50 100 150] cv [0.1 0.15 0.2]
       poisson
 
-If the weights sum to one then the result is an exposure / severity outer
-product, treated as a mixed severity. If the weights are missing or
-sum to the number of severity components (e.g. are all equal to 1) then the
-result is an item by item combination, circumvented the outer product.
 
 
 **Example.** The next two examples illustrate the different behavior. First,

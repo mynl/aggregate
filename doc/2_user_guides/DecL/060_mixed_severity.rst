@@ -18,6 +18,20 @@ as ``wts=5``, or the relevant number of components (note equals sign). A missing
 interpreted as giving each severity weight 1 which results in five times the
 total loss. Commas in the lists are optional.
 
+.. warning::
+
+    Weights are applied to exposure, and their meaning depends on how exposure
+    is entered.
+
+If exposure is given by claim count, then the weights apply to claim count.
+This gives the usual mixture of severity curves. However, if exposure is
+entered as loss or premium times a loss ratio, then the weights give the
+proportion of expected loss, not the claim count. **Make sure the weights are
+appropriate to the way exposure is expressed**. For example, if the mixture
+is used to split small and large claims, then an 80/20 split small/large claim
+counts may well correspond to a 20/80 split of expected losses (Pareto rule
+of thumb).
+
 **Example.**
 
 .. ipython:: python

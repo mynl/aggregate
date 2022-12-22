@@ -52,8 +52,6 @@ Helpful References
 
 * Property rating: :cite:t:`Bernegger1997`, :cite:t:`Ludwig1991`
 
-* :cite:t:`Anderson1988` move to cat file.
-
 .. _re basic examples:
 
 Basic Examples

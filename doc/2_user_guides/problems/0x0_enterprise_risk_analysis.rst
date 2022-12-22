@@ -6,8 +6,10 @@ This section re-analyzes reinsurance structure alternatives introduced in
 Brehm et al. (2007) Guy Carpenter & Company, LLC.
 
 
-Reinsurance Example From Section 2.5.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reinsurance Example
+~~~~~~~~~~~~~~~~~~~~
+
+This section analyzes the example given in Section 2.5 of Enterprise Risk Analysis.
 
 **Assumptions.** ABCD writes 33M excess property and casualty business.
 

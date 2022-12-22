@@ -37,6 +37,19 @@ Using Samples and the Switcheroo Trick
 
 *Documentation to follow.*
 
+There's a sneaky but effective way to add correlation. The idea is:
+
+* Make a portfolio with independent lines as usual
+* Pull a sample from each unit
+* Shuffle the sample to induce the correlation you want using Iman-Conover.
+  You don't have to use a normal copula.
+* (Sneaky part): recompute :math:`\mathsf E[X_i \mid X]` functions with those
+  from the sample.
+
+From there, you can compute everything you need to use the natural allocation
+because it works on the conditional expectations, not the actual sample. I
+call it the switcheroo operation.
+
 .. _samp ic:
 
 Applying the Iman Conover Algorithm

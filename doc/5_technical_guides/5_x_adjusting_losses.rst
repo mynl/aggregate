@@ -120,4 +120,3 @@ The function ``utilities.picks_work`` computes the adjusted severity. In
 debug mode, it returns useful layer information. A severity can be
 adjusted on-the-fly by ``Aggregate`` using the ``picks`` keyword after
 the severity specification and before any occurrence reinsurance.
-

@@ -20,6 +20,7 @@ Contents
 * :ref:`10 min Underwriter`
 
     - :ref:`10 mins create from decl`
+    - :ref:`10 mins formatting`
     - :ref:`Object Creation from the Knowledge Database`
     - :ref:`10 mins bts`
 
@@ -107,25 +108,58 @@ Object Creation Using DecL and :meth:`build`
 
 The Underwriter class interprets DecL programs (:doc:`2_x_dec_language`). These allow severities, aggregates and portfolios to be created using standard insurance language.
 
-For example, to build an :class:`Aggregate` directly from DecL run:
+For example, to build an :class:`Aggregate` using DecL and report key statistics for frequency, severity, and aggregate, needs just two lines of code.
 
 .. ipython:: python
     :okwarning:
 
-    a01 = build('agg TenM:01 '
-              '100 claims '
-              '100 xs 0 '
-              'sev lognorm 10 cv 1.25 '
-              'poisson')
+    a01 = build('agg TenM:01 100 claims 100 xs 0 sev lognorm 10 cv 1.25 poisson')
     qd(a01)
 
-DecL is supposed to be human-readable, so I hope you can guess what the program creates. The block under it reports key statistics for frequency, severity, and in the aggregate. Think of the units as 1000s of USD, EUR, GBP, etc.
 
-DecL was created as a shorthand. The alternative is to use positional arguments or key word arguments in function calls. The former are confusing because there are so many. The latter are verbose, because of the need to specify the parameter name. DecL is a  concise, expressive, flexible, and powerful alternative.
+DecL is supposed to be human-readable, so I hope you can guess what the DecL part of the code::
 
-.. note::
+    agg TenM:01 5 claims 1000 xs 0 sev lognorm 50 cv 4 poisson
 
-    :class:`Aggregate` and :class:`Portfolio` objects need to be updated after they have been created. Updating builds out discrete numerical approximations, analogous to simulation. By default, :meth:`build` handles updating automatically.
+creates. Think of the units as 1000s of USD, EUR, GBP, etc.
+
+DecL is a custom language, created to describe aggregate distributions. The alternative is to use positional arguments or key word arguments in function calls. The former are confusing because there are so many. The latter are verbose, because of the need to specify the parameter name. DecL is a concise, expressive, flexible, and powerful alternative.
+
+.. _10 mins formatting:
+
+Important: Formatting a DecL Program
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. warning::
+
+    **All DecL programs are one line long.**
+
+It is best to break DecL up to make it more readable. The fact that Python automatically concatenates strings between parenthesis makes this easy. The program above is always entered in the help as::
+
+    a01 = build('agg TenM:01 '
+                '100 claims '
+                '100 xs 0 '
+                'sev lognorm 10 cv 1.25 '
+                'poisson')
+
+which Python makes equivalent to::
+
+    a01 = build('agg TenM:01 100 claims 100 xs 0 sev lognorm 10 cv 1.25 poisson')
+
+as originally entered. **Pay attention to spaces at the end of each line!** Entering::
+
+    a01 = build('agg TenM:01'
+                '100 claims'
+                '100 xs 0'
+                'sev lognorm 10 cv 1.25'
+                'poisson')
+
+produces::
+
+    a01 = build('agg TenM:01100 claims100 xs 0sev lognorm 10 cv 1.25poisson')
+
+which results in syntax errors.
+
 
 Object Creation from the Knowledge Database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,9 +175,7 @@ It is accessed as the read-only property :attr:`build.knowledge`. Here are the f
 .. ipython:: python
     :okwarning:
 
-    with pd.option_context("display.colheader_justify","left"):
-        print(build.knowledge.head())
-
+    qd(build.knowledge.head(), justify="left", max_colwidth=60)
 
 A row in the knowledge can be accessed by name. This example models the roll of a single die.
 
@@ -171,8 +203,7 @@ The method :meth:`build.qshow` (quick show) searches the knowledge using a regex
 .. ipython:: python
     :okwarning:
 
-    with pd.option_context("display.colheader_justify","left"):
-        print(build.qshow('Dice').head(3))
+    qd(build.qshow('Dice').head(3), justify="left", max_colwidth=60)
 
 The method :meth:`build.show` also searches the knowledge using a regex applied to the names, but it creates and plots each match by default. Be careful not to create too many objects! Try running::
 
@@ -420,6 +451,10 @@ They have probability mass, cumulative distribution, survival, and quantile (inv
     :okwarning:
 
     a03.pmf(60), a03.cdf(50), a03.sf(60), a03.q(a03.cdf(60)), a03.q(0.5)
+
+.. note::
+
+    :class:`Aggregate` and :class:`Portfolio` objects need to be updated after they have been created. Updating builds out discrete numerical approximations, analogous to simulation. By default, :meth:`build` handles updating automatically.
 
 .. warning::
 
@@ -859,7 +894,7 @@ See :doc:`../5_technical_guides/5_x_numerical_methods` and :doc:`../5_technical_
 Statistical Functions
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`Aggregate` and :class:`Portfolio` objects include basic statistics as properties. Those prefixed ``agg`` are based on exact calculations:
+:class:`Aggregate` and :class:`Portfolio` objects include basic statistics as attributes. Those prefixed ``agg`` are based on exact calculations:
 
 * ``agg_m``, ``agg_cv``, ``agg_sd``, ``agg_var`` (variance), and ``agg_skew``
 
@@ -867,7 +902,8 @@ and prefixed ``emp`` are based on the estimated numerical statistics:
 
 * ``emp_m``, ``emp_cv``, ``emp_sd``, ``emp_var``, and ``emp_skew``.
 
-These are just conveniences; they are available in ``report_df``.
+In addition, :class:`Aggregate` has similar series prefixed ``agg_sev`` and ``emp_sev`` for the severity.
+These attributes are just conveniences; they are all available in (or derivable from) ``report_df``.
 
 :class:`Aggregate` and :class:`Portfolio` objects act like ``scipy.stats`` (continuous) frozen random variable objects and include the following statistical functions.
 

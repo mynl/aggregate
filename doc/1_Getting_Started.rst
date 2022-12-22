@@ -1,5 +1,50 @@
 .. 2022-11-10: reviewed
 
+|  |doc|  |py-versions| |downloads| |stars| |forks|
+|  |contributors| |version| |license| |packages|   |twitter|
+
+.. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
+    :target: https://pepy.tech/project/aggregate
+    :alt: Downloads
+
+.. |stars| image:: https://img.shields.io/github/stars/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/stargazers
+    :alt: Github stars
+
+.. |forks| image:: https://img.shields.io/github/forks/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/network/members
+    :alt: Github forks
+
+.. |contributors| image:: https://img.shields.io/github/contributors/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/graphs/contributors
+    :alt: Contributors
+
+.. |version| image:: https://img.shields.io/pypi/v/aggregate.svg?label=pypi
+    :target: https://pypi.org/project/aggregate
+    :alt: Latest version
+
+.. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
+    :alt: Supported Python versions
+
+.. |license| image:: https://img.shields.io/pypi/l/aggregate.svg
+    :target: https://github.com/mynl/aggregate/blob/master/LICENSE
+    :alt: License
+
+.. |packages| image:: https://repology.org/badge/tiny-repos/python:aggregate.svg
+    :target: https://repology.org/metapackage/python:aggregate/versions
+    :alt: Binary packages
+
+.. |doc| image:: https://readthedocs.org/projects/aggregate/badge/?version=latest
+    :target: https://aggregate.readthedocs.io/en/latest/
+    :alt: Documentation Status
+
+.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
+    :target: https://twitter.com/mynl
+    :alt: Twitter Follow
+
+-----
+
+
 *****************
 Getting Started
 *****************
@@ -7,11 +52,12 @@ Getting Started
 Installation
 =============
 
-Install from PyPI ::
+To install from PyPI ::
 
-   pip install aggregate
+    pip install sly
+    pip install aggregate
 
-See https://pypi.org/project/aggregate/. You must have ``matplotlib>=3.5`` installed, as well as the other packages listed in requirements.txt.
+See https://pypi.org/project/aggregate/. You must ensure all the packages listed in requirements.txt are already installed (see `Dependencies`_ ). Apart from ``sly``, they are all standard.
 
 Source Code
 ===========
@@ -26,7 +72,14 @@ The help assumes you know how to program in Python, understand probability, and 
 License
 =======
 
-:doc:`BSD 3<../LICENCE>`
+BSD 3.
+
+Dependencies
+=============
+
+See requirements.txt. The top block is required for installation. The bottom block is required to build the documentation.
+
+.. literalinclude:: ../requirements.txt
 
 Help Structure
 ===============
@@ -93,9 +146,7 @@ The only object you need to import to get started is ``build``. ``qd`` (quick di
 ``build`` is a :class:`Underwriter` object. It  allows you to create all other
 objects and  includes a library of examples, called the knowledge.
 
-Using ``build`` you can create an :class:`Aggregate` object using an DecL  program. For example, the program
-
-::
+Using ``build`` you can create an :class:`Aggregate` object using an :doc:`DecL program <2_user_guides/2_x_dec_language>`. For example, the program::
 
     agg Eg1 dfreq [1:5] dsev [1:3]
 
@@ -106,6 +157,12 @@ creates an aggregate distribution called ``Eg1``. The frequency distribution is 
 
     a = build('agg Eg1 dfreq [1:5] dsev [1:3]')
     qd(a)
+
+The DecL program::
+
+    agg Eg2 5 claims 1000 xs 0 sev lognorm 50 cv 4 poisson
+
+creates a realistic insurance portfolio, with 5 expected claims, severity sampled from a 1000 xs 0 layer of a lognormal with mean 50 and CV 4 and Poisson frequency.
 
 :class:`Aggregate` objects act like a discrete probability distribution. There are properties for the mean, standard deviation, coefficient of variation (cv), and skewness.
 

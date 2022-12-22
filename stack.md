@@ -69,6 +69,11 @@ Programming Enhancements
 .. -------------------------
 .. * How to model two reinstatements?
 
+Useful?
+
+.. |appveyor| image:: https://img.shields.io/appveyor/ci/mynl/aggregate/master.svg?maxAge=3600&label=Windows
+    :target: https://ci.appveyor.com/project/mynl/aggregate
+    :alt: Windows tests (Appveyor)
 
 * Papers
     - Clark re -> re pricing

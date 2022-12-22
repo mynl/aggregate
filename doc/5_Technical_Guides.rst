@@ -11,7 +11,6 @@ Technical Guides cover theory and implementation. How calculations work in theor
 .. * :doc:`5_technical_guides/5_x_quantiles`
 .. * :doc:`5_technical_guides/5_x_adjusting_losses`
 .. * :doc:`5_technical_guides/5_x_numerical_methods`
-.. * :doc:`5_technical_guides/5_x_approximation_error`
 .. * :doc:`5_technical_guides/5_x_tweedie`
 .. * :doc:`5_technical_guides/5_x_aggregate_calculations` performed by the :class:`Aggregate` object.
 .. * :doc:`5_technical_guides/5_x_portfolio_calculations` performed by the :class:`Portfolio` object.
@@ -30,7 +29,6 @@ Technical Guides cover theory and implementation. How calculations work in theor
     5_technical_guides/5_x_quantiles
     5_technical_guides/5_x_adjusting_losses
     5_technical_guides/5_x_numerical_methods
-    5_technical_guides/5_x_approximation_error
     5_technical_guides/5_x_tweedie
     5_technical_guides/5_x_aggregate_calculations
     5_technical_guides/5_x_portfolio_calculations

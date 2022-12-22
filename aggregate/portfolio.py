@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
 from pathlib import Path
-import pypandoc
 import re
 import scipy.stats as ss
 from scipy import interpolate
@@ -4553,24 +4552,26 @@ class Portfolio(object):
             story = f"""
 Consider adding **{line}** to the existing portfolio. The existing portfolio has capital {a:,.1f} and and epd of {e:.4g}.
 
-* If {line} is added as second priority to the existing lines with no increase in capital it has an epd of {e2:.4g}.
-* If the regulator requires the overall epd be a constant then the firm must increase capital to {a0:,.1f} or by {(a0 / a - 1) * 100:.2f} percent.
+<ul>
+<li> If {line} is added as second priority to the existing lines with no increase in capital it has an epd of {e2:.4g}.
+<li> If the regulator requires the overall epd be a constant then the firm must increase capital to {a0:,.1f} or by {(a0 / a - 1) * 100:.2f} percent.
     - At the higher capital {line} has an epd of {e2a0:.4g} as second priority and the existing lines have an epd of {eb0a0:.4g} as first priority.
     - The existing and {line} epds under equal priority are {eba0:.4g} and {e1a0:.4g}.
-* If {line} *thought* it was added at equal priority it would have expected an epd of {e1:.4g}.
+<li> If {line} *thought* it was added at equal priority it would have expected an epd of {e1:.4g}.
   In order to achieve this epd as second priority would require capital of {a2:,.1f}, an increase of {(a2 / a - 1) * 100:.2f} percent.
-* In order for {line} to have an epd equal to the existing lines as second priority would require capital
+<li> In order for {line} to have an epd equal to the existing lines as second priority would require capital
   of {a3:,.1f}, and increase of {(a3 / a - 1) * 100:.2f} percent.
-* In order for {line} to be added at equal priority and for the existing lines to have an unchanged epd requires capital of {af:,.1f}, an
+<li> In order for {line} to be added at equal priority and for the existing lines to have an unchanged epd requires capital of {af:,.1f}, an
   increase of {(af / a - 1) * 100:.2f} percent.
-* In order for {line} to be added at equal priority and to have an epd equal to the existing line epd requires capital of {af2:,.1f}, an
+<li> In order for {line} to be added at equal priority and to have an epd equal to the existing line epd requires capital of {af2:,.1f}, an
   increase of {(af2 / a - 1) * 100:.2f} percent.
-* In order for the existing lines to have an unchanged epd at equal priority requires capital of {a4:,.1f}, an increase of {(a4 / a - 1) * 100:.2f} percent.
+<li> In order for the existing lines to have an unchanged epd at equal priority requires capital of {a4:,.1f}, an increase of {(a4 / a - 1) * 100:.2f} percent.
+<ul>
 """
             ans.append(story)
         ans = '\n'.join(ans)
         if output == 'html':
-            display(HTML(pypandoc.convert_text(ans, to='html', format='markdown')))
+            display(HTML(ans))
         else:
             return ans
 

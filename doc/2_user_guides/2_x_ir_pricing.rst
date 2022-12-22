@@ -11,7 +11,7 @@ Individual Risk Pricing
 
 **See also:** :doc:`2_x_re_pricing`, :doc:`DecL/080_reinsurance`. For other related examples see :doc:`2_x_problems`, especially :doc:`problems/0x0_bahnemann`.
 
-The examples in this section are illustrative. ``aggregate`` gives you the gross, ceded, and net distributions and with those in hand, the analytic world is your oyster. You can answer any reasonable question about a large account program.
+The examples in this section are illustrative. ``aggregate`` gives you the gross, ceded, and net distributions and with those in hand, you are off to the analytic races. You can answer any reasonable question about a large account program.
 
 Contents
 ----------

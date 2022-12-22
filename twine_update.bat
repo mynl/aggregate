@@ -9,6 +9,8 @@ echo %1
 
 twine check dist/aggregate-%1*
 
-twine upload -u mildenhall -p %PPPW% dist/*%1* --verbose
+echo twine upload --verbose -u mildenhall -p %PPPW% dist/*%1*
+
+twine upload --verbose -u mildenhall -p %PPPW% dist/*%1*
 
 

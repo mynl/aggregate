@@ -1168,13 +1168,23 @@ def xsden_to_meancv(xs, den):
 
     Consider adding: np.nan_to_num(den)
 
+    Note: cannot rely on pd.Series[-1] to work... it depends on the index.
+    xs could be an index
     :param xs:
     :param den:
     :return:
     """
+    pg = 1 - den.sum()
     xd = xs * den
-    ex1 = np.sum(xd)
-    ex2 = np.sum(xd * xs)
+    if isinstance(xs, np.ndarray):
+        xsm = xs[-1]
+    elif isinstance(xs, pd.Series):
+        xsm = xs.iloc[-1]
+    else:
+        xsm = np.array(xs)[-1]
+    ex1 = np.sum(xd) + pg * xsm
+    # logger.warning(f'tail mass mean adjustment {pg * xsm}')
+    ex2 = np.sum(xd * xs) + pg * xsm ** 2
     sd = np.sqrt(ex2 - ex1 ** 2)
     if ex1 != 0:
         cv = sd / ex1
@@ -1193,11 +1203,19 @@ def xsden_to_meancvskew(xs, den):
         :param den:
         :return:
         """
+    pg = 1 - den.sum()
     xd = xs * den
-    ex1 = np.sum(xd)
+    if isinstance(xs, np.ndarray):
+        xsm = xs[-1]
+    elif isinstance(xs, pd.Series):
+        xsm = xs.iloc[-1]
+    else:
+        xsm = np.array(xs)[-1]
+    ex1 = np.sum(xd) + pg * xsm
+    # logger.warning(f'tail mass mean adjustment {pg * xsm}')
     xd *= xs
-    ex2 = np.sum(xd)
-    ex3 = np.sum(xd * xs)
+    ex2 = np.sum(xd) + pg * xsm ** 2
+    ex3 = np.sum(xd * xs) + pg * xsm ** 3
     mw = MomentWrangler()
     mw.noncentral = ex1, ex2, ex3
     return mw.mcvsk

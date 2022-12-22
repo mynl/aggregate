@@ -8,7 +8,7 @@
 import matplotlib.pyplot as plt
 import sys
 import os
-from recommonmark.parser import CommonMarkParser
+# from recommonmark.parser import CommonMarkParser
 
 # allow RTD to find aggregate
 sys.path.insert(0, os.path.abspath('.'))
@@ -97,7 +97,7 @@ html_theme_options = {
     'logo_only': False,
     'display_version': True,
     'prev_next_buttons_location': 'both',
-    'style_external_links': True,
+    'style_external_links': False,
     'collapse_navigation': True,
     'sticky_navigation': True,
     'navigation_depth': 3,

@@ -19,7 +19,7 @@ expresses a limit profile with 1000 of premium at 1000 x 0; 2000 at 2000
 x 0 4000 at 5000 x 0 and 1000 at 4000 x 1000. In this case all the loss
 ratios are the same, but they could vary too.
 
-aNote that an aggregate with a mixed severity is a sum of aggregates,
+Note that an aggregate with a mixed severity is a sum of aggregates,
 with the mixture weights applied to the expected claim count. This is
 analogous to the fact that :math:`\exp(a+b)=\exp(a)\exp(b)`. In terms of
 a compound Poisson,

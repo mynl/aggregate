@@ -1,5 +1,7 @@
 .. _2_x_samples_rearrangement:
 
+.. NEEDS WORK
+
 Samples, Iman-Conover, and the Rearrangement Algorithm
 =======================================================
 
@@ -11,15 +13,12 @@ Samples, Iman-Conover, and the Rearrangement Algorithm
 
 **See also:** :doc:`../5_technial_guides/5_x_samples`,  :doc:`../5_technial_guides/5_x_iman_conover`, :doc:`../5_technial_guides/5_x_rearrangement``.
 
-See examples in /TELOS/Blog/agg/examples/IC_and_rearrangement.ipynb.
+**Contents:**
 
-Contents
------------
-
-* :ref:`Helpful References`
-* :ref:`samp samp`
-* :ref:`samp ic`
-* :ref:`samp ra`
+#. :ref:`Helpful References`
+#. :ref:`samp samp`
+#. :ref:`samp ic`
+#. :ref:`samp ra`
 
 Helpful References
 --------------------
@@ -29,6 +28,7 @@ Helpful References
 * IC paper ref.
 * Mildenhall Agg Dist WP
 
+See examples in /TELOS/Blog/agg/examples/IC_and_rearrangement.ipynb.
 
 .. _samp samp:
 

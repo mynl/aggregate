@@ -17,17 +17,17 @@ Reinsurance Pricing
 
 The examples in this section are illustrative. ``aggregate`` gives you the gross, ceded, and net distributions and with those in hand, the analytic world is your oyster. You can answer any reasonable question about a reinsurance program.
 
-Contents
-----------
+**Contents:**
 
-* :ref:`Helpful references <re references>`
-* :ref:`Basic examples <re basic examples>`
-* :ref:`Modes of reinsurance analysis <re modes>`
-* :ref:`re functions`
-* :ref:`Casualty exposure rating <re casualty exposure>`
-* :ref:`Property exposure rating <re property exposure>`
-* :ref:`Variable features <re variable>`
-* :ref:`Inwards analysis of Bear and Nemlick variable features <re inwards variable>`
+
+#. :ref:`Helpful references <re references>`
+#. :ref:`Basic examples <re basic examples>`
+#. :ref:`Modes of reinsurance analysis <re modes>`
+#. :ref:`re functions`
+#. :ref:`Casualty exposure rating <re casualty exposure>`
+#. :ref:`Property exposure rating <re property exposure>`
+#. :ref:`Variable features <re variable>`
+#. :ref:`Inwards analysis of Bear and Nemlick variable features <re inwards variable>`
 
     - :ref:`Aggregate deductible <re bear 1>`
     - :ref:`Aggregate limit <re bear 2>`
@@ -36,9 +36,9 @@ Contents
     - :ref:`Profit share <re bear 5>`
     - :ref:`Sliding scale commission <re bear 6>`
 
-* :ref:`Outwards analysis <re outwards analysis>`
-* :ref:`Adjusting layer loss picks <re loss picks>`
-* :ref:`re summary`
+#. :ref:`Outwards analysis <re outwards analysis>`
+#. :ref:`Adjusting layer loss picks <re loss picks>`
+#. :ref:`re summary`
 
 .. _re references:
 

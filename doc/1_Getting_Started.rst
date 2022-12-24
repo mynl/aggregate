@@ -1,50 +1,5 @@
 .. 2022-11-10: reviewed
 
-|  |doc|  |py-versions| |downloads| |stars| |forks|
-|  |contributors| |version| |license| |packages|   |twitter|
-
-.. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
-    :target: https://pepy.tech/project/aggregate
-    :alt: Downloads
-
-.. |stars| image:: https://img.shields.io/github/stars/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/stargazers
-    :alt: Github stars
-
-.. |forks| image:: https://img.shields.io/github/forks/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/network/members
-    :alt: Github forks
-
-.. |contributors| image:: https://img.shields.io/github/contributors/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/graphs/contributors
-    :alt: Contributors
-
-.. |version| image:: https://img.shields.io/pypi/v/aggregate.svg?label=pypi
-    :target: https://pypi.org/project/aggregate
-    :alt: Latest version
-
-.. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
-    :alt: Supported Python versions
-
-.. |license| image:: https://img.shields.io/pypi/l/aggregate.svg
-    :target: https://github.com/mynl/aggregate/blob/master/LICENSE
-    :alt: License
-
-.. |packages| image:: https://repology.org/badge/tiny-repos/python:aggregate.svg
-    :target: https://repology.org/metapackage/python:aggregate/versions
-    :alt: Binary packages
-
-.. |doc| image:: https://readthedocs.org/projects/aggregate/badge/?version=latest
-    :target: https://aggregate.readthedocs.io/en/latest/
-    :alt: Documentation Status
-
-.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
-    :target: https://twitter.com/mynl
-    :alt: Twitter Follow
-
------
-
-
 *****************
 Getting Started
 *****************
@@ -130,6 +85,11 @@ is equivalent to:
     print(a)
 
 The Python line continuation ``\`` is used to create compact input.
+
+Numbers and Units
+==================
+
+You can chose your own units. The examples include numbers interpreted in ones, thousands, and millions. Amounts are broadly calibrated to make sense in USD, EUR, and GBP.
 
 ``aggregate`` Hello World
 ==========================

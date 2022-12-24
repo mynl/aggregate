@@ -1,6 +1,60 @@
 # TODO stack
 
+Examples introduced!
+
+All references! REF!
+
+Cat: put in changes to climate change el impact! (in progress)
+Then reinsurance and 10 mins...
+
+**Details.**
+
 `np.newaxis`, x=x[:, np.newaxis]
+
+Comments then code!!
+
+agg written in one line stand-alone and broken up in build MAKES SURE IT IS PASTEABLE!
+
+One-line it only for graphics?
+
+actuary student example, why is lev so far off analytic answer?
+
+::
+
+        a01 = build('agg Actuary:01 '
+                    '2000 premium at 0.675 lr 1000 xs 0 '
+                    'sev lognorm 50 cv 1.25 '
+                    'poisson', bs=1/8)
+        qd(a01)
+
+        qd(a01.sf(2000), a01.sf(2500))
+        qd(a01.density_df.loc[[2500], ['F', 'S', 'lev', 'epd']])
+
+
+    a01.density_df.loc[2500, ['F', 'exlea']].prod() + 2500 * a01.density_df.loc[2500, 'S']
+
+    from aggregate import lognorm_lev, mu_sigma_from_mean_cv
+
+    mu, sigma = mu_sigma_from_mean_cv(a01.agg_m, a01.agg_cv)
+    lev = lognorm_lev(mu, sigma, 1, 2500)
+    lev_agg = a01.density_df.loc[2500, 'lev']
+    default = a01.agg_m - lev
+    epd = default / a01.est_m
+    default_agg = a01.est_m - lev_agg
+    pd.DataFrame((lev, default, lev_agg, default_agg, epd, default_agg / a01.agg_m),
+                 index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg LEV',
+                 'Agg Default', 'Lognorm EPD', 'Agg EPD'],
+                 name='Item'),
+                 columns=['Value'])
+
+
+shift.loc and cv::
+
+    a = build('agg T 1 claim sev 10 * gamma 1 cv 3 + 50 fixed')
+    qd(a)
+    a.plot()
+    sigma = a.sevs[0].fz.args[0]
+    (np.exp(sigma**2)-1)**.5, 1/sigma**.5
 
 
 * Extract Python from rst

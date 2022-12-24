@@ -1,35 +1,41 @@
 .. _2_x_exposure:
 
+.. reviewed 2022-12-24
+
 The Exposure Clause
 -------------------
 
-The exposure clause has two parts: exposures and an optional layers sub-clause (see See :doc:`030_limits`).
+The exposure clause has two parts: exposures and an optional layers sub-clause
+described in :doc:`030_limits`. It specifies the volume of insurance. There
+are five forms:
 
-Exposures specifies the volume of insurance.
-There are four forms:
+#.  Expected loss
+#.  Premium and loss ratio
+#.  Exposure and rate
+#.  Claim count
+#.  Using the ``dfreq`` keyword to enter the frequency distribution directly
 
--  Expected loss
--  Premium and loss ratio
--  Claim count
--  Using the ``dfreq`` keyword to enter the frequency distribution directly
-
-For example::
+**Examples**::
 
        1000 loss
        1000 premium at 0.7 lr
+       5 exposure at 2000 rate
        123 claims
        dfreq [1 2 3] [3/4 3/16 1/16]
 
 
 * ``1000 loss`` directly specifies expected loss. The claim count is derived
   from average severity. It is typical for an actuary to estimate the loss
-  pick and select a severity curve and then derive frequency.
+  pick and select a severity curve, and then derive frequency.
 * ``1000 premium at 0.7 lr`` directly specifies premium and a loss ratio.
   Expected losses equal the product. The claim count is again derived from
-  severity. The final ``lr`` is optional and used just for clarity. Again,
-  actuaries often take plan premiums and apply loss ratio picks to determine
-  losses, rather than starting with a loss pick. This idiom supports that
-  approach.
+  severity. Actuaries often take plan premiums and apply loss ratio
+  picks to determine losses, rather than starting with a loss pick. This
+  idiom supports that approach.
+* ``5 exposure at 2000 rate`` directly specifies exposure and a loss rate. It
+  is analogous to the loss ratio form. Actuaries often know exposure and unit
+  rates (per vehicle, per 100 insured value, per location). This idiom supports
+  that approach.
 * ``123 claims`` directly specifies the expected claim count; the last letter
   ``s`` on ``claims`` is optional, allowing ``1 claim``. Expected losses
   equal claim count times average severity.
@@ -46,8 +52,9 @@ losses.
 
 * If ``count`` is given it is used and loss is derived from severity.
 * Else if ``loss`` is given, then count is derived from the severity.
-* Else if ``premium at xx lr`` are given, then the loss is derived by
-  multiplication and counts from severity.
+* Else if either ``pp premium at xx lr`` or ``ee exposure at rr rate`` is
+  given, then the loss is derived by multiplication and counts from
+  severity.
 * In all cases, if ``premium`` is given the loss ratio is computed
 
 These choices present no ambiguity when using DecL. But the input arguments

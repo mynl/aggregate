@@ -7,6 +7,50 @@
 .. sectnum
    :depth: 3
 
+.. see https://shields.io/ search github
+
+.. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
+    :target: https://pepy.tech/project/aggregate
+    :alt: Downloads
+
+.. |stars| image:: https://img.shields.io/github/stars/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/stargazers
+    :alt: Github stars
+
+.. |forks| image:: https://img.shields.io/github/forks/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/network/members
+    :alt: Github forks
+
+.. |contributors| image:: https://img.shields.io/github/contributors/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/graphs/contributors
+    :alt: Contributors
+
+.. |version| image:: https://img.shields.io/pypi/v/aggregate.svg?label=pypi
+    :target: https://pypi.org/project/aggregate
+    :alt: Latest version
+
+.. |activity| image:: https://img.shields.io/github/commit-activity/m/mynl/aggregate
+   :target: https://github.com/mynl/aggregate
+   :alt: Latest Version
+
+.. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
+    :alt: Supported Python versions
+
+.. |license| image:: https://img.shields.io/pypi/l/aggregate.svg
+    :target: https://github.com/mynl/aggregate/blob/master/LICENSE
+    :alt: License
+
+.. |packages| image:: https://repology.org/badge/tiny-repos/python:aggregate.svg
+    :target: https://repology.org/metapackage/python:aggregate/versions
+    :alt: Binary packages
+
+.. |doc| image:: https://readthedocs.org/projects/aggregate/badge/?version=latest
+    :target: https://aggregate.readthedocs.io/en/latest/
+    :alt: Documentation Status
+
+.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
+    :target: https://twitter.com/SJ2Mi
+    :alt: Twitter Follow
 
 #######################
 aggregate Documentation
@@ -25,16 +69,11 @@ aggregate Documentation
    6_Development
    7_bibliography
 
-**Date**: |today| | **Version**: |version|
+|  |activity| |doc| |version|
+|  |py-versions| |downloads|
+|  |license| |packages|  |twitter|
 
-**Download documentation**:
-`PDF Version <https://aggregate.readthedocs.io/_/downloads/en/latest/pdf/>`_
-
-**Useful links**:
-`Binary Installers <https://pypi.org/project/aggregate>`__ |
-`Source Repository <https://github.com/mynl/aggregate>`__
-
-:mod:`aggregate` is an open source, BSD-licensed Python library providing easy-to-use intuitive natural language tools to work with aggregate probability distributions.
+:mod:`aggregate` is an open source, BSD-licensed Python package providing an expressive language and fast, accurate computations to make working with aggregate (compound) probability distributions easy and intuitive. It allows students and practitioners to use realistic real-world distributions that reflect the underlying frequency and severity generating processes. It has applications in insurance, risk management, actuarial science, and related areas.
 
 .. Panels at https://sphinx-panels.readthedocs.io/en/latest/
    img-top-cls: pl-5 pr-5

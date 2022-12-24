@@ -1,5 +1,7 @@
 .. _design and purpose:
 
+.. reviewed 2022-12-24
+
 DecL Design and Purpose
 ------------------------
 
@@ -7,7 +9,7 @@ The Dec Language, or simply DecL, is designed to make it easy to go from "Dec pa
 
 Coverage expressed concisely in words on a Dec page is often incomplete and is hard to program. Consider
 
-    A trucking policy with a premium of 5000, a limit of 1000, and a retention 50.
+    A trucking policy with a premium of 5000, a limit of 1000, and a deductible of 50.
 
 To estimate the distribution of aggregate loss outcomes for this policy, the actuary must:
 
@@ -18,23 +20,23 @@ To estimate the distribution of aggregate loss outcomes for this policy, the act
 #. Select a suitable frequency distribution, say Poisson.
 #. Calculate a numerical approximation to the resulting compound-Poisson aggregate distribution
 
-A DecL program, which can be built with ``aggregate``, takes care of many of these details. The program corresponding to the trucking policy is simply::
+A DecL program takes care of many of these details. The program corresponding to the trucking policy is simply::
 
-    agg Trucking
-        5000 premium at 0.65 lr loss
-        1000 xs 50
-        sev lognorm 50 1.75
+    agg Trucking                      \
+        5000 premium at 0.65 lr       \
+        1000 xs 50                    \
+        sev lognorm 50 cv 1.75        \
         poisson
 
 It specifies the loss ratio and distributions selected in steps 1, 2 and 5; these require actuarial judgment and cannot be automated. Based on this input, the ``aggregate`` package computes the rest of steps 1, 3, 4, and 6. The details of the program are explained in the rest of this chapter.
 
+.. note::
+    All DecL programs are one-line long. The program above uses a Python ``\`` line break so that the code above can be cut and pasted as an argument to ``build`` using a triple quoted string. See :ref:`10 mins formatting`.
 
 Specifying a Realistic Aggregate Distribution
-----------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The trucking example hints at the complexity of specifying a realistic insurance aggregate distribution. Abstracting the details, a complete specification has seven parts
-
-.. _seven clauses:
 
 1. A name
 2. The exposure, optionally including occurrence limits and deductibles
@@ -44,22 +46,23 @@ The trucking example hints at the complexity of specifying a realistic insurance
 6. Aggregate reinsurance (optional)
 7. Additional notes (optional)
 
-DecL follows this pattern and specifies an aggregate distribution using :ref:`seven clauses <seven clauses>`::
+DecL follows this pattern::
 
-    agg name
-        exposure <limit>
-        severity
-        <occurrence re>
-        <frequency>
-        <aggregate re>
+    agg name                   \
+        exposure <limit>       \
+        severity               \
+        <occurrence re>        \
+        <frequency>            \
+        <aggregate re>         \
         <note>
 
-where <clause> is optional. All programs are one line long and horizontal white space is ignored. The program is built (interpreted) using the ``build`` function.
-Python automatically concatenates strings between parenthesis, so it is easiest and clearest to enter a program as::
+where ``<...>`` is an optional clause. All programs are one-line long and horizontal white space is ignored.
+
+DecL programs are built (interpreted) using the ``build`` function. Python automatically concatenates strings between parenthesis (no need or ``\``), making it is easiest and clearest to enter a program as::
 
     build('agg Trucking '
           '5000 premium at 0.65 lr 1000 xs 50 '
-          'sev lognorm 50 1.75 '
+          'sev lognorm 50 cv 1.75 '
           'poisson')
 
 The entries in this example are as follows.
@@ -71,29 +74,34 @@ The entries in this example are as follows.
 
 * The exposure clause is ``5000 premium at 0.65 lr 1000 xs 50``. (Percent notation is acceptable: the loss ratio can be entered as ``65% lr``.) It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 50``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
 
-* The severity clause ``sev lognorm 50 1.75`` determines the *ground-up* severity, see :ref:`severity <2_agg_class_severity_clause>`. ``sev`` is a keyword
+* The severity clause ``sev lognorm 50 cv 1.75`` determines the **ground-up** severity, see :ref:`severity <2_agg_class_severity_clause>`. ``sev`` is a keyword
 
 
 * The ``frequency`` clause, ``poisson``, specifies the frequency distribution, see :ref:`frequency <2_agg_class_frequency_clause>`.
 
-The occurrence re, aggregate re and note clauses are omitted. See :ref:`reinsurance <2_agg_class_reinsurance_clause>` and :doc:`090_notes`.
+The occurrence re, aggregate re and note clauses are omitted. See :ref:`2_agg_class_reinsurance_clause` and :doc:`090_notes`.
 
-``build`` automatically computes the expected claim count from the premium, expected loss ratio, and average severity.
+``aggregate`` automatically computes the expected claim count from the premium, expected loss ratio, and average severity.
 
 Python ``f``-strings allow variables to be passed into DecL programs, ``f'sev lognorm {x} cv {cv}``.
 
-There are two other specifications for different situations::
+Alternative Specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    agg NAME BUILTIN_AGG
+There are two other specifications for different situations that reference a
+distribution from the ``knowledge`` database.
 
-    BUILTIN_AGG
+The first simply refers to the object by name, prefixing it with ``agg.``. Thus::
 
-These reference a distribution from the ``knowledge`` database.
-``BUILTIN_AGG`` has the form ``agg.NAME`` meaning an :class:`Aggregate` object called ``NAME``. For example, ``Trucking`` (defined above) can be replicated using either of the following forms::
+    agg.Trucking
 
-    build('agg NewTruckingAccount agg.Trucking')
-    build('agg.Trucking')
+refers to the ``Trucking`` example above.
 
-Both create new objects; the former is called ``NewTruckingAccount`` and the latter uses the existing name. See the :doc:`../../4_dec_Language_Reference`.
+The second allows the flexibility to provide a new name for the object::
+
+    agg NewTruckingAccount agg.Trucking
+
+These forms are mostly used in portfolios.
+See the :doc:`../../4_dec_Language_Reference`.
 
 The rest of this Chapter describes the basic features of each clause.

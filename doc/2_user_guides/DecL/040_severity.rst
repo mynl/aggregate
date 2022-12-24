@@ -2,10 +2,12 @@
 
 .. _2_agg_class_severity_clause:
 
+.. reviewed 2022-12-24
+
 The Severity Clause
 ----------------------
 
-The severity clause specifies the ground-up severity distribution, or "curve" as it is sometimes known. It is a very flexible clause. Its design follows the ``scipy.stats`` package's specification of random variables using shape, location, and scale factors, see :ref:`probability background <5_x_probability>`. The syntax is different for non-parametric discrete distributions and parametric continuous distributions.
+The severity clause specifies the ground-up severity distribution, or "severity curve" as it is sometimes known. It is a very flexible clause. Its design follows the ``scipy.stats`` package's specification of random variables using shape, location, and scale factors, see :ref:`probability background <5_x_probability>`. The syntax is different for non-parametric discrete distributions and parametric continuous distributions.
 
 
 .. _nonparametric severity:
@@ -28,7 +30,7 @@ the reciprocal of the length of the ``outcomes`` vector.
 A Python-like colon notation is available for ranges.
 Probabilities can be entered as fractions, but no other arithmetic operation is supported.
 
-The five examples::
+**Examples**::
 
     dsev [0 9 10] [0.5 0.3 0.2]
     dsev [0 9 10]
@@ -36,17 +38,17 @@ The five examples::
     dsev [0:100:25]
     dsev [1:6] [1/4 1/4 1/8 1/8 1/8 1/8]
 
-specify
 
-#. A severity with a 0.5 chance of taking the value 0, 0.3 chance of 9, and 0.2 of 10.
-#. Equally likely outcomes of 0, 9, or 10;
-#. Equally likely outcomes 1, 2, 3, 4, 5, 6;
-#. Equally likely outcomes 0, 25, 50, 100; and
-#. Outcomes 1 or 2 with probability 0.25 or 3-6 with probability 0.125.
+* ``dsev [0 9 10] [0.5 0.3 0.2]`` is a severity with a 0.5 chance of taking the value 0, 0.3 chance of 9, and 0.2 of 10.
+* ``dsev [0 9 10]`` gives equally likely outcomes of 0, 9, or 10.
+* ``dsev [1:6]`` gives equally likely outcomes 1, 2, 3, 4, 5, 6. Unlike Python (but like ``pandas.DataFrame.loc``) the right-hand limit is included.
+* ``dsev [0:100:25]`` gives qually likely outcomes 0, 25, 50, 100.
+* ``dsev [1:6] [1/4 1/4 1/8 1/8 1/8 1/8]`` gives outcomes 1 or 2 with probability 0.25 or 3-6 with probability 0.125.
 
 .. warning::
     Use binary fractions (denominator a power of two) to avoid rounding errors!
 
+**Details.**
 
 A ``dsev`` clause is converted by the parser into a ``dhistogram`` step distribution::
 
@@ -62,7 +64,7 @@ When executed, these are both converted into a ``scipy.stats`` ``histogram`` cla
 Parametric Severity
 ~~~~~~~~~~~~~~~~~~~~~
 
-A parametric distribution can be specified in two ways (``<SHAPE1>`` denotes an optional argument)::
+A parametric distribution can be specified in two ways::
 
     sev DIST_NAME MEAN cv CV
     sev DIST_NAME <SHAPE1> <SHAPE2>
@@ -74,13 +76,13 @@ where
 * ``MEAN`` is the expected loss,
 * ``cv`` (lowercase) is a keyword indicating entry of the CV,
 * ``CV`` is the loss coefficient of variation, and
-* ``SHAPE1``, ``SHAPE2`` are the shape variables.
+* ``SHAPE1``, ``SHAPE2`` are the (optional) shape variables.
 
-The first form enters the expected ground-up severity and CV directly. It is available for distributions with only one shape parameter and the beta distribution on :math:`[0,1]`. ``aggregate`` uses a formula (lognormal, gamma, beta) or numerical method (all others) to solve for the shape parameter to achieve the correct CV and then scales to the desired mean. The second form directly enters the shape variable(s). Shape parameters entered for zero parameter distributions are ignored.
+The first form enters the expected ground-up severity and CV directly. It is available for distributions with only one shape parameter and the beta distribution on :math:`[0,1]`. ``aggregate`` uses a formula (lognormal, gamma, beta) or numerical method (all other one shape parameter distributions) to solve for the shape parameter to achieve the correct CV and then scales to the desired mean. The second form directly enters the shape variable(s). Shape parameters entered for zero parameter distributions are ignored.
 
 **Example.** Entering ``sev lognorm 10 cv 0.2`` produces a lognormal
 distribution with a mean of 10 and a CV of 0.2. Entering ``lognorm 0.2`` produces a lognormal
-with :math:`\mu=0` and :math:`\sigma=0.2`. It can then be :ref:`scaled and shifted<dec shift scale>`.
+with :math:`\mu=0` and :math:`\sigma=0.2`, which can then be :ref:`scaled and shifted<dec shift scale>`.
 
 ``DIST_NAME`` can be any zero, one, or two shape parameter ``scipy.stats`` continuous distribution.
 They have (mostly) easy to guess names. For example:
@@ -89,14 +91,16 @@ They have (mostly) easy to guess names. For example:
   ``norm``, Gaussian normal; ``unif``, uniform; and ``expon``, the exponential.
 
 * Distributions with one shape parameter include:
-  ``pareto``, ``lognorm``, ``gamma``, ``invgamma``, ``loggamma``, and ``weibull_min``
+  ``pareto``, ``lognorm``, ``gamma``, ``invgamma``, ``loggamma``, and ``weibull_min`` the Weibull.
 
 * Distributions with two shape parameters include:
   ``beta`` and ``gengamma``, the generalized gamma.
 
 See :ref:`available sev dists` for a full list.
 
-Finally, ``dhistogram`` and ``chistogram`` can be used to create discrete
+**Details.**
+
+``dhistogram`` and ``chistogram`` create discrete
 (point mass) and continuous (ogive) empirical distributions. ``chistogram``
 is rarely used and ``dhistogram`` is easier to input using ``dsev``,
 :ref:`nonparametric severity`.
@@ -107,33 +111,34 @@ is rarely used and ``dhistogram`` is easier to input using ``dsev``,
 Shifting and Scaling Severity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A parametric severity clause can be transformed by scaling and location (shifting or translation) factors,
-using the standard ``scipy.stats`` ``scale`` and ``loc``::
+A parametric severity clause can be transformed by scaling and location  factors,
+following the ``scipy.stats`` ``scale`` and ``loc`` syntax.
+Location is a shift or translation. The syntax is::
 
     sev SCALE * DISTNAME SHAPE + LOC
     sev SCALE * DISTNAME SHAPE - LOC
 
-For zero
-parameter distributions ``SHAPE`` is omitted. Two parameter distributions are
-``sev SCALE * DISTNAME SHAPE1 SHAPE2 + LOC``.
+
+For zero parameter distributions ``SHAPE`` is omitted. Two parameter
+distributions are entered ``sev SCALE * DISTNAME SHAPE1 SHAPE2 + LOC``.
 
 **Examples.**
 
-* ``sev lognorm 10 cv 3``: lognormal, mean 10, cv 0.
+* ``sev lognorm 10 cv 3``: lognormal, mean 10, CV 0.
 
 * ``sev 10 * lognorm 1.75``: lognormal, :math:`10X`, :math:`X \sim \mathrm{lognormal}(\mu=0,\sigma=1.75)`
 
 * ``sev 10 * lognorm 1.75 + 20``: lognormal, :math:`10X + 20`
 
-* ``sev 10 * lognorm 1 cv 3 + 50``: lognormal: :math:`10Y + 50`, :math:`Y\sim` lognormal mean 1, cv 3
+* ``sev 10 * lognorm 1 cv 3 + 50``: lognormal: :math:`10Y + 50`, :math:`Y\sim` lognormal mean 1, CV 3
 
-* ``sev 100 * pareto 1.3 - 100``: Pareto, shape (:math:`\alpha`) 3, scale (:math:`\lambda`) 100
+* ``sev 100 * pareto 1.3 - 100``: Pareto, shape :math:`\alpha=3`, scale :math:`\lambda=100`.
 
 * ``sev 100 * pareto 1.3``: Single parameter Pareto for :math:`x \ge 100`, Shape (:math:`\alpha`) 3, scale (:math:`\lambda`) 100
 
-* ``sev 50 * norm + 100``: normal, mean (location) 100, standard deviation (scale) 50. No shape parameters.
+* ``sev 50 * norm + 100``: normal, mean (location) 100, standard deviation (scale) 50. No shape parameter.
 
-* ``sev 5 * expon``: exponential, mean (scale) 5. No shape parameters.
+* ``sev 5 * expon``: exponential, mean (scale) 5. No shape parameter.
 
 * ``sev 5 * uniform + 1``: uniform between 1 and 6, scale 5, location 1. No shape parameters.
 
@@ -158,9 +163,9 @@ The scale and location parameters can be :doc:`vectors<070_vectorization>`.
 Unconditional Severity
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The severity clause is ground-up and it is converted to a distribution
+The severity clause is entered ground-up. It is converted to a distribution
 conditional on a loss to the layer if there is a limits sub-clause. Thus, for
-an excess layer :math:`y` xs :math:`a` severity has a
+an excess layer :math:`y` xs :math:`a`, the severity used to create the aggregate has a
 distribution :math:`X \mid X > a`, where :math:`X` is specified in the
 ``sev`` clause. For a ground-up (or missing) layer there is no adjustment.
 
@@ -170,27 +175,34 @@ severity distribution.
 
 **Example.**
 
-::
-
-   agg Conditional 1 claim 10 x 10 sev lognorm 10 cv 1 fixed
-   agg Unconditional 1 claim 10 x 10 sev lognorm 10 cv 1 ! fixed
-
-produces conditional and unconditional samples from an excess layer of a
-lognormal. The latter includes an approximately 0.66 chance of a claim
-of zero, corresponding to :math:`X \le 10` below the attachment.
+The default behavior uses severity conditional to the layer. In this example, the conditional layer severity is 6.
 
 .. ipython:: python
     :okwarning:
 
     from aggregate import build, qd
+    cond = build('agg DecL:Conditional '
+                 '1 claim '
+                 '12 x 8 '
+                 'sev 20 * uniform '
+                 'fixed')
+    qd(cond)
 
-    cond = build('agg DecL:Conditional   1 claim 10 x 10 sev 5 * expon   fixed')
-    uncd = build('agg DecL:Unconditional 1 claim 10 x 10 sev 5 * expon ! fixed')
-    qd(cond.describe)
-    qd(uncd.describe)
-    print(uncd.sevs[0].fz.sf(10), uncd.agg_m / cond.agg_m)
+To specify unconditional severity, append ``!`` to the severity clause. The
+unconditional layer severity is only 3.6 because there is just a 60% chance of
+attaching the layer. In the last line, ``uncd.sevs[0].fz`` is ``sev 20 *
+uniform`` ground-up.
 
-Here ``uncd.sevs[0].fz`` is ``sev 5 * expon`` ground-up.
+.. ipython:: python
+    :okwarning:
+
+    uncd = build('agg DecL:Unconditional '
+                 '1 claim '
+                 '12 x 8 '
+                 'sev 20 * uniform ! '
+                 'fixed')
+    qd(uncd)
+    print(uncd.sevs[0].fz.sf(8), uncd.agg_m / cond.agg_m)
 
 
 .. _available sev dists:

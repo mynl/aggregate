@@ -1,5 +1,8 @@
 .. _2_x_reserving:
 
+.. reviewed 2022-12-24
+.. NEEDS WORK
+
 Reserving
 ==========
 
@@ -11,12 +14,11 @@ Reserving
 
 **See also:**
 
-Contents
------------
+**Contents:**
 
-* :ref:`Helpful References`
-* :ref:`res modeling`
-* :ref:`res resolution`
+#. :ref:`Helpful References`
+#. :ref:`res modeling`
+#. :ref:`res resolution`
 
 Helpful References
 --------------------

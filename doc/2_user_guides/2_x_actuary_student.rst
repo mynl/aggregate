@@ -1,6 +1,7 @@
 .. _2_x_actuary_student:
 
 .. reviewed 2022-11-10
+.. reviewed 2022-12-24
 
 Actuarial Student
 ====================
@@ -9,21 +10,16 @@ Actuarial Student
 
 **Audience:** Actuarial science university students and actuarial analysts.
 
-**Prerequisites:** Familiarity with aggregate probability distributions (as covered on SOA STAM, CAS MAS I, IFOA CS-2) and basic insurance terminology (insurance company operations).
+**Prerequisites:** Familiarity with aggregate probability distributions as covered on SOA STAM, CAS MAS I, or IFOA CS-2, and basic insurance terminology from insurance company operations.
 
 **See also:** :doc:`2_x_student` for a more basic introduction; :doc:`../2_User_Guides` for other applications.
 
-Contents
-----------
+**Contents:**
 
-* :ref:`Realistic Insurance Example`
-* :ref:`College and Exam Questions`
-* :ref:`Formal Construction`
-* :ref:`Simple Example`
-* :ref:`Exercise - Test Your Understanding`
-* :ref:`Dice Rolls`
-* :ref:`Advantages of Modeling with Aggregate Distributions`
-* :ref:`actuary summary`
+#. :ref:`Realistic Insurance Example`
+#. :ref:`College and Exam Questions`
+#. :ref:`Advantages of Modeling with Aggregate Distributions`
+#. :ref:`actuary summary`
 
 Realistic Insurance Example
 ---------------------------
@@ -48,11 +44,12 @@ You model aggregate losses using the collective risk model.
    1. The probability aggregate losses exceed the premium.
    2. The probability aggregate losses exceed 2500
    3. The expected value of aggregate losses limited to 2500
-   4. The expected value of aggregate losses in excess of 2500
+   4. The expected policyholder deficit in excess of 2500
 
 **Answers.**
 
-Building an aggregate object using simple DecL program, and then querying its ``density_df`` dataframe reveals all the answers.
+Build an aggregate object using simple DecL program.
+The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printed and formatted automatically by ``qd(a01)``.
 
 .. ipython:: python
     :okwarning:
@@ -60,32 +57,34 @@ Building an aggregate object using simple DecL program, and then querying its ``
     from aggregate import build, qd
 
     a01 = build('agg Actuary:01 '
-              '2000 premium at 0.675 lr 1000 xs 0 '
-              'sev lognorm 50 cv 1.25 '
-              'poisson')
+                '2000 premium at 0.675 lr '
+                '1000 xs 0 '
+                'sev lognorm 50 cv 1.25 '
+                'poisson'
+                , bs=1/8)
     qd(a01)
 
-The dataframe ``a01.describe``, printed and formatted automatically by the helper function ``qd`` gives the answers to questions 1 and 2. The survival function ``a01.sf`` answers 3.1 and 3.2. Again, ``qd`` is used to print with reasonable defaults.
+The survival function ``a01.sf`` answers 3.1 and 3.2. ``qd`` is used to print with reasonable defaults. The dataframe ``a01.density_df`` computes limited expected values (levs) and expected policyholder deficit indexed by loss level, and other values. Querying it answers 3.3.
 
 .. ipython:: python
     :okwarning:
 
     qd(a01.sf(2000), a01.sf(2500))
-    qd(a01.density_df.loc[[2500], ['F', 'lev', 'epd']])
+    qd(a01.density_df.loc[[2500], ['F', 'S', 'lev', 'epd']])
 
-The dataframe ``a01.density_df`` computes limited expected values (levs), indexed by loss level. The value ``a01.agg_m`` is the mean.
 
-.. ipython:: python
-    :okwarning:
-
-    default_agg = a01.agg_m - a01.density_df.loc[2500, 'lev']
-    default_agg
+..  # other things to consider
+    xs = a01.density_df.loc[2500, ['S', 'exgta']]
+    xs = xs.prod()
+    xxs = xs - 2500 * a01.density_df.loc[2500, 'S']
+    lev = a01.density_df.loc[2500, 'lev']
+    xs, a01.est_m - lev, xxs, xxs/a01.est_m, a01.density_df.loc[2500, 'epd']
 
 
 College and Exam Questions
 ---------------------------
 
-College courses and the early actuarial exams often ask purely technical questions. Using assumptions from :ref:`Realistic Insurance Example` answer the following.
+College courses and the early actuarial exams often ask purely technical questions. Using assumptions from the :ref:`Realistic Insurance Example` answer the following.
 
 1. Compute the severity lognormal parameters mu and sigma.
 2. Compute the expected insured severity and expected claim count.
@@ -103,7 +102,7 @@ College courses and the early actuarial exams often ask purely technical questio
    2. The expected value of losses limited to 2500
    3. The expected value of losses in excess of 2500
 
-The code below provides all the answers. ``mu_sigma_from_mean_cv`` computes the lognormal parameters---probably the most written macro in actuarial science! Start by applying it to the given severity parameters to answer question 1.
+The code below provides all the answers. ``mu_sigma_from_mean_cv`` computes the lognormal parameters---one of the most written macro in actuarial science! Start by applying it to the given severity parameters to answer question 1.
 
 .. ipython:: python
     :okwarning:
@@ -136,13 +135,16 @@ The function ``lognorm_lev`` computes limited expected values for the lognormal.
 
     mu, sigma = mu_sigma_from_mean_cv(a01.agg_m, a01.agg_cv)
     lev = lognorm_lev(mu, sigma, 1, 2500)
+    lev_agg = a01.density_df.loc[2500, 'lev']
     default = a01.agg_m - lev
-    epd = default / a01.agg_m
-    pd.DataFrame((lev, default, default_agg, epd, default_agg / a01.agg_m),
-                 index=pd.Index(['Lognorm LEV', 'Lognorm Default',
+    epd = default / a01.est_m
+    default_agg = a01.est_m - lev_agg
+    bit = pd.DataFrame((lev, default, lev_agg, default_agg, epd, default_agg / a01.agg_m),
+                 index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg LEV',
                  'Agg Default', 'Lognorm EPD', 'Agg EPD'],
                  name='Item'),
                  columns=['Value'])
+    qd(bit)
 
 
 
@@ -177,7 +179,7 @@ Objects created by :meth:`build` in this guide.
     :okexcept:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^(TenM|Student|Actuary):').iterrows():
+    for n, r in build.qshow('^Actuary:').iterrows():
         pprint_ex(r.program, split=20)
 
 

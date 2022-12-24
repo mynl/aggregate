@@ -1,5 +1,7 @@
 .. _2_x_tweedie_keyword:
 
+.. reviewed 2022-12-24
+
 The ``tweedie`` Keyword
 ------------------------
 
@@ -9,7 +11,11 @@ The ``tweedie`` Keyword
 
 The ``aggregate`` language keyword ``tweedie`` makes it easy to build Tweedie distributions.
 It uses reproductive
-parameters :math:`\mu, p, \sigma`, since these are most natural for GLM modeling. The keyword is used as follows to produce :math:`\mathsf{Tw}_{1.05}(2, 5)`, mean 2, :math:`p=1.05`, and dispersion 5.
+parameters :math:`\mu, p, \sigma^2` (mean, power, and dispersion), since these are most natural for GLM modeling.
+
+**Example.**
+
+The keyword is used as follows to produce :math:`\mathsf{Tw}_{1.05}(2, 5)`, mean 2, :math:`p=1.05`, and dispersion 5.
 
 .. ipython:: python
     :okwarning:
@@ -31,8 +37,11 @@ Inspecting the (non-trivial parts of the) specification shows the parser convert
 
 The note shows the compound Poisson specification.
 
-The helper function ``tweedie_convert`` translates between parameterizations. The scale parameter :math:`\sigma^2` has offsetting effects: higher :math:`\sigma^2` results in a lower claim count, a higher gamma mean, and a more skewed aggregate distribution with a bigger mass at zero. The code below shows the three representations, starting with the easiest to interpret.
+The helper function ``tweedie_convert`` translates between parameterizations. The scale (dispersion) parameter :math:`\sigma^2` has offsetting effects: higher :math:`\sigma^2` results in a lower claim count, a higher gamma mean, and a more skewed aggregate distribution with a bigger mass at zero.
 
+**Example.**
+
+The code below shows the three Tweedie representations, starting with the easiest to interpret.
 
 .. ipython:: python
     :okwarning:
@@ -98,6 +107,8 @@ Build a Tweedie using reproductive parameters, ``p``, ``mu``, ``sigma2``.
     print(a19.spec)
     print(a19.cdf(0), np.exp(-.40671))
 
+**Example.**
+
 When ``p`` is close to 1, the Tweedie approaches a Poisson. Here mean = 10 and sigma2 = 1, so the distribution is not over-dispersed.  The gamma severity has mean 1 and a very small CV; it acts like degenerate distribution at 1.
 
 .. ipython:: python
@@ -108,6 +119,8 @@ When ``p`` is close to 1, the Tweedie approaches a Poisson. Here mean = 10 and s
     a20.plot()
     qd(a20)
     tweedie_convert(p=1.0001, μ=10, σ2=1)
+
+**Example.**
 
 When ``p`` is close to 2, the Tweedie approaches a Gamma. Here mean = 10, and sigma2=0.04.
 The variance equals ``sigma2 mu^2``, so CV = sigma = 0.2
@@ -140,16 +153,3 @@ Build the same distribution explicitly from gamma severities. Here the gamma is 
 
     import matplotlib.pyplot as plt
     plt.close('all')
-
-Summary of Objects Created by DecL
--------------------------------------
-
-Objects created by :meth:`build` in the DecL guide.
-
-.. ipython:: python
-    :okwarning:
-    :okexcept:
-
-    from aggregate import pprint_ex
-    for n, r in build.qshow('^DecL:').iterrows():
-        pprint_ex(r.program, split=20)

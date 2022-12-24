@@ -470,7 +470,38 @@ Aggregate Distributions
 
 Let :math:`A=X_1+\cdots +X_N` be an aggregate distribution, where
 :math:`N` is the **frequency** component and  :math:`X_i` are iid **severity**
-random variables. Then, using the tower property of conditional expectations and the independence of :math:`N` and :math:`X_i` gives
+random variables.
+
+
+
+Aggregate statistics: the mean
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The mean of a sum equals the sum of the means. Let :math:`A = X_1 + \cdots + X_N`. If :math:`N=n` is fixed then :math:`\mathsf E[A] = n\mathsf E(X)`, because all :math:`\mathsf E[X_i]=\mathsf E[X]`. In general,
+
+.. math::
+
+    \mathsf E[A] = \mathsf E[X]\mathsf E[N]
+
+by conditional probability.
+
+Aggregate statistics: the variance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The variance of a sum of independent random variables equals the sum of the variances.  If :math:`N=n` is fixed then :math:`\mathsf{Var}(A) = n\mathsf{Var}(X)` and :math:`\mathsf{Var}(N)=0`. If :math:`X=x` is fixed then :math:`\mathsf{Var}(A) = x^2\mathsf{Var}(N)` and :math:`\mathsf{Var}(X)=0`. Making the obvious associations :math:`n\leftrightarrow\mathsf E[N]`, :math:`x\leftrightarrow\mathsf E[X]` suggests
+
+.. math::
+
+    \mathsf{Var}(A) = \mathsf E[N]\mathsf{Var}(X) + \mathsf E[X]^2\mathsf{Var}(N).
+
+Using conditional expectations and conditioning on the value of :math:`N` shows this  is the correct answer!
+
+**Exercise.** Confirm the formulas for an aggregate mean and variance hold for the :ref:`Simple Example`.
+
+Moment Generating Function
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Using the tower property of conditional expectations and the independence of :math:`N` and :math:`X_i` gives
 
 .. math::
 

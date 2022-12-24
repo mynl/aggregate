@@ -57,10 +57,11 @@ knobble_fonts()
 
 # module level doc-string
 __doc__ = """
-**aggregate** is a Python package providing an expressive language and fast, accurate computations
-to make working with aggregate (compound) probability distributions
-easy and intuitive. It allows students and practitioners to work with realistic
-real-world distributions that reflect the underlying frequency and severity
-generating processes. It has applications in insurance, risk management, actuarial
-science, and related areas.
+:mod:`aggregate` is an open source, BSD-licensed Python package providing an
+expressive language and fast, accurate computations to make working with
+aggregate (compound) probability distributions easy and intuitive. It allows
+students and practitioners to use realistic real-world distributions that
+reflect the underlying frequency and severity generating processes. It has
+applications in insurance, risk management, actuarial science, and related
+areas.
 """

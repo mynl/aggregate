@@ -1,9 +1,11 @@
 .. _2_x_cat:
 
+.. reviewed 2022-12-24
+
 Catastrophe Modeling
 ======================
 
-**Objectives:** Apply ``aggregate`` to catastrophe (cat) risk management, including calculation of occurrence and aggregate exceeding probability (OEP, AEP) values, manipulation of cat model output, computing PMLs with secondary uncertainty, and estimating ILW loss costs.
+**Objectives:** Apply ``aggregate`` to catastrophe (cat) risk management, including calculating of occurrence and aggregate exceeding probability (OEP, AEP) values, computing PMLs with secondary uncertainty, and estimating ILW loss costs.
 
 **Audience:** Catastrophe modelers, reinsurance actuaries, and risk management professionals.
 
@@ -11,15 +13,14 @@ Catastrophe Modeling
 
 **See also:** :doc:`2_x_capital`, :doc:`2_x_strategy`, :doc:`2_x_re_pricing`, :doc:`2_x_ir_pricing`.
 
-Contents
-----------
+**Contents:**
 
-* :ref:`Helpful References`
-* :ref:`cat jewsons pml estimates`
-* :ref:`cat jewsons climate estimates`
-* :ref:`ILW Pricing`
-* :ref:`Secondary Uncertainty`
-* :ref:`cat summary`
+#. :ref:`Helpful References`
+#. :ref:`cat jewsons pml estimates`
+#. :ref:`cat jewsons climate estimates`
+#. :ref:`ILW Pricing`
+#. :ref:`Secondary Uncertainty`
+#. :ref:`cat summary`
 
 
 Helpful References
@@ -220,7 +221,7 @@ as :math:`x\to\infty`, see REF. The next plot confirms that Feller's approximati
 
 .. note::
 
-    These graphs demonstrate computational facility. I'm not suggesting one million year PML is a reliable estimate. But the figure is *reliably computing* what the specified statistical model implies. The losses shown range up to USD 5 trillion or about 20% of GDP.
+    These graphs demonstrate computational facility. I'm not suggesting one million year PML is a reliable estimate. But the figure is **reliably computing what the specified statistical model implies**. The losses shown range up to USD 5 trillion, about 20% of GDP.
 
 
 .. _cat jewsons climate estimates:
@@ -228,7 +229,7 @@ as :math:`x\to\infty`, see REF. The next plot confirms that Feller's approximati
 Jewson's US Wind Climate Change Estimates
 --------------------------------------------
 
-Jewson Table 2 provides estimates for the impact of a 2&deg;C increase in global mean surface temperature (GMST) on event frequency by Safir-Simpson category. He also provides the standard deviation of the impact. These are added in the next dataframe.
+Jewson Table 2 provides estimates for the impact of a 2 degree Celcius increase in global mean surface temperature (GMST) on event frequency by Safir-Simpson category. He also provides the standard deviation of the impact. These are added in the next dataframe.
 
 .. ipython:: python
     :okwarning:
@@ -240,7 +241,7 @@ Jewson Table 2 provides estimates for the impact of a 2&deg;C increase in global
 
 He models the impact of climate change on PMLs by assuming the frequency of each category is perturbed using a lognormal with mean and standard deviation given by the last two columns of the above table. He assumes that the perturbations across categories are comonotonic. In actuarial terms, he is using comonotonic frequency mixing variables, to create a mixed compound Poisson.
 
-We can create a similar effect using ``aggregate`` first by adjusting the baseline event frequencies by the ``Freq Chg`` column and then by applying mixing across all events together (resulting in comonotonic perturbations). We select a mix CV equal to Jewson's estimate for Category 4 events. The categories are similar --- in light of the overall uncertainty of the analysis.
+We can create a similar effect using ``aggregate`` first by adjusting the baseline event frequencies by the ``Freq Chg`` column and then by applying shared mixing across all events together (resulting in comonotonic perturbations). We select a mix CV equal to Jewson's estimate for Category 4 events. The categories are similar --- in light of the overall uncertainty of the analysis.
 
 .. ipython:: python
     :okwarning:
@@ -333,21 +334,26 @@ Here are plots of the base and adjusted AEP and OEP curves. Compare Jewson Figur
 ILW Pricing
 -------------
 
-Industry Loss Warranties (ILW) are securities that pay an agreed amount if losses from a certain peril exceed a threshold during the contract term. They are usually written on an occurrence basis and are triggered by losses from a single event. For example, a US hurricane $20 billion ILW pays 1 if there is a US hurricane causing $20 billion or more losses during the contract period. They are used by insurers to provide cat capacity. Because they are not written on an indemnity basis there is no underwriting, which simplifies their pricing.
+Industry Loss Warranties (ILW) are securities that pay an agreed amount if losses from a named peril exceed a threshold during the contract term. They are usually written on an occurrence basis and are triggered by losses from a single event. For example, a US hurricane $20 billion ILW pays 1 if there is a US hurricane causing $20 billion or more losses during the contract period. They are used by insurers to provide cat capacity. Because they are not written on an indemnity basis there is no underwriting, which simplifies their pricing.
 
-Brokers publish price sheets for ILWs to give a view of market pricing. A recent sheet quoted the prices for US hurricane, expressed as percentages of the face value, as
+Brokers publish price sheets for ILWs to give a view of market pricing. Price is expressed as a percentage of the face value. A recent sheet quoted prices for US hurricane as follows.
 
-|       15B  at   47.0%
-|       20B  at   38.0%
-|       25B  at   33.0%
-|       30B  at   27.5%
-|       40B  at   17.5%
-|       50B  at   13.0%
-|       60B  at   10.75%
+.. math::
+    \small
+    \begin{matrix}
+    \begin{array}{@{}cr@{}}\hline
+        \textbf{Attachment} & \textbf{Price}\\ \hline
+        15B  &   47.0%   \\
+        20B  &   38.0%   \\
+        25B  &   33.0%   \\
+        30B  &   27.5%   \\
+        40B  &   17.5%   \\
+        50B  &   13.0%   \\
+        60B  &   10.75%   \\ \hline
+      \end{array}
+    \end{matrix}
 
-(see the first column of the dataframe below).
-
-The next dataframe adds expected losses and compares them to the ILW pricing. The expected loss is given by the occurrence survival function --- it is simply the probability of attaching the layer. The ``EL`` columns show Jewell's expected losses across the four views discussed above. Note the loss impact is caused by greater event frequency only, and that its effect increases with impact.
+The next dataframe adds expected losses and compares them to the ILW pricing. The expected loss is given by the occurrence survival function --- it is simply the probability of attaching the layer. The ``EL`` columns show Jewell's expected losses across the four views discussed above. The impact on EL is only caused by greater event frequency. Its effect increases with attachment.
 
 .. ipython:: python
     :okwarning:
@@ -361,11 +367,11 @@ The next dataframe adds expected losses and compares them to the ILW pricing. Th
     ilw['Price'] = [.47, .38, .33, .275, .175, .13, .1075]; \
     ilw.index.name = 'Trigger'; \
     ilw = ilw.iloc[:, [-1,0,1,2,3]]; \
-    qd(ilw)
+    qd(ilw, float_format=lambda x: f'{x:.4f}')
 
-Cat pricing is expressed in terms of the implied multiple equals to the premium to EL ratio (the reciprocal of the loss ratio), shown next in the ``Multiple`` columns.
-Cat pricing is usually in the range of 2 to 5 times the standard commercial models' estimates of expected loss. The base pricing below falls into this range. The climate adjusted pricing falls outside, which is not unexpected, since the pricing is for the coming period and not a future climate-impacted period.
+Cat pricing is often expressed in terms of the implied multiple: the ratio of premium to EL (reciprocal of the loss ratio).
 
+Cat pricing multiples are usually in the range of 2 to 5 times the standard commercial models' estimates of expected loss. The base model pricing multiples, shown below, fall into this range. The climate adjusted multiples fall outside, which is not unexpected, since the pricing is for the coming period and not a future climate-impacted period.
 
 .. ipython:: python
     :okwarning:
@@ -382,7 +388,7 @@ and proportional hazard (PH)
 
 .. math:: g(s) = s^p, \ p<1
 
-parametric families (see PIR REF). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable *between* distortions.)
+parametric families (see PIR REF). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable between distortions.)
 
 .. ipython:: python
     :okwarning:
@@ -398,9 +404,9 @@ parametric families (see PIR REF). In both cases, a higher parameter corresponds
 Secondary Uncertainty
 ------------------------
 
-Secondary uncertainty is the practice of expanding cat model simulated output by assuming that the results from each event form a distribution. It is usual to assume the distribution is a beta. The model output provides the beta's mean and standard deviation. Given this output, a modeler often needs to compute statistics, such as a layer expected loss,  reflecting the secondary uncertainty. This calculation can be performed in ``aggergate`` as follows.
+Secondary uncertainty is the practice of expanding cat model simulated output by assuming that the results from each event form a distribution. It is usual to assume the distribution is a beta. The model output provides the beta's mean and standard deviation. Given this output, modelers often need to compute statistics, such as a layer expected loss, reflecting the secondary uncertainty. This calculation can be performed in ``aggergate`` as follows.
 
-**Assumptions:** Assume one location with a TIV of 2500 and simple cat model output of only three events with mean losses 100, 200, and 1100 and secondary uncertainty standard deviation 100, 150, and 600. The overall event frequency is 1.6 with a Poisson distribution.
+**Assumptions:** Assume one location with a TIV of 2500 and simple cat model output with only three equally-likely events with mean losses 100, 200, and 1100 and secondary uncertainty standard deviation 100, 150, and 600. The overall event frequency is 1.6 with a Poisson distribution.
 
 **Question:** What is the expected loss to a 1000 xs 1000 per risk cover with and without secondary uncertainty?
 
@@ -419,10 +425,11 @@ The model with no secondary uncertainty is a simple mixed severity.
     :okwarning:
 
     base = build('agg Cat:Base '
-             '1.6 claims '
-             f'dsev {df.GroundUpLoss.values} '
-             'occurrence ceded to 1000 xs 1000 '
-             'poisson', bs=1)
+                 '1.6 claims '
+                 f'dsev {df.GroundUpLoss.values} '
+                 'occurrence ceded to 1000 xs 1000 '
+                 'poisson'
+                 , bs=1)
     qd(base)
 
 To incorporate the secondary uncertainty, we first compute the beta parameters using the method of moments. Then build the :class:`Aggregate` model incorporating secondary uncertainty in each loss.
@@ -444,7 +451,7 @@ To incorporate the secondary uncertainty, we first compute the beta parameters u
 
 Including secondary uncertainty nearly triples the expected loss to the layer, from 53 to 154. Had the third loss been only 1000, there would be no loss at all to the layer without secondary uncertainty.
 
-The next plot compares the severity and aggregate distributions.
+The next plot compares the gross severity and aggregate distributions.
 
 .. ipython:: python
     :okwarning:

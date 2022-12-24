@@ -11,10 +11,8 @@
 
 **See also:** :doc:`2_x_student`, :doc:`2_x_actuary_student`, :doc:`../3_Reference`, :doc:`2_x_dec_language`.
 
-The ``aggregate`` package makes working with aggregate probability distributions as straightforward as working with parametric distributions (e.g., those built into ``scipy.stats``), even though their densities rarely have a closed form expression. See :doc:`../3_Reference` for more.
 
-Contents
----------
+**Contents:**
 
 * :ref:`Principal Classes`
 * :ref:`10 min Underwriter`
@@ -65,9 +63,11 @@ Contents
 Principal Classes
 ------------------
 
+The ``aggregate`` package makes working with aggregate probability distributions as straightforward as working with parametric distributions (e.g., those built into ``scipy.stats``), even though their densities rarely have a closed form expression. See :doc:`../3_Reference` for more.
+
 The ``aggregate`` package is built around five principal classes.
 
-#. The :class:`Underwriter` class keeps track of everything in its ``knowledge`` dataframe, interprets Dec language (DecL, pronounced like deckle, /ˈdɛk(ə)l/) programs, and acts as a helper.
+#. The :class:`Underwriter` class keeps track of everything in its ``knowledge`` dataframe, interprets Dec Language (DecL, pronounced like deckle, /ˈdɛk(ə)l/) programs, and acts as a helper.
 #. The :class:`Severity` class models a size of loss distribution (a severity curve).
 #. The :class:`Aggregate` class models a single unit of business, such as a line, business unit, geography, or operating division.
 #. The :class:`Distortion` class provides a distortion function, the basis of a spectral risk measure.

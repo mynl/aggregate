@@ -1,13 +1,13 @@
-
-
 .. _2_agg_class_note_clause:
+
+.. reviewed 2022-12-24
 
 The Note Clause
 ---------------------
 
-An optional note or comment on the distribution can be added at the end, as
-the last clause. Can include hints for computation. Text is enclosed in
-braces.
+An optional note (comment) on the distribution can be added at the end, as the
+last clause. The note can include hints for computation. The text is enclosed
+in braces.
 
 ::
 

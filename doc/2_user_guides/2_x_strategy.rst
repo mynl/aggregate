@@ -1,5 +1,8 @@
 .. _2_x_strategy:
 
+.. reviewed 2022-12-24
+.. NEEDS WORK
+
 Strategy and Portfolio Management
 ==================================
 
@@ -11,12 +14,10 @@ Strategy and Portfolio Management
 
 **See also:**  :doc:`2_x_cat`, :doc:`2_x_capital`, :doc:`2_x_case_studies`.
 
+**Contents:**
 
-Contents
------------
-
-* :ref:`Helpful References`
-* :ref:`strat margin alloc`
+#. :ref:`Helpful References`
+#. :ref:`strat margin alloc`
 
 Helpful References
 --------------------

@@ -1,5 +1,6 @@
-|  |doc|  |py-versions| |downloads| |stars| |forks|
-|  |contributors| |version| |license| |packages|   |twitter|
+|  |activity| |doc| |version|
+|  |py-versions| |downloads|
+|  |license| |packages|  |twitter|
 
 .. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
     :target: https://pepy.tech/project/aggregate
@@ -21,6 +22,10 @@
     :target: https://pypi.org/project/aggregate
     :alt: Latest version
 
+.. |activity| image:: https://img.shields.io/github/commit-activity/m/mynl/aggregate
+   :target: https://github.com/mynl/aggregate
+   :alt: Latest Version
+
 .. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
     :alt: Supported Python versions
 
@@ -37,7 +42,7 @@
     :alt: Documentation Status
 
 .. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
-    :target: https://twitter.com/mynl
+    :target: https://twitter.com/SJ2Mi
     :alt: Twitter Follow
 
 -----
@@ -48,12 +53,8 @@ aggregate: a powerful aggregate distribution modeling library in Python
 What is it?
 -----------
 
-**aggregate** is a Python package providing an expressive language and fast,
-accurate computations to make working with aggregate (compound) probability
-distributions easy and intuitive. It allows students and practitioners to
-use realistic real-world distributions that reflect the underlying
-frequency and severity generating processes. It has applications in
-insurance, risk management, actuarial science, and related areas.
+**aggregate** is an open source, BSD-licensed Python package providing an expressive language and fast, accurate computations to make working with aggregate (compound) probability distributions easy and intuitive. It allows students and practitioners to use realistic real-world distributions that reflect the underlying frequency and severity generating processes. It has applications in insurance, risk management, actuarial science, and related areas.
+
 
 Documentation
 -------------
@@ -72,7 +73,8 @@ Installation
 
 ::
 
-  pip install sly, aggregate
+  pip install sly
+  pip install aggregate
 
 
 Getting started
@@ -161,7 +163,7 @@ See requirements.txt.
 License
 -------
 
-:ref:`BSD 3 licence <LICENSE>`
+BSD 3 licence.
 
 Contributing to aggregate
 -------------------------

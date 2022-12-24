@@ -2,6 +2,9 @@
 
 .. _2_agg_class_frequency_clause:
 
+.. reviewed 2022-12-24
+
+
 The Frequency Clause
 -------------------------
 
@@ -23,8 +26,9 @@ directly specifies the frequency distribution. The ``outcomes`` and ``probabilit
 
 ::
 
-    agg A dfreq [9 10 11] [.5 .25 .25] sev lognorm 50 cv 1.75
+    agg A dfreq [1 2 3] [.5 3/8 1/8] sev lognorm 50 cv 1.75
 
+specifies a frequency distribution with outcomes 1, 2, or 3 occurring with probabilities 0.5, 0.375, and 0.125 respectively. Probabilities can be entered as decimals or fractions.
 
 .. _parametric frequency:
 
@@ -33,14 +37,14 @@ Parametric Frequency Distributions
 
 The following parametric frequency distributions are supported. Remember that the exposure clause determines the expected claim count.
 
-* ``poisson``, no additional parameters required
-* ``geometric``, no additional parameters required
+* ``poisson``, no additional parameters required.
+* ``geometric``, no additional parameters required.
 * ``fixed``, no additional parameters required, expected claim count must be an integer.
-* ``bernoulli``, no additional parameters required, expected claim count must be :math:`\le 1`.
+* ``bernoulli``, no additional parameters required; expected claim count must be :math:`\le 1`.
 * ``binomial SHAPE``, the shape parameter sets :math:`p` and :math:`n=\mathsf{E}[N]/p`.
 * ``neyman SHAPE`` (or ``neymana`` or ``neymanA``), the Neyman A
   Poisson-compound Poisson. The shape variable gives the average number of
-  claimants per claim. See JKK. REF
+  claimants per claim. See JKK and :cite:t:`Consul1973`.
 * ``pascal SHAPE1 SHAPE2`` (the generalized Poisson-Pascal, see REF), where ``SHAPE1``
   gives the cv and ``SHAPE2`` the number of claims per occurrence.
 
@@ -48,7 +52,10 @@ The following parametric frequency distributions are supported. Remember that th
 
 ::
 
-    agg A 10 claims sev lognorm 50 cv 1.75 poisson
+    agg A 100 claims sev lognorm 50 cv 0.75 poisson
+    agg A 100 claims sev lognorm 50 cv 0.75 mixed gamma 0.2
+
+specifies a Poisson frequency.  and negative binomial frequency respectively. For the latter, frequency CV equals ``(1 + .2**2 * 100) ** .5 / 10 = 0.22361``.
 
 
 Mixed-Poisson Frequency Distributions
@@ -76,9 +83,10 @@ A :math:`G`-mixed Poisson frequency (see :ref:`mixed frequency distributions`), 
 
 ::
 
-    agg 5 claims dsev [1] mixed gamma 0.16
+    agg A 100 claims sev lognorm 50 cv 0.75 mixed gamma 0.2
 
-produces a negative binomial (gamma-mixed Poisson) distribution with variance :math:`5\times (1 + 0.16^2 \times 5)`.
+specifies a negative binomial (gamma-mixed Poisson) frequency respectively. The  variance equals :math:`100\times (1 + 0.2^2 \times 100)` and the CV equals ``(1 + .2**2 * 100) ** .5 / 10 = 0.22361``.
+
 
 .. warning::
     Fixed frequency will accept non-integer input, but will not return a distribution (it will have negative probabilities). Be careful!

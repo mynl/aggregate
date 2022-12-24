@@ -1,19 +1,22 @@
 .. _2_x_dec_language:
 
+.. reviewed 2022-12-24
+
 The Dec Language
 ======================
 
-**Objectives:** Introduce the Dec language (DecL) grammar.
+**Objectives:** Introduce the Dec Language (DecL) grammar.
 
-**Audience:** User who wants to use it to build realistic aggregates.
+**Audience:** User who wants to use DecL to build realistic aggregates.
 
 **Prerequisites:** Familiar with using ``build``. Probability theory behind aggregate distributions. Insurance and reinsurance terminology.
 
 **See also:** :doc:`2_x_re_pricing`, and :doc:`../4_dec_Language_Reference`.
 
 **Notation:** ``<item>`` denotes an optional term.
-
 See the note :ref:`10 mins formatting` for important information about how DecL programs are formatted and laid out in the help.
+
+**Contents:**
 
 .. toctree::
     :maxdepth: 4
@@ -31,3 +34,16 @@ See the note :ref:`10 mins formatting` for important information about how DecL 
     DecL/100_tweedie
 
 
+
+Summary of Objects Created by DecL
+-------------------------------------
+
+Objects created by :meth:`build` in the DecL guide.
+
+.. ipython:: python
+    :okwarning:
+    :okexcept:
+
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^DecL:').iterrows():
+        pprint_ex(r.program, split=20)

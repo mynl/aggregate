@@ -27,7 +27,7 @@ from .spectral import Distortion
 from .utilities import ft, \
     ift, sln_fit, sgamma_fit, \
     axiter_factory, AxisManager, html_title, \
-    suptitle_and_tight, \
+    suptitle_and_tight, pprint_ex, \
     MomentAggregator, Answer, subsets, round_bucket, \
     make_mosaic_figure, iman_conover, approximate_work
 
@@ -1715,6 +1715,13 @@ class Portfolio(object):
         else:
             df = None
         return df
+
+    @property
+    def pprogram(self):
+        """
+        pretty print the program to html
+        """
+        pprint_ex(self.program, 20)
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """

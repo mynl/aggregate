@@ -2861,6 +2861,13 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
             args.update(kwargs)
             print(x.to_string(**args))
             # print(x.to_string(formatters={c: f for c in x.columns}))
+        elif isinstance(x, pd.Series):
+            args = {'max_rows': 25,
+                    'float_format': ff,
+                    'name': True
+                    }
+            args.update(kwargs)
+            print(x.to_string(**args))
         elif isinstance(x, int):
             print(x)
         elif isinstance(x, Number):

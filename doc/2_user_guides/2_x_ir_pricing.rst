@@ -1,5 +1,8 @@
 .. _2_x_ir_pricing:
 
+.. reviewed 2022-12-24
+.. NEEDS WORK
+
 Individual Risk Pricing
 ==========================
 
@@ -11,14 +14,15 @@ Individual Risk Pricing
 
 **See also:** :doc:`2_x_re_pricing`, :doc:`DecL/080_reinsurance`. For other related examples see :doc:`2_x_problems`, especially :doc:`problems/0x0_bahnemann`.
 
+
+**Contents:**
+
+#. :ref:`Helpful references <ir references>`
+#. :ref:`Modes of Large Account Analysis`
+#. :ref:`ir stop loss`
+
+
 The examples in this section are illustrative. ``aggregate`` gives you the gross, ceded, and net distributions and with those in hand, you are off to the analytic races. You can answer any reasonable question about a large account program.
-
-Contents
-----------
-
-* :ref:`Helpful references <ir references>`
-* :ref:`Modes of Large Account Analysis`
-* :ref:`ir stop loss`
 
 .. _ir references:
 

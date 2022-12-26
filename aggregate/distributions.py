@@ -641,12 +641,15 @@ class Aggregate(Frequency):
                          for i in bit1.index.get_level_values('attach')]
         bit2 = pd.DataFrame(index=bit.index)
         # i = (share, layer, attach)
+        bit3 = bit0['ceded']
+        bit3 = bit3.iloc[:] / bit0['subject'].iloc[-1]
+        # TODO: not sure total cession is correct
         bit2['ceded'] = [v.ceded if i[-1] == 'gup' else v.ceded / self.sev.sf(i[-1] / i[0])
                          for i, v in bit0[['ceded']].iterrows()]
         ans = pd.concat((
             bit0 * self.n,
-            bit, bit1, bit2),
-            axis=1, keys=['ex', 'cv', 'en', 'severity'],
+            bit, bit1, bit2, bit3),
+            axis=1, keys=['ex', 'cv', 'en', 'severity', 'pct'],
             names=['stat', 'view'])
         return ans 
 
@@ -675,6 +678,7 @@ class Aggregate(Frequency):
         """
         if axs is None:
             fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H), constrained_layout=True)
+            self.figure = fig
         ax0, ax1 = axs.flat
 
         self.occ_reins_df.filter(regex='p_[scn]').rename(columns=lambda x: x[2:]).plot(ax=ax0, logy=True)
@@ -1294,7 +1298,7 @@ class Aggregate(Frequency):
         ix = self.density_df.index.get_loc(x, 'nearest')
         return self.density_df.iat[ix, 0]
 
-    def update(self, log2=13, bs=0, recommend_p=0.999, debug=False, **kwargs):
+    def update(self, log2=16, bs=0, recommend_p=0.999, debug=False, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -1311,7 +1315,7 @@ class Aggregate(Frequency):
             bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         if 'approximation' not in kwargs:
-            if self.n > 100:
+            if self.n > 10000:
                 kwargs['approximation'] = 'slognorm'
             else:
                 kwargs['approximation'] = 'exact'

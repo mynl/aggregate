@@ -7,6 +7,12 @@ All references! REF!
 Cat: put in changes to climate change el impact! (in progress)
 Then reinsurance and 10 mins...
 
+Reins: occ plot function not used in 2.6.6 = is it the right function?; duplication in explanation of new reins function (esp at the end).
+
+10 mins: severity with mean and CVs
+
+WARNINGS OFF function in utilities
+
 **Details.**
 
 `np.newaxis`, x=x[:, np.newaxis]

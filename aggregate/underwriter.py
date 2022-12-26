@@ -190,8 +190,8 @@ class Underwriter(object):
 
     def __repr__(self):
         s = []
-        s.append(f'Underwriter   {self.name}')
-        s.append(f'Knowledge     {len(self._knowledge)} programs')
+        s.append(f'underwriter   {self.name}')
+        s.append(f'knowledge     {len(self._knowledge)} programs')
         for k in ['log2', 'update', 'debug', 'site_dir', 'default_dir']:
             s.append(f'{k:<14s}{getattr(self, k)}')
         # s.append(super().__repr__())

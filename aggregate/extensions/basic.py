@@ -10,9 +10,9 @@ fcm = lambda x: f'{x/1e6:,.1g}'
 fg = lambda x: f'{x:8g%}'
 
 
-def rst_to_md(fn):
+def rst_to_md(fn, to_dir='/s/telos/temp/z'):
     """
-    Strip ipython code out of rst and make an md file that can be read into Jupyter
+    Strip ipython code out of rst file and make an md file that can be read into Jupyter
     """
     if type(fn) == str:
         fn = Path(fn)
@@ -30,7 +30,19 @@ def rst_to_md(fn):
     preamble = '```python\n'
     postamble = '\n```'
     str_out = preamble + '\n```\n\n```python\n'.join(python_code) + postamble
-    fout = (Path('/s/telos/temp/z') / fn.name).with_suffix('.md')
+    fout = (Path(to_dir) / fn.name).with_suffix('.md')
     fout.write_text(str_out, encoding='utf-8')
     return fout
 
+def all_rst_to_md(from_dir='doc', to_dir='/s/telos/temp/z'):
+    """
+    Convert all rst files in from_dir  to md files
+    """
+
+    if from_dir == 'doc':
+        from_dir = Path(__file__).parent.parent.parent / 'doc'
+        assert from_dir.exists()
+
+    for fn in Path(from_dir).glob('**/*.rst'):
+        print(f'Converting {fn}')
+        rst_to_md(fn, to_dir)

@@ -92,9 +92,13 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
         clean = re.sub(r'[ \t]+', ' ', t.strip())
         clean = re.sub(r' note\{[^}]*\}', '', clean)
         if split > 0 and len(clean) > split:
-            clean = re.sub(r' (d?sev|occurrence|agg|aggregate|mixed|poisson|fixed)', r'\n    \1', clean)
-            s = clean.split(' ')
-            clean = ' '.join(s[:2]) + '\n\t' + ' '.join(s[2:])
+            clean = re.sub(
+                r' ((dfreq )([0-9]+ )|([0-9]+ )(claims?|premium|loss|exposure)|d?sev|occurrence|agg|aggregate|wts?|mixed|poisson|fixed)',
+                           r'\n  \1', clean)
+        if clean[:4] == 'port':
+            # put in extra tabs at agg for portfolios
+            sc = clean.split('\n')
+            clean = sc[0] + '\n' + '\n'.join([i if i[:5] == '  agg' else '  ' + i for i in sc[1:]])
         ans.append(clean)
     ans = '\n'.join(ans)
     if html is True:

@@ -20,7 +20,6 @@ install_requires = [
     'numpy',
     'pandas',
     'psutil',
-    'pypandoc',
     'scipy',
     'sly',
     'titlecase',
@@ -46,12 +45,13 @@ long_description = """aggregate: a powerful aggregate distribution modeling libr
 What is it?
 -----------
 
-**aggregate** is a Python package providing an expressive language and fast,
-accurate computations to make working with aggregate (compound) probability
-distributions easy and intuitive. It allows students and practitioners to
-use realistic real-world distributions that reflect the underlying
-frequency and severity generating processes. It has applications in
-insurance, risk management, actuarial science, and related areas.
+**aggregate** makes working with aggregate (compound) probability
+distributions fast, accurate, easy, and intuitive.  It can solve problems
+in insurance, risk management, actuarial science, and related areas, using
+realistic models that reflect the actual underlying frequency and severity
+generating processes. It includes an expressive language called DecL to
+describe aggregate distributions and is implemented in Python under an open
+source BSD-license.
 
 Documentation
 -------------

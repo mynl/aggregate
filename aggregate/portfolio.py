@@ -376,9 +376,9 @@ class Portfolio(object):
         a_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
         a_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
         a_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
-        df = pd.DataFrame({'E[X]': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                           'Skew(X)': [sev_skew, n_skew, a_skew]},
-                          index=['Sev', 'Freq', 'Agg'])
+        df = pd.DataFrame({'E[X]': [n_m, sev_m, a_m], 'CV(X)': [n_cv, sev_cv, a_cv],
+                           'Skew(X)': [n_skew, sev_skew, a_skew]},
+                          index=['Freq', 'Sev', 'Agg'])
         df.index.name = 'X'
 
         if self.audit_df is not None:
@@ -396,6 +396,11 @@ class Portfolio(object):
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X']).fillna('')
+        # add estimated severity
+        sev_est_m = (df.xs('Sev', axis=0, level=1)['Est E[X]'].iloc[:-1].astype(float) *
+        df.xs('Freq', axis=0, level=1)['E[X]'].iloc[:-1]).sum() / df.loc[('total', 'Freq'), 'E[X]']
+        df.loc[('total', 'Sev'), 'Est E[X]'] = sev_est_m
+        df.loc[('total', 'Sev'), 'Err E[X]'] = sev_est_m / df.loc[('total', 'Sev'), 'E[X]'] - 1
         return df
 
     @property

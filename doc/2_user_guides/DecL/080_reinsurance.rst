@@ -15,7 +15,7 @@ syntax is best illustrated with some examples.
 
 **Examples.**
 
-#. Occurrence reinsurance::
+#. **Occurrence reinsurance**::
 
     agg Trucking                    \
     5000 loss 1000 xs 0             \
@@ -40,8 +40,7 @@ syntax is best illustrated with some examples.
     poisson
 
   models ceded losses.
-
-#. Aggregate reinsurance::
+2. **Aggregate reinsurance**::
 
     agg WorkComp                    \
     15000 loss                      \
@@ -50,9 +49,8 @@ syntax is best illustrated with some examples.
     poisson                         \
     aggregate ceded to 50% so 2000 xs 15000
 
- specifies the distribution of losses ceded to an aggregate protection for the 2000 xs 15000 layer of total losses (attaching at the loss pick), with occurrences limited to 500. The underlying business could be an SIR on a large account Workers Compensation policy, and the aggregate is a part of the insurance charge (Table L, M).
-
-#. Occurrence and aggregate reinsurance::
+  specifies the distribution of losses ceded to an aggregate protection for the 2000 xs 15000 layer of total losses (attaching at the loss pick), with occurrences limited to 500. The underlying business could be an SIR on a large account Workers Compensation policy, and the aggregate is a part of the insurance charge (Table L, M).
+3. **Occurrence and aggregate reinsurance**::
 
     agg Trucking 5000               \
     loss 1000 xs 0                  \
@@ -70,11 +68,11 @@ The occurrence reinsurance clause comes after severity but before frequency, bec
 
 The options for both clauses are:
 
-* They keywords ``ceded to`` or ``net of`` determines which losses flow out of the
+* Keywords ``ceded to`` or ``net of`` determine which losses flow out of the
   reinsurance.
-* fraction ``po`` limit ``xs`` attachment describes a partial placement, e.g.,
+* A fraction ``po`` limit ``xs`` attachment describes a partial placement, e.g.,
   ``0.5 so 3 xs 2``.
-* participation ``so`` limit ``xs`` attachment describes a partial placement
+* A participation ``so`` limit ``xs`` attachment describes a partial placement
   by the ceded limit, e.g., ``1 po 3 xs 2``. This syntax is equivalent to
   ``0.333 so 3 xs 2``.
 
@@ -88,13 +86,13 @@ policy limit. For example, a 5M limit may be layered as 250 xs 0, 250 xs 250,
 500 xs 500, 1000 xs 1000, and 3000 xs 2000. A tower can be input manually::
 
     occurrence ceded to 250 xs 0 and 250 xs 250 and 500 xs 500  \
-        and 1000 xs 1000 and 3000 xs 2000
+    and 1000 xs 1000 and 3000 xs 2000
 
-However, since layering is quite common, there
-is also a shorthand. A layering can be entered by specifying just the layer break
-points using the ``tower`` keyword::
+There is also a shorthand for layering, since it is quite common. A layering
+can be entered by specifying just the layer break points using the ``tower``
+keyword::
 
-        occurrence ceded to tower [0 250 500 1000 2000 5000]
+    occurrence ceded to tower [0 250 500 1000 2000 5000]
 
 The tower does not have to start at 0 and does not have to exhaust the entire
 policy limit. Towers can be applied to occurrence and aggregate reinsurance.

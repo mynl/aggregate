@@ -2428,33 +2428,6 @@ class Aggregate(Frequency):
                 print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
             return rbr
 
-    # def q_old(self, p):
-    #     """
-    #     Return lowest quantile, appropriate for discrete bucketing.
-    #     quantile guaranteed to be in the index
-    #     nearest does not work because you always want to pick rounding up
-    #
-    #     Definition 2.1 (Quantiles)
-    #
-    #     :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] ≥ α\}` is the lower α-quantile of X
-    #
-    #     :math:`x(α) = qα(X) = inf\{x ∈ R : P[X ≤ x] > α\}` is the upper α-quantile of X.
-    #
-    #     We use the x-notation if the dependence on X is evident, otherwise the q-notion.
-    #     Acerbi and Tasche (2002)
-    #
-    #     :param p:
-    #     :return:
-    #     """
-    #     if self._q is None:
-    #         self._q = interpolate.interp1d(self.density_df.F, self.density_df.loss, kind='linear')
-    #     l = float(self._q(p))
-    #     # find next nearest index value if not an exact match (this is slightly faster and more robust
-    #     # than l/bs related math)
-    #     l1 = self.density_df.index.get_loc(l, 'bfill')
-    #     l1 = self.density_df.index[l1]
-    #     return l1
-
     def q(self, p, kind='lower'):
         """
         Compute quantile, returning element in the index. Exact same code from Portfolio.q.
@@ -2524,118 +2497,6 @@ class Aggregate(Frequency):
             logger.error(f'Unexpected weirdness in {self.name} severity quantile...computed {p}th percentile as {l} '
                          'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
         return l
-
-    # def careful_q(self, p):
-    #     """
-    #     Careful calculation of q handling jumps (based of SRM_Examples Noise class originally).
-    #     Note this is automatically vectorized and returns and array whereas q isn't.
-    #     It doesn't necessarily return an element of the index.
-    #
-    #     Just for reference here is code to illustrate the problem. This code is used in Vig_0_Audit.ipynb. ::
-    #
-    #         uw = agg.Underwriter()
-    #
-    #         def plot_eg_agg(b, e, w, n=32, axs=None, x_range=1):
-    #             '''
-    #             makes a tricky distribution function with a poss isolated jump
-    #             creates an agg object and checks the quantile function is correct
-    #
-    #             mass at w
-    #
-    #             '''
-    #
-    #             if axs is None:
-    #                 f, axs0 = plt.subplots(2,3, figsize=(9,6))
-    #                 axs = iter(axs0.flatten())
-    #
-    #             tm = np.linspace(0, 1, 33)
-    #             tf = lambda x : f'{32*x:.0f}'
-    #
-    #             def pretty(axis, ticks, formatter):
-    #                 maj = ticks[::4]
-    #                 mnr = [i for i in ticks if i not in maj]
-    #                 labels = [formatter(i) for i in maj]
-    #                 axis.set_ticks(maj)
-    #                 axis.set_ticks(mnr, True)
-    #                 axis.set_ticklabels(labels)
-    #                 axis.grid(True, 'major', lw=0.707, c='lightblue')
-    #                 axis.grid(True, 'minor', lw=0.35, c='lightblue')
-    #
-    #             # make the distribution
-    #             xs = np.linspace(0, x_range, n+1)
-    #             Fx = np.zeros_like(xs)
-    #             Fx[b:13] = 1
-    #             Fx[20:e] = 1
-    #             Fx[w] = 32 - np.sum(Fx)
-    #             Fx = Fx / Fx.sum()
-    #             Fx = np.cumsum(Fx)
-    #
-    #             # make an agg version: find the jumps and create a dhistogram
-    #             temp = pd.DataFrame(dict(x=xs, F=Fx))
-    #             temp['f'] = np.diff(temp.F, prepend=0)
-    #             temp = temp.query('f > 0')
-    #             pgm = f'agg Tricky 1 claim sev dhistogram xps {temp.x.values} {temp.f.values} fixed'
-    #             a = uw(pgm)
-    #             a.easy_update(10, 0.001)
-    #             # plot
-    #             a.plot(axiter=axs)
-    #             pretty(axs0[0,0].xaxis, tm, tf)
-    #             pretty(axs0[0,2].xaxis, tm, tf)
-    #             pretty(axs0[0,2].yaxis, tm, tf)
-    #
-    #             # lower left plot: distribution function
-    #             ax = next(axs)
-    #             ax.step(xs, Fx, where='post', marker='.')
-    #             ax.plot(a.xs, a.agg_density.cumsum(), linewidth=3, alpha=0.5, label='from agg')
-    #             ax.set(title=f'b={b}, e={e}, w={w}', ylim=-0.05, aspect='equal')
-    #             if x_range  == 1:
-    #                 ax.set(aspect='equal')
-    #             ax.legend(frameon=False, loc='upper left')
-    #             pretty(ax.xaxis, tm, tf)
-    #             pretty(ax.yaxis, tm, tf)
-    #
-    #             # lower middle plot
-    #             ps = np.linspace(0, 1, 301)
-    #             agg_careful = a.careful_q(ps)
-    #             ax = next(axs)
-    #             ax.step(Fx, xs, where='pre', marker='.', label='input')
-    #             ax.plot(Fx, xs, ':', label='input joined')
-    #             ax.plot(ps, agg_careful, linewidth=1, label='agg careful')
-    #             ax.set(title='Inverse', ylim=-0.05)
-    #             if x_range  == 1:
-    #                 ax.set(aspect='equal')
-    #             pretty(ax.xaxis, tm, tf)
-    #             pretty(ax.yaxis, tm, tf)
-    #             ax.legend()
-    #
-    #             # lower right plot
-    #             ax = next(axs)
-    #             dmq = np.zeros_like(ps)
-    #             for i, p in enumerate(ps):
-    #                 try:
-    #                     dmq[i] = a.q(p)
-    #                 except:
-    #                     dmq[i] = 0
-    #             ax.plot(ps, agg_careful, label='careful (agg obj)', linewidth=1, alpha=1)
-    #             ax.plot(ps, dmq, label='agg version')
-    #             ax.legend(frameon=False, loc='upper left')
-    #             pretty(ax.xaxis, tm, tf)
-    #             pretty(ax.yaxis, tm, tf)
-    #             ax.set(title='Check with agg version')
-    #
-    #             plt.tight_layout()
-    #
-    #             return a
-    #
-    #         aw = plot_eg_agg(6, 29, 16)
-    #
-    #     :param p: single or vector of values of ps, 0<1
-    #     :return:  quantiles
-    #     """
-    #     if self._careful_q is None:
-    #         self._careful_q = CarefulInverse.dist_inv1d(self.xs, self.agg_density)
-    #
-    #     return self._careful_q(p)
 
     def tvar(self, p, kind='interp'):
         """
@@ -2721,17 +2582,6 @@ class Aggregate(Frequency):
         else:
             raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default) or tail')
 
-        # original version
-        # function not vectorized
-        # q = float(self.q(p, 'middle'))
-        # l1 = self.density_df.index.get_loc(q, 'bfill')
-        # q1 = self.density_df.index[l1]
-        #
-        # i1 = np.trapz(self.density_df.loc[q1:, 'S'], dx=self.bs)
-        # i2 = (q1 - q) * (2 - p - self.density_df.at[q1, 'F']) / 2  # trapz adj for first part
-        # return q + (i1 + i2) / (1 - p)
-
-
     @property
     def sev(self):
         """
@@ -2758,25 +2608,6 @@ class Aggregate(Frequency):
                     return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
                 self._sev = SevFunctions(cdf=_sev_cdf, sf=_sev_sf, pdf=_sev_pdf)
         return self._sev
-    #
-    # def sev_cdf(self, x):
-    #     """
-    #     Direct access to the underlying weighted severity, exact computation.
-    #
-    #     """
-    #     if self._sev_cdf is None:
-    #         self._make_exact_cdfs()
-    #     return self._sev_cdf(x)
-    #
-    # def sev_sf(self, x):
-    #     if self._sev_cdf is None:
-    #         self._make_exact_cdfs()
-    #     return self._sev_sf(x)
-    #
-    # def sev_pdf(self, x):
-    #     if self._sev_cdf is None:
-    #         self._make_exact_cdfs()
-    #     return self._sev_pdf(x)
 
     def cdf(self, x, kind='previous'):
         """
@@ -2870,52 +2701,6 @@ class Aggregate(Frequency):
         agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
         return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
-
-        # if approx_type == 'norm':
-        #     sd = m*cv
-        #     if output=='scipy':
-        #         return ss.norm(loc=m, scale=sd)
-        #     sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-        #     agg_str += f'{sd} @ norm 1 # {m} '
-        #
-        # elif approx_type == 'lognorm':
-        #     mu, sigma = mu_sigma_from_mean_cv(m, cv)
-        #     sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
-        #     if output=='scipy':
-        #         return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2))
-        #     agg_str += f'{np.exp(mu)} * lognorm {sigma} '
-        #
-        # elif approx_type == 'gamma':
-        #     shape = cv ** -2
-        #     scale = m / shape
-        #     if output=='scipy':
-        #         return ss.gamma(shape, scale=scale)
-        #     sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
-        #     agg_str += f'{scale} * gamma {shape} '
-        #
-        # elif approx_type == 'slognorm':
-        #     shift, mu, sigma = sln_fit(m, cv, skew)
-        #     if output=='scipy':
-        #         return ss.lognorm(sigma, scale=np.exp(mu-sigma**2/2), loc=shift)
-        #     sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
-        #     agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
-        #
-        # elif approx_type == 'sgamma':
-        #     shift, alpha, theta = sgamma_fit(m, cv, skew)
-        #     if output=='scipy':
-        #         return ss.gamma(alpha, loc=shift, scale=theta)
-        #     sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-        #     agg_str += f'{theta} * gamma {alpha} + {shift} '
-        #
-        # else:
-        #     raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
-        #
-        # if output == 'agg':
-        #     agg_str += ' fixed'
-        #     return agg_str
-        # else:
-        #     return Aggregate(**{'name': name, 'note': f'frozen version of {self.name}',
-        #                         'exp_en': 1, **sev, 'freq_name': 'fixed'})
 
     fit = approximate
 

@@ -71,10 +71,8 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    # PORT_BUILTIN = r'port\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?' # |empirical'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?'
     DISTORTION = 'dist(ortion)?'
-
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
     NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
     # NUMBER = r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
@@ -131,11 +129,6 @@ class UnderwritingLexer(Lexer):
     ID['zm'] = ZM
     ID['zt'] = ZT
     ID['x'] = XS
-
-    # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
-    # @_(r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?')
-    # def NUMBER(self, t):
-    #     return float(t.value)
 
     @_(r'\n+')
     def newline(self, t):
@@ -893,13 +886,6 @@ class UnderwritingParser(Parser):
             del built_in_dict['name']
         return built_in_dict
 
-    # @_('BUILTIN_PORT')
-    # def builtin_port(self, p):
-    #     # ensure lookup only happens here
-    #     self.logger(f'builtin_agg <-- PORT_BUILTIN', p)
-    #     built_in_dict = self.safe_lookup(p.PORT_BUILTIN)
-    #     return built_in_dict
-
     # ids =========================================================
     @_('ID')
     def name(self, p):
@@ -930,37 +916,6 @@ class UnderwritingParser(Parser):
         self.logger('numbers <-- expr', p)
         return p.expr
 
-    # calculator ===================================================
-    # implement simple calculator with exponents and exp as a convenience,
-    # with % (divide by 100) and unary plus and minus
-    # mimics the Python grammar https://docs.python.org/3/reference/grammar.html
-    # too much bother...keep division, exp and **
-    # @_('sum %prec LOW')
-    # def expr(self, p):
-    #     self.logger('expr <-- sum', p)
-    #     return p.sum
-    #
-    # @_('sum PLUS term')
-    # def sum(self, p):
-    #     self.logger('sum <-- sum + term', p)
-    #     return p.sum + p.term
-    #
-    # @_('sum MINUS term')
-    # def sum(self, p):
-    #     self.logger('sum <-- sum - term', p)
-    #     return p.sum - p.term
-    #
-    # @_('term %prec LOW')
-    # def sum(self, p):
-    #     self.logger('term <-- sum', p)
-    #     return p.term
-    #
-    # @_('term TIMES factor')
-    # def term(self, p):
-    #     self.logger('term <-- term * factor', p)
-    #     return p.term * p.factor
-
-    # cut off here
     @_('term')
     def expr(self, p):
         self.logger('expr <-- term', p)
@@ -975,17 +930,6 @@ class UnderwritingParser(Parser):
     def term(self, p):
         self.logger('term <-- factor', p)
         return p.factor
-
-    # this causes an unresolvable difficulty with sev ID expr +expr
-    # can't tell if it is a two param dist or a location shift
-    # folded - into the regex def of a number
-    # @_('PLUS factor', 'MINUS factor')
-    # def factor(self, p):
-    #     self.logger(f'factor <-- {p[0]} factor', p)
-    #     if p[0] == '+':
-    #         return p.factor
-    #     else:
-    #         return -p.factor
 
     @_('power')
     def factor(self, p):
@@ -1083,7 +1027,7 @@ def grammar(add_to_doc=False, save_to_fn=''):
     # finally add the language words
     # this is a bit manual, but these shouldnt change much...
     # lang_words = '\n\nlanguage words go here\n\n'
-    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
+    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
 
@@ -1158,7 +1102,7 @@ XS                      ::= "xs|x"
     if add_to_doc is True:
         pout.write_text(s, encoding='utf-8')
 
-    # save to user folder gammar
+    # save to user folder grammar
     if save_to_fn == '':
         save_to_fn = Path.home() / 'aggregate/parser/grammar.md'
     Path(save_to_fn).write_text(s, encoding='utf-8')

@@ -2,7 +2,8 @@
 **Dec** Language  Reference
 ***********************************
 
-.. to update run:
+.. to update run: python -m aggregate.parser to refresh 4_agg_langugage_reference/ref_include.rst
+   and (alas) manually paste the lexer defs below
 
 .. To view the grammar using a railroad diagram paste the
    specification below into
@@ -35,13 +36,12 @@ Aggregate names must not include underscore. Portfolio names may include undersc
 
 ::
 
-
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
               NUMBER, INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, HOMOG_MULTIPLY,
-              LOSS, PREMIUM, AT, LR, CLAIMS,
-              XS,
+              PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
+              LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
+              XS, PICKS,
               DISTORTION,
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
@@ -53,17 +53,12 @@ Aggregate names must not include underscore. Portfolio names may include undersc
 
     ignore = ' \t,\\|'
     literals = {'[', ']', '!', '(', ')'}
-
-    # per manual, need to list longer tokens before shorter ones
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9_:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed' # |empirical'
+    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
+    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?'
     DISTORTION = 'dist(ortion)?'
-
-    # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
     NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
-
     ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'
     EXPONENT = r'\^|\*\*'
     PLUS = r'\+'
@@ -71,18 +66,20 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     TIMES = r'\*'
     DIVIDE = '/'
     PERCENT = '%'
-    HOMOG_MULTIPLY = '@'
+    INHOMOG_MULTIPLY = '@'
     EQUAL_WEIGHT = '='
     RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
     ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
+    ID['exposure'] = EXPOSURE
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['tower'] = TOWER
     ID['mixed'] = MIXED
     ID['unlim'] = INFINITY
+    ID['picks'] = PICKS
     ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
     ID['ceded'] = CEDED
@@ -91,6 +88,7 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ID['dsev'] = DSEV
     ID['loss'] = LOSS
     ID['port'] = PORT
+    ID['rate'] = RATE
     ID['net'] = NET
     ID['sev'] = SEV
     ID['agg'] = AGG

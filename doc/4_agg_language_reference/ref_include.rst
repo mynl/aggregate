@@ -1,5 +1,4 @@
-answer              	::= sev_out
-                    	 | agg_out
+answer              	::= agg_out
                     	 | port_out
                     	 | distortion_out
                     	 | expr
@@ -15,7 +14,7 @@ agg_list            	::= agg_list agg_out
 agg_out             	::= AGG name exposures layers sev_clause occ_reins freq agg_reins note
                     	 | AGG name dfreq layers sev_clause occ_reins agg_reins note
                     	 | AGG name TWEEDIE expr expr expr note
-                    	 | AGG name builtin_agg note
+                    	 | AGG name builtin_agg agg_reins note
                     	 | builtin_agg agg_reins note
 
 sev_out             	::= SEV name sev note
@@ -49,7 +48,8 @@ sev_clause          	::= SEV sev %prec LOW
                     	 | dsev
                     	 | BUILTIN_SEV
 
-sev                 	::= sev "!"
+sev                 	::= sev picks
+                    	 | sev "!"
                     	 | sev PLUS numbers
                     	 | sev MINUS numbers
                     	 | numbers TIMES sev
@@ -65,6 +65,8 @@ xps                 	::= XPS doutcomes dprobs
 dsev                	::= DSEV doutcomes dprobs
 
 dfreq               	::= DFREQ doutcomes dprobs
+
+picks               	::= PICKS "[" numberl "]" "[" numberl "]"
 
 doutcomes           	::= "[" numberl "]"
                     	 | "[" expr RANGE expr "]"
@@ -89,6 +91,7 @@ note                	::= NOTE
 exposures           	::= numbers CLAIMS
                     	 | numbers LOSS
                     	 | numbers PREMIUM AT numbers LR
+                    	 | numbers EXPOSURE AT numbers RATE
 
 ids                 	::= "[" idl "]"
                     	 | ID
@@ -96,7 +99,7 @@ ids                 	::= "[" idl "]"
 idl                 	::= idl ID
                     	 | ID
 
-builtin_agg         	::= expr HOMOG_MULTIPLY builtin_agg
+builtin_agg         	::= expr INHOMOG_MULTIPLY builtin_agg
                     	 | expr TIMES builtin_agg
                     	 | builtin_agg PLUS expr
                     	 | builtin_agg MINUS expr
@@ -126,7 +129,7 @@ atom                	::= NUMBER PERCENT
                     	 | INFINITY
                     	 | NUMBER
 
-FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|fixed'
+FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
 
@@ -158,7 +161,7 @@ EXP                     ::= 'exp'
 
 EXPONENT                ::= '^|**'
 
-HOMOG_MULTIPLY          ::= "@"
+INHOMOG_MULTIPLY        ::= "@"
 
 INFINITY                ::= 'inf|unlim|unlimited'
 

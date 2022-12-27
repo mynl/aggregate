@@ -9,6 +9,7 @@ Published Problems and Examples
 
 **See also:** Bear and Nemlick and Mata et al. examples in :doc:`2_x_re_pricing`.
 
+**Contents:**
 
 .. toctree::
     :maxdepth: 4

@@ -1,27 +1,21 @@
 # TODO stack
 
-Examples introduced!
+Tuesday
+=======
 
-All references! REF!
+* estimating bucket size: put error code into agg *and how into port*?
+* All references! REF!
+* Cat: put in changes to climate change el impact! (in progress)
+* Reins: occ plot function not used in 2.6.6 = is it the right function?; duplication in explanation of new reins function (esp at the end).
+* Create a WARNINGS OFF function in utilities (or in build.warnings_off())
+* Actuary LEV so far off (student, see below)
+* shift and loc with mean and cv (sev in 10 mins)
+* How does DecL update?
 
-Cat: put in changes to climate change el impact! (in progress)
-Then reinsurance and 10 mins...
+Handy Stuff
+===========
 
-Reins: occ plot function not used in 2.6.6 = is it the right function?; duplication in explanation of new reins function (esp at the end).
-
-10 mins: severity with mean and CVs
-
-WARNINGS OFF function in utilities
-
-**Details.**
-
-`np.newaxis`, x=x[:, np.newaxis]
-
-Comments then code!!
-
-agg written in one line stand-alone and broken up in build MAKES SURE IT IS PASTEABLE!
-
-One-line it only for graphics?
+* `np.newaxis`, x=x[:, np.newaxis]
 
 actuary student example, why is lev so far off analytic answer?
 
@@ -63,17 +57,10 @@ shift.loc and cv::
     (np.exp(sigma**2)-1)**.5, 1/sigma**.5
 
 
-* Extract Python from rst
-* reins summaries in re section? [rather than by hand]; describe in DecL section
-* scale all graph plots! what are standards?
-* constants module in agg?
 
 
-0. Add exposure / rate keywords for 10 exposure at 1200 rate ? Is that in docs?
 0. Uncertainty principle for bs: too small not enough space; too large miss features of sev; for given n there is a min possible error
-1.
 1. qd looks for like columns / column format guesser?
-2. poisson poisson distribution  = neyman type a
 3. ZM and ZT
 3. cat paper; match Jewson; ILW pricing?
 4. rec bucket - do some testing to determine a good p.

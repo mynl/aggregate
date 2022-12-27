@@ -25,13 +25,13 @@ the theory and implementation details. Sections in the guides marked **Details**
 
 #. :doc:`2_user_guides/2_x_re_pricing` (practice):  Applications of the :class:`Aggregate` class to reinsurance exposure rating, including swings and slides, aggregate stop loss and swing rated programs, illustrated using problems from CAS Parts 8 and 9.
 
-#. :doc:`2_user_guides/2_x_reserving` (practice):  Applications of the :class:`Aggregate` class to reserving, including models of loss emergence and determining ranges for IBNR and case reserves.
+#. :doc:`2_user_guides/2_x_reserving` (practice, placeholder):  Applications of the :class:`Aggregate` class to reserving, including models of loss emergence and determining ranges for IBNR and case reserves.
 
 #. :doc:`2_user_guides/2_x_cat` (practice): Applications of the :class:`Aggregate` class to catastrophe risk evaluation and pricing using thick-tailed Poisson Pareto and lognormal models, including occurrence and aggregate PMLs and layer loss costs. Covers material on CAS Parts 8 and 9.
 
-#. :doc:`2_user_guides/2_x_capital` (practice): Application of the :class:`Portfolio` class to capital modeling, including VaR, TVaR, and risk visualization and quantification. Covers material on CAS Part 9.
+#. :doc:`2_user_guides/2_x_capital` (practice, placeholder): Application of the :class:`Portfolio` class to capital modeling, including VaR, TVaR, and risk visualization and quantification. Covers material on CAS Part 9.
 
-#. :doc:`2_user_guides/2_x_strategy` (practice): Application of the :class:`Portfolio` and  and :class:`Distortion` classes to strategy and portfolio management, including margin (capital) allocation, determining benchmark pricing within a portfolio using alternative pricing methodologies, and the evaluation of reinsurance.
+#. :doc:`2_user_guides/2_x_strategy` (practice, placeholder): Application of the :class:`Portfolio` and  and :class:`Distortion` classes to strategy and portfolio management, including margin (capital) allocation, determining benchmark pricing within a portfolio using alternative pricing methodologies, and the evaluation of reinsurance.
 
 #. :doc:`2_user_guides/2_x_case_studies` (practice): Using ``aggregate`` to reproduce the case study exhibits from the book `Pricing Insurance Risk <https://www.wiley.com/en-us/Pricing+Insurance+Risk:+Theory+and+Practice-p-9781119755678>`_ and build similar exhibits for your own cases.
 
@@ -39,7 +39,13 @@ the theory and implementation details. Sections in the guides marked **Details**
 
 #. :doc:`2_user_guides/2_x_problems` (practice):  ``aggregate`` solutions to a wide selection of problems and examples from books (Loss Models, Loss Data Analytics), actaruial exam study notes, and academic papers.
 
-Guides marked *practice* are problem and application based; they give possible driving destinations. *Reference* guides are access-based; they describe how to unlock the car, start the engine, and engage a gear.
+Guides marked **practice** are problem and application based and give possible driving destinations; those marked **reference** are access-based and describe how to unlock the car, start the engine, and engage a gear.
+
+Guides marked **placeholder** are work in progress, often just a sketch of planned content.
+
+.. to complete: IR, samples,
+
+.. placeholders are: reserving, capital, strategy
 
 .. toctree::
     :maxdepth: 1

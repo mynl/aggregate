@@ -2,6 +2,8 @@
 **Dec** Language  Reference
 ***********************************
 
+.. to update run:
+
 .. To view the grammar using a railroad diagram paste the
    specification below into
    the Edit Grammar tab of https://www.bottlecaps.de/rr/ui and then View Diagram.

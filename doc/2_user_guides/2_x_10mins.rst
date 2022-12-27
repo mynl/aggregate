@@ -1,5 +1,7 @@
 .. _2_x_10mins:
 
+.. reviewed 2022-12-26
+
 10 minutes to aggregate
 =========================
 
@@ -507,9 +509,9 @@ The pdf, cdf, and sf for the underlying severity are also available.
 .. _10 min mixtures:
 
 Mixtures
-~~~~~~~~~
+~~~~~~~~~~~~
 
-An :class:`Aggregate` can have a mixed severity. The mixture can include different distributions, parameters, shifts and locations.
+An :class:`Aggregate` can have a mixed severity. The mixture can include different distributions, parameters, shifts, and locations.
 
 .. ipython:: python
     :okwarning:
@@ -738,28 +740,33 @@ See :doc:`../5_technical_guides/5_x_numerical_methods` for further discussion.
 .. _10 min hyper:
 
 Hyper-parameters ``log2`` and ``bs``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``log2`` and ``bs`` control numerical calculations. ``log2`` equals the log to
-base 2 of the number of buckets used and ``bs`` equals the bucket size. These
-values are printed by ``qd``.
+The hyper-parameters ``log2`` and ``bs`` control numerical calculations.
+``log2`` equals the log to base 2 of the number of buckets used and ``bs``
+equals the bucket size. These values are printed by ``qd``.
 
 .. _10 min agg bucket:
 
-For :class:`Aggregate` Objects
-"""""""""""""""""""""""""""""""
+Estimating For :class:`Aggregate` Objects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For an :class:`Aggregate`, :meth:`recommend_bucket` uses a shifted lognormal method of moments fit and takes the ``recommend_p`` percentile as the right-hand end of the discretization. By default ``recommend_p=0.999``, but for thick tailed distributions it may be necessary to use a value closer to 1. :meth:`recommend_bucket` also considers any limits: ideally limits are multiples of the bucket size.
+For an :class:`Aggregate`, :meth:`recommend_bucket` uses a shifted lognormal
+method of moments fit and takes the ``recommend_p`` percentile as the
+right-hand end of the discretization. By default ``recommend_p=0.999``, but
+for thick tailed distributions it may be necessary to use a value closer to
+1. :meth:`recommend_bucket` also considers any limits: ideally limits are
+multiples of the bucket size.
 
-The recommended value of ``bs`` is rounded up to a binary fraction (denominator is a power of 2).
+The recommended value of ``bs`` is rounded up to a binary fraction
+(denominator is a power of 2).
 
 .. _10 min port bucket:
 
+Estimating For :class:`Portfolio` Objects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For :class:`Portfolio` Objects
-"""""""""""""""""""""""""""""""""
 For a :class:`Portfolio`, the right hand end of the distribution is estimated using the square root of sum of squares (proxy independent sum) of the right hand ends of each unit.
-
 
 The method :meth:`port.recommend_bucket` suggests a reasonable bucket size.
 

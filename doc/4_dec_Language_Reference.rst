@@ -5,6 +5,8 @@
 .. to update run: python -m aggregate.parser to refresh 4_agg_langugage_reference/ref_include.rst
    and (alas) manually paste the lexer defs below
 
+.. updated 2022-12-27
+
 .. To view the grammar using a railroad diagram paste the
    specification below into
    the Edit Grammar tab of https://www.bottlecaps.de/rr/ui and then View Diagram.

@@ -49,6 +49,42 @@ def adjusting_layer_losses():
     return f
 
 
+def savings_charge():
+    """
+    Figure to illustrate the insurance savings and expense(charge).
+
+    """
+    f, ax = plt.subplots(1, 1, figsize=(FIG_H, FIG_W), constrained_layout=True)
+    fz = ss.lognorm(.4)
+    xs = np.linspace(0, fz.isf(1e-3), 1001, endpoint=False)
+    F = fz.cdf(xs)
+    ax.plot(F, xs, lw=3)
+    a1 = 1.25  # height of line
+    ax.axhline(a1, c='C7', lw=1.5)
+    ax.set_xticks([0, .25, .5, .75, 1])
+    ax.set_yticks([0, a1, 3.5])
+    ax.set_yticklabels(['0', '$r$', ''])
+    ax.set(xlabel='Nonexceedance probability', ylabel='Scaled outcome',
+           ylim=[0, 3.5], xlim=[0, 1],
+           title='Insurance savings and expense')
+
+    xx = [.9, .25]
+    yy = [1.05 * a1, .8* a1]
+    ll = ['Insurance\ncharge, $\\phi(r)$',
+         'Insurance\nsavings, $\\psi(r)$']
+    hos = [-0.1, 0.25]
+    vos = [1.2, .65]
+    ax.text(.5, a1 * .4, '$E[X\\wedge l]$', ha='center', va='center')
+    for x, y, l, ho, vo in zip(xx, yy, ll, hos, vos):
+        ax.annotate(text=l,
+                    xy=(x, y),
+                    xytext=(x + ho, y + vo),
+                    ha='right',
+                    va='bottom',
+                    arrowprops={'arrowstyle': '->', 'linewidth': .5}
+                    )
+    return f
+
 def mixing_convergence(freq_cv, sev_cv, bs=1/64):
     """
     Illustrate convergence of mixed distributions to the mixing distribution.

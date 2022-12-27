@@ -2428,6 +2428,52 @@ class Aggregate(Frequency):
                 print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
             return rbr
 
+    def aggregate_error_analysis(self, log2, bs2_from=None, **kwargs):
+        """
+        Analysis of aggregate error across a range of bucket sizes. If ``bs2_from
+        is None`` use recommend_bucket plus/mins 3. Note: if distribution does
+        not have a second moment, you must enter bs2_from.
+
+        :param log2:
+        :param bs2_from: lower bound on bs to use, in log2 terms; estimate using
+          ``recommend_bucket`` if not input.
+        :param kwargs: passed to ``update``
+
+        """
+        # copy of self, updating alters the internal state of an object
+        cself = Aggregate(**self.spec)
+
+        if bs2_from is None:
+            if cself.agg_cv == np.inf:
+                raise ValueError('Distribution must have variance to guess bucket size. '
+                                 'Input bs2_from')
+            bs = self.recommend_bucket(log2)
+            bs = round_bucket(bs)
+            bs2 = int(np.log(bs) / np.log(2))
+            bss = 2. ** np.arange(bs2 - 3, bs2 + 4)
+        else:
+            bss = 2. ** np.arange(bs2_from, bs2_from + 7)
+
+        # analytic aggregate mean
+        m = cself.agg_m
+        # aggregate analysis
+        agg_ans = []
+        for bs in bss:
+            cself.update(bs=bs, log2=log2, approximation='exact', **kwargs)
+            agg_ans.append([bs, m, cself.est_m,
+                            cself.est_m - m, cself.est_m / m - 1])
+
+        agg_df = pd.DataFrame(agg_ans,
+                              columns=['bs', 'agg_m', 'est_m',
+                                       'abs_m', 'rel_m', ])
+        m = cself.sev_m
+        agg_df['rel_h'] = agg_df.bs / 2 / m
+        agg_df['rel_total'] = agg_df.rel_h * np.sign(agg_df.rel_m) + agg_df.rel_m
+        agg_df = agg_df.set_index('bs')
+        agg_df.columns = agg_df.columns.str.split('_', expand=True)
+        agg_df.columns.names = ['view', 'stat']
+        return agg_df
+
     def q(self, p, kind='lower'):
         """
         Compute quantile, returning element in the index. Exact same code from Portfolio.q.

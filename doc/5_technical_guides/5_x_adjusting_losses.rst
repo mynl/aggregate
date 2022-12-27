@@ -84,7 +84,7 @@ These quantities are illustrated in the next figure.
     :okwarning:
 
     from aggregate.extensions.figures import adjusting_layer_losses
-    @savefig picks.png
+    @savefig picks.png scale=20
     adjusting_layer_losses();
 
 There is no adjustment to :math:`S` for :math:`x\ge a_n`. In the top

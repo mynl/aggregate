@@ -56,36 +56,6 @@ Handy Stuff
 
 * `np.newaxis`, x=x[:, np.newaxis]
 
-actuary student example, why is lev so far off analytic answer?
-
-::
-
-        a01 = build('agg Actuary:01 '
-                    '2000 premium at 0.675 lr 1000 xs 0 '
-                    'sev lognorm 50 cv 1.25 '
-                    'poisson', bs=1/8)
-        qd(a01)
-
-        qd(a01.sf(2000), a01.sf(2500))
-        qd(a01.density_df.loc[[2500], ['F', 'S', 'lev', 'epd']])
-
-
-    a01.density_df.loc[2500, ['F', 'exlea']].prod() + 2500 * a01.density_df.loc[2500, 'S']
-
-    from aggregate import lognorm_lev, mu_sigma_from_mean_cv
-
-    mu, sigma = mu_sigma_from_mean_cv(a01.agg_m, a01.agg_cv)
-    lev = lognorm_lev(mu, sigma, 1, 2500)
-    lev_agg = a01.density_df.loc[2500, 'lev']
-    default = a01.agg_m - lev
-    epd = default / a01.est_m
-    default_agg = a01.est_m - lev_agg
-    pd.DataFrame((lev, default, lev_agg, default_agg, epd, default_agg / a01.agg_m),
-                 index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg LEV',
-                 'Agg Default', 'Lognorm EPD', 'Agg EPD'],
-                 name='Item'),
-                 columns=['Value'])
-
 
 shift.loc and cv::
 

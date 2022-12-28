@@ -126,7 +126,7 @@ The function ``a01.approximate`` parameterizes all the requested matched moment 
     df['Error'] = df.Value / df.loc['agg', 'Value'] - 1
     qd(df.sort_values('Value'))
 
-The function ``lognorm_lev`` computes limited expected values for the lognormal. It is used to assemble a dataframe to answer question 4.
+The function ``lognorm_lev`` computes limited expected values for the lognormal. It is used to assemble a dataframe to answer question 4. In this case, the lognormal approximation EPD is over 50% higher than the more accurate estimate provided by ``aggregate``.
 
 .. ipython:: python
     :okwarning:

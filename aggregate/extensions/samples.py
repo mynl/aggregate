@@ -80,7 +80,7 @@ def portfolio_from_sample(n, means, cvs, rcm_p=1, positive=True, plot=True, log2
     return ans
 
 
-def add_exa_sample(self, sample):
+def add_exa_sample(self, sample, S_calculation='forwards'):
     """
     Computes a version of density_df using sample to compute E[Xi | X].
     Then fill in the other ex.... variables using code from
@@ -104,7 +104,7 @@ def add_exa_sample(self, sample):
     """
 
     # starter information
-    cut_eps = np.finfo(np.float).eps
+    # cut_eps = np.finfo(np.float).eps
     bs = self.bs
 
     # working copy
@@ -177,11 +177,15 @@ def add_exa_sample(self, sample):
 
     # macro, F, S
     df['F'] = np.cumsum(df.p_total)
-    # add_exa method; you'd think the fill value should be 0, which
-    # will be the case when df.p_total sums to 1 (or more)
-    df['S'] =  \
-            df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1],
-                max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+
+    if S_calculation == 'forwards':
+        df['S'] = 1 - df.p_total.cumsum()
+    else:
+        # add_exa method; you'd think the fill value should be 0, which
+        # will be the case when df.p_total sums to 1 (or more)
+        df['S'] =  \
+                df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1],
+                    max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
 
     # this avoids irritations later on
     df.F = np.minimum(df.F, 1)
@@ -189,8 +193,9 @@ def add_exa_sample(self, sample):
     # where is S=0
     Seq0 = (df.S == 0)
 
-    ## TODO fix the means and other stats here?
-    ## invalidate quantile functions
+    # TODO fix the means and other stats here?
+
+    # invalidate quantile functions
     self._linear_quantile_function = None
 
     # E[X_i | X=a], E(xi eq a)

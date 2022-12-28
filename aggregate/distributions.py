@@ -1361,7 +1361,7 @@ class Aggregate(Frequency):
         self.xs = xs
         self.bs = xs[1]
         # WHOA! WTF
-        self.log2 = int(np.log(len(xs)) / np.log(2))
+        self.log2 = int(np.log2(len(xs)))
 
         if type(tilt_vector) == float:
             tilt_vector = np.exp(-tilt_vector * np.arange(2**self.log2))
@@ -2450,7 +2450,7 @@ class Aggregate(Frequency):
                                  'Input bs2_from')
             bs = self.recommend_bucket(log2)
             bs = round_bucket(bs)
-            bs2 = int(np.log(bs) / np.log(2))
+            bs2 = int(np.log2(bs))
             bss = 2. ** np.arange(bs2 - 3, bs2 + 4)
         else:
             bss = 2. ** np.arange(bs2_from, bs2_from + 7)

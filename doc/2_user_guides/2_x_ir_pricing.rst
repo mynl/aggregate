@@ -192,9 +192,10 @@ application.
     qd(a01)
     qd(a01.statistics.loc['sev', [0, 1, 'mixed']])
 
-Look at the ``aggregate_error_analysis`` to pick ``bs``. Use an expanded
-number of buckets ``log2=19`` because the mixture includes small mean
-lognormal and large mean Pareto components (some trial and error not shown).
+Look at the ``aggregate_error_analysis`` to pick ``bs`` (see :ref:`10 min agg
+bucket`). Use an expanded number of buckets ``log2=19`` because the mixture
+includes small mean lognormal and large mean Pareto components (some trial
+and error not shown).
 
 .. ipython:: python
     :okwarning:

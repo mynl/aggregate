@@ -3185,3 +3185,36 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, deb
     Picks = namedtuple('picks', ['layers', 'exact', 'density', 'audit'])
     return Picks(layers=layers, exact=exact, density=density, audit=t)
 
+
+def integral_by_doubling(func, x0, err=1e-8):
+    r"""
+    Compute :math:`\int_{x_0}^\infty f` as the sum
+
+    .. math::
+
+        \int_{x_0}^\infty f = \sum_{n \ge 0} \int_{2^nx_0}^_{2^{n+1}x_0} f
+
+    Caller should check the integral actually converges.
+
+    :param func: function to be integrated.
+    :param x0: starting x value
+    :param err: desired accuracy: stop when incremental integral is <= err.
+    """
+    ans = 0.
+    counter = 0
+    # from to
+    f, t = x0, 2 * x0
+    last_int = 10
+    while last_int > err:
+        s = quad(func, f, t)
+        if s[1] > err:
+            raise ValueError(
+                f'Questionable integral numeric convergence, err {s[1]:.4g}\n'
+                f'f={f}, t={t}, x0={x0}, counter={counter}\n{str(fz)}')
+        last_int = s[0]
+        ans += s[0]
+        f, t = t, 2 * t
+        counter += 1
+        if counter > 96:
+            raise ValueError(f'counter = {counter} and error = {err}')
+    return -ans

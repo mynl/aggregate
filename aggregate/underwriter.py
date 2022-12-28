@@ -82,6 +82,11 @@ class Underwriter(object):
         # check site dir exists
         self.site_dir.mkdir(parents=True, exist_ok=True)
 
+        # case dir
+        self.case_dir = Path.home() / 'aggregate/cases'
+        # check case dir exists
+        self.case_dir.mkdir(parents=True, exist_ok=True)
+
         self.template_dir = self.default_dir.parent / 'templates'
         self.template_dir.mkdir(parents=True, exist_ok=True)
 

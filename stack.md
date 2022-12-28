@@ -12,6 +12,45 @@ Tuesday
 * shift and loc with mean and cv (sev in 10 mins)
 * How does DecL update?
 
+
+Xi to EXi|X to... graph progression... also consider scaled versions
+---------------------------------------------------------------------
+
+    %%sf 2 3 2.45 3.5
+    # mx = p07.q(1-1e-5)
+    bite = p07.density_df.filter(regex='exeqa_[ABC]').loc[0:mx]
+    bitp = p07.density_df.filter(regex='p_[ABC]').loc[0:mx]
+
+    bitp = bitp.cumsum()
+    xs = p07.density_df.loc[0:mx, 'loss']
+    ps = p07.density_df.loc[0:mx, 'p_total'].cumsum()
+
+    xl = [-0.025, 1.025]
+    # xl = [.98, 1.001]
+    # yl = p07.q(0.995)
+    # yl = [-yl/50, yl]
+
+    for ax, ce, cp, a in zip(axs.flat, bite, bitp, p07):
+        ax.plot(bitp[cp], xs, label='Standalone')
+        ax.plot(ps, bite[ce], label='E[Xi | X]')
+        ax.axhline(a.agg_m, lw=.5, c='C7', label='Expected')
+        ax.set(title=f'{a.name}, EX={a.agg_m:,.0f}', xlim=xl, ylim=yl)
+        ax.legend()
+
+    # mx = p07.q(1-1e-6)
+    # xl2 = [-mx/50, mx]
+    bite = p07.density_df.filter(regex='exeqa_[ABC]')
+    bitp = p07.density_df.filter(regex='p_[ABC]').cumsum()
+    xs = p07.density_df['loss']
+    ps = p07.density_df['p_total'].cumsum()
+
+    for ax, ce, cp, a in zip(axs.flat[3:], bite, bitp, p07):
+        ax.plot(xs, xs, label='total')
+        ax.plot(xs, bite[ce], label='E[Xi | X]')
+        ax.set(title=f'{a.name}, EX={a.agg_m:,.0f}',  ylim=yl, xlabel='loss')
+        ax.legend()
+
+
 Handy Stuff
 ===========
 
@@ -161,3 +200,51 @@ Corro and Tseng: NCCI 2014 ELFs
 
 
 AAS Paper!
+
+
+# Junk Yard
+
+Reproducing a Book Case Study
+------------------------------
+
+TODO Code here!
+
+Bodoff’s Examples
+-----------------
+
+This section shows how to reproduce Bodoff’s “Thought experiment 1”. He considers a situation of two losses wind, *W*, and earthquake, *Q*, where *W* and *Q* are independent, *W* takes the value 99 with probability 20% and otherwise zero, and *Q* takes the value 100 with probability 5% and otherwise zero. Total losses *Y* = *W* + *Q*. There are four possibilities outcomes.
+
+.. table:: Bodoff Thought Experiment 1
+
+   =================== ===============
+   **Event**           **Probability**
+   =================== ===============
+   No Loss             0.76
+   *W* = 99            0.19
+   *Q* = 100           0.04
+   *W* = 99, *Q* = 100 0.01
+   =================== ===============
+
+Here are the ``Aggregate`` programs for the four examples Bodoff considers.
+
+::
+
+   port BODOFF1 note{Bodoff Thought Experiment No. 1}
+       agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed
+       agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+
+   port BODOFF2 note{Bodoff Thought Experiment No. 2}
+       agg wind  1 claim sev dhistogram xps [0,  50] [0.80, 0.20] fixed
+       agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+
+   port BODOFF3 note{Bodoff Thought Experiment No. 3}
+       agg wind  1 claim sev dhistogram xps [0,   5] [0.80, 0.20] fixed
+       agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+   port BODOFF4 note{Bodoff Thought Experiment No. 4 (check!)}
+       agg a 0.25 claims sev   4 * expon poisson
+       agg b 0.05 claims sev  20 * expon poisson
+       agg c 0.05 claims sev 100 * expon poisson
+

@@ -2,8 +2,8 @@
 
 .. reviewed 2022-12-26
 
-10 minutes to aggregate
-=========================
+A Ten Minutes Guide to ``aggregate``
+=====================================
 
 **Objectives:** A whirlwind introduction to ``aggregate``.
 
@@ -257,7 +257,7 @@ The :meth:`Underwriter.build` method wraps the
 
 :meth:`Underwriter.factory` takes an ``Answer`` argument and updates it by creating the relevant object and updating it if ``build.update is True``.
 
-A set of methods called :meth`interpreter_xxx` run DecL  programs through parser for debugging purposes, but do not create any output or add anything to the knowledge.
+A set of methods called :meth:`interpreter_xxx` run DecL  programs through parser for debugging purposes, but do not create any output or add anything to the knowledge.
 
 * :meth:`Underwriter.interpreter_line` works on one line.
 * :meth:`Underwriter.interpreter_file`  works on each line in a file.
@@ -748,8 +748,8 @@ equals the bucket size. These values are printed by ``qd``.
 
 .. _10 min agg bucket:
 
-Estimating For :class:`Aggregate` Objects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Estimating and Testing ``bs`` For :class:`Aggregate` Objects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For an :class:`Aggregate`, :meth:`recommend_bucket` uses a shifted lognormal
 method of moments fit and takes the ``recommend_p`` percentile as the
@@ -758,13 +758,54 @@ for thick tailed distributions it may be necessary to use a value closer to
 1. :meth:`recommend_bucket` also considers any limits: ideally limits are
 multiples of the bucket size.
 
-The recommended value of ``bs`` is rounded up to a binary fraction
-(denominator is a power of 2).
+The recommended value of ``bs`` should rounded up to a binary fraction
+(denominator is a power of 2) using :meth:`utilities.round_bucket`.
+
+:class:`Aggregate` also includes two functions for assessing ``bs``, one based
+ on the overall error and one based on looking at each severity component.
+
+:meth:`Aggregate.aggregate_error_analysis` updates the object at a range of
+ different ``bs`` values and reports the total absolute (strictly, signed
+ absolute error) and relative error as well as an upper bound ``bs/2`` on the
+ absolute value of the discretization error. ``log2`` must be input and,
+ optionally, the log base 2 of the smallest bucket to model. It then models
+ six doublings of the input bucket. If no bucket is input, it models three
+ doublings up and down from the rounded :meth:`recommend_bucket` suggestion.
+ The output table shows the implied absolute ``agg_m``  and relative
+ ``est_m`` aggregate error in the mean, ``bs / 2`` divided into average
+ severity as ``rel h``, and the sum of this and ``rel m``. Thick tailed
+ distributions can favor a large bucket size without regard to the impact on
+ discretization; accounting for the impact of ``bs / 2`` is a countervailing
+ force.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a04.aggregate_error_analysis(16), sparsify=False, col_space=9)
+
+:meth:`Aggregate.severity_error_analysis` performs a detailed error analysis of each severity component. It reports:
+
+* The name, limit, attachment, and truncation point for each severity component.
+* ``S`` the probability the component (or total losses) exceed the truncation.
+* ``sum_p`` the sum of discrete probabilities, which can be :math:`<1` if ``normalize=False``.
+* ``wt`` the weight of the component and ``en`` the corresponding claim count.
+* ``agg_mean`` and ``agg_wt`` the aggregate mean contribution from the component (sums to the overall mean), and the each component's proportion of the total. The loss weight can differ drastically from the count weight.
+* ``mean`` and ``est_mean`` the analytic and estimated severity by component and the corresponding ``abs`` and ``rel`` error.
+* ``trunc_error`` the truncation error by component (tail integral) and relative truncation error.
+* The ``h_error`` based on ``bs / 2`` by component, a (conservative) upper bound on discretization error and the relative error compared to the component mean.
+* ``h2_adj`` and ``rel_h2_adj`` estimate a second order adjustment to the numerical mean. They give a better idea of the discretization error.
+
+.. ipython:: python
+    :okwarning:
+
+    qd(a04.severity_error_analysis(), line_width=75)
+
+Generally there is either discretization or truncation error. Look for one of them to dominate. Discretization error is solved with a smaller bucket; truncation with a larger. When the two conflict, add more buckets by increasing ``log2``.
 
 .. _10 min port bucket:
 
-Estimating For :class:`Portfolio` Objects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Estimating and Testing ``bs`` For :class:`Portfolio` Objects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For a :class:`Portfolio`, the right hand end of the distribution is estimated using the square root of sum of squares (proxy independent sum) of the right hand ends of each unit.
 
@@ -776,7 +817,9 @@ The method :meth:`port.recommend_bucket` suggests a reasonable bucket size.
     print(p07.recommend_bucket().iloc[:, [0,3,6,10]])
     p07.best_bucket(16)
 
-The column ``bsN`` correspond to discretizing with 2**N buckets. The rows show suggested bucket sizes for each unit and in total. For example with ``N=16`` (i.e., 65,536 buckets) the suggestion is 1.727. It is best the bucket size is a divisor of any limits or attachment points. :meth:`best_bucket` takes this into account and suggests 2.
+The column ``bsN`` corresponds to discretizing with 2**N buckets. The rows show suggested bucket sizes by unit and in total. For example with ``N=16`` (i.e., 65,536 buckets) the suggestion is 2.19. It is best the bucket size is a divisor of any limits or attachment points. :meth:`best_bucket` takes this into account and suggests 2.
+
+To test ``bs``, run the tests above on each unit.
 
 .. _10 min common:
 

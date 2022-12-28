@@ -25,7 +25,8 @@ from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
     axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint_ex, approximate_work, moms_analytic, picks_work
+    pprint_ex, approximate_work, moms_analytic, picks_work, \
+    integral_by_doubling
 
 from .spectral import Distortion
 
@@ -2473,6 +2474,92 @@ class Aggregate(Frequency):
         agg_df.columns = agg_df.columns.str.split('_', expand=True)
         agg_df.columns.names = ['view', 'stat']
         return agg_df
+
+    def severity_error_analysis(self, sev_calc='round', discretization_calc='survival',
+                                normalize=True):
+        """
+        Analysis of severity component errors, uses the current bs in self.
+        Gives detailed, component by component, error analysis of severities.
+        Includes discretization error (bs large relative to mean) and
+        truncation error (tail integral large).
+
+        Total S shows the aggregate not severity. Generally about self.n * (1 - sum_p)
+        (per Feller).
+
+        """
+        truncation_point = self.bs * (1 << self.log2)
+        wts = self.en / self.n
+        beds = self.discretize(sev_calc=sev_calc,
+                               discretization_calc=discretization_calc,
+                               normalize=normalize)
+        sev_ans = []
+        total_row = len(self.sevs)
+        for i, (s, wt, en, bed) in enumerate(zip(self.sevs, wts, self.en, beds)):
+            if len(self.sevs) == 1:
+                i = self.name
+            # exact
+            m = self.statistics.loc[('sev', 'ex1'), i]
+            # estimated
+            em, _ = xsden_to_meancv(self.xs, bed)
+            sev_ans.append([s.long_name,
+                            s.limit, s.attachment,
+                            truncation_point,
+                            s.sf(truncation_point), bed.sum(),
+                            wt, en,
+                            m, 0,
+                            m, em
+                            ])
+        # the total
+        m = self.sev_m
+        sev_ans.append(['total',
+                        self.limit.max(), self.attachment.min(),
+                        truncation_point,
+                        self.sf(truncation_point), self.density_df.p_sev.sum(),
+                        1, self.n,
+                        m, 0.,
+                        m, self.est_sev_m
+                        ])
+
+        sev_df = pd.DataFrame(sev_ans,
+                              columns=['name',
+                                       'limit', 'attachment',
+                                       'trunc',
+                                       'S', 'sum_p',
+                                       'wt', 'en',
+                                       'agg_mean', 'agg_wt',
+                                       'mean', 'est_mean'
+                                       ],
+                              index=range(total_row + 1))
+        sev_df['agg_mean'] *= sev_df['en']
+        sev_df['agg_wt'] = sev_df['agg_mean'] / \
+            sev_df.loc[0:total_row-1, 'agg_mean'].sum()
+        sev_df['abs'] = sev_df['est_mean'] - sev_df['mean']
+        sev_df['rel'] = sev_df['abs'] / sev_df['mean']
+        sev_df['trunc_error'] = \
+            [integral_by_doubling(s.sf, truncation_point) for s in self.sevs] + \
+            [integral_by_doubling(self.sev.sf, truncation_point)]
+        sev_df['rel_trunc_error'] = sev_df.trunc_error / sev_df['mean']
+        sev_df['h_error'] = self.bs / 2
+        sev_df['rel_h_error'] = self.bs / 2 / sev_df['mean']
+
+        # compute discretization_err_2 (was a separate function in development)
+        xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
+        ans = []
+        for s in self.sevs:
+            # density at xs
+            f = s.pdf(xs)
+            # derv of f = -S''
+            df = np.gradient(f, self.bs)
+            # integral to quadratic adjustment term approx to S
+            ans.append(np.sum(df) * self.bs ** 3 / 24)
+        ans = pd.Series(ans)
+
+        sev_df['h2_adj'] = np.hstack((ans, 0.))
+        sev_df.loc[total_row, 'h2_adj'] = \
+            sev_df.loc[0:total_row - 1, ['wt', 'h2_adj']].prod(1).sum()
+        sev_df['rel_h2_adj'] = sev_df['h2_adj'] / sev_df['mean']
+
+        return sev_df
 
     def q(self, p, kind='lower'):
         """

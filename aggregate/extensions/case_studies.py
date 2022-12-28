@@ -1,45 +1,15 @@
-"""
-
-Cut out hacks aimed at reproducing book exhibits (color, roe hack, blend fix etc.) these are
-now all applied by default. Set up for new syntax case specification.
-
-* No case manager - that is site only. No netter.
-* gridoff removed and grid lines cut out.
-* locf not used
-* make_netter and book style calls
-
-Trimeed out Tense and Relaxed portfolios.
-
-COPIED FROM WEBSITE/PricingInsuranceRisk
-JUNE 26 2022
-For hacking and planned integration into aggregate
-
-NO BACKWARD COMPATIBILITY REQUIREMENT... though ability to generate book examples a plus
-
-(PIR version came from spectral risk mono/Python ... which came from the ipynb exhibit creator)
-
-Note and To Do
-
-1. Per occ for HuSCS? This is actually quite hard...
-2. Other
-"""
-
-# Book Case Studies in library
-# See case_studies_runner.py to run
+# History
+# Removed hacks aimed at reproducing book exhibits (color, roe hack, blend fix etc.) these are
+# now all applied by default. Set up for new syntax case specification.
+# gridoff removed and grid lines cut out.
 # Integrates code from common_header, common_scripts, and hack
-# Integrates FigureManager, to be stand-alone
 
 import aggregate as agg
-from aggregate.distributions import Aggregate
-from aggregate.portfolio import Portfolio
-from aggregate.spectral import Distortion
-from aggregate.utilities import round_bucket, make_mosaic_figure, FigureManager
-from aggregate.bounds import Bounds, plot_max_min, plot_lee
+from aggregate import Aggregate, round_bucket, make_mosaic_figure, FigureManager, Bounds, plot_max_min
 import argparse
 from collections import OrderedDict
 from datetime import datetime
-import hashlib
-from inspect import signature, currentframe, getargvalues
+from inspect import signature
 from itertools import product
 from jinja2 import Environment, FileSystemLoader
 import json
@@ -58,11 +28,10 @@ from platform import platform
 import psutil
 import re
 from scipy.integrate import cumtrapz
-from scipy.interpolate import interp1d
 import shlex
 from subprocess import Popen
 from titlecase import titlecase as title
-import warnings
+import webbrowser
 
 from IPython.display import HTML, display
 
@@ -88,7 +57,6 @@ logger = logging.getLogger('aggregate.case_studies')
 stat_renamer = {'L': 'Expected Loss', 'P': "Premium", 'LR': 'Loss Ratio',
                 'M': "Margin", 'PQ': 'Leverage', 'Q': 'Capital', 'ROE': "ROE", 'a': 'Assets',
                 'rp': "Return Period", 'epdr': 'EPD Ratio', 'EPDR': 'EPD Ratio'}
-
 
 
 def add_defaults(dict_in, kind='agg'):
@@ -177,7 +145,7 @@ def urn(df):
 
 class CaseStudy(object):
     _stats_ = ['L', 'M', 'P', 'LR', 'Q', 'ROE', 'PQ', 'a']
-    _dist_ = ['EL', 'Dist roe', 'Dist ph', 'Dist wang', 'Dist dual', 'Dist tvar', 'Dist blend', ]
+    _dist_ = ['EL', 'Dist ccoc', 'Dist ph', 'Dist wang', 'Dist dual', 'Dist tvar', 'Dist blend', ]
     _classical_ = ['EL', 'ScaledEPD', 'ScaledTVaR', 'ScaledVaR', 'EqRiskEPD', 'EqRiskTVaR', 'EqRiskVaR',
                    'coTVaR', 'covar']
 
@@ -185,7 +153,7 @@ class CaseStudy(object):
         """
         Create an empty CaseStudy.
 
-        Use various factory options to actually populate.
+        Use ``factory`` to populate.
 
         """
 
@@ -324,37 +292,34 @@ class CaseStudy(object):
                 reg_p, roe, d2tc,
                 f_discrete, s_values, gs_values, bs, log2, padding):
         """
-        Create CaseStudy from case_id and all arguments in generic format with explicit reinsurance.
+        Create CaseStudy from case_id and all arguments in generic format with
+        explicit reinsurance. The reinsured unit is always B.
 
-        f_blend_fix True by default and try to do extend method.
-        f_roe_fix True by default (use approx to CCoC distortion)
+        Once created, run ``self.full_monty()s to create all exhibits and
+        ``self.browse_exhibits()` to view them.
 
-        re_line is always line B.
-
-        option_id = tame, cnc, hs, discrete, or a custom name that must be allowable as a directory name.
-        portfolio_function(option_id, flags): function to create the portfolios and return all relevant variables
-
-        d2tc = debt to total capital limit, for better blend distortion
-
-        :param case_id:
-        :param case_name:
-        :param case_description:
-        :param a_distribution:
-        :param b_distribution_net:
-        :param b_distribution_gross:
-        :param reg_p:
-        :param roe:
-        :param d2tc:
-        :param f_discrete:
-        :param bs:
-        :param log2:
-        :param padding:
+        :param case_id: unique id for case, must be acceptable as a filename
+        :param case_name: name of case
+        :param case_description: description of case
+        :param a_distribution: DecL program for unit A
+        :param b_distribution_gross: DecL program for unit B gross of reinsurance
+        :param b_distribution_net: DecL program for unit B net of reinsurance
+        :param reg_p: regulatory capital probability threshold
+        :param roe: target cost of capital
+        :param d2tc:  debt to total capital limit, for better blend distortion
+        :param f_discrete: True if the output is a discrete distribution
+        :param s_values: list of s values used to calibrate the blended distributions. They correspond
+          to the return period and prices for cat bonds with small s values.
+        :param gs_values: list of g(s) values
+        :param bs: bin size for discrete distributions
+        :param log2: log2 of the number of bins for discrete distributions
+        :param padding: for update.
         """
 
         self.case_id = case_id  # originally option_id
         self.case_name = case_name
         self.case_description = case_description
-        # programs
+        # DecL programs
         self.a_distribution = a_distribution
         self.b_distribution_gross = b_distribution_gross
         self.b_distribution_net = b_distribution_net
@@ -377,25 +342,14 @@ class CaseStudy(object):
         self.padding = padding
 
         # new style output from uw as list of Answer(...) object
-        out = self.uw.write(f'''
-port Gross_{self.case_id}
-    {self.a_distribution}
-    {self.b_distribution_gross}
-''')
-        self.gross = out[0].object # [('port', f'Gross_{self.case_id}')][0]
+        out = self.uw.write(f'port Gross_{self.case_id} {self.a_distribution} {self.b_distribution_gross}')
+        self.gross = out[0].object
         # sort out better bucket
         if self.bs == 0 or np.isnan(self.bs):
             self.bs = self.gross.best_bucket(self.log2)
         self.gross.update(log2=self.log2, bs=self.bs, padding=self.padding, remove_fuzz=True)
-        # self.gross = TensePortfolio(self.gross, ,
-        #                             ROE=self.roe, p=self.reg_p)
 
-        # net portfolio
-        out = self.uw.write(f'''
-port Net_{self.case_id}
-    {self.a_distribution}
-    {self.b_distribution_net}
-''')
+        out = self.uw.write(f'port Net_{self.case_id} {self.a_distribution} {self.b_distribution_net}')
         self.net = out[0].object
         self.net.update(log2=self.log2, bs=self.bs, remove_fuzz=True)
         self.ports = OrderedDict(gross=self.gross, net=self.net)
@@ -427,9 +381,7 @@ port Net_{self.case_id}
         self.blend_distortions = self.gross.calibrate_blends(a, prem, s_values, gs_values, debug=False)
 
         self.roe_d = self.approx_roe(e=1e-10)
-        # self.dist_dict = OrderedDict(roe=self.roe_d, blend=self.blend_d)
-        self.dist_dict = OrderedDict(roe=self.roe_d, **self.blend_distortions)
-        # TODO Enhance!
+        self.dist_dict = OrderedDict(ccoc=self.roe_d, **self.blend_distortions)
         k = list(self.blend_distortions.keys())[0]
         self.blend_d = self.blend_distortions[k]
         self.cache_dir = self.cache_base / f'{self.case_id}'
@@ -437,10 +389,14 @@ port Net_{self.case_id}
 
     def __repr__(self):
         return f'''Case Study object {self.case_id} @ {self.cache_dir} ({super().__repr__()})
-Portfolios: {self.gross.name} (EL={self.gross.ex:.2f}) and {self.net.name} ({self.net.ex:.2f}).
-Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a in self.gross])}).
-
+Portfolios: {self.gross.name} (EL={self.gross.agg_m:.2f}) and {self.net.name} ({self.net.est_m:.2f}).
+Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for a in self.gross])}).
 '''
+    def browse_exhibits(self):
+        # book exhibits
+        webbrowser.open(Path.home() / f'aggregate/cases/{self.case_id}_book.html')
+        # extended exhibits
+        webbrowser.open(Path.home() / f'aggregate/cases/{self.case_id}_extended.html')
 
     def full_monty(self):
         """
@@ -482,7 +438,7 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.ex:.2f}" for a i
         :return:
         """
         aroe = pd.DataFrame({'col_x': [0, e, 1], 'col_y': [0, self.v * e + self.d, 1]})
-        approx_roe_di = agg.Distortion('convex', None, None, df=aroe, col_x='col_x', col_y='col_y', display_name='roe')
+        approx_roe_di = agg.Distortion('convex', None, None, df=aroe, col_x='col_x', col_y='col_y', display_name='ccoc')
         return approx_roe_di
 
     def make_audit_exhibits(self):
@@ -736,7 +692,7 @@ The column sop shows the sum by unit. {self.re_description} All units produce th
             # caption = f'Table {table_no}: '
             caption = f"""Parameter estimates for the five base spectral risk measures."""
             tab115 = self.gross.dist_ans.droplevel((0, 1), axis=0).loc[
-                ['roe', 'ph', 'wang', 'dual', 'tvar'], ['param', 'error', '$P$', '$K$', 'ROE', '$S$']]. \
+                ['ccoc', 'ph', 'wang', 'dual', 'tvar'], ['param', 'error', '$P$', '$K$', 'ROE', '$S$']]. \
                 rename(columns={'$P$': 'P', '$K$': 'K', '$S$': 'S', 'ROE': 'ι'})
             self._display("N", urn(tab115), caption, None)
 
@@ -985,15 +941,15 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # book default distortions
         if self.case_id.startswith('discrete'):
             dnet = 'tvar'
-            dgross = 'roe'
+            dgross = 'ccoc'
         elif self.case_id.startswith('tame'):
             dnet = 'tvar'
-            dgross = 'roe'
+            dgross = 'ccoc'
         elif self.case_id.startswith('cnc'):
             dnet = 'ph'
             dgross = 'dual'
-            # dnet = 'roe'
-            # dgross = 'roe'
+            # dnet = 'ccoc'
+            # dgross = 'ccoc'
         elif self.case_id.startswith('hs'):
             dnet = 'wang'
             dgross = 'blend'
@@ -1198,7 +1154,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         a = self.pricing_summary.at['a', base]
         prem = self.pricing_summary.at['P', base]
-        roe_d = agg.Distortion('roe', self.roe)
+        roe_d = agg.Distortion('ccoc', self.roe)
         tvar_d = agg.Distortion('tvar', bounds.p_star('total', prem))
         idx = df.index.get_locs(df.idxmax()['t1'])[0]
         pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
@@ -1231,7 +1187,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         max_d.plot(ax=ax, both=False)
         min_d.plot(ax=ax, both=False)
 
-        ax.lines[n + 0].set(label='roe')
+        ax.lines[n + 0].set(label='ccoc')
         ax.lines[n + 2].set(color='green', label='tvar')
         ax.lines[n + 4].set(color='red', label='max')
         ax.lines[n + 6].set(color='purple', label='min')
@@ -1331,14 +1287,14 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
             ps = bit.index
             gprime = {}
-            dist_list = ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']
+            dist_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']
             for dn in dist_list:
                 gprime[dn] = diff(self.gross.dists[dn].g)
 
             self.diff_g = pd.DataFrame({dn: gprime[dn](1 - ps) for dn in dist_list},
                                        index=bit.index)
 
-            names = {'roe': 'CCoC', 'ph': 'Prop Hazard', 'wang': 'Wang',
+            names = {'ccoc': 'CCoC', 'ph': 'Prop Hazard', 'wang': 'Wang',
                      'dual': "Dual", 'tvar': "TVaR", 'blend': "Blend"}
 
             lbl = 'Gross E[Xi | X]'
@@ -1364,7 +1320,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 ax = next(axi)
                 # removed c='k'
                 ax.plot(self.diff_g.index, self.diff_g[d1], c='C2', lw=1, label=names[d1], drawstyle='steps-post')
-                if d1 == 'roe':
+                if d1 == 'ccoc':
                     ax.plot([1], [ylim - 0.1], '^', c='C2', ms=10, label='CCoC mass')
                 ax.plot(self.diff_g.index, self.diff_g[d2], c='C3', lw=1, label=names[d2], drawstyle='steps-post')
                 # ax.yaxis.set_major_locator(ticker.MultipleLocator(.25))
@@ -1405,14 +1361,14 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
             ps = 1 / bit0.index
             gprime = {}
-            dist_list = ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']
+            dist_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']
             for dn in dist_list:
                 gprime[dn] = diff(self.gross.dists[dn].g)
 
             self.diff_g = pd.DataFrame({dn: gprime[dn](ps) for dn in dist_list},
                                        index=bit0.index)
 
-            names = {'roe': 'CCoC', 'ph': 'Prop Hazard', 'wang': 'Wang',
+            names = {'ccoc': 'CCoC', 'ph': 'Prop Hazard', 'wang': 'Wang',
                      'dual': "Dual", 'tvar': "TVaR", 'blend': "Blend"}
 
             lbl = 'Gross E[Xi | X]'
@@ -1431,7 +1387,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 ax = next(axi)
                 # removed c='k'
                 ax.plot(self.diff_g.index, self.diff_g[d1], c='C2', lw=1, label=names[d1])
-                if d1 == 'roe':
+                if d1 == 'ccoc':
                     ax.plot([.4e5], [ylim - 0.1], '^', c='C2', ms=10, label='CCoC mass')
                 ax.plot(self.diff_g.index, self.diff_g[d2], c='C3', lw=1, label=names[d2])
                 ax.yaxis.set_major_locator(ticker.MultipleLocator(ylim / 5))
@@ -1477,74 +1433,6 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             self.net.plot(axd_bottom)
             caption = f'(B) {self.case_name}, gross (top) and net (bottom) densities on a nominal (left) and log (right) scale.'
             self._display_plot('B', f, caption)
-
-            # # limits for graphs
-            # if self.case_id == 'cnc':
-            #     regex = 'p_[CNt]'
-            #     a = 300  # gross.q(reg_p)
-            # elif self.case_id == 'tame':
-            #     regex = 'p_[ABt]'
-            #     a = 200
-            # elif self.case_id == 'hs':
-            #     regex = 'p_[HSt]'
-            #     a = 1000
-            # elif self.case_id == 'discrete':
-            #     regex = 'p_[Xt]'
-            #     a = 110
-            # else:
-            #     # lines should be called A and B
-            #     regex = f'p_({self.a_name}|{self.b_name}|total)'
-            #     if self.f_discrete:
-            #         a = self.gross.q(1)
-            #     else:
-            #         a = self.gross.q((1 + self.reg_p) / 2)
-            #
-            # if self.f_discrete:
-            #     i = 0
-            #     for ax, ln in zip(axs.flat, self.gross.line_names_ex):
-            #         self.gross.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', lw=2, ax=ax, c=f'C{i}',
-            #                                                        label=f'Gross {ln}')
-            #         if ln == self.re_line or ln == 'total':
-            #             self.net.density_df[f'p_{ln}'].cumsum().plot(drawstyle='steps-post', ls='--', lw=1, ax=ax,
-            #                                                          c=f'C{i}', label=f'Net {ln}')
-            #         ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
-            #         ax.legend(loc='lower right')
-            #         if self.case_id == 'discrete':
-            #             ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-            #         i += 1
-            #
-            #     ax = axs.flatten()[-1]
-            #     self.gross.density_df.filter(regex='p_[tX]').cumsum().plot(drawstyle='steps-post', ax=ax)
-            #     ax.set(xlim=[-1, a + 1], ylim=[-0.025, 1.025])
-            #     ax.legend(loc='lower right')
-            #     if self.case_id == 'discrete':
-            #         ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-            #     caption = f'(B) Figure (suppl.) 2.2: {self.case_name}, gross and net densities by line and combined gross.',
-            #     self._display_plot('B', f, caption)
-            #
-            # else:
-            #     self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-            #         columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax0)
-            #     self.gross.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-            #         columns=lambda x: x.replace('p_', 'Gross ')).plot(ax=ax1, logy=True)
-            #
-            #     self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-            #         columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax2)
-            #     self.net.density_df.filter(regex=regex).iloc[:, [2, 0, 1]].rename(
-            #         columns=lambda x: x.replace('p_', 'Net ')).plot(ax=ax3, logy=True)
-            #
-            #     for ax in axs.flat:
-            #         ax.set(xlim=[-a / 50, a])
-            #
-            #     if ax in [ax1, ax3]:
-            #         ax.legend().set(visible=False)
-            #
-            #     if self.case_id in ['tame', 'cnc']:
-            #         ax2.set(ylim=[-0.00125 / 16, .025 / 16])
-            #     else:
-            #         ax0.set(ylim=[-0.0025 / 2, .025])
-            #         ax2.set(ylim=[-0.005, .1])
-
 
             # fig 2.3, 2.5, and 2.6  ===================================================================================
             logger.info('Figures 2.3, 2.5, 2.7')
@@ -1703,7 +1591,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             p_star = bounds.p_star('total', premium, a)
             bounds.cloud_view(axs.flatten(), 0, alpha=1, pricing=True,
                               title=f'Premium={premium:,.1f}, p={self.reg_p:.1g}\na={a:,.0f}, p*={p_star:.3f}',
-                              distortions=[{k: port.dists[k] for k in ['roe', 'tvar']},
+                              distortions=[{k: port.dists[k] for k in ['ccoc', 'tvar']},
                                            {k: port.dists[k] for k in ['ph', 'wang', 'dual']}])
             # for ax in axs.flat:
             #     ax.set(aspect='equal')
@@ -1725,7 +1613,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 axi = iter(axs.flatten())
                 g_ins_stats(axi, dn, port.dists[dn], ls=ls)
 
-            for dn, ls in zip(['roe', 'tvar', 'blend'], ['-', '--', ':']):
+            for dn, ls in zip(['ccoc', 'tvar', 'blend'], ['-', '--', ':']):
                 axi = iter(axs.flatten()[6:])
                 g_ins_stats(axi, dn, port.dists[dn], ls=ls)
 
@@ -1738,7 +1626,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             f, axs = self.smfig(6, 4, (4 * 2.5, 6 * 2.5))
 
             port = self.ports['gross']
-            for i, dn in zip(range(6), ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']):
+            for i, dn in zip(range(6), ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']):
                 axi = iter(axs.flatten()[4 * i:])
                 macro_market_graphs(axi, port, dn, 200)
                 if i > 0:
@@ -1838,7 +1726,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                                    strict='ordered', df=[0, .98])
 
         # f_roe_fix, put pre-computed approx back
-        port.dists['roe'] = self.roe_d
+        port.dists['ccoc'] = self.roe_d
         # and then SET the distortions for net
         self.ports['net'].dists = self.ports['gross'].dists.copy()
 
@@ -1973,8 +1861,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # add self.blend_d to list of distortions
         for port in self.ports.values():
             # add mass_hints...
-            if 'roe' not in port.dists:
-                port.dists['roe'] = self.dist_dict['roe']
+            if 'ccoc' not in port.dists:
+                port.dists['ccoc'] = self.dist_dict['ccoc']
             if 'blend' not in port.dists and 'blend' in self.dist_dict:
                 port.dists['blend'] = self.dist_dict['blend']
             elif 'blend' not in port.dists:
@@ -1984,7 +1872,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         # Ch. Modern Mono Practice across distortions
         # all using GROSS calibrated distortions:
-        distortions = [self.ports['gross'].dists[dn] for dn in ['roe', 'ph', 'wang', 'dual', 'tvar', 'blend']]
+        distortions = [self.ports['gross'].dists[dn] for dn in ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']]
         bit_apply_gross = []
         for port in self.ports.values():
             temp = port.stand_alone_pricing(distortions, p=self.reg_p, kind='var')
@@ -2017,13 +1905,13 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             if k not in ad_compss:
                 ad_comps = port.analyze_distortions(p=self.reg_p,
                                                     efficient=False,
-                                                    regex='ph|dual|wang|tvar|roe|blend')
+                                                    regex='ph|dual|wang|tvar|ccoc|blend')
                 ad_compss[k] = ad_comps
                 if k == 'net':
                     # for classical CCoC need to just use roe distortion
                     ad_compss['net_classical'] = port.analyze_distortions(p=self.reg_p,
                                                                           efficient=False,
-                                                                          regex='roe')
+                                                                          regex='ccoc')
         summaries = {}
         for k, ad_comps in ad_compss.items():
             deets = ad_comps.comp_df.swaplevel(0, 1).sort_index(ascending=(1, 0))
@@ -2071,14 +1959,14 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         :return:
         """
         vas = ['Premium', 'Loss Ratio', 'Rate of Return']
-        dns = ['CCoC', 'PH', 'Wang', 'Dual', 'TVaR', 'Blend']
+        dns = ['Ccoc', 'PH', 'Wang', 'Dual', 'TVaR', 'Blend']
         idx = product(vas, dns)
         bit_sa = self.modern_monoline_by_distortion.loc[idx]
 
         vas = ['P', 'LR', 'ROE']
-        dns = ['Dist roe', 'Dist ph', 'Dist wang', 'Dist dual', 'Dist tvar', 'Dist blend']
+        dns = ['Dist ccoc', 'Dist ph', 'Dist wang', 'Dist dual', 'Dist tvar', 'Dist blend']
         idx = product(vas, dns)
-        renamer = {'P': 'Premium', 'LR': 'Loss Rato', 'ROE': 'Rate of return', 'Dist roe': 'CCoC', 'Dist ph': 'PH',
+        renamer = {'P': 'Premium', 'LR': 'Loss Rato', 'ROE': 'Rate of return', 'Dist ccoc': 'CCoC', 'Dist ph': 'PH',
                    'Dist wang': 'Wang', 'Dist dual': 'Dual', 'Dist tvar': 'TVaR', 'Dist blend': 'Blend'}
         bit_d = self.distortion_pricing.loc[idx]
         bit_d = bit_d.drop(('ceded', 'diff'), axis=1).rename(index=renamer)
@@ -2148,8 +2036,6 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         return img_tag
 
 
-
-
 def extract_sort_order(summaries, _varlist_, classical=False):
     '''
     Pull out exhibits. Note difference: classical uses net_classical, calibrated to roe
@@ -2193,12 +2079,12 @@ def g_ins_stats(axi, dn0, dist, ls='-'):
     dn = {'ph': "PH",
           'wang': "Wang",
           'dual': "Dual",
-          'roe': 'CCoC',
+          'ccoc': 'CCoC',
           'tvar': 'TVaR',
           'blend': 'Blend'}[dn0]
     if dn0 == 'blend':
         dn = 'Blend'
-    elif dn0 == 'roe':
+    elif dn0 == 'ccoc':
         # TODO HORRIBLE
         dn = f'{dn}, 0.10'
     else:
@@ -2225,76 +2111,6 @@ def g_ins_stats(axi, dn0, dist, ls='-'):
             ax.set(aspect=1)
         if i == 1:
             ax.legend(loc='lower right')
-
-
-# ============================================================================
-# ============================================================================
-# ============================================================================
-# Similar Risks IME Paper Functions
-def show3d(df, height=600, xlabel="p_upper", ylabel="p_lower", zlabel="Price", initialCamera=None):
-    """
-    quick plot of a Bounds cloud_df view FRAGILE
-
-    def plot3D(X, Y, Z, height=600, xlabel="X", ylabel="Y", zlabel="Z", initialCamera=None):
-
-        Javascript 3d graphics.
-        Sample call
-
-        X, Y = np.meshgrid(np.linspace(-3,3,50),np.linspace(-3,3,50))
-        Z = np.sin(X**2 + Y**2)**2/(X**2+Y**2)
-        plot3D(X, Y, Z)
-
-        :param X:
-        :param Y:
-        :param Z:
-        :param height:
-        :param xlabel:
-        :param ylabel:
-        :param zlabel:
-        :param initialCamera:
-        :return:
-
-    """
-    bit = df.t1.unstack()
-    X, Y = np.meshgrid(bit.columns, bit.index)
-    Z = bit.to_numpy()
-
-    options = {
-        "width": "100%",
-        "style": "surface",
-        "showPerspective": True,
-        "showGrid": True,
-        "showShadow": False,
-        "keepAspectRatio": True,
-        "height": str(height) + "px",
-        "xlabel": xlabel
-    }
-
-    if initialCamera:
-        options["cameraPosition"] = initialCamera
-
-    data = [{"x": X[y, x], "y": Y[y, x], "z": Z[y, x]} for y in range(X.shape[0]) for x in range(X.shape[1])]
-    visCode = r"""
-       <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" type="text/css" rel="stylesheet" />
-       <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
-       <div id="pos" style="top:0px;left:0px;position:absolute;"></div>
-       <div id="visualization"></div>
-       <script type="text/javascript">
-        var data = new vis.DataSet();
-        data.add(""" + json.dumps(data) + """);
-        var options = """ + json.dumps(options) + """;
-        var container = document.getElementById("visualization");
-        var graph3d = new vis.Graph3d(container, data, options);
-        graph3d.on("cameraPositionChange", function(evt)
-        {
-            elem = document.getElementById("pos");
-            elem.innerHTML = "H: " + evt.horizontal + "<br>V: " + evt.vertical + "<br>D: " + evt.distance;
-        });
-       </script>
-    """
-    htmlCode = "<iframe srcdoc='" + visCode + "' width='100%' height='" + str(
-        height) + "px' style='border:0;' scrolling='no'> </iframe>"
-    display(HTML(htmlCode))
 
 
 class ClassicalPremium(object):
@@ -2558,7 +2374,7 @@ def macro_market_graphs(axi, port, dn, rp):
     dn = {'ph': "PH",
           'wang': "Wang",
           'dual': "Dual",
-          'roe': 'CCoC',
+          'ccoc': 'CCoC',
           'tvar': 'TVaR',
           'blend': 'Blend'}[dn]
 
@@ -2736,35 +2552,6 @@ def process_memory(show_process=False):
         logger.info(f'Memory usage = {m:.3f}GB: |' + '=' * mu)
 
 
-def run_case_in_background(case_id, logLevel=30):
-    """
-    TODO: Fix up...no longer so easy...
-
-    Run a case and produce all the exhibits in the background.
-    Log the output and stderr info to a file
-
-    :param case_id:
-    :param base_file:
-    :param logLevel:
-    :return:
-    """
-
-    if platform()[:5] == 'Linux':
-        # python anywhere
-        pgm = '/home/Yzaamb/.virtualenvs/smve38b/bin/python'
-    else:
-        pgm = 'python'
-    args = shlex.split(f'{pgm} -m case_studies -c {case_id} -g {logLevel}')
-    # sterr = Path(datetime.now().strftime(f'log/{case_id}-%Y-%m-%d@%H-%M-%S-err.txt'))
-    stout = Path(datetime.now().strftime(f'log/{case_id}-out.txt'))
-    sterr = Path(datetime.now().strftime(f'log/{case_id}-err.txt'))
-    f_out = stout.open('w', encoding='utf=8')
-    f_err = sterr.open('w', encoding='utf=8')
-    p = Popen(args, stdout=f_out, stderr=f_err, text=True, encoding='utf-8')
-    return p, stout, sterr
-
-
-
 class ManualRenderResults():
 
     APPNAME = 'Pricing Insurance Risk'
@@ -2857,62 +2644,3 @@ class ManualRenderResults():
         p.write_text(h, encoding='utf-8')
         logger.info(f'Rendered {len(blobs)} exhibits and plots.')
 
-
-# command line related
-def setup_command_line():
-    """
-    Set up all command line options and return parser
-
-    :return:  parser object
-    """
-    parser = argparse.ArgumentParser(
-        description='PIR - Case Study Generator. Usual options -rb to run in color mode with ROE and blend fixes and use extend calibration.',
-        epilog='start /d . python -m case_studies -o cnc -rb  will run the cnc case in a background window. Add /min to minimize the window. '
-               'start "NAME"... uses NAME as the title for the new window.'
-    )
-    # Debug group
-
-    # EQUAL = 1 << 0  # discrete in equal model (ch 15); discrete only
-    # BOOK = 1 << 1  # book monochrome mode graphs, black lines; alt uses colored lines
-    # ROE_FIX = 1 << 2
-    # BLEND_FIX = 1 << 3
-    # COLOR = 1 << 4  # colored background to graphs
-    # CCOC_BLEND = 1 << 5  # use CCoC method to calibrate blend (default is to extend)
-
-    # meta download
-    parser.add_argument('-c', '--case', action='store', type=str, default='',
-                        help='Selected case id from case_spec.csv database. Use -c all to run all cases.')
-    parser.add_argument('-g', '--logger', action="store", type=int, default=30,
-                        help='Logger level.')
-    parser.add_argument('-l', '--list', action="store_true",
-                        help='List available cases and exit.')
-    # parser.add_argument('-k', '--book', action="store_true",
-    #                     help='Book, monochrome graphs.')
-    return parser
-
-
-if __name__ == '__main__':
-    # start "name" /d . python -m case_studies -c tame -l 31
-
-    # for debugging
-
-    command_line = setup_command_line()
-    args = command_line.parse_args()
-
-    logger.setLevel(args.logger)
-
-    if args.list:
-        print(CaseStudy.case_list())
-        exit()
-
-    if args.case == 'all':
-        case_ids = CaseStudy.case_list().index
-    else:
-        case_ids = args.case.split(' ')
-
-    process_memory(True)
-    for case_id in case_ids:
-        logger.info(f'{case_id} creating CaseStudy object')
-        case = CaseStudy.factory(case_id)
-        process_memory()
-        case.full_monty()

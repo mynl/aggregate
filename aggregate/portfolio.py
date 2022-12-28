@@ -5672,7 +5672,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 jr = df.iat[j, 1]
                 w = (premium - pj) / (pi - pj)
                 wts[(il, ir, jl, jr)] = w
-                # spoon feed into a dummy distortion
+                # feed into a dummy distortion
                 temp = Distortion('ph', .599099)
                 temp.name = 'blend'
                 # temp.display_name  = f'Extension ({il}, {ir}), ({jl}, {jr})'
@@ -5680,7 +5680,12 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                         w * dists[(il, ir)](x) + (1 - w) * dists[(jl, jr)](x))
                 temp.g_inv = None
                 wdists[(il, ir, jl, jr)] = temp
-
+        if len(wdists) == 0:
+            # failed to extrapolate, but still want a reasonable blend
+            logger.warning('Failed to fit blend')
+            # TODO placeholder - FIX!
+            wdists[0] = Distortion('ph', .599099)
+            wdists[0].name = 'blend'
         if debug is True:
             return wdists, df, pricer, dists, wts
         else:

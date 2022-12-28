@@ -17,7 +17,8 @@ from . utilities import get_fmts, pprint, pprint_ex, ft, \
     make_corr_matrix, random_corr_matrix, \
     LoggerManager, knobble_fonts, approximate_work, \
     partial_e, partial_e_numeric, moms_analytic, qd, \
-    sEngFormatter, mv, picks_work, GCN, lognorm_approx
+    sEngFormatter, mv, picks_work, GCN, lognorm_approx, \
+    integral_by_doubling
 from . spectral import Distortion
 from . distributions import Frequency, Severity, Aggregate
 from . portfolio import Portfolio, make_awkward

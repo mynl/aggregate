@@ -55,6 +55,7 @@ Floating point arithmetic is not associative.
 .. ipython:: python
 
    x,y = 4.41 + (2.36 + 1.53), (4.41 + 2.36) + 1.53
+   x,y = .1 + (0.6 + 0.3), (0.1 + 0.6) + 0.3
    x, y, x.as_integer_ratio(), y.as_integer_ratio()
 
 

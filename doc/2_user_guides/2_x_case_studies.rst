@@ -236,6 +236,8 @@ These snippets are provided in Python scripts in ``aggregate.extensions`` called
     python -m aggregate.extensions.tame
 
 
+Precomputed versions are available at `https://www.pricinginsurancerisk.com/results`_.
+
 Defining a Custom Case Study
 ------------------------------
 

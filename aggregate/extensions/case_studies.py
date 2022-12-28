@@ -586,7 +586,8 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
                 elif r.amax < 10 and r.amin >= 0:
                     fmts[n] = f3
                 else:
-                    fmts[n] = fc
+                    # was fc, but none of these numbers is that large
+                    fmts[n] = f3
             ff = fmts
         return self._display_work(exhibit_id, df, f'<div id="{exhibit_id}" /> ' + caption, ff, save,
                                   self.cache_dir, self.show)
@@ -2578,8 +2579,8 @@ class ManualRenderResults():
 
         :return:
         """
-        self.render_custom('[A-Z]', suffix='book')
-        self.render_custom('Z*', suffix='extended')
+        self.render_custom('[A-Y]', suffix='book')
+        self.render_custom('Z.*', suffix='extended')
 
     def render_custom(self, *argv, suffix='custom'):
         """
@@ -2601,9 +2602,10 @@ class ManualRenderResults():
         blobs = []
         ids = []
         for pattern in argv:
-            for p in sorted(base_dir.glob(f'{pattern}.html')):
-                ids.append(p.stem)
-                blobs.append(p.read_text(encoding='utf-8'))
+            for p in sorted(base_dir.glob('*.html')):
+                if re.match(pattern, p.stem):
+                    ids.append(p.stem)
+                    blobs.append(p.read_text(encoding='utf-8'))
 
         desc = [f'<p>{self.case_object.case_description}</p>']
         spec = self.case_object.to_dict()

@@ -3,13 +3,10 @@
 # (c) Stephen Mildenhall 2022
 
 import aggregate as agg
-from aggregate import build, Bounds
-from aggregate.utilities  import iman_conover, mu_sigma_from_mean_cv
-# from aggregate.utils import rearrangement_algorithm_max_VaR
-from aggregate.utilities import random_corr_matrix
-
+from aggregate import build, Bounds, iman_conover, mu_sigma_from_mean_cv, random_corr_matrix
 from collections import namedtuple
 from functools import lru_cache
+import logging
 import numpy as np
 import pandas as pd
 from pandas.plotting import scatter_matrix
@@ -17,12 +14,13 @@ from scipy.sparse import coo_matrix
 import scipy.stats as ss
 
 
+logger = logging.getLogger(__name__)
 
-def qd(df):
+def qdp(df):
     """
     quick describe with nice percentiles and cv
     """
-    d = df.describe
+    d = df.describe()
     d.loc['cv'] = d.loc['std'] / d.loc['mean']
     return d
 
@@ -37,7 +35,7 @@ def make_test_sample(n, means, cvs, desired_correlation=None):
     c = len(mus)
     names = [chr(65+i) for i in range(c)]
     df = pd.DataFrame(
-                     { i: ss.lognorm(s,
+                     {i: ss.lognorm(s,
                          scale=m*np.exp(-s*s/2)).rvs(n) for m, s, i in
                          zip(means, sigmas, names)
                      })
@@ -64,14 +62,13 @@ def portfolio_from_sample(n, means, cvs, rcm_p=1, positive=True, plot=True, log2
     else:
         rcm = random_corr_matrix(c, rcm_p, positive)
     sample = make_test_sample(n, means, cvs, rcm)
-    display(sample.corr())
+    # display(sample.corr())
     if plot is True:
         scatter_matrix(sample, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde');
 
     # add total etc.
     sample = sample.sort_index()
     sample = sample.reset_index(drop=False)
-    display(qd(sample))
 
     # make the Portfolio object
     port = agg.Portfolio('test_from_df', sample)
@@ -131,7 +128,7 @@ def add_exa_sample(self, sample):
     # re-scale loss samples so they sum to total, need to extract p_total first
     if 'p_total' not in sample_in:
         # equally likely probs
-        print('Adding p_total to sample_in')
+        logger.info('Adding p_total to sample_in')
         # logger.info('Adding p_total to sample_in')
         p_total = 1.0 / len(sample_in)
     else:
@@ -209,14 +206,15 @@ def add_exa_sample(self, sample):
         df.query('p_total > 0')[[f'exeqa_{i}' for i in self.line_names]].sum(axis=1))
     # display(df.query('p_total > 0').head().T)
 
-    # QDFC?
+    # in another situation; here we are before exlea has been added
+    # deal with the problem of conditioning on very small probabilities in the left tail
     # loss_max = df[['loss', 'exlea_total']].query('exlea_total > loss').loss.max()
     # if np.isnan(loss_max):
     #     loss_max = 0
     # else:
     #     # was mult * bs
     #     loss_max += bs
-    #     print(f'WARNING: loss_max > 0, {loss_max}')
+    #     logger.warning(f'Small probability fix: loss_max > 0, {loss_max}')
     # # try nan in place of 0             V
     # df.loc[0:loss_max, 'exlea_total'] = np.nan
 

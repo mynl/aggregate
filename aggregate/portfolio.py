@@ -89,10 +89,10 @@ class Portfolio(object):
             logger.info('Creating from sample DataFrame')
             spec_list = spec_list[0]
         if isinstance(spec_list, pd.DataFrame):
-            if 'p_total' in spec_list:
-                probs = spec_list['p_total'].to_numpy()
-            else:
-                probs = np.repeat(1 / len(spec_list), len(spec_list))
+            if 'p_total' not in spec_list:
+                logger.info('Adding p_total column to DataFrame with equal probs')
+                spec_list = spec_list.copy()
+                spec_list['p_total'] = np.repeat(1 / len(spec_list), len(spec_list))
 
         for spec in spec_list:
             if isinstance(spec, Aggregate):
@@ -101,10 +101,10 @@ class Portfolio(object):
                 agg_name = spec.name
             elif isinstance(spec, str) and isinstance(spec_list, pd.DataFrame):
                 if spec not in ['total', 'p_total']:
-                    s = spec_list[spec].sort_values().to_numpy()
+                    s = spec_list[[spec, 'p_total']].sort_values(spec)
                     a = Aggregate(name=spec,
                                   exp_en=1,
-                                  sev_name='dhistogram', sev_xs=s, sev_ps=probs,
+                                  sev_name='dhistogram', sev_xs=s[spec].values, sev_ps=s['p_total'].values,
                                   freq_name='fixed')
                     agg_name = spec
                 else:
@@ -165,7 +165,7 @@ class Portfolio(object):
         self.augmented_df = None
         self.epd_2_assets = {}
         self.assets_2_epd = {}
-        self.priority_capital_df = None
+        self._priority_capital_df = None
         self.priority_analysis_df = None
         self.audit_df = None
         self.padding = 0
@@ -396,11 +396,12 @@ class Portfolio(object):
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X']).fillna('')
-        # add estimated severity
-        sev_est_m = (df.xs('Sev', axis=0, level=1)['Est E[X]'].iloc[:-1].astype(float) *
-        df.xs('Freq', axis=0, level=1)['E[X]'].iloc[:-1]).sum() / df.loc[('total', 'Freq'), 'E[X]']
-        df.loc[('total', 'Sev'), 'Est E[X]'] = sev_est_m
-        df.loc[('total', 'Sev'), 'Err E[X]'] = sev_est_m / df.loc[('total', 'Sev'), 'E[X]'] - 1
+        if self.audit_df is not None:
+            # add estimated severity
+            sev_est_m = (df.xs('Sev', axis=0, level=1)['Est E[X]'].iloc[:-1].astype(float) *
+                df.xs('Freq', axis=0, level=1)['E[X]'].iloc[:-1]).sum() / df.loc[('total', 'Freq'), 'E[X]']
+            df.loc[('total', 'Sev'), 'Err E[X]'] = sev_est_m / df.loc[('total', 'Sev'), 'E[X]'] - 1
+            df.loc[('total', 'Sev'), 'Est E[X]'] = sev_est_m
         return df
 
     @property
@@ -1024,7 +1025,7 @@ class Portfolio(object):
         return round_bucket(bs)
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
-               sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0, epds=None,
+               sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0,
                trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, approximation=None, debug=False):
         """
 
@@ -1187,26 +1188,6 @@ class Portfolio(object):
         # add exa details
         if add_exa:
             self.add_exa(self.density_df, details=True)
-            # default priority analysis
-            logger.debug('Adding EPDs in Portfolio.update')
-            if epds is None:
-                epds = np.hstack(
-                    [np.linspace(0.5, 0.1, 4, endpoint=False)] +
-                    [np.linspace(10 ** -n, 10 ** -(n + 1), 9, endpoint=False) for n in range(1, 7)])
-                epds = np.round(epds, 7)
-            self.priority_capital_df = pd.DataFrame(index=pd.Index(epds))
-            for col in self.line_names:
-                for i in range(3):
-                    self.priority_capital_df['{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
-                    self.priority_capital_df['{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](
-                        epds)
-                col = 'not ' + col
-                for i in range(2):
-                    self.priority_capital_df['{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
-            self.priority_capital_df['{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
-            self.priority_capital_df.columns = self.priority_capital_df.columns.str.split("_", expand=True)
-            self.priority_capital_df.sort_index(axis=1, level=1, inplace=True)
-            self.priority_capital_df.sort_index(axis=0, inplace=True)
         else:
             # at least want F and S to get quantile functions
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
@@ -1227,183 +1208,209 @@ class Portfolio(object):
         self.q_temp = None
         self._cdf = None
 
-    def update_efficiently(self, log2, bs, approx_freq_ge=100, approx_type='slognorm',
-                           sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1):
-        """
-        Runs stripped down versions of update and add_exa.
-        Code copied from those routines and cleaned for comments etc.
-        NOT UPDATED FOR REINSURANCE.
+    @property
+    def priority_capital_df(self):
+        if self._priority_capital_df is None:
+            # default priority analysis
+            # never use these, so movaed out of main update
+            # TODO make a property and create on demand
+            logger.debug('Adding EPDs in Portfolio.update')
+            epds = np.hstack(
+                [np.linspace(0.5, 0.1, 4, endpoint=False)] +
+                [np.linspace(10 ** -n, 10 ** -(n + 1), 9, endpoint=False) for n in range(1, 7)])
+            epds = np.round(epds, 7)
+            self._priority_capital_df = pd.DataFrame(index=pd.Index(epds))
+            for col in self.line_names:
+                for i in range(3):
+                    self._priority_capital_df['{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
+                    self._priority_capital_df['{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](
+                        epds)
+                col = 'not ' + col
+                for i in range(2):
+                    self._priority_capital_df['{:}_{:}'.format(col, i)] = self.epd_2_assets[(col, i)](epds)
+            self._priority_capital_df['{:}_{:}'.format('total', 0)] = self.epd_2_assets[('total', 0)](epds)
+            self._priority_capital_df.columns = self._priority_capital_df.columns.str.split("_", expand=True)
+            self._priority_capital_df.sort_index(axis=1, level=1, inplace=True)
+            self._priority_capital_df.sort_index(axis=0, inplace=True)
+        return self._priority_capital_df
 
-        TODO: is this enough of a speedup to be useful?
-
-
-        :param log2:
-        :param bs:
-        :param approx_freq_ge:
-        :param approx_type:
-        :param remove_fuzz:
-        :param sev_calc:
-        :param discretization_calc:
-        :param padding:
-        :return:
-        """
-        self.log2 = log2
-        self.bs = bs
-        self.padding = padding
-        self.approx_type = approx_type
-        self.sev_calc = sev_calc
-        self._remove_fuzz = True
-        self.approx_type = approx_type
-        self.approx_freq_ge = approx_freq_ge
-        self.discretization_calc = discretization_calc
-
-        ft_line_density = {}
-        N = 1 << log2
-        MAXL = N * bs
-        xs = np.linspace(0, MAXL, N, endpoint=False)
-        # no tilt for efficient mode
-        tilt_vector = None
-
-        # where the answer will live
-        self.density_df = pd.DataFrame(index=xs)
-        self.density_df['loss'] = xs
-        ft_all = None
-        for agg in self.agg_list:
-            raw_nm = agg.name
-            nm = f'p_{agg.name}'
-            _a = agg.update_efficiently(xs, self.padding, 'exact' if agg.n < approx_freq_ge else approx_type,
-                                        sev_calc, discretization_calc, normalize)
-            ft_line_density[raw_nm] = agg.ftagg_density
-            self.density_df[nm] = agg.agg_density
-            if ft_all is None:
-                ft_all = np.copy(ft_line_density[raw_nm])
-            else:
-                ft_all *= ft_line_density[raw_nm]
-        self.density_df['p_total'] = np.real(ift(ft_all, self.padding, tilt_vector))
-
-        # make the not self.line_density = sum of all but the given line
-        ft_nots = {}
-        for line in self.line_names:
-            ft_not = np.ones_like(ft_all)
-            if np.any(ft_line_density[line] == 0):
-                # have to build up
-                for not_line in self.line_names:
-                    if not_line != line:
-                        ft_not *= ft_line_density[not_line]
-            else:
-                if len(self.line_names) > 1:
-                    ft_not = ft_all / ft_line_density[line]
-            self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, tilt_vector))
-            ft_nots[line] = ft_not
-
-        self.remove_fuzz(log='update_efficiently')
-
-        # no audit statistics_df
-
-        # BEGIN add_exa ================================================================================================
-        # add exa details now in-line
-        # def add_exa(self, df, details, ft_nots=None):
-        # Call is self.add_exa(self.density_df, details=True)
-
-        # name in add_exa, keeps code shorter
-        df = self.density_df
-        cut_eps = np.finfo(np.float).eps
-
-        # sum of p_total is so important...we will rescale it...
-        if not np.all(df.p_total >= 0):
-            # have negative densities...get rid of them
-            first_neg = np.argwhere((df.p_total < 0).to_numpy()).min()
-        sum_p_total = df.p_total.sum()
-
-        df['F'] = np.cumsum(df.p_total)
-        df['S'] =  \
-            df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
-
-        # E(min(X, a))
-        # df['exa_total'] = self.cumintegral(df['S'])
-        df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
-        df['lev_total'] = df['exa_total']
-
-        df['exlea_total'] = \
-            (df.exa_total - df.loss * df.S) / df.F
-        n_ = df.shape[0]
-        if n_ < 1100:
-            mult = 1
-        elif n_ < 15000:
-            mult = 10
-        else:
-            mult = 100
-        loss_max = df[['loss', 'exlea_total']].query(' exlea_total>loss ').loss.max()
-        if np.isnan(loss_max):
-            loss_max = 0
-        else:
-            loss_max += mult * bs
-        # try nan in place of 0             V
-        df.loc[0:loss_max, 'exlea_total'] = np.nan
-
-        df['e_total'] = np.sum(df.p_total * df.loss)
-        df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
-        df['exeqa_total'] = df.loss  # E(X | X=a) = a(!) included for symmetry was exa
-
-        # FFT functions for use in exa calculations
-        # computing sums so minimal padding required
-        def loc_ft(x):
-            return ft(x, 1, None)
-
-        def loc_ift(x):
-            return ift(x, 1, None)
-
-        # where is S=0
-        Seq0 = (df.S == 0)
-
-        for col in self.line_names:
-            df['exeqa_' + col] = \
-                np.real(loc_ift(loc_ft(df.loss * df['p_' + col]) *
-                                ft_nots[col])) / df.p_total
-            df.loc[df.p_total < cut_eps, 'exeqa_' + col] = 0
-            df['exeqa_ημ_' + col] = \
-                np.real(loc_ift(loc_ft(df.loss * df['ημ_' + col]) *
-                                loc_ft(df['p_' + col]))) / df.p_total
-            df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
-            stemp = 1 - df['p_' + col].cumsum()
-            # df['lev_' + col] = self.cumintegral(stemp)
-            df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
-
-            stemp = 1 - df['ημ_' + col].cumsum()
-            df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
-
-            # EX_i | X<= a; temp is used in le and gt calcs
-            temp = np.cumsum(df['exeqa_' + col] * df.p_total)
-            df['exlea_' + col] = temp / df.F
-            df.loc[0:loss_max, 'exlea_' + col] = 0  # df.loc[0:loss_max, 'loss']
-            temp_not = np.cumsum(df['exeqa_ημ_' + col] * df.p_total)
-            df['exlea_ημ_' + col] = temp_not / df.F
-            df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # df.loc[0:loss_max, 'loss']
-
-            # this is so important we will calculate it directly
-            df['exi_xgta_' + col] = ((df[f'exeqa_{col}'] / df.loss *
-                                      df.p_total).shift(-1)[
-                                     ::-1].cumsum()) / df.S
-            # need this NOT to be nan otherwise exa won't come out correctly
-            df.loc[Seq0, 'exi_xgta_' + col] = 0.
-            df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
-                                         df.p_total).shift(-1)[
-                                        ::-1].cumsum()) / df.S
-            df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
-            df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
-            df.loc[0, 'exi_xeqa_' + col] = 0
-            df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
-            df.loc[0, 'exi_xeqa_ημ_' + col] = 0
-            df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-            df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-
-        # END add_exa ==================================================================================================
-
-        self.last_update = np.datetime64('now')
-        # invalidate stored functions
-        self._linear_quantile_function = None
-        self.q_temp = None
-        self._cdf = None
+    # def update_efficiently(self, log2, bs, approx_freq_ge=100, approx_type='slognorm',
+    #                        sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1):
+    #     """
+    #     Runs stripped down versions of update and add_exa.
+    #     Code copied from those routines and cleaned for comments etc.
+    #     NOT UPDATED FOR REINSURANCE.
+    #
+    #     TODO: is this enough of a speedup to be useful?
+    #
+    #
+    #     :param log2:
+    #     :param bs:
+    #     :param approx_freq_ge:
+    #     :param approx_type:
+    #     :param remove_fuzz:
+    #     :param sev_calc:
+    #     :param discretization_calc:
+    #     :param padding:
+    #     :return:
+    #     """
+    #     self.log2 = log2
+    #     self.bs = bs
+    #     self.padding = padding
+    #     self.approx_type = approx_type
+    #     self.sev_calc = sev_calc
+    #     self._remove_fuzz = True
+    #     self.approx_type = approx_type
+    #     self.approx_freq_ge = approx_freq_ge
+    #     self.discretization_calc = discretization_calc
+    #
+    #     ft_line_density = {}
+    #     N = 1 << log2
+    #     MAXL = N * bs
+    #     xs = np.linspace(0, MAXL, N, endpoint=False)
+    #     # no tilt for efficient mode
+    #     tilt_vector = None
+    #
+    #     # where the answer will live
+    #     self.density_df = pd.DataFrame(index=xs)
+    #     self.density_df['loss'] = xs
+    #     ft_all = None
+    #     for agg in self.agg_list:
+    #         raw_nm = agg.name
+    #         nm = f'p_{agg.name}'
+    #         _a = agg.update_efficiently(xs, self.padding, 'exact' if agg.n < approx_freq_ge else approx_type,
+    #                                     sev_calc, discretization_calc, normalize)
+    #         ft_line_density[raw_nm] = agg.ftagg_density
+    #         self.density_df[nm] = agg.agg_density
+    #         if ft_all is None:
+    #             ft_all = np.copy(ft_line_density[raw_nm])
+    #         else:
+    #             ft_all *= ft_line_density[raw_nm]
+    #     self.density_df['p_total'] = np.real(ift(ft_all, self.padding, tilt_vector))
+    #
+    #     # make the not self.line_density = sum of all but the given line
+    #     ft_nots = {}
+    #     for line in self.line_names:
+    #         ft_not = np.ones_like(ft_all)
+    #         if np.any(ft_line_density[line] == 0):
+    #             # have to build up
+    #             for not_line in self.line_names:
+    #                 if not_line != line:
+    #                     ft_not *= ft_line_density[not_line]
+    #         else:
+    #             if len(self.line_names) > 1:
+    #                 ft_not = ft_all / ft_line_density[line]
+    #         self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, tilt_vector))
+    #         ft_nots[line] = ft_not
+    #
+    #     self.remove_fuzz(log='update_efficiently')
+    #
+    #     # no audit statistics_df
+    #
+    #     # BEGIN add_exa ================================================================================================
+    #     # add exa details now in-line
+    #     # def add_exa(self, df, details, ft_nots=None):
+    #     # Call is self.add_exa(self.density_df, details=True)
+    #
+    #     # name in add_exa, keeps code shorter
+    #     df = self.density_df
+    #     cut_eps = np.finfo(np.float).eps
+    #
+    #     # sum of p_total is so important...we will rescale it...
+    #     if not np.all(df.p_total >= 0):
+    #         # have negative densities...get rid of them
+    #         first_neg = np.argwhere((df.p_total < 0).to_numpy()).min()
+    #     sum_p_total = df.p_total.sum()
+    #
+    #     df['F'] = np.cumsum(df.p_total)
+    #     df['S'] =  \
+    #         df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+    #
+    #     # E(min(X, a))
+    #     # df['exa_total'] = self.cumintegral(df['S'])
+    #     df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
+    #     df['lev_total'] = df['exa_total']
+    #
+    #     df['exlea_total'] = \
+    #         (df.exa_total - df.loss * df.S) / df.F
+    #     n_ = df.shape[0]
+    #     if n_ < 1100:
+    #         mult = 1
+    #     elif n_ < 15000:
+    #         mult = 10
+    #     else:
+    #         mult = 100
+    #     loss_max = df[['loss', 'exlea_total']].query(' exlea_total>loss ').loss.max()
+    #     if np.isnan(loss_max):
+    #         loss_max = 0
+    #     else:
+    #         loss_max += mult * bs
+    #     # try nan in place of 0             V
+    #     df.loc[0:loss_max, 'exlea_total'] = np.nan
+    #
+    #     df['e_total'] = np.sum(df.p_total * df.loss)
+    #     df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
+    #     df['exeqa_total'] = df.loss  # E(X | X=a) = a(!) included for symmetry was exa
+    #
+    #     # FFT functions for use in exa calculations
+    #     # computing sums so minimal padding required
+    #     def loc_ft(x):
+    #         return ft(x, 1, None)
+    #
+    #     def loc_ift(x):
+    #         return ift(x, 1, None)
+    #
+    #     # where is S=0
+    #     Seq0 = (df.S == 0)
+    #
+    #     for col in self.line_names:
+    #         df['exeqa_' + col] = \
+    #             np.real(loc_ift(loc_ft(df.loss * df['p_' + col]) *
+    #                             ft_nots[col])) / df.p_total
+    #         df.loc[df.p_total < cut_eps, 'exeqa_' + col] = 0
+    #         df['exeqa_ημ_' + col] = \
+    #             np.real(loc_ift(loc_ft(df.loss * df['ημ_' + col]) *
+    #                             loc_ft(df['p_' + col]))) / df.p_total
+    #         df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
+    #         stemp = 1 - df['p_' + col].cumsum()
+    #         # df['lev_' + col] = self.cumintegral(stemp)
+    #         df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+    #
+    #         stemp = 1 - df['ημ_' + col].cumsum()
+    #         df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+    #
+    #         # EX_i | X<= a; temp is used in le and gt calcs
+    #         temp = np.cumsum(df['exeqa_' + col] * df.p_total)
+    #         df['exlea_' + col] = temp / df.F
+    #         df.loc[0:loss_max, 'exlea_' + col] = 0  # df.loc[0:loss_max, 'loss']
+    #         temp_not = np.cumsum(df['exeqa_ημ_' + col] * df.p_total)
+    #         df['exlea_ημ_' + col] = temp_not / df.F
+    #         df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # df.loc[0:loss_max, 'loss']
+    #
+    #         # this is so important we will calculate it directly
+    #         df['exi_xgta_' + col] = ((df[f'exeqa_{col}'] / df.loss *
+    #                                   df.p_total).shift(-1)[
+    #                                  ::-1].cumsum()) / df.S
+    #         # need this NOT to be nan otherwise exa won't come out correctly
+    #         df.loc[Seq0, 'exi_xgta_' + col] = 0.
+    #         df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
+    #                                      df.p_total).shift(-1)[
+    #                                     ::-1].cumsum()) / df.S
+    #         df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
+    #         df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
+    #         df.loc[0, 'exi_xeqa_' + col] = 0
+    #         df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
+    #         df.loc[0, 'exi_xeqa_ημ_' + col] = 0
+    #         df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
+    #         df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
+    #
+    #     # END add_exa ==================================================================================================
+    #
+    #     self.last_update = np.datetime64('now')
+    #     # invalidate stored functions
+    #     self._linear_quantile_function = None
+    #     self.q_temp = None
+    #     self._cdf = None
 
     def trim_df(self):
         """
@@ -1627,8 +1634,8 @@ class Portfolio(object):
             if r in report_list:
                 html_title(f'{r} Report for {self.name}', 1)
                 if r == 'priority_capital':
-                    if self.priority_capital_df is not None:
-                        display(self.priority_capital_df.loc[1e-3:1e-2, :].style)
+                    if self._priority_capital_df is not None:
+                        display(self._priority_capital_df.loc[1e-3:1e-2, :].style)
                     else:
                         html_title(f'Report {r} not generated', 2)
                 elif r == 'quick':

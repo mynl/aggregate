@@ -102,7 +102,7 @@ The Power Variance Exponential Family of Distributions
 
     from aggregate import power_variance_family
     power_variance_family()
-    @savefig tweedie_powervariance.png
+    @savefig tweedie_powervariance.png scale=20
     pass
 
 

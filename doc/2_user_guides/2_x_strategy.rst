@@ -6,7 +6,7 @@
 Strategy and Portfolio Management
 ==================================
 
-**Objectives:** Use spectral risk measures to allocate total margin by unit.
+**Objectives:** Use spectral risk measures to allocate total margin by unit.Application of the :class:`Portfolio` and  and :class:`Distortion` classes to strategy and portfolio management, including margin (capital) allocation, determining benchmark pricing within a portfolio using alternative pricing methodologies, and the evaluation of reinsurance.
 
 **Audience:** Planning and strategy, ERM, capital modeling, risk management actuaries.
 

@@ -5,7 +5,7 @@
 Case Studies
 ===================
 
-**Objectives:** Recreate PIR Case Study exhibits; create custom Case Studies.
+**Objectives:** Using :mod:`aggregate` to reproduce the case study exhibits from the book `Pricing Insurance Risk <https://www.wiley.com/en-us/Pricing+Insurance+Risk:+Theory+and+Practice-p-9781119755678>`_ and build similar exhibits for your own cases.
 
 **Audience:** Capital modeling and corporate strategy actuaries; anyone reading PIR.
 
@@ -236,7 +236,7 @@ These snippets are provided in Python scripts in ``aggregate.extensions`` called
     python -m aggregate.extensions.tame
 
 
-Precomputed versions are available at `https://www.pricinginsurancerisk.com/results`_.
+Precomputed versions are available at :ref:`https://www.pricinginsurancerisk.com/results`.
 
 Defining a Custom Case Study
 ------------------------------

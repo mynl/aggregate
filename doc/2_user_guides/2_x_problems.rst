@@ -1,7 +1,7 @@
 Published Problems and Examples
 =================================
 
-**Objectives:** Use ``aggregate`` to replicate worked problems and examples from published references. Demonstrate method of solution and verify correctness of ``aggregate`` calculations.
+**Objectives:** :mod:`aggregate` solutions to a wide selection of problems and examples from books (Loss Models, Loss Data Analytics), actuarial exam study notes, and academic papers. Demonstrates the method of solution and verifies the correctness of :mod:`aggregate` calculations.
 
 **Audience:** Academics and researchers and actuarial students reading the cited works.
 

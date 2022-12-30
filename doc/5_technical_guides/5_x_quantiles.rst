@@ -64,8 +64,7 @@ Here's an example of the problems that can occur.
    :okwarning:
 
    from aggregate.extensions.pir_figures import fig_4_1
-
-   @savefig quantiles2.png
+   @savefig quantiles2.png scale=20
    fig = fig_4_1()
 
 

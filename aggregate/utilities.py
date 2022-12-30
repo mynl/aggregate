@@ -2345,8 +2345,8 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
     """
     Perform Iman Conover shuffling on input marginals to achieve desired_correlation
     Desired_correlation must be positive definite and of the correct size.
-    The result has the same rand correlation as a reference sample with the
-    desired linear correlation. Thus the process relies on linear and rank
+    The result has the same rank correlation as a reference sample with the
+    desired linear correlation. Thus, the process relies on linear and rank
     correlation (for the reference and the input sample) being close.
 
     if dof==0 use normal scores; else you mv t
@@ -2398,7 +2398,7 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
     C = np.linalg.cholesky(desired_correlation)
 
     # make a perfectly uncorrelated reference: noise function = steps 1-6; product is step 8 (transposed)
-    if dof==0:
+    if dof == 0:
         N = ic_noise(n, d) @ C.T
     else:
         N = ic_t_noise(n, d, dof) @ C.T
@@ -2415,7 +2415,7 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
         df = pd.DataFrame(shuffled_marginals, columns=marginals.columns)
 
     # add total if requested
-    if add_total is True:
+    if add_total:
         df['total'] = df.sum(axis=1)
         df = df.set_index('total')
         df = df.sort_index(ascending=False)
@@ -2490,7 +2490,7 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
         Otherwise truncate each at the ``int(1-p * len(df))``
     :param tau: simulation tolerance
     :param max_iter: maximum number of iterations to attempt
-    :return:
+    :return: the top 1-p values of the rearranged DataFrame
     """
 
     sorted_marginals = {}
@@ -2528,13 +2528,13 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
         # reporting and loop control
         n_iter += 1
         if n_iter >= 2:
-            print(f'Iteration {n_iter:d}\t{v:5.3e}\tChg\t{chg_var:5.3e}')
+            logger.info(f'Iteration {n_iter:d}\t{v:5.3e}\tChg\t{chg_var:5.3e}')
         if n_iter > max_n_iter:
-            print("ERROR: not converging...breaking")
+            logger.error("ERROR: not converging...breaking")
             break
 
     df_out['total'] = df_out.sum(axis=1)
-    print(f'Ending VaR\t{v:7.5e}\ns lower {df_out.total.min():7.5e}')
+    logger.info(f'Ending VaR\t{v:7.5e}\ns lower {df_out.total.min():7.5e}')
     return df_out.sort_values('total')
 
 
@@ -3192,7 +3192,7 @@ def integral_by_doubling(func, x0, err=1e-8):
 
     .. math::
 
-        \int_{x_0}^\infty f = \sum_{n \ge 0} \int_{2^nx_0}^_{2^{n+1}x_0} f
+        \int_{x_0}^\infty f = \sum_{n \ge 0} \int_{2^nx_0}^{2^{n+1}x_0} f
 
     Caller should check the integral actually converges.
 
@@ -3210,7 +3210,7 @@ def integral_by_doubling(func, x0, err=1e-8):
         if s[1] > err:
             raise ValueError(
                 f'Questionable integral numeric convergence, err {s[1]:.4g}\n'
-                f'f={f}, t={t}, x0={x0}, counter={counter}\n{str(fz)}')
+                f'f={f}, t={t}, x0={x0}, counter={counter}')
         last_int = s[0]
         ans += s[0]
         f, t = t, 2 * t

@@ -66,13 +66,14 @@ This aggregate can also be built as a :class:`Portfolio`.
 .. ipython:: python
     :okwarning:
 
-    a02 = build('port DecL:02 '
-                    'agg Unit1 40 loss 5000 xs 0 sev lognorm 10 cv 0.75 poisson '
-                    'agg Unit2 25 loss 5000 xs 0 sev lognorm 20 cv 1.00 poisson '
-                    'agg Unit3 15 loss 5000 xs 0 sev lognorm 50 cv 1.25 poisson '
-                    'agg Unit4 10 loss 5000 xs 0 sev lognorm 75 cv 1.50 poisson '
-                    'agg Unit5 10 loss 5000 xs 0 sev lognorm 100 cv 2.00 poisson '
-                    , bs=1/2, approximation='exact')
+    a02 = build(
+        'port DecL:02 '
+            'agg Unit1 40 loss 5000 xs 0 sev lognorm 10 cv 0.75 poisson '
+            'agg Unit2 25 loss 5000 xs 0 sev lognorm 20 cv 1.00 poisson '
+            'agg Unit3 15 loss 5000 xs 0 sev lognorm 50 cv 1.25 poisson '
+            'agg Unit4 10 loss 5000 xs 0 sev lognorm 75 cv 1.50 poisson '
+            'agg Unit5 10 loss 5000 xs 0 sev lognorm 100 cv 2.00 poisson '
+        , bs=1/2, approximation='exact')
     qd(a02)
 
 Actual frequency equals total frequency times weight. Setting ``wts=5`` results in equal weights, here 0.2.

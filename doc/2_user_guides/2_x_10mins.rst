@@ -862,6 +862,8 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 - :meth:`approximate` to create an analytic approximation.
 
+- :meth:`sample` pulls samples, see :ref:`samp samp`.
+
 .. _10 min info:
 
 The ``info`` Dataframe
@@ -1118,7 +1120,7 @@ the total.
     :okwarning:
 
     p07.plot()
-    @savefig 10min_p07.png
+    @savefig 10min_p07.png scale=20
     p07.figure.suptitle('Portfolio plot');
 
 .. _10 min price:

@@ -9,7 +9,7 @@ Reinsurance Pricing
 .. what about finite reinstatements by count?
 
 
-**Objectives:** Use ``aggregate`` to evaluate inwards (assumed) and outwards (ceded) reinsurance. ``aggregate`` can compute the gross, ceded, and net distributions, and with those in hand  any reasonable question can be answered.
+**Objectives:** Applications of the :class:`Aggregate` class to reinsurance exposure rating, including swings and slides, aggregate stop loss and swing rated programs, illustrated using problems from CAS Parts 8 and 9.
 
 **Audience:** Reinsurance pricing, broker, or ceded re actuary.
 

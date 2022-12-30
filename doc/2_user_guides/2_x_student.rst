@@ -6,7 +6,7 @@
 Student
 ==========
 
-**Objectives:** Define and give examples of aggregate probability distributions; get started using ``aggregate``.
+**Objectives:** Introduction to aggregate distributions using simple discrete examples for actuarial science majors and STAM, MAS-I, CS-2 candidates; get started using :mod:`aggregate`.
 
 **Audience:** New user, with no knowledge of aggregate distributions or insurance terminology.
 

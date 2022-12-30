@@ -53,7 +53,9 @@ aggregate: a powerful aggregate distribution modeling library in Python
 What is it?
 -----------
 
-**aggregate** makes working with aggregate (compound) probability distributions fast, accurate, easy, and intuitive.  It can solve problems in insurance, risk management, actuarial science, and related areas, using realistic models that reflect the actual underlying frequency and severity generating processes. It includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
+:mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
+It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
+:mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
 
 
 Documentation

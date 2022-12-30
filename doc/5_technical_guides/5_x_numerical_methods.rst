@@ -550,11 +550,10 @@ for :math:`x>0` and :math:`f(x)=\exp(-\lambda)`. The exact function shows the FF
 
     a = build('agg Tw tweedie 10 1.01 1')
     qd(a.describe)
-
     @savefig tweedie_test_1.png
     a.plot()
 
-A Tweedie with :math:`p` close to 1 is approximates a Poisson. Its gamma severity is very peaked around its mean (high :math:`\alpha` and offsetting small :math:`\beta`).
+A Tweedie with :math:`p` close to 1 approximates a Poisson. Its gamma severity is very peaked around its mean (high :math:`\alpha` and offsetting small :math:`\beta`).
 
 The next function provides a transparent, if not maximally efficient, implementation of the Tweedie density.
 
@@ -604,6 +603,6 @@ The following graphs show that the FFT approximation is excellent, across a wide
     ax0.set(ylabel='density');
     bit['err'] = bit.p / bit.exact - 1
     bit.err.plot(ax=ax1);
-    @savefig tweedie_test_2.png
+    @savefig tweedie_test_2.png scale=20
     ax1.set(ylabel='relative error', ylim=[-1e-5, 1e-5]);
 

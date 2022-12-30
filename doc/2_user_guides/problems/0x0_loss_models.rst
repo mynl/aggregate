@@ -748,12 +748,12 @@ Here is a sample from the distribution and the mean-matched compound Poisson (fo
         print(bit)
     fig, axs = plt.subplots(1,2, figsize=(3.5*2, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
-    bit[('exact', 'p_total')].plot(marker='.', lw=.25, logy=True, ax=ax0, label='Portfolio')
-    bit[('comp Po', 'p_total')].plot(marker='.', markerfacecolor='None', lw=.25, logy=True, ax=ax0, label='compound Po')
-    (1-bit[('exact', 'p_total')].cumsum()).plot(ax=ax1)
-    (1-bit[('comp Po', 'p_total')].cumsum()).plot(ax=ax1)
-    ax0.legend()
-    ax0.set(ylabel='log pmf')
+    bit[('exact', 'p_total')].plot(marker='.', lw=.25, logy=True, ax=ax0, label='Portfolio');
+    bit[('comp Po', 'p_total')].plot(marker='.', markerfacecolor='None', lw=.25, logy=True, ax=ax0, label='compound Po');
+    (1-bit[('exact', 'p_total')].cumsum()).plot(ax=ax1);
+    (1-bit[('comp Po', 'p_total')].cumsum()).plot(ax=ax1);
+    ax0.legend();
+    ax0.set(ylabel='log pmf');
     @savefig kpw_9_16.png
     ax1.set(ylabel='survival function');
 

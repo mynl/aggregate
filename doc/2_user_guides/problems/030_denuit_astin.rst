@@ -33,9 +33,9 @@ The first function, called :math:`\kappa_i(x)` in PIR, is computed automatically
     bit = p.density_df.query('p_total > 0').iloc[1:]
     rat = bit.filter(regex='exeqa_P').apply(
         lambda x: x / bit.loss.to_numpy(), axis=0)
-    ax = rat.plot.bar(ylim=[-0.05,1.05], stacked=True)
+    ax = rat.plot.bar(ylim=[-0.05,1.05], stacked=True, figsize=(3.5, 2.45))
     ax.set(xlim=[-0.5, 15.5], ylim=[0,1])
-    @savefig denuit_19.png
+    @savefig denuit_19.png scale=20
     ax.legend().set(visible=False);
 
 
@@ -98,6 +98,6 @@ Description...
         ax.set_yticks(range(0, mx, t))
         ax.grid(lw=.25, c='w')
         ax.set(title=f'{n} risks')
-    @savefig denuit_45.png
+    @savefig denuit_45.png scale=20
     fig.suptitle('Denuit Figure 4.5')
 

@@ -6,7 +6,7 @@
 Capital Modeling and Risk Management
 =================================================
 
-**Objectives:** Describe capital modeling and risk management, including the use of conditional expectations as a risk management and visualization device.
+**Objectives:** Application of the :class:`Portfolio` class to capital modeling, including VaR, TVaR, and risk visualization and quantification. Covers material on CAS Part 9.
 
 **Audience:** ERM, capital modeling, risk management actuaries.
 

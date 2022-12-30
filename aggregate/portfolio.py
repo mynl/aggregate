@@ -10,6 +10,7 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import (MultipleLocator, StrMethodFormatter, MaxNLocator,
                                FixedLocator, FixedFormatter, AutoMinorLocator)
 import numpy as np
+from numpy.random import PCG64
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
 from pathlib import Path
@@ -101,10 +102,10 @@ class Portfolio(object):
                 agg_name = spec.name
             elif isinstance(spec, str) and isinstance(spec_list, pd.DataFrame):
                 if spec not in ['total', 'p_total']:
-                    s = spec_list[[spec, 'p_total']].sort_values(spec)
+                    s = spec_list[[spec, 'p_total']].groupby(spec).sum()
                     a = Aggregate(name=spec,
                                   exp_en=1,
-                                  sev_name='dhistogram', sev_xs=s[spec].values, sev_ps=s['p_total'].values,
+                                  sev_name='dhistogram', sev_xs=s.index.values, sev_ps=s.p_total.values,
                                   freq_name='fixed')
                     agg_name = spec
                 else:
@@ -222,7 +223,7 @@ class Portfolio(object):
 
     def remove_fuzz(self, df=None, eps=0, force=False, log=''):
         """
-        remove fuzz at threshold eps. if not passed use np.finfo(np.float).eps.
+        remove fuzz at threshold eps. if not passed use np.finfo(float).eps.
 
         Apply to self.density_df unless df is not None
 
@@ -236,7 +237,7 @@ class Portfolio(object):
         if df is None:
             df = self.density_df
         if eps == 0:
-            eps = np.finfo(np.float).eps
+            eps = np.finfo(float).eps
 
         if self._remove_fuzz or force:
             logger.debug(f'Portfolio.remove_fuzz | Removing fuzz from {self.name} dataframe, caller {log}')
@@ -1314,7 +1315,7 @@ class Portfolio(object):
     #
     #     # name in add_exa, keeps code shorter
     #     df = self.density_df
-    #     cut_eps = np.finfo(np.float).eps
+    #     cut_eps = np.finfo(float).eps
     #
     #     # sum of p_total is so important...we will rescale it...
     #     if not np.all(df.p_total >= 0):
@@ -2090,7 +2091,7 @@ class Portfolio(object):
         # eps is used NOT to do silly things when x is so small F(x)< eps
         # below this percentile you do not try to condition on the event!
         # np.finfo(np.float).eps = 2.2204460492503131e-16
-        cut_eps = np.finfo(np.float).eps
+        cut_eps = np.finfo(float).eps
 
         # get this done
         # defuzz(self.density_df, cut_eps)
@@ -2102,12 +2103,12 @@ class Portfolio(object):
         # sum of p_total is so important...we will rescale it...
         if not np.all(df.p_total >= 0):
             # have negative densities...get rid of them
-            first_neg = df.query('p_total < 0')
+            first_neg = df.query(f'p_total < {-cut_eps}')
             logger.warning(
-                f'Portfolio.add_exa | p_total has a negative value starting at {first_neg.head()}; NOT setting to zero...')
+                # f'Portfolio.add_exa | p_total has a negative value starting at {first_neg.head()}; NOT setting to zero...')
+                f'p_total has {len(first_neg)} negative values; NOT setting to zero...')
         sum_p_total = df.p_total.sum()
-        logger.info(f'Portfolio.add_exa | {self.name}: sum of p_total is 1 - '
-                    f'{1 - sum_p_total:12.8e} NOT RESCALING')
+        logger.info(f'{self.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')
         # df.p_total /= sum_p_total
         df['F'] = np.cumsum(df.p_total)
         # this method is terrible because you lose precision for very small values of S
@@ -2863,8 +2864,10 @@ class Portfolio(object):
         # df['S'] = 1 - df.F
 
         # floating point issues: THIS HAPPENS, so needs to be corrected...
+        cut_eps = np.finfo(float).eps
         if len(df.loc[df.S < 0, 'S'] > 0):
-            logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0)} negative S values being set to zero...")
+            logger.warning(f"{len(df.loc[df.S < -cut_eps, 'S'] > 0)} negative S < -eps values being set to zero...")
+            # logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0)} negative S values being set to zero...")
         df.loc[df.S < 0, 'S'] = 0
 
         # add the exag and distorted probs
@@ -5698,25 +5701,30 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         else:
             return wdists
 
-    def resample(self, n, desired_correlation=None):
+    def sample(self, n, replace=True, random_state=None, desired_correlation=None, keep_total=True):
         """
-        Resample from port object lines
-        Apply Iman Conover if required
+        Pull multivariate sample. Apply Iman Conover to induce correlation if required.
 
         """
+        # bit generator
+        bg = PCG64(random_state)
         df = pd.DataFrame(index=range(n))
         for c in self.line_names:
             pc = f'p_{c}'
-            df[c] = self.density_df[['loss', pc]].query(f'`{pc}` > 0').\
-                sample(n, replace=True, weights=pc).\
-                drop(columns=pc).reset_index(drop=True)
+            df[c] = self.density_df[['loss', pc]].\
+                    query(f'`{pc}` > 0').\
+                    sample(n, replace=replace, weights=pc, ignore_index=True, random_state=bg).\
+                    drop(columns=pc)
 
         if desired_correlation is not None:
             df = iman_conover(df, desired_correlation)
         else:
             df['total'] = df.sum(axis=1)
-            df = df.set_index('total')
+            df = df.set_index('total', drop=not keep_total)
+        df = df.reset_index(drop=True)
         return df
+
+    resample = sample
 
     @property
     def unit_names(self):

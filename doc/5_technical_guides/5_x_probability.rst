@@ -873,7 +873,7 @@ shape as expected counts increase.
     :okwarning:
 
     from aggregate.extensions import mixing_convergence
-    @savefig tr_prob_convg.png
+    @savefig tr_prob_convg.png scale=20
     mixing_convergence(0.25, 0.5)
 
 On the top, :math:`G=1` and the claim count is Poisson. Here the scaled

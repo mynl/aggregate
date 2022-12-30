@@ -6,7 +6,7 @@
 Reserving
 ==========
 
-**Objectives:** Use ``aggregate`` to model reserve uncertainty and demonstrate the resolution of uncertainty over time as claims settle.
+**Objectives:**  Applications of the :class:`Aggregate` class to reserving, including models of loss emergence and determining ranges for IBNR and case reserves.
 
 **Audience:** Reserving, capital modeling, ERM actuaries.
 

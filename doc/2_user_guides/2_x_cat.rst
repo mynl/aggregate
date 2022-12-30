@@ -5,7 +5,8 @@
 Catastrophe Modeling
 ======================
 
-**Objectives:** Apply ``aggregate`` to catastrophe (cat) risk management, including calculating of occurrence and aggregate exceeding probability (OEP, AEP) values, computing PMLs with secondary uncertainty, and estimating ILW loss costs.
+**Objectives:** Applications of the :class:`Aggregate` class to catastrophe risk evaluation and pricing using thick-tailed Poisson Pareto and lognormal models, including occurrence and aggregate PMLs (OEP, AEP) and layer loss costs. Covers material on CAS Parts 8 and 9.
+
 
 **Audience:** Catastrophe modelers, reinsurance actuaries, and risk management professionals.
 
@@ -327,7 +328,7 @@ Here are plots of the base and adjusted AEP and OEP curves. Compare Jewson Figur
         ax.set_yticklabels([f'{x}' for x in ticks]);
         ax.legend()
 
-    @savefig cat_aep_oep.png
+    @savefig cat_aep_oep.png scale=20
     fig.suptitle('Impact of climate change on AEP and OEP curves');
 
 

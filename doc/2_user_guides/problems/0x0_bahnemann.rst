@@ -83,7 +83,7 @@ Extract various points of the pmf, cdf, and sf. The adjustment to the index is c
     (a.density_df.p / a.bs).plot(ylim=[0, 0.0002], xlim=[-100, 10000], lw=2, ax=ax0)
     ax0.set(title='Density')
     a.density_df.F.plot(ylim=[-0.05, 1.05], xlim=[-100, 10000], lw=2, ax=ax1)
-    @savefig bahn1.png
+    @savefig bahn1.png scale=20
     ax0.set(title='Mixed density');
     ax1.set(title='Distribution function');
 
@@ -203,7 +203,7 @@ The log density (left) shows the probability masses at outcomes consisting of on
     ax0.set(ylabel='distribution', ylim=[0,1]);
     ax1.axvline(1000, c='C7', lw=.5);
     ax1.axvline(2000, c='C7', lw=.5);
-    @savefig bahn4-15.png
+    @savefig bahn4-15.png scale=20
     ax1.axvline(3000, c='C7', lw=.5);
 
 
@@ -277,7 +277,7 @@ The exact severity can be accessed directly, as ``a.sevs[0].fz``, allowing us to
     ax.axvline(10000, c='C7', lw=.5);
     ax.axvline(15000, c='C7', lw=.5);
     ax.set(ylabel='cdf');
-    @savefig bahn5-13.png
+    @savefig bahn5-13.png scale=20
     ax.legend(loc='lower right');
 
 .. _example 6_3:

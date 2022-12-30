@@ -8,12 +8,12 @@ import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
 import numpy as np
 from numpy.linalg import inv
+from numpy.random import PCG64
 import pandas as pd
 from scipy.integrate import quad
 import scipy.stats as ss
 from scipy import interpolate
 from scipy.optimize import newton
-from IPython.core.display import display
 from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov
 from scipy.optimize.nonlin import NoConvergence
@@ -508,7 +508,7 @@ class Aggregate(Frequency):
             self._density_df = pd.DataFrame(dict(loss=self.xs, p_total=self.agg_density))
             self._density_df['p'] = self._density_df.p_total
             # remove the fuzz, same method as Portfolio.remove_fuzz
-            eps = np.finfo(np.float).eps
+            eps = np.finfo(float).eps
             # may not have a severity, remember...
             self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
                 self._density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
@@ -2714,6 +2714,19 @@ class Aggregate(Frequency):
                 return self._inverse_tail_var(p)
         else:
             raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default) or tail')
+
+    def sample(self, n, replace=True, random_state=None):
+        """
+        Draw a sample of n items from the aggregate distribution. Wrapper around
+        pd.DataFrame.sample.
+
+        """
+        bg = PCG64(random_state)
+        if self.density_df is None:
+            raise ValueError('Must update before sampling.')
+        return self.density_df[['loss']].sample(n=n, weights=self.density_df.p_total,
+                                                replace=replace, random_state=bg,
+                                                ignore_index=True)
 
     @property
     def sev(self):

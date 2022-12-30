@@ -5,10 +5,7 @@
 Individual Risk Pricing
 ==========================
 
-**Objectives:** Use ``aggregate`` to compute the insurance charge and savings
-for limited losses across different account sizes (called Table L and M
-charges in the US). These factors are used in individual rating for large
-accounts.
+**Objectives:** Applications of the :class:`Aggregate` class to individual risk pricing, including LEVs, ILFs, layering, and the insurance charge and savings (Table L, M), illustrated using problems from CAS Part 8.
 
 **Audience:** Individual risk large account pricing, broker, or risk retention
 actuary.

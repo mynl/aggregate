@@ -35,7 +35,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 # only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.9.6.7"
+__version__ = "0.9.6.8"
 
 # set up
 from pathlib import Path
@@ -58,11 +58,5 @@ knobble_fonts()
 
 # module level doc-string
 __doc__ = """
-:mod:`aggregate` makes working with aggregate (compound) probability
-distributions fast, accurate, easy, and intuitive.  It can solve problems in
-insurance, risk management, actuarial science, and related areas, using
-realistic models that reflect the actual underlying frequency and severity
-generating processes. It includes an expressive language called DecL to
-describe aggregate distributions and is implemented in Python under an open
-source BSD-license.
+:mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity. It makes working with an aggregate (compound) probability distribution as easy as the lognormal, delivering the speed and accuracy of parametric distributions to situations that usually require simulation. :mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
 """

@@ -45,7 +45,8 @@ Distribution Examples
 
 .. _lda gamma:
 
-**Gamma distribution**
+Gamma distribution
+"""""""""""""""""""
 
 .. ipython:: python
     :okwarning:
@@ -73,7 +74,8 @@ Distribution Examples
 
 .. _lda pareto:
 
-**Pareto distribution**
+Pareto distribution
+""""""""""""""""""""""
 
 .. ipython:: python
     :okwarning:
@@ -97,7 +99,8 @@ Distribution Examples
 
 .. _lda weibull:
 
-**Weibull distribution**
+Weibull distribution
+"""""""""""""""""""""
 
 ``scipy.stats`` includes Weibull min (for positive :math:`x`) and Weibull max (for negative :math:`x`) distributions. We want the min version.
 

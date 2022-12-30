@@ -2,6 +2,7 @@
 Extensions
 ==========
 
+
 .. automodule:: aggregate.extensions
    :members:
    :undoc-members:
@@ -25,6 +26,10 @@ Case Study Support
 
 Samples
 ---------
+
+.. warning::
+   All functionality in ``extensions.samples`` should be regarded as experimental and subject to change in future releases. What's useful will generally be integrated into the base package
+
 
 .. automodule:: aggregate.extensions.samples
    :members:

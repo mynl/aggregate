@@ -150,8 +150,7 @@ Creating an object automatically adds its specification to the knowledge, with n
 .. ipython:: python
     :okwarning:
 
-   print(build.knowledge.head())
-
-   build.knowledge.query('name == "Eg1"')
+    qd(build.knowledge.head(), line_width=73, max_colwidth=50, justify='left')
+    qd(build.knowledge.query('name == "Eg1"'), line_width=73, max_colwidth=50, justify='left')
 
 The :doc:`2_User_Guides` contain more details and examples.

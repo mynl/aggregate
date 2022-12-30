@@ -5,7 +5,7 @@
 The Dec Language
 ======================
 
-**Objectives:** Introduce the Dec Language (DecL) grammar.
+**Objectives:** Introduce the Dec Language (DecL) used to specify aggregate distributions in familiar insurance terminology.
 
 **Audience:** User who wants to use DecL to build realistic aggregates.
 

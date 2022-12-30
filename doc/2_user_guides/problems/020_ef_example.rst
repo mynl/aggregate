@@ -54,12 +54,12 @@ The next figure (compare Figure 1 in the paper, shown below) shows that padding,
 .. ipython:: python
     :okwarning:
 
-    f, axs = plt.subplots(1, 2, figsize=(10, 3.5), constrained_layout=True, squeeze=True)
+    f, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
     df.plot(ax=ax0, logy=False)
     df.plot(ax=ax1, logy=True)
     ax0.legend(loc='upper left')
-    @savefig ef_1.png
+    @savefig ef_1.png scale=20
     ax1.legend(loc='lower right');
 
 
@@ -73,7 +73,7 @@ Clearly there is not enough *space* with only 2**8 buckets. Expanding to 2**16 a
 .. ipython:: python
     :okwarning:
 
-    f, axs = plt.subplots(1, 2, figsize=(10, 3.5), constrained_layout=True, squeeze=True)
+    f, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
     ax0, ax1 = axs.flat
 
     df.plot(ax=ax0, logy=False)
@@ -85,7 +85,7 @@ Clearly there is not enough *space* with only 2**8 buckets. Expanding to 2**16 a
     ax1.plot(bit.index, (20*4/3*a.bs)*(3/(3+bit.index))**5, label='Feller approximation')
     ax0.set(xlim=[-5, a.q(0.99999)])
     ax0.legend(loc='upper right')
-    @savefig ef_2.png
+    @savefig ef_2.png scale=20
     ax1.legend(loc='upper right');
 
 

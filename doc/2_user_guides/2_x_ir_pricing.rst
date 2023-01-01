@@ -35,10 +35,13 @@ any reasonable question about a large account program.
 Helpful References
 --------------------
 
-* Fisher study note, Bahnemann, :cite:t:`Fisher2019`, :cite:t:`Bahnemann2015`
-* WCIRB Table L
-* ISO retro rating plan
-* CAS Exam 8 readings
+* :cite:t:`Fisher2019`
+* :cite:t:`Bahnemann2015`
+* Other CAS Part 8 readings.
+
+.. WCIRB Table L
+.. ISO retro rating plan
+.. CAS Exam 8 readings
 
 .. Table M and Table L!
 .. https://www.wcirb.com/content/california-retrospective-rating-plan

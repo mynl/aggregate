@@ -1,14 +1,10 @@
-Denuit (2019)
------------------
-
-:cite:`Denuit2019` or
-:cite:p:`Denuit2019` or
-:cite:t:`Denuit2019`
-
-Denuit, Michel: Size-biased transform and conditional mean risk sharing, with application to p2p insurance and tontines
+Denuit (2019 and 2022)
+------------------------
 
 Poisson/Discrete Example (6.1)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Example from :cite:t:`Denuit2019`, Size-biased transform and conditional mean risk sharing, with application to p2p insurance and tontines.
 
 .. ipython:: python
     :okwarning:
@@ -64,15 +60,11 @@ Proportion of expected loss by unit.
     qd(bb / bb.iloc[-1,0])
 
 
-
-
 Mortality Example and Figure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-1. ASTIN 2022 Mortality Credits with Large Survivor Funds (D, Hieber, Roberts) [Fig 5 done]
-
-Description...
+Example from :cite:t:`Denuit2022b`,  Mortality Credits with Large Survivor Funds.
+Reproducing Figure 4.5.
 
 
 .. ipython:: python

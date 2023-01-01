@@ -18,7 +18,7 @@ Contents
 Helpful References
 --------------------
 
-* PIR chapter 14, 15.
+.. * PIR chapter 14, 15.
 
 .. _strat margin alloc:
 

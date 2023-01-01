@@ -45,9 +45,9 @@ long_description = """aggregate: a powerful aggregate distribution modeling libr
 What is it?
 -----------
 
-:mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
+``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
-:mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
+``aggregate`` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
 
 
 Documentation
@@ -93,15 +93,15 @@ version = aggregate.__version__
 setup(name="aggregate",
       description="aggregate - working with compound probability distributions",
       long_description=long_description,
-      license="""BSD""",
+      long_description_content_type='text/x-rst',
+      license="BSD",
       version=version,
       author="Stephen J. Mildenhall",
       author_email="steve@convexrisk.com",
       maintainer="Stephen J. Mildenhall",
       maintainer_email="steve@convexrisk.com",
       packages=['aggregate'],
-      package_data={'': ['*.txt', '*.rst', '*.md', 'agg/*.agg', 'examples/*.py', 'examples/*.ipynb',
-                         'test/*.py']},
+      package_data={'': ['*.txt', '*.rst', '*.md', 'agg/*.agg']},
       tests_require=tests_require,
       install_requires=install_requires,
       classifiers=[

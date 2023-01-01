@@ -22,13 +22,15 @@ Strategy and Portfolio Management
 Helpful References
 --------------------
 
-* PIR chapter 14, 15.
+* :cite:t:`PIR` chapters 14 and 15 and references therein.
 
 .. _strat margin alloc:
 
 Margin Allocation Using Spectral Risk Measures
 -------------------------------------------------------
 
-*Documentation to follow.* In the meantime, see examples in :doc:`2_x_case_studies`.
+.. todo::
+
+    Documentation to follow. In the meantime, see examples in :doc:`2_x_case_studies`.
 
 

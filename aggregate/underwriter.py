@@ -7,6 +7,7 @@ import re
 from IPython.display import HTML, display
 # from inspect import signature
 
+from .constants import *
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion

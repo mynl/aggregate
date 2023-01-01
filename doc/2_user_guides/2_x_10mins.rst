@@ -135,7 +135,7 @@ DecL is a custom language, created to describe aggregate distributions. Alternat
 Important: Formatting a DecL Program
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. warning::
+.. important::
 
     **All DecL programs are one line long.**
 

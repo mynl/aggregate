@@ -21,10 +21,12 @@ Helpful References
 --------------------
 
 * :cite:t:`Mildenhall2022a`
-* PIR Section 11.2.3
+* :cite:t:`PIR` Section 11.2.3
 
 The Distortion Envelope
 -------------------------
 
-*Documentation to follow.*
+.. todo::
+
+    Documentation to follow.
 

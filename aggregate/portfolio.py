@@ -2703,7 +2703,7 @@ class Portfolio(object):
 
         df = self.dist_ans.iloc[:, [0,4,5,6,7,8,9,10]].copy()
         df.index.names = ['a', 'LR', 'method']
-        df.columns = ['S', 'EL', 'P', 'PQ', 'Q', 'COC', 'param', 'error']
+        df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'error']
         return df
 
     def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1, efficient=False):

@@ -1,9 +1,8 @@
 Enterprise Risk Analysis
 ----------------------------
 
-This section re-analyzes reinsurance structure alternatives introduced in
-*Enterprise Risk Analysis for Property & Liability Insurance Companies* by P.
-Brehm et al. (2007) Guy Carpenter & Company, LLC.
+This section re-analyzes reinsurance structure alternatives introduced in :cite:t:`Brehm2007`,
+Enterprise Risk Analysis for Property & Liability Insurance Companies.
 
 
 Reinsurance Example
@@ -352,7 +351,7 @@ families
 #. TVaR.
 
 They are sorted from most tail-centric (expensive for tail risk) to cheapest. See
-PIR REF.
+:cite:t:`PIR`.
 
 The next dataframe shows the asset level and implied loss ratio,
 distortion name, survival probability (0.5%), expected loss, premium, premium

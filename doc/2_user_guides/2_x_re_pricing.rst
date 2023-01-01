@@ -44,12 +44,11 @@ Reinsurance Pricing
 Helpful References
 --------------------
 
-* General reinsurance: :cite:t:`Strain1997`, :cite:t:`Carter2013`, :cite:t:`Albrecher2017`
-
-* General reinsurance pricing: :cite:t:`Bear1990`, :cite:t:`Mata2002`, :cite:t:`Clark2014`, David Clark *Basics of Reinsurance Pricing*, Actuarial Study Note, CAS (Arlington, VA) 2014 revised version.
-
-
+* General reinsurance: :cite:t:`Strain1997`, :cite:t:`Carter2013`, :cite:t:`Albrecher2017`, :cite:t:`Parodi2015`
+* :cite:t:`Clark2014`, CAS Part 8 reading
+* General reinsurance pricing: :cite:t:`Bear1990`, :cite:t:`Mata2002`
 * Property rating: :cite:t:`Bernegger1997`, :cite:t:`Ludwig1991`
+* :cite:t:`PIR` chapter 19
 
 .. _re basic examples:
 

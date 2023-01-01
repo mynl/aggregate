@@ -24,11 +24,12 @@ Working With Samples
 Helpful References
 --------------------
 
-* PIR chapter 14, 15.
-* RA original paper ref.
-* IC original paper ref.
+* :cite:t:`PIR` chapter 14 and 15
+* :cite:t:`Puccetti2012`
+* :cite:t:`Conover1999`
+* :cite:t:`Mildenhall2005a`
 * Vitale IC proof in dependency book
-* Mildenhall Agg Dist WP
+
 
 .. See examples in /TELOS/Blog/agg/examples/IC_and_rearrangement.ipynb.
 

@@ -6,7 +6,7 @@ Poisson/Pareto Example
 
 :cite:t:`Embrechts2009a`, Panjer recursion versus FFT for compound distributions.
 
-Consider a :math:`\mathit{Po}(\lambda)\vee\mathit{Pareto}(\alpha, \beta)`, :math:`\alpha` is shape and :math:`\beta` is scale.
+Consider a :math:`\mathrm{Po}(\lambda)\vee\mathrm{Pareto}(\alpha, \beta)`, :math:`\alpha` is shape and :math:`\beta` is scale.
 
 .. ipython:: python
     :okwarning:

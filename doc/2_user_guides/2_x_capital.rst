@@ -1,7 +1,7 @@
 .. _2_x_capital:
 
 .. reviewed 2022-12-24
-.. NEEDS WORK
+.. reviewed 2023-01-01
 
 Capital Modeling and Risk Management
 =================================================
@@ -23,18 +23,18 @@ Capital Modeling and Risk Management
 Helpful References
 --------------------
 
+* :cite:t:`PIR`, especially chapter 14.
 
-* Portfolio level probability of default, EPD, Var and TVaR statistics
-
-
-* PIR chapter 14.
+.. Portfolio level probability of default, EPD, Var and TVaR statistics
 
 .. _res kappa:
 
-Conditional Expectations as Risk Management and Visualization Device
+Conditional Expectation as a Risk Management and Visualization Device
 -------------------------------------------------------------------------
 
 .. Kappa as a risk measure function.
 
-*Documentation to follow.* In the meantime, see examples in :doc:`2_x_case_studies`.
+.. todo::
+
+    Documentation to follow. In the meantime, see examples in :doc:`2_x_case_studies`.
 

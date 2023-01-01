@@ -6,7 +6,7 @@
 Student
 ==========
 
-**Objectives:** Introduction to aggregate distributions using simple discrete examples for actuarial science majors and STAM, MAS-I, CS-2 candidates; get started using :mod:`aggregate`.
+**Objectives:** Introduction to aggregate distributions using simple discrete examples for actuarial science majors and short-term actuarial modeling exam candidates; get started using :mod:`aggregate`.
 
 **Audience:** New user, with no knowledge of aggregate distributions or insurance terminology.
 
@@ -76,7 +76,7 @@ Aggregate :math:`A = X_1 + \cdots + X_N`.
 #. What are the expected value and CV of :math:`A`?
 #. What possible values can :math:`A` take? What are the probabilities of each?
 
-.. warning::
+.. important::
 
     Stop and solve the exercise!
 

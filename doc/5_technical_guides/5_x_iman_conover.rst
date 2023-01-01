@@ -24,8 +24,8 @@ Contents
 Helpful References
 --------------------
 
-* PIR chapter 14, 15.
-* SM WC paper.
+* :cite:t:`Conover1999`
+* :cite:t:`Mildenhall2005a`
 
 
 Basic Idea

@@ -27,9 +27,10 @@ Catastrophe Modeling
 Helpful References
 --------------------
 
-* Jewson
-* Mitchell Wallace cat modeling book.
+* :cite:t:`Jewson2022b`
+* :cite:t:`MitchellWallace2017`
 * :cite:t:`Anderson1988`
+* :cite:t:`Woo2002`
 
 .. _cat jewsons pml estimates:
 
@@ -39,7 +40,7 @@ Jewson's US Wind PML Estimates
 Model Description
 ~~~~~~~~~~~~~~~~~~~
 
-`Stephen Jewson <https://www.linkedin.com/in/steve-jewson-phd-052bb417/>`_ *Projections of Changes in U.S. Hurricane Damage Due to Projected Changes in Hurricane Frequencies*, (2020) reports the following frequency and severity statistics for US hurricane losses.
+`Stephen Jewson <https://www.linkedin.com/in/steve-jewson-phd-052bb417/>`_ *Projections of Changes in U.S. Hurricane Damage Due to Projected Changes in Hurricane Frequencies*, :cite:t:`Jewson2022b` reports the following frequency and severity statistics for US hurricane losses.
 
 .. image:: img/jewson.png
   :width: 800
@@ -389,7 +390,7 @@ and proportional hazard (PH)
 
 .. math:: g(s) = s^p, \ p<1
 
-parametric families (see PIR REF). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable between distortions.)
+parametric families (see :cite:t:`PIR`). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable between distortions.)
 
 .. ipython:: python
     :okwarning:

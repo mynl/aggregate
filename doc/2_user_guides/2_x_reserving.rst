@@ -23,19 +23,25 @@ Reserving
 Helpful References
 --------------------
 
-* PIR chapter 17.
-* Solvency II Cost of Capital Risk Margin.
+* :cite:t:`Meyers2019`
+* :cite:t:`PIR`, chapter 17
+
+.. Solvency II Cost of Capital Risk Margin.
 
 .. _res modeling:
 
 Modeling the Current Accident Year, Case and IBRN Reserves
 ------------------------------------------------------------
 
-*Documentation to follow.*
+.. todo::
+
+    Documentation to follow.
 
 .. _res resolution:
 
 The Resolution of Reserve Uncertainty Over Time
 ---------------------------------------------------------------
 
-*Documentation to follow.*
+.. todo::
+
+    Documentation to follow.

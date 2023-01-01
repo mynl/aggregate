@@ -1,7 +1,7 @@
 Loss Models Book
 --------------------
 
-(KPW) Klugman, Stuart A., Harry H. Panjer, and Gordon E. Willmot. *Loss models: from data to decisions*. John Wiley & Sons, Fifth Edition, 2019.
+Examples from the text :cite:t:`LM`, Loss models: from data to decisions. The Loss models book is used as a text for several actuarial society exams and many college courses.
 
 Contents
 ~~~~~~~~~

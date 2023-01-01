@@ -1,6 +1,8 @@
 Bahnemann Monograph
 --------------------
 
+Examples from the CAS published monograph :cite:t:`Bahnemann2015`, Distributions for actuaries, which is a text for CAS Part 8.
+
 Contents
 ~~~~~~~~~
 

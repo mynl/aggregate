@@ -97,9 +97,9 @@ Other notes
 
 How FFT works is technical appendix. Using it to compute aggs goes here.
 
-Emb Fr paper on moment matching
+:cite:t:`Embrechts2009a` paper on moment matching, juice not worth the squeeze.
 
-KPW on moment matching p. 182.
+:cite:t:`LM` on moment matching p. 182.
 
 Panjer and Lutek [97] found that two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, the **rounding method and the first-moment method (p = 1) had similar errors**, while the second-moment method (p = 2) provided significant improvement. The specific formulas for the method of rounding and the method of matching the first moment are given in Appendix E. A reason to favor matching zero or one moment is that the resulting probabilities will always be **nonnegative**. When matching two or more moments, this cannot be guaranteed.
 
@@ -142,7 +142,7 @@ Discretizing approximates the severity with a purely discrete distribution suppo
 
    with (?) :math:`p_0=0`.
 
-#. The **moment** difference (Gerber, KPW) assigns
+#. The **moment** difference (:cite:t:`LM`) assigns
 
    .. math::
 
@@ -151,7 +151,7 @@ Discretizing approximates the severity with a purely discrete distribution suppo
 
    It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
 
-Call the discrete approximation :math:`X_b^d` where :math:`d=r,\ f,\ b,\ m` describes the discretization. It is clear that :math:`X_b` converges weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution using :math:`X` as severity for the rounding, forward and backward methods. Further, the rounding approximation is sandwiched between the forward and backwards methods (REF EF.p499).
+Call the discrete approximation :math:`X_b^d` where :math:`d=r,\ f,\ b,\ m` describes the discretization. It is clear that :math:`X_b` converges weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution using :math:`X` as severity for the rounding, forward and backward methods. Further, the rounding approximation is sandwiched between the forward and backwards methods, :cite:t:`Embrechts2009a` p. 499.
 
 
 EF comment on moment method:
@@ -416,8 +416,7 @@ Approximations and Errors
 Based on an analysis of the relative error, select ``log2=18`` and ``bs=1/16``, see :ref:`../5_technical_guides/5_x_approximation_error`. The reported statistics are close to the theoretic numbers implied by the (limited) stochastic model.
 
 
-Estimation of the variance of
-percentile estimates; Morton B. BROWN and Robert A. WOLFE
+:cite:t:`Brown1983`, Estimation of the variance of percentile estimates.
 
 Compute the number of sims to model the mean to within tolerance a of actual with probability p, :math:`(z_{p/2}/a \nu)^2` where :math:`\nu` is the CV. (Usual normal approx to se of mean argument.) Eg for 90% conf z=1.644 and a=0.01 (FFT is generally much closer) you get 27,055 times :math:`\nu^2`. For cat like distributions :math:`\nu` can be in the range 50-100, leading to 67-270 million simulations. Thus FFT provides stunning accuracy.
 

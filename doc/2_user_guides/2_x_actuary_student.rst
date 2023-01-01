@@ -6,7 +6,7 @@
 Actuarial Student
 ====================
 
-**Objectives:** Introduce the ``aggregate`` library for working with aggregate probability distributions in the context of actuarial society exams and university courses in (short-term) actuarial modeling.
+**Objectives:** Introduce the ``aggregate`` library for working with aggregate probability distributions in the context of actuarial society exams (`SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_) and university courses in (short-term) actuarial modeling.
 
 **Audience:** Actuarial science university students and actuarial analysts.
 

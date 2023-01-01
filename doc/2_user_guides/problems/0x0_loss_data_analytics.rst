@@ -1,7 +1,7 @@
 Loss Data Analytics Book
 -----------------------------
 
-Jed Frees' open source actuarial software. `Text <https://openacttexts.github.io/Loss-Data-Analytics/>`_ and `github source <https://github.com/OpenActTexts/Loss-Data-Analytics>`_.
+Examples from Jed Frees' open source actuarial software. `Text <https://openacttexts.github.io/Loss-Data-Analytics/>`_ and `github source <https://github.com/OpenActTexts/Loss-Data-Analytics>`_ available on-line.
 
 Contents
 ~~~~~~~~~~

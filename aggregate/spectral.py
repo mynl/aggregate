@@ -671,8 +671,12 @@ class Distortion(object):
         else:
             gS = np.array(self.g_dual(S))
 
-        loss = np.trapz(S, S.index)
-        prem = np.trapz(gS, S.index)
+        # trapz is not correct with our interpretation elsewhere; we use a step function
+        # loss = np.trapz(S, S.index)
+        # prem = np.trapz(gS, S.index)
+        dx = np.diff(S.index)
+        loss = (S.iloc[:-1].values * dx).sum()
+        prem = (gS[:-1] * dx).sum()
 
         return prem, loss
 

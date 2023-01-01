@@ -202,7 +202,7 @@ def sln_fit(m, cv, skew):
         sigma = np.sqrt(np.log(1 + eta ** 2))
         shift = m - cv * m / eta
         if shift > m:
-            logger.warning(f'utils sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
+            logger.log(WL, f'utils sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
             shift = m - 1e-6
         mu = np.log(m - shift) - sigma ** 2 / 2
         return shift, mu, sigma
@@ -1187,7 +1187,7 @@ def xsden_to_meancv(xs, den):
     else:
         xsm = np.array(xs)[-1]
     ex1 = np.sum(xd) + pg * xsm
-    # logger.warning(f'tail mass mean adjustment {pg * xsm}')
+    # logger.log(WL, f'tail mass mean adjustment {pg * xsm}')
     ex2 = np.sum(xd * xs) + pg * xsm ** 2
     sd = np.sqrt(ex2 - ex1 ** 2)
     if ex1 != 0:
@@ -1216,7 +1216,7 @@ def xsden_to_meancvskew(xs, den):
     else:
         xsm = np.array(xs)[-1]
     ex1 = np.sum(xd) + pg * xsm
-    # logger.warning(f'tail mass mean adjustment {pg * xsm}')
+    # logger.log(WL, f'tail mass mean adjustment {pg * xsm}')
     xd *= xs
     ex2 = np.sum(xd) + pg * xsm ** 2
     ex3 = np.sum(xd * xs) + pg * xsm ** 3
@@ -2697,7 +2697,7 @@ def partial_e(sev_name, fz, a, n):
         # single parameter Pareto is scale=lambda, loc=0
         # these formulae for regular pareto, hence
         if λ + loc != 0:
-            logger.warning('Pareto not shifted to x>0 range...using numeric moments.')
+            logger.log(WL, 'Pareto not shifted to x>0 range...using numeric moments.')
             return partial_e_numeric(fz, a, n)
         ans = []
         # will return inf if the Pareto does not have the relevant moments
@@ -3134,7 +3134,7 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, deb
     # display(achieved)
     if abs(achieved.iloc[0] - target[0]) > 1e-3:
         # issues with hitting 1
-        logger.warning(f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
+        logger.log(WL, f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
         # take top right corner off
         if target[0] > attachments[0]:
             raise ValueError(f'target[0] = {target[0]} > first attachment[0] = {attachments[0]} which is impossible.')
@@ -3150,7 +3150,7 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, deb
         # update
         density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
         achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
-        logger.warning(f'Revised layer 1 achieved = {achieved.iloc[0]}')
+        logger.log(WL, f'Revised layer 1 achieved = {achieved.iloc[0]}')
 
     density['diff S'] = density['S'] - density['Sa']
 
@@ -3160,7 +3160,7 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, deb
     # data frame of layer statistics from input density
     exact = None
     if sf is not None:
-        logger.warning('sf passed in; computing exact layer statistics')
+        logger.log(WL, 'sf passed in; computing exact layer statistics')
         exact = pd.DataFrame(columns=['a', 'lev', 'aS', 'S'],
                              index=range(1, 1+len(attachments)), dtype=float)
         for i, x in enumerate(attachments):

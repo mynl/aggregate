@@ -244,7 +244,7 @@ class Underwriter(object):
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
-                logger.warning(
+                logger.log(WL,
                     f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
                 obj = None
             else:
@@ -344,7 +344,7 @@ class Underwriter(object):
 
         # report on what has been done
         if rv is None:
-            logger.warning(f'Program did not contain any output')
+            logger.log(WL, f'Program did not contain any output')
         else:
             if len(rv):
                 logger.info(f'Program created {len(rv)} objects.')
@@ -512,7 +512,7 @@ class Underwriter(object):
         rv = self.write(program, update=False, force_severity=True)
 
         if rv is None or len(rv) == 0:
-            logger.warning('build produced no output')
+            logger.log(WL, 'build produced no output')
             return None
 
         # in this loop bs_ and log2_ are the values actually used for each update;

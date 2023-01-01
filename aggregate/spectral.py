@@ -294,10 +294,11 @@ class Distortion(object):
         self.g = g
         self.g_inv = g_inv
 
-        def g_dual(x):
-            return 1 - self.g(x)
-
-        self.g_dual = g_dual
+    def g_dual(self, x):
+        """
+        The dual of the distortion function g.
+        """
+        return 1 - self.g(1 - x)
 
     def __str__(self):
         if self.display_name != '':
@@ -617,4 +618,61 @@ class Distortion(object):
         gs = np.array(gs)
         return Distortion('convex', None, df=pd.DataFrame({'s': s.flat, 'gs': gs.flat}),
                           col_x='s', col_y='gs', display_name=display_name)
+
+    def price(self, ser, a=np.inf, kind='ask', S_calculation='forwards'):
+        r"""
+        Compute the bid and ask prices for the distribution determined by ``ser`` with
+        an asset limit ``a``. Uses ``np.trapz`` to compute :math:`\int_0^a S` or
+        :math:`\int_0^a g(S)`. Index of ``ser`` need not be equally spaced, so it can
+        be applied to :math:`\kappa`. To do this for unit A in portfolio port::
+
+            ser = port.density_df[['exeqa_A', 'p_total']].\
+                set_index('exeqa_A').groupby('exeqa_A').\
+                sum()['p_total']
+            dist.price(ser, port.q(0.99), 'both')
+
+
+        :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes must
+          be spaced evenly. ``ser`` is usually a probability column from ``density_df``.
+        :param kind: is "ask", "bid",  or "both", giving the pricing view.
+        :param a: asset level. ``ser`` is truncated at ``a``.
+        """
+
+        if not isinstance(ser, pd.Series):
+            raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
+
+        if kind in ['bid', 'ask']:
+            pass
+        elif kind == 'both':
+            return [*self.price(ser, a, 'bid', S_calculation),
+                    self.price(ser, a, 'ask', S_calculation)[0]]
+        else:
+            raise ValueError(f'kind must be bid, ask, or both, not {kind}')
+
+        # apply limit
+        if a < np.inf:
+            ser = ser.copy()
+            tail = ser[a:].sum()
+            ser = ser[:a]
+            ser[a] = tail
+        else:
+            ser = ser.sort_index(ascending=True)
+
+        if S_calculation == 'forwards':
+            S = 1 - ser.cumsum()
+        else:
+            fill_value = max(0, 1 - ser.sum())
+            S = np.minimum(1, fill_value +
+                           ser.shift(-1, fill_value=0)[::-1].cumsum())
+
+        # not all distortions return numpy; force conversion
+        if kind == 'ask':
+            gS = np.array(self.g(S))
+        else:
+            gS = np.array(self.g_dual(S))
+
+        loss = np.trapz(S, S.index)
+        prem = np.trapz(gS, S.index)
+
+        return prem, loss
 

@@ -2104,7 +2104,7 @@ class Portfolio(object):
         if not np.all(df.p_total >= 0):
             # have negative densities...get rid of them
             first_neg = df.query(f'p_total < {-cut_eps}')
-            logger.warning(
+            logger.log(WL,
                 # f'Portfolio.add_exa | p_total has a negative value starting at {first_neg.head()}; NOT setting to zero...')
                 f'p_total has {len(first_neg)} negative values; NOT setting to zero...')
         sum_p_total = df.p_total.sum()
@@ -2866,8 +2866,8 @@ class Portfolio(object):
         # floating point issues: THIS HAPPENS, so needs to be corrected...
         cut_eps = np.finfo(float).eps
         if len(df.loc[df.S < 0, 'S'] > 0):
-            logger.warning(f"{len(df.loc[df.S < -cut_eps, 'S'] > 0)} negative S < -eps values being set to zero...")
-            # logger.warning(f"{len(df.loc[df.S < 0, 'S'] > 0)} negative S values being set to zero...")
+            logger.log(WL, f"{len(df.loc[df.S < -cut_eps, 'S'] > 0)} negative S < -eps values being set to zero...")
+            # logger.log(WL, f"{len(df.loc[df.S < 0, 'S'] > 0)} negative S values being set to zero...")
         df.loc[df.S < 0, 'S'] = 0
 
         # add the exag and distorted probs
@@ -2945,10 +2945,10 @@ class Portfolio(object):
             # only add masses upto ess_sup
             # mass_S = pd.Series(0.0 index=df.index)
             # mass_S.iloc[:idx_ess_sup] =
-            # logger.warning('No mass_hints given...estimating...')
+            # logger.log(WL, 'No mass_hints given...estimating...')
             mass_hints = pd.Series(index=self.line_names)
             for line in self.line_names:
-                # logger.warning(f'Individual line={line}')
+                # logger.log(WL, f'Individual line={line}')
                 # print(f'Individual line={line}')
                 mass_hints[line] = df[f'exi_xeqa_{line}'].iloc[-1]
                 for ii in range(1, min(4, max(self.log2 - 8, 0))):
@@ -2959,7 +2959,7 @@ class Portfolio(object):
                     # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
                     #                f'is {mass_hints[line]:.5g}')
                 logger.debug('Generally, you want these values to be consistent, except for discrete distributions.')
-            logger.warning(f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}'
+            logger.log(WL, f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}'
                            f' mass {dist.mass} {dist}')
             # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
 
@@ -3001,12 +3001,12 @@ class Portfolio(object):
             #     # not clear how accurately this is computed numerically
             #     # this amount is a
             #     mass = total_mass * self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup]
-            #     logger.warning(f'Individual line={line} weight from portfolio mass = {mass}')
+            #     logger.log(WL, f'Individual line={line} weight from portfolio mass = {mass}')
             #     for ii in range(1, max(self.log2 - 4, 0)):
             #         avg_xix = self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
-            #         logger.warning(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
+            #         logger.log(WL, f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
             #                        f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]}:.5g')
-            #     logger.warning('You want these values all to be consistent!')
+            #     logger.log(WL, 'You want these values all to be consistent!')
             # old
             # mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}'] * \
             #        np.where(self.density_df.S > 0, 1, 0)
@@ -3429,7 +3429,7 @@ class Portfolio(object):
             p = self.cdf(a)
             ql = self.q(p, 'lower')
             qu = self.q(p, 'upper')
-            logger.warning(
+            logger.log(WL,
                 f'Input a={a} to gamma; computed p={p:.8g}, lower and upper quantiles are {ql:.8g} and {qu:.8g}')
 
         # alter in place or return a copy? For now return a copy...

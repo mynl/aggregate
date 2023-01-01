@@ -591,7 +591,7 @@ class Aggregate(Frequency):
         ``_apply_reins_work``
         """
         if self.occ_reins is None and self.agg_reins is None:
-            logger.warning('Asking for reinsurance_df, but no reinsurance specified. Returning None.')
+            logger.log(WL, 'Asking for reinsurance_df, but no reinsurance specified. Returning None.')
             return None
 
         if self._reinsurance_df is None:
@@ -1378,7 +1378,7 @@ class Aggregate(Frequency):
 
             # adjust for picks if necessary
             if self.sev_pick_attachments is not None:
-                logger.warning('Adjusting for picks.')
+                logger.log(WL, 'Adjusting for picks.')
                 self.sev_density = self.picks(self.sev_pick_attachments, self.sev_pick_losses)
 
         if force_severity == 'yes':
@@ -1431,7 +1431,7 @@ class Aggregate(Frequency):
             if not np.isfinite(self.agg_cv):
                 raise ValueError('Cannot fit a distribution with infinite second moment.')
             if self.agg_skew < 0:
-                logger.warning('Negative skewness, ignoring and fitting unshifted distribution.')
+                logger.log(WL, 'Negative skewness, ignoring and fitting unshifted distribution.')
 
             if self.agg_skew == 0:
                 self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)

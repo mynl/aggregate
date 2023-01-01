@@ -73,7 +73,6 @@ Integration by parts gives
    \begin{align}
    \int_{a_{i-1}}^{a_i} S(x)dx
    &= xS(x)\,\big\vert_{a_{i-1}}^{a_i} + \int_{a_{i-1}}^{a_i} x dF(x) \\
-   %&= a_iS(a_i) - a_{i-1}S(a_{i-1}) + \int_{a_{i-1}}^{a_i} x dF(x) \\
    &= a_iS(a_i) + \int_{a_{i-1}}^{a_i} (x - a_{i-1}) dF(x) \\
    &= e_i + m_i.
    \end{align}

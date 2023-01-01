@@ -343,14 +343,14 @@ Brokers publish price sheets for ILWs to give a view of market pricing. Price is
     \small
     \begin{matrix}
     \begin{array}{@{}cr@{}}\hline
-        \textbf{Attachment} & \textbf{Price}\\ \hline
-        15B  &   47.0%   \\
-        20B  &   38.0%   \\
-        25B  &   33.0%   \\
-        30B  &   27.5%   \\
-        40B  &   17.5%   \\
-        50B  &   13.0%   \\
-        60B  &   10.75%   \\ \hline
+        \textbf{Attachment} & \textbf{Price (Pct)}\\ \hline
+        15B  &   47.0   \\
+        20B  &   38.0   \\
+        25B  &   33.0   \\
+        30B  &   27.5   \\
+        40B  &   17.5   \\
+        50B  &   13.0   \\
+        60B  &   10.75   \\ \hline
       \end{array}
     \end{matrix}
 

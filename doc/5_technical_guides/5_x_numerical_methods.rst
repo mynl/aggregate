@@ -11,8 +11,24 @@ Numerical Methods and FFT Convolution
 
 **See also:**  :ref:`aggregate <2_x_aggregate>`.
 
+**Contents:**
+
+* :ref:`num hr`
+* :ref:`num faf`
+* :ref:`num floats`
+* :ref:`num how agg reps a dist`
+
+.. _num hr:
+
+Helpful References
+--------------------
+
+
+
+
 For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
 
+.. _num faf:
 
 Fast, Accurate, and Flexible
 ------------------------------
@@ -45,6 +61,9 @@ The downside is less flexibility. FFT-based methods cannot model the
 * Total cession to specific and aggregate covers because it requires the bivariate distribution. It can model the sum of the parts.
 
 Flexibility can be improved using higher dimensional FFT methods, for example to track ceded and net positions simultaneously, but they soon run afoul of the limits of practical computation. See CAS WP ref for an example using 2-dimensional FFTs.
+
+
+.. _num floats:
 
 
 Floats

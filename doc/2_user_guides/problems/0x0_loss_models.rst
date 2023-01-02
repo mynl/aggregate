@@ -1,7 +1,7 @@
 Loss Models Book
 --------------------
 
-Examples from the text :cite:t:`LM`, Loss models: from data to decisions. The Loss models book is used as a text for several actuarial society exams and many college courses.
+Examples from the text :cite:t:`LM`, Loss Models: from data to decisions. The Loss models book is used as a text for several actuarial society exams and many college courses. KPW is shorthand for Loss Models.
 
 Contents
 ~~~~~~~~~
@@ -340,7 +340,8 @@ ZM Binomial, Example 9.11
 
 A compound distribution has a zero-modified binomial distribution with 𝑚 = 3, :math:`q = 0.3`, and :math:`p_0^M = 0.4`. Individual payments are 0, 50, and 150, with probabilities 0.3, 0.5, and 0.2, respectively. Use the recursive formula to determine the probability distribution of :math:`S`.
 
-TODO implement ZM and ZT.
+.. todo::
+    Implement ZM and ZT.
 
 .. _example 9_12:
 
@@ -350,7 +351,8 @@ ETNB, Example 9.12
 The number of claims has a Poisson–ETNB distribution with Poisson parameter 𝜆 = 2 and ETNB parameters :math:`\beta = 3` and :math:`r = 0.2`. The claim size distribution has probabilities 0.3, 0.5, and 0.2 at 0, 10, and 20, respectively. Determine the total claims distribution recursively.
 
 
-TODO implement ZM and ZT.
+.. todo::
+    Implement ZM and ZT.
 
 .. _exercise 9_45:
 
@@ -392,9 +394,9 @@ For a premium of 6, an insurer covers aggregate claims and agrees to pay a divid
 Repeat the Exercise with a negative binomial frequency distribution with r = 6 and
 :math:`\beta = 0.5`.
 
-GO back and fix prior...
-exp = r b / (1+b) = 2
-CV = sqrt(1/6)
+.. GO back and fix prior...
+  exp = r b / (1+b) = 2
+  CV = sqrt(1/6)
 
 .. ipython:: python
     :okwarning:
@@ -477,7 +479,7 @@ The covered layer is 18 xs 6, in which the insured pays 25% because of the coins
 
 ``describe`` returns gross under ``E[X]`` and the requested net or ceded under ``Est E[X]``. The print statement computes net variance from the product of estimated mean and cv. The spikes on the density corresponds to the possibility of only limit claims.
 
-**TODO** harmonize with their answer for probabilities.
+.. **TODO** harmonize with their answer for probabilities.
 
 .. _exercise 9_63:
 
@@ -893,3 +895,10 @@ Compound Poisson approximation is easy to construct as a mixture.
     kpw_9_74cp = build('agg KPW.9.74.cp [10 7.5 10] claims sev [500 750 1000] * expon poisson')
     qd(kpw_9_74cp)
     mv(kpw_9_74cp)
+
+
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')

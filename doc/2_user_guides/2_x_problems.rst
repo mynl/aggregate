@@ -7,7 +7,7 @@ Published Problems and Examples
 
 **Prerequisites:** ``aggregate`` programming; risk theory.
 
-**See also:** Bear and Nemlick and Mata et al. examples in :doc:`2_x_re_pricing`.
+**See also:** Examples in :doc:`2_x_re_pricing`.
 
 **Contents:**
 
@@ -21,11 +21,4 @@ Published Problems and Examples
     problems/0x0_loss_models
     problems/0x0_bahnemann
     problems/0x0_enterprise_risk_analysis
-
-
-Other papers to review include :cite:t:`Hyndman1996` and :cite:t:`Denuit2019`.
-
-Any of the following problems:
-
-* Given frequency and severity compute the moments, distribution, approximate the distribution, compute anything from the distribution (layers, etc.)
 

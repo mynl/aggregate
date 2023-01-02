@@ -36,6 +36,13 @@ See requirements.txt. The top block is required for installation. The bottom blo
 
 .. literalinclude:: ../requirements.txt
 
+
+Help Parameters and Examples
+================================
+
+.. warning::
+    All parameters are fabrications. They try to be realistic (or at least not materially unrealistic) but are not intended to be applied to real-world pricing. They are for educational purposes only.
+
 Help Structure
 ===============
 

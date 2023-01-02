@@ -11,18 +11,18 @@ The Rearrangement Algorithm
 
 **See also:**
 
-Contents
------------
+**Contents:**
 
 * :ref:`Helpful References`
-* :ref:`strat margin alloc`
+* :ref:`The Rearrangement Algorithm`
+* :ref:`Worked Example`
 
 Helpful References
 --------------------
 
-* PIR Section 4.2.5.
 * :cite:t:`Puccetti2012`
 * :cite:t:`Embrechts2013`
+* :cite:t:`PIR`, Section 4.2.5.
 
 .. _strat margin alloc:
 

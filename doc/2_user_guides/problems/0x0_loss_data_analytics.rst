@@ -117,7 +117,7 @@ Weibull distribution
         ax0.plot(xs, ss.weibull_min(3, scale=scale).pdf(xs), label=f'scale = {scale}')
     for shape in [1.5, 2, 2.5, 3]:
         ax1.plot(xs, ss.weibull_min(shape, scale=100).pdf(xs), label=f'shape = {shape}')
-    @savefig lda_pareto.png scale=20
+    @savefig lda_weibull.png scale=20
     for ax in axs.flat:
         ax.legend(loc='upper right')
         ax.set(ylabel='Weibull_min density', xlabel='x')
@@ -237,7 +237,7 @@ where :math:`x` is measured in millions. Calculate the total amount, in millions
     ps = np.diff(F, append=1)
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
     @savefig lda_344.png scale=20
-    ax.plot(xs, ps)
+    ax.plot(xs, ps);
 
 When the empirical distribution has many entries it is faster to build the ``Aggregate`` object directly, rather than use DecL. The moments of the severity and aggregate distribution are computed from the numerical approximation during creation. There is no need to update the object.
 
@@ -451,9 +451,9 @@ Here is a comparison of the FFT model with the normal approximation. Example 5.4
     :okwarning:
 
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
-    (a.density_df.p / a.bs).plot(label='Exact', ax=ax)
-    ax.plot(a.xs, fz.pdf(a.xs), label='Normal approx')
-    ax.set(xlim=[0, 3000], title='Normal approximation')
+    (a.density_df.p / a.bs).plot(label='Exact', ax=ax);
+    ax.plot(a.xs, fz.pdf(a.xs), label='Normal approx');
+    ax.set(xlim=[0, 3000], title='Normal approximation');
     @savefig lda_normal.png scale=20
     ax.legend(loc='upper right');
 
@@ -495,7 +495,6 @@ Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that 
               'dsev [5 10 20] [.2 .3 .5] geometric '
               'aggregate net of tower [0 5 10 15 inf]')
     b = a1.reinsurance_audit_df.xs('ceded', axis=1, level=0)
-    # reverse cumulative sum, minus mean from last row
     b['cumul ex'] = b.ex[::-1].cumsum() - a.agg_m
     qd(b, accuracy=4)
 
@@ -512,7 +511,11 @@ Aggregate losses are modeled as follows:
 
 Calculate :math:`\mathsf{E}(N^P)` and :math:`\mathsf{Var}(N^P)`.
 
-**Solution.** TODO: implement ZT and ZM!
+**Solution.**
+
+.. todo::
+
+    Implement ZT and ZM!
 
 .. _lda neg bin 555:
 
@@ -558,11 +561,11 @@ Here is a comparison of the two densities.
     :okwarning:
 
     fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True, squeeze=True)
-    a0.density_df.p_total.plot(ax=ax, label='Original')
-    a1.density_df.p_total.plot(ax=ax, label='Adjusted')
-    ax.set(xlim=[-10, 1.25 * a0.q(0.9999)])
+    a0.density_df.p_total.plot(ax=ax, label='Original');
+    a1.density_df.p_total.plot(ax=ax, label='Adjusted');
+    ax.set(xlim=[-10, 1.25 * a0.q(0.9999)]);
     @savefig lda_5_5_5.png scale=20
-    ax.legend(loc='upper right')
+    ax.legend(loc='upper right');
 
 .. _lda poisson exponential:
 

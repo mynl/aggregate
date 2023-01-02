@@ -11,11 +11,20 @@ The Tweedie Distribution: Theory
 
 **See also:** :doc:`../2_user_guides/DecL/100_tweedie`.
 
+**Contents:**
+
+* :ref:`tw helpful refs`
+* :ref:`tw theory`
+* :ref:`tw pvf`
+
+.. _tw helpful refs:
+
 Helpful References
 -------------------
 
-Jørgensen, Bent. 1997. The theory of dispersion models. CRC Press.
+* :cite:t:`Jorgensen1997`
 
+.. _tw theory:
 
 Theory
 -------
@@ -92,7 +101,7 @@ where :math:`w = \sum_i w_i`. The weights :math:`w_i` represents volume
 in cell :math:`i` and :math:`X_i` represents the pure premium. The sum
 on the left represents the total pure premium.
 
-
+.. _tw pvf:
 
 The Power Variance Exponential Family of Distributions
 ------------------------------------------------------

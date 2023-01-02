@@ -7,11 +7,9 @@ Using Samples
 
 **Prerequisites:** Probability, multivariate distributions, DecL, general use of ``aggregate``.
 
-**See also:** :doc:`5_x_iman_conover`, :doc:`5_x_rearrangement`, :doc:`../2_user_guides/2_x_samples`
+**See also:** :doc:`5_x_iman_conover`, :doc:`5_x_rearrangement_algorithm`, :doc:`../2_user_guides/2_x_samples`
 
-
-Contents
------------
+**Contents:**
 
 * :ref:`Helpful References`
 * :ref:`Using Samples`
@@ -19,8 +17,6 @@ Contents
 
 Helpful References
 --------------------
-
-* PIR chapter 14, 15.
 
 .. _strat margin alloc:
 

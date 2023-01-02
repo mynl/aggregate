@@ -30,7 +30,7 @@ Simple Discrete Aggregate, Example 4.1
 Assume that n = 0, 1, 2 are the only possible numbers of
 claims and they occur with probabilities 0.6, 0.3 and 0.1, and that there exist just three potential claim sizes: 1, 2, and 3 with probabilities 0.4, 0.5 and 0.1. (Note: the text uses claim sizes 100, 200 and 300.) Compute the distribution of possible outcomes and its mean and variance.
 
-Imports and a convenience function.
+Imports and convenience functions.
 
 .. ipython:: python
     :okwarning:
@@ -499,4 +499,11 @@ Here is a summary of all the objects created in this section.
 .. ipython:: python
     :okwarning:
 
-    build.qshow('^Bahn')
+    from aggregate import pprint_ex
+    for n, r in build.qshow('^Bahn').iterrows():
+        pprint_ex(r.program, split=20)
+
+.. ipython:: python
+    :suppress:
+
+    plt.close('all')

@@ -10,8 +10,7 @@ The Iman-Conover Method
 
 **See also:**
 
-Contents
------------
+**Contents:**
 
 * :ref:`Helpful References`
 * :ref:`Basic Idea`
@@ -131,11 +130,11 @@ the covariance matrix of :math:`\mathsf{T}` is
 .. math::
 
    \begin{aligned}
-   n^{-1}\mathsf{T}'\mathsf{T} &=&n^{-1}\mathsf{C}'\mathsf{F}'^{-1}\mathsf{M}'\mathsf{M}\mathsf{F}^{-1}\mathsf{C} \notag  \\
-   &=&\mathsf{C}'\mathsf{F}'^{-1}\mathsf{EE}\mathsf{F}^{-1}\mathsf{C} \notag   \\
-   &=&\mathsf{C}'\mathsf{F}'^{-1}\mathsf{F}'\mathsf{F}\mathsf{F}^{-1}\mathsf{C} \notag  \\
-   &=&\mathsf{C}' \mathsf{C} \notag  \\
-   &=&\mathsf{S},\label{icCorr}\end{aligned}
+   n^{-1}\mathsf{T}'\mathsf{T} &= n^{-1}\mathsf{C}'\mathsf{F}'^{-1}\mathsf{M}'\mathsf{M}\mathsf{F}^{-1}\mathsf{C} \notag  \\
+   &= \mathsf{C}'\mathsf{F}'^{-1}\mathsf{EE}\mathsf{F}^{-1}\mathsf{C} \notag   \\
+   &= \mathsf{C}'\mathsf{F}'^{-1}\mathsf{F}'\mathsf{F}\mathsf{F}^{-1}\mathsf{C} \notag  \\
+   &= \mathsf{C}' \mathsf{C} \notag  \\
+   &= \mathsf{S},\label{icCorr}\end{aligned}
 
 and hence :math:`\mathsf{T}` has correlation matrix exactly equal to :math:`\mathsf{S}`,
 as desired. If :math:`\mathsf{EE}` is singular then the column shuffle needs to

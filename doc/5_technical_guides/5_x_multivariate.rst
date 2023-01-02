@@ -3,17 +3,18 @@ Multivariate Methods
 
 **Objectives:** Multivariate distributions from shared mixing variables; 2 dimensional FFT techniques.
 
-**Audience:**
+**Audience:** Users interested in directly estimating multivariate distributions.
 
 **Prerequisites:** DecL, general use of ``aggregate``, probability.
 
 **See also:**
 
-Contents
------------
+**Contents:**
 
 * :ref:`Helpful References`
-* :ref:`strat margin alloc`
+* :ref:`Two Shortcomings`
+* :ref:`mv neg multi`
+* :ref:`Correlated Aggregate Distributions`
 
 Helpful References
 --------------------
@@ -22,19 +23,17 @@ Helpful References
 
 .. _strat margin alloc:
 
-
 Two Shortcomings
 -------------------
 
-Occ cat program with reinstatements: can't model net.
+``aggregate`` methods are fundamentally univariate. Only one loss is tracked through each calculation. As a result, there are several programs it is impossible to model directly:
 
-Spec and agg: can model cession
+* The net of an occurrence cat program with an aggregate limit (need to track the net and cession to know when the aggregate limit is exhausted).
+* The total cession from a specific and agg program (need to track two ceded results).
 
-These are dual problems.
+These are dual problems. It is possible to model them using two dimensional FFTs.
 
-See agg/reinstatements.ipynb
-
-
+.. _mv neg multi:
 
 Negative Multinomial Distribution and Related Frequency Distributions
 -----------------------------------------------------------------------
@@ -94,7 +93,7 @@ frequency distributions :math:`(N_1,\dots,N_t)` where
 We will call such multivariate frequencies, with common mixing
 distributions, :math:`G`-mixed multivariate Poisson distributions.
 
-Evolution of Claims Over Time\*
+Evolution of Claims Over Time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here is an application of the NMN distribution. If :math:`A` is an
@@ -191,7 +190,7 @@ marginals, in line with our prior notions of liability dynamics. It
 therefore provides a good model for the decomposition of ultimate losses
 into losses paid each period.
 
-Related Multivariate Frequency Distributions\*
+Related Multivariate Frequency Distributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We can use the same trick with other mixing distributions than the
@@ -236,8 +235,8 @@ variance are given by
 
 .. _multiFreq:
 
-Excess count interpretation of :math:`G`-mixed multivariate Poisson distributions\*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Excess count interpretation of :math:`G`-mixed multivariate Poisson distributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The reader has probably realized that a :math:`G`-mixed multivariate
 Poisson seems closely related to a single :math:`G`-mixed Poisson and a

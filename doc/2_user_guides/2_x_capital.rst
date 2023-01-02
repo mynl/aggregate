@@ -27,7 +27,7 @@ Helpful References
 
 .. Portfolio level probability of default, EPD, Var and TVaR statistics
 
-.. _res kappa:
+.. _cap kappa:
 
 Conditional Expectation as a Risk Management and Visualization Device
 -------------------------------------------------------------------------

@@ -13,10 +13,36 @@ Probability Background
 
 **Notation:** The variance of a random variable :math:`X` is :math:`\mathsf{var}(X)=\mathsf{E}[X^2]-\mathsf{E}[X]^2`. The standard deviation is :math:`\sigma(X)=\sqrt{\mathsf{var}(X)}`. The coefficient of variation (CV) of :math:`X` is :math:`\mathsf{CV}(X)=\sigma(X)/\mathsf{E}[X]`. The skewness of :math:`X` is :math:`\mathsf{E}[(X-\mathsf{E}[X])^3]/\sigma(X)^3`.
 
+**Contents:**
+
+* :ref:`p hr`
+* :ref:`p types`
+* :ref:`p mgfs`
+* :ref:`p severity`
+* :ref:`p frequency`
+* :ref:`p aggregate`
+* :ref:`p sln sg`
+* :ref:`p xs freq`
+* :ref:`p sev irrel`
+
+.. _p hr:
+
+
+Helpful References
+--------------------
+
+* :cite:t:`feller71`
+
+.. _p types:
+
 Types
 ------
 
-TODO
+.. todo::
+
+  Documentation to follow.
+
+.. _p mgfs:
 
 Moment Generating Functions
 ---------------------------
@@ -91,6 +117,8 @@ The MGF of a Poisson variable with mean :math:`n` is
 See any standard text on probability for more information on moment
 generating functions, characteristic functions and modes of convergence.
 
+.. _p severity:
+
 Severity Distributions
 -----------------------
 
@@ -151,8 +179,19 @@ An easy integral computation, substitute :math:`y=\lambda + x` to express in pow
    &= \sum_{i=0}^k (-1)^{k-i} \alpha\lambda^\alpha \binom{k}{i}   \int_\lambda^{\lambda + a}  y^{i-\alpha-1} \lambda^{k-i}\,dy \\
    &= \sum_{i=0}^k (-1)^{k-i} \alpha\lambda^{\alpha+k-i} \binom{k}{i}  \frac{y^{i-\alpha}}{i-\alpha}\big|_\lambda^{\lambda + a}.
 
+.. _p frequency:
+
 Frequency Distributions
 ------------------------
+
+Bernoulli Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Binomial Distribution
+~~~~~~~~~~~~~~~~~~~~~~
+
+Fixed Distribution
+~~~~~~~~~~~~~~~~~~~
 
 .. _mixed frequency distributions:
 
@@ -248,15 +287,8 @@ we get an expression for the skewness
 The corresponding MGF of the gamma is
 :math:`M_G(\zeta) = (1-\theta\zeta)^{-a}`.
 
-dddddd
-
-Recall that a negative binomial is a gamma-mixed Poisson: if :math:`N \mid G`
-is distributed as a Poisson with mean :math:`G`, and :math:`G` has a
-gamma distribution, then the unconditional distribution of :math:`N` is
-a negative binomial. Both the gamma and negative binomial occur in the
-literature with many different parameterizations. The main ones are
-shown in the next three tables.
-
+The gamma and negative binomial occur in the literature with many different
+parameterizations. The main ones are shown in the next three tables.
 
 .. list-table:: Parameterizations of the Gamma Distribution
   :widths: 20 20 20 20 20
@@ -346,11 +378,9 @@ Note that :math:`Q=P+1`, :math:`q=1-p`, :math:`0<p<1` and :math:`r>0`, and :math
     - :math:`p=1/(1+cn)`
 
 
-Model (a) is used by Wang and Loss
-Models, (b) by Johnson et al. [Chapter 5] and (c)
-by Bowers et al. and Excel. In model (c)
-the parameter :math:`r` need not be an integer because the binomial
-coefficient can be computed as
+Model (a) is used by Wang and Loss Models, (b) by Johnson et al. [Chapter 5]
+and (c) by Bowers et al. and Excel. In model (c) the parameter :math:`r` need
+not be an integer because the binomial coefficient can be computed as
 
 .. math:: \binom{r+x-1}{x}=\frac{\Gamma(r+x)}{\Gamma(r)x!},
 
@@ -396,11 +426,6 @@ with mean :math:`n` and variance :math:`vn` for some :math:`v>1`. We
 call :math:`v` the variance multiplier. Now the coefficient of variation
 tends to :math:`0` as :math:`n\to\infty`. The notion of over-dispersion
 and its application in modeling is discussed in Clark and Thayer, and Verrall.
-
-
-
-
-dddddd
 
 .. _prob variance mult:
 
@@ -452,18 +477,10 @@ The skewness of :math:`G` equals the skewness of :math:`G'` equals
 Poisson Inverse Gaussian Distribution
 """"""""""""""""""""""""""""""""""""""
 
-Bernoulli Distribution
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Binomial Distribution
-~~~~~~~~~~~~~~~~~~~~~~
-
-Fixed Distribution
-~~~~~~~~~~~~~~~~~~~
-
 The :math:`(a,b,0)` and :math:`(a,b,1)` Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. _p aggregate:
 
 Aggregate Distributions
 -----------------------
@@ -471,7 +488,6 @@ Aggregate Distributions
 Let :math:`A=X_1+\cdots +X_N` be an aggregate distribution, where
 :math:`N` is the **frequency** component and  :math:`X_i` are iid **severity**
 random variables.
-
 
 
 Aggregate statistics: the mean
@@ -572,6 +588,7 @@ shifted gamma distribution. We turn next to a description of these handy
 distributions.
 
 .. _shiftedLN:
+.. _p sln sg:
 
 Shifted Gamma and Lognormal Distributions
 -----------------------------------------
@@ -644,6 +661,7 @@ of exponentials where the mixing distribution is gamma.
    | :math:`\mu`          |                                   |                                          |
    +----------------------+-----------------------------------+------------------------------------------+
 
+.. _p xs freq:
 
 Excess Frequency Distributions
 ------------------------------
@@ -782,6 +800,8 @@ covariance term is
    &= c\mathsf{E}[RS]  + \mathsf{cov}(R,S)  \\
    &= (1+c)\mathsf{cov}(R,S) + crs  \\
    &= \rho \sqrt{v_rv_s}(1+c)+crs.
+
+.. _p sev irrel:
 
 Severity is Irrelevant
 ----------------------

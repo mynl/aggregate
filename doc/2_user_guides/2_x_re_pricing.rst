@@ -584,7 +584,6 @@ For 400 xs 100 and Pareto shape 1.1, these two DecL programs produce identical r
 
     4 claims 400 xs 0 sev 100 * pareto 1.1 - 100 poisson
 
----
 
 .. _re bear 1:
 

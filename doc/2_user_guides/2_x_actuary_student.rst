@@ -10,7 +10,7 @@ Actuarial Student
 
 **Audience:** Actuarial science university students and actuarial analysts.
 
-**Prerequisites:** Familiarity with aggregate probability distributions as covered on SOA STAM, CAS MAS I, or IFOA CS-2, and basic insurance terminology from insurance company operations.
+**Prerequisites:** Familiarity with aggregate probability distributions as covered on actuarial society exams and basic insurance terminology from insurance company operations.
 
 **See also:** :doc:`2_x_student` for a more basic introduction; :doc:`../2_User_Guides` for other applications.
 

@@ -13,17 +13,27 @@ Quantiles and Related Measures
 
 **See also:**
 
-Contents
------------
+**Contents:**
+
+* :ref:`q hr`
+* :ref:`quantiles`
+* :ref:`Value at Risk`
+* :ref:`Return Periods`
+* :ref:`q aep oep`
+* :ref:`q tvar`
+
+
+.. _q hr:
 
 Helpful References
 --------------------
 
-* PIR Chapter 4
+- :cite:t:`PIR`, chapter 4
+- :cite:t:`Hyndman1996`
 
--  Quantiles are the fundamental building block risk measure.
--  Value at risk (VaR) = quantiles when used as a risk measure.
--  Tail value at risk (TVaR).
+..  Quantiles are the fundamental building block risk measure.
+    Value at risk (VaR) = quantiles when used as a risk measure.
+    Tail value at risk (TVaR).
 
 Quantiles
 ---------
@@ -281,6 +291,8 @@ When :math:`X` represents aggregate annual losses, the statement
 - :math:`x` is the smallest loss for which :math:`X\le x` with an annual probability of at least :math:`0.99`, or
 - :math:`x` is the smallest loss with an annual probability at most :math:`0.01` of being exceeded.
 
+.. _q aep oep:
+
 Aggregate and Occurrence Probable Maximal Loss and Catastrophe Model Output
 ----------------------------------------------------------------------------
 
@@ -402,6 +414,8 @@ It is easy to create simple discrete examples where VaR fails to be subadditive.
    pd.DataFrame([ans, ans2], index=pd.Index([0.7, 0.95], name='p'))
 
 The function ``var_dict`` returns the VaR of each unit in ``p`` and the total. The total VaR is greater than the sum of the parts. Subadditivity requires total VaR be less than or equal to the sum of the parts.
+
+.. _q tvar:
 
 Tail VaR and Related Risk Measures
 ----------------------------------

@@ -12,10 +12,23 @@
 **See also:** :doc:`5_x_aggregate_calculations`, :doc:`5_x_distortions`, :doc:`../2_user_guides/2_x_10mins`.
 
 
+**Contents:**
+
+* :ref:`Helpful References`
+* :ref:`Calculations`
+
+Helpful References
+--------------------
+
+* :cite:t:`PIR`
+
+
+Calculations
+-------------
 
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class
 computes the densities of each aggregate component as well as the sum,
-and also computes the variables shown in XXXX.
+and also computes the variables shown below.
 These variables are central to many
 allocation algorithms. All computations use FFTs to compute relevant
 convolutions and surface integrals. :math:`X_i(a` represents recoveries
@@ -124,7 +137,7 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
      - Second priority EPD
      -
 
-**For Total, All Lines :math:`X`**
+**For Total, All Lines** :math:`X`
 
 -  Density :math:`f` computed by convolving each individual line using
    FFTs.

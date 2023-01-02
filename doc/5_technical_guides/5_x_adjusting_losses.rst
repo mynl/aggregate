@@ -9,8 +9,7 @@ Adjusting Layer Loss Picks
 
 **Prerequisites:** DecL, general use of ``aggregate``, probability.
 
-**See also:**
-
+**See also:** :doc:`../2_user_guides/2_x_re_pricing`.
 
 Reinsurance actuaries apply experience and exposure rating to excess of
 loss programs. Experience rating trends and develops layer losses to

@@ -21,7 +21,7 @@ Case Studies
 #. :ref:`Defining a Custom Case Study`
 #. :ref:`Standard Case Study Exhibits`
 
-**Confession:** The ``case_studies`` code is sub-optimal. Some of it is horrendous.
+**Confession:** Some of the ``case_studies`` code is sub-optimal.
 
 PIR Case Studies
 --------------------
@@ -36,8 +36,6 @@ Each case describes business written by Ins Co., a one-period de novo insurer
 that comes into existence at time zero, raises capital and writes business,
 and pays all losses at time one. A case models two units (line, region,
 operating unit, or other division) with one more risky than the other. Usually, the riskier one is reinsured. Case exhibits compare unit statistics and pricing on a gross and net basis, showing results from over a dozen different methods.
-
-PIR includes four Case Studies.
 
 Simple Discrete Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -73,7 +71,7 @@ insurers and reinsurers. It arises in many different guises:
 The two units are independent and have gamma and lognormal distributions.
 
 Aggregate reinsurance applies to the Cat unit, with an attachment probability
-0.1(41) and detachment probability 0.005(121).
+0.1 (41) and detachment probability 0.005 (121).
 
 Hurricane/Severe Convective Storm (HuSCS) Case Study
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,14 +84,13 @@ event-level output. Both units are modeled using an aggregate distribution
 with a Poisson frequency and lognormal severity.
 
 Aggregate reinsurance applies to the HU unit with an occurrence attachment
-probability 0.05(40) and detachment probability 0.005 (413). See REF for a
-version with occurrence reinsurance.
+probability 0.05(40) and detachment probability 0.005 (413). (PIR incorrectly states the reinsurance is occurrence.)
 
 
 Creating a Case Study
 ---------------------
 
-Case Study exhibits are managed by the class :class:`CaseStudy` in ``aggregate.extensions.case_studies``, see :ref:`Extensions`. Here are the four steps needed to create a case study. The computations take a few minutes. The output is a set of HTML files that can be viewed in a browser. The code blocks below are provided in executable scripts described below.
+Case Study exhibits are managed by the class :class:`CaseStudy` in ``aggregate.extensions.case_studies``, see :ref:`Extensions`. Here are the steps needed to create a case study. The computations take a few minutes. The output is a set of HTML files that can be viewed in a browser. The code blocks below are provided in executable scripts described below.
 
 1. Import ``case_studies``::
 
@@ -123,7 +120,13 @@ Case Study exhibits are managed by the class :class:`CaseStudy` in ``aggregate.e
                     log2=16,
                     padding=1)
 
-4. To browse the exhibits execute::
+4. Execute::
+
+    my_case.full_monty()
+
+  to create all figures and tables. The code can take several minutes to execute.
+
+5. To browse the exhibits execute::
 
     my_case.browse_exhibits()
 

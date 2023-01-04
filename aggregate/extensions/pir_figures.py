@@ -1,9 +1,10 @@
 # standalone figures from PIR book
 
-import numpy as np
-import scipy.stats as ss
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+import numpy as np
+import pandas as pd
+import scipy.stats as ss
 from .. import build
 from .. import Distortion
 from .. constants import FIG_W, FIG_H, PLOT_FACE_COLOR
@@ -55,6 +56,146 @@ def fig_4_1():
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
 
     return fig
+
+def ex49():
+    ps = np.ones(10) / 10
+    cps = np.hstack((0,np.cumsum(ps)))
+    xs = np.array([0,0,1,1,1,2,3, 4,8, 12, 25])
+    df = pd.DataFrame({'x': xs[1:], 'p': ps})
+    df = pd.DataFrame(df.groupby('x').p.sum())
+    df['F'] = df.p.cumsum()
+    df = df.reset_index(drop=False)
+    return ps, cps, xs, df
+
+
+def prob_format(axis):
+    axis.set_major_formatter(ticker.FuncFormatter(
+            lambda x, y: '0' if x==0
+            else ('1' if x>=0.999
+            else (f'{x:.2f}' if np.allclose(x,0.25) or np.allclose(x, 0.75)
+            else f'{x:.1f}'))))
+
+
+def fig_4_5():
+    ps, cps, xs, df = ex49()
+    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W  + .2))
+    ax0, ax1 = axs.flat
+    ax = ax0
+    ax.plot(xs, cps, drawstyle='steps-post')
+    ax.plot(xs[1:], cps[1:], 'o')
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.yaxis)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(xlim=[-.5, 25.5],
+           ylim=[-.025, 1.025],
+           title='Distribution function\nright continuous',
+           aspect=(26/1.05)/(4.5/3.25)/1.15,
+           ylabel='$F(x)$', xlabel='Outcome, $x$')
+
+    ax = ax1
+    ax.plot(cps, xs, drawstyle='steps-pre')
+    ax.plot(cps[1:], xs[1:], 'o')
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.xaxis)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(ylim=[-.5, 25.5],
+           xlim=[-.025, 1.025],
+           title='Lower quantile VaR function\nleft continuous',
+           aspect=(4.5/3.25)/(26/1.05),
+           xlabel='$F(x)$', ylabel='Outcome, $x$')
+
+def fig_4_6():
+    ps, cps, xs, df = ex49()
+    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W  + .2))
+    ax0, ax1 = axs.flat
+    ax = ax0
+    ax.plot(df.x, df.F, c='C0')
+    ax.plot([0,0], [0, df.F.iloc[0]], c='C0')
+    ax.plot(df.x, df.F, 'o', c='C0')
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.yaxis)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(xlim=[-.5, 25.5], ylim=[-.025, 1.025],
+               title='Distribution function\n',
+               aspect=(26/1.05)/(3.5/2.45),
+               ylabel='$F(x)$', xlabel='Outcome, $x$')
+
+    ax = ax1
+    ax.plot(df.F, df.x , c='C0')
+    ax.plot([0, df.F.iloc[0]], [0,0], c='C0')
+    ax.plot(df.F, df.x, 'o', c='C0')
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.xaxis)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(ylim=[-.5, 25.5], xlim=[-.025, 1.025],
+           title='Lower quantile VaR function\n',
+           aspect=(3.5/2.45)/(26/1.05),
+           xlabel='$F(x)$', ylabel='Outcome, $x$')
+
+def fig_4_8():
+    ps, cps, xs, df = ex49()
+
+    ad = build(f'agg Empirical 1 claim sev dhistogram xps {df.x.values} {df.p.values} fixed', bs=1)
+    xv = np.hstack((1e-10, df.x.values))
+    adc = build(f'agg Empirical 1 claim sev chistogram xps {xv} {df.p.values} fixed', bs=1/128)
+    qps = np.linspace(0,1,1000, endpoint=True)
+    tvar =np.array([ad.tvar(p) for p in qps])
+    tvarx =np.array([ad.tvar(p, kind='tail') for p in qps])
+    ctvar =np.array([adc.tvar(p) for p in qps])
+
+    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_H, FIG_W  + .3), sharey=True)
+    ax0,ax1 = axs.flat
+
+    # discrete
+    ax = ax0
+    ad.density_df.loss = np.minimum(ad.density_df.loss, 25)
+
+    ad.density_df.plot(y='loss', x='F', drawstyle='steps-pre', ylim=[-1,25.2], xlim=[-0.02,1.02], ax=ax, ls='--', label='Quantile')
+    ax.plot(cps[:2], [0,0], ls='--', label='_none_')
+    ax.plot(cps[1:], xs[1:], 'o', ms=5, c='C0', label='_none_')
+    ax.plot(qps, tvar, c='C0', lw=1, label='TVaR')
+    ax.plot(qps, tvarx, c='C3', lw=1, label='TVaR Ex')
+
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.xaxis)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(ylim=[-.5, 25.2],
+           xlim=[-.025, 1.025],
+           title='TVaR and lower quantile VaR,\ndiscrete sample',
+           aspect=(4.5/3.25)/(26/1.05),
+           xlabel='$F(x)$', ylabel='Outcome, $x$')
+    ax.legend() # .set(visible=False)
+
+    # continuous
+    ax = ax1
+    adc.density_df.plot(y='loss', x='F', drawstyle='steps-pre', ylim=[-1,25.2], xlim=[-0.02,1.02], ax=ax, ls='--')
+    ax.plot(df.F, df.x, 'o', ms=5)
+
+    ax.plot(qps, ctvar, c='C0')
+
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(.2))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(.1))
+    prob_format(ax.xaxis)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set(ylim=[-.5, 25.2],
+           xlim=[-.025, 1.025],
+           title='TVaR and lower quantile VaR,\ncontinuous sample',
+           aspect=(4.5/3.25)/(26/1.05),
+           xlabel='$F(x)$', ylabel='Outcome, $x$')
+    ax.legend().set(visible=False)
+
+
 
 
 def fig_10_3():
@@ -135,6 +276,26 @@ def g_loss_margin_equity(axs, dist, s=0.25):
     a.text(.625 + sm, g_s / 2, 'Premium\n$=g(s)$', va='center', ha='left')
     # a.plot([0, s], [g_s, g_s], lw=1, c='k')
     a.plot([0, .626], [g_s, g_s], lw=.5, c='k', ls='-')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Module Name : curlyBrace
@@ -312,103 +473,57 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
     '''
 
     fig = ax.get_figure()
-
     pt1 = [None, None]
     pt2 = [None, None]
-
     ax_width, ax_height = getAxSize(fig, ax)
-
     ax_xlim = list(ax.get_xlim())
     ax_ylim = list(ax.get_ylim())
 
     # log scale consideration
     if 'log' in ax.get_xaxis().get_scale():
-
         if p1[0] > 0.0:
-
             pt1[0] = np.log(p1[0])
-
         elif p1[0] < 0.0:
-
             pt1[0] = -np.log(abs(p1[0]))
-
         else:
-
             pt1[0] = 0.0
-
         if p2[0] > 0.0:
-
             pt2[0] = np.log(p2[0])
-
         elif p2[0] < 0.0:
-
             pt2[0] = -np.log(abs(p2[0]))
-
         else:
-
             pt2[0] = 0
-
         for i in range(0, len(ax_xlim)):
-
             if ax_xlim[i] > 0.0:
-
                 ax_xlim[i] = np.log(ax_xlim[i])
-
             elif ax_xlim[i] < 0.0:
-
                 ax_xlim[i] = -np.log(abs(ax_xlim[i]))
-
             else:
-
                 ax_xlim[i] = 0.0
-
     else:
-
         pt1[0] = p1[0]
         pt2[0] = p2[0]
-
     if 'log' in ax.get_yaxis().get_scale():
-
         if p1[1] > 0.0:
-
             pt1[1] = np.log(p1[1])
-
         elif p1[1] < 0.0:
-
             pt1[1] = -np.log(abs(p1[1]))
-
         else:
-
             pt1[1] = 0.0
-
         if p2[1] > 0.0:
-
             pt2[1] = np.log(p2[1])
-
         elif p2[1] < 0.0:
-
             pt2[1] = -np.log(abs(p2[1]))
-
         else:
-
             pt2[1] = 0.0
-
         for i in range(0, len(ax_ylim)):
-
             if ax_ylim[i] > 0.0:
-
                 ax_ylim[i] = np.log(ax_ylim[i])
-
             elif ax_ylim[i] < 0.0:
-
                 ax_ylim[i] = -np.log(abs(ax_ylim[i]))
-
             else:
-
                 ax_ylim[i] = 0.0
-
     else:
-
         pt1[1] = p1[1]
         pt2[1] = p2[1]
 
@@ -418,11 +533,8 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
 
     # this is to deal with 'equal' axes aspects
     if bool_auto:
-
         pass
-
     else:
-
         xscale = 1.0
         yscale = 1.0
 
@@ -488,127 +600,66 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
 
     # log scale consideration
     if 'log' in ax.get_xaxis().get_scale():
-
         for i in range(0, len(arc1x)):
-
             if arc1x[i] > 0.0:
-
                 arc1x[i] = np.exp(arc1x[i])
-
             elif arc1x[i] < 0.0:
-
                 arc1x[i] = -np.exp(abs(arc1x[i]))
-
             else:
-
                 arc1x[i] = 0.0
-
         for i in range(0, len(arc2x)):
-
             if arc2x[i] > 0.0:
-
                 arc2x[i] = np.exp(arc2x[i])
-
             elif arc2x[i] < 0.0:
-
                 arc2x[i] = -np.exp(abs(arc2x[i]))
-
             else:
-
                 arc2x[i] = 0.0
-
         for i in range(0, len(arc3x)):
-
             if arc3x[i] > 0.0:
-
                 arc3x[i] = np.exp(arc3x[i])
-
             elif arc3x[i] < 0.0:
-
                 arc3x[i] = -np.exp(abs(arc3x[i]))
-
             else:
-
                 arc3x[i] = 0.0
-
         for i in range(0, len(arc4x)):
-
             if arc4x[i] > 0.0:
-
                 arc4x[i] = np.exp(arc4x[i])
-
             elif arc4x[i] < 0.0:
-
                 arc4x[i] = -np.exp(abs(arc4x[i]))
-
             else:
-
                 arc4x[i] = 0.0
-
     else:
-
         pass
-
     if 'log' in ax.get_yaxis().get_scale():
-
         for i in range(0, len(arc1y)):
-
             if arc1y[i] > 0.0:
-
                 arc1y[i] = np.exp(arc1y[i])
-
             elif arc1y[i] < 0.0:
-
                 arc1y[i] = -np.exp(abs(arc1y[i]))
-
             else:
-
                 arc1y[i] = 0.0
-
         for i in range(0, len(arc2y)):
-
             if arc2y[i] > 0.0:
-
                 arc2y[i] = np.exp(arc2y[i])
-
             elif arc2y[i] < 0.0:
-
                 arc2y[i] = -np.exp(abs(arc2y[i]))
-
             else:
-
                 arc2y[i] = 0.0
-
         for i in range(0, len(arc3y)):
-
             if arc3y[i] > 0.0:
-
                 arc3y[i] = np.exp(arc3y[i])
-
             elif arc3y[i] < 0.0:
-
                 arc3y[i] = -np.exp(abs(arc3y[i]))
-
             else:
-
                 arc3y[i] = 0.0
-
         for i in range(0, len(arc4y)):
-
             if arc4y[i] > 0.0:
-
                 arc4y[i] = np.exp(arc4y[i])
-
             elif arc4y[i] < 0.0:
-
                 arc4y[i] = -np.exp(abs(arc4y[i]))
-
             else:
-
                 arc4y[i] = 0.0
-
     else:
-
         pass
 
     # plot arcs
@@ -624,39 +675,23 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
     summit = [arc2x[-1], arc2y[-1]]
 
     if str_text:
-
         int_line_num = int(int_line_num)
-
         str_temp = '\n' * int_line_num
-
         # convert radians to degree and within 0 to 360
         ang = np.degrees(theta) % 360.0
-
         if (ang >= 0.0) and (ang <= 90.0):
             rotation = ang
-
             str_text = str_text + str_temp
-
         if (ang > 90.0) and (ang < 270.0):
-
             rotation = ang + 180.0
-
             str_text = str_temp + str_text
-
         elif (ang >= 270.0) and (ang <= 360.0):
-
             rotation = ang
-
             str_text = str_text + str_temp
-
         else:
-
             rotation = ang
-
         ax.axes.text(arc2x[-1], arc2y[-1], str_text, ha='center', va='center', rotation=rotation, fontdict=fontdict)
-
     else:
-
         pass
 
     arc1 = [arc1x, arc1y]

@@ -2,12 +2,12 @@
 
 .. from Ch 4 in PIR
 
-Quantiles and Related Measures
-==============================
+Quantiles and Related Risk Measures
+=====================================
 
 **Objectives:** Definition and calculation of quantiles and related risk measures.
 
-**Audience:** Readers interested in precise definitions of common risk measures.
+**Audience:** Readers interested in quantiles, VaR, and TVaR risk measures.
 
 **Prerequisites:** Risk measures, probability.
 
@@ -55,12 +55,12 @@ and is denoted :math:`q(p)`. The resulting function
 
 Two issues arise when defining quantiles.
 
-1. The equation :math:`F(x)=p` may fail to have a *unique* solution when
+1. The equation :math:`F(x)=p` may fail to have a unique solution when
    :math:`F` is not strictly increasing. This can occur for any
-   :math:`F`. Is corresponds to a range of *impossible* outcome values.
+   :math:`F`. Is corresponds to a range of outcome values with probability zero.
 
 2. When :math:`F` is not continuous, the equation :math:`F(x)=p` may
-   have *no solution*: :math:`F` can jump from below :math:`p` to above
+   have no solution: :math:`F` can jump from below :math:`p` to above
    :math:`p`. Simulation and catastrophe models, and all discrete random
    variables have discontinuous distributions.
 
@@ -106,14 +106,14 @@ not strictly a part of :math:`F`\ ’s graph, because a function must
 associate a *unique* value to each :math:`x` in its domain. However,
 filling in the vertical segment makes it easier to locate inverse values
 by finding the graph’s intersection with the horizontal line at
-:math:`p` and is recommended in @Rockafellar2014b. Mentally, you should
-always *fill in* jumps in this way, treating the added segment as part
+:math:`p` and is recommended in :cite:t:`Rockafellar2014b`. Mentally, you should
+always fill in jumps in this way, treating the added segment as part
 of the graph.
 
 ===========
 
 **Definition.** Let :math:`X` be a random variable with distribution function :math:`F`
-and let :math:`0 < p < 1`. Any :math:`x` satisfying
+and :math:`0 < p < 1`. Any :math:`x` satisfying
 
 .. math::
 
@@ -194,12 +194,28 @@ disadvantage is its failure to be subadditive.
 The Failure of VaR to be Subadditive
 ----------------------------------------
 
-It is easy to create simple discrete examples where VaR fails to be subadditive. More interesting, 0.7-VaR applied to the sum of two independent exponential distributions is not subadditive, but 0.95-VaR is.
+It is easy to create simple discrete examples where VaR fails to be subadditive, for example:
+
+.. math::
+    \small
+    \begin{matrix}
+    \begin{array}{clrrrr}\hline
+        \text{Event} & \text{Prob} & F & X_1 & X_2 & X \\ \hline
+        1 & 0.98 & 0.98 &    0 &    0  &    0 \\
+        2 & 0.01 & 0.99 & 1000 &  100  & 1100 \\
+        3 & 0.01 & 1.00 &  150 & 1100  & 1250 \\ \hline
+      \end{array}
+    \end{matrix}
+
+:math:`X_1` has 0.99 VaR 150 and :math:`X_2` has 0.99 VaR 100 but :math:`X` has 0.99 VaR 1100.
+
+More interesting, 0.7-VaR applied to the sum of two independent exponential distributions is not subadditive, but 0.95-VaR is.
 
 .. ipython:: python
    :okwarning:
 
    from aggregate import build, qd
+   import pandas as pd
    p = build('port NotSA '
              'agg A dfreq [1] sev 1 * expon '
              'agg B dfreq [1] sev 1 * expon')
@@ -208,8 +224,7 @@ It is easy to create simple discrete examples where VaR fails to be subadditive.
    ans['sum'] = ans['A'] + ans['B']
    ans2 = p.var_dict(0.95)
    ans2['sum'] = ans2['A'] + ans2['B']
-
-   pd.DataFrame([ans, ans2], index=pd.Index([0.7, 0.95], name='p'))
+   pd.DataFrame([ans, ans2], index=pd.Index(['0.70', '0.95'], name='p'))
 
 The function ``var_dict`` returns the VaR of each unit in ``p`` and the total. The total VaR is greater than the sum of the parts. Subadditivity requires total VaR be less than or equal to the sum of the parts.
 
@@ -220,8 +235,7 @@ Tail VaR and Related Risk Measures
 
 Tail value at risk (TVaR) is the conditional average of the worst
 :math:`1-p` outcomes. Let :math:`X` be a loss random variable and :math:`0 \le p<1`.
-The :math:`p`-**Tail Value at Risk** is the conditional average of the
-worst :math:`1-p` proportion of outcomes
+Then :math:`p`-**Tail Value at Risk** is given by
 
 .. math::
 
@@ -270,7 +284,9 @@ not an integer. For instance, if :math:`N=71` and :math:`p=0.95`, then
 :math:`Np=67.45` and :math:`n=67`, giving
 :math:`\mathsf{TVaR}_p = 20(0.55x_{67}+x_{68}+x_{69}+x_{70})/71`.
 
-**Example.** Let :math:`X` be defined on
+**Example.**
+
+Let :math:`X` be defined on
 a sample space with ten equally likely events and outcomes
 :math:`0,1,1,1,2,3, 4,8, 12, 25`. Compute :math:`\mathsf{TVaR}_p(X)` for
 all :math:`p`. Is it a piecewise linear function?
@@ -294,14 +310,20 @@ TVaR is not piecewise linear. For
 example, for :math:`0.8\le p<0.9`,
 :math:`\mathsf{TVaR}_p(X)=(12(0.9-p) + 2.5)/(1-p)`.
 
-The default aggregate TVaR function ignores this slight non-linearity and just interpolates. To get a more exact answer use ``kind='tail'``.
-
 .. ipython:: python
 
-   p = 0.73
-   print(a.tvar(0.7), a.tvar(p), a.tvar(p, 'tail'),
+    p = 0.73
+    print(a.tvar(0.7), a.tvar(p), a.tvar(p, 'tail'),
       ((0.8-p) * 8 + 0.2 *a.tvar(0.8)) / (1-p))
 
+The default aggregate TVaR function ignores this slight non-linearity and just interpolates. To get a more exact answer use ``kind='tail'``. The difference is illustrated on the left in the next figure.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate.extensions.pir_figures import fig_4_8
+    @savefig quan_48.png scale=20
+    fig_4_8()
 
 CTE, and WCE: Alternatives to TVaR
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -334,6 +356,9 @@ discrete and mixed variables when :math:`p` coincides with a mass point.
 
 Expected Policyholder Deficit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The expected policyholder deficit **EPD** when a risk  :math:`X` is
+supported by assets :math:`a` equals :math:`\mathsf E[(X-a)^+]`, the unconditional excess loss cost. The insurer defaults on the EPD amount.
 
 The **EPD ratio** is defined as the ratio of the EPD to expected losses.
 It gives the proportion of losses that are unpaid when :math:`X` is

@@ -9,6 +9,4 @@ Using Samples and The Switcheroo Trick
 
     Documentation to follow.
 
-.. todo::
 
-    Documentation to follow.

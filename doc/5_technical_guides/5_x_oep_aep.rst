@@ -1,12 +1,7 @@
 .. _q aep oep:
 
-Aggregate and Occurrence Probable Maximal Loss
+Occurrence and Aggregate Probable Maximal Loss
 -------------------------------------------------
-
-All of our discussion so far relates to *aggregate* loss over one year.
-Occurrence flavored quantiles and closely related occurrence PMLs are
-also used. These have different meanings and computations that we
-describe here.
 
 Probable maximal loss (PML)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -19,14 +14,13 @@ expected. The MFL estimates the largest fire loss likely to occur if
 loss-suppression systems fail. For a large office building, the PML
 could be a total loss to 4 to 6 floors, and the MFL could be a total
 loss within four walls, assuming a single structure burns down.
-@McGuinness1969 discusses PMLs.
+:cite:t:`McGuinness1969` discusses PMLs.
 
 Today, PML is used to quantify potential catastrophe losses. Catastrophe
 risk is typically managed using reinsurance purchased on an occurrence
 basis and covering all losses from a single event. Therefore insurers
 are interested in the annual frequency of events greater than an
-attachment threshold, leading to the occurrence PML.
-
+attachment threshold, leading to the occurrence PML, now known as occurrence exceeding probabilities.
 
 Occurrence Exceeding Probability (OEP)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,8 +48,8 @@ events causing a loss of :math:`x` or more in a year is at least
    \implies \mathsf{PML}_{n, \lambda} &= q_X\left( 1 -\frac{1}{\lambda}\log\left( \frac{n}{n-1}\right) \right)
 
 (if :math:`S(x)=s` then :math:`F(x)=1-s` and
-:math:`x=q_X(1-s)=\mathsf{VaR}_{1-s}(X)`). Thus, *the occurrence PML is
-a quantile of severity at an adjusted probability level*, where the
+:math:`x=q_X(1-s)=\mathsf{VaR}_{1-s}(X)`). Thus, the occurrence PML is
+a quantile of severity at an adjusted probability level, where the
 adjustment depends on :math:`\lambda`.
 
 Converting to non-exceedance probabilities, if :math:`p=1-1/n` (close to
@@ -110,7 +104,10 @@ below.
 | 0.999          | 0.001          | 1,000 years    |                  |
 +----------------+----------------+----------------+------------------+
 
-When :math:`X` represents aggregate annual losses, the statement
+In a Poisson model, the waiting time between events with a frequency of :math:`\lambda` has an exponential distribution with mean :math:`1/\lambda`. Thus, an event with frequency 0.01 is often quoted as having a 100 year return period. Notice, however, the distinction between the chances of no events in a year and the waiting time until the next event. If :math:`\lambda` is large, say 12 (one event per month on average), the chances of no events in a year equals
+:math:`\exp(-12)=6.1\times 10^{-6}` is vs. a one-month return period. For small :math:`\lambda` there is very little difference between the two since the probability of one or more events equals :math:`1-\exp(-\lambda)\approx \lambda`.
+
+To reiterate the definition above, when :math:`X` represents aggregate annual losses, the statement
 :math:`x=\mathsf{VaR}_{0.99}(X)`, :math:`p=0.99` means
 
 - :math:`x` is the smallest loss for which :math:`X\le x` with an annual probability of at least :math:`0.99`, or
@@ -120,7 +117,7 @@ Aggregate Exceeding Probability (AEP)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Severity VaR (quantile) and occurrence PML are distinct but related concepts.
-However, **aggregate PML** is
+However, **aggregate PML** or **aggregate exceeding probability** is
 often used as a synonym for aggregate VaR, i.e., VaR of the aggregate
 loss distribution..
 
@@ -136,10 +133,10 @@ usually thick tailed. Then, as we explain shortly,
 This equation is a relationship between aggregate and
 severity VaRs.
 
-We can estimate aggregate VaRs in terms of occurrence PMLs with no
+We can sometimes estimate aggregate VaRs in terms of occurrence PMLs with no
 simulation. For large :math:`n` and a thick tailed :math:`X` occurrence
-PMLs and aggregate VaRs contain the same information—there is not *more
-information* in the aggregate, as is sometimes suggested. The
+PMLs and aggregate VaRs contain the same information—there is not more
+information in the aggregate, as is sometimes suggested. The
 approximation follows from the equation
 
 .. math::
@@ -147,5 +144,5 @@ approximation follows from the equation
    \mathsf{Pr}(X_1+\cdots +X_n >x) \to n\mathsf{Pr}(X>x)\ \text{as}\ x\to\infty
 
 for all :math:`n`, which holds when :math:`X` is
-sufficiently thick tailed. See [@Embrechts1997, Corollary 1.3.2] for the
+sufficiently thick tailed. See :cite:t:`Embrechts1997`, Corollary 1.3.2 for the
 details.

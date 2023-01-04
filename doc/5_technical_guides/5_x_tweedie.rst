@@ -1,7 +1,7 @@
 .. _2_x_tweedie:
 
-The Tweedie Distribution: Theory
-----------------------------------
+The Tweedie Distribution
+--------------------------
 
 
 The Tweedie distribution is a Poisson mixture of gammas. It is an exponential family distribution :cite:p:`Jorgensen1997`. Tweedie distributions are a suitable model for pure premiums and are used as unit distributions in GLMs :cite:p:`Mccullagh2019`. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
@@ -83,13 +83,15 @@ See the blog post `The Tweedie-Power Variance Function
 Family <https://www.mynl.com/blog?id=c9a74f2055686bb2c250c4fc4f627a89>`__
 for more details.
 
+
 .. ipython:: python
     :okwarning:
 
-    from aggregate import power_variance_family
-    power_variance_family()
+    from aggregate.extensions.figures import power_variance_family
     @savefig tweedie_powervariance.png scale=20
-    pass
+    power_variance_family()
+
+
 
 
 

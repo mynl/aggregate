@@ -23,7 +23,8 @@ Thus the moment generating function of :math:`N'` is
    M_{N'}(\zeta) &=M_N(\log(M_I(\zeta)))  \\
    &=M_N(\log(p+qe^{\zeta}))
 
-Using indicator variables :math:`I` is called :math:`p`-thinning by Grandell.
+Using indicator variables :math:`I` is called :math:`p`-thinning by
+:cite:t:`Grandell1997`.
 
 Here are some examples.
 
@@ -66,74 +67,3 @@ sense that the variance to mean ratio has decreased. For the general
 0` the variance to mean ratio approaches :math:`1` and :math:`N'`
 approaches a Poisson distribution. The fact that :math:`N'` becomes
 Poisson is called the law of small numbers.
-
-Parameter Uncertainty
-~~~~~~~~~~~~~~~~~~~~~
-
-It is common for actuaries to work with point estimates as though they
-are certain. In reality there is a range around any point estimate. We
-now work through one possible implication of such parameter uncertainty.
-We will model :math:`\mathsf{E}[A]=R` and :math:`\mathsf{E}[B]=S` with :math:`R` and
-:math:`S` correlated random variables, and :math:`A` and :math:`B`
-conditionally independent given :math:`R` and :math:`S`. We will assume
-for simplicity that the severities :math:`X` and :math:`Y` are fixed and
-that the uncertainty all comes from claim counts. The reader can extend
-the model to varying severities as an exercise. :math:`R` and :math:`S`
-pick up uncertainty in items like the trend factor, tail factors and
-other economic variables, as well as the natural correlation induced
-through actuarial methods such as the Bornheutter-Ferguson.
-
-Suppose :math:`\mathsf{E}[R]=r`, :math:`\mathsf{E}[S]=s`, :math:`\mathsf{var}(R)=v_r`,
-:math:`\mathsf{var}(S)=v_s` and let :math:`\rho` be the correlation coefficient
-between :math:`R` and :math:`S`.
-
-By (`[varAgg] <#varAgg>`__) the conditional distribution of :math:`A \mid R`
-is a mixed compound Poisson distribution with expected claim count
-:math:`R/x` and contagion :math:`c`. Therefore the conditional variance
-is
-
-.. math::
-
-   \mathsf{var}(A \mid R)
-   &= \mathsf{E}[M \mid R]\mathsf{var}(X)+\mathsf{var}(M \mid R)\mathsf{E}[X]^2  \\
-   &= R/x v_x + R/x(1+cR/x) x^2  \\
-   &= xR(1+ v_x/x^2) + cR^2,
-
-and the unconditional variance of :math:`A` is
-
-.. math::
-
-   \mathsf{var}(A)
-   &= \mathsf{E}[\mathsf{var}(A \mid R)] + \mathsf{var}(\mathsf{E}[A \mid R])  \\
-   &= \mathsf{E}[xR(v_x/x^2+1)+cR^2] + \mathsf{var}(R)  \\
-   &=  xr(v_x/x^2+1)+c(v_r+r^2) + v_r.
-
-Next, because :math:`A` and :math:`B` are conditionally independent
-given :math:`R` and :math:`S`,
-
-.. math::
-
-   \mathsf{cov}(A,B)
-   &= \mathsf{E}[\mathsf{cov}(A,B \mid R,S)] + \mathsf{cov}(\mathsf{E}[A \mid R], \mathsf{E}[B \mid S])  \\
-   &= \mathsf{cov}(R, S).\label{simpleCov}
-
-Note Equation (`[simpleCov] <#simpleCov>`__) is only true if we assume
-:math:`A\not=B`.
-
-Parameter Uncertainty and Bivariate Frequency
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Finally, suppose :math:`\mathsf{E}[A]=R`, :math:`\mathsf{E}[B]=S` with :math:`R` and
-:math:`S` correlated parameters *and* conditional on :math:`(R,S)`
-suppose that :math:`(M,N)` has a :math:`G`-mixed bivariate Poisson
-distribution. By (`[covMNM] <#covMNM>`__) :math:`\mathsf{cov}(A,B \mid R,S)=cRS`. The
-unconditional variances are as given in (`[varA] <#varA>`__). The
-covariance term is
-
-.. math::
-
-   \mathsf{cov}(A,B)
-   &= \mathsf{E}[\mathsf{cov}(A,B \mid R,S)] + \mathsf{cov}(\mathsf{E}[A \mid R], \mathsf{E}[B \mid S])  \\
-   &= c\mathsf{E}[RS]  + \mathsf{cov}(R,S)  \\
-   &= (1+c)\mathsf{cov}(R,S) + crs  \\
-   &= \rho \sqrt{v_rv_s}(1+c)+crs.

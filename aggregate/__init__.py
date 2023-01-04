@@ -11,7 +11,6 @@ from . utilities import get_fmts, pprint, pprint_ex, ft, \
     make_ceder_netter, make_mosaic_figure, nice_multiple, \
     style_df, logger_level, friendly, \
     FigureManager, tweedie_convert, tweedie_density,\
-    power_variance_family, \
     iman_conover, rearrangement_algorithm_max_VaR, \
     mu_sigma_from_mean_cv, \
     make_corr_matrix, random_corr_matrix, \

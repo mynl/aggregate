@@ -89,11 +89,11 @@ which we summarize in the following theorem.
    **Theorem.**
    Subject to :math:`\rho` satisfying certain continuity assumptions, the following are equivalent.
 
-   * :math:`\rho` is a law invariant, coherent, comonotonic additive risk measure.
-   * :math:`\rho=\rho_g` for a concave distortion :math:`g`.
-   * :math:`\rho` has a representation as a weighted average of TVaRs for a measure :math:`\mu` on :math:`[0,1]`:  :math:`\rho(X)=\int_0^1 \mathsf{TVaR}_p(X)\mu(dp)`.
-   * :math:`\rho(X)=\max_{\mathsf Q\in\mathscr{Q}} \mathsf E_{\mathsf Q}[X]` where :math:`\mathscr{Q}` is the set of (finitely) additive measures with :math:`\mathsf Q(A)\le g(\mathsf P(A))` for all measurable :math:`A`.
-   * :math:`\rho(X)=\max_{\mathsf Z\in\mathscr{Z}} \mathsf E[XZ]` where :math:`\mathscr{Z}` is the set of positive functions on :math:`\Omega` satisfying :math:`\int_p^1 q_Z(t)dt \le g(1-p)`, and :math:`q_Z` is the quantile function of :math:`Z`.
+   #. :math:`\rho` is a law invariant, coherent, comonotonic additive risk measure.
+   #. :math:`\rho=\rho_g` for a concave distortion :math:`g`.
+   #. :math:`\rho` has a representation as a weighted average of TVaRs for a measure :math:`\mu` on :math:`[0,1]`:  :math:`\rho(X)=\int_0^1 \mathsf{TVaR}_p(X)\mu(dp)`.
+   #. :math:`\rho(X)=\max_{\mathsf Q\in\mathscr{Q}} \mathsf E_{\mathsf Q}[X]` where :math:`\mathscr{Q}` is the set of (finitely) additive measures  with :math:`\mathsf Q(A)\le g(\mathsf P(A))` for all measurable :math:`A`.
+   #. :math:`\rho(X)=\max_{\mathsf Z\in\mathscr{Z}} \mathsf E[XZ]` where :math:`\mathscr{Z}` is the set of positive functions on :math:`\Omega` satisfying :math:`\int_p^1 q_Z(t)dt \le g(1-p)`, and :math:`q_Z` is the quantile function of :math:`Z`.
 
 The Theorem combines results from :cite:t:`Follmer2011` (4.79, 4.80, 4.93, 4.94,
 4.95), :cite:t:`Delbaen2000`, :cite:t:`Kusuoka2001`, and :cite:t:`Carlier2003`. It
@@ -215,7 +215,7 @@ diversifiable risk, :cite:t:`DeWaegenaere2003` assures us the pricing is
 consistent with a general equilibrium.
 
 The layer density is distinct from models that vary the volume of each
-line in a homogeneous portfolio model. Our portfolio is static. By
+unit in a homogeneous portfolio model. Our portfolio is static. By
 varying assets we are implicitly varying the quality of insurance.
 
 The Equal Priority Default Rule
@@ -275,15 +275,15 @@ risk-free. :math:`X_1` is backed by :math:`a_1=2272` and the recovery is
 subject to a considerable haircut, since
 :math:`\mathsf E[X_1\wedge 2272] = 732.3`. If these risks are pooled, the pool
 must hold :math:`a=a_0+a_1` for the same level of prudence. When
-:math:`X_1\le a_1` both lines are paid in full. But when
+:math:`X_1\le a_1` both units are paid in full. But when
 :math:`X_1 > a_1`, :math:`X_0` receives :math:`1000(a/(1000+X_1))` and
 :math:`X_1` receives the remaining :math:`X_1(a/(1000+X_1))`. Payment to
-both lines is pro rated down by the same factor
+both units is pro rated down by the same factor
 :math:`a/(1000+X_1)`—hence the name *equal* priority. In the pooled
 case, the expected recovery to :math:`X_0` is 967.5 and 764.8 to
 :math:`X_1`. Pooling and equal priority result in a transfer of 32.5
 from :math:`X_0` to :math:`X_1`. This example shows what can occur when
-a thin tailed line pools with a thick tailed one under a weak capital
+a thin tailed unit pools with a thick tailed one under a weak capital
 standard with equal priority. We shall see how pricing compensates for
 these loss payment transfers, with :math:`X_1` paying a positive margin
 and :math:`X_0` a negative one. The calculations are performed in ``aggregate`` as follows. First, set up the :class:`Portfolio`:
@@ -299,7 +299,7 @@ and :math:`X_0` a negative one. The calculations are performed in ``aggregate`` 
                 bs=4)
     qd(port)
 
-:meth:`var_dict` returns the 90th percentile points by line and in total.
+:meth:`var_dict` returns the 90th percentile points by unit and in total.
 
 .. ipython:: python
     :okwarning:
@@ -334,10 +334,10 @@ Because of its importance in allocating losses, define
     \alpha_i(a) := \mathsf E[X_i/X\mid X> a].
 
 The value :math:`\alpha_i(x)` is the expected proportion
-of recoveries by line :math:`i` in the layer at :math:`x`. Since total
+of recoveries by unit :math:`i` in the layer at :math:`x`. Since total
 assets available to pay losses always equals the layer width, and the
 chance the layer attaches is :math:`S(x)`, it is intuitively clear
-:math:`\alpha_i(x)S(x)` is the loss density for line :math:`i`, that is,
+:math:`\alpha_i(x)S(x)` is the loss density for unit :math:`i`, that is,
 the derivative of :math:`\bar S_i(x)` with respect to :math:`x`. We now
 show this rigorously.
 
@@ -457,7 +457,7 @@ It is helpful to define the premium, risk adjusted, analog of the
     \beta_i(a) := \mathsf E_{\mathsf Q}[(X_i/X) \mid X > a].
 
 :math:`\beta_i(x)` is the value of the recoveries paid
-to line :math:`i` by a policy paying 1 in states :math:`\{ X>a \}`,
+to unit :math:`i` by a policy paying 1 in states :math:`\{ X>a \}`,
 i.e. an allocation of the premium for :math:`1_{X>a}`. By the properties
 of conditional expectations, we have
 
@@ -478,53 +478,36 @@ To compute :math:`\alpha_i` and :math:`\beta_i` we use a third function,
     \kappa_i(x):= \mathsf E[X_i \mid X=x],
 
 the conditional expectation of loss by policy, given the
-total loss. It is an important fact that the risk adjusted version of
-:math:`\kappa` is unchanged because SRMs are law invariant. With these
-preliminaries we can state the main theorem of this section.
+total loss.
+
+.. main theorem
 
 .. container:: theorem
-   .. main theorem
-   **Theorem.** Let :math:`\mathsf Q\in \mathcal Q` be the measure with Radon-Nikodym derivative :math:`Z=g'(S_X(X))`.
-   \begin{enumerate}
 
-   * :math:`\mathsf E[X_i \mid X=x]=\mathsf E_{\mathsf Q}[X_i \mid X=x]`.
-   * :math:`\beta_i` can be computed from :math:`\kappa_i` as
+   **Theorem.** Let :math:`\mathsf Q\in \mathcal Q` be the measure with Radon-Nikodym derivative :math:`Z=g'(S_X(X))`. Then:
+
+   #. :math:`\mathsf E[X_i \mid X=x]=\mathsf E_{\mathsf Q}[X_i \mid X=x]`.
+   #. :math:`\beta_i` can be computed from :math:`\kappa_i` as
 
    .. math::
        \beta_i(a)= \frac{1}{\mathsf Q(X>a)}\int_a^\infty \dfrac{\kappa_i(x)}{x} g'(S(x))f(x)\, dx. \label{eq:beta-easy}
 
-   * The natural allocation premium for policy :math:`i` under equal priority when total losses are supported by assets :math:`a`, :math:`\bar P_i(a):=\rho_{X\wedge a}(X_i(a))`, is given by
+   #. The natural allocation premium for policy :math:`i` under equal priority when total losses are supported by assets :math:`a`, :math:`\bar P_i(a):=\rho_{X\wedge a}(X_i(a))`, is given by
 
    .. math::
        \bar P_i(a) &=
         \mathsf E_{\mathsf Q}[X_i \mid {X\le a}](1-g(S(a))) + a\mathsf E_{\mathsf Q}[X_i/X  \mid {X > a}]g(S(a)) \label{eq:pibar-main} \\
         &=\mathsf E[X_iZ\mid X\le a](1-S(a)) + a\mathsf E[(X_i/X)Z\mid X>a]S(a).
 
-   * The policy :math:`i` premium density is
+   #. The policy :math:`i` premium density equals
 
    .. math::
        P_i(a)=\beta_i(a)g(S(a)).
        \label{eq:beta-gS}
 
-The Theorem shows we can replace
-:math:`\mathsf E_{\mathsf Q}[X_i \mid X]` with :math:`\mathsf E[X_i \mid X]`, which
-enables explicit calculation. There is no risk adjusted version of
-:math:`\kappa_i`. Intuitively, a law invariant risk measure cannot
-change probabilities within an event defined by :math:`X`: if it did
-then it would be distinguishing between events on information other than
-:math:`S(X)` whereas law invariance says this is all that can matter.
-It also identifies the premium density, giving an allocation of
-total premium and a premium analog of the loss allocation.
-It provides a clear and illuminating way
-to visualize risk by collapsing a multidimensional problem to one
-dimension.
 
-The proof writes the price of a limited liability cover as the price of
-default-free protection minus the value of the default put. This is the
-standard starting point for allocation in a perfect competitive market
-taken by :cite:t:`Phillips1998`, :cite:t:`Myers2001`, :cite:t:`Sherris2006a`, and :cite:t:`Ibragimov2010`.
-They then allocate the default put rather than the value of insurance
-payments directly.
+It is an important to know when the natural allocation premium is unique. It is so when :math:`Z` is the only contact function (i.e., there are no others).
+If :math:`X` has a strictly increasing quantile function or is injective then :math:`\mathsf Q` is unique and therefore given by :math:`g'S(X)` and hence :math:`X` measurable, see :cite:p:`Carlier2003` and :cite:t:`Marinacci2004b`. More generally, we can replace :math:`\mathsf Q` with its expectation given :math:`X` to make a canonical choice, resulting in the linear natural allocation :cite:p:`Cherny2011`.
 
 The problem that can occur when :math:`\mathsf Q` is not unique, but
 that can be circumvented when :math:`\rho` is a SRM, can be illustrated
@@ -547,10 +530,40 @@ that for :math:`\mathsf{Q}`. The theorem isolates a specific
 :math:`\mathsf Q` from other, non-TVaR, :math:`\rho`: you can always
 shuffle part of the contact function within :math:`C` to generate
 non-unique allocations.
+See :cite:t:`PIR` Example 239 for an illustration.
+
+When :math:`\mathsf Q` is :math:`X` measurable, then
+:math:`\mathsf E_{\mathsf Q}[X_i \mid X]=\mathsf E[X_i \mid X]`, which enables explicit calculation. In this case there is no risk adjusted version of :math:`\kappa_i`. If :math:`\mathsf Q` is not :math:`X` measurable, then there can be risk adjusted :math:`\kappa_i` because
+
+.. math::
+
+    \mathsf E[X_i Z \mid X] \not= \mathsf E[X_i \mid X] \mathsf E[Z \mid X].
+
+
+.. this is wrong
+.. There is no risk adjusted version of
+    :math:`\kappa_i`. Intuitively, a law invariant risk measure cannot
+    change probabilities within an event defined by :math:`X`: if it did
+    then it would be distinguishing between events on information other than
+    :math:`S(X)` whereas law invariance says this is all that can matter.
+    It also identifies the premium density, giving an allocation of
+    total premium and a premium analog of the loss allocation.
+    It provides a clear and illuminating way
+    to visualize risk by collapsing a multidimensional problem to one
+    dimension.
+
+
+The proof writes the price of a limited liability cover as the price of
+default-free protection minus the value of the default put. This is the
+standard starting point for allocation in a perfect competitive market
+taken by :cite:t:`Phillips1998`, :cite:t:`Myers2001`, :cite:t:`Sherris2006a`, and :cite:t:`Ibragimov2010`.
+They then allocate the default put rather than the value of insurance
+payments directly.
+
 
 To recap: the premium formulas  have been derived assuming
 capital is provided at a cost :math:`g` and there is equal priority by
-unit. The formulas are computationally tractable (see implementation in :doc:`5_x_portfolio_calculations`) and require no other
+unit. The formulas are computationally tractable (see implementation in :doc:`5_x_portfolio_calculations`) and require only that :math:`X` have an increasing quantile function or that :math:`g'S(X)` be used as the risk adjustment, but make no other
 assumptions. There is no need to assume the :math:`X_i` are independent.
 They produce an entirely general, canonical determination of premium in
 the presence of shared costly capital. This result extends :cite:t:`Grundl2007`,
@@ -563,7 +576,7 @@ Properties of Alpha, Beta, and Kappa
 
 In this section we explore properties of :math:`\alpha_i`,
 :math:`\beta_i`, and :math:`\kappa_i`, and show how they interact to
-determine premiums by line via the natural allocation.
+determine premiums by unit via the natural allocation.
 
 For a measurable :math:`h`, :math:`\mathsf E[X_ih(X)]=\mathsf E[\kappa_i(X)h(X)]` by
 the tower property. This simple observation results in huge
@@ -701,7 +714,7 @@ natural margin allocation in the case of finite assets.
 .. container:: cor
 
     **Corollary.**
-    The margin density for line :math:`i` at asset level :math:`a` is given by
+    The margin density for unit :math:`i` at asset level :math:`a` is given by
 
     .. math::
         \label{eq:coc-by-line}
@@ -715,14 +728,14 @@ natural margin allocation in the case of finite assets.
         \bar M_i(a)=& \bar P_i(a) - \bar L_i(a) \nonumber \\
         =& \int_0^a \beta_i(x)g(S(x)) -  \alpha_i(x)S(x)\,dx.  \label{eq:margin-by-line}
 
-    Differentiating we get the margin density for line
+    Differentiating we get the margin density for unit
     :math:`i` at :math:`a` expressed in terms of :math:`\alpha_i` and
     :math:`\beta_i` as shown.
 
 Margin in the current context is the cost of capital, thus this
 is an important result. It allows us
-to compute economic value by line and to assess static portfolio
-performance by line—one of the motivations for performing capital
+to compute economic value by unit and to assess static portfolio
+performance by unit—one of the motivations for performing capital
 allocation in the first place. In many ways it is also a good place to
 stop. Remember these results only assume we are using a distortion risk
 measure and have equal priority in default. We are in a static model, so
@@ -730,31 +743,31 @@ questions of portfolio homogeneity are irrelevant. We are not assuming
 :math:`X_i` are independent.
 
 What can we say about by margins by
-line? Since :math:`g` is increasing and concave
+unit? Since :math:`g` is increasing and concave
 :math:`P(a)=g(S(a))\ge S(a)` for all :math:`a\ge 0`. Thus all asset
 layers contain a non-negative total margin density. It is a different
-situation by line, where we can see
+situation by unit, where we can see
 
 .. math::
    M_i(a) \ge 0 \iff
    \beta_i(a)g(S(a)) - \alpha_i(a)S(a)\ge 0 \iff
    \frac{\beta_i(a)}{\alpha_i(a)} \ge \frac{S(a)}{g(S(a))}.
 
-The line layer margin density is positive when :math:`\beta_i/\alpha_i`
-is greater than the all-lines layer loss ratio. Since the loss ratio is
+The unit layer margin density is positive when :math:`\beta_i/\alpha_i`
+is greater than the all-unit layer loss ratio. Since the loss ratio is
 :math:`\le 1` there must be a positive layer margin density whenever
 :math:`\beta_i(a)/\alpha_i(a) > 1`. But when
-:math:`\beta_i(a)/\alpha_i(a) < 1` it is possible the line has a
+:math:`\beta_i(a)/\alpha_i(a) < 1` it is possible the unit has a
 negative margin density. How can that occur and why does it make sense?
 To explore this we look at the shape of :math:`\alpha` and :math:`\beta`
 in more detail.
 
 It is important to remember why the Proposition does
 not apply: it assumes unlimited cover, whereas here :math:`a<\infty`.
-With finite capital there are potential transfers between lines caused
+With finite capital there are potential transfers between units caused
 by their behavior in default that overwhelm the positive margin implied
 by the proposition. Also note the proposition cannot be applied to
-:math:`X\wedge a=\sum_i X_i(a)` because the line payments are no longer
+:math:`X\wedge a=\sum_i X_i(a)` because the unit payments are no longer
 independent.
 
 In general we can make two predictions about margins.
@@ -763,8 +776,8 @@ In general we can make two predictions about margins.
 :math:`\kappa_i(x)/x` increase with :math:`x` will have always have a
 positive margin.
 
-**Prediction 2**: A log-concave (thin tailed) line aggregated with a
-non-log-concave (thick tailed) line can have a negative margin,
+**Prediction 2**: A log-concave (thin tailed) unit aggregated with a
+non-log-concave (thick tailed) unit can have a negative margin,
 especially for lower asset layers.
 
 Prediction 1 follows because the risk adjustment puts more weight on
@@ -772,49 +785,49 @@ Prediction 1 follows because the risk adjustment puts more weight on
 :math:`\beta_i(x)/\alpha_i(x)> 1 > S(x) / g(S(x))`. Recall the risk
 adjustment is comonotonic with total losses :math:`X`.
 
-A thin tailed line aggregated with thick tailed lines will have
+A thin tailed unit aggregated with thick tailed units will have
 :math:`\alpha_i(x)` decreasing with :math:`x`. Now the risk adjustment
 will produce :math:`\beta_i(x)<\alpha_i(x)` and it is possible that
 :math:`\beta_i(x)/\alpha_i(x)<S(x)/g(S(x))`. In most cases,
 :math:`\alpha_i(x)` approaches :math:`\mathsf E[X_i]/x` and
 :math:`\beta_i(x)/\alpha_i(x)` increases with :math:`x`, while the layer
-loss ratio decreases—and margin increases—and the thin line will
-eventually get a positive margin. Whether or not the thin line has a
+loss ratio decreases—and margin increases—and the thin unit will
+eventually get a positive margin. Whether or not the thin unit has a
 positive total margin :math:`\bar M_i(a)>0` depends on the particulars
-of the lines and the level of assets :math:`a`. A negative margin is
+of the units and the level of assets :math:`a`. A negative margin is
 more likely for less well capitalized insurers, which makes sense
 because default states are more material and they have a lower overall
 dollar cost of capital. In the independent case, as :math:`a\to\infty`
-the proposition guarantees an eventually positive margins for all lines.
+the proposition guarantees an eventually positive margins for all units.
 
 These results are reasonable. Under limited liability, if assets and
-liabilities are pooled then the thick tailed line benefits from pooling
+liabilities are pooled then the thick tailed unit benefits from pooling
 with the thin one because pooling increases the assets available to pay
 losses when needed. Equal priority transfers wealth from thin to thick
 in states of the world where thick has a bad event. But because thick
 dominates the total, the total losses are bad when thick is bad. The
-negative margin compensates the thin-tailed line for transfers.
+negative margin compensates the thin-tailed unit for transfers.
 
 Another interesting situation occurs for asset levels within attritional
 loss layers. Most realistic insured loss portfolios are quite skewed and
 never experience very low loss ratios. For low loss layers, :math:`S(x)`
 is close to 1 and the layer at :math:`x` is funded almost entirely by
 expected losses; the margin and equity density components are nearly
-zero. Since the sum of margin densities over component lines equals the
+zero. Since the sum of margin densities over component units equals the
 total margin density, when the total is zero it necessarily follows that
-either all line margins are also zero or that some are positive and some
-are negative. For the reasons noted above, thin tailed lines get the
-negative margin as thick tailed lines compensate them for the improved
-cover the thick tail lines obtain by pooling.
+either all unit margins are also zero or that some are positive and some
+are negative. For the reasons noted above, thin tailed units get the
+negative margin as thick tailed units compensate them for the improved
+cover the thick tail units obtain by pooling.
 
-In conclusion, the natural margin by line reflects the relative
+In conclusion, the natural margin by unit reflects the relative
 consumption of assets by layer, :cite:t:`Mango2005a`. Low layers are less
 ambiguous to the provider and have a lower margin relative to expected
 loss. Higher layers are more ambiguous and have lower loss ratios. High
-risk lines consume more higher layer assets and hence have a lower loss
-ratio. For independent lines with no default the margin is always
+risk units consume more higher layer assets and hence have a lower loss
+ratio. For independent units with no default the margin is always
 positive. But there is a confounding effect when default is possible.
-Because more volatile lines are more likely to cause default, there is a
+Because more volatile units are more likely to cause default, there is a
 wealth transfer to them. The natural premium allocation compensates low
 risk policies for this transfer, which can result in negative margins in
 some cases.
@@ -822,15 +835,15 @@ some cases.
 The Natural Allocation of Equity
 ------------------------------------
 
-Although we have a margin by line,
-we cannot compute return by line, or allocate frictional costs of
+Although we have a margin by unit,
+we cannot compute return by unit, or allocate frictional costs of
 capital, because we still lack an equity allocation, a problem we now
 address.
 
 .. container:: def
 
    **Definition.**
-   The **natural allocation of equity** to line :math:`i` is given by
+   The **natural allocation of equity** to unit :math:`i` is given by
 
    .. math::
        Q_i(a) = \frac{\beta_i(a)g(S(a)) -  \alpha_i(x)S(a)}{g(S(a))- S(a)} \times (1-g(S(a))). \label{eq:main-alloc}
@@ -842,53 +855,53 @@ is
    \iota(a) := \frac{M(a)}{Q(a)} = \frac{P(a) - S(a)}{1-P(a)} = \frac{g(S(a)) - S(a)}{1- g(S(a))}.
 
 We claim that for a law invariant pricing measure the layer return *must
-be the same for all lines*. Law invariance implies the risk measure is
+be the same for all units*. Law invariance implies the risk measure is
 only concerned with the attachment probability of the layer at
 :math:`a`, and not with the cause of loss within the layer. If return
-*within a layer* varied by line then the risk measure could not be law
+*within a layer* varied by unit then the risk measure could not be law
 invariant.
 
-We can now compute capital by layer by line, by solving for the unknown
+We can now compute capital by layer by unit, by solving for the unknown
 equity density :math:`Q_i(a)` via
 
 .. math::
    \iota(a) = \frac{M(a)}{Q(a)} = \frac{M_i(a)}{Q_i(a)}\implies Q_i(a) = \frac{M_i(a)}{\iota(a)}.
 
-Substituting for layer return and line margin gives the result.
+Substituting for layer return and unit margin gives the result.
 
 Since :math:`1-g(S(a))` is the proportion of capital in the layer at
-:math:`a`, the main allocation result says the allocation to line
+:math:`a`, the main allocation result says the allocation to unit
 :math:`i` is given by the nicely symmetric expression
 
 .. math::
     \label{eq:q-formula}
     \frac{\beta_i(a)g(S(a)) -  \alpha_i(x)S(a)}{g(S(a))- S(a)}.
 
-To determine total capital by line we integrate the
+To determine total capital by unit we integrate the
 equity density
 
 .. math::
    \bar Q_i(a) := \int_0^a Q_i(x) dx.
 
-And finally we can determine the average return to line :math:`i` at
+And finally we can determine the average return to unit :math:`i` at
 asset level :math:`a`
 
 .. math::
-    \label{eq:avg-roe-by-line}
+    \label{eq:avg-roe-by-unit}
     \bar\iota_i(a) = \frac{\bar M_i(a)}{\bar Q_i(a)}.
 
 
-The average return will generally vary by line and by
+The average return will generally vary by unit and by
 asset level :math:`a`. Although the return within each layer is the same
-for all lines, the margin, the proportion of capital, and the proportion
-attributable to each line all vary by :math:`a`. Therefore average
-returns will vary by line and :math:`a`. This is in stark contrast to
-the standard industry approach, which uses the same return for each line
-and implicitly all :math:`a`. How these quantities vary by line is
+for all units, the margin, the proportion of capital, and the proportion
+attributable to each unit all vary by :math:`a`. Therefore average
+returns will vary by unit and :math:`a`. This is in stark contrast to
+the standard industry approach, which uses the same return for each unit
+and implicitly all :math:`a`. How these quantities vary by unit is
 complicated. Academic approaches emphasized the possibility that returns
-vary by line, but struggled with parameterization, :cite:t:`Myers1987`.
+vary by unit, but struggled with parameterization, :cite:t:`Myers1987`.
 
-This formula shows the average return by line
+This formula shows the average return by unit
 is an :math:`M_i`-weighted harmonic mean of the layer returns given by
 the distortion :math:`g`, viz
 

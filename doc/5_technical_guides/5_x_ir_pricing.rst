@@ -12,7 +12,7 @@ the aggregate cover. It is a function of the expected loss, the specific loss
 limit, and the aggregate retention. They sometimes also want to know
 the **insurance savings**, a credit for losses below a minimum. Tables
 tabulating insurance savings and charges are called Table L (California) or
-Table M (rest of the US).
+Table M (rest of the US). The two differ in the denominator: limited or unlimited losses.
 
 Let :math:`X` denote unlimited severity, :math:`N` annual frequency, :math:`l`
 the occurrence limit and :math:`a` the aggregate retention of limited losses.
@@ -36,8 +36,7 @@ which we define as the ratio
     r = \frac{a}{\mathsf E[A(n,l)]}
 
 of the aggregate limit to expected losses net of specific insurance.
-(Per Fisher, this is the definition used by Table REF). Therefore, the aggregate
-retention equals
+Therefore, the aggregate retention equals
 
 .. math::
 

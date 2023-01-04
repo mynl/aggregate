@@ -20,6 +20,7 @@ available assets :math:`a`. Hence expected recoveries are
    \mathsf{E}[X_i(a)] &= \mathsf{E}[X_i(X\wedge a) / X] \\
            &= \mathsf{E}[X_i(X\wedge a) / X \mid X \le a]F(a) + \mathsf{E}[X_i(X\wedge a)/ X \mid X > a]S(a) \\
            &= \mathsf{E}[X_i\mid X \le a]F(a) + a\mathsf{E}[X_i /X \mid X > a]S(a) \\
+           &= \mathsf{E}[X_i\mid X \le a]F(a) + a\alpha_i(a)S(a) \\
 
 emphasizing the importance of knowing :math:`\mathsf{E}[X_i /X \mid X]`.
 
@@ -82,7 +83,7 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
      -
      -
    * - exgta_line
-     - :math:`\mathsf E[X_i \mid X \ge a]`
+     - :math:`\mathsf E[X_i \mid X > a]`
      - Conditional expectation formula
      -
    * - exi_x_line
@@ -138,10 +139,10 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
       \mathsf{E}[X\mid X > a] = \frac{\mathsf{E}[X]-\mathsf{E}[X\mid X \le a]F(a)}{/S(a)}.
 
 
-For Individual Lines :math:`X_i`
+**For Individual Lines** :math:`X_i`
 
 -  Density and distributions as for total.
--  exeqa_line :math:`=\mathsf{E}[X_i \mid X=a]` can be computed
+-  exeqa_line :math:`=\mathsf{E}[X_i \mid X=a]=\kappa_i(a)` can be computed
    efficiently using FFTs in the case :math:`X_i` are independent.
    Without loss of generality :math:`X=X_i + \hat X_i` where
    :math:`\hat X_i` is the sum of all other lines (“not :math:`i`”). Let
@@ -192,7 +193,7 @@ For Individual Lines :math:`X_i`
 
       \mathsf{E}[X_i/X \mid X \le a] = \frac{1}{F(a)}\int_0^a \mathsf{E}[X_i\mid X=x]x^{-1}f_X(x)dx.
 
--  exi_xgta_line :math:`=\mathsf{E}[X_i/X \mid X > a]` computed from
+-  exi_xgta_line :math:`=\mathsf{E}[X_i/X \mid X > a]=\alpha_i(a)` computed from
    :math:`\mathsf{E}[X_i/X]` and :math:`\mathsf{E}[X_i/X \mid X \le a]`
    as usual.
 -  exa_line :math:`=\mathsf{E}[X_i(a)]` is the loss cost for line
@@ -316,7 +317,7 @@ distorted probabilities defined by :math:`g`.
 
    The first integral is computed as a cumulative sum of
    its terms, the second is computed as a reverse cumulative sum, both
-   using ``exeqa``.
+   using ``exeqa``. This expectation can also be expressed using :math:`\beta_i(a)`.
 -  If :math:`g` has a probability mass at :math:`s=0` then **how are the
    masses dealt with**?
 

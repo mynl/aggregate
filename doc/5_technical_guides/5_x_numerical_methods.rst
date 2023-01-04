@@ -23,7 +23,23 @@ Numerical Methods and FFT Convolution
 Helpful References
 --------------------
 
+Kinds of Dist Ref
+------------------
 
+.. ipython:: python
+    :okwarning:
+
+    from aggregate.extensions.pir_figures import fig_4_5, fig_4_6
+    @savefig num_discrete_approx.png scale=20
+    fig_4_5()
+
+And
+
+.. ipython:: python
+    :okwarning:
+
+    @savefig num_cts_approx.png scale=20
+    fig_4_6()
 
 
 For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
@@ -73,9 +89,9 @@ Floating point arithmetic is not associative.
 
 .. ipython:: python
 
-   x,y = 4.41 + (2.36 + 1.53), (4.41 + 2.36) + 1.53
-   x,y = .1 + (0.6 + 0.3), (0.1 + 0.6) + 0.3
-   x, y, x.as_integer_ratio(), y.as_integer_ratio()
+    x,y = 4.41 + (2.36 + 1.53), (4.41 + 2.36) + 1.53
+    x,y = .1 + (0.6 + 0.3), (0.1 + 0.6) + 0.3
+    x, y, x.as_integer_ratio(), y.as_integer_ratio()
 
 
 
@@ -118,35 +134,35 @@ Recall the computation of quantiles of a :ref:`dice roll <prob dice quantiles>`.
 ``aggregate`` produces the consistent results---if we look carefully and account for the foibles of floating point numbers. The case :math:`p=0.1` is easy. But the case :math:`p=1/6` appears wrong. There are two ways we can model the throw of a dice: with frequency 1 to 6 and fixed severity 1, or as fixed frequency 1 and severity 1 to 6. They give different answers. The lower quantile is wrong in the first case (it equals 1) and the upper quantile in the second (2).
 
 .. ipython:: python
-   :okwarning:
+    :okwarning:
 
-   from aggregate import build
+    from aggregate import build
 
-   d = build('agg Dice dfreq [1:6] dsev [1]')
-   print(d.q(0.1, 'lower'), d.q(0.1, 'upper'))
-   print(d.q(1/6, 'lower'), d.q(1/6, 'upper'))
+    d = build('agg Dice dfreq [1:6] dsev [1]')
+    print(d.q(0.1, 'lower'), d.q(0.1, 'upper'))
+    print(d.q(1/6, 'lower'), d.q(1/6, 'upper'))
 
-   d2 = build('agg Dice2 dfreq [1] dsev [1:6]')
-   print(d2.q(1/6, 'lower'), d2.q(1/6, 'upper'))
+    d2 = build('agg Dice2 dfreq [1] dsev [1:6]')
+    print(d2.q(1/6, 'lower'), d2.q(1/6, 'upper'))
 
 These differences are irritating, rather than important! The short answer is to adhere to
 
 .. warning::
 
-   Always use binary floats, that have an exact binary representation. They must have an exact binary representation as a fraction :math:`a/b` where :math:`b` is a power of two. 1/3, 1/5 and 1/10 are **not** binary floats.
+    Always use binary floats, that have an exact binary representation. They must have an exact binary representation as a fraction :math:`a/b` where :math:`b` is a power of two. 1/3, 1/5 and 1/10 are **not** binary floats.
 
 Here's the long answer, if you want to know. Looking at the source shows that the quantile function is implemented as a previous or next look up on a dataframe of distinct values of the cumulative distribution function. These two frames are:
 
 .. ipython:: python
-   :okwarning:
+    :okwarning:
 
-   import pandas as pd
+    import pandas as pd
 
-   with pd.option_context('display.float_format', lambda x: f'{x:.25g}'):
-       print(d.density_df.query('p_total > 0')[['p', 'F']])
-       print(d2.density_df.query('p_total > 0')[['p', 'F']])
+    with pd.option_context('display.float_format', lambda x: f'{x:.25g}'):
+        print(d.density_df.query('p_total > 0')[['p', 'F']])
+        print(d2.density_df.query('p_total > 0')[['p', 'F']])
 
-   print(f'{d.cdf(1):.25f} < {1/6:.25f} < 1/6 < {d2.cdf(1):.25f}')
+    print(f'{d.cdf(1):.25f} < {1/6:.25f} < 1/6 < {d2.cdf(1):.25f}')
 
 Based on these numbers, the reported quantiles are correct. :math:`p=1/6` is strictly greater than ``d.cdf(1)`` and strictly less than ``d2.cdf(1)``, as shown in the last row! ``d`` and ``d2`` are different because the former runs through the FFT routine to convolve the trivial severity, whereas the latter does not.
 
@@ -163,18 +179,18 @@ all :math:`p`.
 
 
 .. ipython:: python
-   :okwarning:
+    :okwarning:
 
-   a = build('agg Ex.50 dfreq [1] '
-             'dsev [0 1 2 3 4 8 12 25] [.1 .3 .1 .1 .1 .1 .1 .1]')
-   @savefig quantile_a.png
-   a.plot()
+    a = build('agg Ex.50 dfreq [1] '
+              'dsev [0 1 2 3 4 8 12 25] [.1 .3 .1 .1 .1 .1 .1 .1]')
+    @savefig quantile_a.png
+    a.plot()
 
-   print(a.q(0.05), a.q(0.1), a.q(0.2), a.q(0.4),
-      a.q(0.4, 'upper'), a.q(0.41), a.q(0.5))
+    print(a.q(0.05), a.q(0.1), a.q(0.2), a.q(0.4),
+       a.q(0.4, 'upper'), a.q(0.41), a.q(0.5))
 
-   with pd.option_context('display.float_format', lambda x: f'{x:.25g}'):
-       print(a.density_df.query('p_total > 0')[['p', 'F']])
+    with pd.option_context('display.float_format', lambda x: f'{x:.25g}'):
+        print(a.density_df.query('p_total > 0')[['p', 'F']])
 
 **Solution.** On the graph, fill in the vertical segments of the
 distribution function. Draw a horizontal line at height :math:`p` and
@@ -225,45 +241,45 @@ Discretizing approximates the severity with a purely discrete distribution suppo
 
 #. The **round** or **discrete** method assigns probability
 
-   .. math:: p_k = \Pr(x_k - b/2 < X \le x_k+b/2)
+    .. math:: p_k = \Pr(x_k - b/2 < X \le x_k+b/2)
 
-   to the :math:`k`th bucket.
+    to the :math:`k`th bucket.
 
 #. The **forward** difference assigns
 
-   .. math:: p_k = \Pr(x_k - b/2 < X \le x_{k+1} )
+    .. math:: p_k = \Pr(x_k - b/2 < X \le x_{k+1} )
 
 #. The **backward** difference assigns
 
-   .. math:: p_k = \Pr(x_{k-1} - b/2 < X \le x_k )
+    .. math:: p_k = \Pr(x_{k-1} - b/2 < X \le x_k )
 
-   with (?) :math:`p_0=0`.
+    with (?) :math:`p_0=0`.
 
 #. The **moment** difference (:cite:t:`LM`) assigns
 
-   .. math::
+    .. math::
 
-      p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b} \\
-      p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b}
+       p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b} \\
+       p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b}
 
-   It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
+    It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
 
 Call the discrete approximation :math:`X_b^d` where :math:`d=r,\ f,\ b,\ m` describes the discretization. It is clear that :math:`X_b` converges weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution using :math:`X` as severity for the rounding, forward and backward methods. Further, the rounding approximation is sandwiched between the forward and backwards methods, :cite:t:`Embrechts2009a` p. 499.
 
 
 EF comment on moment method:
 
-   In this light, Gerber (1982) suggests a procedure that locally matches the first k moments. Practically interesting is only the case k = 1; for k ≥ 2 the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is much more involved than the rounding method in terms of implementation; we need to calculate limited expected values. Apart from that, the gain is rather modest; moment matching only pays off for large bandwidths, and after all, the rounding method is to be preferred. This is further reinforced by the work of Grübel and Hermesmeier (2000): if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{h,j} / h`, an approximation for the compound density, can be quadratically extrapolated.
+    In this light, Gerber (1982) suggests a procedure that locally matches the first k moments. Practically interesting is only the case k = 1; for k ≥ 2 the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is much more involved than the rounding method in terms of implementation; we need to calculate limited expected values. Apart from that, the gain is rather modest; moment matching only pays off for large bandwidths, and after all, the rounding method is to be preferred. This is further reinforced by the work of Grübel and Hermesmeier (2000): if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{h,j} / h`, an approximation for the compound density, can be quadratically extrapolated.
 
 Need quad to work...bot not positive. Explore adjusting the first couple of buckets.
 
 To create a rv_histogram variable from ``xs`` and corresponding ``p`` values use:
 
-   ::
+    ::
 
-       xss = np.sort(np.hstack((xs, xs + 1e-5)))
-       pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
-       fz_discr = ss.rv_histogram((pss, xss))
+        xss = np.sort(np.hstack((xs, xs + 1e-5)))
+        pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
+        fz_discr = ss.rv_histogram((pss, xss))
 
 The value 1e-5 just needs to be smaller than the resolution requested, i.e. do not “split the bucket”. Generally histograms will be downsampled, not upsampled, so this is not a restriction.
 
@@ -272,8 +288,8 @@ Continuous Approximation to Severity (Ogive)
 
 Approximate the distribution with a continuous “histogram” distribution that is uniform on :math:`(x_k, x_{k+1}]`. The discrete proababilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a rv_histogram variable is much easier, just use::
 
-    xs2 = np.hstack((xs, xs[-1] + xs[1]))
-    fz_cts = ss.rv_histogram((ps2, xs2))
+     xs2 = np.hstack((xs, xs[-1] + xs[1]))
+     fz_cts = ss.rv_histogram((ps2, xs2))
 
 The first method we call **discrete** and the second **histogram**. The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes. The histogram method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the historgram method is interpreted as discrete and if the mean is computed appropriately for a discrete variable as :math:`\sum_i p_k x_k`, then the mean will be under-estimated by :math:`b/2`.
 
@@ -296,8 +312,8 @@ whose length :math:`m` is a power of two :math:`m=2^n`. Here
 
 .. math::
 
-   \begin{gathered}
-   x_i= \text{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\text{Pr}(X<b/2),\quad x_{m}=\text{Pr}(X>(m-1/2)b)\end{gathered}
+    \begin{gathered}
+    x_i= \text{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\text{Pr}(X<b/2),\quad x_{m}=\text{Pr}(X>(m-1/2)b)\end{gathered}
 
 for some fixed :math:`b`. We call :math:`b` the bucket size. Note
 :math:`\sum_i x_i=1` by construction. The FFT of the :math:`m\times 1`
@@ -306,7 +322,7 @@ vector :math:`\text{x}` is another :math:`m\times 1` vector
 
 .. math::
 
-   \sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).\label{fft}
+    \sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).\label{fft}
 
 The coefficients of :math:`\hat{\text{x}}` are complex numbers. It is
 also possible to express :math:`\hat{\text{x}}=\text{F}\text{x}` where
@@ -331,14 +347,14 @@ aggregate distribution then
 
 .. math::
 
-   M_A(\zeta)=M_G(n(M_X(\zeta)-1)).
+    M_A(\zeta)=M_G(n(M_X(\zeta)-1)).
 
 Using FFTs you can replace the *function* :math:`M_X` with the discrete
 approximation *vector* :math:`\hat{\text{x}}` and compute
 
 .. math::
 
-   \hat{\text{a}}=M_G(n(\hat{\text{x}} -1))
+    \hat{\text{a}}=M_G(n(\hat{\text{x}} -1))
 
 component-by-component to get an approximation vector to the function
 :math:`M_A`. You can then use the inverse FFT to recover an discrete
@@ -395,7 +411,7 @@ length :math:`m` is a power of two :math:`m=2^n`. Here
 
 .. math::
 
-   x_i=\mathsf{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\mathsf{Pr}(X<b/2),\quad x_{m}=\mathsf{Pr}(X>(m-1/2)b)
+    x_i=\mathsf{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\mathsf{Pr}(X<b/2),\quad x_{m}=\mathsf{Pr}(X>(m-1/2)b)
 
 for some fixed :math:`b`. We call :math:`b` the bucket size. Note
 :math:`\sum_i
@@ -467,7 +483,7 @@ the characteristic function. Direct inversion of the Fourier transform
 is also possible using FFTs. The application of FFTs is not completely
 straight forward because of certain aspects of the approximations
 involved. The details are very clearly explained in Menn and Rachev
-:raw-latex:`\cite{mennrachev}`. Their method allows the use of FFTs to
+:cite:t:`Menn2006`. Their method allows the use of FFTs to
 determine densities for distributions which have analytic MGFs but not
 densities—notably the class of stable distributions.
 
@@ -478,23 +494,23 @@ The FFT Approach
 
 * **Pros.**
 
-    - Accurate (see discussion of se of mean and percentiles; exact shape of distribution; can't hope for histograms as sharp; can see what is going on [for his bucket size = 1 need... simulations])
-    - Fast: both in absolute terms and especially relative to the accuracy achieved when compared with simulation approaches
+     - Accurate (see discussion of se of mean and percentiles; exact shape of distribution; can't hope for histograms as sharp; can see what is going on [for his bucket size = 1 need... simulations])
+     - Fast: both in absolute terms and especially relative to the accuracy achieved when compared with simulation approaches
 
-        * Speed independent of the expected frequency!
+         * Speed independent of the expected frequency!
 
 * **Cons.**
 
-    - Univariate: capture one variable at a time; can capture mixtures
+     - Univariate: capture one variable at a time; can capture mixtures
 
-        * Yes: mixture with common mixing between lines
-        * No: ceded and net; specific and agg combined
+         * Yes: mixture with common mixing between lines
+         * No: ceded and net; specific and agg combined
 
-      OTOH, so fast you can see the net and ceded distributions, just not
-      as a bivariate distribution.
+       OTOH, so fast you can see the net and ceded distributions, just not
+       as a bivariate distribution.
 
-    - Need a small *b* to capture detail for small *x*
-    - Need enough space, the range :math:`nb` (or *nb*) to capture the full range of outputs.
+     - Need a small *b* to capture detail for small *x*
+     - Need enough space, the range :math:`nb` (or *nb*) to capture the full range of outputs.
 
 
 Define the ? quantization or discretization error to be the difference between these two.
@@ -530,32 +546,32 @@ What is the density? (Obs small because range so large)! Table and investigate..
 
 Here's some code on the mean. ::
 
-    import scipy.stats as ss
+     import scipy.stats as ss
 
-    z = ss.norm.isf
-    phi = ss.norm.cdf
+     z = ss.norm.isf
+     phi = ss.norm.cdf
 
-    def test_sample_mean(cv, p=0.99, a=0.01, simulate=False):
-        """
-        Test number of sims for p=99% certainty of a=1% accuracy when underlying
-        variable is lognormal with given cv. Basic large sample, normal approximation
-        to standard error of the mean.
+     def test_sample_mean(cv, p=0.99, a=0.01, simulate=False):
+         """
+         Test number of sims for p=99% certainty of a=1% accuracy when underlying
+         variable is lognormal with given cv. Basic large sample, normal approximation
+         to standard error of the mean.
 
-        """
-        zp = z((1-p)/2)
-    n = int((zp / a * cv) ** 2)
-    print(f'zp = {zp:.3f}, zp**2 = {zp*zp:.3f}\nformula = {(zp/a)**2:,.0f} * n**2\nn = {n:,.0f}')
+         """
+         zp = z((1-p)/2)
+     n = int((zp / a * cv) ** 2)
+     print(f'zp = {zp:.3f}, zp**2 = {zp*zp:.3f}\nformula = {(zp/a)**2:,.0f} * n**2\nn = {n:,.0f}')
 
-    if n <= 100000 or simulate is True:
-        mu, sig = mu_sigma_from_mean_cv(1, cv)
-        fz = ss.lognorm(sig, scale=np.exp(mu))
+     if n <= 100000 or simulate is True:
+         mu, sig = mu_sigma_from_mean_cv(1, cv)
+         fz = ss.lognorm(sig, scale=np.exp(mu))
 
-        samps = [np.mean(fz.rvs(n)) for i in range(1000)]
-        plt.hist(samps, lw=.25, ec='w', bins=10)
-        samps = np.sort(samps)
-        print(f'observed 99% ci equals ({samps[10]}, {samps[990]})')
+         samps = [np.mean(fz.rvs(n)) for i in range(1000)]
+         plt.hist(samps, lw=.25, ec='w', bins=10)
+         samps = np.sort(samps)
+         print(f'observed 99% ci equals ({samps[10]}, {samps[990]})')
 
-    return zp, n
+     return zp, n
 
 test_sample_mean(.2, .9, .01)
 
@@ -569,26 +585,26 @@ Mandlebrot - the higher moments of the lognormal are nonlocal and depend on diff
 
 ::
 
-    # how much of the mean of a lognormal comes from the extreme tail?
-    ans = []
-    for sigma in [.5, .75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4]:
-        fz = ss.lognorm(sigma)
-        for n in range(1,16):
-            p = 1 - 10**-n
-            q = fz.isf(1-p)
-            m, v = fz.stats()
-            cv = float(v**.5/m)
-            lev = moms_analytic(fz, q, 0, 1)[1]
-            ans.append([sigma, n, p, 10**-n, q, cv, float(m), lev])
+     # how much of the mean of a lognormal comes from the extreme tail?
+     ans = []
+     for sigma in [.5, .75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4]:
+         fz = ss.lognorm(sigma)
+         for n in range(1,16):
+             p = 1 - 10**-n
+             q = fz.isf(1-p)
+             m, v = fz.stats()
+             cv = float(v**.5/m)
+             lev = moms_analytic(fz, q, 0, 1)[1]
+             ans.append([sigma, n, p, 10**-n, q, cv, float(m), lev])
 
-    ans = pd.DataFrame(ans, columns=['sigma', 'n', 'p', 's', 'q(p)', 'cv', 'mean', 'lev'])
-    ans['err'] = ans.lev / ans['mean'] - 1
-    print(ans.to_string(formatters={'err': lambda x: f'{x:.1%}'}))
+     ans = pd.DataFrame(ans, columns=['sigma', 'n', 'p', 's', 'q(p)', 'cv', 'mean', 'lev'])
+     ans['err'] = ans.lev / ans['mean'] - 1
+     print(ans.to_string(formatters={'err': lambda x: f'{x:.1%}'}))
 
-    x = ans.query('abs(err) < 0.001').groupby('sigma').apply(lambda x: x.iloc[0])
-    x
+     x = ans.query('abs(err) < 0.001').groupby('sigma').apply(lambda x: x.iloc[0])
+     x
 
-    x.set_index('cv')['n'].plot()
+     x.set_index('cv')['n'].plot()
 
 Since bs is  based on the p999, it will fail when confronting and extreme tail.
 
@@ -600,7 +616,7 @@ More code... test different n for rec bucket, different methods.
 
     from aggregate import build, qd, Aggregate, Severity, round_bucket
 
-    a = build('agg TEST 1 claim sev lognorm 1 cv 50 fixed', update=False)
+    a = build('agg TEST 1 claim sev lognorm 1 cv 50 fixed', pdate=False)
 
     for n in range(3,11):
         a.update(recommend_p=n, log2=16)

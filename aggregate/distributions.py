@@ -3080,8 +3080,9 @@ class Severity(ss.rv_continuous):
             try:
                 xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
             except ValueError:
-                # for empirical
-                logger.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast')
+                # for empirical, with cts histogram xs and ps do not have the same size
+                if self.sev_name != 'chistogram':
+                    logger.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast.')
                 xs = np.array(sev_xs)
                 ps = np.array(sev_ps)
             if not np.isclose(np.sum(ps), 1.0):

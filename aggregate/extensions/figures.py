@@ -153,3 +153,47 @@ def mixing_convergence(freq_cv, sev_cv, bs=1/64):
     ax = axs.flat[-1]
     ax.plot(ps, fz.cdf(ps), lw=2, alpha=.5, c='k', label='Mixing')
     ax.legend(loc='lower right')
+
+
+def power_variance_family():
+    """
+    Graph to illustrate the power variance exponential family distributions.
+
+    Reference: Jørgensen, Bent. 1997. The theory of dispersion models. CRC Press.
+    """
+    alpha = np.linspace(-2, 2, 101)
+    p = (alpha-2) / (alpha-1)
+    alphabar = -(alpha+1)
+    f, ax = plt.subplots(figsize=(FIG_W * 2, FIG_W * 2))
+    ax.plot(alphabar, p, lw=3)
+    ax.set(ylim=[-5,10])
+    # ax.grid(lw=.25, c='b', alpha=.5)
+    ax.axhline(1, c='k', lw=1)
+    ax.axhline(0, c='k', lw=1)
+    ax.axvline(-2, c='k', lw=.5)
+    ax.axvline(-3/2, c='k', lw=0.5, ls='--')
+    ax.axhline(3, c='k', lw=0.5, ls='--')
+    ax.axhline(2, c='r', lw=1)
+    ax.axvline(-1, c='r', lw=1)
+    ax.set(xlabel='$\\bar\\alpha=-(\\alpha+1)$, base jump density is $x^{\\bar\\alpha}$',
+           ylabel='Variance power function $p$, $V(\\mu)=\\phi\\mu^p$')
+    ax.yaxis.set_major_locator(ticker.FixedLocator(np.arange(-4,10)))
+
+    def ql(x, y, t, dot=True, rhs=None):
+        ax.text(x + .05, y+0.2, t)
+        if dot:
+            ax.plot(x,y, 'rd', ms=5)
+        else:
+            if rhs is None:
+                rhs = x + 1
+            ax.plot([x, rhs], [y, y], lw=3)
+
+    ql(-3, 0, 'Normal')
+    ql(-3, 6, 'Stable', False)
+    ql(-2, 9, 'Cauchy')
+    ql(-2, -2, 'Pos Stable', False)
+    ql(-1.5, 3, 'Stab 3/2\nIG')
+    ql(-1, 2, 'Gamma')
+    ql(1, 1, 'Poisson')
+    ql(-1, -2, 'Tweedie', False, 1)
+    ax.set(title='Power Variance Exponential Family Distributions');

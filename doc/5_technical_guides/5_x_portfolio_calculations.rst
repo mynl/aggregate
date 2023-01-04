@@ -1,30 +1,7 @@
 .. _portfolio_calculations:
 
 :class:`Portfolio` Class Calculations
-======================================
-
-**Objectives:** Describe calculations performed by the :class:`Portfolio` class.
-
-**Audience:**
-
-**Prerequisites:** DecL, general use of ``aggregate``, probability.
-
-**See also:** :doc:`5_x_aggregate_calculations`, :doc:`5_x_distortions`, :doc:`../2_user_guides/2_x_10mins`.
-
-
-**Contents:**
-
-* :ref:`Helpful References`
-* :ref:`Calculations`
-
-Helpful References
---------------------
-
-* :cite:t:`PIR`
-
-
-Calculations
--------------
+------------------------------------------
 
 A ``Portfolio`` is a collection of ``Aggregate`` objects. The class
 computes the densities of each aggregate component as well as the sum,
@@ -147,11 +124,11 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
    called lev_total for limited expected value, is computed as
    cumulative sums of :math:`S` times bucket size. Note exa_total=
    lev_total.
--  exlea\_total :math:`=\mathsf{E}[X \mid X\le a]` is computed using the relation :math:`E(X\wedge a)=\int_0^a tf(t)dt + aS(a)` as
+-  exlea\_total :math:`=\mathsf{E}[X \mid X\le a]` is computed using the relation :math:`\mathsf E[X\wedge a]=\int_0^a tf(t)dt + aS(a)` as
 
    .. math::
 
-      E(X \mid X\le a)=\frac{1}{F(a)} \int_0^a tf(t)dt = \frac{\mathsf{E}[X\wedge a]-aS(a)}{F(a)}.
+      \mathsf E[X \mid X\le a]=\frac{1}{F(a)} \int_0^a tf(t)dt = \frac{\mathsf{E}[X\wedge a]-aS(a)}{F(a)}.
 
    When :math:`F(a)` is very small these values are unreliable and so the first values are set equal to zero.
 -  exgta\_total :math:`=\mathsf{E}[X\mid X > a]` is computed using the relation :math:`\mathsf{E}[X] = \mathsf{E}[X\mid X \le a]F(a) + \mathsf{E}[X\mid X > a]S(a)`. Therefore
@@ -181,7 +158,7 @@ For Individual Lines :math:`X_i`
       \mathsf{E}[X_i \mid X=a] &= \int_0^a x_i f_a(x_i, a-x_i) dx_i\\
                  &= \frac{1}{f_X(a)} \int_0^a x_i f_i(x_i)f_{\hat i}(a-x_i) dx_i
 
-   showing :math:`E(X_i \mid X=a)` is the convolution of
+   showing :math:`\mathsf E[X_i \mid X=a]` is the convolution of
    the functions :math:`x_i\mapsto x_i f_i(x_i)` and :math:`f_{\hat i}`.
    The convolution can be computed using FFTs. In the case
    :math:`f_X(a)` is very small these estimates may be numerically

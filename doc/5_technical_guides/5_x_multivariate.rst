@@ -1,3 +1,6 @@
+.. this doc is not part of the documentation - it is for future use only
+
+
 Multivariate Methods
 =======================
 

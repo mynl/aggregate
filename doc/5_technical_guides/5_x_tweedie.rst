@@ -1,37 +1,12 @@
 .. _2_x_tweedie:
 
 The Tweedie Distribution: Theory
-==================================
+----------------------------------
 
-**Objectives:** Introduce aggregate probability distributions and the `aggregate` library for working with then in the context of real-world, but basic, actuarial problems illustrated using the Tweedie distribution from GLM modeling.
 
-**Audience:** Actuaries at the Associate or Fellow level.
+The Tweedie distribution is a Poisson mixture of gammas. It is an exponential family distribution :cite:p:`Jorgensen1997`. Tweedie distributions are a suitable model for pure premiums and are used as unit distributions in GLMs :cite:p:`Mccullagh2019`. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
 
-**Prerequisites:** GLM modeling, Tweedie distributions.
-
-**See also:** :doc:`../2_user_guides/DecL/100_tweedie`.
-
-**Contents:**
-
-* :ref:`tw helpful refs`
-* :ref:`tw theory`
-* :ref:`tw pvf`
-
-.. _tw helpful refs:
-
-Helpful References
--------------------
-
-* :cite:t:`Jorgensen1997`
-
-.. _tw theory:
-
-Theory
--------
-
-Tweedie distributions are a suitable model for pure premiums and are used in GLMs. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
-
-The **Tweedie** family of distributions is a three-parameter exponential family. It is used as unit distribution in GLMs. A variable :math:`X \sim \mathrm{Tw}_p(\mu, \sigma^2)` when
+The **Tweedie** family of distributions is a three-parameter exponential family. A variable :math:`X \sim \mathrm{Tw}_p(\mu, \sigma^2)` when
 :math:`\mathsf E[X] = \mu` and
 :math:`\mathsf{Var}(X) = \sigma^2 \mu^p`, :math:`1 \le p \le 2`.
 :math:`p` is a shape parameter and :math:`\sigma^2>0` is a scale   parameter called the dispersion.
@@ -103,8 +78,10 @@ on the left represents the total pure premium.
 
 .. _tw pvf:
 
-The Power Variance Exponential Family of Distributions
-------------------------------------------------------
+The next diagram shows how the Tweedie family fits within the broader power variance exponential family of distributions.
+See the blog post `The Tweedie-Power Variance Function
+Family <https://www.mynl.com/blog?id=c9a74f2055686bb2c250c4fc4f627a89>`__
+for more details.
 
 .. ipython:: python
     :okwarning:
@@ -115,8 +92,5 @@ The Power Variance Exponential Family of Distributions
     pass
 
 
-See the blog post `The Tweedie-Power Variance Function
-Family <https://www.mynl.com/blog?id=c9a74f2055686bb2c250c4fc4f627a89>`__
-for more details.
 
 

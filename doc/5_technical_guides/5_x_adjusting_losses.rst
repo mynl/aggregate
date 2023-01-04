@@ -1,15 +1,7 @@
 .. _re loss picks:
 
 Adjusting Layer Loss Picks
-===========================
-
-**Objectives:** Describe how to adjust severity distributions to achieve selected loss picks by layer in an excess of loss reinsurance or layered insurance program.
-
-**Audience:** Reinsurance and large account actuaries.
-
-**Prerequisites:** DecL, general use of ``aggregate``, probability.
-
-**See also:** :doc:`../2_user_guides/2_x_re_pricing`.
+---------------------------
 
 Reinsurance actuaries apply experience and exposure rating to excess of
 loss programs. Experience rating trends and develops layer losses to

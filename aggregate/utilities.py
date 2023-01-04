@@ -1904,24 +1904,19 @@ def knobble_fonts():
     https://stackoverflow.com/questions/22408237/named-colors-in-matplotlib
 
     """
-    font_size = 9
-    legend_font = 'x-small'
 
     # this sets a much smaller base fontsize
     # everything scales off font size
-    plt.rcParams['font.size'] = font_size
+    plt.rcParams['font.size'] = FONT_SIZE
 
     # mpl default is medium
-    plt.rcParams['legend.fontsize'] = legend_font
+    plt.rcParams['legend.fontsize'] = LEGEND_FONT
 
-    # see https://matplotlib.org/stable/gallery/color/named_colors.html
-    plot_face_color = 'lightsteelblue'
-    figure_bg_color = 'aliceblue'
     # graphics set up
-    plt.rcParams["axes.facecolor"] = plot_face_color
+    plt.rcParams["axes.facecolor"] = PLOT_FACE_COLOR
     # note plt.rc lets you set multiple related properties at once:
-    plt.rc('legend', fc=plot_face_color, ec=plot_face_color)
-    plt.rcParams['figure.facecolor'] = figure_bg_color
+    plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
+    plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
 
     plot_colormap_name = 'cividis'
 
@@ -2104,8 +2099,9 @@ class FigureManager():
         # mpl default is medium
         plt.rcParams['legend.fontsize'] = legend_font
         # see https://matplotlib.org/stable/gallery/color/named_colors.html
-        self.plot_face_color = 'lightsteelblue'
-        self.figure_bg_color = 'aliceblue'
+        self.plot_face_color = PLOT_FACE_COLOR
+        self.figure_bg_color = FIGURE_BG_COLOR
+
         # graphics set up
         plt.rcParams["axes.facecolor"] = self.plot_face_color
         # note plt.rc lets you set multiple related properties at once:

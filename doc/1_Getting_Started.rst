@@ -101,7 +101,7 @@ You can chose your own units. The examples include numbers interpreted in ones, 
 ``aggregate`` Hello World
 ==========================
 
-The only object you need to import to get started is ``build``. ``qd`` (quick display) is a nice-to-have utility function that handles printing with sensible defaults.
+The only object you need to import to get started is ``build``. The quick display function ``qd`` is a nice-to-have utility function that handles printing with sensible defaults. It is used extensively throughout.
 
 .. ipython:: python
     :okwarning:

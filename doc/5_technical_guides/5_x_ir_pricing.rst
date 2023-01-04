@@ -1,8 +1,8 @@
 
 .. _ir stop loss:
 
-Self-Insurance Plan Stop-Loss Insurance: Background
-=====================================================
+Self-Insurance Plan Stop-Loss Insurance
+------------------------------------------
 
 Self-insurance plans often purchase per occurrence (specific) insurance, to
 limit the amount from any one loss that flows into the plan, and aggregate

@@ -1,34 +1,11 @@
 
+.. _samp ic method:
+
 The Iman-Conover Method
-=======================
-
-**Objectives:** Describe the Iman-Conover algorithm for inducing correlation in a sample.
-
-**Audience:**
-
-**Prerequisites:** Probability, measures of association, multivariate distributions, matrix algebra.
-
-**See also:**
-
-**Contents:**
-
-* :ref:`Helpful References`
-* :ref:`Basic Idea`
-* :ref:`Theoretical Derivation`
-* :ref:`Algorithm`
-* :ref:`ic simple example`
-* :ref:`ic extensions`
-* :ref:`ic normal copula`
-
-Helpful References
---------------------
-
-* :cite:t:`Conover1999`
-* :cite:t:`Mildenhall2005a`
-
+--------------------------
 
 Basic Idea
-------------
+~~~~~~~~~~~~~~~
 
 Here is the basic idea of the Iman-Conover method. Given samples of
 :math:`n` values from two known marginal distributions :math:`X` and
@@ -41,13 +18,9 @@ structure. What makes the IC method work so effectively is the existence
 of easy algorithms to determine samples from reference distributions
 with prescribed linear correlation structures.
 
-Section `1.1 <#theory>`__ explains the Choleski trick for generating
-multivariate reference distributions with given correlation structure.
-Section `1.2 <#algorithm>`__ gives a formal algorithmic description of
-the IC method.
 
 Theoretical Derivation
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Suppose that :math:`\mathsf{M}` is an :math:`n` element sample from an :math:`r`
 dimensional multivariate distribution, so :math:`\mathsf{M}` is an
@@ -147,7 +120,7 @@ method is to re-order the each column of the input distribution
 :math:`\mathsf{T}`.
 
 Algorithm
----------
+~~~~~~~~~~~~~
 
 Here is a more algorithmic description of the IC method. The description
 uses normal scores and the Choleski method to determine the reference
@@ -161,8 +134,7 @@ referencing appropriate Lapack routines.
 Lapack is a standard set of linear algebra functions. Software vendors
 provide very high performance implementations of Lapack, many of which
 are used in CPU benchmarks. Several free Windows implementations are
-available on the web. The software described in the Appendix uses the
-Intel Performance http://www.intel.com/software/products/perflib/. The
+available on the web. The
 reader should study the simple algorithm first to understand what is
 going in the IC method. In order to code a high performance
 implementation you should follow the steps outlined in the detailed
@@ -197,18 +169,18 @@ and whose approximate correlation matrix is :math:`\mathsf{S}`.
    correlation matrix :math:`\mathsf{S}`.
 
 #. Compute :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}`. The matrix :math:`\mathsf{T}` has exactly the
-   desired correlation structure by Equation (`[icCorr] <#icCorr>`__).
+   desired correlation structure.
 
 #. Let :math:`\mathsf{Y}` be the input matrix :math:`\mathsf{X}` with each column reordered to have exactly the same rank ordering as the corresponding column of :math:`\mathsf{T}`.
 
-#. Compute the Choleski decomposition of :math:`\mathsf{S}`, :math:`\mathsf{S}=\mathsf{C}'\mathsf{C}`, with :math:`\mathsf{C}` upper triangular. If the Choleski algorithm fails then :math:`\mathsf{S}` is not a valid correlation matrix. Flag an error and exit. Checking :math:`\mathsf{S}` is a correlation matrix in Step 1 avoids performing wasted calculations and allows the routine to exit as quickly as possible. Also check that all the diagonal entries of :math:`\mathsf{S}` are 1 so :math:`\mathsf{S}` has full rank. Again flag an error and exit if not. The Lapack routine DPOTRF can use be used to compute the Choleski decomposition. In the absence of Lapack, :math:`\mathsf{C}=(c_{ij})` can be computed recursively using
+#. Compute the Choleski decomposition of :math:`\mathsf{S}`, :math:`\mathsf{S}=\mathsf{C}'\mathsf{C}`, with :math:`\mathsf{C}` upper triangular. If the Choleski algorithm fails then :math:`\mathsf{S}` is not a valid correlation matrix. Flag an error and exit. Checking :math:`\mathsf{S}` is a correlation matrix in Step 1 avoids performing wasted calculations and allows the routine to exit as quickly as possible. Also check that all the diagonal entries of :math:`\mathsf{S}` are 1 so :math:`\mathsf{S}` has full rank. Again flag an error and exit if not. The Lapack routine ``DPOTRF`` can use be used to compute the Choleski decomposition. In the absence of Lapack, :math:`\mathsf{C}=(c_{ij})` can be computed recursively using
 
    .. math::
 
       c_{ij}=\frac{s_{ij}-\sum_{k=1}^{j-1}
         c_{ik}c_{jk}}{\sqrt{1-\sum_{k=1}^{j-1} c_{jk}^2}}\label{chol}
 
-   for :math:`1\le i\le j\le n`—since all the diagonal elements of :math:`S` equal one. The empty sum :math:`\sum_0^0=0` and for :math:`j>i` the denominator of (`[chol] <#chol>`__) equals :math:`c_{ii}` and the elements of :math:`\mathsf{C}` should be calculated from left to right, top to bottom. See Wang or Herzog.
+   for :math:`1\le i\le j\le n`—since all the diagonal elements of :math:`S` equal one. The empty sum :math:`\sum_0^0=0` and for :math:`j>i` the denominator equals :math:`c_{ii}` and the elements of :math:`\mathsf{C}` should be calculated from left to right, top to bottom. See Wang or Herzog.
 
 #. Let :math:`m=\lfloor n/2\rfloor` be the largest integer less than or equal to :math:`n/2` and :math:`v_i=\Phi^{-1}(i/(2m+1))` for
    :math:`i=1,\dots,m`.
@@ -230,13 +202,13 @@ and whose approximate correlation matrix is :math:`\mathsf{S}`.
 
 #. Randomly shuffle columns :math:`2,\dots,r` of the score matrix.
 
-#. Compute the correlation matrix :math:`\mathsf{EE}` of the shuffled score matrix :math:`\mathsf{M}`. Each column of :math:`\mathsf{M}` has mean zero, by construction, and variance :math:`m_{xx}`. The correlation matrix is obtained by dividing each element of :math:`\mathsf{M}'\mathsf{M}` by :math:`m_{xx}`. The matrix product can be computed using the Lapack routine DGEMM. If :math:`\mathsf{EE}` is singular repeat step 6.
+#. Compute the correlation matrix :math:`\mathsf{EE}` of the shuffled score matrix :math:`\mathsf{M}`. Each column of :math:`\mathsf{M}` has mean zero, by construction, and variance :math:`m_{xx}`. The correlation matrix is obtained by dividing each element of :math:`\mathsf{M}'\mathsf{M}` by :math:`m_{xx}`. The matrix product can be computed using the Lapack routine ``DGEMM``. If :math:`\mathsf{EE}` is singular repeat step 6.
 
-#. Determine Choleski decomposition :math:`\mathsf{EE}=\mathsf{F}'\mathsf{F}` of :math:`\mathsf{EE}` using the Lapack routine DPOTRF. Because :math:`\mathsf{EE}` is a correlation matrix it must be symmetric and positive definite and so is guaranteed to have a Choleski root.
+#. Determine Choleski decomposition :math:`\mathsf{EE}=\mathsf{F}'\mathsf{F}` of :math:`\mathsf{EE}` using the Lapack routine ``DPOTRF``. Because :math:`\mathsf{EE}` is a correlation matrix it must be symmetric and positive definite and so is guaranteed to have a Choleski root.
 
-#. Compute :math:`\mathsf{F}^{-1}\mathsf{C}` using the Lapack routine DTRTRS to solve the linear equation :math:`\mathsf{F}\mathsf{A}=\mathsf{C}` for :math:`\mathsf{A}`. Solving the linear equation avoids a time consuming matrix inversion and multiplication. The routine DTRTRS is optimized for upper triangular input matrices.
+#. Compute :math:`\mathsf{F}^{-1}\mathsf{C}` using the Lapack routine ``DTRTRS`` to solve the linear equation :math:`\mathsf{F}\mathsf{A}=\mathsf{C}` for :math:`\mathsf{A}`. Solving the linear equation avoids a time consuming matrix inversion and multiplication. The routine ``DTRTRS`` is optimized for upper triangular input matrices.
 
-#. Compute the correlated scores :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}=\mathsf{M}\mathsf{A}` using DGEMM. The matrix :math:`\mathsf{T}` has exactly the desired correlation structure.
+#. Compute the correlated scores :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}=\mathsf{M}\mathsf{A}` using ``DGEMM``. The matrix :math:`\mathsf{T}` has exactly the desired correlation structure.
 
 #. Compute the ranks of the elements of :math:`\mathsf{T}`. Ranks are computed by indexing the columns of :math:`\mathsf{T}` as described in Section 8.4 of Press et al. Let :math:`r(k)` denote the index of the :math:`k`\ th ranked element of :math:`\mathsf{T}`.
 
@@ -255,7 +227,7 @@ that of a multivariate distribution with correlation matrix :math:`\mathsf{S}`.
 .. _ic simple example:
 
 Simple Example of Iman-Conover
-------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Having explained the IC method, we now give a simple example to
 explicitly show all the details. The example will work with :math:`n=20`
@@ -303,7 +275,7 @@ The desired target correlation matrix is
    1.000 & 0.800 & 0.400 & 0.000\\
    0.800 & 1.000 & 0.300 & -0.200\\
    0.400 & 0.300 & 1.000 & 0.100\\
-   0.000 & -0.200 & 0.100 & 1.000
+   0.000 & -0.200 & 0.100 & 1.000\\
    \end{pmatrix}.
 
 The Choleski decomposition of :math:`\mathsf{S}` is
@@ -471,7 +443,7 @@ marginal distributions are reasonably symmetric.
 .. _ic extensions:
 
 Extensions of Iman-Conover
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Following through the explanation of the IC method shows that it relies
 on a choice of multivariate reference distribution. A straightforward
@@ -480,32 +452,29 @@ method Equation (`[coolA] <#coolA>`__) applied to certain independent
 scores. The example in Section `1.3 <#egs>`__ used normal scores.
 However nothing prevents us from using other distributions for the
 scores provided they are suitably normalized to have mean zero and
-standard deviation one. We explore the impact of different choices of
-score distribution on the resulting multivariate distribution in Section
-`1.4.1 <#egScore>`__.
+standard deviation one.
 
 Another approach to IC is to use a completely different multivariate
 distribution as reference. There are several other families of
 multivariate distributions, including the elliptically contoured
 distribution family (which includes the normal and :math:`t` as a
 special cases) and multivariate Laplace distribution, which are easy to
-simulate from. We explore the impact of changing the reference
-distribution in Section `1.4.2 <#egRef>`__. Note that changing scores is
+simulate from. Changing scores is
 actually an example of changing the reference distribution; however, for
 the examples we consider the exact form of the new reference is unknown.
 
 .. _egScore:
 
 Alternative Scores
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 The choice of score distribution has a profound effect on the
-multivariate distribution output by the IC method. Recall that the
-algorithm described in Section `1.2 <#algorithm>`__ used normally
+multivariate distribution output by the IC method. The basic Iman-Conover
+algorithm uses normally
 distributed scores. We now show the impact of using exponentially and
 uniformly distributed scores.
 
-Figure `1.1 <#fig:scores>`__ shows three bivariate distributions with
+The next figure shows three bivariate distributions with
 identical marginal distributions (shown in the lower right hand plot),
 the same correlation coefficient of :math:`0.643\pm 0.003` but using
 normal scores (top left), exponential scores (top rigtht) and uniform
@@ -521,25 +490,15 @@ is important to remember that if all you know about the bivariate
 distribution are the marginals and correlation coefficient all three
 outcomes are possible.
 
-.. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/scores.pdf
-   :alt: Bivariate distributions with normal, uniform and exponential
+.. figure:: scores.png
+
+   Bivariate distributions with normal, uniform and exponential
    scores.
-   :name: fig:scores
 
-   Bivariate distributions with normal, uniform and exponential scores.
 
-.. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/sums.pdf
-   :alt: Sum of marginals from bivariate distributions made with
-   different score distributions.
-   :name: fig:sums
-
-   Sum of marginals from bivariate distributions made with different
-   score distributions.
-
-Figure `1.2 <#fig:sums>`__ shows the distribution of the sum of the two
-marginals for each of the three bivariate distributions in Figure
-`1.1 <#fig:scores>`__ and for independent marginals. The sum with
-exponential scores has a higher kurtosis (is more peaked) than with
+Figure MISSING  shows the distribution of the sum of the two marginals for
+each of the three bivariate distributions and for independent marginals. The
+sum with exponential scores has a higher kurtosis (is more peaked) than with
 normal scores. As expected all three dependent sums have visibly thicker
 tails than the independent sum.
 
@@ -554,7 +513,7 @@ to fully specifying it!
 .. _egRef:
 
 Multivariate Reference Distributions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The IC method needs some reference multivariate distribution to
 determine an appropriate rank ordering for the input marginals. So far
@@ -619,9 +578,9 @@ the form
 
 .. math:: \Phi(\mathsf{t})=\frac{1}{1+ \mathsf{t}'\mathsf{S}\mathsf{t} / 2}\label{symLaplace}
 
-where :math:`\mathsf{S}` is the covariance matrix. To simulate from
-(`[symLaplace] <#symLaplace>`__) use the fact that :math:`\sqrt{W}\mathsf{X}`
-has a symmetric Laplace distribution if :math:`W` is exponential and
+where :math:`\mathsf{S}` is the covariance matrix. To simulate, use the fact
+that :math:`\sqrt{W}\mathsf{X}` has a symmetric Laplace distribution
+if :math:`W` is exponential and
 :math:`\mathsf{X}` a multivariate normal with covariance matrix :math:`\mathsf{S}`.
 
 The multivariate asymmetric Laplace distribution has characteristic
@@ -629,7 +588,7 @@ function
 
 .. math:: \Psi(\mathsf{t})=\frac{1}{1+\mathsf{t}'\mathsf{S}\mathsf{t}/2 - i\mathsf{m}'\mathsf{t}}.\label{asymLaplace}
 
-To simulate from (`[asymLaplace] <#asymLaplace>`__) use the fact that
+To simulate from WHAT, use the fact that
 
 .. math:: \mathsf{m} W + \sqrt{W}\mathsf{X} \label{aslsim}
 
@@ -638,7 +597,7 @@ has a symmetric Laplace distribution if :math:`W` is exponential and
 means zero. The asymmetric Laplace is not an elliptically contoured
 distribution.
 
-Figure `1.3 <#fig:tCopula>`__ compares IC samples produced using a
+The next figure compares IC samples produced using a
 normal copula to those produced with a :math:`t`-copula. In both cases
 the marginals are normally distributed with mean zero and unit standard
 deviation. The :math:`t`-copula has :math:`\nu=2` degrees of freedom. In
@@ -646,10 +605,7 @@ both figures the marginals are uncorrelated, but in the right the
 marginals are not independent. The :math:`t`-copula has pinched tails,
 similar to Venter’s Heavy Right Tailed copulas.
 
-.. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/tCopula.pdf
-   :alt: IC samples produced from the same marginal and correlation
-   matrix using the normal and :math:`t` copula reference distributions.
-   :name: fig:tCopula
+.. figure:: t-norm.png
 
    IC samples produced from the same marginal and correlation matrix
    using the normal and :math:`t` copula reference distributions.
@@ -657,15 +613,14 @@ similar to Venter’s Heavy Right Tailed copulas.
 .. _extAlg:
 
 Algorithms for Extended Methods
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Section `1.4.2 <#egRef>`__ we described how the IC method can be
 extended by using different reference multivariate distributions. It is
 easy to change the IC algorithm to incorporate different reference
 distributions for :math:`t`-copulas and asymmetric Laplace
 distributions. Follow the detailed algorithm to step 10. Then use the
-stochastic representation (`[tsim] <#tsim>`__) (resp.
-`[aslsim] <#aslsim>`__ for the Laplace): simulate from the scaling
+stochastic representation to simulate from the scaling
 distribution for each row and multiply each component by the resulting
 number, resulting in an adjusted :math:`\mathsf{T}` matrix. Then complete steps
 11 and 12 of the detailed algorithm.
@@ -673,7 +628,7 @@ number, resulting in an adjusted :math:`\mathsf{T}` matrix. Then complete steps
 .. _ic normal copula:
 
 Comparison With the Normal Copula Method
-----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By the normal copula method we mean the following algorithm, described
 in Wang  or Herzog.
@@ -765,7 +720,7 @@ there are some important differences to bear in mind. Comparing and
 contrasting the two methods should help clarify how the two algorithms
 are different.
 
-#. Theorem `[wangThm] <#wangThm>`__ shows the normal copula method
+#. :cite:t:`WangS1998` shows the normal copula method
    corresponds to the IC method when the latter is computed using normal
    scores and the Choleski trick.
 
@@ -808,3 +763,148 @@ are different.
 
 In summary remember these differences can have material practical
 consequences and it is important not to misuse IC method samples.
+
+
+Theoretical Underpinnings of the Iman-Conover Method
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The theoretical foundations of the Iman-Conover method are elegantly
+justified by Vitale’s Theorem :cite:t:`Vitale1990`. We will
+state Vitale’s theorem, explain its relationship to the IC method, and
+sketch the proof. The result should give a level of comfort to
+practitioners using a simulation approach to modeling multivariate
+distributions. It is not necessary to follow the details laid out here
+in order to understand and use the IC method, so the uninterested reader
+can skip the rest of the section. The presentation we give follows
+Vitale’s original paper :cite:t:`Vitale1990` closely.
+
+Functional dependence and independence between two random variables are
+clearly opposite ends of the dependence spectrum. It is therefore
+surprising that Vitale’s Theorem says that any bivariate distribution
+:math:`(U,V)` can be approximated arbitrarily closely by a functionally
+dependent pair :math:`(U,TU)` for a suitable transformation :math:`T`.
+
+In order to explain the set up of Vitale’s theorem we need to introduce
+some notation. Let :math:`n` be a power of 2. An interval of the form
+:math:`((j-1)/n,j/n)` for some :math:`n\ge 1` and :math:`1\le j\le n` is
+called a dyadic interval of rank :math:`n`. An invertible (Borel)
+measure-preserving map which maps by translation on each dyadic interval
+of rank :math:`n` is called a permutation of rank :math:`n`. Such a
+:math:`T` just permutes the dyadic intervals, so there is a natural
+correspondence between permutations of :math:`n` elements and
+transformations :math:`T`. If the permutation of dyadic intervals has a
+single cycle (has order :math:`n` in the symmetric group) then :math:`T`
+is called a cyclic permutation.
+
+.. container:: theorem
+
+   **Theorem.** (Vitale) Let :math:`U` and :math:`V` be uniformly distributed
+   variables. There is a sequence of cyclic permutations
+   :math:`T_1,T_2,\dots` such that :math:`(U,T_nU)` converges in
+   distribution to :math:`(U,V)` as :math:`n\to \infty`.
+
+Recall convergence in distribution means that the distribution function
+of :math:`(U,T_nU)` tends to that of :math:`(U,V)` at all points of
+continuity as :math:`n\to\infty`.
+
+The proof of Vitale’s theorem is quite instructive and so we give a
+detailed sketch.
+
+The proof is in two parts. The first constructs a sequence of arbitrary
+permutations :math:`T_n` with the desired property. The second part
+shows it can be approximated with cyclic permutations. We skip the
+second refinement.
+
+Divide the square :math:`[0,1]\times [0,1]` into sub-squares. We will
+find a permutation :math:`T` such that the distributions of
+:math:`(U,V)` and :math:`(U,TU)` coincide on sub-squares. Reducing the
+size of the sub-squares will prove the result.
+
+Fix :math:`n`, a power of two. Let :math:`I_j=((j-1)/n,j/n)`,
+:math:`j=1,\dots,n`. We will find an invertible permutation :math:`T`
+such that
+
+.. math:: \Pr(U\in I_j,TU\in I_k)=\Pr(U\in I_j,V\in I_k):=p_{jk}
+
+for :math:`j,k=1,\dots,n`. Define
+
+.. math::
+
+   \begin{aligned}
+   I_{j1}&=((j-1)/n, (j-1)/n+p_{j1}) \\
+   I_{j2}&=((j-1)/n +p_{j1}, (j-1)/n+p_{j1}+p_{j2}) \\
+   && \cdots \\
+   I_{jn}&=((j-1)/n +p_{j1}+\cdots+p_{j,n-1}, j/n)\end{aligned}
+
+and
+
+.. math::
+
+   \begin{aligned}
+   \tilde I_{j1}&=((j-1)/n, (j-1)/n+p_{1j}) \\
+   \tilde I_{j2}&=((j-1)/n +p_{1j}, (j-1)/n+p_{1j}+p_{2j}) \\
+   && \cdots \\
+   \tilde I_{jn}&=((j-1)/n +p_{1j}+\cdots+p_{n-1,j}, j/n).\end{aligned}
+
+By construction the measure of :math:`I_{jk}` equals the measure of
+:math:`\tilde
+I_{kj}`. The invertible map :math:`T` which sends each :math:`I_{jk}` to
+:math:`\tilde
+I_{kj}` by translation is the map we need because
+
+.. math::
+
+   \begin{aligned}
+   \Pr(U\in I_j, T(U)\in I_k) &=
+   \Pr(U\in I_j, U \in T^{-1}(I_k))   \\
+   &= \Pr(U\in I_j \cap T^{-1}(\bigcup_l \tilde I_{kl}))   \\
+   &= \Pr(U\in \bigcup_l I_j \cap   I_{lk})   \\
+   &= \Pr(U\in  I_{jk})   \\
+   &= p_{jk},\end{aligned}
+
+since the only :math:`I_{lk}` which intersects :math:`I_j` is
+:math:`I_{jk}` by construction, and :math:`U` is uniform. The
+transformation :math:`T` is illustrated schematically in Table
+`1 <#tab:vitale>`__ for :math:`n=3`. The fact 3 is not a power of 2 does
+not invalidate the schematic!
+
+.. math::
+   \small
+   \begin{matrix}
+   \begin{array}{c || c||c|c|c||c|c|c||c|c|c||}
+   \hline
+    &  \tilde I_{33}  &  &  &  &  & & & & &  p_{33}     \\
+   I_3 & \tilde I_{32} &  &  &  &  &  & p_{23} &  &  &  \\
+    & \tilde I_{31} &  &  & p_{13} &  &  &  &  &  &     \\ \hline \hline
+    & \tilde I_{23} &  &  &  &  &  &  &  & p_{32} &     \\
+   I_2 & \tilde I_{22} &  &  &  &  & p_{22} &  &  &  &  \\
+    & \tilde I_{21} &  & p_{12} &  &  &  &  &  &  &     \\ \hline \hline
+    & \tilde I_{13} &  &  &  &  &  &  & p_{31} &  &     \\
+   I_1 & \tilde I_{12} &  &  &  & p_{21} &  &  &  &  &  \\
+    & \tilde I_{11} & p_{11} &  &  &  &  &  &  &  &     \\ \hline \hline
+    &  & I_{11} & I_{12} & I_{13} & I_{21} & I_{22} & I_{13} & I_{31} & I_{32} & I_{33} \\ \hline \hline
+    &  & & I_1 & & & I_2 & & &  I_3 \\
+   \end{array}
+   \end{matrix}
+
+
+
+If each :math:`p_{jk}` is a dyadic rational then :math:`T` is a
+permutation of the interval. If not then we approximate and use some
+more heavy duty results (a 1946 theorem of Birkhoff on representation by
+convex combinations of permutation matrices) to complete the proof.
+
+Vitale’s theorem can be extended to non-uniform distributions.
+
+.. container:: cor
+
+   **Corollary.** (Vitale) Let :math:`U` and :math:`V` be arbitrary random variables.
+   There is a sequence of functions :math:`S_1,S_2,\dots` such that
+   :math:`(U,S_n U)` converges in distribution to :math:`(U,V)` as
+   :math:`n\to\infty`.
+
+Let :math:`F` be the distribution function of :math:`U` and :math:`G`
+for :math:`V`. Then :math:`F(U)` and :math:`G(V)` are uniformly
+distributed. Apply Vitale’s theorem to get a sequence of functions
+:math:`T_n`. Then :math:`S_n=G^{-1}T_nF` is the required transformation.
+

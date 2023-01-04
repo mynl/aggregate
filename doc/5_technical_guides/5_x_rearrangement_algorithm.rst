@@ -1,33 +1,13 @@
 .. verbatim from PIR
 
+.. _samp ra algo:
+
 The Rearrangement Algorithm
-===========================
-
-**Objectives:** Describe the Rearrangement Algorithm for finding the worst-VaR dependence relation.
-
-**Audience:**
-
-**Prerequisites:** Risk measures, VaR, probability.
-
-**See also:**
-
-**Contents:**
-
-* :ref:`Helpful References`
-* :ref:`The Rearrangement Algorithm`
-* :ref:`Worked Example`
-
-Helpful References
---------------------
-
-* :cite:t:`Puccetti2012`
-* :cite:t:`Embrechts2013`
-* :cite:t:`PIR`, Section 4.2.5.
+------------------------------
 
 .. _strat margin alloc:
 
-The Rearrangement Algorithm
------------------------------
+
 
 The Rearrangement Algorithm (RA) is a practical and straightforward
 method to determine the worst-VaR sum. The RA works by iteratively
@@ -104,7 +84,7 @@ tests where we can compute the answer analytically.
 .. _ra worked example:
 
 Worked Example
-----------------
+~~~~~~~~~~~~~~~~~~~
 
 **Setup.** Compute the worst
 :math:`\mathsf{VaR}_{0.99}` of the sum of lognormal distributions with mean 10

@@ -1027,7 +1027,8 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0,
-               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, approximation=None, debug=False):
+               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, approximation=None,
+               details=False, debug=False):
         """
 
         TODO: currently debug doesn't do anything...
@@ -1091,6 +1092,7 @@ class Portfolio(object):
         self.normalize = normalize
 
         if self.hash_rep_at_last_update == hash(self):
+            # this doesn't work
             logger.warning(f'Nothing has changed since last update at {self.last_update}')
             return
 
@@ -1140,6 +1142,7 @@ class Portfolio(object):
         # make the not self.line_density = sum of all but the given line
         # have the issue here that if you divide and the dist
         # is symmetric then you get a div zero...
+        ft_nots = {}
         for line in self.line_names:
             ft_not = np.ones_like(ft_all)
             if np.any(ft_line_density[line] == 0):
@@ -1150,7 +1153,9 @@ class Portfolio(object):
             else:
                 if len(self.line_names) > 1:
                     ft_not = ft_all / ft_line_density[line]
-            self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, tilt_vector))
+            ft_nots[line] = ft_not
+            if details:
+                self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, tilt_vector))
 
         self.remove_fuzz(log='update')
 
@@ -1188,7 +1193,7 @@ class Portfolio(object):
 
         # add exa details
         if add_exa:
-            self.add_exa(self.density_df, details=True)
+            self.add_exa(self.density_df,  details=details, ft_nots=ft_nots)
         else:
             # at least want F and S to get quantile functions
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
@@ -2066,28 +2071,6 @@ class Portfolio(object):
             to recompute all the not lines each time around and it is stilly to do that twice
         """
 
-        # will need two decorators for epd functions: these handle swapping the arguments and
-        # protecting against value errors
-        def minus_arg_wrapper(a_func):
-            def new_fun(x):
-                try:
-                    x = a_func(-x)
-                except ValueError:
-                    x = 999
-                return x
-
-            return new_fun
-
-        def minus_ans_wrapper(a_func):
-            def new_fun(x):
-                try:
-                    x = -a_func(x)
-                except ValueError:
-                    x = 999
-                return x
-
-            return new_fun
-
         # eps is used NOT to do silly things when x is so small F(x)< eps
         # below this percentile you do not try to condition on the event!
         # np.finfo(np.float).eps = 2.2204460492503131e-16
@@ -2166,25 +2149,26 @@ class Portfolio(object):
         # if F(x)<very small then E(X | X<x) = x, you are certain to be above the threshold
         # this is more stable than dividing by the very small F(x)
         df['e_total'] = np.sum(df.p_total * df.loss)
-        # epds for total on a stand alone basis (all that makes sense)
-        df['epd_0_total'] = \
-            np.maximum(0, (df['e_total'] - df['lev_total'])) / \
-            df['e_total']
+
         df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
         df['exeqa_total'] = df.loss  # E(X | X=a) = a(!) included for symmetry was exa
 
-        # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
-        # Nov 2020 tweaks
-        index_inv = 1.0 / df.loss
-        df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
+        if details:
+            # epds for total on a standalone basis (all that makes sense)
+            df['epd_0_total'] = \
+                np.maximum(0, (df['e_total'] - df['lev_total'])) / \
+                df['e_total']        # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
+            # Nov 2020 tweaks
+            index_inv = 1.0 / df.loss
+            df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
 
         # FFT functions for use in exa calculations
         # computing sums so minimal padding required
         def loc_ft(x):
-            return ft(x, 1, None)
+            return ft(x, self.padding, None)
 
         def loc_ift(x):
-            return ift(x, 1, None)
+            return ift(x, self.padding, None)
 
         # where is S=0
         Seq0 = (df.S == 0)
@@ -2219,11 +2203,7 @@ class Portfolio(object):
                                     ft_nots[col])) / df.p_total
             # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
             df.loc[df.p_total < cut_eps, 'exeqa_' + col] = 0
-            df['exeqa_ημ_' + col] = \
-                np.real(loc_ift(loc_ft(df.loss * df['ημ_' + col]) *
-                                loc_ft(df['p_' + col]))) / df.p_total
-            # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
-            df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
+
             # E(X_{i, 2nd priority}(a))
             # need the stand alone LEV calc
             # E(min(Xi, a)
@@ -2232,27 +2212,15 @@ class Portfolio(object):
             # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
             # df['lev_' + col] = temp * bs
             df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
-            if details:
-                df['e2pri_' + col] = \
-                    np.real(loc_ift(loc_ft(df['lev_' + col]) * loc_ft(df['ημ_' + col])))
-            stemp = 1 - df['ημ_' + col].cumsum()
-            # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
-            # df['lev_ημ_' + col] = temp * bs
-            df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
 
             # EX_i | X<= a; temp is used in le and gt calcs
             temp = np.cumsum(df['exeqa_' + col] * df.p_total)
             df['exlea_' + col] = temp / df.F
             # revised version for small losses: do not know this value
             df.loc[0:loss_max, 'exlea_' + col] = 0  # df.loc[0:loss_max, 'loss']
-            temp_not = np.cumsum(df['exeqa_ημ_' + col] * df.p_total)
-            df['exlea_ημ_' + col] = temp_not / df.F
-            # revised version for small losses: do not know this value
-            df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # df.loc[0:loss_max, 'loss']
 
             # constant value, helpful in calculations
             df['e_' + col] = np.sum(df['p_' + col] * df.loss)
-            df['e_ημ_' + col] = np.sum(df['ημ_' + col] * df.loss)
 
             # EX_i | X>a
             df['exgta_' + col] = (df['e_' + col] - temp) / df.S
@@ -2268,16 +2236,7 @@ class Portfolio(object):
             df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
             # more generally F=0 error:                      V
             df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-            # not version
-            df['exi_x_ημ_' + col] = np.sum(
-                df['exeqa_ημ_' + col] * df.p_total / df.loss)
-            # as above
-            temp_xi_x_not = np.cumsum(
-                df['exeqa_ημ_' + col] * df.p_total / df.loss)
-            df['exi_xlea_ημ_' + col] = temp_xi_x_not / df.F
-            df.loc[0, 'exi_xlea_ημ_' + col] = 0  # df.F=0 at zero
-            # more generally F=0 error:
-            df.loc[df.exlea_total == 0, 'exi_xlea_ημ_' + col] = 0
+
             # put value back
             df.loss.iloc[0] = temp
             # this is so important we will calculate it directly rather than the old:
@@ -2299,14 +2258,10 @@ class Portfolio(object):
             #     (df['exi_x_ημ_' + col] - temp_xi_x_not) / df.S
             # as for line
             # fill_value = df[f'exeqa_ημ_{col}'].iloc[-1] / df.loss.iloc[-1] * df.S.iloc[-1]
-            df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
-                                         df.p_total).shift(-1, fill_value=fill_value)[
-                                        ::-1].cumsum()) / df.S
-            df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
+
             df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
             df.loc[0, 'exi_xeqa_' + col] = 0
-            df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
-            df.loc[0, 'exi_xeqa_ημ_' + col] = 0
+
             # need the loss cost with equal priority rule
             # exa_ = E(X_i(a)) = E(X_i | X<= a)F(a) + E(X_i / X| X>a) a S(a)
             #   = exlea F(a) + exixgta * a * S(a)
@@ -2319,14 +2274,56 @@ class Portfolio(object):
             #     df.S * df['exi_xgta_ημ_' + col]
             # alt calc using S: validated the same, going with this as a more direct calc
             df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-            df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-
-            # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
-            # Nov 2020
-            # df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
-            df[f'e1xi_1gta_{col}'] = (df[f'p_{col}'] * index_inv).shift(-1)[::-1].cumsum()
 
             if details:
+                # fill in ημ
+                df['exeqa_ημ_' + col] = \
+                    np.real(loc_ift(loc_ft(df.loss * df['ημ_' + col]) *
+                                    loc_ft(df['p_' + col]))) / df.p_total
+                # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
+                df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
+
+                df['e2pri_' + col] = \
+                    np.real(loc_ift(loc_ft(df['lev_' + col]) * loc_ft(df['ημ_' + col])))
+
+                stemp = 1 - df['ημ_' + col].cumsum()
+                # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
+                # df['lev_ημ_' + col] = temp * bs
+                df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+
+                temp_not = np.cumsum(df['exeqa_ημ_' + col] * df.p_total)
+                df['exlea_ημ_' + col] = temp_not / df.F
+                # revised version for small losses: do not know this value
+                df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # df.loc[0:loss_max, 'loss']
+
+                df['e_ημ_' + col] = np.sum(df['ημ_' + col] * df.loss)
+
+                # not version
+                df['exi_x_ημ_' + col] = np.sum(
+                    df['exeqa_ημ_' + col] * df.p_total / df.loss)
+                # as above
+                temp_xi_x_not = np.cumsum(
+                    df['exeqa_ημ_' + col] * df.p_total / df.loss)
+                df['exi_xlea_ημ_' + col] = temp_xi_x_not / df.F
+                df.loc[0, 'exi_xlea_ημ_' + col] = 0  # df.F=0 at zero
+                # more generally F=0 error:
+                df.loc[df.exlea_total == 0, 'exi_xlea_ημ_' + col] = 0
+
+                df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
+                                         df.p_total).shift(-1, fill_value=fill_value)[
+                                        ::-1].cumsum()) / df.S
+                df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
+
+                df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
+                df.loc[0, 'exi_xeqa_ημ_' + col] = 0
+
+                df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
+
+                # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
+                # Nov 2020
+                # df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
+                df[f'e1xi_1gta_{col}'] = (df[f'p_{col}'] * index_inv).shift(-1)[::-1].cumsum()
+
                 # epds
                 df['epd_0_' + col] = \
                     np.maximum(0, (df['e_' + col] - df['lev_' + col])) / \
@@ -2344,6 +2341,28 @@ class Portfolio(object):
                 df['epd_2_' + col] = \
                     np.maximum(0, (df['e_' + col] - df['e2pri_' + col])) / \
                     df['e_' + col]
+
+                # will need two decorators for epd functions: these handle swapping the arguments and
+                # protecting against value errors
+                def minus_arg_wrapper(a_func):
+                    def new_fun(x):
+                        try:
+                            x = a_func(-x)
+                        except ValueError:
+                            x = 999
+                        return x
+
+                    return new_fun
+
+                def minus_ans_wrapper(a_func):
+                    def new_fun(x):
+                        try:
+                            x = -a_func(x)
+                        except ValueError:
+                            x = 999
+                        return x
+
+                    return new_fun
 
                 # epd interpolation functions
                 # capital and epd functions: for i = 0 and 1 we want line and not line
@@ -2374,6 +2393,7 @@ class Portfolio(object):
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
             df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
+        # outside above loop
         if details:
             epd_values = -df['epd_0_total'].values
             # if np.any(epd_values[1:] <= epd_values[:-1]):
@@ -2834,6 +2854,9 @@ class Portfolio(object):
         :param efficient: just compute the bar minimum and return
         :return: density_df with extra columns appended
         """
+        # for debugging
+        print('efficient set to true line 2858 apply distortion')
+        efficient = True
 
         # initially work will "full precision"
         if df_in is None:
@@ -2853,7 +2876,7 @@ class Portfolio(object):
             dist = self.dists[dist]
 
         # make g and ginv and other interpolation functions
-        g, g_inv = dist.g, dist.g_inv
+        g, g_inv, g_prime = dist.g, dist.g_inv, dist.g_prime
 
         # maybe important that p_total sums to 1
         # this appeared not to make a difference, and introduces an undesirable difference from
@@ -3112,6 +3135,8 @@ class Portfolio(object):
             # df[f'RAW_{line}'] = self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] * \
             #     df.loc[::-1, 'gp_total']
 
+        print('eff hack')
+        efficient = False
         if efficient:
             # need to get to T.M and T.Q for pricing... laser in on those...
             # duplicated and edited code from below
@@ -3128,7 +3153,7 @@ class Portfolio(object):
             # lhopital's rule estimate of g'(1) = ROE(1)
             # this could blow up...
             ϵ = 1e-4
-            gprime1 = (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
+            gprime1 = g_prime(1) # (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
             df['M.ROE_total'] = np.where(df['M.Q_total']!=0,
                                                 df['M.M_total'] / df['M.Q_total'],
                                                 gprime1)
@@ -3175,9 +3200,7 @@ class Portfolio(object):
         # df['T.P_total'] = df['exag_total']
         # critical insight is the layer ROEs are the same for all lines by law invariance
         # lhopital's rule estimate of g'(1) = ROE(1)
-        # this could blow up...  TODO extend Distortion class to return gprime1
-        ϵ = 1e-10
-        gprime1 = (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
+        gprime1 =  g_prime(1) # (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
         df['M.ROE_total'] = np.where(df['M.Q_total']!=0,
                                             df['M.M_total'] / df['M.Q_total'],
                                             gprime1)
@@ -5807,8 +5830,8 @@ def make_awkward(log2, scale=False):
     ys = [2*i for i in xs]
     ps = [1 / n for i in xs]
     if scale is True:
-        xs = xs / sc
-        ys = ys / sc
+        xs = np.array(xs) / sc
+        ys = np.array(ys) / sc
 
     A = Aggregate('A', exp_en=1, sev_name='dhistogram', sev_xs=xs, sev_ps=ps,
                       freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))

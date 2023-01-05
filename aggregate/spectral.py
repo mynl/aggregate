@@ -102,6 +102,7 @@ class Distortion(object):
         self.col_x = col_x
         self.col_y = col_y
         self.display_name = display_name
+        g_prime = None
 
         # now make g and g_inv
         if self._name == 'ph':
@@ -116,6 +117,9 @@ class Distortion(object):
             def g_inv(x):
                 return x ** rhoinv
 
+            def g_prime(x):
+                return rho * x ** (rho - 1.0)
+
         elif self._name == 'wang':
             lam = self.shape
             n = ss.norm()
@@ -126,6 +130,9 @@ class Distortion(object):
 
             def g_inv(x):
                 return n.cdf(n.ppf(x) - lam)
+
+            def g_prime(x):
+                return n.pdf(n.ppf(x) - lam) / n.pdf(n.ppf(x) + lam)
 
         elif self._name == 'tt':
             lam = self.shape
@@ -162,6 +169,9 @@ class Distortion(object):
 
             def g_inv(x):
                 return np.where(x < 1, x * (1 - p), 1)
+
+            def g_prime(x):
+                return np.where(x < 1 - p, alpha, 0)
 
         elif self._name == 'ly':
             # linear yield
@@ -205,6 +215,9 @@ class Distortion(object):
             def g_inv(x):
                 return np.where(x <= d, 0, (x - d) / v)
 
+            def g_prime(x):
+                return v
+
         elif self._name == 'lep':
             # leverage equivalent pricing
             # self.r0 = risk free/financing and r = risk charge (the solved parameter)
@@ -240,6 +253,9 @@ class Distortion(object):
 
             def g_inv(y):
                 return 1 - (1 - y)**q
+
+            def g_prime(x):
+                return p * (1 - x)**(p - 1)
 
         elif self._name == 'wtdtvar' or self._name == 'bitvar':
             # weighted tvar, df = p0 <p1, shape = weight on p1
@@ -293,6 +309,9 @@ class Distortion(object):
 
         self.g = g
         self.g_inv = g_inv
+        if g_prime is None:
+            g_prime = lambda x: (g(x + 1e-6) - g(x - 1e-6)) / 2e-6
+        self.g_prime = g_prime
 
     def g_dual(self, x):
         """

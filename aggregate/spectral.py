@@ -118,7 +118,7 @@ class Distortion(object):
                 return x ** rhoinv
 
             def g_prime(x):
-                return rho * x ** (rho - 1.0)
+                return rho * x ** (rho - 1.0) if x > 0 else np.inf
 
         elif self._name == 'wang':
             lam = self.shape
@@ -641,8 +641,7 @@ class Distortion(object):
     def price(self, ser, a=np.inf, kind='ask', S_calculation='forwards'):
         r"""
         Compute the bid and ask prices for the distribution determined by ``ser`` with
-        an asset limit ``a``. Uses ``np.trapz`` to compute :math:`\int_0^a S` or
-        :math:`\int_0^a g(S)`. Index of ``ser`` need not be equally spaced, so it can
+        an asset limit ``a``. Index of ``ser`` need not be equally spaced, so it can
         be applied to :math:`\kappa`. To do this for unit A in portfolio port::
 
             ser = port.density_df[['exeqa_A', 'p_total']].\
@@ -679,10 +678,11 @@ class Distortion(object):
 
         if S_calculation == 'forwards':
             S = 1 - ser.cumsum()
+            S = np.maximum(0, S)
         else:
             fill_value = max(0, 1 - ser.sum())
             S = np.minimum(1, fill_value +
-                           ser.shift(-1, fill_value=0)[::-1].cumsum())
+                           ser.shift(-1, fill_value=0)[::-1].cumsum()[::-1])
 
         # not all distortions return numpy; force conversion
         if kind == 'ask':
@@ -696,6 +696,46 @@ class Distortion(object):
         dx = np.diff(S.index)
         loss = (S.iloc[:-1].values * dx).sum()
         prem = (gS[:-1] * dx).sum()
-
         return prem, loss
 
+    def price2(self, ser, a=None, S_calculation='forwards'):
+        r"""
+        Compute the bid and ask prices for the distribution determined by ``ser`` with
+        an asset limits given by values of ``ser``. Index of ``ser`` need not be equally
+        spaced, so it can be applied to :math:`\kappa`. To do this for unit A in portfolio
+        ``port``::
+
+            ser = port.density_df[['exeqa_A', 'p_total']].\
+                set_index('exeqa_A').groupby('exeqa_A').\
+                sum()['p_total']
+            dist.price(ser, port.q(0.99))
+
+        :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes must
+          be spaced evenly. ``ser`` is usually a probability column from ``density_df``.
+        """
+
+        if not isinstance(ser, pd.Series):
+            raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
+
+        if S_calculation == 'forwards':
+            S = 1 - ser.cumsum()
+            S = np.maximum(0, S)
+        else:
+            fill_value = max(0, 1 - ser.sum())
+            S = np.minimum(1, fill_value +
+                           ser.shift(-1, fill_value=0)[::-1].cumsum()[::-1])
+
+        # not all distortions return numpy; force conversion
+        gS = np.array(self.g(S))
+        dgS = np.array(self.g_dual(S))
+
+        dx = np.diff(S.index)
+        loss = (S.iloc[:-1].values * dx).cumsum()
+        ask = (gS[:-1] * dx).cumsum()
+        bid = (dgS[:-1] * dx).cumsum()
+        ans = pd.DataFrame({'bid': bid, 'el': loss, 'ask': ask}, index=S.index[1:])
+        if a is None:
+            return ans
+        else:
+            # no longer guaranteed that a is in ser.index
+            return ans.iloc[ans.index.get_loc(a, method='nearest')]

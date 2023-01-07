@@ -2,7 +2,9 @@
 
 from aggregate.extensions import case_studies as cs
 from aggregate import build
+import warnings
 
+warnings.filterwarnings('ignore')
 
 if __name__ == '__main__':
     # calibrate reinsurance

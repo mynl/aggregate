@@ -35,7 +35,6 @@ Helpful References
 * :cite:t:`Embrechts2009a`
 * :cite:t:`WangS1998`
 * :cite:t:`Mildenhall2005a`
-* Anti-helpful :cite:t:`Robertson1992`
 
 .. _num overview:
 
@@ -84,21 +83,40 @@ There are two obvious ways to construct a numerical approximation to a cdf:
 
 #. As a continuous random variable with a piecewise linear distribution function.
 
-The second approach assumes the aggregate is actually a continuous random variable, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed. An aggregate using a severity with a limit is also mixed (there is a non-zero probability of only limit claims). When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts from  a numerical approximation. The large jumps are obvious but the small ones are not.
+**Example.**
 
-There are three other arguments in favor of a discrete model. First, we live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi. Computers are inherently discrete. Second, probability theory is based on measure theory, which approximates distributions using simple functions that are discrete (though not necessarily defined on a lattice). Third, the continuous model introduces unnecessary additional complexities in use, without any guaranteed gain in accuracy across all cases.
+Illustration of the two approaches.
 
-.. version of this in 10 mins
+.. ipython:: python
+    :okwarning:
+    from aggregate.extensions.pir_figures import fig_4_5, fig_4_6
+    @savefig num_discrete_approx.png scale=20
+    fig_4_5()
+
+And
+
+.. ipython:: python
+    :okwarning:
+    @savefig num_cts_approx.png scale=20
+    fig_4_6()
+
+-----
+
+The second approach assumes the aggregate is actually a continuous random variable, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed (they have a mass at zero). An aggregate using a severity with a limit is also mixed (there is a mass at multiples of the limit caused by the non-zero probability of only limit claims). When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts from  a numerical approximation. The large jumps may be obvious but the small ones are not.
+
+There are three other arguments in favor of discrete models. First, we live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi. Computers are inherently discrete. Second, probability theory is based on measure theory, which approximates distributions using simple functions that are discrete (though not necessarily defined on a lattice). Third, the continuous model introduces unnecessary additional complexities in use, without any guaranteed gain in accuracy across all cases. See the complicated calculations in :cite:t:`Robertson1992`, for example.
+
+.. a version of the following is in 10 mins
 
 For all of these reasons we use a discrete numerical approximation. To "know or compute an aggregate" means that we have a discrete approximation to its distribution function that is concentrated on integer multiples of a fixed bandwidth or bucket size :math:`b`. Concretely, this specifies the aggregate as the value :math:`b` and a vector of probabilities :math:`(p_0,p_1,\dots, p_{n-1})` with the interpretation
 
 .. math:: \Pr(X=kb)=p_k.
 
-All subsequent computations assume that this approximation **is** the aggregate distribution. Thus, the cdf is a step function with a jump of size :math:`p_k` at :math:`kb` that is continuous from the right (it jumps up at :math:`kb`). This mean that moments are simply
+All subsequent computations assume that the aggregate is approximated in this way. Thus, the cdf is a step function with a jump of size :math:`p_k` at :math:`kb` that is continuous from the right (it jumps up at :math:`kb`). The moments are simply
 
-.. math:: \sum_k k^r p_i b
+.. math:: \sum_k k^r p_i b.
 
-for example.
+The distribution function can be computed as the cumulative sum of :math:`(p_0,p_1,\dots, p_{n-1})`. Limited expected value, computed as the integral of the survival function can be computed at the points :math:`kb` as :math:`b` times the cumulative sum of the survival function shifted down by one, and so forth. All of these calculations are more straightforward than assuming a piecewise linear cdf.
 
 For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
 

@@ -25,6 +25,14 @@ from . underwriter import Underwriter, build, debug_build
 from . bounds import Bounds, plot_max_min, plot_lee
 from . constants import *
 
+import sys
+
+# knobble warnings
+# https://docs.python.org/3/library/warnings.html#temporarily-suppressing-warnings
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
 
 __docformat__ = 'restructuredtext'
 __project__ = 'aggregate'

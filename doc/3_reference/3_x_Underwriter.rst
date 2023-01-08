@@ -6,7 +6,18 @@ Underwriter Class
 
 .. autoclass:: aggregate.underwriter.Underwriter
    :members:
-   :undoc-members:
-   :special-members: __init__, __getiteem__
+   :special-members:
    :private-members:
+   :undoc-members:
 
+
+
+Other Underwriter functions
+-------------------------
+
+.. automodule:: aggregate.underwriter
+   :exclude-members: Underwriter
+   :members:
+   :special-members:
+   :private-members:
+   :undoc-members:

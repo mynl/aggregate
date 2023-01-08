@@ -4,12 +4,14 @@ Bounds Module
 
 .. autoclass:: aggregate.bounds.Bounds
    :members:
-   :special-members: __init__
+   :special-members:
+   :private-members:
    :undoc-members:
 
 .. automodule:: aggregate.bounds
-   :members:
    :exclude-members: Bounds
-   :undoc-members:
+   :members:
+   :special-members:
    :private-members:
+   :undoc-members:
 

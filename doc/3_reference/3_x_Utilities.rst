@@ -7,12 +7,18 @@ Moment Aggregator Class
 
 .. autoclass:: aggregate.utilities.MomentAggregator
    :members:
+   :special-members:
+   :private-members:
+   :undoc-members:
 
 Moment Wrangler Class
 -----------------------
 
 .. autoclass:: aggregate.utilities.MomentWrangler
    :members:
+   :special-members:
+   :private-members:
+   :undoc-members:
 
 
 Axis Manager Class
@@ -20,17 +26,20 @@ Axis Manager Class
 
 .. autoclass:: aggregate.utilities.AxisManager
    :members:
+   :special-members:
+   :private-members:
+   :undoc-members:
 
 
 Utilities Module
 ----------------
 
 .. automodule:: aggregate.utilities
-   :members:
    :exclude-members: AxisManager, MomentAggregator, MomentWrangler
-   :undoc-members:
+   :members:
+   :special-members:
    :private-members:
-
+   :undoc-members:
 
 Constants
 ----------
@@ -38,4 +47,3 @@ Constants
 .. automodule:: aggregate.constants
    :members:
    :undoc-members:
-   :private-members:

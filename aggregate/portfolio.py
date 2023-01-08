@@ -3513,7 +3513,7 @@ class Portfolio(object):
         if a_reg in ans_ad.augmented_df.index:
             aug_row = ans_ad.augmented_df.loc[a_reg]
         else:
-            logger.error('WARNING: Regulatory assets not in augmented_df. Using last.')
+            logger.warning('Regulatory assets not in augmented_df. Using last.')
             aug_row = ans_ad.augmented_df.iloc[-1]
 
         # holder for the answer

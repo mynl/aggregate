@@ -2,16 +2,16 @@
 
 .. reviewed 2022-12-26
 
-A Ten Minutes Guide to ``aggregate``
+A Ten Minute Guide to ``aggregate``
 =====================================
 
-**Objectives:** A whirlwind introduction to ``aggregate``.
+**Objectives:** A whirlwind introduction---don't expect to understand everything the first time, but you will see what you can achieve with the package. Follows the `pandas <https://pandas.pydata.org/docs/user_guide/10min.html>`_ model, a *long* 10 minutes.
 
 **Audience:** A new user.
 
-**Prerequisites:** The ability to temporarily ignore what you don't understand. Not everything will make sense the first time, but you will see what you can achieve with the package. Read in conjunction with a practice guide.
+**Prerequisites:** Python programming; aggregate distributions.  Read in conjunction with :doc:`2_x_student` or :doc:`2_x_actuary_student` practice guides.
 
-**See also:** :doc:`2_x_student`, :doc:`2_x_actuary_student`, :doc:`../3_Reference`, :doc:`2_x_dec_language`.
+**See also:** :doc:`../3_Reference`, :doc:`2_x_dec_language`.
 
 
 **Contents:**
@@ -1261,7 +1261,7 @@ Twelve Plot
 
 The :meth:`twelve_plot` method produces a detailed analysis of the behavior of a two unit portfolio. To run it, build the portfolio and calibrate some distortions. Then apply one of the distortions (to compute an augmented version of ``density_df`` with pricing information). We give two examples.
 
-First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5. The argument ``efficient=False`` in :meth:`apply_distortion` includes extra columns in ``density_df`` that are needed to compute the plot.
+First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5.
 
 
 .. ipython:: python
@@ -1275,7 +1275,7 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
     print(f'Asset P value {p09.cdf(12.5):.5g}')
     p09.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
     qd(p09.distortion_df)
-    p09.apply_distortion('dual', efficient=False);
+    p09.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10mins_twelve_p09.png
     p09.twelve_plot(fig, axs, p=0.999, p2=0.999)
@@ -1433,7 +1433,7 @@ Apply the dual distortion and then create the twelve plot.
 .. ipython:: python
     :okwarning:
 
-    p10.apply_distortion('dual', efficient=False);
+    p10.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10min_twelve_plot.png
     p10.twelve_plot(fig, axs, p=0.999995, p2=0.999999)

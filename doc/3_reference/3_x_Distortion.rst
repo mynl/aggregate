@@ -4,5 +4,7 @@ Distortion Module
 
 .. automodule:: aggregate.spectral
    :members:
-   :special-members: __init__
+   :special-members:
+   :private-members:
+   :undoc-members:
 

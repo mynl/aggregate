@@ -7,6 +7,8 @@ Portfolio Class
 
 .. autoclass:: aggregate.portfolio.Portfolio
    :members:
+   :special-members:
+   :private-members:
    :undoc-members:
 
 
@@ -14,6 +16,8 @@ Other Portfolio functions
 -------------------------
 
 .. automodule:: aggregate.portfolio
-   :members:
    :exclude-members: Portfolio
-
+   :members:
+   :special-members:
+   :private-members:
+   :undoc-members:

@@ -13,11 +13,11 @@ or :doc:`2_user_guides/2_x_actuary_student` guide and scan
 through :doc:`2_user_guides/2_x_10mins`. See :doc:`5_Technical_Guides` for
 the theory and implementation details. Sections in the guides marked **Details** can be skipped. There is some duplication between sections to make them more independent.
 
-#. :doc:`2_user_guides/2_x_10mins` (reference): A whirlwind introduction---don't expect to understand everything the first time! Basic functionality of important classes. Read in parallel with the :doc:`Student<2_user_guides/2_x_student>` or :doc:`Actuarial Student<2_user_guides/2_x_actuary_student>` practice guides. Follows the `pandas <https://pandas.pydata.org/docs/user_guide/10min.html>`_ model, a *long* 10 minutes.
-
 #. :doc:`2_user_guides/2_x_student` (practice): Introduction to aggregate distributions using simple discrete examples for actuarial science majors and short-term actuarial modeling exam candidates; get started using :mod:`aggregate`.
 
 #. :doc:`2_user_guides/2_x_actuary_student` (practice): Introduce the ``aggregate`` library for working with aggregate probability distributions in the context of actuarial society exams (`SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_) and university courses in (short-term) actuarial modeling.
+
+#. :doc:`2_user_guides/2_x_10mins` (reference): A whirlwind introduction---don't expect to understand everything the first time, but you will see what you can achieve with the package. Read in parallel with the :doc:`Student<2_user_guides/2_x_student>` or :doc:`Actuarial Student<2_user_guides/2_x_actuary_student>` practice guides. Follows the `pandas <https://pandas.pydata.org/docs/user_guide/10min.html>`_ model, a *long* 10 minutes.
 
 #. :doc:`2_user_guides/2_x_dec_language` (reference): Introduce the Dec Language (DecL) used to specify aggregate distributions in familiar insurance terminology.
 

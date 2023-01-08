@@ -22,7 +22,7 @@ The source code is hosted on GitHub, https://github.com/mynl/aggregate.
 Prerequisites
 =============
 
-The help assumes you know how to program in Python, understand probability, and are familiar with the concept of an aggregate distribution. Awareness of insurance terminology such as limit, attachment and deductible, and the material covered in `SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_ is helpful.
+This help assumes you know how to program in Python, understand probability, and are familiar with the concept of an aggregate distribution. Awareness of insurance terminology such as limit, attachment and deductible, and the material covered in `SOA exam STAM <https://www.soa.org/education/exam-req/edu-exam-stam-detail/>`_, `CAS exam MAS I <https://www.casact.org/exam/exam-mas-i-modern-actuarial-statistics-i>`_, or `IFOA CS-2 <https://www.actuaries.org.uk/curriculum_entity/curriculum_entity/8>`_ is helpful.
 
 License
 =======
@@ -46,7 +46,7 @@ Help Parameters and Examples
 Help Structure
 ===============
 
-The help structured around **access**, **application**, **theory**, and **implementation**. There are six parts.
+This help is structured around **access**, **application**, **theory**, and **implementation**. There are six parts.
 
 #. Getting Started (this document).
 #. :doc:`2_User_Guides`, explaining how to **access** functionality and practical guides explaining how to **apply** it.
@@ -96,7 +96,7 @@ The Python line continuation ``\`` is used to create compact input.
 Numbers and Units
 ==================
 
-You can chose your own units. The examples include numbers interpreted in ones, thousands, and millions. Amounts are broadly calibrated to make sense in USD, EUR, and GBP.
+You can choose your own units. The examples include numbers interpreted in ones, thousands, and millions. Amounts are broadly calibrated to make sense in USD, EUR, and GBP.
 
 ``aggregate`` Hello World
 ==========================
@@ -145,7 +145,7 @@ They have probability mass, cumulative distribution, survival, and quantile (inv
 
     a.pmf(6), a.cdf(5), a.sf(6), a.q(a.cdf(6)), a.q(0.5)
 
-It is easy check some of these calculations. The probability of the minimum outcome of one equals 1/15 (1/5 for a frequency of 1 and 1/3 for a severity of 1) and the maximum outcome of 15 equals 1/1215 (1/5 for a frequency of 5 and (1/3)**5 to draw severity of 3 on each). The object returns the correct values.
+It is easy to check some of these calculations. The probability of the minimum outcome of one equals 1/15 (1/5 for a frequency of 1 and 1/3 for a severity of 1) and the maximum outcome of 15 equals 1/1215 (1/5 for a frequency of 5 and (1/3)**5 to draw severity of 3 on each). The object returns the correct values.
 
 .. ipython:: python
     :okwarning:

@@ -45,10 +45,15 @@ def make_projection_distributions(self):
     return projections, sum_probs
 
 
-def plot_comparison(self, projections, axs):
+def plot_comparison(self, projections, axs, smooth):
     """
     Plot to compare unit, projection of unit, and total in self.
     self is a Portfolio
+
+    :param self: Portfolio
+    :param projections: dict of projections
+    :param axs: list of axes
+    :param smooth: smoothing factor for densities
     """
     lw = 2
     for unit, proj, axd, ax, axr, lc in \
@@ -62,6 +67,10 @@ def plot_comparison(self, projections, axs):
 
         # normalized densities: exeqa
         p = proj.p_total.copy()
+        # rebucket to smooth out
+        quant = self.bs * smooth
+        p.index = quant * np.round(p.index / quant)
+        p = p.groupby(level=0).sum()
         p.iloc[:-1] = p.iloc[:-1] / np.diff(p.index) * mn
         p.index = p.index / mn
         p.plot(ax=axd, c=lc, ls='--', label='Projection of ' + unit)
@@ -81,7 +90,7 @@ def plot_comparison(self, projections, axs):
         axd.set(xlim=[0, 5],
                 xlabel='loss', ylabel='density')
         yl = axd.get_ylim()
-        if yl[1] > 20:
+        if yl[1] > 100:
             axd.set(yscale='log', ylabel='log density')
         axd.legend(loc='upper right')
 
@@ -187,6 +196,16 @@ def plot_up_down(self, udd, axs):
         (udd.up_functions[unit] - udd.down_functions[unit]
          ).plot(ax=ax, lw=1.5, ls=':', c='C2', label='recreated')
         ax.legend()
+        ax.set(xlabel='loss', ylabel='up or down function')
+
+    # plot ud distributions
+    ax = axs.flat[-1]
+    for (k, v), c in zip(udd.up_distributions.items(), ['C0', 'C1']):
+        v.cumsum().plot(c=c, ax=ax, label=f'Up {k}')
+    for (k, v), c in zip(udd.down_distributions.items(), ['C0', 'C1']):
+        v.cumsum().plot(c=c, ls=':', ax=ax, label=f'Down {k}')
+    ax.legend(loc='lower right')
+    ax.set(xlabel='loss', ylabel='cumulative probability')
 
 
 def price_work(dn, series, names_ex):
@@ -273,11 +292,17 @@ def price_compare(self, dn, projection_dists, ud_dists):
     return compare
 
 
-def full_monty(self, dn, truncate=True):
+def full_monty(self, dn, truncate=True, smooth=16):
     """
     One stop shop for a Portfolio self
     Unlimited assets
+    Prints all on one giant figure
     """
+
+    # figure for all plots
+    fig, axs = plt.subplots(4, 3, figsize=(
+        3 * 3.5, 4 * 2.45), constrained_layout=True)
+
     # in the known bounded case we can truncate
     regex = ''.join([i[0] for i in self.line_names_ex])
     if truncate:
@@ -285,7 +310,7 @@ def full_monty(self, dn, truncate=True):
         self._linear_quantile_function = None
 
     # density and exa plots
-    fig, axd = make_mosaic_figure('ABC', figsize=(3 * 3.5, 2.45))
+    axd = {'A': axs[0, 0], 'B': axs[0, 1], 'C': axs[0, 2]}
     self.plot(axd=axd)
     self.density_df.filter(regex=f'exeqa_[{regex}]').plot(ax=axd['C'])
     axd['C'].set(xlabel='loss', ylabel='Conditional expectation')
@@ -296,18 +321,19 @@ def full_monty(self, dn, truncate=True):
         print(sum_probs)
 
     # impact of projections on distributions
-    fig, axs = plt.subplots(2, 3, figsize=(
-        3 * 3.5, 2 * 2.45), constrained_layout=True)
-    plot_comparison(self, projection_dists, axs)
+    axs1 = axs[1:3, :]
+    plot_comparison(self, projection_dists, axs1, smooth)
 
     # up and down decomp
     ud_dists = up_down_distributions(self)
 
     # plot UD
-    fig, axs = plt.subplots(1, 2, figsize=(
-        2 * 3.5, 2.45), constrained_layout=True)
-    plot_up_down(self, ud_dists, axs)
+    axs1 = axs[3, :]
+    plot_up_down(self, ud_dists, axs1)
 
     compare = price_compare(self, dn, projection_dists, ud_dists)
     compare['umd'] = compare['up'] - compare['down']
-    return compare
+
+    RiskProgression = namedtuple('RiskProgression', ['compare_df', 'projection_dists', 'ud_dists'])
+    ans = RiskProgression(compare, projection_dists, ud_dists)
+    return ans

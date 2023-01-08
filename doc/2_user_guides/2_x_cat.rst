@@ -40,13 +40,13 @@ Jewson's US Wind PML Estimates
 Model Description
 ~~~~~~~~~~~~~~~~~~~
 
-`Stephen Jewson <https://www.linkedin.com/in/steve-jewson-phd-052bb417/>`_ *Projections of Changes in U.S. Hurricane Damage Due to Projected Changes in Hurricane Frequencies*, :cite:t:`Jewson2022b` reports the following frequency and severity statistics for US hurricane losses.
+`Stephen Jewson <https://www.linkedin.com/in/steve-jewson-phd-052bb417/>`_ *Projections of Changes in U.S. Hurricane Damage Due to Projected Changes in Hurricane Frequencies* (submitted, under peer review), :cite:t:`Jewson2022b` reports the following frequency and severity statistics for US hurricane losses.
 
 .. image:: img/jewson.png
   :width: 800
   :alt: Original paper table.
 
-The dataframe ``jewson`` recreates the table and adds severity CVs. It includes corrections from the author (private communication).
+The dataframe ``jewson`` recreates the table and adds severity CVs.
 
 .. ipython:: python
     :okwarning:
@@ -125,13 +125,12 @@ It is easy to compute aggregate PML points (aggregate quantiles). The next table
 Occurrence PML Estimates
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Occurrence PMLs, called OEP points, can be computed for a compound Poisson model as adjusted severity quantiles. There are two approaches, which give very similar answers for low frequency events but differ for high.
-
-The first defines the :math:`n` year OEP to be the loss level :math:`\mathit{OEP}(n)` so that
+Occurrence PMLs, called **occurrence exceeding probability** (OEP) points, can be computed for a compound Poisson model as adjusted severity quantiles.
+The :math:`n` year OEP is defined as the loss level :math:`\mathit{OEP}(n)` so that
 
     there is a :math:`1/n` chance of one or more losses greater than :math:`\mathit{OEP}(n)` per year.
 
-If :math:`\lambda` is the annual event frequency and :math:`S` the severity survival function, then the annual frequency of losses greater than :math:`x` equals :math:`\lambda S(x)` and therefore chance of one or more losses greater than :math:`x` equals :math:`1-\exp(-\lambda S(x))` with Poisson frequency (one minus chance of no events). Rearranging gives
+The definition is valid only for :math:`n\ge 1` since :math:`1/n` is interpreted as a probability. If :math:`\lambda` is the annual event frequency and :math:`S` the severity survival function, then the annual frequency of losses greater than :math:`x` equals :math:`\lambda S(x)` and therefore chance of one or more losses greater than :math:`x` equals :math:`1-\exp(-\lambda S(x))` with Poisson frequency (one minus chance of no events). Rearranging gives
 
 .. math::
 
@@ -139,16 +138,22 @@ If :math:`\lambda` is the annual event frequency and :math:`S` the severity surv
 
 where :math:`q` is the severity distribution quantile function.
 
-The second defines the :math:`n` year OEP to be the loss level :math:`\mathit{OEP}^*(n)` with a :math:`1/n` annual frequency. Thus
+:cite:t:`Jewson2022` considers the related notion of **event exceedance frequency** (EEF). Here, the :math:`n` year EEF is defined as the loss level :math:`\mathit{EEF}(n)` with a :math:`1/n` annual frequency. Thus
 
 .. math::
 
-    \mathit{OEP}^*(n) = q\left(1 - \frac{1}{\lambda n}\right).
+    \mathit{EEF}(n) = q\left(1 - \frac{1}{\lambda n}\right).
 
-Since :math:`\log(1+x)\approx x` for small :math:`x`, these two estimates are very similar for large :math:`n`, but they diverge significantly for small :math:`n`. Jewson uses the second definition.
+This definition is valid for any :math:`n > 0` since the result is a frequency rather than a probability.
+OEP and EEF are very similar for large :math:`n` because
+:math:`\log(1+x)\approx x` for small :math:`x`, but they diverge significantly for small :math:`n` and only the latter makes sense for :math:`0 < n < 1`.
+Jewson shows EEFs in his Figure 2.
 See :ref:`Aggregate and Occurrence Probable Maximal Loss and Catastrophe Model Output`.
 
-The following table shows OEP points, comparing the two methods.
+Jewson comments that OEP is useful for validating the frequency of annual maximum loss, which is affected by clustering. Thus OEP estimates are important for validating models that include clustering.
+EEF is useful for validating whether a model captures the mean frequency of events, including events with frequency greater than 1 per year.
+
+The following table shows OEP and EEF points, comparing the two statistics.
 
 .. ipython:: python
     :okwarning:
@@ -156,13 +161,13 @@ The following table shows OEP points, comparing the two methods.
     oep = pd.DataFrame({'Return': [2, 5, 10, 20, 25, 50, 100, 200, 250, 1000, 10000]}, dtype=float); \
     oep['p'] = 1 - 1/oep.Return;                                       \
     oep['W OEP'] = [w.q_sev(1 + np.log(i) / w.n) for i in oep.p];      \
-    oep["W OEP*"] = [w.q_sev(1 - 1 / i /w.n) for i in oep.Return];     \
+    oep["W EEF"] = [w.q_sev(1 - 1 / i /w.n) for i in oep.Return];     \
     oep['M OEP'] = [m.q_sev(1 + np.log(i) / m.n) for i in oep.p];      \
-    oep["M OEP*"] = [m.q_sev(1 - 1 / i /m.n) for i in oep.Return];     \
+    oep["M EEF"] = [m.q_sev(1 - 1 / i /m.n) for i in oep.Return];     \
     oep = oep.set_index(['Return']);                                   \
     qd(oep)
 
-The next block of code shows the same information as Jewson's Figure 2. It includes both definitions of OEP for comparison. The dashed line shows a third alternative ``aggregate`` implementation using the exact continuous weighted severity survival function ``m.sev.sf``, rather than the discrete approximation in ``m.density_df``.
+The next block of code shows the same information as Jewson's Figure 2. It includes OEP and EEF for comparison. The dashed line shows a third alternative ``aggregate`` implementation using the exact continuous weighted severity survival function ``m.sev.sf``, rather than the discrete approximation in ``m.density_df``.
 
 .. ipython:: python
     :okwarning:
@@ -171,9 +176,9 @@ The next block of code shows the same information as Jewson's Figure 2. It inclu
     for ax, mw, title, xmax in zip(axs.flat[::-1], [m, w], ['Martinez estimates', 'Weinkel estimates'], [550, 240]):
         bit = np.exp(-(1-mw.density_df.F_sev.loc[:1000]) * m.n)
         bit = 1 / (1 - bit)
-        bit.plot(logy=True, ax=ax, label='Pr no events in year')
+        bit.plot(logy=True, ax=ax, label='OEP = Pr no events in year')
         bit = 1 / ((1 - mw.density_df.F_sev.loc[:20000]) * m.n)
-        bit.plot(logy=True, ax=ax, label='RP = 1/freq')
+        bit.plot(logy=True, ax=ax, label='EEF RP = 1/freq')
         xs = np.linspace(0, 500, 501)
         if title[0] == 'M':
             rp = 1 / (m.n * m.sev.sf(xs))
@@ -355,7 +360,7 @@ Brokers publish price sheets for ILWs to give a view of market pricing. Price is
       \end{array}
     \end{matrix}
 
-The next dataframe adds expected losses and compares them to the ILW pricing. The expected loss is given by the occurrence survival function --- it is simply the probability of attaching the layer. The ``EL`` columns show Jewell's expected losses across the four views discussed above. The impact on EL is only caused by greater event frequency. Its effect increases with attachment.
+The next dataframe adds expected losses and compares them to the ILW pricing. The expected loss is given by the occurrence survival function --- it is simply the probability of attaching the layer. The ``EL`` columns show Jewson's expected losses across the four views discussed above. The impact on EL is only caused by greater event frequency. Its effect increases with attachment.
 
 .. ipython:: python
     :okwarning:

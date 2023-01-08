@@ -1261,7 +1261,7 @@ Twelve Plot
 
 The :meth:`twelve_plot` method produces a detailed analysis of the behavior of a two unit portfolio. To run it, build the portfolio and calibrate some distortions. Then apply one of the distortions (to compute an augmented version of ``density_df`` with pricing information). We give two examples.
 
-First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5.
+First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5. The argument ``efficient=False`` in :meth:`apply_distortion` includes extra columns in ``density_df`` that are needed to compute the plot.
 
 
 .. ipython:: python
@@ -1275,7 +1275,7 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
     print(f'Asset P value {p09.cdf(12.5):.5g}')
     p09.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
     qd(p09.distortion_df)
-    p09.apply_distortion('dual');
+    p09.apply_distortion('dual', efficient=False);
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10mins_twelve_p09.png
     p09.twelve_plot(fig, axs, p=0.999, p2=0.999)
@@ -1433,7 +1433,7 @@ Apply the dual distortion and then create the twelve plot.
 .. ipython:: python
     :okwarning:
 
-    p10.apply_distortion('dual');
+    p10.apply_distortion('dual', efficient=False);
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10min_twelve_plot.png
     p10.twelve_plot(fig, axs, p=0.999995, p2=0.999999)

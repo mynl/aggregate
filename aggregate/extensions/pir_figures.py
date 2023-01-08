@@ -337,29 +337,14 @@ def g_loss_margin_equity(axs, dist, s=0.25):
 
 def getAxSize(fig, ax):
     '''
-    .. _getAxSize :
-
     Get the axes size in pixels.
 
-    Parameters
-    ----------
-    fig : matplotlib figure object
-        The of the target axes.
+    Reference: https://uk.mathworks.com/matlabcentral/fileexchange/38716-curly-brace-annotation
 
-    ax : matplotlib axes object
-        The target axes.
+    :param fig: matplotlib figure object The of the target axes.
+    :param ax: matplotlib axes object The target axes.
+    :return: ax_width : float, the axes width in pixels; ax_height : float, the axes height in pixels.
 
-    Returns
-    -------
-    ax_width : float
-        The axes width in pixels.
-
-    ax_height : float
-        The axes height in pixels.
-
-    Reference
-    -----------
-    https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels
     '''
 
     bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
@@ -371,10 +356,7 @@ def getAxSize(fig, ax):
 
 
 def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2, fontdict={}, **kwargs):
-    # def curlyBrace(fig, ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2, fontdict={}, **kwargs):
     '''
-    .. _curlyBrace :
-
     Plot an optionally annotated curly bracket on the given axes of the given figure.
 
     Note that the brackets are anti-clockwise by default. To reverse the text position, swap
@@ -383,8 +365,8 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
     Note that, when the axes aspect is not set to "equal", the axes coordinates need to be
     transformed to screen coordinates, otherwise the arcs may not be seeable.
 
-    Parameters
-    ----------
+    **Parameters**
+
     fig : matplotlib figure object
         The of the target axes.
 
@@ -447,8 +429,8 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
         This allows the user to set the line arguments using named arguments that are
         the same as in matplotlib.
 
-    Returns
-    -------
+    **Returns**
+
     theta : float
         The bracket angle in radians.
 
@@ -467,8 +449,8 @@ def curlyBrace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='', int_line_num=2,
     arc4 : list of lists
         arc4 positions.
 
-    Reference
-    ----------
+    **Reference**
+
     https://uk.mathworks.com/matlabcentral/fileexchange/38716-curly-brace-annotation
     '''
 

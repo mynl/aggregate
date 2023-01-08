@@ -2741,6 +2741,10 @@ class Portfolio(object):
         :return: density_df with extra columns appended
         """
 
+        if not efficient:
+            # make sure eta-mu columns have been computed
+            _ = self.assets_2_epd
+
         # initially work will "full precision"
         if df_in is None:
             df = self.density_df.copy()

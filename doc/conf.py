@@ -22,7 +22,8 @@ project = agg.__project__
 copyright = agg.__copyright__
 author = agg.__author__
 
-# generally want warning to be an error, but helpful at times.
+# generally want True, so warning to be an error
+# helpful in debugging to set equal to False
 ipython_warning_is_error = True
 
 # The version info for the project you're documenting, acts as replacement for

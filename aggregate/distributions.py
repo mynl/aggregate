@@ -1257,16 +1257,20 @@ class Aggregate(Frequency):
             # note the first bucket is negative
             adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
         elif sev_calc == 'forward' or sev_calc == 'continuous':
-            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs ))
+            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
         elif sev_calc == 'backward':
-            adj_xs = np.hstack((-self.bs, self.xs[:-1], np.inf))
+            adj_xs = np.hstack((-self.bs, self.xs)) # , np.inf))
         elif sev_calc == 'moment':
-            raise NotImplementedError('moment discretization not implemented')
+            raise NotImplementedError('Moment matching discretization not implemented. Embrechts says it is not worth it.')
             #
             # adj_xs = np.hstack((self.xs, np.inf))
         else:
             raise ValueError(
                 f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
+
+        # in all cases, the first bucket must include the mass at zero
+        # Also allow severity to have real support and so want to capture all the way from -inf, hence:
+        adj_xs[0] = -np.inf
 
         # bed = bucketed empirical distribution
         beds = []
@@ -3557,7 +3561,7 @@ class Severity(ss.rv_continuous):
                     # else:
                     #     # reached limit, unreliable
                     #     ex = (np.nan, np.nan)
-            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1]/ex[0]}')
+            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1]/ex[0] if ex[0]!=0 else np.inf}')
             return ex[:2]
 
         ex1a = 0
@@ -3602,7 +3606,7 @@ class Severity(ss.rv_continuous):
             max_rel_error = 1e-3
             if moments_finite[0]:
                 ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-                if ex1[1] / ex1[0] < max_rel_error:
+                if ex1[0] !=0 and ex1[1] / ex1[0] < max_rel_error:
                     ex1 = ex1[0]
                 else:
                     ex1 = np.nan

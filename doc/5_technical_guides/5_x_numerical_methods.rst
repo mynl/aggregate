@@ -16,6 +16,7 @@ Numerical Methods and FFT Convolution
 * :ref:`num hr`
 * :ref:`num overview`
 * :ref:`num how agg reps a dist`
+* :ref:`num discretization`
 * :ref:`num algo steps`
 * :ref:`num errors`
 * :ref:`num parameters`
@@ -31,10 +32,27 @@ Helpful References
 
 * :cite:t:`LM`
 * `Loss Data Analytics <https://openacttexts.github.io/Loss-Data-Analytics/>`_
-* :cite:t:`Grubel1999`
-* :cite:t:`Embrechts2009a`
+* :cite:t:`Gerber1982`
+* :cite:t:`Buhlmann1984`
+* :cite:t:`Embrechts1993`
 * :cite:t:`WangS1998`
+* :cite:t:`Grubel1999`
 * :cite:t:`Mildenhall2005a`
+* :cite:t:`Embrechts2009a`
+
+
+**Text to go somewhere.**
+
+For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
+
+The FFT method is a miraculous technique for computing aggregate
+distributions. It is especially effective when the expected claim count
+is relatively small and the underlying severity distribution is bounded.
+These assumptions are true for many excess of loss reinsurance treaties,
+for example. Thus the FFT is very useful when quoting excess layers with
+annual aggregate deductibles or other variable features. The FFT
+provides a discrete approximation to the moment generating function.
+
 
 .. _num overview:
 
@@ -47,23 +65,22 @@ Numerical analysts face a trilemma
 
 Simulation is flexible, but trades-off speed against accuracy. Fewer simulations is faster but provides lower accuracy; many simulations improves accuracy at the cost of speed.
 
-``aggregate`` is based on the fast Fourier transform (FFT) convolution algorithm. It delivers the third trilemma option: fast and accurate, but less flexible than simulation.
+``aggregate`` is based on the fast Fourier transform (FFT) convolution algorithm. It delivers the third trilemma option: it is fast and accurate but less flexible than simulation.
 
 There are many use-cases where ``aggregate`` is unbeatable. It an compute the distribution of
 
-* Aggregate losses of a portfolio with a complex limit and attachment profile, mixed severity distributions.
+* Aggregate losses of a portfolio with a complex limit and attachment profile, and a mixed severity distributions.
 * Ceded or net outcomes net for an occurrence reinsurance program.
 * Ceded or net outcomes for reinsurance contracts with variable features (sliding commissions, swing rated programs, profit commissions, aggregate limits, see :doc:`../2_user_guides/2_x_re_pricing`.)
-* Retained loss net of specific and aggregate insurance, as found in a risk-retention group, see :doc:`../2_user_guides/2_x_ir_pricing`, including exact computation of so-called Table L and Table M charges in US worker compensation ratemaking.
-* The sum of independent units (line of business, business unit, geographic unit etc. Other methods available for dependent units).
+* Retained loss net of specific and aggregate insurance, as found in a risk-retention group, see :doc:`../2_user_guides/2_x_ir_pricing`, including exact computation of Table L and Table M charges in US worker compensation ratemaking.
+* The sum of independent units (line of business, business unit, geographic unit etc.). Other methods are available for dependent units.
 * The sum of dependent units, where the dependence structure is driven by :ref:`common frequency mixing variables <5_x_probability>`.
-* Aggregates
-with thick-tailed severity and where accuracy is important, such as catastrophe risk PMLs, AEP, and OEP points.
-* Outcomes with low expected loss rates which are hard to simulate with sufficient accuracy.
+
+It is particularly well-suited to compute aggregates with thick-tailed severity and where accuracy is important, such as catastrophe risk PMLs, AEP, and OEP points. Outcomes with low expected loss rates which are hard to simulate with sufficient accuracy.
 
 In Finance, FFT methods are established as the go-to choice solution for convolution REF.
 
-The basic FFT algorithm used in ``aggregate`` tracks only one variable at a time. Thus, it cannot model the joint distribution of ceded and net loss or quantities derived from it, such as the total cession to a specific and aggregate cover or the cession to an occurrence program with limited reinstatements. Both of these require a bivariate distribution. (It *can* model the net position after specific and aggregate cessions, and ceded losses to an occurrence program with an aggregate limit.) The strengths and weaknesses of the algorithm are discussed further in :ref:`num swot`.
+The basic FFT algorithm used in ``aggregate`` tracks only one variable at a time. Thus, it cannot model joint distributions such as ceded and net loss or quantities derived from it such as the total cession to a specific and aggregate cover, or the cession to an occurrence program with limited reinstatements. Both of these require a bivariate distribution. (It *can* model the net position after specific and aggregate cessions, and ceded losses to an occurrence program with an aggregate limit.) The strengths and weaknesses of the algorithm are discussed further in :ref:`num swot`.
 
 
 .. _num how agg reps a dist:
@@ -73,145 +90,398 @@ How ``aggregate`` Represents a Distribution
 
 .. quote from index
 
-``aggregate`` delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal. It can create exact or very accurate approximation to the cumulative distribution function (cdf) of extremely complicated aggregate distributions---opening the way to calculate the pdf or pmf, sf, and many other actuarial and risk theoretic functions. To do this, it needs a representation of the underlying distribution that is amenable to computation.
+``aggregate`` delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal. It can create an exact or very accurate approximation to the cumulative distribution function (cdf) of extremely complicated aggregate distributions---opening the way to calculate the pdf or pmf, sf, and many other actuarial and risk theoretic functions based on the distribution. It must start with a representation of the underlying distribution that is amenable to computation.
 
-For most aggregate distributions there is no analytic solution (for example, there is no closed form expression for the distribution of the sum of two lognormals). Therefore we must use numerical approximations to the exact cdf.
+There is no analytic expression for the cdf of most aggregate distributions. For example, there is no closed form expression for the distribution of the sum of two lognormals :cite:p:`Milevsky1998`. Therefore we must use a numerical approximation to the exact cdf.
 
 There are two obvious ways to construct a numerical approximation to a cdf:
 
-#. As a discrete (arithmetic, lattice) distribution supported on :math:`0, b, 2b, \dots`.
+#. As a discrete (arithmetic, lattice) distribution supported on a discrete set of points.
 
 #. As a continuous random variable with a piecewise linear distribution function.
 
-**Example.**
-
-Illustration of the two approaches.
+The next two figures illustrate of the two approaches.
+First, a discrete approximation, which results in a step-function approximation. The cdf is shown left and the corresponding quantile function right. The cdf is continuous from the right and the (lower) quantile function from the left. The distribution does not have a density function (pdf); it only has a probability mass function (pmf).
 
 .. ipython:: python
     :okwarning:
+
     from aggregate.extensions.pir_figures import fig_4_5, fig_4_6
     @savefig num_discrete_approx.png scale=20
     fig_4_5()
 
-And
+Second, a piecewise linear continuous approximation. This distribution has a step-function pdf (not shown).
 
 .. ipython:: python
     :okwarning:
+
     @savefig num_cts_approx.png scale=20
     fig_4_6()
 
------
 
-The second approach assumes the aggregate is actually a continuous random variable, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed (they have a mass at zero). An aggregate using a severity with a limit is also mixed (there is a mass at multiples of the limit caused by the non-zero probability of only limit claims). When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts from  a numerical approximation. The large jumps may be obvious but the small ones are not.
+The second approach assumes the aggregate has a continuous distribution, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed (they have a mass at zero). An aggregate whose severity has a limit has a mass at multiples of the limit, caused by the non-zero probability of limit-only claims. When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts from  a numerical approximation. The large jumps may be obvious but the small ones are not.
 
-There are three other arguments in favor of discrete models. First, we live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi. Computers are inherently discrete. Second, probability theory is based on measure theory, which approximates distributions using simple functions that are discrete (though not necessarily defined on a lattice). Third, the continuous model introduces unnecessary additional complexities in use, without any guaranteed gain in accuracy across all cases. See the complicated calculations in :cite:t:`Robertson1992`, for example.
+There are three other arguments in favor of discrete models. First, we live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi. Computers are inherently discrete. Second, probability theory is based on measure theory, which approximates distributions using simple functions that are discrete. Third, the continuous model introduces unnecessary complexities in use, without any guaranteed gain in accuracy across all cases. See the complicated calculations in :cite:t:`Robertson1992`, for example.
 
 .. a version of the following is in 10 mins
 
-For all of these reasons we use a discrete numerical approximation. To "know or compute an aggregate" means that we have a discrete approximation to its distribution function that is concentrated on integer multiples of a fixed bandwidth or bucket size :math:`b`. Concretely, this specifies the aggregate as the value :math:`b` and a vector of probabilities :math:`(p_0,p_1,\dots, p_{n-1})` with the interpretation
+For all of these reasons we use a discrete numerical approximation. Further, **we assume that the distribution is known at integer multiples of a fixed bandwidth or bucket size**. This assumption is forced by the use of FFTs and has some undesirable consequences, as we shall see. Ideally, we would use a stratified approach, sampling more points where the distribution changes shape and using larger gaps to capture the tail. However, the computational efficiency of FFTs make this a good trade-off.
+
+Based on the above considerations, to compute an aggregate means that we have a discrete approximation to its distribution function concentrated on integer multiples of a fixed bucket size :math:`b`. This specifies the approximation aggregate as
+
+#. the value :math:`b` and
+#. a vector of probabilities :math:`(p_0,p_1,\dots, p_{n-1})`
+
+with the interpretation
 
 .. math:: \Pr(X=kb)=p_k.
 
-All subsequent computations assume that the aggregate is approximated in this way. Thus, the cdf is a step function with a jump of size :math:`p_k` at :math:`kb` that is continuous from the right (it jumps up at :math:`kb`). The moments are simply
+**All subsequent computations assume that the aggregate is approximated in this way.** There are several important consequences. The cdf is a step function with a jump of size :math:`p_k` at :math:`kb`. It is continuous from the right (it jumps up at :math:`kb`). Its moments are simply
 
 .. math:: \sum_k k^r p_i b.
 
-The distribution function can be computed as the cumulative sum of :math:`(p_0,p_1,\dots, p_{n-1})`. Limited expected value, computed as the integral of the survival function can be computed at the points :math:`kb` as :math:`b` times the cumulative sum of the survival function shifted down by one, and so forth. All of these calculations are more straightforward than assuming a piecewise linear cdf.
+It can be computed as the cumulative sum of :math:`(p_0,p_1,\dots, p_{n-1})`. The limited expected value (the integral of the survival function), can be computed at the points :math:`kb` as :math:`b` times the cumulative sum of the survival function. The pdf, if it exists, can be approximated by :math:`p_i/b`. And so forth. All of these calculations are more straightforward than assuming a piecewise linear cdf.
 
-For thick tailed lognormal variables, it is best to truncate the severity distribution. Truncation does not impact PML estimates below the probability of truncation.  We select a truncation of USD 20T, about the size of the US economy. The unlimited models suggest there is less than a 1 in 10,000 chance of a model so large.
-
-
+.. _num discretization:
 
 Discretizing the Severity Distribution
-""""""""""""""""""""""""""""""""""""""""
+-----------------------------------------
 
-Discretizing approximates the severity with a purely discrete distribution supported at points :math:`x_k=x_0+kb`, :math:`k=0,1,\dots, N`, where :math:`b` is called the **bucket size** or the **bandwidth**. The corresponding discrete probabilities can be computed in four ways.
+This section discusses ways to approximate a severity distribution with a discrete distribution. Severity distributions used by ``aggregate`` are supported on the non-negative real numbers; we allow a loss of zero, but not negative losses. However, the discretization process allows severity to be derived from a distribution supported on the whole real line---see the :ref:`note <num note>` below.
 
-#. The **round** or **discrete** method assigns probability
+Let :math:`F` be a distribution function and :math:`q` the corresponding lower quantile function. It is convenient to be able to refer to a random variable with distribution :math:`F`, so let :math:`X=q(U)` where :math:`U(\omega)=\omega` is the standard uniform variable on the sample space :math:`\Omega=[0,1]`. :math:`X` has distribution :math:`F` :cite:p:`Follmer2016`
 
-   .. math:: p_k = \Pr(x_k - b/2 < X \le x_k+b/2)
+We want  approximate  :math:`F` with a finite, purely discrete distribution supported at points :math:`x_k=kb`, :math:`k=0,1,\dots, m`, where :math:`b` is called the **bucket size** or the **bandwidth**. Split this problem into two: first create an infinite discretization on :math:`k=0,1,\dots`, and then truncate it.
 
-   to the :math:`k`th bucket.
+The calculations described in this section are performed in :meth:`Aggregate.discretize`.
 
-#. The **forward** difference assigns
+Infinite Discretization
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   .. math:: p_k = \Pr(x_k - b/2 < X \le x_{k+1} )
+There are four common methods to create an infinite discretization.
 
-#. The **backward** difference assigns
+#. The **rounding** method assigns probability
 
-   .. math:: p_k = \Pr(x_{k-1} - b/2 < X \le x_k )
+   .. math:: p_k &= \Pr((k - 1/2)b < X \le (k + 1/2)b) \\
+                 &= F((k + 1/2)b) - F((k - 1/2)b) \\
+             p_0 &= F(b/2)
 
-   with (?) :math:`p_0=0`.
+   to the :math:`k` th bucket.
 
-#. The **moment** difference (:cite:t:`LM`) assigns
+#. The **forward** difference method assigns
+
+   .. math:: p_k &= \Pr(kb < X \le (k+1)b ) \\
+                 &= F((k + 1)b) - F(kb) \\
+             p_0 &= F(b).
+
+#. The **backward** difference method assigns
+
+   .. math:: p_k &= \Pr((k-1)b < X \le kb ) \\
+                 &= F(kb) - F((k - 1)b) \\
+             p_0 &= F(0).
+
+#. The **moment** difference method :cite:p:`LM` assigns
 
    .. math::
 
-      p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b} \\
-      p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b}
+      p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b} \\
+      p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b}.
 
    It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
 
-Call the discrete approximation :math:`X_b^d` where :math:`d=r,\ f,\ b,\ m` describes the discretization. It is clear that :math:`X_b` converges weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution using :math:`X` as severity for the rounding, forward and backward methods. Further, the rounding approximation is sandwiched between the forward and backwards methods, :cite:t:`Embrechts2009a` p. 499.
+
+.. _num note:
+
+.. note::
+    Setting the first bucket to :math:`F(b/2)` for the rounding method (resp. :math:`F(b)`, :math:`F(0)`) allows the use of random variables with negative support. Any values :math:`\le 0` are included in the zero bucket. This behavior is useful because it allows the normal, Cauchy, and other similar distributions can be used as the basis for a severity.
+
+Each of these methods methods produces a sequence :math:`p_k\ge 0` of probabilities that sum to 1 and can be interpreted as the pmf and distribution function :math:`F_b^{(d)}` of a discrete approximation random variable :math:`X_b^{(d)}`
+
+.. math ::
+
+    \Pr(X_b^{(d)} = kb) = p_k \\
+    F_b^{(d)}(kb) = \sum_{i \le k} p_i
+
+where superscript :math:`d=r,\ f,\ b,\ m` describes the discretization method and subscript :math:`b` the bucket size.
+
+There is a disconnect between how the rounding method is defined and how it is interpreted. By definition, it corresponds to a distribution with jumps at :math:`(k+1/2)b`, not :math:`kb`. However, the approximation takes the latter interpretation to simplify and harmonize subsequent calculations across the three discretization methods.
+
+It is clear that :cite:p:`Embrechts2009a`
+
+.. p. 499
+
+.. math::
+
+ &   F_b^{(b)}  \le F \le F_b^{(f)}  \\
+ &   F_b^{(b)}  \le F_b^r \le F_b^{(f)}  \\
+ &   X_b^{(b)}  \ge X \ge X_b^{(f)}  \\
+ &   X_b^{(b)}  \ge X_b^r \ge X_b^{(f)}  \\
+ &   X_b^{(b)} \uparrow X  \ \text{as}\  b\downarrow 0 \\
+ &   X_b^{(f)} \downarrow X \ \text{as}\  b\downarrow 0
+
+:math:`X_b`, :math:`X_r`, and :math:`X_f` converge weakly (in :math:`L^1`) to :math:`X` and the same holds for a compound distribution with severity :math:`X`. These inequalities are illustrated in the example below.
+
+Rounding Method Used by Default
+""""""""""""""""""""""""""""""""
+
+Based on the following observations as well as independent testing, ``aggregate`` uses the **rounding** method by default and offers the forward and backwards methods to compute explicit bounds on the distribution approximation if required. These options are available in :meth:`update` through the ``sev_calc`` argument, which can take the values ``round``, ``forwards``, and ``backwards``.
 
 
-EF comment on moment method:
+:cite:t:`Embrechts2009a` comment (emphasis added) on the moment method
 
-   In this light, Gerber (1982) suggests a procedure that locally matches the first k moments. Practically interesting is only the case k = 1; for k ≥ 2 the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is much more involved than the rounding method in terms of implementation; we need to calculate limited expected values. Apart from that, the gain is rather modest; moment matching only pays off for large bandwidths, and after all, the rounding method is to be preferred. This is further reinforced by the work of Grübel and Hermesmeier (2000): if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{h,j} / h`, an approximation for the compound density, can be quadratically extrapolated.
+   that both the forward/backward differences and the rounding method do not conserve any moments of the original distribution. In this light :cite:t:`Gerber1982` suggests a procedure that locally matches the first :math:`k` moments. Practically interesting is only the case :math:`k = 1`; for :math:`k \ge 2` the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is **much more involved than the rounding method** in terms of implementation; we need to calculate limited expected values. Apart from that, the **gain is rather modest**; moment matching only pays off for large bandwidths, and after all, **the rounding method is to be preferred**. This is further reinforced by the work of  :cite:t:`Grubel1999`: if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{b,j} / b`, an approximation for the compound density, can be quadratically extrapolated.
 
-Need quad to work...bot not positive. Explore adjusting the first couple of buckets.
+.. LM on moment matching p. 182. careful here
 
-To create a rv_histogram variable from ``xs`` and corresponding ``p`` values use:
+:cite:t:`LM` report that :cite:t:`Panjer1983` found two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, the **rounding method and the first-moment method had similar errors**, while the second-moment method provided significant improvement but at the cost of no longer guaranteeing that the resulting probabilities are  **nonnegative**.
 
-   ::
+.. LM go on: The methods described here are qualitatively similar to numerical methods used to solve Volterra integral equations such as (9.26) developed in numerical analysis (see, e.g. Baker [10]).
+  Ex 9.41 gives the formulas for weights in terms of LEVs.
 
-       xss = np.sort(np.hstack((xs, xs + 1e-5)))
-       pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
-       fz_discr = ss.rv_histogram((pss, xss))
+Discretization Example
+""""""""""""""""""""""""
 
-The value 1e-5 just needs to be smaller than the resolution requested, i.e. do not “split the bucket”. Generally histograms will be downsampled, not upsampled, so this is not a restriction.
+.. note about negative needs to go elsewhere
 
-:cite:t:`Embrechts2009a` paper on moment matching, juice not worth the squeeze.
+This example illustrates the impact of different discretization methods on the severity and aggregate distributions. The example uses a severity that can take negative values. ``aggregate`` treats any negative values as a mass at zero. This approach allows for the use of the normal and other distributions supported on the whole real line. It has finite support, so truncation is not an issue. And it is discrete so it is easy to check the calculations are correct. The severity is shown first, discretized using ``bs=1, 1/2, 1/4, 1/8``. The orange, rounded method, lies between the blue forward and green backwards lines.
 
-:cite:t:`LM` on moment matching p. 182.
+.. ipython:: python
+    :okwarning:
 
-Panjer and Lutek [97] found that two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, the **rounding method and the first-moment method (p = 1) had similar errors**, while the second-moment method (p = 2) provided significant improvement. The specific formulas for the method of rounding and the method of matching the first moment are given in Appendix E. A reason to favor matching zero or one moment is that the resulting probabilities will always be **nonnegative**. When matching two or more moments, this cannot be guaranteed.
+    from aggregate import build, qd
+    import matplotlib.pyplot as plt
+    from matplotlib import ticker
+    dsev = [-1, 0, .25, .5, .75, 1, 1.5 + 1 / 16, 2, 2 + 1/4, 3]
+    a01 = build(f'agg Num:01 1 claim dsev {dsev} fixed', update=False)
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
+        constrained_layout=True)
+    for bs, ax in zip([1, 1/2, 1/4, 1/8], axs.flat):
+        for k in ['forward', 'round', 'backward']:
+            a01.update(log2=10, bs=bs, sev_calc=k)
+            a01.density_df.p_total.cumsum().\
+                plot(xlim=[-.25, 3.25], lw=2 if  k=='round' else 1,
+                drawstyle='steps-post', ls='--', label=k, ax=ax)
+            ax.legend(loc='lower right')
+            ax.set(title=f'Bucket size bs={bs}')
+    axs[0,0].set(ylabel='distribution');
+    axs[1,0].set(ylabel='distribution');
+    @savefig num_ex1a.png scale=20
+    fig.suptitle('Severity by discretization method for different bucket sizes');
 
-The methods described here are qualitatively similar to numerical methods used to solve Volterra integral equations such as (9.26) developed in numerical analysis (see, e.g. Baker [10]).
+Next, create aggregate distributions with a Poisson frequency,  mean 4 claims, shown for the same values of ``bs``.
 
-Ex 9.41 gives the formulas for weights in terms of LEVs.
+.. ipython:: python
+    :okwarning:
+
+    a02 = build(f'agg Num:02 4 claims dsev {dsev} poisson', update=False)
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
+        constrained_layout=True)
+    for bs, ax in zip([1, 1/2, 1/4, 1/8], axs.flat):
+        for k in ['forward', 'round', 'backward']:
+            a02.update(log2=10, bs=bs, sev_calc=k)
+            a02.density_df.p_total.cumsum().\
+                plot(xlim=[-2, 27], lw=2 if  k=='round' else 1,
+               drawstyle='steps-post', label=k, ax=ax)
+            ax.legend(loc='lower right')
+            ax.set(title=f'Bucket size bs={bs}')
+    @savefig num_ex1b.png scale=20
+    fig.suptitle('Aggregates by discretization method');
+
+.. TODO Right place for this?
+
+.. note::
+    Setting ``drawstyle='steps-post'`` joins dots with a step function that jumps on the right, making the result continuous from the right, appropriate for a distribution. Quantile functions are continuous from the left and should be rendered using  ``drawstyle='steps-pre'``, which puts the jump on the left.
 
 
+.. TODO Right place for this?
 
+Implementation Details
+""""""""""""""""""""""""
 
-Continuous Approximation to Severity (Ogive)
-""""""""""""""""""""""""""""""""""""""""""""""""
+Severities specified discretely, using the ``dsev`` keyword are implemented using a ``scipy.stats`` ``rv_historgram`` object, which is actually continuous. They work by concentrating the probability in small intervals just to the right of each knot point. Given::
 
-Approximate the distribution with a continuous “histogram” distribution that is uniform on :math:`(x_k, x_{k+1}]`. The discrete proababilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a rv_histogram variable is much easier, just use::
+    dsev [xs] [ps]
+
+where ``xs`` and ``ps`` are the vectors of outcomes and probabilities, internally ``aggregate`` creates::
+
+   xss = np.sort(np.hstack((xs - 2 ** -14, xs)))
+   pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
+   fz_discr = ss.rv_histogram((pss, xss))
+
+.. TODO seems this might be slightly wrong when bs is very small? material?
+
+The value 1e-14 just needs to be smaller than the bucket size resolution, i.e. small enought not to “split the bucket”. The mass is to the left of the knot to make a right continuous function (the approximation ramps up before the knot). Generally histograms are downsampled, not upsampled, so this is not a restriction.
+
+A ``dsev`` statement is translated into the more general::
+
+    sev dhistorgram xps [xs] [ps]
+
+where ``dhistrogram`` creates a discrete histogram (as above) and the ``xps`` keyword prefixes inputting the knots and probabilities. It is also possible to specify the input severity as a continuous histogram that is uniform on :math:`(x_k, x_{k+1}]`. The discrete probabilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a rv_histogram variable is much easier, just use::
+
+    sev chistorgram xps [xs] [ps]
+
+which is translated into::
 
     xs2 = np.hstack((xs, xs[-1] + xs[1]))
     fz_cts = ss.rv_histogram((ps2, xs2))
 
-The first method we call **discrete** and the second **histogram**. The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes. The histogram method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the historgram method is interpreted as discrete and if the mean is computed appropriately for a discrete variable as :math:`\sum_i p_k x_k`, then the mean will be under-estimated by :math:`b/2`.
+The code adds an additional knot at the end to create enough differences (there are only two differences between three points).
 
+The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes and the default. The continuous method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the continuous method is interpreted as discrete and if the mean is computed as :math:`\sum_i p_k x_k`, which is appropriate for a discrete variable, then it will be under-estimated by :math:`b/2`.
 
+Exact Calculation
+""""""""""""""""""
 
-Implications of Choice of Discretization
-"""""""""""""""""""""""""""""""""""""""""
+The differences :math:`p_k=F((k + 1/2)b) - F((k - 1/2)b)` can be computed in three different ways, controlled by the ``discretization_calc`` option. The options are:
 
-How you compute levs, q, cdf etc.
+#. ``discretization_calc='distribution'`` takes differences of the sequence :math:`F((k + 1/2)b)`. This results in a potential loss of accuracy in the right tail where the distribution function increases to 1. The resulting probabilities can be no smaller than the smallest difference between 1 and a float. ``numpy`` reports this as ``numpy.finfo(float).epsneg``; it is of the order ``1e-16``.
 
+#. ``discretization_calc='survival'`` takes the negative difference of the sequence :math:`S(k + 1/2)b)` of survival function values. This results in a potential loss of accuracy in the left tail where the survival function increases to 1. However, it provides better resolution in the right.
+
+#. ``discretization_calc='both'`` attempts to make the best of both worlds, computing::
+
+    np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
+
+  This does double the work and is marginally slower.
+
+The update default is ``survival``. The calculation method does not generally impact the aggregate distribution when FFTs are used because they compute to accuracy about ``1e-16`` (there is a 1 in each row and column of :math:`\mathsf F`, see :ref:`num fft`). However, the option can be helpful to create a pleasing graph of severity log density.
+
+Truncation
+~~~~~~~~~~~
+
+The discrete probabilities :math:`p_k` must be truncated into a finite-length vector to use in calculations. The number of buckets used is set by the ``log2`` variable, which inputs its base 2 logarithm. The default is ``log2=16`` corresponding to 65,536 buckets. There are two truncation options, controlled by the ``normalize`` variable.
+
+#. ``normalize=False`` simply truncates, resulting in a vector of probabilities that sums to less than 1.
+
+#. ``normalize=True`` truncates and then normalizes, dividing the truncated vector by its sum, resulting in a vector of probabilities that does sums to 1 (approximately, see :ref:`floats <num floats>`).
+
+The default is ``normalize=True``.
+
+It is obviously desirable for the discrete probabilities to sum to 1. A third option, to put a mass at the maximum loss does not produce intuitive results---since the underlying distributions generally do not have a mass the graphs look wrong.
+
+In general, it is best to use ``normalize=True`` in cases where the truncation error is immaterial, for example with a thin tailed severity. It is numerically cleaner and avoids issues with quantiles close to 1. When there will be an unavoidable truncation error, it is best to use  ``normalize=False``. The user needs to be aware that the extreme right tail is understated. The bucket size and number of buckets should be selected so that the tail is accurate where it is being relied upon. See REF ERROR ANALYSIS for more.
+
+.. warning::
+    Be careful using ``normalize=True`` for thick tail severities. It results in unreliable and hard to interpret estimated mean severity. See REF on selecting bs.
 
 .. _num algo steps:
 
 Fundamental Algorithm
 ----------------------
 
+This section describes the FFT convolution algorithm ``aggregate`` uses to compute aggregate distributions. The first subsection lays out the algorithm steps. The second discusses implementation details. The third explains why the algorithm works and discusses errors.
+
+Algorithm
+~~~~~~~~~~~~
+
+**Algorithm input.**
+
+#. A bucket size :math:`b` and number of buckets :math:`m=2^{\log_2}`.
+#. An integer padding parameter :math:`d \ge 0`.
+#. A vector :math:`\mathsf p=(p_0,p_1,\dots,p_{m-1})` of probabilities :math:`p_k=\Pr(X=kb)` describing a discrete severity distribution :math:`X`, with :math:`\sum_k p_k \le 1`.
+#. The moment generating function :math:`M_N(z):=\mathsf E[e^{zN}]` of the frequency distribution :math:`N`.
+#. FFT and inverse FFT functions :math:`\mathsf{FT}` and :math:`\mathsf{IFT}`.
+
+**Algorithm objective.**
+
+Compute the aggregate distribution
+
+.. math::
+    A = X_1 + \cdots X_N
+
+under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is independent of :math:`X_i`, follow these steps:
+
+**Algorithm steps.**
+
+#. Pad the vector :math:`\mathsf p` to length :math:`2^{\log_2 + d}` by appending zeros, to produce :math:`\mathsf x`.
+#. Compute the FFT :math:`\mathsf z:=\mathsf{FT(\mathsf x)}`.
+#. Compute :math:`\mathsf f:=M_N(\mathsf z)`.
+#. Compute the inverse FFT  :math:`\mathsf y:=\mathsf{IFT(\mathsf f`.
+#. Take the first :math:`m` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
+
+The output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
+
+Implementation
+~~~~~~~~~~~~~~~~~
+
+Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``numpy.fft`` called :meth:`numpy.fft.rfft` and :meth:`numpy.fft.irfft`. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on one line of code::
+
+    agg_density = rifft(M_N(rfft(p)))
+
+Obviously, a lot of work is done to marshal the input, but this line is where the magic happens.
+
+The FFT routines are accurate up to machine noise, of order  ``1e-16``. The noise can be positive or negative---the latter highly undesirable in probabilities. It appears random and does not accumulate undesirably in practical applications. It is best to strip out the noise, setting to zero all values with absolute value less than machine epsilon (``numpy.finfo(float).esp``). The ``remove_fuzz`` option controls this behavior. It is set ``True`` by default. CHECK SURE?
+
+Theory and Errors
+~~~~~~~~~~~~~~~~~~
+
+
+
+The next step is magic in actuarial science. Remember that if :math:`N`
+is a :math:`G`-mixed Poisson and :math:`A=X_1+\cdots+X_N` is an
+aggregate distribution then
+
+.. math:: M_A(z)=M_G(n(M_X(z)-1)).
+
+Using FFTs you can replace the *function* :math:`M_X` with the discrete
+approximation *vector* :math:`\hat{\mathsf{x}}` and compute
+
+.. math:: \hat{\mathsf{a}}=M_G(n(\hat{\mathsf{x}} -1))
+
+component-by-component to get an approximation vector to the function
+:math:`M_A`. You can then use the inverse FFT to recover an discrete
+approximation :math:`\a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
+for more details.
+
+Similar tricks are possible in two dimensions—see Press et al.,
+and Homer and Clark for a discussion.
+
+The FFT allows us to use the following very simple method to
+qualitatively approximate the density of an aggregate of dependent
+marginals :math:`X_1,\dots,X_n` given a correlation matrix
+:math:`\Sigma`. First use the FFT method to compute the sum :math:`S'`
+of the :math:`X_i` as though they were independent. Let
+:math:`\mathsf{Var}(S')=\sigma^{'2}` and let :math:`\sigma^2` be the variance of
+the sum of the :math:`X_i` implied by :math:`\Sigma`.
+
+Next use the FFT to add a further “noise” random variable :math:`N`
+to :math:`S'` with mean zero and variance :math:`\sigma^2-\sigma^{'2}`. Two
+obvious choices for the distribution of :math:`N` are normal or shifted
+lognormal. Then :math:`S'+N` has the same mean and variance as the sum of the
+dependent variables :math:`X_i`. The range of possible choices for :math:`N`
+highlights once again that knowing the marginals and correlation structure is
+not enough to determine the whole multivariate distribution. It is an
+interesting question whether all possible choices of :math:`N` correspond to
+actual multivariate structures for the
+:math:`X_i` and conversely whether all multivariate structures
+correspond to an :math:`N`. (It is easy to use MGFs to deconvolve
+:math:`N` from the true sum using Fourier methods; the question is
+whether the resulting “distribution” is non-negative.)
+
+Heckman and Meyers used Fourier transforms to compute aggregate
+distributions by numerically integrating the characteristic function.
+Direct inversion of the Fourier transform is also possible using FFTs.
+The application of FFTs is not completely straight forward because of
+certain aspects of the approximations involved. The details are very
+clearly explained in Menn and Rachev. Their method allows the use of
+FFTs to determine densities for distributions which have analytic MGFs
+but not densities—notably the class of stable distributions.
+
+
+Explanation
+~~~~~~~~~~~~
+
 
 .. _num errors:
 
 Sources of Error in the Algorithm
 -----------------------------------
+
+#. Discretization
+#. Truncation
+#. FFT algorithm
+#. Aliasing
+
 
 .. _num parameters:
 
@@ -479,18 +749,81 @@ Flexibility can be improved using higher dimensional FFT methods, for example to
 
 .. _num floats:
 
-Floats
----------
+Floating Point Arithmetic and Rounding Errors
+-----------------------------------------------
 
 Floating point arithmetic is not associative.
 
 .. ipython:: python
 
-   x,y = 4.41 + (2.36 + 1.53), (4.41 + 2.36) + 1.53
-   x,y = .1 + (0.6 + 0.3), (0.1 + 0.6) + 0.3
-   x, y, x.as_integer_ratio(), y.as_integer_ratio()
+   x = .1 + (0.6 + 0.3)
+   y = (0.1 + 0.6) + 0.3
+   x, x.as_integer_ratio(), y, y.as_integer_ratio()
 
 Cumulative error. Knuth observations.
+
+**Exercise Redux.**
+
+Recall the exercise to compute  quantiles of a :ref:`dice roll <prob dice quantiles>`.
+``aggregate`` produces the consistent results---if we look carefully and account for the foibles of floating point numbers. The case :math:`p=0.1` is easy. But the case :math:`p=1/6` appears wrong. There are two ways we can model the throw of a dice: with frequency 1 to 6 and fixed severity 1, or as fixed frequency 1 and severity 1 to 6. They give different answers. The lower quantile is wrong in the first case (it equals 1) and the upper quantile in the second (2).
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build, qd
+    import pandas as pd
+    d = build('agg Dice dfreq [1:6] dsev [1]')
+    print(d.q(0.1, 'lower'), d.q(0.1, 'upper'))
+    print(d.q(1/6, 'lower'), d.q(1/6, 'upper'))
+    d2 = build('agg Dice2 dfreq [1] dsev [1:6]')
+    print(d2.q(1/6, 'lower'), d2.q(1/6, 'upper'))
+
+These differences are irritating! The short answer is to adhere to
+
+.. warning::
+    Always use binary floats, that have an exact binary representation. They must have an exact binary representation as a fraction :math:`a/b` where :math:`b` is a power of two. 1/3, 1/5 and 1/10 are **not** binary floats.
+
+Here's the long answer, if you want to know. Looking at the source shows that the quantile function is implemented as a previous or next look up on a dataframe of distinct values of the cumulative distribution function. These two dataframes are:
+
+.. ipython:: python
+    :okwarning:
+
+    ff = lambda x: f'{x:.25g}'
+    qd(d.density_df.query('p_total > 0')[['p', 'F']], float_format=ff)
+    qd(d2.density_df.query('p_total > 0')[['p', 'F']], float_format=ff)
+    print(f'\n{d.cdf(1):.25f} < {1/6:.25f} < 1/6 < {d2.cdf(1):.25f}')
+
+Based on these numbers, the reported quantiles are correct. :math:`p=1/6` is strictly greater than ``d.cdf(1)`` and strictly less than ``d2.cdf(1)``, as shown in the last row! ``d`` and ``d2`` are different because the former runs through the FFT routine to convolve the trivial severity, whereas the latter does not.
+
+----
+
+**Exercise.** :math:`X` is a random variable defined on a sample space
+with ten equally likely events. The event outcomes are
+:math:`0,1,1,1,2,3, 4,8, 12, 25`. Compute :math:`\mathsf{VaR}_p(X)` for
+all :math:`p`.
+
+.. ipython:: python
+    :okwarning:
+
+    a = build('agg Ex.50 dfreq [1] '
+              'dsev [0 1 2 3 4 8 12 25] [.1 .3 .1 .1 .1 .1 .1 .1]')
+    @savefig quantile_a.png
+    a.plot()
+    print(a.q(0.05), a.q(0.1), a.q(0.2), a.q(0.4),
+       a.q(0.4, 'upper'), a.q(0.41), a.q(0.5))
+    qd(a.density_df.query('p_total > 0')[['p', 'F']],
+        float_format=ff)
+
+**Solution.** On the graph, fill in the vertical segments of the
+distribution function. Draw a horizontal line at height :math:`p` and
+find its intersection with the completed graph. There is a unique
+solution for all :math:`p` except :math:`0.1, 0.4, 0.5,\dots, 0.9`.
+Consider :math:`p=0.4`. Any :math:`x` satisfying
+:math:`\mathsf{Pr}(X < x) \le 0.4 \le \mathsf{Pr}(X\le x)` is a :math:`0.4`-quantile. By
+inspection the solutions are :math:`1\le x \le 2`. VaR is defined as the
+lower quantile, :math:`x=1`. The :math:`0.41` quantile is :math:`x=2`.
+VaRs are not interpolated in this problem specification. The loss 25 is
+the :math:`p`-VaR for any :math:`p>0.9`. The apparently errant numbers for aggregate (the upper quantile at 0.1 equals 2) are explained by the float representations. The float representation of ``0.4`` is ``3602879701896397/9007199254740992`` which actually equals ``0.4000000000000000222044605``.
 
 
 .. _num fft:
@@ -498,104 +831,93 @@ Cumulative error. Knuth observations.
 Fast Fourier Transforms
 -----------------------
 
-The FFT method is a miraculous technique for computing aggregate
-distributions. It is especially effective when the expected claim count
-is relatively small and the underlying severity distribution is bounded.
-These assumptions are true for many excess of loss reinsurance treaties,
-for example. Thus the FFT is very useful when quoting excess layers with
-annual aggregate deductibles or other variable features. The FFT
-provides a discrete approximation to the moment generating function.
+There are three things going on here:
 
-To use the FFT method, first “bucket” (or quantize) the severity
-distribution into a density vector :math:`\mathsf{x}=(x_1,\dots,x_{m})` whose
-length :math:`m` is a power of two :math:`m=2^n`. Here
+#. **Fourier transform**
+#. **Discrete** Fourier transform
+#. **Fast** Fourier transform
+
+**Fourier transforms** provide an alternative way to represent a distribution function. Given a distribution function :math:`F`, its Fourier transform (FT) is usually written :math:`\hat F`. The FT contains the same information as the distribution and there is a dictionary back and forth between the two, using the inverse FT.
+Some computations with distributions are easier to perform using their FT, which is what makes them useful.
+
+The FT is like exponentiation for distributions.
+Exponentials and logs turn (difficult) multiplication into (easy) addition
+
+.. math:: e^a \times e^b = e^{a+b}.
+
+FTs turn difficult convolution of distributions (addition of the corresponding random variables) into easy multiplication. If :math:`X_i` are random variables and :math:`F_X` is the distribution of  :math:`X`, :math:`i=1,2`, and :math:`X=X_1+X_2` with distribution :math:`F` then
+
+.. math:: \widehat{F_{X_1+X_2}} = \widehat{F_{X_1}} \times \widehat{F_{X_2}},
+
+where the righthand side is a product of functions. Computing the distribution of a sum of random variables is complicated because you have to consider all different ways an outcome can be split. But it is easy using FTs:
+
+* Take the FT of each distribution function
+* Multiply the FTs
+* Take the inverse FT
+
+Of course, this depends on it being easy to compute the FT and its inverse---which is where FFTs come in.
+
+**Discrete** Fourier transforms are a discrete approximation to continuous FTs, formed by sampling at finitely many points. The DFT is a vector, rather than a function. They retain the convolution property of FTs. They are sometimes called discrete cosine transforms (DCT).
+
+The **Fast** Fourier transform generally refers to a very fast way to compute discrete FTs, but general usage blurs the distinction between discrete FTs and their computation and uses FFT as a catchall for both.
+
+Here are some more details.
+The FFT of the :math:`m\times 1` vector
+:math:`\mathsf{x}=(x_0,\dots,x_{m-1})`, a discrete approximation to a distribution in our application, is another :math:`m\times 1` vector :math:`\hat{\mathsf{x}}`
+whose :math:`j`\ th component is
+
+.. math:: \sum_{k=0}^{m-1} x_k\exp(2\pi ijk/m),
+
+where :math:`i=\sqrt{-1}`. The coefficients of :math:`\hat{\mathsf{x}}` are complex numbers. It is
+possible to express :math:`\hat{\mathsf{x}}=\mathsf{F}\mathsf{x}` where
 
 .. math::
 
-   x_i=\mathsf{Pr}((i-1/2)b<X<(i+1/2)b)\\ x_1=\mathsf{Pr}(X<b/2),\quad
-   x_{m}=\mathsf{Pr}(X>(m-1/2)b)
+   \mathsf{F}=
+   \begin{pmatrix}
+   1 & 1 & \dots & 1 \\
+   1 & w & \dots & w^{m-1} \\
+   1 & w^2 & \dots & w^{2(m-1)} \\
+   \vdots & & & \vdots \\
+   1 & w^{m-1} & \dots & w^{(m-1)^2}
+   \end{pmatrix}
 
-for some fixed :math:`b`. We call :math:`b` the bucket size. Note
-:math:`\sum_i
-x_i=1` by construction. The FFT of the :math:`m\times 1` vector
-:math:`\mathsf{x}` is another :math:`m\times 1` vector :math:`\hat{\mathsf{x}}`
-whose :math:`j`\ th component is
-
-.. math:: \sum_{k=0}^{2^n-1} x_k\exp(2\pi ijk/2^n).
-
-The coefficients of :math:`\hat{\mathsf{x}}` are complex numbers. It is also
-possible to express :math:`\hat{\mathsf{x}}=\mathsf{F}\mathsf{x}` where :math:`\mathsf{F}` is an
-appropriate matrix of complex roots of unity, so there is nothing
-inherently mysterious about a FFT. The trick is that there exists a very
-efficient algorithm for computing (`[fft] <#fft>`__). Rather than taking
+is a matrix of complex roots of unity and  :math:`\exp(2\pi i/m)`. This shows there is nothing
+inherently mysterious about an FFT. The trick is that there is a very
+efficient algorithm for computing the matrix multiplication :cite:p:`Press1992a`.  Rather than taking
 time proportional to :math:`m^2`, as one would expect, it can be
-computed in time proportional to :math:`m\log(m)`. The difference
+computed in time proportional to :math:`m\log(m)`. For large values of :math:`m`, the difference
 between :math:`m\log(m)` and :math:`m^2` time is the difference between
 practically possible and practically impossible.
 
-
-You can use the inverse FFT to recover :math:`\mathsf{x}` from its transform
-:math:`\hat{\mathsf{x}}`. The inverse FFT is computed using the same equation
-as the FFT except there is a minus sign in the
-exponent and the result is divided by :math:`2^n`. Because the equation
-is essentially the same, the inversion process can also be computed in
-:math:`m\log(m)` time.
-
-The next step is magic in actuarial science. Remember that if :math:`N`
-is a :math:`G`-mixed Poisson and :math:`A=X_1+\cdots+X_N` is an
-aggregate distribution then
-
-.. math:: M_A(z)=M_G(n(M_X(z)-1)).
-
-Using FFTs you can replace the *function* :math:`M_X` with the discrete
-approximation *vector* :math:`\hat{\mathsf{x}}` and compute
-
-.. math:: \hat{\mathsf{a}}=M_G(n(\hat{\mathsf{x}} -1))
-
-component-by-component to get an approximation vector to the function
-:math:`M_A`. You can then use the inverse FFT to recover an discrete
-approximation :math:`\a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
-for more details.
-
-Similar tricks are possible in two dimensions—see Press et al.,
-and Homer and Clark for a discussion.
-
-The FFT allows us to use the following very simple method to
-qualitatively approximate the density of an aggregate of dependent
-marginals :math:`X_1,\dots,X_n` given a correlation matrix
-:math:`\Sigma`. First use the FFT method to compute the sum :math:`S'`
-of the :math:`X_i` as though they were independent. Let
-:math:`\mathsf{Var}(S')=\sigma^{'2}` and let :math:`\sigma^2` be the variance of
-the sum of the :math:`X_i` implied by :math:`\Sigma`.
-
-Next use the FFT to add a further “noise” random variable :math:`N`
-to :math:`S'` with mean zero and variance :math:`\sigma^2-\sigma^{'2}`. Two
-obvious choices for the distribution of :math:`N` are normal or shifted
-lognormal. Then :math:`S'+N` has the same mean and variance as the sum of the
-dependent variables :math:`X_i`. The range of possible choices for :math:`N`
-highlights once again that knowing the marginals and correlation structure is
-not enough to determine the whole multivariate distribution. It is an
-interesting question whether all possible choices of :math:`N` correspond to
-actual multivariate structures for the
-:math:`X_i` and conversely whether all multivariate structures
-correspond to an :math:`N`. (It is easy to use MGFs to deconvolve
-:math:`N` from the true sum using Fourier methods; the question is
-whether the resulting “distribution” is non-negative.)
-
-Heckman and Meyers used Fourier transforms to compute aggregate
-distributions by numerically integrating the characteristic function.
-Direct inversion of the Fourier transform is also possible using FFTs.
-The application of FFTs is not completely straight forward because of
-certain aspects of the approximations involved. The details are very
-clearly explained in Menn and Rachev. Their method allows the use of
-FFTs to determine densities for distributions which have analytic MGFs
-but not densities—notably the class of stable distributions.
+The inverse FFT to recovers :math:`\mathsf{x}` from its transform
+:math:`\hat{\mathsf{x}}`. The inverse FFT is computed using the same equation as the FFT with :math:`\mathsf F^{-1}` (matrix inverse) in place of :math:`F`. The inverse equals
 
 
+.. math::
+
+   \mathsf{F}^{-1}=
+   \frac{1}{m}
+   \begin{pmatrix}
+   1 & 1 & \dots & 1 \\
+   1 & w^{-1} & \dots & w^{-(m-1)} \\
+   1 & w^2 & \dots & w^{2(m-1)} \\
+   \vdots & & & \vdots \\
+   1 & w^{-(m-1)} & \dots & w^{-(m-1)^2}
+   \end{pmatrix}
 
 
+Because the equation is essentially the same, the inversion process can also be computed in :math:`m\log(m)` time.
+
+In the convolution algorithm, the product of functions :math:`\widehat{F_{X_1}} \times \widehat{F_{X_2}}` is replaced by the component-by-component product of two vectors, which is easy to compute. Thus, to convolve two discrete distributions, represented as :math:`\mathsf p=(p_0,\dots,p_{m-1})` and :math:`\mathsf q=(q_0,\dots,q_{m-1})` simply
+
+* Take the FFT of each vector, :math:`\hat{\mathsf p}=\mathsf F\mathsf p` and :math:`\hat{\mathsf q}=\mathsf F\mathsf q`
+* Compute the component-by-component product :math:`\mathsf z = \hat{\mathsf p}\hat{\mathsf q}`
+* Compute the inverse FFT :math:`\mathsf F^{-1}\mathsf z`.
+
+The answer is the exact convolution of the two input distributions, except that sum values wrap around: the extreme right tail re-appears as probabilities around 0. This problem is called aliasing (the same as the wagon-wheel effect in old Westerns), but it can be addressed by padding the input vectors.
 
 
+It is not necessary to understand the details of FTs to use ``aggregate`` although they are fascinating, see for example :cite:t:`Korner2022`. In probability, the moment generating functions and characteristic function are based on FTs. They are discussed in any serious probability text.
 
-
-
+.. pi and agm?

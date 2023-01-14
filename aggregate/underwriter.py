@@ -533,6 +533,9 @@ class Underwriter(object):
                         max_loss = np.max(d['sev_xs']) * d['exp_en']
                     elif d['freq_name'] == 'empirical':
                         max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
+                    elif d['freq_name'] == 'bernoulli':
+                        # allow for max loss to occur
+                        max_loss = np.max(d['sev_xs'])
                     else:
                         # normal approx on count
                         max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)

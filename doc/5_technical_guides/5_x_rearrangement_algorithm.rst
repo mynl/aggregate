@@ -125,17 +125,13 @@ The following code replicates this calculation in aggregate. The answer relies o
    import numpy as np
    import pandas as pd
    import scipy.stats as ss
-
    ps = np.linspace(0.99, 1, 40, endpoint=False)
    params = {i: agg.mu_sigma_from_mean_cv(10, i) for i in [1,2,3]}
-
    df = pd.DataFrame({f'x_{i}': ss.lognorm(params[i][1],
       scale=np.exp(params[i][0])).isf(1-ps)
       for i in [1,2,3]}, index=ps)
-
    df_ra = agg.rearrangement_algorithm_max_VaR(df)
-   with pd.option_context('display.float_format', lambda x: f'{x:.1f}'):
-       print(df_ra)
+   agg.qd(df_ra, float_format=lambda x: f'{x:.1f}', max_rows=100)
 
 There are several important points to note about the Rearrangement
 Algorithm output and the failure of subadditivity it induces. They

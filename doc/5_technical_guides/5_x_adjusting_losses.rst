@@ -54,19 +54,17 @@ Define
 -  :math:`m_i = \int_{a_{i-1}}^{a_i} xdF(x) - f_i = \int_{a_{i-1}}^{a_i} (x-a_{i-1})dF(x) = l_i - e_i`
    equals the part of :math:`l_i` from losses in the layer.
 -  :math:`t_i` are selected unconditional expected losses by layer.
-   :math:`t_i=l_i` resutls in no adjustment. :math:`t_i` is computed by
+   :math:`t_i=l_i` results in no adjustment. :math:`t_i` is computed by
    dividing the layer loss pick by the expected number of ground-up
    claims.
 
 Integration by parts gives
 
 .. math::
-   \begin{align}
    \int_{a_{i-1}}^{a_i} S(x)dx
    &= xS(x)\,\big\vert_{a_{i-1}}^{a_i} + \int_{a_{i-1}}^{a_i} x dF(x) \\
    &= a_iS(a_i) + \int_{a_{i-1}}^{a_i} (x - a_{i-1}) dF(x) \\
    &= e_i + m_i.
-   \end{align}
 
 These quantities are illustrated in the next figure.
 
@@ -81,13 +79,11 @@ There is no adjustment to :math:`S` for :math:`x\ge a_n`. In the top
 layer, adjust to :math:`\tilde S(x) = S(a_n) + w_n(S(x) - S(a_n))`, so
 
 .. math::
-   \begin{align}
    t_n
    &= \int_{a_{n-1}}^{a_n} \tilde S(x)dx \\
    &= S(a_n)y_n + w_n(l_n - e_n) \\
    &= \omega_n y_n + w_nm_n \\
    \implies w_n &= \frac{t_n - \omega_n y_n}{m_n},
-   \end{align}
 
 where :math:`\omega_n=S(a_n)`. Set
 :math:`\omega_i = \omega_{i+1} + w_{i+1} p_{i+1}` and
@@ -95,12 +91,10 @@ where :math:`\omega_n=S(a_n)`. Set
 layer. We can compute all the weights by proceeding down the tower:
 
 .. math::
-   \begin{align}
    t_i
    &= \int_{a_{i-1}}^{a_i} \tilde S(x)dx \\
    &= \omega_i y_i + w_i(l_i - e_i) \\
    \implies w_i &= \frac{t_i - \omega_i y_i}{m_i}.
-   \end{align}
 
 :math:`\tilde S` is continuous is :math:`S` is because of the definition
 of :math:`\omega` at the layer boundaries. When :math:`x=a_{i-1}`,

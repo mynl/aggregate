@@ -394,9 +394,9 @@ under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is in
 **Algorithm steps.**
 
 #. Pad the vector :math:`\mathsf p` to length :math:`2^{\log_2 + d}` by appending zeros, to produce :math:`\mathsf x`.
-#. Compute the FFT :math:`\mathsf z:=\mathsf{FT(\mathsf x)}`.
+#. Compute the FFT :math:`\mathsf z:=\mathsf{FT}(\mathsf x)`.
 #. Compute :math:`\mathsf f:=M_N(\mathsf z)`.
-#. Compute the inverse FFT  :math:`\mathsf y:=\mathsf{IFT(\mathsf f`.
+#. Compute the inverse FFT  :math:`\mathsf y:=\mathsf{IFT}(\mathsf f)`.
 #. Take the first :math:`m` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
 
 The output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
@@ -430,7 +430,7 @@ approximation *vector* :math:`\hat{\mathsf{x}}` and compute
 
 component-by-component to get an approximation vector to the function
 :math:`M_A`. You can then use the inverse FFT to recover an discrete
-approximation :math:`\a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
+approximation :math:`\mathsf a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
 for more details.
 
 Similar tricks are possible in two dimensions—see Press et al.,

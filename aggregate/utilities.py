@@ -17,6 +17,7 @@ import pandas as pd
 from pandas.io.formats.format import EngFormatter
 import re
 import scipy.stats as ss
+import scipy.fft as sft
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import broyden2, newton_krylov
@@ -114,7 +115,6 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
     if tacit is True:
         return ans
 
-# moment utility functions
 def ft(z, padding, tilt):
     """
     fft with padding and tilt
@@ -128,24 +128,20 @@ def ft(z, padding, tilt):
     :param tilt: vector of tilt values
     :return:
     """
-    # locft = np.fft.fft
-    locft = np.fft.rfft
+    locft = sft.rfft
     if z.shape != (len(z),):
         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
     # tilt
+    # valeus per https://stackoverflow.com/questions/71706387/finding-fft-gives-keyerror-aligned-pandas
     if tilt is not None:
         zt = z * tilt
     else:
         zt = z
-    # pad
-    if padding > 0:
-        # temp = np.hstack((z, np.zeros_like(z), np.zeros_like(z), np.zeros_like(z)))
-        pad_len = zt.shape[0] * ((1 << padding) - 1)
-        temp = np.hstack((zt, np.zeros(pad_len)))
-    else:
-        temp = zt
+    if type(zt) != np.ndarray:
+        zt = zt.to_numpy()
+    # padding handled by the ft routine
     # temp = np.hstack((z, np.zeros_like(z)))
-    return locft(temp)
+    return locft(zt, len(z) << padding)
 
 
 def ift(z, padding, tilt):
@@ -157,13 +153,14 @@ def ift(z, padding, tilt):
     :param tilt:
     :return:
     """
-    # locift = np.fft.ifft
-    locift = np.fft.irfft
+    locift = sft.irfft
     if z.shape != (len(z),):
         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
-    temp = locift(z)
+    if type(z) != np.ndarray:
+        temp = locift(z.to_numpy())
+    else:
+        temp = locift(z)
     # unpad
-    # temp = temp[0:]
     if padding != 0:
         temp = temp[0:len(temp) >> padding]
     # untilt
@@ -171,6 +168,63 @@ def ift(z, padding, tilt):
         temp /= tilt
     return temp
     # return temp[0:int(len(temp) / 2)]
+
+# def ft(z, padding, tilt):
+#     """
+#     fft with padding and tilt
+#     padding = n makes vector 2^n as long
+#     n=1 doubles (default)
+#     n=2 quadruples
+#     tilt is passed in as the tilting vector or None: easier for the caller to have a single instance
+#
+#     :param z:
+#     :param padding: = 1 doubles
+#     :param tilt: vector of tilt values
+#     :return:
+#     """
+#     # locft = np.fft.fft
+#     locft = np.fft.rfft
+#     if z.shape != (len(z),):
+#         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
+#     # tilt
+#     if tilt is not None:
+#         zt = z * tilt
+#     else:
+#         zt = z
+#     # pad
+#     if padding > 0:
+#         # temp = np.hstack((z, np.zeros_like(z), np.zeros_like(z), np.zeros_like(z)))
+#         pad_len = zt.shape[0] * ((1 << padding) - 1)
+#         temp = np.hstack((zt, np.zeros(pad_len)))
+#     else:
+#         temp = zt
+#     # temp = np.hstack((z, np.zeros_like(z)))
+#     return locft(temp)
+#
+#
+# def ift(z, padding, tilt):
+#     """
+#     ift that strips out padding and adjusts for tilt
+#
+#     :param z:
+#     :param padding:
+#     :param tilt:
+#     :return:
+#     """
+#     # locift = np.fft.ifft
+#     locift = np.fft.irfft
+#     if z.shape != (len(z),):
+#         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
+#     temp = locift(z)
+#     # unpad
+#     # temp = temp[0:]
+#     if padding != 0:
+#         temp = temp[0:len(temp) >> padding]
+#     # untilt
+#     if tilt is not None:
+#         temp /= tilt
+#     return temp
+#     # return temp[0:int(len(temp) / 2)]
 
 
 def mu_sigma_from_mean_cv(m, cv):

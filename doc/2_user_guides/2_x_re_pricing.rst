@@ -561,7 +561,7 @@ The next table shows Bear and Nemlick's estimated premium rates.
   :width: 800
   :alt: Original paper table.
 
-  Bear and Nemlick's estimated premium rates by program by numerical method. The Lognormal Model column uses a method of moments fit to the aggregate mean and CV. The Collective Risk Model columns uses the :cite:t:`Heckman1983` continuous FFT method.
+  Bear and Nemlick's estimated premium rates by program by numerical method. The Lognormal Model column uses a method of moments fit to the aggregate mean and CV. The Collective Risk Model columns uses the Heckman-Meyers continuous FFT method.
 
 Heckman and Meyers describe claim count contagion and frequency parameter uncertainty, which they model using a mixed-Poisson frequency distribution. Their parameter :math:`c` is the variance of the mixing distribution. The value ``c=0.05`` is replicated in DecL with the frequency clause ``mixed gamma 0.05**0.5``, since DecL is based on the CV of the mixing distribution (the mean is always 1).
 

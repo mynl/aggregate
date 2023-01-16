@@ -77,85 +77,21 @@ aggregate Documentation
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
 :mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
 
+This help document is in six parts plus a bibliography.
 
-.. Panels at https://sphinx-panels.readthedocs.io/en/latest/
-   img-top-cls: pl-5 pr-5
+#. :doc:`1_Getting_Started` --- Get up and running: installation, ``aggregate`` "hello world", and a glimpse into the functionality.
 
-
-.. panels::
-   :img-top-cls: height=100px bg-success
-
-   ---
-   :img-top: _static/gs.png
-
-   Get up and running: installation, ``aggregate`` "hello world", and a glimpse into the functionality.
-
-   +++
-
-   .. link-button:: 1_Getting_Started
-      :type: ref
-      :text: Getting Started
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/ug.png
-
-   How to solve real-world actuarial problems using ``aggregate``.
-
-   +++
-
-   .. link-button:: 2_User_Guides
-      :type: ref
-      :text: User Guides
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/api.png
+#. :doc:`2_User_Guides` --- How to solve real-world actuarial problems using ``aggregate``.
 
 
-   Documentation for every class and function, for developers and more advanced users.
-
-   +++
-
-   .. link-button:: 3_Reference
-      :type: ref
-      :text: API Reference
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/decl.png
+#. :doc:`3_Reference` --- Documentation for every class and function, for developers and more advanced users.
 
 
-   The Dec Language (DecL)  for specifying aggregate distributions.
-
-   +++
-
-   .. link-button:: 4_dec_Language_Reference
-      :type: ref
-      :text: DecL Reference
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/tg.png
+#. :doc:`4_dec_Language_Reference` --- The Dec Language (DecL)  for specifying aggregate distributions.
 
 
-   Probability theory background and the numerical implementation methods employed by ``aggregate``.
+#. :doc:`5_Technical_Guides` --- Probability theory background and the numerical implementation methods employed by ``aggregate``.
 
-   +++
+#. :doc:`6_Development` --- Design philosophy, competing products, future development ideas, and historical perspective.
 
-   .. link-button:: 5_Technical_Guides
-      :type: ref
-      :text: Technical Guides
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/dev.png
-
-   Design philosophy, competing products, future development ideas, and historical perspective.
-
-   +++
-
-   .. link-button:: 6_Development
-      :type: ref
-      :text: Development
-      :classes: btn-block btn-secondary stretched-link
+#. :doc:`7_bibliography`

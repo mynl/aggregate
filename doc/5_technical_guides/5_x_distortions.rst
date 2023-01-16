@@ -167,9 +167,9 @@ chance of default. Using the layer density view, define expected loss
 
 .. math::
 
-    \bar S(a) &= \mathsf E[X\wedge a]=\int_0^a S(x)\,dx \label{eq:sbar-def} \\
+    \bar S(a) &= \mathsf E[X\wedge a]=\int_0^a S(x)\,dx   \\
     \bar P(a) &= \rho(X\wedge a) = \int_0^\infty g(S_{X\wedge a}(x))\,dx \\
-              &=\int_0^a g(S_{X}(x))dx. \label{eq:prem-def}
+              &=\int_0^a g(S_{X}(x))dx.
 
 
 Margin is :math:`\bar M(a):=\bar P(a)-\bar S(a)` and margin density is

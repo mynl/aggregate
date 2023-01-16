@@ -1,11 +1,15 @@
 # figures other than from PIR book
 
 import numpy as np
+# from numpy import roll
 import scipy.stats as ss
+from scipy.fft import rfft, irfft # , fftshift, ifftshift, fft, ifft
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+import matplotlib as mpl
 from .. import build
 from .. constants import FIG_H, FIG_W
+
 
 def adjusting_layer_losses():
     """
@@ -84,6 +88,7 @@ def savings_charge():
                     arrowprops={'arrowstyle': '->', 'linewidth': .5}
                     )
     return f
+
 
 def mixing_convergence(freq_cv, sev_cv, bs=1/64):
     """
@@ -197,3 +202,54 @@ def power_variance_family():
     ql(1, 1, 'Poisson')
     ql(-1, -2, 'Tweedie', False, 1)
     ax.set(title='Power Variance Exponential Family Distributions');
+
+
+def fft_wrapping_illustration(ez=10, en=20):
+    """
+    Illustrate wrapping by convolving a uniform distribution with mean ez
+    en times. Show in a space just big enough for the severity first and then
+    big enough for the full aggregate. Center and right hand plot illustrate how the
+    full components are sliced up and combined to the wrapped total.
+    """
+    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_H), constrained_layout=True)
+    ax0, ax1, ax2 = axs.flat
+    # enough space for severity
+    small2 = int(np.ceil(np.log2(2 * ez)))
+    # enough space for aggregate
+    big2 = int(np.ceil(np.log2(2 * ez * en)))
+    z = np.zeros(1 << small2)
+    z[:ez*2] = 1 / ez / 2
+
+    wrapped = irfft( rfft(z) ** en )
+    ax0.plot(wrapped, c='C0')
+    ax0.set(title=f'Wrapped distribution\nlog2={small2}')
+    lm = ax0.get_ylim()
+    lm = (-lm[1] / 20, lm[1]* 1.1)
+    ax0.set(ylim=lm)
+
+    full = irfft( rfft(z, 1<<big2) ** en )
+    norm = mpl.colors.Normalize(0, 1, clip=True)
+    cmappable = mpl.cm.ScalarMappable(norm=norm, cmap='plasma')
+    mapper = cmappable.to_rgba
+    cc = list(map(mapper, np.linspace(0, 1, 1 << big2-small2)))
+    ax1.plot(full, label='Full computation', c='w', alpha=1, lw=3)
+    for n, (s, c) in enumerate(zip(full.reshape((1<<big2-small2, 1<<small2)), cc)):
+        ax1.plot(s, c=c, label=f'Part {n}')
+        ax1.plot(np.arange((1<<small2) * n, (1<<small2) * (n+1)), s, c=c, lw=2, label=None)
+    for n in range(1 << big2-small2):
+        ax1.axvline(n * (1 << small2), lw=.25, c='C7')
+    for n in range(1 << big2-small2):
+        ax1.axvline(n * (1 << small2), lw=.25, c='C7')
+    if big2 - small2 <= 3:
+        ax1.legend(loc='center right')
+    ax1.set(title=f'Full distribution\nlog2={big2}, {1<<big2-small2} components')
+
+    wrapped_from_full = full.reshape((1<<big2-small2, 1<<small2))
+    ax2.plot(wrapped_from_full.T, label=None, c='C7', lw=.5)
+    ax2.plot(wrapped_from_full.sum(0), lw=3, label='Wrapped from full', c='C1')
+    ax2.plot(wrapped, lw=1, label='Wrapped', c='C0')
+    ax2.set(title='Wrapping components (grey)\nSums (blue, organge as left)')
+    # ax2.legend(loc)
+    ax2.set(ylim=lm)
+
+    assert np.allclose(wrapped_from_full.sum(0), wrapped)

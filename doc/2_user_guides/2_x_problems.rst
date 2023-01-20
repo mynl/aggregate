@@ -21,4 +21,5 @@ Published Problems and Examples
     problems/0x0_loss_models
     problems/0x0_bahnemann
     problems/0x0_enterprise_risk_analysis
+    problems/0x0_other_misc
 

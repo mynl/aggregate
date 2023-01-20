@@ -2801,6 +2801,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     from .portfolio import Portfolio
     # ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
     ff = lambda x: f'{x:.5g}'
+    # split output
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
             if 'Err CV(X)' in x.describe.columns:
@@ -2822,6 +2823,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
                     'justify': None
                     }
             args.update(kwargs)
+            print()
             print(x.to_string(**args))
             # print(x.to_string(formatters={c: f for c in x.columns}))
         elif isinstance(x, pd.Series):
@@ -2830,6 +2832,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
                     'name': True
                     }
             args.update(kwargs)
+            print()
             print(x.to_string(**args))
         elif isinstance(x, int):
             print(x)
@@ -2837,7 +2840,6 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
             print(ff(x))
         else:
             print(x)
-
 
 def mv(x, y=None):
     """

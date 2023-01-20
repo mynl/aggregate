@@ -275,7 +275,7 @@ The desired target correlation matrix is
    1.000 & 0.800 & 0.400 & 0.000\\
    0.800 & 1.000 & 0.300 & -0.200\\
    0.400 & 0.300 & 1.000 & 0.100\\
-   0.000 & -0.200 & 0.100 & 1.000\\
+   0.000 & -0.200 & 0.100 & 1.000
    \end{pmatrix}.
 
 The Choleski decomposition of :math:`\mathsf{S}` is
@@ -287,7 +287,7 @@ The Choleski decomposition of :math:`\mathsf{S}` is
    1.000 & 0.800 & 0.400 & 0.000\\
    0.000 & 0.600 & -0.033 & -0.333\\
    0.000 & 0.000 & 0.916 & 0.097\\
-   0.000 & 0.000 & 0.000 & 0.938\\
+   0.000 & 0.000 & 0.000 & 0.938
    \end{pmatrix}.
 
 Now we make the score matrix. The basic scores are
@@ -319,7 +319,7 @@ to get
    1.00860  & -0.82015  & -1.92062  & 1.00860 \\
    1.22896  & 1.50709  & 0.49584  & -1.50709 \\
    1.50709  & 0.06874  & -0.06874  & 0.06874 \\
-   1.92062  & 0.65151  & -0.34878  & -0.82015 \\
+   1.92062  & 0.65151  & -0.34878  & -0.82015
    \end{pmatrix}.
 
 As described in Section `1.1 <#theory>`__, :math:`\mathsf{M}` is approximately
@@ -332,7 +332,7 @@ independent. In fact :math:`\mathsf{M}` has covariance matrix
    1.0000  & 0.0486  & 0.0898  & -0.0960 \\
    0.0486  & 1.0000  & 0.4504  & -0.2408 \\
    0.0898  & 0.4504  & 1.0000  & -0.3192 \\
-   -0.0960  & -0.2408  & -0.3192  & 1.0000 \\
+   -0.0960  & -0.2408  & -0.3192  & 1.0000
    \end{pmatrix}
 
 and :math:`\mathsf{EE}` has Choleski decomposition
@@ -344,7 +344,7 @@ and :math:`\mathsf{EE}` has Choleski decomposition
    1.0000 & 0.0486 & 0.0898 & -0.0960\\
    0.0000 & 0.9988 & 0.4466 & -0.2364\\
    0.0000 & 0.0000 & 0.8902 & -0.2303\\
-   0.0000 & 0.0000 & 0.0000 & 0.9391\\
+   0.0000 & 0.0000 & 0.0000 & 0.9391
    \end{pmatrix}.
 
 Thus :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}` is given by
@@ -372,7 +372,7 @@ Thus :math:`\mathsf{T}=\mathsf{M}\mathsf{F}^{-1}\mathsf{C}` is given by
    1.00860  & 0.28474  & -1.23688  & 0.59246 \\
    1.22896  & 1.85260  & 0.17411  & -1.62428 \\
    1.50709  & 1.20294  & 0.39517  & 0.13931 \\
-   1.92062  & 1.87175  & -0.04335  & -0.97245 \\
+   1.92062  & 1.87175  & -0.04335  & -0.97245
    \end{pmatrix}.
 
 An easy calculation will verify that :math:`\mathsf{T}` has correlation matrix
@@ -383,15 +383,15 @@ have the same rank order as :math:`\mathsf{T}`. The first column does not change
 because it is already in ascending order. In the second column, the
 first element of :math:`\mathsf{Y}` must be the 14th element of :math:`\mathsf{X}`, the
 second the 20th, third 10th and so on. The ranks of the other elements
-are
+are the transpose of
 
 .. math::
 
    \begin{pmatrix}
    14 & 20 & 10 & 18 & 11 & 19 & 17 & 13 & 15 & 8 & 12 & 6 & 9 & 16 & 5 & 3 & 7 & 2 & 4 & 1\\
    20 & 19 & 16 & 4 & 14 & 13 & 2 & 15 & 5 & 12 & 17 & 6 & 11 & 8 & 1 & 3 & 18 & 9 & 7 & 10\\
-   18 & 6 & 15 & 14 & 2 & 8 & 9 & 13 & 4 & 19 & 10 & 7 & 3 & 12 & 17 & 1 & 5 & 20 & 11 & 16\\
-   \end{pmatrix}'
+   18 & 6 & 15 & 14 & 2 & 8 & 9 & 13 & 4 & 19 & 10 & 7 & 3 & 12 & 17 & 1 & 5 & 20 & 11 & 16
+   \end{pmatrix}
 
 and the resulting re-ordering of :math:`\mathsf{X}` is
 
@@ -418,7 +418,7 @@ and the resulting re-ordering of :math:`\mathsf{X}` is
    184,381  & 60,948  & 17,233  & 26,754 \\
    206,940  & 86,685  & 25,393  & 13,273 \\
    217,092  & 70,592  & 30,779  & 21,178 \\
-   240,935  & 87,138  & 25,198  & 18,821 \\
+   240,935  & 87,138  & 25,198  & 18,821
    \end{pmatrix}.
 
 The rank correlation matrix of :math:`\mathsf{Y}` is exactly :math:`\mathsf{S}`. The
@@ -431,7 +431,7 @@ achieved value is
    1.00  & 0.85  & 0.26  & -0.11 \\
    0.85  & 1.00  & 0.19  & -0.20 \\
    0.26  & 0.19  & 1.00  & 0.10 \\
-   -0.11  & -0.20  & 0.10  & 1.00 \\
+   -0.11  & -0.20  & 0.10  & 1.00
    \end{pmatrix},
 
 a fairly creditable performance given the input correlation matrix and

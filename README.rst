@@ -50,7 +50,7 @@
 aggregate: a powerful aggregate distribution modeling library in Python
 ========================================================================
 
-What is it?
+Purpose
 -----------
 
 ``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
@@ -88,9 +88,9 @@ Here is a model of the sum of three dice rolls. The DataFrame ``describe`` compa
 
 ::
 
-  from aggregate import build
+  from aggregate import build, qd
   a = build('agg Dice dfreq [3] dsev [1:6]')
-  print(a.describe)
+  qd(a)
 
 >>>        E[X] Est E[X]    Err E[X]   CV(X) Est CV(X)   Err CV(X) Skew(X) Est Skew(X)
 >>>  X                                                                                
@@ -113,7 +113,7 @@ mean 10, p=1.005, dispersion (phi, sigma^2)=4
 ::
 
   t = build('agg Tweedie tweedie 5 1.005 1')
-  print(t.describe)
+  qd(t)
 
 >>>        E[X] Est E[X]    Err E[X]    CV(X) Est CV(X)   Err CV(X)  Skew(X) Est Skew(X)
 >>> X
@@ -139,7 +139,7 @@ severity, mean 50 and cv 2.
 ::
 
   a = build('agg Example 10 claims sev lognorm 50 cv 2 poisson')
-  print(a.describe)
+  qd(a)
 
 >>>       E[X] Est E[X]   Err E[X]   CV(X) Est CV(X) Err CV(X)  Skew(X) Est Skew(X)
 >>> X

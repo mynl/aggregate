@@ -50,10 +50,10 @@ class Frequency(object):
     - ``poisson``: Poisson(freq_a)
     - ``poisson``: geometric(freq_a)
     - ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
-        claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
-        number of claimants per claim (or claims per occurrence). Hence the Poisson component
-        has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
-        cv freq_a
+      claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
+      number of claimants per claim (or claims per occurrence). Hence the Poisson component
+      has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
+      cv freq_a
 
     **Mixture** Frequency Types
 
@@ -66,22 +66,22 @@ class Frequency(object):
 
     - ``gamma``: negative binomial, freq_a = cv of gamma distribution
     - ``delaporte``: shifted gamma, freq_a = cv of mixing disitribution, freq_b = proportion of
-        certain claims = shift. freq_b must be between 0 and 1.
+      certain claims = shift. freq_b must be between 0 and 1.
     - ``ig``: inverse gaussian, freq_a = cv of mixing distribution
     - ``sig``: shifted inverse gaussian, freq_a = cv of mixing disitribution, freq_b = proportion of
-        certain claims = shift. freq_b must be between 0 and 1.
+      certain claims = shift. freq_b must be between 0 and 1.
     - ``sichel``: generalized inverse gaussian mixing distribution, freq_a = cv of mixing distribution and
-        freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
-        -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
-        cases are available.
+      freq_b = lambda value. The beta and mu parameters solved to match moments. Note lambda =
+      -0.5 corresponds to inverse gaussian and 0.5 to reciprocal inverse gauusian. Other special
+      cases are available.
     - ``sichel.gamma``: generalized inverse gaussian mixture where the parameters match the moments of a
-        delaporte distribution with given freq_a and freq_b
+      delaporte distribution with given freq_a and freq_b
     - ``sichel.ig``: generalized inverse gaussian mixture where the parameters match the moments of a
-        shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
-        has poor numerical stability and may fail.
+      shifted inverse gaussian distribution with given freq_a and freq_b. This parameterization
+      has poor numerical stability and may fail.
     - ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
-        method should be used carefully. It has poor numerical stability and can produce bizzare
-        aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
+      method should be used carefully. It has poor numerical stability and can produce bizzare
+      aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
 
     :param freq_name: name of the frequency distribution, poisson, geometric, etc.
     :param freq_a:
@@ -94,21 +94,19 @@ class Frequency(object):
         """
         Creates the mgf and moment function:
 
-        freq_zm True if zero modified, default False
-        freq_p0 modified value of p0
-
-        # check zero mod is acceptable? --> parser
-        if freq_zm is True:
-            assertg freq_name in ['poisson', 'binomial', 'geometric',
-                    'logarithmic']
-
-        logarithmic??
-        Enter NB not as mixed to allow easy creation of zm?
-
         * moment function(n) returns EN, EN^2, EN^3 when EN=n.
         * mgf(n, z) is the mgf evaluated at log(z) when EN=n
 
+        :param freq_name: name of the frequency distribution, poisson, geometric, etc.
+        :param freq_a:
+        :param freq_b:
+        :param freq_zm: freq_zm True if zero modified, default False
+        :param freq_p0: modified p0, probability of zero claims
         """
+        # check zero mod is acceptable? --> parser
+        # if freq_zm is True:
+        #     assertg freq_name in ['poisson', 'binomial', 'geometric',
+        #             'logarithmic']
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
@@ -3043,7 +3041,7 @@ class Severity(ss.rv_continuous):
         :param sev_xs: for fixed or histogram classes
         :param sev_ps:
         :param sev_wt: this is not used directly; but it is convenient to pass it in and ignore it because sevs are
-               implicitly created with sev_wt=1.
+          implicitly created with sev_wt=1.
         :param sev_conditional: conditional or unconditional; for severities use conditional
         :param name: name of the severity object
         :param note: optional note.
@@ -3120,7 +3118,15 @@ class Severity(ss.rv_continuous):
                 self.sev2 = np.sum(xs ** 2 * ps)
                 self.sev3 = np.sum(xs ** 3 * ps)
                 # binary consistent
-                xss = np.sort(np.hstack((xs - 2 ** -14, xs)))  # was + but F(x) = Pr(X<=x) so seems shd be to left
+                # need to be careful in case input has duplicates - these need removing
+                if len(xs) != len(set(xs)):
+                    logger.info('Duplicates in empirical distribution, summarizing.')
+                    _ = pd.DataFrame({'x': xs, 'p': ps}).groupby('x').sum('p')
+                    xs = np.array(_.index)
+                    ps = _.p.values
+                    del _
+                # was + but F(x) = Pr(X<=x) so shd be to left
+                xss = np.sort(np.hstack((xs - 2 ** -14, xs)))
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
                 self.fz = ss.rv_histogram((pss, xss))
             else:
@@ -3672,14 +3678,13 @@ class Severity(ss.rv_continuous):
         Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
 
-        TODO better coordination of figsize! Better axis formats and ranges.
-
         :param n: number of points to plot.
         :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
         :param figsize: (width, height) in inches.
         :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
         :return:
         """
+        # TODO better coordination of figsize! Better axis formats and ranges.
 
         xs = np.linspace(0, self._isf(1e-4), n)
         xs2 = np.linspace(0, self._isf(1e-12), n)

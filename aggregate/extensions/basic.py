@@ -34,6 +34,7 @@ def rst_to_md(fn, to_dir='/s/telos/temp/z'):
     fout.write_text(str_out, encoding='utf-8')
     return fout
 
+
 def all_rst_to_md(from_dir='doc', to_dir='/s/telos/temp/z'):
     """
     Convert all rst files in from_dir  to md files
@@ -46,3 +47,28 @@ def all_rst_to_md(from_dir='doc', to_dir='/s/telos/temp/z'):
     for fn in Path(from_dir).glob('**/*.rst'):
         print(f'Converting {fn}')
         rst_to_md(fn, to_dir)
+
+
+class Formatter(object):
+    def __init__(self, w=8, dp=3, pdp=1, threshold=1000):
+        """
+        dp for < threshold
+        pdp for percentages, used if >=0
+        """
+        self.threshold = threshold
+        if pdp >= 0:
+            self.pdp = f'{{x:{w}.{pdp}%}}'
+        else:
+            self.pdp = None
+        self.dp = f'{{x:{w},.{dp}f}}'
+        self.big = '{x:{w},.0f}'
+
+    def __call__(self, x):
+        if type(x) == str:
+            return x
+        if self.pdp is not None and x <= 1:
+            return self.pdp.format(x=x)
+        elif abs(x) <= self.threshold:
+            return self.dp.format(x=x)
+        else:
+            return self.big.format(x=x)

@@ -223,7 +223,7 @@ class Underwriter(object):
         Create object of kind from spec, a dictionary.
         Creating from uw obviously needs the uw, so this is NOT a staticmethod!
 
-        :param answer an Answer class with members kind, name, spec, and program
+        :param answer: an Answer class with members kind, name, spec, and program
         :return: creates answer.object
         """
 
@@ -273,9 +273,12 @@ class Underwriter(object):
 
         1. Read in the program and cleans it (e.g. punctuation, parens etc. are
            removed and ignored, replace ; with new line etc.)
+
         2. Parse line by line to create a dictionary definition of sev, agg or port objects.
+
         3. Replace sev.name, agg.name and port.name references with their objects.
-        5. If update set, update all created objects.
+
+        4. If update set, update all created objects.
 
         Sample input::
 
@@ -288,15 +291,11 @@ class Underwriter(object):
 
         See parser for full language spec! See Aggregate class for many examples.
 
-        Reasonable kwargs:
-
-        * **add_exa** should port.add_exa add the exa related columns to the output?
-
         :param log2:
         :param bs:
         :param portfolio_program:
         :param update: override class default
-        :param kwargs: passed to object's update method if update==True
+        :param kwargs: passed to object's update method if ``update==True``
         :return: single created object or dictionary name: object
         """
 
@@ -743,7 +742,7 @@ class Underwriter(object):
         ??How diff from describe??
         Allows exploration of pre-loaded databases.
 
-        Eg regex = "A.*[234] for A...2, 3 and 4.
+        Eg ``regex = "A.*[234]`` for A...2, 3 and 4.
 
         See ``qshow`` for a wrapper that just returns the matches, with no object
         creation or plotting.
@@ -827,7 +826,7 @@ class Underwriter(object):
         List all agg databases in site and default directories.
         If entries is True then read them and return named objects.
 
-        Filter = glob filter for filename; .agg is added
+        :param filter:  glob filter for filename; .agg is added
 
         """
 

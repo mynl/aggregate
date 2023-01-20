@@ -5,6 +5,7 @@
 # containing dir.
 #
 
+import aggregate as agg
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -12,7 +13,6 @@ import os
 # allow RTD to find aggregate
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
-import aggregate as agg
 
 # graphics defaults - better res graphics
 plt.rcParams['figure.dpi'] = 300
@@ -87,6 +87,11 @@ bibtex_reference_style = 'author_year'
 # user starts in light mode
 default_dark_mode = False
 
+# https://www.spinics.net/lists/linux-doc/msg77015.html
+autosectionlabel_prefix_document = True
+autosectionlabel_maxdepth = 1
+
+
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -129,7 +134,9 @@ latex_elements = {
     'papersize': 'a4paper',
     # The font size ('10pt', '11pt' or '12pt').
     'pointsize': '10pt',
-    'extrapackages': '\\usepackage{mathrsfs}'
+    'extrapackages': '\\usepackage{mathrsfs}',
+    # 'preamble': '\\renewenvironment{DUlineblock}{}{}',
+    # 'preamble': '\\renewenvironment{DUlineblock}{\\begin{comment}}{\\end{comment}}'
 }
 
 # Grouping the document tree into LaTeX files. List of tuples

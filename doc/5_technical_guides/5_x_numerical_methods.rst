@@ -54,6 +54,58 @@ annual aggregate deductibles or other variable features. The FFT
 provides a discrete approximation to the moment generating function.
 
 
+
+The next step is magic in actuarial science. Remember that if :math:`N`
+is a :math:`G`-mixed Poisson and :math:`A=X_1+\cdots+X_N` is an
+aggregate distribution then
+
+.. math:: M_A(z)=M_G(n(M_X(z)-1)).
+
+Using FFTs you can replace the *function* :math:`M_X` with the discrete
+approximation *vector* :math:`\hat{\mathsf{x}}` and compute
+
+.. math:: \hat{\mathsf{a}}=M_G(n(\hat{\mathsf{x}} -1))
+
+component-by-component to get an approximation vector to the function
+:math:`M_A`. You can then use the inverse FFT to recover an discrete
+approximation :math:`\mathsf a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
+for more details.
+
+Similar tricks are possible in two dimensions—see Press et al.,
+and Homer and Clark for a discussion.
+
+The FFT allows us to use the following very simple method to
+qualitatively approximate the density of an aggregate of dependent
+marginals :math:`X_1,\dots,X_n` given a correlation matrix
+:math:`\Sigma`. First use the FFT method to compute the sum :math:`S'`
+of the :math:`X_i` as though they were independent. Let
+:math:`\mathsf{Var}(S')=\sigma^{'2}` and let :math:`\sigma^2` be the variance of
+the sum of the :math:`X_i` implied by :math:`\Sigma`.
+
+Next use the FFT to add a further “noise” random variable :math:`N`
+to :math:`S'` with mean zero and variance :math:`\sigma^2-\sigma^{'2}`. Two
+obvious choices for the distribution of :math:`N` are normal or shifted
+lognormal. Then :math:`S'+N` has the same mean and variance as the sum of the
+dependent variables :math:`X_i`. The range of possible choices for :math:`N`
+highlights once again that knowing the marginals and correlation structure is
+not enough to determine the whole multivariate distribution. It is an
+interesting question whether all possible choices of :math:`N` correspond to
+actual multivariate structures for the
+:math:`X_i` and conversely whether all multivariate structures
+correspond to an :math:`N`. (It is easy to use MGFs to deconvolve
+:math:`N` from the true sum using Fourier methods; the question is
+whether the resulting “distribution” is non-negative.)
+
+Heckman and Meyers used Fourier transforms to compute aggregate
+distributions by numerically integrating the characteristic function.
+Direct inversion of the Fourier transform is also possible using FFTs.
+The application of FFTs is not completely straight forward because of
+certain aspects of the approximations involved. The details are very
+clearly explained in Menn and Rachev. Their method allows the use of
+FFTs to determine densities for distributions which have analytic MGFs
+but not densities—notably the class of stable distributions.
+
+
 .. _num overview:
 
 Overview
@@ -369,7 +421,7 @@ In general, it is best to use ``normalize=True`` in cases where the truncation e
 Fundamental Algorithm
 ----------------------
 
-This section describes the FFT convolution algorithm ``aggregate`` uses to compute aggregate distributions. The first subsection lays out the algorithm steps. The second discusses implementation details. The third explains why the algorithm works and discusses errors.
+This section describes the FFT convolution algorithm ``aggregate`` uses to compute aggregate distributions. The first subsection lays out the algorithm steps and the second discusses implementation details.
 
 Algorithm
 ~~~~~~~~~~~~
@@ -387,16 +439,16 @@ Algorithm
 Compute the aggregate distribution
 
 .. math::
-    A = X_1 + \cdots X_N
+    A = X_1 + \cdots + X_N
 
-under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is independent of :math:`X_i`, follow these steps:
+under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is independent of :math:`X_i`.
 
 **Algorithm steps.**
 
 #. Pad the vector :math:`\mathsf p` to length :math:`2^{\log_2 + d}` by appending zeros, to produce :math:`\mathsf x`.
-#. Compute the FFT :math:`\mathsf z:=\mathsf{FT}(\mathsf x)`.
+#. Compute :math:`\mathsf z:=\mathsf{FT}(\mathsf x)`.
 #. Compute :math:`\mathsf f:=M_N(\mathsf z)`.
-#. Compute the inverse FFT  :math:`\mathsf y:=\mathsf{IFT}(\mathsf f)`.
+#. Compute the inverse FFT,  :math:`\mathsf y:=\mathsf{IFT}(\mathsf f)`.
 #. Take the first :math:`m` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
 
 The output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
@@ -404,68 +456,13 @@ The output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :
 Implementation
 ~~~~~~~~~~~~~~~~~
 
-Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``numpy.fft`` called :meth:`numpy.fft.rfft` and :meth:`numpy.fft.irfft`. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on one line of code::
+Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``scipy.fft`` called :meth:`scipy.fft.rfft` and :meth:`scipy.fft.irfft`. There are similar functions in ``numpy.fft``. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The FFT routine automatically handles padding the input vector. The The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on one line of code::
 
     agg_density = rifft(M_N(rfft(p)))
 
-Obviously, a lot of work is done to marshal the input, but this line is where the magic happens.
+Obviously, a lot of work is done to marshal the input, but this line is where the magic occurs.
 
 The FFT routines are accurate up to machine noise, of order  ``1e-16``. The noise can be positive or negative---the latter highly undesirable in probabilities. It appears random and does not accumulate undesirably in practical applications. It is best to strip out the noise, setting to zero all values with absolute value less than machine epsilon (``numpy.finfo(float).esp``). The ``remove_fuzz`` option controls this behavior. It is set ``True`` by default. CHECK SURE?
-
-Theory and Errors
-~~~~~~~~~~~~~~~~~~
-
-
-
-The next step is magic in actuarial science. Remember that if :math:`N`
-is a :math:`G`-mixed Poisson and :math:`A=X_1+\cdots+X_N` is an
-aggregate distribution then
-
-.. math:: M_A(z)=M_G(n(M_X(z)-1)).
-
-Using FFTs you can replace the *function* :math:`M_X` with the discrete
-approximation *vector* :math:`\hat{\mathsf{x}}` and compute
-
-.. math:: \hat{\mathsf{a}}=M_G(n(\hat{\mathsf{x}} -1))
-
-component-by-component to get an approximation vector to the function
-:math:`M_A`. You can then use the inverse FFT to recover an discrete
-approximation :math:`\mathsf a` of :math:`A` from :math:`\hat{\mathsf{a}}`! See (big) Wang
-for more details.
-
-Similar tricks are possible in two dimensions—see Press et al.,
-and Homer and Clark for a discussion.
-
-The FFT allows us to use the following very simple method to
-qualitatively approximate the density of an aggregate of dependent
-marginals :math:`X_1,\dots,X_n` given a correlation matrix
-:math:`\Sigma`. First use the FFT method to compute the sum :math:`S'`
-of the :math:`X_i` as though they were independent. Let
-:math:`\mathsf{Var}(S')=\sigma^{'2}` and let :math:`\sigma^2` be the variance of
-the sum of the :math:`X_i` implied by :math:`\Sigma`.
-
-Next use the FFT to add a further “noise” random variable :math:`N`
-to :math:`S'` with mean zero and variance :math:`\sigma^2-\sigma^{'2}`. Two
-obvious choices for the distribution of :math:`N` are normal or shifted
-lognormal. Then :math:`S'+N` has the same mean and variance as the sum of the
-dependent variables :math:`X_i`. The range of possible choices for :math:`N`
-highlights once again that knowing the marginals and correlation structure is
-not enough to determine the whole multivariate distribution. It is an
-interesting question whether all possible choices of :math:`N` correspond to
-actual multivariate structures for the
-:math:`X_i` and conversely whether all multivariate structures
-correspond to an :math:`N`. (It is easy to use MGFs to deconvolve
-:math:`N` from the true sum using Fourier methods; the question is
-whether the resulting “distribution” is non-negative.)
-
-Heckman and Meyers used Fourier transforms to compute aggregate
-distributions by numerically integrating the characteristic function.
-Direct inversion of the Fourier transform is also possible using FFTs.
-The application of FFTs is not completely straight forward because of
-certain aspects of the approximations involved. The details are very
-clearly explained in Menn and Rachev. Their method allows the use of
-FFTs to determine densities for distributions which have analytic MGFs
-but not densities—notably the class of stable distributions.
 
 
 Explanation
@@ -474,13 +471,15 @@ Explanation
 
 .. _num errors:
 
-Sources of Error in the Algorithm
+Error Analysis
 -----------------------------------
 
-#. Discretization
-#. Truncation
-#. FFT algorithm
-#. Aliasing
+There are four sources of error in the algorithm:
+
+#. Discretization: replacing the original distribution with a discretized approximation.
+#. Truncation: shrinking the support of the distribution by right truncation.
+#. Aliasing: working with only finitely many frequencies in the Fourier domain.
+#. FFT algorithm: floating point issues, underflow and (rarely) overflow.
 
 
 .. _num parameters:

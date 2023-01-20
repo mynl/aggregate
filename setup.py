@@ -39,11 +39,11 @@ install_requires = [
 ]
 
 
-long_description = """aggregate: a powerful aggregate distribution modeling library in Python
-========================================================================
+long_description = """aggregate
+===========
 
-What is it?
------------
+Purpose
+-------
 
 ``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
@@ -91,7 +91,7 @@ enhancements and ideas are welcome.
 version = aggregate.__version__
 
 setup(name="aggregate",
-      description="aggregate - working with compound probability distributions",
+      description="aggregate - powerful tools for compound probability distributions",
       long_description=long_description,
       long_description_content_type='text/x-rst',
       license="BSD",
@@ -108,9 +108,9 @@ setup(name="aggregate",
           'Development Status :: 4 - Beta',
           'Programming Language :: Python :: 3',
           'License :: OSI Approved :: BSD License',
-          'Topic :: Education',
           'Topic :: Office/Business :: Financial',
           'Topic :: Scientific/Engineering :: Mathematics',
+          'Topic :: Education',
           'Intended Audience :: Financial and Insurance Industry',
           'Intended Audience :: Education'
       ],

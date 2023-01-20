@@ -11,7 +11,7 @@ access-oriented reference guides and problem and application based  practice
 guides. New users should start reading the :doc:`2_user_guides/2_x_student`
 or :doc:`2_user_guides/2_x_actuary_student` guide and scan
 through :doc:`2_user_guides/2_x_10mins`. See :doc:`5_Technical_Guides` for
-the theory and implementation details. Sections in the guides marked **Details** can be skipped. There is some duplication between sections to make them more independent.
+the theory and implementation details. Sections in the guides marked **Details** can be skipped. There is some duplication between sections to make them independent.
 
 #. :doc:`2_user_guides/2_x_student` (practice): Introduction to aggregate distributions using simple discrete examples for actuarial science majors and short-term actuarial modeling exam candidates; get started using :mod:`aggregate`.
 

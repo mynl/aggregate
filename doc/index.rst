@@ -5,18 +5,8 @@
 aggregate Documentation
 #######################
 
-.. toctree::
-   :maxdepth: 3
-   :hidden:
-   :numbered:
-
-   1_Getting_Started
-   2_User_Guides
-   3_Reference
-   4_dec_Language_Reference
-   5_Technical_Guides
-   6_Development
-   7_bibliography
+Introduction
+=============
 
 :mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
@@ -104,3 +94,17 @@ This help document is in six parts plus a bibliography.
       :type: ref
       :text: Development
       :classes: btn-block btn-secondary stretched-link
+
+
+.. toctree::
+   :maxdepth: 3
+   :hidden:
+   :numbered:
+
+   1_Getting_Started
+   2_User_Guides
+   3_Reference
+   4_dec_Language_Reference
+   5_Technical_Guides
+   6_Development
+   7_bibliography

@@ -167,6 +167,16 @@ License
 
 BSD 3 licence.
 
+
+Versions
+---------
+
+Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
+
+* MAJOR version changes with incompatible API changes.
+* MINOR version changes with added functionality in a backwards compatible manner.
+* PATCH version changes with backwards compatible bug fixes.
+
 Contributing to aggregate
 -------------------------
 

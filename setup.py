@@ -91,7 +91,7 @@ enhancements and ideas are welcome.
 version = aggregate.__version__
 
 setup(name="aggregate",
-      description="aggregate - powerful tools for compound probability distributions",
+      description="Tools for creating and working with aggregate probability distributions.",
       long_description=long_description,
       long_description_content_type='text/x-rst',
       license="BSD",

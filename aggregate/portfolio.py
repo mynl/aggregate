@@ -5723,7 +5723,7 @@ def make_awkward(log2, scale=False):
     sc = 1 << log2
     xs = [int(bin(i)[2:], 4) for i in range(n)]
     ys = [2 * i for i in xs]
-    ps = [1 / n for i in xs]
+    ps = [1 / n] * n
     if scale is True:
         xs = np.array(xs) / sc
         ys = np.array(ys) / sc
@@ -5733,5 +5733,5 @@ def make_awkward(log2, scale=False):
     B = Aggregate('B', exp_en=1, sev_name='dhistogram', sev_xs=ys, sev_ps=ps,
                       freq_name='empirical', freq_a=np.array([1]), freq_b=np.array([1]))
     awk = Portfolio('awkward', [A, B])
-    awk.update(log2+1, 1/sc if scale else 1, remove_fuzz=True, padding=0)
+    awk.update(log2, 1/sc if scale else 1, remove_fuzz=True, padding=0)
     return awk

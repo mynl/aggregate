@@ -3126,7 +3126,11 @@ class Severity(ss.rv_continuous):
                     ps = _.p.values
                     del _
                 # was + but F(x) = Pr(X<=x) so shd be to left
-                xss = np.sort(np.hstack((xs - 2 ** -14, xs)))
+                # Jan 2023: want the increment to be smaller than any reasonable
+                # bucket size so buckets are not "split". This is fragile
+                # TODO: make 30 depend on the magnitude of xs to avoid underflow problems
+                # we won't likely ever have more than 1B = 2**30 buckets
+                xss = np.sort(np.hstack((xs - 2 ** -30, xs)))
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
                 self.fz = ss.rv_histogram((pss, xss))
             else:

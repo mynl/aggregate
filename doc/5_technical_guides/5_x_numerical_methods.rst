@@ -428,9 +428,10 @@ Algorithm
 
 **Algorithm input.**
 
-#. A bucket size :math:`b` and number of buckets :math:`m=2^{\log_2}`.
+#. A bucket size :math:`b`.
+#. A target number of buckets, expressed as its log base-2, :math:`\mathit{log2}`.
 #. An integer padding parameter :math:`d \ge 0`.
-#. A vector :math:`\mathsf p=(p_0,p_1,\dots,p_{m-1})` of probabilities :math:`p_k=\Pr(X=kb)` describing a discrete severity distribution :math:`X`, with :math:`\sum_k p_k \le 1`.
+#. A vector :math:`\mathsf p=(p_0,p_1,\dots,p_{l-1})` of probabilities :math:`p_k=\Pr(X=kb)` describing a discrete severity distribution :math:`X`, with :math:`l\le 2^\mathit{log2}` and :math:`\sum_k p_k \le 1`.
 #. The moment generating function :math:`M_N(z):=\mathsf E[e^{zN}]` of the frequency distribution :math:`N`.
 #. FFT and inverse FFT functions :math:`\mathsf{FT}` and :math:`\mathsf{IFT}`.
 
@@ -445,13 +446,13 @@ under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is in
 
 **Algorithm steps.**
 
-#. Pad the vector :math:`\mathsf p` to length :math:`2^{\log_2 + d}` by appending zeros, to produce :math:`\mathsf x`.
+#. Pad the vector :math:`\mathsf p` to length :math:`2^{\mathit{log2} + d}` by appending zeros, to produce :math:`\mathsf x`.
 #. Compute :math:`\mathsf z:=\mathsf{FT}(\mathsf x)`.
 #. Compute :math:`\mathsf f:=M_N(\mathsf z)`.
 #. Compute the inverse FFT,  :math:`\mathsf y:=\mathsf{IFT}(\mathsf f)`.
-#. Take the first :math:`m` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
+#. Take the first :math:`m:=2^{\mathit{log2}}` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
 
-The output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
+The output :math:`\mathsf a=(a_0,\dots,a_{m-1})`has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
 
 Implementation
 ~~~~~~~~~~~~~~~~~

@@ -92,7 +92,7 @@ def plot_comparison(self, projections, axs, smooth):
         yl = axd.get_ylim()
         if yl[1] > 100:
             axd.set(yscale='log', ylabel='log density')
-        axd.legend(loc='upper right')
+        axd.legend(loc='upper right').set(title='NORMALIZED losses')
 
         # plot normalized distributions on linear and return period scale
         ax.plot(self.density_df[f'p_{unit}'].cumsum(),

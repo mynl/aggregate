@@ -9,6 +9,7 @@ from . test_suite import *
 from . pir_figures import *
 from . figures import *
 from . risk_progression import *
+from . bodoff import *
 
 # module level doc-string
 __doc__ = """

@@ -12,7 +12,7 @@ Published Problems and Examples
 **Contents:**
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 1
 
     problems/010_gh_example
     problems/020_ef_example

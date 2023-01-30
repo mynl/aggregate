@@ -538,9 +538,13 @@ class Aggregate(Frequency):
             # expect next two rows to be the same...but they are not in certain situations...
             # the second is more on point.
             # self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
-            self._density_df['S'] = fill_value + self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
-            fill_value = max(0, 1. - (self._density_df.F_sev.iloc[-1]))
-            self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=fill_value)[::-1].cumsum()
+            # change Jan 2023 - general principle S is best computed forwards
+            # self._density_df['S'] = fill_value + self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
+            # fill_value = max(0, 1. - (self._density_df.F_sev.iloc[-1]))
+            # self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=fill_value)[::-1].cumsum()
+            # Update 2021-01-28: S is best computed forwards
+            self._density_df['S'] = 1 - self._density_df.p_total.cumsum()
+            self._density_df['S_sev'] = 1 - self._density_df.p_sev.cumsum()
 
             # add LEV, TVaR to each threshold point...
             self._density_df['lev'] = self._density_df.S.shift(1, fill_value=0).cumsum() * self.bs
@@ -1496,71 +1500,74 @@ class Aggregate(Frequency):
         # invalidate stored functions
         self._cdf = None
 
-    # def update_efficiently(self, xs, padding=1, approximation='exact', sev_calc='discrete',
-    #                        discretization_calc='survival', normalize=True):
-    #     """
-    #     Compute the density with absolute minimum overhead. Called by port.update_efficiently
-    #     Started with code for update and removed frills
-    #     No tilting!
-    #
-    #     :param xs:  range of x values used to discretize
-    #     :param padding: for FFT calculation
-    #     :param approximation: exact = perform frequency / severity convolution using FFTs. slognorm or
-    #       sgamma apply shifted lognormal or shifted gamma approximations.
-    #     :param sev_calc:   discrete = suitable for fft, continuous = for rv_histogram cts version
-    #     :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
-    #     :param normalize:  if True, normalize the density to sum to 1. For thick tail distributions, this may not
-    #       be appropriate and should be set to False.
-    #     :return:
-    #     """
-    #
-    #     self.xs = xs
-    #     self.bs = xs[1]
-    #     self.log2 = int(np.log(len(xs)) / np.log(2))
-    #     tilt_vector = None
-    #
-    #     # make the severity vector: a claim count weighted average of the severities
-    #     if approximation == 'exact':
-    #         wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
-    #         self.sev_density = np.zeros_like(xs)
-    #         beds = self.discretize(sev_calc, discretization_calc, normalize)
-    #         for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
-    #             self.sev_density += temp * w
-    #
-    #     if approximation == 'exact':
-    #         if self.n == 0:
-    #             # for dynamics it is helpful to have a zero risk return zero appropriately
-    #             # z = ft(self.sev_density, padding, tilt_vector)
-    #             self.agg_density = np.zeros_like(self.xs)
-    #             self.agg_density[0] = 1
-    #             # extreme idleness...but need to make sure it is the right shape and type
-    #             self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
-    #         else:
-    #             # usual calculation...this is where the magic happens!
-    #             z = ft(self.sev_density, padding, tilt_vector)
-    #             self.ftagg_density = self.mgf(self.n, z)
-    #             self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
-    #     else:
-    #         # regardless of request if skew == 0 have to use normal
-    #         if self.agg_skew == 0:
-    #             self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)
-    #         elif approximation == 'slognorm':
-    #             shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
-    #             self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-    #         elif approximation == 'sgamma':
-    #             shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
-    #             self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
-    #         else:
-    #             raise ValueError(f'Invalid approximation {approximation} option passed to CAgg density. '
-    #                              'Allowable options are: exact | slogorm | sgamma')
-    #
-    #         ps = self.fzapprox.pdf(xs)
-    #         self.agg_density = ps / np.sum(ps)
-    #         self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
-    #
-    #     # invalidate stored functions
-    #     self._cdf = None
-    #     self.verbose_audit_df = None
+    @property
+    def valid(self):
+        """
+        Check if the model appears valid. An answer of True does not guarantee the model is valid, but
+        False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
+        Called and reported automatically by qd for Aggregate objects.
+
+        Checks the relative errors (from ``self.describe``) for:
+
+        * severity mean < eps
+        * severity cv < 10 * eps
+        * severity skew < 100 * eps (skewness is more difficult to estimate)
+        * aggregate mean < eps and < 2 * severity mean relative error (larger values
+          indicate possibility of aliasing and that ``bs`` is too small).
+        * aggregate cv < 10 * eps
+        * aggregate skew < 100 * esp
+
+        eps = 1e-5
+
+        Test only applied for CV and skewness when they are > 0.
+
+        Run with logger level 30 (warning) for more information on failures.
+
+        :return: True if all tests are passed, else False.
+
+        """
+        if self._density_df is None:
+            return True
+        df = self.describe.abs()
+        try:
+            df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
+        except ZeroDivisionError:
+            df['Err Skew(X)'] = np.nan
+        except TypeError:
+            df['Err Skew(X)'] = np.nan
+        eps = 1e-4
+        if df.loc['Sev', 'Err E[X]'] > eps:
+            logger.warning('FAIL: Sev mean error > eps')
+            return False
+
+        if df.loc['Agg', 'Err E[X]'] > eps:
+            logger.warning('FAIL: Agg mean error > eps')
+            return False
+
+        if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
+            logger.warning('FAIL: Agg mean error > 10 * sev error')
+            return False
+
+        try:
+            if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
+                logger.warning('FAIL: Sev CV error > eps')
+                return False
+
+            if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
+                logger.warning('FAIL: Agg CV error > eps')
+                return False
+
+            if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
+                logger.warning('FAIL: Sev skew error > eps')
+                return False
+
+            if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
+                logger.warning('FAIL: Agg skew error > eps')
+                return False
+        except (TypeError, ZeroDivisionError):
+            pass
+
+        return True
 
     def picks(self, attachments, layer_loss_picks, debug=False):
         """
@@ -1844,9 +1851,9 @@ class Aggregate(Frequency):
         self.density_df['gS'] = gS
         self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
 
-    def cramer_lundberg(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=0):
+    def pollaczeck_khinchine(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
         """
-        Return the CL function relating surplus to eventual probability of ruin.
+        Return the PZ function relating surplus to eventual probability of ruin.
 
         Assumes frequency is Poisson
 
@@ -1856,7 +1863,7 @@ class Aggregate(Frequency):
         excess = replace severit with X | X > cap (i.e. no shifting)
         stop_loss = apply stop loss reinsurance to cap, so  X > stop_loss replaced with Pr(X > stop_loss) mass
 
-        Embrechts, Kluppelberg, Mikosch 1.2 Page 28 Formula 1.11
+        Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
 
         Pollaczeck-Khinchine Capital
 
@@ -1920,6 +1927,9 @@ class Aggregate(Frequency):
                 return q
 
         return ruin, find_u, mean, dfi  # , ruin2
+
+    # for backwards compatibility
+    cramer_lundberg = pollaczeck_khinchine
 
     def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name=""):
         """
@@ -2396,7 +2406,6 @@ class Aggregate(Frequency):
             df.loc['Sev', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_sev_skew']
             df.loc['Agg', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_agg_skew']
             df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)', 'Est Skew(X)']]
-        df = df.fillna('')
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
 

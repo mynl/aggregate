@@ -24,7 +24,7 @@ Technical Guides cover theory and implementation. How calculations work in theor
 
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     5_technical_guides/5_x_probability
     5_technical_guides/5_x_quantiles
@@ -32,6 +32,7 @@ Technical Guides cover theory and implementation. How calculations work in theor
     5_technical_guides/5_x_numerical_methods
     5_technical_guides/5_x_distortions
     5_technical_guides/5_x_bodoff
+    5_technical_guides/5_x_pk
     5_technical_guides/5_x_calculations
     5_technical_guides/5_x_working_with_samples
 

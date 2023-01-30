@@ -649,8 +649,10 @@ class Distortion(object):
                 sum()['p_total']
             dist.price(ser, port.q(0.99), 'both')
 
+        Always use ``S_calculation='forwards`` method to compute S = 1 - cumsum(probs).
+        Computes the price as the integral of gS.
 
-        :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes must
+        :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes need not
           be spaced evenly. ``ser`` is usually a probability column from ``density_df``.
         :param kind: is "ask", "bid",  or "both", giving the pricing view.
         :param a: asset level. ``ser`` is truncated at ``a``.
@@ -669,12 +671,13 @@ class Distortion(object):
 
         # apply limit
         if a < np.inf:
-            ser = ser.copy()
-            tail = ser[a:].sum()
+            # ser = ser.copy()
+            # tail = ser[a:].sum()
             ser = ser[:a]
-            ser[a] = tail
-        else:
-            ser = ser.sort_index(ascending=True)
+            # ser[a] = tail
+
+        # unlikely to be an issue
+        ser = ser.sort_index(ascending=True)
 
         if S_calculation == 'forwards':
             S = 1 - ser.cumsum()
@@ -733,6 +736,7 @@ class Distortion(object):
         loss = (S.iloc[:-1].values * dx).cumsum()
         ask = (gS[:-1] * dx).cumsum()
         bid = (dgS[:-1] * dx).cumsum()
+        # index is shifted by 1 because it is the right hand range of integration
         ans = pd.DataFrame({'bid': bid, 'el': loss, 'ask': ask}, index=S.index[1:])
         if a is None:
             return ans

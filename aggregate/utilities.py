@@ -2805,12 +2805,12 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
             if 'Err CV(X)' in x.describe.columns:
-                qd(x.describe.drop(columns=['Err CV(X)']), accuracy=accuracy, **kwargs)
+                qd(x.describe.drop(columns=['Err CV(X)']).fillna(''), accuracy=accuracy, **kwargs)
             else:
                 # object not updated
-                qd(x.describe, accuracy=accuracy, **kwargs)
+                qd(x.describe.fillna(''), accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            print(f'log2 = {x.log2}, bs = {bss}')
+            print(f'log2 = {x.log2}, bs = {bss}, valid = {x.valid}.')
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,

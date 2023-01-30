@@ -1,5 +1,6 @@
-# standalone figures from PIR book
+# standalone figures and tables from PIR book
 
+from itertools import count
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import numpy as np
@@ -277,25 +278,78 @@ def g_loss_margin_equity(axs, dist, s=0.25):
     # a.plot([0, s], [g_s, g_s], lw=1, c='k')
     a.plot([0, .626], [g_s, g_s], lw=.5, c='k', ls='-')
 
+def natural_scale(port):
+    """
+    For creating Table 9.15
+    """
+    margins = np.hstack((np.linspace(.025, .1, 4), np.linspace(.15, .25, 3)))
+    roe = .1
+    p_defaults = [.01, .05, 0.1, .25]
+    df = pd.DataFrame(columns=['limit', 'p_default', 'margin', 'roe', 'exi', 'cvxi', 'lambda', 'u', 'mean_g', 'max_index'], dtype=float)
+    limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 5, 10]}
+    counter = count(0, 1)
+    for line_name in  port.line_names[:3]:
+        ag = port[line_name]
+        ag_ex = ag.agg_m
+        for margin in margins:
+            try:
+                ruin, find_u, mean, dfi = ag.pollaczeck_khinchine(margin, kind='index', padding=2)
+                # ruin, find_u, mean, dfi = ag.cramer_lundberg(margin, kind='interpolate', padding=2)
+                # density of integrated distribution
+                dfi = pd.Series(dfi, index=ruin.index)
+                ex = np.sum(dfi * dfi.index)
+                ex2 = np.sum(dfi * dfi.index**2)
+                # mean and SD of integrated distibution
+                cv = np.sqrt(ex2 - ex*ex) / ex
+                mean_g = ex / margin
+                for p_default, i in zip(p_defaults, counter):
+                    u = find_u(p_default)
+                    n_lambda = roe *  u / (margin * ag_ex)
+                    df.loc[i] = [limit_dict[line_name], p_default, margin, roe, ex, cv, n_lambda, u, mean_g, ruin.index[-1]]
+            except IndexError as e:
+                print(e)
+    df['u/r'] = df.u / df.margin
+    bit = df.set_index(['limit', 'margin', 'p_default'])['lambda'].unstack(1)
+    bit.index.names = ['Limit', 'p']
+    bit.columns.name = 'Margin'
+    return bit
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def fig_9_1(port):
+    from .case_studies import ClassicalPremium
+    port_name = 'gross'
+    line_names = ['Limit1', 'Limit10']
+    margin = 0.1
+    ruins = {}
+    find_us = {}
+    dfis = {}
+    for line_name in line_names:
+        ag = port[line_name]
+        ruins[line_name], find_us[line_name], mean, dfi = ag.cramer_lundberg(margin, kind='interpolate')
+        dfis[line_name] = pd.Series(dfi, index=ruins[line_name].index)
+    xmaxs= {'Limit1': 10e6, 'Limit10': 50e6}
+    limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 10]}
+    n_big_dict ={'Limit1': 10000, 'Limit10': 50000}
+    cp = ClassicalPremium({'gross': port}, 110)
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True)
+    axi = iter(axs.flat)
+    for line_name in line_names:
+        ax0 = next(axi)
+        ax1 = next(axi)
+        ax_ = ax0.twinx()
+        xmax = xmaxs[line_name]
+        ruins[line_name].index.name = 'Starting capital'
+        ruins[line_name].plot(ax=ax0)
+        ax0.axhline(1/(1+margin), lw=1)
+        ruins[line_name].plot(ax=ax_, ls='--', lw=1)
+        ax_.set(ylim=[0.5e-6, 2], ylabel='log probability', yscale='log')
+        ax_.yaxis.set_minor_locator(ticker.LogLocator(subs='all', numticks=20))
+        ax0.set(xlim=[-xmax/50, xmax], ylim=[-0.05, 1.05], ylabel='Probability of eventual default',
+                title=f'Limit {limit_dict[line_name]/1e6:.0f}M, margin {margin}')
+        ax_.set(xlim=[-xmax/50, xmax])
+        p_default = 0.05
+        cp.illustrate(port_name, line_name, ax1, margin, p=p_default, n_big=n_big_dict[line_name], n_sample=100)
+        ax1.set(xlabel='Volume or time')
 
 
 # Module Name : curlyBrace

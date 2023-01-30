@@ -195,16 +195,20 @@ class Underwriter(object):
                 raise KeyError(f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
 
     def __repr__(self):
+        import aggregate
         s = []
         s.append(f'underwriter   {self.name}')
         s.append(f'knowledge     {len(self._knowledge)} programs')
+        s.append(f'version       {aggregate.__version__}')
         for k in ['log2', 'update', 'debug', 'site_dir', 'default_dir']:
             s.append(f'{k:<14s}{getattr(self, k)}')
         # s.append(super().__repr__())
         return '\n'.join(s)
 
     def _repr_html_(self):
+        import aggregate
         s = [f'<p><h3>Underwriter {self.name}</h3>',
+             f'Version {aggregate.__version__}. '
              f'Knowledge contains {len(self._knowledge)} programs. '
              'Run <code>build.knowledge</code> for a DataFrame listing by kind and name. '
              'Run <code>build.show(name)</code> for more details entry <code>name</code>, '

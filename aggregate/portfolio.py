@@ -396,7 +396,7 @@ class Portfolio(object):
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
-        df = pd.concat(t1, keys=t2, names=['unit', 'X']).fillna('')
+        df = pd.concat(t1, keys=t2, names=['unit', 'X'])
         if self.audit_df is not None:
             # add estimated severity
             sev_est_m = (df.xs('Sev', axis=0, level=1)['Est E[X]'].iloc[:-1].astype(float) *
@@ -1213,6 +1213,86 @@ class Portfolio(object):
         self._cdf = None
 
     @property
+    def valid(self):
+        """
+        Check if the model appears valid. See documentation for Aggregate.valid.
+
+        An answer of True does not guarantee the model is valid, but
+        False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
+        Called and reported automatically by qd for Aggregate objects.
+
+        Checks the relative errors (from ``self.describe``) for:
+
+        * severity mean < eps
+        * severity cv < 10 * eps
+        * severity skew < 100 * eps (skewness is more difficult to estimate)
+        * aggregate mean < eps and < 2 * severity mean relative error (larger values
+          indicate possibility of aliasing and that ``bs`` is too small).
+        * aggregate cv < 10 * eps
+        * aggregate skew < 100 * esp
+
+        eps = 1e-5
+
+        Test only applied for CV and skewness when they are > 0.
+
+        :return: True if all tests are passed, else False.
+
+        """
+        if self.density_df is None:
+            return True
+
+        any_false = False
+        for a in self.agg_list:
+            if not a.valid:
+                logger.warning(f'Aggregate {a.name} not valid')
+                any_false = True
+
+        if any_false:
+            return False
+        else:
+            logger.info('All aggregate objects pass validation.')
+
+        df = self.describe.xs('total', level=0, axis=0).abs()
+        try:
+            df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
+        except ZeroDivisionError:
+            df['Err Skew(X)'] = np.nan
+        except TypeError:
+            df['Err Skew(X)'] = np.nan
+        eps = 1e-3
+        if df.loc['Sev', 'Err E[X]'] > eps:
+            logger.warning('FAIL: Portfolio Sev mean error > eps')
+            return False
+
+        if df.loc['Agg', 'Err E[X]'] > eps:
+            logger.warning('FAIL: Portfolio Agg mean error > eps')
+            return False
+
+        if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
+            logger.warning('FAIL: Agg mean error > 10 * sev error')
+            return False
+        try:
+            if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
+                logger.warning('FAIL: Portfolio Sev CV error > eps')
+                return False
+
+            if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
+                logger.warning('FAIL: Portfolio Agg CV error > eps')
+                return False
+
+            if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
+                logger.warning('FAIL: Portfolio Sev skew error > eps')
+                return False
+
+            if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
+                logger.warning('FAIL: Portfolio Agg skew error > eps')
+                return False
+        except (TypeError, ZeroDivisionError):
+            pass
+
+        return True
+
+    @property
     def priority_capital_df(self):
         if self._priority_capital_df is None:
             # default priority analysis
@@ -1913,9 +1993,19 @@ class Portfolio(object):
         #                          max(0, 1. - (df.p_total.sum())))))
         # which was ugly and not quite right because the it ended  ... pn plast  vs  pn+plast, plast
         # Dec 2020
-        # TODO: fix and rationalize with Aggregate.density_df; this can't be right, can it? Fill value is just S(last point)
-        df['S'] =  \
-            df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+        # TODO: fix and rationalize with Aggregate.density_df; this can't be right, can it?
+        #  Fill value is just S(last point)
+        #df['S'] =  \
+        #    df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+
+        # Jan 2023 update: use the same method as Aggregate.density_df
+        # And the end of all our exploring
+        # Will be to arrive where we started
+        # And know the place for the first time.
+        # T.S. Eliot
+        # The loss of accuracy is not germaine in portfolio where you have gone through
+        # FFTs
+        df['S'] = 1 - df.F
 
         # get rounding errors, S may not go below zero
         logger.info(
@@ -3536,17 +3626,19 @@ class Portfolio(object):
 
         return ans
 
-    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True, augmented_dfs=None,
-                            regex='', add_comps=True):
+    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True,
+                            augmented_dfs=None, regex='', add_comps=True):
         """
         Run analyze_distortion on self.dists
 
         :param a:
         :param p: the percentile of capital that the distortions are calibrated to
-        :param efficient:
+        :param kind: var, upper var, tvar, epd
         :param mass_hints:
-        :param kind:
-        :param regex: regex to match name of distortion to apply
+        :param efficient:
+        :param augmented_dfs: input pre-computed augmented_dfs (distortions applied)
+        :param regex: apply only distortion names matching regex
+        :param add_comps: add traditional pricing comps to the answer
         :return:
 
         """

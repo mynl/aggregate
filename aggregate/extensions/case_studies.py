@@ -1035,6 +1035,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         ]
         for port, nm, caption in zip((self.net, self.gross), ('T_net', 'T_gross'), captions):
             f, axs = self.smfig(4, 3, (10.8, 12.0))
+            # ad comps does not create augmented
+            port.apply_distortion(port.dists['dual'], efficient=False)
             port.twelve_plot(f, axs, xmax=xlim[1], ymax2=xlim[1],
                         contour_scale=port.q(self.reg_p), sort_order=sort_order, cmap=self.colormap)
             axs[0][0].set(ylim=ylim, xlim=xlim)

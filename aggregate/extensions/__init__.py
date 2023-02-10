@@ -10,6 +10,7 @@ from . pir_figures import *
 from . figures import *
 from . risk_progression import *
 from . bodoff import *
+from . ft import *
 
 # module level doc-string
 __doc__ = """

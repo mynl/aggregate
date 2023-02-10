@@ -270,9 +270,21 @@ class Distortion(object):
                 gs = np.array([0.,   pt,   1., 1.])
                 g = interp1d(s, gs, kind='linear')
                 g_inv = interp1d(gs, s, kind='linear')
+
+                if p1 < 1:
+                    def g_prime(x):
+                        return np.where(x > 1 - p0, 0,
+                                        np.where(x < 1 - p1,
+                                                 w / (1 - p1) + (1 - w) / (1 - p0),
+                                                 (1 - w) / (1 - p0)))
+                else:
+                    # p1==1, don't want 1/(1-p1)
+                    def g_prime(x):
+                        return np.where(x > 1 - p0, 0, (1 - w) / (1 - p0))
+
             except:
-                raise ValueError('Inadmissible parameters to Distortion for wtdtvar'
-                                 'pass shape=wt for p1 and df=[p0, p1]')
+                raise ValueError('Inadmissible parameters to Distortion for wtdtvar. '
+                                 'Pass shape=wt for p1 and df=[p0, p1]')
 
         elif self._name == 'convex':
             # convex envelope and general interpolation

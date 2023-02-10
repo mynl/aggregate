@@ -294,7 +294,7 @@ def price_compare(self, dn, projection_dists, ud_dists):
 
 def full_monty(self, dn, truncate=True, smooth=16):
     """
-    One stop shop for a Portfolio self
+    One-stop shop for a Portfolio self
     Unlimited assets
     Prints all on one giant figure
     """

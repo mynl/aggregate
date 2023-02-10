@@ -174,13 +174,36 @@ Second, a piecewise linear continuous approximation. This distribution has a ste
 
 The second approach assumes the aggregate has a continuous distribution, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed (they have a mass at zero). An aggregate whose severity has a limit has a mass at multiples of the limit, caused by the non-zero probability of limit-only claims. When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts from  a numerical approximation. The large jumps may be obvious but the small ones are not.
 
+.. _num robertson:
+
+Sidebar
+"""""""""
+
+It is possible to approximate the continuous cdf approach in ``aggregate``. For example, the following code will reproduce the simple example in Section 4 of :cite:t:`Robertson1992`. Compare the output to his Table 4. Using ``bs=1/200`` approximates a continuous histogram. The use of a decimal bucket size is never recommended, but is used here to approximate Robertson's table values.
+
+.. ipython:: python
+   :okwarning:
+
+   from aggregate import build, qd
+
+   s = build('agg Robertson '
+             '5 claims '
+             'sev chistogram xps [0 .2 .4 .6 .8 1] [.2 .2 .2 .2 .2] '
+             'fixed'
+             , bs=1/200, log2=12)
+   qd(s.density_df.loc[0:6:40, ['F']], max_rows=100,
+     float_format=lambda x: f'{x:.10f}')
+
+----
+
 There are three other arguments in favor of discrete models. First, we live in a discrete world. Monetary amounts are multiples of a smallest unit: the penny, cent, yen, satoshi. Computers are inherently discrete. Second, probability theory is based on measure theory, which approximates distributions using simple functions that are discrete. Third, the continuous model introduces unnecessary complexities in use, without any guaranteed gain in accuracy across all cases. See the complicated calculations in :cite:t:`Robertson1992`, for example.
+
 
 .. a version of the following is in 10 mins
 
-For all of these reasons we use a discrete numerical approximation. Further, **we assume that the distribution is known at integer multiples of a fixed bandwidth or bucket size**. This assumption is forced by the use of FFTs and has some undesirable consequences, as we shall see. Ideally, we would use a stratified approach, sampling more points where the distribution changes shape and using larger gaps to capture the tail. However, the computational efficiency of FFTs make this a good trade-off.
+For these reasons, we use a discrete numerical approximation. Further, we assume that the distribution is known at integer multiples of a fixed bandwidth or bucket size. This assumption is forced by the use of FFTs and has some undesirable consequences, as we shall see. Ideally, we would use a stratified approach, sampling more points where the distribution changes shape and using larger gaps to capture the tail. However, the computational efficiency of FFTs make this a good trade-off.
 
-Based on the above considerations, to compute an aggregate means that we have a discrete approximation to its distribution function concentrated on integer multiples of a fixed bucket size :math:`b`. This specifies the approximation aggregate as
+Based on the above considerations, saying we have "computed an aggregate" means that we have a discrete approximation to its distribution function concentrated on integer multiples of a fixed bucket size :math:`b`. This specifies the approximation aggregate as
 
 #. the value :math:`b` and
 #. a vector of probabilities :math:`(p_0,p_1,\dots, p_{n-1})`
@@ -213,13 +236,11 @@ Infinite Discretization
 
 There are four common methods to create an infinite discretization.
 
-#. The **rounding** method assigns probability
+#. The **rounding** method assigns probability to the :math:`k` th bucket equal to
 
    .. math:: p_k &= \Pr((k - 1/2)b < X \le (k + 1/2)b) \\
                  &= F((k + 1/2)b) - F((k - 1/2)b) \\
-             p_0 &= F(b/2)
-
-   to the :math:`k` th bucket.
+             p_0 &= F(b/2).
 
 #. The **forward** difference method assigns
 
@@ -240,7 +261,7 @@ There are four common methods to create an infinite discretization.
       p_k &= \frac{2\mathsf E[X \wedge kb] - \mathsf E[X \wedge (k-1)b] - \mathsf E[X \wedge (k+1)b]}{b} \\
       p_0 &= 1 - \frac{\mathsf E[X \wedge b]}{b}.
 
-   It ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
+   The moment difference ensures the discretized distribution has the same first moment as the original distribution. This method can be extended to match more moments,  but the resulting weights are not guaranteed to be positive.
 
 
 .. _num note:
@@ -248,7 +269,7 @@ There are four common methods to create an infinite discretization.
 .. note::
     Setting the first bucket to :math:`F(b/2)` for the rounding method (resp. :math:`F(b)`, :math:`F(0)`) allows the use of random variables with negative support. Any values :math:`\le 0` are included in the zero bucket. This behavior is useful because it allows the normal, Cauchy, and other similar distributions can be used as the basis for a severity.
 
-Each of these methods methods produces a sequence :math:`p_k\ge 0` of probabilities that sum to 1 and can be interpreted as the pmf and distribution function :math:`F_b^{(d)}` of a discrete approximation random variable :math:`X_b^{(d)}`
+Each of these methods produces a sequence :math:`p_k\ge 0` of probabilities that sum to 1 and can be interpreted as the pmf and distribution function :math:`F_b^{(d)}` of a discrete approximation random variable :math:`X_b^{(d)}`
 
 .. math ::
 
@@ -277,16 +298,18 @@ It is clear that :cite:p:`Embrechts2009a`
 Rounding Method Used by Default
 """"""""""""""""""""""""""""""""
 
-Based on the following observations as well as independent testing, ``aggregate`` uses the **rounding** method by default and offers the forward and backwards methods to compute explicit bounds on the distribution approximation if required. These options are available in :meth:`update` through the ``sev_calc`` argument, which can take the values ``round``, ``forwards``, and ``backwards``.
 
+``aggregate`` uses the **rounding** method by default and offers the forward and backwards methods to compute explicit bounds on the distribution approximation if required.
+These options are available in :meth:`update` through the ``sev_calc`` argument, which can take the values ``round``, ``forwards``, and ``backwards``.
+This decision is based on the following observations and other independent testing.
 
-:cite:t:`Embrechts2009a` comment (emphasis added) on the moment method
+:cite:t:`Embrechts2009a` comment on the moment method (emphasis added)
 
    that both the forward/backward differences and the rounding method do not conserve any moments of the original distribution. In this light :cite:t:`Gerber1982` suggests a procedure that locally matches the first :math:`k` moments. Practically interesting is only the case :math:`k = 1`; for :math:`k \ge 2` the procedure is not well defined, potentially leading to negative probability mass on certain lattice points. The moment matching method is **much more involved than the rounding method** in terms of implementation; we need to calculate limited expected values. Apart from that, the **gain is rather modest**; moment matching only pays off for large bandwidths, and after all, **the rounding method is to be preferred**. This is further reinforced by the work of  :cite:t:`Grubel1999`: if the severity distribution is absolutely continuous with a sufficiently smooth density, the quantity :math:`f_{b,j} / b`, an approximation for the compound density, can be quadratically extrapolated.
 
 .. LM on moment matching p. 182. careful here
 
-:cite:t:`LM` report that :cite:t:`Panjer1983` found two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, the **rounding method and the first-moment method had similar errors**, while the second-moment method provided significant improvement but at the cost of no longer guaranteeing that the resulting probabilities are  **nonnegative**.
+:cite:t:`LM` report that :cite:t:`Panjer1983` found two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, they report that the **rounding method and the first-moment method had similar errors**, while the second-moment method provided significant improvement but at the cost of no longer guaranteeing that the resulting probabilities are  **nonnegative**.
 
 .. LM go on: The methods described here are qualitatively similar to numerical methods used to solve Volterra integral equations such as (9.26) developed in numerical analysis (see, e.g. Baker [10]).
   Ex 9.41 gives the formulas for weights in terms of LEVs.
@@ -351,19 +374,17 @@ Next, create aggregate distributions with a Poisson frequency,  mean 4 claims, s
 Implementation Details
 """"""""""""""""""""""""
 
-Severities specified discretely, using the ``dsev`` keyword are implemented using a ``scipy.stats`` ``rv_historgram`` object, which is actually continuous. They work by concentrating the probability in small intervals just to the right of each knot point. Given::
+Severities specified discretely, using the ``dsev`` keyword are implemented using a ``scipy.stats`` ``rv_historgram`` object, which is actually continuous. They work by concentrating the probability in small intervals just to the left of each knot point (to make the function right continuous). Given::
 
     dsev [xs] [ps]
 
 where ``xs`` and ``ps`` are the vectors of outcomes and probabilities, internally ``aggregate`` creates::
 
-   xss = np.sort(np.hstack((xs - 2 ** -14, xs)))
+   xss = np.sort(np.hstack((xs - 2 ** -30, xs)))
    pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
    fz_discr = ss.rv_histogram((pss, xss))
 
-.. TODO seems this might be slightly wrong when bs is very small? material?
-
-The value 1e-14 just needs to be smaller than the bucket size resolution, i.e. small enought not to “split the bucket”. The mass is to the left of the knot to make a right continuous function (the approximation ramps up before the knot). Generally histograms are downsampled, not upsampled, so this is not a restriction.
+The value 1e-30 needs to be smaller than the bucket size resolution, i.e. small enough not to “split the bucket”. The mass is to the left of the knot to make a right continuous function (the approximation ramps up before the knot). Generally histograms are downsampled, not upsampled, so this is not a restriction.
 
 A ``dsev`` statement is translated into the more general::
 
@@ -378,7 +399,7 @@ which is translated into::
     xs2 = np.hstack((xs, xs[-1] + xs[1]))
     fz_cts = ss.rv_histogram((ps2, xs2))
 
-The code adds an additional knot at the end to create enough differences (there are only two differences between three points).
+The code adds an additional knot at the end to create enough differences (there are only two differences between three points). The `Robertson example<num robertson>`_ uses a ``chistogram``.
 
 The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes and the default. The continuous method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the continuous method is interpreted as discrete and if the mean is computed as :math:`\sum_i p_k x_k`, which is appropriate for a discrete variable, then it will be under-estimated by :math:`b/2`.
 
@@ -415,7 +436,48 @@ It is obviously desirable for the discrete probabilities to sum to 1. A third op
 In general, it is best to use ``normalize=True`` in cases where the truncation error is immaterial, for example with a thin tailed severity. It is numerically cleaner and avoids issues with quantiles close to 1. When there will be an unavoidable truncation error, it is best to use  ``normalize=False``. The user needs to be aware that the extreme right tail is understated. The bucket size and number of buckets should be selected so that the tail is accurate where it is being relied upon. See REF ERROR ANALYSIS for more.
 
 .. warning::
-    Be careful using ``normalize=True`` for thick tail severities. It results in unreliable and hard to interpret estimated mean severity. See REF on selecting bs.
+    Be careful using ``normalize=True`` for thick tail severities. It results in unreliable and hard to interpret estimated mean severity.
+
+**Example.** :cite:t:`Schaller2008` consider a Poisson-generalized Pareto model for operational risk. They assume an expected claim count equal to 18 and a generalized Pareto with shape 1, scale 12000 and location 7000. This distribution does not have a mean. They want to model the 90th percentile point. They compare using exponential tilting (see :cite:t:`Grubel1999`) with padding, using up to 1 million (log2=20) buckets. They use a right-hand endpoint of 1 million on the severity. This example illustrates the impact of normalization and shows that padding and tilting have a similar effect.
+
+Setup the base distribution without recomputing. Note infinite severity.
+
+.. ipython:: python
+   :okwarning:
+
+   a = build('agg Schaller:Temnov 18 claims sev 12000 * genpareto 1 + 7000 poisson', update=False)
+   qd(a)
+
+Execute a variety of updates and assemble answer. Compare Schaller and Temnov, Example 4.3.2, p. 197. They estimate the 90th percentile as 3,132,643. In this case, normalizing severity has a material impact; it acts to decrease the tail thickness and hence estimated percentiles.
+
+.. ipython:: python
+   :okwarning:
+
+   import time
+   import pandas as pd
+   updates = {
+       'a': dict(log2=17, bs=100, normalize=True, padding=0 , tilt_vector=None),
+       'b': dict(log2=17, bs=100, normalize=False, padding=0, tilt_vector=None),
+       'c': dict(log2=17, bs=100, normalize=False, padding=1, tilt_vector=None),
+       'd': dict(log2=17, bs=100, normalize=False, padding=2, tilt_vector=None),
+       'e': dict(log2=20, bs=25, normalize=True, padding=1 , tilt_vector=None),
+       'f': dict(log2=20, bs=25, normalize=False, padding=1 , tilt_vector=None),
+       'g': dict(log2=17, bs=100, normalize=False, padding=0, tilt_vector=20 / (1<<17))
+       }
+   ans = {}
+   for k, v in updates.items():
+       start_time_ns = time.time_ns()
+       a.update(**v)
+       end_time_ns = time.time_ns()
+       ans[k] = [a.q(0.9), a.q(0.95), a.q(0.99),  (-start_time_ns + end_time_ns) / 1e6]
+   df = pd.DataFrame(ans.values(), index=ans.keys(), columns=[.9, .95, .99, 'millisec'])
+   for k, v in updates['a'].items():
+       df[k] = [v[k] for v in updates.values()]
+   df = df.replace(np.nan, 'None')
+   df = df.set_index(['log2', 'bs', 'normalize', 'padding', 'tilt_vector'])
+   df.columns.name = 'percentile'
+   qd(df, float_format=lambda x: f'{x:12,.0f}', sparsify=False, col_space=4)
+
 
 .. _num algo steps:
 
@@ -458,7 +520,7 @@ The output :math:`\mathsf a=(a_0,\dots,a_{m-1})`has :math:`a_k` very close to :m
 Implementation
 ~~~~~~~~~~~~~~~~~
 
-Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``scipy.fft`` called :meth:`scipy.fft.rfft` and :meth:`scipy.fft.irfft`. There are similar functions in ``numpy.fft``. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The FFT routine automatically handles padding the input vector. The The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on one line of code::
+Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``scipy.fft`` called :meth:`scipy.fft.rfft` and :meth:`scipy.fft.irfft`. There are similar functions in ``numpy.fft``. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The FFT routine automatically handles padding the input vector. The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on a single line of code::
 
     agg_density = rifft(M_N(rfft(p)))
 
@@ -782,17 +844,16 @@ The next block of code provides a reconciliation of methods.
    pa = Portfolio('test', [a])
    pa.update(log2=16, bs=1/4)
    qd(pa)
-   pa.calibrate_distortions(ROEs=[0.1], Ps=[0.99], strict='ordered')
+   pa.calibrate_distortions(ROEs=[0.1], Ps=[0.99], strict='ordered');
    d = pa.dists['dual']
-   pa.distortion_df
-   f"{pa.distortion_df.iloc[0, 2]:.15f}"
+   qd(pa.distortion_df)
+   f"Exact value {pa.distortion_df.iloc[0, 2]:.15f}"
    dm = pa.price(.99, d)
-   f'{dm.price:.15f}'
+   f'Exact value {dm.price:.15f}'
    bit = a.density_df[['loss', 'p_total', 'S']]
    bit['aS'] = 1 - bit.p_total.cumsum()
    bit['gS'] = d.g(bit.S)
    bit['gaS'] = d.g(bit.aS)
-   # bit['gp_total'] = bit.gS.shift(1, fill_value=1) - bit.gS
    test = pd.Series((d.price(bit.loc[:a.q(0.99), 'p_total'], kind='both')[-1],
                      d.price(a.density_df.p_total, a.q(0.99), kind='both')[-1],
                      d.price2(bit.p_total).loc[a.q(0.99)].ask, \

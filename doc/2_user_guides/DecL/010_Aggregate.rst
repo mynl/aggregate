@@ -7,11 +7,11 @@ DecL Design and Purpose
 
 The Dec Language, or simply DecL, is designed to make it easy to go from "Dec page to distribution" --- hence the name. An insurance policy's Declarations page spells out key coverage terms and conditions such as the limit and deductible, effective date, named insured, and covered property. A reinsurance slip performs the same functions.
 
-Coverage expressed concisely in words on a Dec page is often incomplete and is hard to program. Consider
+Coverage expressed concisely in words on a Dec page is often incomplete and hard to program. Consider the declaration
 
-    A trucking policy with a premium of 5000, a limit of 1000, and a deductible of 50.
+    "Aggregate losses from trucking policy with a premium of 5000, a limit of 1000, and a deductible of 50.""
 
-To estimate the distribution of aggregate loss outcomes for this policy, the actuary must:
+To estimate the distribution of outcomes for this policy, the actuary must:
 
 #. Estimate the priced loss ratio on the policy to determine the loss pick (expected loss) as premium times loss ratio. Say they select 65%.
 #. Select a suitable trucking ground-up severity curve, say lognormal with mean 50 and CV 1.75.
@@ -20,7 +20,7 @@ To estimate the distribution of aggregate loss outcomes for this policy, the act
 #. Select a suitable frequency distribution, say Poisson.
 #. Calculate a numerical approximation to the resulting compound-Poisson aggregate distribution
 
-A DecL program takes care of many of these details. The program corresponding to the trucking policy is simply::
+A DecL program takes care of many of these details. The DecL program corresponding to the trucking policy is simply::
 
     agg Trucking                      \
         5000 premium at 0.65 lr       \
@@ -36,7 +36,7 @@ It specifies the loss ratio and distributions selected in steps 1, 2 and 5; thes
 Specifying a Realistic Aggregate Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The trucking example hints at the complexity of specifying a realistic insurance aggregate distribution. Abstracting the details, a complete specification has seven parts
+The trucking example hints at the complexity of specifying a realistic insurance aggregate distribution. Abstracting the details, a complete specification has seven parts:
 
 1. A name
 2. The exposure, optionally including occurrence limits and deductibles
@@ -46,7 +46,7 @@ The trucking example hints at the complexity of specifying a realistic insurance
 6. Aggregate reinsurance (optional)
 7. Additional notes (optional)
 
-DecL follows this pattern::
+DecL follows the same pattern::
 
     agg name                   \
         exposure <limit>       \
@@ -56,9 +56,9 @@ DecL follows this pattern::
         <aggregate re>         \
         <note>
 
-where ``<...>`` is an optional clause. All programs are one-line long and horizontal white space is ignored.
+where ``<...>`` denotes an optional clause. All programs are one-line long and horizontal white space is ignored.
 
-DecL programs are built (interpreted) using the ``build`` function. Python automatically concatenates strings between parenthesis (no need or ``\``), making it is easiest and clearest to enter a program as::
+DecL programs are built (interpreted) using the ``build`` function. Python automatically concatenates strings between parenthesis (no need for ``\``), making it is easiest and clearest to enter a program as::
 
     build('agg Trucking '
           '5000 premium at 0.65 lr 1000 xs 50 '

@@ -19,16 +19,17 @@ An exposure clause::
 
     dfreq [outcomes] <[probabilities]>
 
-directly specifies the frequency distribution. The ``outcomes`` and ``probabilities`` are specified as in :ref:`nonparametric severity`.
+directly specifies the frequency distribution. The ``outcomes`` and ``probabilities`` are specified as in :ref:`nonparametric severity`. There is no need for a frequency clause at the end.
 
 
-**Example.**
+**Examples.**
 
 ::
 
     agg A dfreq [1 2 3] [.5 3/8 1/8] sev lognorm 50 cv 1.75
+    agg A dfreq [1 2 3] [.5 3/8 1/8] dsev [1:11]
 
-specifies a frequency distribution with outcomes 1, 2, or 3 occurring with probabilities 0.5, 0.375, and 0.125 respectively. Probabilities can be entered as decimals or fractions.
+The first specifies a frequency distribution with outcomes 1, 2, or 3 occurring with probabilities 0.5, 0.375, and 0.125 respectively. Probabilities can be entered as decimals or fractions. The second combines a non-parametric frequency and severity.
 
 .. _parametric frequency:
 
@@ -95,4 +96,7 @@ specifies a negative binomial (gamma-mixed Poisson) frequency respectively. The 
 Zero Modification and Zero Truncation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-*Not yet implemented*
+.. todo::
+
+    Not yet implemented.
+

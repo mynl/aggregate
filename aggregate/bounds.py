@@ -502,7 +502,7 @@ class Bounds(object):
         self.cloud_df.index.name = 's'
 
     def cloud_view(self, axs, n_resamples, scale='linear', alpha=0.05, pricing=True, distortions=None,
-                   title='', lim=(-0.025, 1.025), check=False):
+                   title='', lim=(-0.025, 1.025), check=False, add_average=True):
         """
         visualize the cloud with n_resamples
 
@@ -601,6 +601,9 @@ class Bounds(object):
                             ls='-', label='_nolegend_')
                     ax.legend(loc='lower right', ncol=3, fontsize='large')
                     ax.set(xlim=lim, ylim=lim, aspect='equal')
+                if add_average:
+                    self.cloud_df.mean(1).plot(ax=ax, c=f'C{len(distortions[-1])}',
+                                               ls='-.', lw=.5, label='Avg extreme')
             else:
                 # do nothing
                 pass
@@ -623,6 +626,10 @@ class Bounds(object):
                 else:
                     title1 = title
                 ax.set(title=title1)
+        for ax in axs[1:]:
+            ax.legend(ncol=1, loc='lower right')
+        for ax in axs:
+            ax.set(title=None)
 
     def weight_image(self, ax, levels=20, colorbar=True):
         bit = self.weight_df.weight.unstack()
@@ -775,7 +782,7 @@ class Bounds(object):
         return d
 
 
-def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
+def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     """
     stand-alone
     ONLY WORKS FOR BOUNDED PORTFOLIOS (use for beta mixture examples)
@@ -790,11 +797,28 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
     Provenance : from make_port in Examples_2022_post_publish
     """
 
+    if axd is None:
+        fig = plt.figure(constrained_layout=True, figsize=(12, 6))
+        axd = fig.subplot_mosaic(
+            '''
+            AAAABBFF
+            AAAACCFF
+            AAAADDEE
+            AAAADDEE
+        ''')
+
     df = bounds.weight_df.copy()
     df['test'] = df['t_upper'] * df.weight + df.t_lower * (1 - df.weight)
 
     # HERE IS ISSUE - should really use tvar with bounds and incorporate the bound
-    tvar1 = {p: float(pnew.tvar(p)) for p in bounds.tps}
+    if p_reg < 1:
+        logger.warning('figuring tvars with bounds')
+        btemp = Bounds(pnew)
+        b = pnew.q(p_reg)
+        btemp.make_tvar_function('total', b=b)
+        tvar1 = {p: btemp.tvar_with_bound(p, b=b) for p in bounds.tps}
+    else:
+        tvar1 = {p: float(pnew.tvar(p)) for p in bounds.tps}
     df['t1_lower'] = [tvar1[p] for p in df.index.get_level_values(0)]
     df['t1_upper'] = [tvar1[p] for p in df.index.get_level_values(1)]
     df['t1'] = df.t1_upper * df.weight + df.t1_lower * (1 - df.weight)
@@ -806,8 +830,10 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
     max_d = Distortion('wtdtvar', w, df=[pl, pu])
 
     tmax = float(df.iloc[idx]['t1'])
-    print('Ties for max: ', len(df.query('t1 == @tmax')))
-    print('Near ties for max: ', len(df.query('t1 >= @tmax - 1e-4')))
+    n_ = len(df.query('t1 == @tmax'))
+    logger.warning(f'Ties for max: {n_}')
+    n_ = len(df.query(f't1 >= {tmax} - 1e-4'))
+    logger.warning(f'Near ties for max: {n_}')
 
     idn = df.index.get_locs(df.idxmin()['t1'])[0]
     pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
@@ -821,10 +847,13 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
     max_d.plot(ax=ax, both=False)
     min_d.plot(ax=ax, both=False)
 
-    ax.lines[n + 0].set(label='roe')
-    ax.lines[n + 2].set(color='green', label='tvar')
-    ax.lines[n + 4].set(color='red', label='max')
-    ax.lines[n + 6].set(color='purple', label='min')
+    ax.lines[n + 0].set(label='roe', color='C0', ls='--')
+    ax.lines[n + 2].set(color='C1', label='tvar', ls='-.')
+    ax.lines[n + 4].set(color='C4', label='max', lw=1)
+    ax.lines[n + 6].set(color='C5', label='min', lw=1)
+    # the average
+    bounds.cloud_df.mean(1).plot(ax=ax, c='C3',
+                               ls='-.', lw=1.5, label='Avg extreme')
     ax.legend(loc='upper left')
 
     ax.set(title=f'Max ({pl}, {pu}), min ({pln}, {pun})')
@@ -841,16 +870,20 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem):
     ax.plot(pun, pln, 's', ms=3, c='white')
 
     ax = axd['D']
-    plot_lee(port, ax, 'k', lw=1)
-    plot_lee(pnew, ax, 'r')
+    plot_lee(port, ax, 'C0', lw=1)
+    plot_lee(pnew, ax, 'C1')
+    ax.set(ylim=[0, port.q(0.999)])
+    ax.legend()
 
     ax = axd['E']
-    pnew.density_df.p_total.plot(ax=ax)
-    ax.set(xlim=[-0.05, 1.05], title='Density')
+    port.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=port.name)
+    pnew.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=pnew.name)
+    ax.legend()
+    ax.set(title='Total, log densities')
 
     ax = axd['F']
     plot_max_min(bounds, ax)
-    for c, dd in zip(['r', 'g', 'b'], ['ph', 'wang', 'dual']):
+    for c, dd in zip(['C0', 'C1', 'C2'], ['ph', 'wang', 'dual']):
         port.dists[dd].plot(ax=ax, both=False, lw=1)
         ax.lines[n].set(c=c, label=dd)
         n += 2
@@ -936,16 +969,16 @@ def plot_max_min(self, ax):
     """
     ax.fill_between(self.cloud_df.index, self.cloud_df.min(
         1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-    self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='w')
-    self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=0.5, ls='-', c='w')
+    self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
+    self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=0.5, ls='-', c='k')
 
 
-def plot_lee(port, ax, c, lw=2):
+def plot_lee(port, ax, c, lw=1):
     """
     Lee diagram by hand
     """
     p_ = np.linspace(0, 1, 1001)
     qs = [port.q(p) for p in p_]
-    ax.step(p_, qs, lw=lw, c=c)
+    ax.step(p_, qs, lw=lw, c=c, label=port.name)
     ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, max(qs) + .05],
-           title=f'Lee Diagram {port.name}', aspect='equal')
+           title=f'{port.name} Lee diagram')

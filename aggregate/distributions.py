@@ -1321,11 +1321,11 @@ class Aggregate(Frequency):
         if bs == 0:
             bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
         xs = np.arange(0, 1 << log2, dtype=float) * bs
-        if 'approximation' not in kwargs:
-            if self.n > 10000:
-                kwargs['approximation'] = 'slognorm'
-            else:
-                kwargs['approximation'] = 'exact'
+        # if 'approximation' not in kwargs:
+        #     if self.n > 10000:
+        #         kwargs['approximation'] = 'slognorm'
+        #     else:
+        #         kwargs['approximation'] = 'exact'
         return self.update_work(xs, debug=debug, **kwargs)
 
     # for backwards compatibility
@@ -1348,10 +1348,12 @@ class Aggregate(Frequency):
                tilt_amount * N < 20 recommended
         :param approximation: 'exact' = perform frequency / severity convolution using FFTs.
                'slognorm' or 'sgamma' use a shifted lognormal or shifted gamma approximation.
-        :param sev_calc: `discrete` = suitable for fft, `continuous` = for rv_histogram cts version. Only
-               use discrete unless you know what you are doing!
-        :param discretization_calc: use survival, distribution or both (=max(cdf, sf)) which is most accurate calc
-        :param normalize: normalize severity to 1.0
+        :param sev_calc:  discrete=round, forward, backward, or continuous
+               and method becomes discrete otherwise
+        :param discretization_calc:  survival, distribution or both; in addition
+               the method then becomes survival
+        :param normalize: if True, normalize the severity so sum probs = 1. This is generally what you want; but
+               when dealing with thick tailed distributions it can be helpful to turn it off.
         :param force_severity: make severities even if using approximation, for plotting
         :param debug: run reinsurance in debug model if True.
         :return:

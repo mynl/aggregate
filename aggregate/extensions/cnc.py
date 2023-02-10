@@ -7,6 +7,8 @@ import warnings
 warnings.filterwarnings('ignore')
 
 if __name__ == '__main__':
+    # be more informative
+    build.logger_level(20)
     # calibrate reinsurance
     recalc = build('agg Cat 1 claim sev lognorm 20 cv 1.00 fixed'
                    , log2=16, bs=1/64)

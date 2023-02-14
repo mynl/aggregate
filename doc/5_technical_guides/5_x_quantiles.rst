@@ -239,8 +239,8 @@ Then :math:`p`-**Tail Value at Risk** is given by
 
 .. math::
 
-   \mathsf{TVaR}_p(X):=\dfrac{1}{1-p}\int_{p}^1 \mathsf{VaR}_s(X)\,ds=
-   \dfrac{1}{1-p}\int_{p}^1 q^-(s)\,ds.
+   \mathsf{TVaR}_p(X) :&= \dfrac{1}{1-p}\int_{p}^1 \mathsf{VaR}_s(X)\,ds \\
+   &= \dfrac{1}{1-p}\int_{p}^1 q^-(s)\,ds.
 
 In particular :math:`\mathsf{TVaR}_0(X)=\mathsf{E}[X]`. When :math:`p=1`,
 :math:`\mathsf{TVaR}_1(X)` is defined to be :math:`\sup(X)` if :math:`X` is unbounded.
@@ -296,7 +296,8 @@ all :math:`p`. Is it a piecewise linear function?
 
 .. math::
 
-   (1-p)\mathsf{TVaR}_p(X) &= \int_p^1 q^-(s)ds = \int_p^{0.9}q^-(s)ds+ \int_{0.9}^1q^-(s)ds \\
+   (1-p)\mathsf{TVaR}_p(X) &= \int_p^1 q^-(s)ds \\
+   &= \int_p^{0.9}q^-(s)ds+ \int_{0.9}^1q^-(s)ds \\
    &= (0.9-p)\times 12 + (1-0.9)\times \mathsf{TVaR}_{0.9}(X),
 
 for :math:`0.7 \ge p < 0.8`
@@ -310,7 +311,7 @@ TVaR is not piecewise linear. For
 example, for :math:`0.8\le p<0.9`,
 :math:`\mathsf{TVaR}_p(X)=(12(0.9-p) + 2.5)/(1-p)`.
 
-.. ipython:: python
+.. ipython python
 
     p = 0.73
     print(a.tvar(0.7), a.tvar(p), a.tvar(p, 'tail'),

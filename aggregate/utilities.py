@@ -399,7 +399,7 @@ def round_bucket(bs):
 
         if bs > 1 round to 2, 5, 10, ...
 
-        elif bs < 1 find the smallest power of two greater than 1/bs
+        elif bs < 1 find the smallest power of two greater than bs
 
     Test cases: ::
 
@@ -1265,10 +1265,15 @@ def xsden_to_meancvskew(xs, den):
     xd = xs * den
     if isinstance(xs, np.ndarray):
         xsm = xs[-1]
+        bs = xs[1] - xs[0]
     elif isinstance(xs, pd.Series):
         xsm = xs.iloc[-1]
+        bs = xs.iloc[1] - xs.iloc[0]
     else:
-        xsm = np.array(xs)[-1]
+        _ = np.array(xs)
+        xsm = _[-1]
+        bs = _[1] - _[0]
+    xsm = xsm + bs
     ex1 = np.sum(xd) + pg * xsm
     # logger.log(WL, f'tail mass mean adjustment {pg * xsm}')
     xd *= xs
@@ -2783,6 +2788,7 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
 
     return ans
 
+
 def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     """
     Endless quest for a robust display format!
@@ -2810,7 +2816,13 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
                 # object not updated
                 qd(x.describe.fillna(''), accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            print(f'log2 = {x.log2}, bs = {bss}, valid = {x.valid}.')
+            if x.valid is None:
+                vr = 'n/a (reinsurance)'
+            else:
+                vr = "not unreasonable" if x.valid else "fails"
+            print(f'log2 = {x.log2}, bs = {bss}, validation: {vr}.')
+            if isinstance(x, Aggregate) and x.valid is False:
+                qt(x)
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,
@@ -2840,6 +2852,19 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
             print(ff(x))
         else:
             print(x)
+
+
+def qt(a):
+    """
+    Quick test diagnostics for an Aggregate object.
+    """
+    sev_err = a.est_sev_m / a.sev_m - 1
+    agg_err = a.agg_m / a.est_m - 1
+    n = 40
+    sev = 'sev mean: pass' if abs(sev_err) < a.validation_eps else f'sev mean: fails {sev_err: .4e}'
+    agg = 'agg mean: pass' if abs(agg_err) < a.validation_eps else f'agg mean: fails {agg_err: .4e}'
+    print(f"{'-' * n}\n{sev}\n{agg}\n{'-' * n}")
+
 
 def mv(x, y=None):
     """

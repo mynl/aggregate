@@ -51,9 +51,9 @@ Guides marked **placeholder** are work in progress, often just a sketch of plann
     :maxdepth: 1
     :hidden:
 
-    2_user_guides/2_x_10mins
     2_user_guides/2_x_student
     2_user_guides/2_x_actuary_student
+    2_user_guides/2_x_10mins
     2_user_guides/2_x_dec_language
     2_user_guides/2_x_ir_pricing
     2_user_guides/2_x_re_pricing

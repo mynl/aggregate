@@ -88,8 +88,8 @@ bibtex_reference_style = 'author_year'
 default_dark_mode = False
 
 # https://www.spinics.net/lists/linux-doc/msg77015.html
-autosectionlabel_prefix_document = True
-autosectionlabel_maxdepth = 1
+# autosectionlabel_prefix_document = True
+# autosectionlabel_maxdepth = 1
 
 
 # -- Options for HTML output ----------------------------------------------

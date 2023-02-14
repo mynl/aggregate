@@ -162,6 +162,28 @@ Dependencies
 
 See requirements.txt.
 
+Install from source
+--------------------
+::
+
+    git clone --no-single-branch --depth 50 https://github.com/mynl/aggregate.git .
+
+    git checkout --force origin/master
+
+    git clean -d -f -f
+
+    python -mvirtualenv ./venv
+
+    # ./venv/Scripts on Windows
+    ./venv/bin/python -m pip install --exists-action=w --no-cache-dir -r requirements.txt
+
+    # to create help files
+    ./venv/bin/python -m pip install --upgrade --no-cache-dir pip setuptools<58.3.0
+
+    ./venv/bin/python -m pip install --upgrade --no-cache-dir pillow mock==1.0.1 alabaster>=0.7,<0.8,!=0.7.5 commonmark==0.9.1 recommonmark==0.5.0 sphinx<2 sphinx-rtd-theme<0.5 readthedocs-sphinx-ext<2.3 jinja2<3.1.0
+
+Note: options from readthedocs.org script.
+
 License
 -------
 
@@ -177,9 +199,14 @@ Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
 * MINOR version changes with added functionality in a backwards compatible manner.
 * PATCH version changes with backwards compatible bug fixes.
 
-Contributing to aggregate
+Help and contributions
 -------------------------
 
+Limited help available. Email me at help@aggregate.capital.
+
 All contributions, bug reports, bug fixes, documentation improvements,
-enhancements and ideas are welcome.
+enhancements and ideas are welcome. Create a pull request on github and/or
+email me.
+
+Social media: https://www.reddit.com/r/AggregateDistribution/.
 

@@ -38,13 +38,13 @@ between the two shape parameters :math:`\alpha` and :math:`p` given by
    \alpha = \frac{2-p}{p-1}, \qquad
    p = \frac{2+\alpha}{1+\alpha}.
 
-Starting from :math:`\mathrm{Tw}_p(\mu, \sigma^2)` \*
-:math:`\lambda = \displaystyle\frac{\mu^{2-p}}{(2-p)\sigma^2}` \*
+Starting from :math:`\mathrm{Tw}_p(\mu, \sigma^2)`:
+:math:`\lambda = \displaystyle\frac{\mu^{2-p}}{(2-p)\sigma^2}` and
 :math:`\beta = \displaystyle\frac{\mu^{1-p}}{(p-1)\sigma^2} = \mu /\lambda \alpha`
 
-Starting from :math:`\mathsf{Tw}^*(\lambda, \alpha, \beta)` \*
-:math:`\mu = \lambda \alpha \beta` \*
-:math:`\sigma^2 = \lambda \alpha(\alpha + 1) / (\beta^2\mu^p)` by
+Starting from :math:`\mathsf{Tw}^*(\lambda, \alpha, \beta)`:
+:math:`\mu = \lambda \alpha \beta` and
+:math:`\sigma^2 = \lambda \alpha(\alpha + 1) / (\beta^2\mu^p)`, by
 equating expressions for the variance.
 
 It is easy to convert from the gamma mean :math:`m` and CV :math:`\nu`

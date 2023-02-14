@@ -481,56 +481,8 @@ Execute a variety of updates and assemble answer. Compare Schaller and Temnov, E
 
 .. _num algo steps:
 
-Fundamental Algorithm
-----------------------
 
-This section describes the FFT convolution algorithm ``aggregate`` uses to compute aggregate distributions. The first subsection lays out the algorithm steps and the second discusses implementation details.
-
-Algorithm
-~~~~~~~~~~~~
-
-**Algorithm input.**
-
-#. A bucket size :math:`b`.
-#. A target number of buckets, expressed as its log base-2, :math:`\mathit{log2}`.
-#. An integer padding parameter :math:`d \ge 0`.
-#. A vector :math:`\mathsf p=(p_0,p_1,\dots,p_{l-1})` of probabilities :math:`p_k=\Pr(X=kb)` describing a discrete severity distribution :math:`X`, with :math:`l\le 2^\mathit{log2}` and :math:`\sum_k p_k \le 1`.
-#. The moment generating function :math:`M_N(z):=\mathsf E[e^{zN}]` of the frequency distribution :math:`N`.
-#. FFT and inverse FFT functions :math:`\mathsf{FT}` and :math:`\mathsf{IFT}`.
-
-**Algorithm objective.**
-
-Compute the aggregate distribution
-
-.. math::
-    A = X_1 + \cdots + X_N
-
-under the assumption that :math:`X_i` are iid like :math:`X` and :math:`N` is independent of :math:`X_i`.
-
-**Algorithm steps.**
-
-#. Pad the vector :math:`\mathsf p` to length :math:`2^{\mathit{log2} + d}` by appending zeros, to produce :math:`\mathsf x`.
-#. Compute :math:`\mathsf z:=\mathsf{FT}(\mathsf x)`.
-#. Compute :math:`\mathsf f:=M_N(\mathsf z)`.
-#. Compute the inverse FFT,  :math:`\mathsf y:=\mathsf{IFT}(\mathsf f)`.
-#. Take the first :math:`m:=2^{\mathit{log2}}` entries in :math:`\mathsf y` to obtain :math:`\mathsf a:=\mathsf y[0:m]`.
-
-The output :math:`\mathsf a=(a_0,\dots,a_{m-1})`has :math:`a_k` very close to :math:`\Pr(A=kb)`, see :ref:`Theory and Errors`.
-
-Implementation
-~~~~~~~~~~~~~~~~~
-
-Computer systems offer a range of FFT routines. ``aggregate`` uses two functions from ``scipy.fft`` called :meth:`scipy.fft.rfft` and :meth:`scipy.fft.irfft`. There are similar functions in ``numpy.fft``. They are tailored to taking FFTs of vectors of real numbers (as opposed to complex numbers). The FFT routine automatically handles padding the input vector. The inverse transform returns real numbers only, so there is no need to take the real part to remove noise-level imaginary parts. It is astonishing that the whole ``aggregate`` library pivots on a single line of code::
-
-    agg_density = rifft(M_N(rfft(p)))
-
-Obviously, a lot of work is done to marshal the input, but this line is where the magic occurs.
-
-The FFT routines are accurate up to machine noise, of order  ``1e-16``. The noise can be positive or negative---the latter highly undesirable in probabilities. It appears random and does not accumulate undesirably in practical applications. It is best to strip out the noise, setting to zero all values with absolute value less than machine epsilon (``numpy.finfo(float).esp``). The ``remove_fuzz`` option controls this behavior. It is set ``True`` by default. CHECK SURE?
-
-
-Explanation
-~~~~~~~~~~~~
+HERE
 
 
 .. _num errors:
@@ -719,7 +671,7 @@ The recommended bucket is too small because it is based on only the 99.9 percent
 
 
 The contribution of the extreme tail to the mean of a distribution increases with the tail thickness. See results of
-Mandlebrot - the higher moments of the lognormal are nonlocal and depend on different parts of the distribution. (Hence the problems with numerical integration!) (https://users.math.yale.edu/mandelbrot/web_pdfs/9_E9lognormalDistribution.pdf) *A case against the lognormal distribution* in Mandelbrot, Benoit B. "A case against the lognormal distribution." Fractals and scaling in finance. Springer, New York, NY, 1997. 252-269.
+Mandlebrot - the higher moments of the lognormal are nonlocal and depend on different parts of the distribution. (Hence the problems with numerical integration!) [On-line](https://users.math.yale.edu/mandelbrot/web_pdfs/9_E9lognormalDistribution.pdf) *A case against the lognormal distribution* in Mandelbrot, Benoit B. "A case against the lognormal distribution." Fractals and scaling in finance. Springer, New York, NY, 1997. 252-269.
 
 ::
 
@@ -1000,7 +952,7 @@ The FFT of the :math:`m\times 1` vector
 :math:`\mathsf{x}=(x_0,\dots,x_{m-1})`, a discrete approximation to a distribution in our application, is another :math:`m\times 1` vector :math:`\hat{\mathsf{x}}`
 whose :math:`j`\ th component is
 
-.. math:: \sum_{k=0}^{m-1} x_k\exp(2\pi ijk/m),
+.. math:: \sum_{k=0}^{m-1} x_k\exp(-2\pi ijk/m),
 
 where :math:`i=\sqrt{-1}`. The coefficients of :math:`\hat{\mathsf{x}}` are complex numbers. It is
 possible to express :math:`\hat{\mathsf{x}}=\mathsf{F}\mathsf{x}` where
@@ -1016,7 +968,7 @@ possible to express :math:`\hat{\mathsf{x}}=\mathsf{F}\mathsf{x}` where
    1 & w^{m-1} & \dots & w^{(m-1)^2}
    \end{pmatrix}
 
-is a matrix of complex roots of unity and  :math:`\exp(2\pi i/m)`. This shows there is nothing
+is a matrix of complex roots of unity and  :math:`\exp(-2\pi i/m)`. This shows there is nothing
 inherently mysterious about an FFT. The trick is that there is a very
 efficient algorithm for computing the matrix multiplication :cite:p:`Press1992a`.  Rather than taking
 time proportional to :math:`m^2`, as one would expect, it can be

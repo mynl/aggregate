@@ -90,7 +90,7 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
 
 
 def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0,
-              suptitle='', wraps=None):
+              suptitle='', wraps=None, disc_calc='density'):
     """
     Illustrate "manual" inversion of a characteristic function using irfft, including
     optional scaling and location shift.
@@ -100,7 +100,9 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     :param chf: the characteristic function of the distribution, takes args params, loc, scale, t;
       routine handles conversion to Fourier Transform
     :param frz_generator: the scipy.stats function to create the underlying distribution.
-      Used to compute the exact answer.
+      Used to compute the exact answer. If there is not analytic formula, you can pass in
+      a numpy array with the values of the distribution at the points in xs computed by
+      some other means (e.g., for the Tweedie distribution).
     :param loc: location paramteter
     :param scale: scale parameter
     :param xmax: if not zero, used to fix xmax. Otherwise, selected as frz.isf(1e-17) to capture the
@@ -110,7 +112,9 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     :param xshift: if not zero, used to shift the x-axis. The minimum x value equals xshift.
       To center the x-axis, set xshift = -xmax/2. Should be a multiple of bs = xmax / n.
     :param suptitle: optional suptitle for the figure
-    :wraps: optional list of wrap values.
+    :param wraps: optional list of wrap values.
+    :param disc_calc: 'density' rescales pdf, 'surival' uses backward differences of sf (to
+      match Aggregate class calculation)
     """
 
     # number of buckets
@@ -119,14 +123,15 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
         xmax = n
 
     # make frozen object
-    if scale is None:
-        # freq dists (Poisson) do not allow scaling
-        frz = frz_generator(*params, loc=loc)
-        frz.pdf = frz.pmf
-        # for subsequent use
-        scale = 1
-    else:
-        frz = frz_generator(*params, loc=loc, scale=scale)
+    if callable(frz_generator):
+        if scale is None:
+            # freq dists (Poisson) do not allow scaling
+            frz = frz_generator(*params, loc=loc)
+            frz.pdf = frz.pmf
+            # for subsequent use
+            scale = 1
+        else:
+            frz = frz_generator(*params, loc=loc, scale=scale)
 
     # spatial upto xmax; used to create exact using the scipy stats object
     # sampling interval (wavelength) = xmax / n
@@ -136,8 +141,16 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     # xs = np.arange(n) * xmax / n
     bs = xmax / n
     xs = np.arange(n) * bs + xshift
-    exact = frz.pdf(xs)
-    exact = exact / exact.sum() * (frz.cdf(xs[-1]) - frz.cdf(xs[0]))
+    if callable(frz_generator):
+        if disc_calc == 'density':
+            exact = frz.pdf(xs)
+            exact = exact / exact.sum() * (frz.cdf(xs[-1]) - frz.cdf(xs[0]))
+        else:
+            xs1 = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
+            exact = -np.diff(frz.sf(xs1))
+    else:
+        # pass in values
+        exact = frz_generator
 
     # convert chf to ft including scale and loc effects
     def loc_ft(t):
@@ -152,13 +165,16 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
         return ans
 
     # sampling interval = bs = xmax / n [small bs, high sampling rate]
-    # temporal: max freq is 1 / wavelength = n / xmax
-    # 1 / bs = xmax / n is the highest sampling freq for inverting the FT
-    # f(x) = int_R fhat(t) exp(2πi tx)dt ≈ int_=max_f^max_f ...
+    # sampling freq is 1 / bs = n / xmax, the highest sampling freq for inverting the FT
+    # note xmax = n * bs, so n / xmax = 1 / bs.
+    # f(x) = int_R fhat(t) exp(2πi tx)dt ≈ int_-f_max_f^max_f ...
     f_max = n / xmax
     # sample the FT; using real fft, only need half the range
     ts = np.arange(n // 2 + 1) * f_max / n   # ts = np.arange(n // 2 + 1) / xmax
     fx = loc_ft(ts)
+    # for debugging
+    ft_invert.fx = fx
+    ft_invert.ts = ts
     x = irfft(fx)
     if xshift != 0:
         x = np.roll(x, -int(xshift / bs))

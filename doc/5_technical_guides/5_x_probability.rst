@@ -314,7 +314,8 @@ Finally
 
 .. math::
 
-   \mathsf E[N^3] = M_N'''(0) =n^3M_G'''(0)+3n^2M_G''(0)+n M_G'(0) = gn^3 + 3n^2(1+c) + n
+   \mathsf E[N^3] &= M_N'''(0) \\
+   &=n^3M_G'''(0)+3n^2M_G''(0)+n M_G'(0) = gn^3 + 3n^2(1+c) + n
 
 and therefore the central moment
 
@@ -461,8 +462,8 @@ parameterization, if :math:`N` is negative binomial :math:`p,r` then
 
 .. math::
 
-   \mathsf{Pr}(N\le k)=\text{BETADIST}(p;r,k+1):=\frac{1}{B(r,k+1)}\int_0^p
-   u^{r-1} (1-u)^{k} du
+   \mathsf{Pr}(N\le k) &= \text{BETADIST}(p;r,k+1) \\
+   &:=\frac{1}{B(r,k+1)}\int_0^p u^{r-1} (1-u)^{k} du
 
 where :math:`B` is the complete beta function. See Johnson, Kotz and
 Kemp [Eqn. 5.31] for a derivation. BETADIST is

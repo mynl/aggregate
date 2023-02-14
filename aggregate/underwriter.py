@@ -12,7 +12,7 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import logger_level, round_bucket, Answer, LoggerManager, pprint, show_fig
+from .utilities import logger_level, round_bucket, Answer, LoggerManager, qd, show_fig
 
 logger = logging.getLogger(__name__)
 
@@ -197,30 +197,39 @@ class Underwriter(object):
     def __repr__(self):
         import aggregate
         s = []
-        s.append(f'underwriter   {self.name}')
-        s.append(f'knowledge     {len(self._knowledge)} programs')
-        s.append(f'version       {aggregate.__version__}')
-        for k in ['log2', 'update', 'debug', 'site_dir', 'default_dir']:
-            s.append(f'{k:<14s}{getattr(self, k)}')
-        # s.append(super().__repr__())
+        s.append(f'underwriter        {self.name}')
+        s.append(f'knowledge          {len(self._knowledge)} programs')
+        s.append(f'version            {aggregate.__version__}')
+        s.append(f'update             {self.update}')
+        for k in ['log2', 'update', 'debug']:
+            s.append(f'{k:<19s}{getattr(self, k)}')
+        sd = self.site_dir.resolve().relative_to(Path.home())
+        dd = self.default_dir.resolve().relative_to(Path.home())
+        s.append(f'site dir           {sd}')
+        s.append(f'default dir        {dd}')
+        s.append( '')
+        s.append( 'help')
+        s.append( 'build.knowledge    list of all programs')
+        s.append( 'build.qlist(pat)   list programs matching pattern')
+        s.append( 'build.show(name)   build and display name')
         return '\n'.join(s)
 
-    def _repr_html_(self):
-        import aggregate
-        s = [f'<p><h3>Underwriter {self.name}</h3>',
-             f'Version {aggregate.__version__}. '
-             f'Knowledge contains {len(self._knowledge)} programs. '
-             'Run <code>build.knowledge</code> for a DataFrame listing by kind and name. '
-             'Run <code>build.show(name)</code> for more details entry <code>name</code>, '
-             'accepts wildcards and regular expressions.'
-             '</p>'
-             # '<br>',
-             # self.knowledge.to_html(),
-             f'<p>Settings: '
-             ]
-        for k in ['log2', 'update', 'debug']:
-            s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
-        return '\n'.join(s) + '</p>'
+    # def _repr_html_(self):
+    #     import aggregate
+    #     s = [f'<p><h3>Underwriter {self.name}</h3>',
+    #          f'Version {aggregate.__version__}. '
+    #          f'Knowledge contains {len(self._knowledge)} programs. '
+    #          'Run <code>build.knowledge</code> for a DataFrame listing by kind and name. '
+    #          'Run <code>build.show(name)</code> for more details, <code>name</code>, '
+    #          'accepts wildcards and regular expressions.'
+    #          '</p>'
+    #          # '<br>',
+    #          # self.knowledge.to_html(),
+    #          f'<p>Settings: '
+    #          ]
+    #     for k in ['log2', 'update', 'debug']:
+    #         s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
+    #     return '\n'.join(s) + '</p>'
 
     def factory(self, answer):
         """
@@ -487,7 +496,7 @@ class Underwriter(object):
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.999, log_level=None, **kwargs):
+    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.999, logger_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -501,15 +510,15 @@ class Underwriter(object):
         :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
             and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
-        :param log_level: temporary log(ger) level for this build
+        :param logger_level: temporary log(ger) level for this build
         :param recommend_p: passed to recommend bucket functions. Increase (closer to 1) for thick tailed distributions.
         :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
         :return: created object(s)
         """
 
         # automatically puts level back at the end
-        if log_level is not None:
-            lm = LoggerManager(log_level)
+        if logger_level is not None:
+            lm = LoggerManager(logger_level)
 
         # make stuff
         # write will return a dict with keys (kind, name) and value a WriteAnswer namedtuple
@@ -735,11 +744,16 @@ class Underwriter(object):
         """
         Wrapper for show to just list elements in knowledge that match ``regex``.
 
+        Either returns a dataframe or prints the dataframe.
+
         """
+        return self.show(regex, kind='', plot=False, describe=False, return_df=True)
 
-        return self.show(regex, kind='', plot=False, describe=False)
+    def qlist(self, regex):
+        qd(self.show(regex, kind='', plot=False, describe=False),
+           line_width=160, max_colwidth=60, justify='left')
 
-    def show(self, regex, kind='agg', plot=True, describe=True, logger_level=30):
+    def show(self, regex, kind='', plot=True, describe=True, logger_level=30, return_df=False):
         """
         Create from knowledge by name or match to name.
         Optionally plot. Returns the created object plus dataframe with more detailed information.
@@ -802,15 +816,17 @@ class Underwriter(object):
                 logger.error(f'skipping {n}...element not implemented')
             else:
                 if describe:
-                    display(a.describe)
-                    display(HTML('<h4>Program</h4>'))
-                    pprint(p)
+                    # print('DecL Program:\n')
+                    a.pprogram
+                    # print('\n')
+                    qd(a)
                 if plot is True:
                     a.plot(figsize=(8, 2.4))
-                    display(HTML('<h4>Density and Quantiles</h4>'))
+                    # print('\nDensity and Quantiles')
+                    print()
                     show_fig(a.figure, format='svg')
                 if describe:
-                    display(HTML('<br>'))
+                    print('\n')
                 # info
                 if isinstance(a, Portfolio):
                     m, cv = a.describe.loc[('total', 'Agg'), ['Est E[X]', 'Est CV(X)']]
@@ -823,7 +839,8 @@ class Underwriter(object):
                                                              a.agg_sd, m, cv, '')
         # if only one item, return it...much easier to use
         if len(ans) == 1: ans = a
-        return ans, df
+        if return_df:
+            return ans, df
 
     def dir(self, filter=''):
         """

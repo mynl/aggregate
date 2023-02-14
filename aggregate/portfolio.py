@@ -216,6 +216,7 @@ class Portfolio(object):
         self.last_a = None
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
+        self.validation_eps = 1e-3
 
     @property
     def distortion(self):
@@ -1231,7 +1232,7 @@ class Portfolio(object):
         * aggregate cv < 10 * eps
         * aggregate skew < 100 * esp
 
-        eps = 1e-5
+        eps = 1e-3 by default; change in ``validation_eps`` attribute.
 
         Test only applied for CV and skewness when they are > 0.
 
@@ -1239,7 +1240,7 @@ class Portfolio(object):
 
         """
         if self.density_df is None:
-            return True
+            return False
 
         any_false = False
         for a in self.agg_list:
@@ -1259,7 +1260,7 @@ class Portfolio(object):
             df['Err Skew(X)'] = np.nan
         except TypeError:
             df['Err Skew(X)'] = np.nan
-        eps = 1e-3
+        eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
             logger.warning('FAIL: Portfolio Sev mean error > eps')
             return False
@@ -2623,15 +2624,16 @@ class Portfolio(object):
         dist.premium_target = premium_target
         return dist
 
-    def calibrate_distortions(self, LRs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
+    def calibrate_distortions(self, LRs=None, COCs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
                               strict=True, S_calc='cumsum'):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
-        ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate on line
+        ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate online
 
 
         :param LRs:  LR or ROEs given
         :param ROEs: ROEs override LRs
+        :param COCs: CoCs override LRs, preferred terms to ROE; ROE maintained for backwards compatibility.
         :param As:  Assets or probs given
         :param Ps: probability levels for quantiles
         :param kind:
@@ -2643,6 +2645,9 @@ class Portfolio(object):
         :param S_calc:
         :return:
         """
+        if COCs is not None:
+            ROEs = COCs
+
         ans = pd.DataFrame(
             columns=['$a$', 'LR', '$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$', 'Levg', '$K$',
                      'ROE', 'param', 'error', 'method'], dtype=np.float)
@@ -2860,7 +2865,7 @@ class Portfolio(object):
             g = dist.g
             g_prime = dist.g_prime
         else:
-            raise ValueError(f'kind must be bid or ask, not {kind}')
+            raise ValueError(f'kind must be bid or ask, not {view}')
 
         # maybe important that p_total sums to 1
         # this appeared not to make a difference, and introduces an undesirable difference from

@@ -920,6 +920,8 @@ class Aggregate(Frequency):
         self.xs = None
         self.bs = 0
         self.log2 = 0
+        # default validation error
+        self.validation_eps = 1e-4
         # self.ex = 0 --> est_m
         self.est_m = 0
         self.est_cv = 0
@@ -1505,8 +1507,10 @@ class Aggregate(Frequency):
     @property
     def valid(self):
         """
-        Check if the model appears valid. An answer of True does not guarantee the model is valid, but
-        False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
+        Check if the model appears valid. An answer of True means the model is "not unreasonable".
+        It does not guarantee the model is valid. On the other hand,
+        False means it is definitely suspect. (The interpretation is similar to the null hypothesis
+        in a statistical test).
         Called and reported automatically by qd for Aggregate objects.
 
         Checks the relative errors (from ``self.describe``) for:
@@ -1519,17 +1523,19 @@ class Aggregate(Frequency):
         * aggregate cv < 10 * eps
         * aggregate skew < 100 * esp
 
-        eps = 1e-5
+        The default uses eps = 1e-4 relative error. This can be changed by setting the validation_eps
+        variable.
 
         Test only applied for CV and skewness when they are > 0.
 
-        Run with logger level 30 (warning) for more information on failures.
+        Run with logger level 20 (info) for more information on failures.
 
         :return: True if all tests are passed, else False.
 
         """
-        if self._density_df is None:
-            return True
+        if self.reinsurance_kinds() != "None":
+            # cannot validate when there is reinsurance
+            return None
         df = self.describe.abs()
         try:
             df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
@@ -1537,36 +1543,40 @@ class Aggregate(Frequency):
             df['Err Skew(X)'] = np.nan
         except TypeError:
             df['Err Skew(X)'] = np.nan
-        eps = 1e-4
+        except KeyError:
+            # not updated
+            return False
+        eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Sev mean error > eps')
+            logger.info('FAIL: Sev mean error > eps')
             return False
 
         if df.loc['Agg', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Agg mean error > eps')
+            logger.info('FAIL: Agg mean error > eps')
             return False
 
         if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
-            logger.warning('FAIL: Agg mean error > 10 * sev error')
+            logger.info('FAIL: Agg mean error > 10 * sev error')
             return False
 
         try:
             if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Sev CV error > eps')
+                logger.info('FAIL: Sev CV error > eps')
                 return False
 
             if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Agg CV error > eps')
+                logger.info('FAIL: Agg CV error > eps')
                 return False
 
             if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Sev skew error > eps')
+                logger.info('FAIL: Sev skew error > eps')
                 return False
 
             if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Agg skew error > eps')
+                logger.info('FAIL: Agg skew error > eps')
                 return False
         except (TypeError, ZeroDivisionError):
+            logger.info('Caution: not all validation tests applied')
             pass
 
         return True

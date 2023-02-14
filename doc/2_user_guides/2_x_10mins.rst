@@ -16,19 +16,22 @@ A Ten Minute Guide to ``aggregate``
 
 **Contents:**
 
-#. :ref:`Principal Classes`
+#. :ref:`10 min princ cl`
 #. :ref:`10 min Underwriter`
 
-    - :ref:`10 mins create from decl`
-    - :ref:`10 mins formatting`
-    - :ref:`Object Creation from the Knowledge Database`
-    - :ref:`10 mins bts`
+    - :ref:`10 min create from decl`
+    - :ref:`10 min formatting`
+    - :ref:`10 min ob cr`
+    - :ref:`10 min bts`
 
 #. :ref:`10 min how`
 #. :ref:`10 min Severity`
 #. :ref:`10 min Aggregate`
 
-    - :ref:`Creating an Aggregate Distribution`
+    - :ref:`10 min creating agg`
+    - :ref:`10 min quick diagnostics`
+    - :ref:`10 min algo deets`
+    - :ref:`10 min basic prob`
     - :ref:`10 min mixtures`
     - :ref:`10 min accessing`
     - :ref:`10 min reinsurance`
@@ -59,13 +62,15 @@ A Ten Minute Guide to ``aggregate``
 
 #. :ref:`10 min additional`
 
-    - :ref:`Conditional Expected Values`
-    - :ref:`Calibrate Distortions`
-    - :ref:`Analyze Distortions`
-    - :ref:`Twelve Plot`
+    - :ref:`10 min conditional expected values`
+    - :ref:`10 min calibrate distortions`
+    - :ref:`10 min analyze distortions`
+    - :ref:`10 min twelve plot`
 
 #. :ref:`10 min extensions`
 #. :ref:`10 min summary`
+
+.. _10 min princ cl:
 
 Principal Classes
 ------------------
@@ -106,7 +111,7 @@ Printing ``build`` reports its name, the number of objects in its knowledge, and
 
     build
 
-.. _10 mins create from decl:
+.. _10 min create from decl:
 
 Object Creation Using DecL and :meth:`build`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,7 +135,7 @@ The units are 1000s of USD, EUR, or GBP.
 
 DecL is a custom language, created to describe aggregate distributions. Alternatives are to use positional arguments or key word arguments in function calls. The former are confusing because there are so many. The latter are verbose, because of the need to specify the parameter name. DecL is a concise, expressive, flexible, and powerful alternative.
 
-.. _10 mins formatting:
+.. _10 min formatting:
 
 Important: Formatting a DecL Program
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -167,6 +172,7 @@ which results in syntax errors.
 
 DecL includes a Python newline ``\``. All programs in the help are entered so they can be cut and pasted.
 
+.. _10 min ob cr:
 
 Object Creation from the Knowledge Database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -195,7 +201,7 @@ A row in the knowledge can be accessed by name using ``build``. This example mod
 
 The argument ``'B.Dice10'`` is passed through to the underlying dataframe's ``getitem``.
 
-.. _10mins create from knowledge:
+.. _10 min create from knowledge:
 
 A row in the knowledge can be created as a Python object using:
 
@@ -207,20 +213,20 @@ A row in the knowledge can be created as a Python object using:
 
 The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``B.Dice10`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
 
-The method :meth:`build.qshow` (quick show) searches the knowledge using a regex (regular expression) applied to the names, returning a dataframe of specifications.
+The method :meth:`build.qshow` (quick show) searches the knowledge using a regex (regular expression) applied to the names, returning a dataframe of specifications. :meth:`build.qlist` (quick list) just displays them.
 
 .. ipython:: python
     :okwarning:
 
-    qd(build.qshow('Dice').head(3), justify="left", max_colwidth=60)
+    build.qlist('Dice')
 
 The method :meth:`build.show` also searches the knowledge using a regex applied to the names, but it creates and plots each match by default. Be careful not to create too many objects! Try running::
 
-    ans, df = build.show('Dice')
+    ans, df = build.show('Dice', return_df=True)
 
 It returns a list ``ans`` of created objects and a dataframe ``df`` containing information about each.
 
-.. _10 mins bts:
+.. _10 min bts:
 
 :class:`Underwriter` Behind the Scenes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -437,12 +443,14 @@ The :class:`Aggregate` Class
     * Exist in updated and non-updated state.
     * homog and inhomog multiply of built in aggs!! See Treaty 5 from Bear and Nemlick.
 
+.. _10 min creating agg:
+
 Creating an Aggregate Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :class:`Aggregate` objects can be created in three ways:
 
-#.  Generally, they are created using DecL by :meth:`Underwriter.build`, as shown in :ref:`10 mins create from decl`.
+#.  Generally, they are created using DecL by :meth:`Underwriter.build`, as shown in :ref:`10 min create from decl`.
 
 #. Objects in the knowledge can be :ref:`created by name<10mins create from knowledge>`.
 
@@ -462,7 +470,24 @@ This example uses :meth:`build` to make an :class:`Aggregate` with a Poisson fre
                 'poisson')
     qd(a02)
 
-The quick display reports summary exact and estimated frequency, severity, and aggregate statistics. These make it easy to see if the numerical estimation appears valid. Look for a small error in the mean and close second (CV) and third (skew) moments. ``qd`` displays the dataframe ``a.describe``.
+``qd`` displays the dataframe ``a.describe``.
+
+.. _10 min quick diagnostics:
+
+Aggregate Quick Diagnostics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The quick display reports a set of quick diagnostics, showing
+
+* Exact ``E[X]`` and estimated ``Est E[X]`` frequency, severity, and aggregate statistics.
+* Relative errors ``Err E[X]`` for the means.
+* Coefficient of variation ``CV(X)`` and estimated CV, ``Est CV(X)``
+* Skewness ``Skew(X)`` and estimated skewness, ``Est Skew(X)``
+* The (log to base 2) of the number of buckets used, ``log2``
+* The bucket size ``bs`` used in discretization
+
+These statistics make it help to test if the numerical estimation is  valid. Look for a small error in the mean and close second (CV) and third (skew) moments.
+The last item ``valid = True`` shows the model passes some basic validation tests. Strictly, it means the model did not fail any tests: it is not unreasonable. The test should be interpreted like a null hypothesis; you expect it to be True and are worried when it is False.
 
 In this case, the aggregate mean error is too high because the discretization bucket size ``bs`` is too small. Update with a larger bucket.
 
@@ -472,7 +497,108 @@ In this case, the aggregate mean error is too high because the discretization bu
     a02.update(bs=1/128)
     qd(a02)
 
-----------------
+
+.. _10 min algo deets:
+
+Aggregate Algorithm in Detail
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Here's the ``aggregate`` FFT convolution algorithm stripped down to bare essentials and coded in raw Python to show you what happens behind the curtain.
+Let's recreate the following simple example. The variable names for the means and shape are for clarity. ``sev_shape`` is :math:`\sigma` for a lognormal.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build, qd
+    en = 50
+    sev_scale = 10
+    sev_shape = 0.8
+    simple = build('agg Simple '
+                   f'{en} claims '
+                   f'sev {sev_scale} * lognorm {sev_shape} '
+                   'poisson')
+    qd(simple)
+
+
+The algorithm steps are:
+
+#. Inputs
+
+    - Severity distribution cdf. Use ``scipy.stats``.
+    - Frequency distribution probability generating function. For a Poisson with mean :math:`\lambda` the PGF is :math:`\mathscr P(z) = \exp(\lambda(z - 1))`.
+    - The bucket size :math:`b`. Use the value ``simple.bs``.
+    - The number of buckets :math:`n=2^{log_2}`. Use the default ``log2=16`` found in ``simple.log2``.
+    - A padding parameter, equal to 1 by default, from ``simple.padding``.
+
+#. Discretize the severity cdf.
+#. Apply the FFT to discrete severity with padding to size ``2**(log2 + padding)``.
+#. Apply the frequency pgf to the FFT.
+#. Apply the inverse FFT to create is a discretized version of the aggregate distribution and output it.
+
+The next few lines of code implement this algorithm. Start by importing the probability distribution and FFT routines. ``rfft`` and ``irfft`` take the FFT and inverse FFT of real input.
+
+.. ipython:: python
+    :okwarning:
+
+    import numpy as np
+    from scipy.fft import rfft, irfft
+    import scipy.stats as ss
+
+Pull parameters from ``simple`` to match calculations, step 1. ``n_pad`` is the length of the padded vector used in the convolution to manage aliasing.
+
+.. ipython:: python
+    :okwarning:
+
+    bs = simple.bs
+    log2 = simple.log2
+    padding = simple.padding
+    n = 1 << log2
+    n_pad = 1 << (log2 + padding)
+    sev = ss.lognorm(sev_shape, scale=sev_scale)
+
+Use the ``round`` method and the survival function to discretize, completing step 2.
+
+.. ipython:: python
+    :okwarning:
+
+    xs = np.arange(0, (n + 1) * bs, bs)
+    discrete_sev = -np.diff(sev.sf(xs - bs / 2))
+
+The next line of code carries out algorithm steps 3, 4, and 5!
+All the magic happens here. The forward FFT adds padding, but the answer must  be unpadded manually, with the final ``[:n]``.
+
+.. ipython:: python
+    :okwarning:
+
+    agg = irfft( np.exp( en * (rfft(discrete_sev, n_pad) - 1) ) )[:n]
+
+Plots to compare the two approaches. They are spot on!
+
+.. ipython:: python
+    :okwarning:
+
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45),
+        constrained_layout=True);                                    \
+    ax0, ax1 = axs.flat;                                             \
+    simple.density_df.p_total.plot(lw=2, label='Aggregate', ax=ax0); \
+    ax0.plot(xs[:-1], agg, lw=1, label='By hand');                   \
+    ax0.legend();                                                    \
+    simple.density_df.p_total.plot(lw=2, label='Aggregate', ax=ax1); \
+    ax1.plot(xs[:-1], agg, lw=1, label='By hand');                   \
+    ax1.legend();
+    @savefig 10mins_byhand.png scale=20
+    ax1.set(yscale='log');
+
+The very slight difference for small loss values arises because ``build`` removes numerical fuzz, setting values below machine epsilon (about ``2e-16``) to zero, explaining why the blue aggregate line drops off vertically on the left.
+
+
+
+.. _10 min basic prob:
+
+Basic Probability Functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An :class:`Aggregate` object acts like a discrete probability distribution. There are properties for the aggregate and severity mean, standard deviation, coefficient of variation, and skewness, both computed exactly and numerically estimated.
 
@@ -583,11 +709,16 @@ The following are equal using the defaut discretization method.
 Reinsurance
 ~~~~~~~~~~~~~~~
 
-:class:`Aggregate` objects can apply per occurrence and aggregate reinsurance.
+:class:`Aggregate` objects can apply per occurrence and aggregate reinsurance using clauses
 
-**Example.**
+* ``occurrence net of [limit] xs ]attach]``
+* ``occurrence net of [pct] so [limit] xs [attach]``, where ``so`` stands for "share of"
+* ``occurrence ceded to [limit] xs ]attach]``
+* and so forth.
 
-The gross distribution is a triangular aggregate created as the sum of two uniform distribution on 1, 2,..., 10.
+**Examples.**
+
+Gross distribution: a triangular aggregate created as the sum of two uniform distribution on 1, 2,..., 10.
 
 .. ipython:: python
     :okwarning:
@@ -761,22 +892,25 @@ multiples of the bucket size.
 The recommended value of ``bs`` should rounded up to a binary fraction
 (denominator is a power of 2) using :meth:`utilities.round_bucket`.
 
-:class:`Aggregate` also includes two functions for assessing ``bs``, one based
- on the overall error and one based on looking at each severity component.
+:class:`Aggregate` also includes two functions for assessing ``bs``,
+one based on the overall error and one based on looking at each severity
+component.
 
 :meth:`Aggregate.aggregate_error_analysis` updates the object at a range of
- different ``bs`` values and reports the total absolute (strictly, signed
- absolute error) and relative error as well as an upper bound ``bs/2`` on the
- absolute value of the discretization error. ``log2`` must be input and,
- optionally, the log base 2 of the smallest bucket to model. It then models
- six doublings of the input bucket. If no bucket is input, it models three
- doublings up and down from the rounded :meth:`recommend_bucket` suggestion.
- The output table shows the implied absolute ``agg_m``  and relative
- ``est_m`` aggregate error in the mean, ``bs / 2`` divided into average
- severity as ``rel h``, and the sum of this and ``rel m``. Thick tailed
- distributions can favor a large bucket size without regard to the impact on
- discretization; accounting for the impact of ``bs / 2`` is a countervailing
- force.
+different ``bs`` values and reports the total absolute (strictly, signed
+absolute error) and relative error as well as an upper bound ``bs/2`` on
+the absolute value of the discretization error. ``log2`` must be input and,
+optionally, the log base 2 of the smallest bucket to model. It then models
+six doublings of the input bucket. If no bucket is input, it models three
+doublings up and down from the rounded :meth:`recommend_bucket` suggestion.
+The output table shows:
+
+* The actual ``(agg, m)`` and estimated ``(est, m)`` means, from the ``describe`` dataframe.
+* The implied absolute ``(abs, m)``  and relative ``(rel, m)`` errors in the mean.
+* ``(rel, h)`` shows the maximum relative severity discretization error, which equals ``bs / 2`` divided by the average severity.
+* ``(rel, total)``, equal to the sum of ``(rel, h)`` and ``rel m``.
+
+Thick tailed distributions can favor a large bucket size without regard to the impact on discretization; accounting for the impact of ``bs / 2`` is a countervailing force.
 
 .. ipython:: python
     :okwarning:
@@ -917,7 +1051,7 @@ In an :class:`Aggregate`, ``p`` and ``p_total`` are identical, the latter includ
     with pd.option_context('display.max_columns', a05g.density_df.shape[1]):
         print(a05g.density_df.head())
 
-The :class:`Portfolio` version is more exhaustive. It includes a variety of columns for each unit, suffixed ``_unit``, and for the complement of each unit (sum of everything but that unit) suffixed ``_ημ_unit``. The totals are suffixed ``_total``. The most important columns are ``exeqa_unit``, :ref:`Conditional Expected Values`. All the column names and a subset of ``density_df`` are shown next.
+The :class:`Portfolio` version is more exhaustive. It includes a variety of columns for each unit, suffixed ``_unit``, and for the complement of each unit (sum of everything but that unit) suffixed ``_ημ_unit``. The totals are suffixed ``_total``. The most important columns are ``exeqa_unit``, :ref:`10 min conditional expected values`. All the column names and a subset of ``density_df`` are shown next.
 
 .. ipython:: python
     :okwarning:
@@ -1077,10 +1211,9 @@ The last line illustrates that :meth:`q` and :meth:`cdf` are inverses. The :meth
 The :meth:`plot` Method
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The :meth:`plot` method provides basic visualization.
+The :meth:`plot` method provides basic visualization. There are three plots: the pdf/pmf for severity and the aggregate on the left. The middle plot shows log density for continuous distributions and the distribution function for discrete ones (selected when ``bs==1`` and the mean is < 100). The right plot shows the quantile (or VaR or Lee) plot.
 
-Discrete :class:`Aggregate` objects are plotted differently than continuous ones.
-The reinsurance examples show the discrete output format. The plots show the
+The reinsurance examples below show the discrete output format. The plots show the
 gross, net of occurrence, and net severity and aggregate pmf (left) and cdf
 (middle), and the quantile (Lee) plot (right). The property ``a05g.figure``
 returns the last figure made by the object as a convenience. You could also
@@ -1102,8 +1235,7 @@ use :meth:`plt.gcf`.
     a05n.figure.suptitle('Net of occurrence and aggregate');
 
 
-Continuous distributions substitute the log density for the distribution in the
-middle.
+Continuous distributions substitute the log density for the distribution in the middle.
 
 .. ipython:: python
     :okwarning:
@@ -1190,6 +1322,7 @@ Additional :class:`Portfolio` Methods
    * apply_distortion(s)
    * analyze_distortion(s)
 
+.. _10 min conditional expected values:
 
 Conditional Expected Values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1228,6 +1361,7 @@ The thin horizontal line at the maximum value of ``exeqa_B`` (left plot) shows t
 
 Using ``filter(regex=...)`` to select columns from ``density_df`` is a helpful idiom. The total column is labeled ``_total``. Using upper case for unit names makes them easier to select.
 
+.. _10 min calibrate distortions:
 
 Calibrate Distortions
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1243,6 +1377,8 @@ The :meth:`calibrate_distortions` method calibrates distortions to achieve reque
 
 The answer is returned in the ``dist_ans`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.dists`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
 
+.. _10 min analyze distortions:
+
 Analyze Distortions
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -1255,6 +1391,8 @@ The :meth:`analyze_distortions` method applies the distortions in ``p07.dists`` 
     ans = p07.analyze_distortions(p=0.996)
     print(ans.comp_df.xs('LR', axis=0, level=1).
          to_string(float_format=lambda x: f'{x:.1%}'))
+
+.. _10 min twelve plot:
 
 Twelve Plot
 ~~~~~~~~~~~~~

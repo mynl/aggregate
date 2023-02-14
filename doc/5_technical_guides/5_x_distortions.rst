@@ -18,15 +18,15 @@ Distortions and Spectral Risk Measures
 **Contents:**
 
 * :ref:`dist hr`
-* :ref:`Distortion Function and Spectral Risk Measures`
-* :ref:`Layer Densities`
-* :ref:`The Equal Priority Default Rule`
-* :ref:`Expected Loss Payments at Different Asset Levels`
-* :ref:`The Natural Allocation Premium`
-* :ref:`Properties of Alpha, Beta, and Kappa`
-* :ref:`Properties of the Natural Allocation`
-* :ref:`The Natural Allocation of Equity`
-* :ref:`Appendix: Notation and Conventions`
+* `Distortion Function and Spectral Risk Measures`_
+* `Layer Densities`_
+* `The Equal Priority Default Rule`_
+* `Expected Loss Payments at Different Asset Levels`_
+* `The Natural Allocation Premium`_
+* :ref:`dist abk`
+* `Properties of the Natural Allocation`_
+* `The Natural Allocation of Equity`_
+* :ref:`dist appendix`
 
 .. _dist hr:
 
@@ -571,6 +571,8 @@ who pointed out that with an additive pricing functional there is no
 need to allocate capital in order to price, to the situation of a
 non-additive SRM pricing functional.
 
+.. _dist abk:
+
 Properties of Alpha, Beta, and Kappa
 --------------------------------------
 
@@ -917,6 +919,7 @@ instance, the sense of the problem dictates that
 :math:`0\times\infty=0`: with no initial capital there is no final
 capital regardless of the return.
 
+.. _dist appendix:
 
 Appendix: Notation and Conventions
 -----------------------------------

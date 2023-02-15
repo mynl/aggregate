@@ -204,7 +204,13 @@ class Underwriter(object):
         for k in ['log2', 'update', 'debug']:
             s.append(f'{k:<19s}{getattr(self, k)}')
         sd = self.site_dir.resolve().relative_to(Path.home())
-        dd = self.default_dir.resolve().relative_to(Path.home())
+        sd = f'~/{sd}'
+        dd = self.default_dir.resolve()
+        try:
+            dd = dd.relative_to(Path.home())
+            dd = f'~/{dd}'
+        except ValueError:
+            dd = str(dd)
         s.append(f'site dir           {sd}')
         s.append(f'default dir        {dd}')
         s.append( '')

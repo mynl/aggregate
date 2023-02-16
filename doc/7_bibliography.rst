@@ -1,7 +1,3 @@
 
-****************
-Bibliography
-****************
-
 .. bibliography::
     :cited:

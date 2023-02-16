@@ -79,7 +79,7 @@ class UnderwritingLexer(Lexer):
 
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
-    ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'
+    ID = r'[a-zA-Z][\._:~a-zA-Z0-9]*'
     EXPONENT = r'\^|\*\*'
     PLUS = r'\+'
     MINUS = r'\-'

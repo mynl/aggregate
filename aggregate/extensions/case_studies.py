@@ -1863,7 +1863,6 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         # add self.blend_d to list of distortions
         for port in self.ports.values():
-            # add mass_hints...
             if 'ccoc' not in port.dists:
                 port.dists['ccoc'] = self.dist_dict['ccoc']
             if 'blend' not in port.dists and 'blend' in self.dist_dict:

@@ -148,6 +148,86 @@ Build the same distribution explicitly from gamma severities. Here the gamma is 
     g2 = build(f'sev g2 {sc} * gamma {sh}')
     print(g2.stats(), g.stats())
 
+
+Analytic Error Analysis
+""""""""""""""""""""""""""
+
+There is a series expansion for the pdf of a Tweedie computed by conditioning on the number of claims and using that a convolution of gammas with the same scale parameter is again gamma. For a Tweedie with expected frequency :math:`\lambda`, gamma shape :math:`\alpha` and scale :math:`\beta`, it is given by
+
+.. math::
+
+    f(x) = \sum_{n \ge 1} e^{-\lambda}\frac{\lambda^n}{n!}\frac{x^{n\alpha-1}e^{-x/\beta}}{\Gamma(n\alpha)\beta^{{n\alpha}}}
+
+for :math:`x>0` and :math:`f(x)=\exp(-\lambda)`. The exact function shows the FFT method is very accurate.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import tweedie_convert, build, qd
+    from scipy.special import loggamma
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from pandas import option_context
+
+    a = build('agg Tw tweedie 10 1.01 1')
+    qd(a)
+    @savefig tweedie_test_1.png
+    a.plot()
+
+A Tweedie with :math:`p` close to 1 approximates a Poisson. Its gamma severity is very peaked around its mean (high :math:`\alpha` and offsetting small :math:`\beta`).
+
+The next function provides a transparent, if inefficient, implementation of the Tweedie density.
+
+.. ipython:: python
+    :okwarning:
+
+    def tweedie_density(x, mean, p, disp):
+        pars = tweedie_convert(p=p, μ=mean, σ2=disp)
+        λ = pars['λ']
+        α = pars['α']
+        β = pars['β']
+        if x == 0:
+            return np.exp(-λ)
+        logl = np.log(λ)
+        logx = np.log(x)
+        logb = np.log(β)
+        logbase = -λ
+        log_term = 100
+        const = -λ - x / β
+        ans = 0.0
+        for n in range(1, 2000): #while log_term > -20:
+            log_term = (const  +
+                        + n * logl  +
+                        + (n * α - 1) * logx +
+                        - loggamma(n+1) +
+                        - loggamma(n * α) +
+                        - n * α * logb)
+            ans += np.exp(log_term)
+            if n > 20 and log_term < -227:
+                break
+        return ans
+
+
+The following graphs show that the FFT approximation is excellent, across a wide range, just as its good moment-matching performance suggests it would be.
+
+.. ipython:: python
+    :okwarning:
+
+    bit = a.density_df.loc[5:a.q(0.99):256, ['p']]
+    bit['exact'] = [tweedie_density(i, 10, 1.01, 1) for i in bit.index]
+    bit['p'] /= a.bs
+
+    fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True, squeeze=True)
+    ax0, ax1 = axs.flat
+
+    bit.plot(ax=ax0);
+    ax0.set(ylabel='density');
+    bit['err'] = bit.p / bit.exact - 1
+    bit.err.plot(ax=ax1);
+    @savefig tweedie_test_2.png scale=20
+    ax1.set(ylabel='relative error', ylim=[-1e-5, 1e-5]);
+
+
 .. ipython:: python
     :suppress:
 

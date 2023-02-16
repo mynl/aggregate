@@ -3,15 +3,10 @@ Bounds Module
 ==============
 
 .. autoclass:: aggregate.bounds.Bounds
+   :special-members: __init__
    :members:
-   :special-members:
    :private-members:
-   :undoc-members:
 
 .. automodule:: aggregate.bounds
-   :exclude-members: Bounds
    :members:
-   :special-members:
-   :private-members:
-   :undoc-members:
 

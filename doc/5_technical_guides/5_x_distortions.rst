@@ -218,6 +218,116 @@ The layer density is distinct from models that vary the volume of each
 unit in a homogeneous portfolio model. Our portfolio is static. By
 varying assets we are implicitly varying the quality of insurance.
 
+
+.. _num pricing:
+
+Portfolio Pricing with Spectral Risk Measures
+-----------------------------------------------
+
+Taken as read: a painful discussion that markets set prices, not actuaries and models. *Pricing* here means *valuing* according to some model. For actuaries, valuation is a term of art it means reserving to a life actuary. Pricing actuaries understanding that they are just determining a model value. Thus we will refer to the model price.
+
+Several methods apply a distortion :math:`g` to price by computing
+
+.. math::
+
+   \rho_g(X) = \int g(S(t))dt
+
+notably:
+
+#. :class:`Aggregate`: ``price``, ``apply_distortion``
+#. :class:`Portfolio`: ``price``, ``apply_distortion``,  (called by ``analyze distortion``)
+#. :class:`Distortion`: ``price``, ``price2``
+#. Working by hand using ``density_df.p_total``.
+
+All of these methods use the same approach, the integral is approximated as a left Riemann sum:
+
+.. math::
+
+   \int_0^\infty g(S(t))dt \approx
+   \sum_{k=0}{n} g(S(kb))b
+
+The implementation computes
+
+* ``S`` as ``1 - p_total.cumsum()``,
+* ``gS = d.g(S)``, and
+* ``(gS.loc[:a - bs] * np.diff(S.index)).sum()`` or ``.cumsum().iloc[-1]``.
+
+The ``p_total.cumsum()`` idiom automatically accounts for the case where the output distribution is not normalized (sums to :math:`<1`).
+Using ``sum`` vs. ``cumsum`` is usually an O(1e-16) difference. These methods all use the forward difference of :math:`dt` and match against the unlagged values of ``S`` or ``gS`` (per PIR p. 272-3). The :class:`Aggregate` method prepends 0 and then computes a ``cumsum``, so the ``a`` index gives the right value. Remember, ``pandas.Series.loc[:a]`` *includes* the element with index ``a`` (whereas ``iloc[:n]`` does not).
+When ``a`` is given, the series includes ``a`` (based on  ``.loc[:a]``) and the last value is dropped from the sum product.
+
+The next block of code provides a reconciliation of methods. Build an aggregate and put it in a :class:`Portfolio` object to expose ``calibrate_distortions``.
+
+.. ipython:: python
+   :okwarning:
+
+   from aggregate import Portfolio, build, qd
+   import pandas as pd
+   a = build('agg CommAuto '
+             '10 claims '
+             '10000 xs 0 '
+             'sev lognorm 50 cv 4 '
+             'poisson')
+   qd(a)
+   pa = Portfolio('test', [a])
+   pa.update(log2=16, bs=1/4)
+   qd(pa)
+
+Determine distortion parameters to achieve a 10% return at 99 percentile capital, and display them. Pull out the achieved pricing.
+
+.. ipython:: python
+   :okwarning:
+
+   pa.calibrate_distortions(ROEs=[0.1], Ps=[0.99], strict='ordered');
+   d = pa.dists['dual']
+   qd(pa.distortion_df)
+   f"Exact premium {pa.distortion_df.iloc[0, 2]:.15f}"
+
+Compute pricing in the four ways described above.
+
+.. ipython:: python
+   :okwarning:
+
+   dm = pa.price(.99, d)
+   f'Exact value {dm.price:.15f}'
+   bit = a.density_df[['loss', 'p_total', 'S']]
+   bit['aS'] = 1 - bit.p_total.cumsum()
+   bit['gS'] = d.g(bit.S)
+   bit['gaS'] = d.g(bit.aS)
+   test = pd.Series((d.price(bit.loc[:a.q(0.99), 'p_total'], kind='both')[-1],
+                     d.price(a.density_df.p_total, a.q(0.99), kind='both')[-1],
+                     d.price2(bit.p_total).loc[a.q(0.99)].ask, \
+                     d.price2(bit.p_total, a.q(0.99)).ask,
+                     a.price(0.99, d).iloc[0, 1],
+                     dm.price,
+                     bit.loc[:a.q(0.99)-a.bs, 'gS'].sum() * a.bs,
+                     bit.loc[:a.q(0.99)-a.bs, 'gS'].cumsum().iloc[-1] * a.bs,
+                     bit.loc[:a.q(0.99)-a.bs, 'gaS'].sum() * a.bs,
+                     bit.loc[:a.q(0.99)-a.bs, 'gaS'].cumsum().iloc[-1] * a.bs),
+             index=['distortion.price',
+                    'distortion.price with a',
+                    'distortion.price2, find a',
+                    'distortion.price2(a)',
+                    'Aggregate.price',
+                    'Portfolio.price',
+                    'bit sum',
+                    'bit cumsum',
+                    'bit sum alt S',
+                    'bit cumsum alt S'
+                   ])
+
+Display the results and the relative difference to the largest price.
+
+.. ipython:: python
+   :okwarning:
+
+   qd(test.sort_values(),
+      float_format=lambda x: f'{x:.15f}')
+   qd(test.sort_values() / test.sort_values().iloc[-1] - 1,
+      float_format=lambda x: f'{x:.6e}')
+
+
+
 The Equal Priority Default Rule
 ----------------------------------
 

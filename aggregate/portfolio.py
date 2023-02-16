@@ -1245,13 +1245,13 @@ class Portfolio(object):
         any_false = False
         for a in self.agg_list:
             if not a.valid:
-                logger.warning(f'Aggregate {a.name} not valid')
+                logger.warning(f'Aggregate {a.name} fails validation')
                 any_false = True
 
         if any_false:
             return False
         else:
-            logger.info('All aggregate objects pass validation.')
+            logger.info('All aggregate objects are not unreasonable')
 
         df = self.describe.xs('total', level=0, axis=0).abs()
         try:
@@ -2778,7 +2778,7 @@ class Portfolio(object):
 
         return ans_table, ans_stacked
 
-    def apply_distortion(self, dist, view='ask', plots=None, df_in=None, create_augmented=True, mass_hints=None,
+    def apply_distortion(self, dist, view='ask', plots=None, df_in=None, create_augmented=True,
                          S_calculation='forwards', efficient=True):
         """
         Apply the distortion, make a copy of density_df and append various columns to create augmented_df.
@@ -2798,27 +2798,9 @@ class Portfolio(object):
         1. basic: exag_sumparts, exag_total df.exa_total
         2. extended: the full original set
 
-        **The issue with distortions that have a mass at 0**
+        Per 0.11.0: no mass at 0 allowed. If you want to use a distortion with mass at 0 you must use
+        a close approximation.
 
-        exag is computed as the cumulative integral of beta g(S), which is unaffected by the mass.
-
-        But beta = exi_xgtag is computed as (cumint exeqa / loss * gp_total) / gS which includes the point at infinity
-        or sup loss. Since gp_total is computed as a difference of gS it does not see the mass ( and it will
-        sum to 1 - mass). Therefore we need to add a term "E[X_i/X | X=sup loss or infty] mass" to the cumint term
-        for all loss (upper limits of integration) <= ess sup(X).
-        To do so requires an estimate of E[X_i/X | X=sup loss or infty], which is hard because the estimates tend to
-        become unstable in the right tail and we only have estimates upto the largest modeled value, not actually
-        infinity. In order to circumvent this difficulty introduce the mass_hint variable where you specifically
-        input estimates of the values. mass_hint is optional.
-
-        Note that if the largest loss really is infinite then exag will be infinite when there is a mass.
-
-        It also requires identifying the sup loss, i.e. the largest loss with S>0. np.searchsorted can be used for
-        the latter. It needs care but is not really difficult.
-
-        The binding constraint is accurate estimation of E[X_i | X]. We will truncate augmented_df at the point that
-        the sum exeqa is < loss - epsilon. In order to compute exeqa you must have S>0, so it will always be the case
-        that the tail is "missing" and you need to add the mass, if there is one.
 
         :type create_augmented: object
         :param dist: agg.Distortion
@@ -2826,10 +2808,6 @@ class Portfolio(object):
         :param plots: iterable of plot types
         :param df_in: when called from gradient you want to pass in gradient_df and use that; otherwise use self.density_df
         :param create_augmented: store the output in self.augmented_df
-        :param mass_hints: hints for values of E[X_i/X | X=x] as x --> infty (optional; if not entered estimated using
-                last reliable value. Mass hints needs to have a get-item method so that mass_hints[line] is the hint
-                for line. e.g. it can be a dictionary or pandas Series indexed by line names. mass_hints must sum to
-                1 over all lines. Total line obviously excluded.
         :param S_calculation: if forwards, recompute S summing p_total forwards...this gets the tail right; the old method was
                 backwards, which does not change S
         :param efficient: just compute the bare minimum (T. series, not M. series) and return
@@ -2901,13 +2879,6 @@ class Portfolio(object):
         # weirdness occurs here were 0 appears as -0: get rid of that
         df.loc[df.gp_total==0, 'gp_total'] = 0.0
 
-        # Impact of mass at zero
-        # if total has an ess sup < top of computed range then any integral a > ess sup needs to have
-        # the mass added. It only needs to be added to quantities computed as integrals, not g(S(x))
-        # which includes it automatically.
-        # total_mass is the mass for the total line, it will be apportioned below to the individual lines
-        # total_mass  = (mass %) x (ess sup loss), applied when S>0
-
         # figure out where to truncate df (which turns into augmented_df)
         lnp = '|'.join(self.line_names)
         # in discrete distributions there are "gaps" of impossible values; do not want to worry about these
@@ -2938,43 +2909,6 @@ class Portfolio(object):
         if not np.alltrue(df.S.iloc[1:] <= df.S.iloc[:-1].values):
             logger.error('S = density_df.S is not non-increasing...carrying on but you should investigate...')
 
-        # this should now apply in ALL mass situations...
-        # total_mass = 0
-        # if dist.mass:
-            # index where S>0 implies NEXT row must have p_total > 0 (since that will be the S value)
-            # hence need to add one here
-            # print(f'Index of ess_sup is {idx_ess_sup}')
-            # total_mass = np.zeros_like(S)
-            # locations and amount of mass to be added to computation of exi_xgtag below...
-            # was + 1, removed...   v
-            # total_mass[:idx_ess_sup   ] = dist.mass
-            # logger.info(f'total_mass vector = {total_mass}')
-            # print(f'total_mass vector = {total_mass}')
-
-        if dist.mass and mass_hints is None:
-            idx_ess_sup = df.S.to_numpy().nonzero()[0][-1] + 1
-            logger.info(f'Index of ess_sup is {idx_ess_sup}')
-            # only add masses upto ess_sup
-            # mass_S = pd.Series(0.0 index=df.index)
-            # mass_S.iloc[:idx_ess_sup] =
-            # logger.log(WL, 'No mass_hints given...estimating...')
-            mass_hints = pd.Series(index=self.line_names)
-            for line in self.line_names:
-                # logger.log(WL, f'Individual line={line}')
-                # print(f'Individual line={line}')
-                mass_hints[line] = df[f'exi_xeqa_{line}'].iloc[-1]
-                for ii in range(1, min(4, max(self.log2 - 8, 0))):
-                    avg_xix = df[f'exi_xeqa_{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
-                    logger.debug(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last trusted '
-                                   f'is {mass_hints[line]:.5g}')
-                                   # f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]:.5g}')
-                    # print(f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
-                    #                f'is {mass_hints[line]:.5g}')
-                logger.debug('Generally, you want these values to be consistent, except for discrete distributions.')
-            logger.log(WL, f'No mass_hints given, using estimated mass_hints = {mass_hints.to_numpy()} for {dist.name}'
-                           f' mass {dist.mass} {dist}')
-            # print(f'Using estimated mass_hints = {mass_hints.to_numpy()}')
-
         for line in self.line_names:
             # avoid double count: going up sum needs to be stepped one back, hence use cumintegral is perfect
             # for <=a cumintegral,  for > a reverse and use cumsum (no step back)
@@ -2996,32 +2930,6 @@ class Portfolio(object):
             #     self.density_df.loc[::-1, f'exeqa_{line}'] / self.density_df.loc[::-1, 'loss'] *
             #     df.loc[::-1, 'gp_total'], 1)[::-1]
             #
-            # Treatment of Masses
-            # You are integrating down from infinity. You need to add the mass at the first
-            # loss level with S>0, or, if S>0 for all x then you add the mass at all levels because
-            # int_x^infty fun = int_F(x)^1 fun + (prob=1) * fun(1) (fun=TVaR)
-            # The mass is (dist.mass x ess sup).
-            # if S>0 but flat and there is a mass then need to include loss X g(S(loss)) term!
-            # pick  up right hand places where S is very small (rounding issues...)
-            # OLD
-            #
-            # mass = 0
-            # if dist.mass:
-            #     logger.error("You cannot use a distortion with a mass at this time...")
-            #     # this is John's problem: the last scenario is getting all the weight...
-            #     # not clear how accurately this is computed numerically
-            #     # this amount is a
-            #     mass = total_mass * self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup]
-            #     logger.log(WL, f'Individual line={line} weight from portfolio mass = {mass}')
-            #     for ii in range(1, max(self.log2 - 4, 0)):
-            #         avg_xix = self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup - (1 << ii):].mean()
-            #         logger.log(WL, f'Avg weight last {1 << ii} observations is  = {avg_xix:.5g} vs. last '
-            #                        f'is {self.density_df[f"exi_xeqa_{line}"].iloc[idx_ess_sup]}:.5g')
-            #     logger.log(WL, 'You want these values all to be consistent!')
-            # old
-            # mass = dist.mass * self.density_df.loss * self.density_df[f'exi_xeqa_{line}'] * \
-            #        np.where(self.density_df.S > 0, 1, 0)
-
             # when computed using np.cumsum exixgtaUC is a pd.Series has an index so when it is mult by .loss
             # (which also has an index) it gets re-sorted into ascending order
             # when computed using cumintegral it is a numpy array with no index and so need reversing
@@ -3036,13 +2944,7 @@ class Portfolio(object):
             # test['z'] = bit
             # test['w'] = bit / test.a
             # test
-            #
-            # df[f'exag_{line}'] = exleaUC + exixgtaUC * self.density_df.loss + mass
-            # df[f'exag1_{line}'] = exleaUC1 + exixgtaUC * self.density_df.loss + mass
-            # is this ever used?
-            # df[f'exleag_{line}'] = exleaUC / df.gF
-            # df[f'exleag1_{line}'] = exleaUC1 / df.gF
-            #
+            #            #
             # again, exi_xgtag is super important, so we will compute it bare bones the same way as exi_xgta
             # df[f'exi_xgtag_{line}'] = exixgtaUC / df.gS
             #
@@ -3051,22 +2953,7 @@ class Portfolio(object):
             #                             df.gp_total).shift(-1)[::-1].cumsum()) / df.gp_total.shift(-1)[::-1].cumsum()
             # exa uses S in the denominator...and actually checking values there is a difference between the sum and gS
             #
-            # May 2020 new treatment of masses
-            #
-            mass = ημ_mass = total_mass = 0.
-            if dist.mass:
-                # this is John's problem: the last scenario is getting all the weight...
-                # total_mass is is the "shortfall" in gp_total - it is added at the end; it is not necessary if the
-                # distribution is actually bounded - then you already pick up the mass
-                # only need to add masses up to this point - an issue for bounded variables
-                # mass = total_mass * self.density_df[f'exi_xeqa_{line}'].iloc[idx_ess_sup]
-                if np.allclose(1.0, df.gp_total.sum()):
-                    logger.info('gp_total sums to 1, mass accounted for in gp_total; no further adjustment needed')
-                else:
-                    mass = dist.mass * mass_hints[line]
-                    ημ_mass = dist.mass * (np.sum(mass_hints) - mass_hints[line])
-                    total_mass = dist.mass
-                    logger.info(f'sum(gp_total)={df.gp_total.sum():.5g} < 1, setting {line} mass = {mass}')
+            # mass hints removed
             # original
             # df['exi_xgtag_' + line] = ((df[f'exeqa_{line}'] / df.loss *
             #             df.gp_total).shift(-1)[::-1].cumsum()) / df.gS
@@ -3082,14 +2969,14 @@ class Portfolio(object):
             logger.debug(f'Tail adjustment for {line}: {last_x:.6g}')
             df['exi_xgtag_' + line] = \
                 ((df[f'exeqa_{line}'] / df.loss * df.gp_total).
-                    shift(-1, fill_value=last_x)[::-1].cumsum() + mass) / (df.gS + total_mass)
+                    shift(-1, fill_value=last_x)[::-1].cumsum()) / df.gS
             # need these to be zero so nan's do not propagate
             df.loc[gSeq0, 'exi_xgtag_' + line] = 0.
             if not efficient:
                 last_x = df[f'exeqa_ημ_{line}'].iloc[-1] / df.loss.iloc[-1] * last_gS
                 df['exi_xgtag_ημ_' + line] = \
                     ((df[f'exeqa_ημ_{line}'] / df.loss * df.gp_total).
-                    shift(-1, fill_value=last_x)[::-1].cumsum() + ημ_mass) / (df.gS + total_mass)
+                    shift(-1, fill_value=last_x)[::-1].cumsum()) / df.gS
                 df.loc[gSeq0, 'exi_xgtag_ημ_' + line] = 0.
             #
             #
@@ -3550,7 +3437,7 @@ class Portfolio(object):
         temp.drop(columns=['BEST', 'WORST'])
         return Answer(gamma_df=temp.sort_index(axis=1), base=self.name, assets=a, p=p, kind=kind)
 
-    def price(self, p, g, view='ask', kind='var', mass_hints=None, efficient=True):
+    def price(self, p, g, view='ask', kind='var', efficient=True):
         """
         Price using regulatory and pricing g functions
 
@@ -3567,7 +3454,6 @@ class Portfolio(object):
         :param g:  pricing distortion function or dictionary spec or dictionary with distortion name, and lr or roe.
         :param view: bid or ask [NOT FULLY INTEGRATED... MUST PASS IN A DISTORTION]
         :param kind: var (default), upper var, tvar, epd; passed to `var_dict`
-        :param mass_hints: mass hints for distortions with a mass, pd.Series indexed by line names
         :param efficient: for apply_distortion
         :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
@@ -3604,7 +3490,7 @@ class Portfolio(object):
         else:
             raise ValueError(f'Inadmissible type {type(g)} passed to price. Expected Distortion or dict.')
 
-        ans_ad = self.apply_distortion(g, view=view, create_augmented=False, mass_hints=mass_hints, efficient=efficient)
+        ans_ad = self.apply_distortion(g, view=view, create_augmented=False, efficient=efficient)
         if a_reg in ans_ad.augmented_df.index:
             aug_row = ans_ad.augmented_df.loc[a_reg]
         else:
@@ -3631,7 +3517,7 @@ class Portfolio(object):
 
         return ans
 
-    def analyze_distortions(self, a=0, p=0, kind='lower', mass_hints=None, efficient=True,
+    def analyze_distortions(self, a=0, p=0, kind='lower',  efficient=True,
                             augmented_dfs=None, regex='', add_comps=True):
         """
         Run analyze_distortion on self.dists
@@ -3639,7 +3525,6 @@ class Portfolio(object):
         :param a:
         :param p: the percentile of capital that the distortions are calibrated to
         :param kind: var, upper var, tvar, epd
-        :param mass_hints:
         :param efficient:
         :param augmented_dfs: input pre-computed augmented_dfs (distortions applied)
         :param regex: apply only distortion names matching regex
@@ -3665,7 +3550,7 @@ class Portfolio(object):
                     use_self = False
                     logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
                 # first distortion...add the comps...these are same for all dists
-                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=(len(dfs) == 0) and add_comps, mass_hints=mass_hints,
+                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=(len(dfs) == 0) and add_comps,
                                                  efficient=efficient, use_self=use_self)
                 dfs.append(ad_ans.exhibit)
                 ans[f'{k}_exhibit'] = ad_ans.exhibit
@@ -3678,7 +3563,7 @@ class Portfolio(object):
 
     def analyze_distortion(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
                            p=None, kind='lower', A=None, use_self=False, plot=False,
-                           a_max_p=1-1e-8, add_comps=True, mass_hints=None, efficient=True):
+                           a_max_p=1-1e-8, add_comps=True, efficient=True):
         """
 
         Graphic and summary DataFrame for one distortion showing results that vary by asset level.
@@ -3749,7 +3634,6 @@ class Portfolio(object):
         :param plot:
         :param a_max_p: percentile to use to set the right hand end of plots
         :param add_comps: add old-fashioned method comparables (included = True as default to make backwards comp.)
-        :param mass_hints: for apply_distortion
         :param efficient:
         :return: various dataframes in an Answer class object
 
@@ -3792,7 +3676,7 @@ class Portfolio(object):
                     dist = dname
                 else:
                     dist = Distortion(dname, dshape, dr0, ddf)
-                _x = self.apply_distortion(dist, create_augmented=False, mass_hints=mass_hints, efficient=efficient)
+                _x = self.apply_distortion(dist, create_augmented=False, efficient=efficient)
                 augmented_df = _x.augmented_df
                 exa = self.density_df.loc[a_cal, 'exa_total']
                 exag = augmented_df.loc[a_cal, 'exag_total']
@@ -3817,7 +3701,7 @@ class Portfolio(object):
                 # was wasteful
                 # cd = self.calibrate_distortions(LRs=[LR], As=[a_cal], r0=dr0, df=ddf)
                 dist = self.calibrate_distortion(dname, r0=dr0, df=ddf, roe=ROE, assets=a_cal)
-                _x = self.apply_distortion(dist, create_augmented=False, mass_hints=mass_hints, efficient=efficient)
+                _x = self.apply_distortion(dist, create_augmented=False, efficient=efficient)
                 augmented_df = _x.augmented_df
 
         # other helpful audit values

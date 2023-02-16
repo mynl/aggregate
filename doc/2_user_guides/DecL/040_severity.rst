@@ -48,7 +48,8 @@ Probabilities can be entered as fractions, but no other arithmetic operation is 
 .. warning::
     Use binary fractions (denominator a power of two) to avoid rounding errors!
 
-**Details.**
+Details
+"""""""""""
 
 A ``dsev`` clause is converted by the parser into a ``dhistogram`` step distribution::
 
@@ -60,6 +61,34 @@ In rare cases you want a continuous (ogive, piecewise linear distribution) versi
 
 When executed, these are both converted into a ``scipy.stats`` ``histogram`` class.
 
+Discrete severities, specified using the ``dsev`` keyword, are implemented using a ``scipy.stats`` ``rv_historgram`` object, which is actually continuous. They work by concentrating the probability in small intervals just to the left of each knot point (to make the function right continuous). Given::
+
+    dsev [xs] [ps]
+
+where ``xs`` and ``ps`` are the vectors of outcomes and probabilities, internally ``aggregate`` creates::
+
+   xss = np.sort(np.hstack((xs - 2 ** -30, xs)))
+   pss = np.vstack((ps1, np.zeros_like(ps1))).reshape((-1,), order='F')[:-1]
+   fz_discr = ss.rv_histogram((pss, xss))
+
+The value ``2**-30`` needs to be smaller than the bucket size resolution, i.e., enough not to “split the bucket”. The mass is to the left of the knot to make a right continuous function (the approximation ramps up before the knot). Generally histograms are downsampled, not upsampled, so this is not a restriction.
+
+A ``dsev`` statement is translated into the more general::
+
+    sev dhistorgram xps [xs] [ps]
+
+where ``dhistrogram`` creates a discrete histogram (as above) and the ``xps`` keyword prefixes inputting the knots and probabilities. It is also possible to specify the input severity as a continuous histogram that is uniform on :math:`(x_k, x_{k+1}]`. The discrete probabilities are :math:`p_k=P(x_k < X \le x_{k+1})`. To create a rv_histogram variable is much easier, just use::
+
+    sev chistorgram xps [xs] [ps]
+
+which is translated into::
+
+    xs2 = np.hstack((xs, xs[-1] + xs[1]))
+    fz_cts = ss.rv_histogram((ps2, xs2))
+
+The code adds an additional knot at the end to create enough differences (there are only two differences between three points). The :ref:`num robertson` uses a ``chistogram``.
+
+The discrete method is appropriate when the distribution will be used and interpreted as fully discrete, which is the assumption the FFT method makes and the default. The continuous method is useful if the distribution will be used to create a scipy.stats rv_histogram variable. If the continuous method is interpreted as discrete and if the mean is computed as :math:`\sum_i p_k x_k`, which is appropriate for a discrete variable, then it will be under-estimated by :math:`b/2`.
 
 Parametric Severity
 ~~~~~~~~~~~~~~~~~~~~~

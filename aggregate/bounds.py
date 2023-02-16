@@ -27,7 +27,7 @@ class Bounds(object):
         p_star = bd.p_star('line', premium)
         bd.cloud_view(axes, ...)
 
-    :param: distribution_spec = Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
+    :param distribution_spec: A Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
             If DataFrame or Series values interpreted as desnsity, sum to 1. F, S, exgta all computed using Portfolio
             methdology
             If DataFrame line --> p_{line}

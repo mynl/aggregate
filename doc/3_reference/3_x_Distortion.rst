@@ -3,8 +3,7 @@ Distortion Module
 ==================
 
 .. automodule:: aggregate.spectral
+   :special-members: __init__
    :members:
-   :special-members:
    :private-members:
-   :undoc-members:
 

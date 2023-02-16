@@ -1530,7 +1530,9 @@ class Aggregate(Frequency):
 
         Run with logger level 20 (info) for more information on failures.
 
-        :return: True if all tests are passed, else False.
+        A Type 1 error (rejecting a valid model) is more likely than Type 2 (failing to reject an invalide one).
+
+        :return: True (interpreted as not unreasonable) if all tests are passed, else False.
 
         """
         if self.reinsurance_kinds() != "None":

@@ -94,7 +94,8 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
         clean = re.sub(r' note\{[^}]*\}', '', clean)
         if split > 0 and len(clean) > split:
             clean = re.sub(
-                r' ((dfreq )([0-9]+ )|([0-9]+ )(claims?|premium|loss|exposure)|d?sev|occurrence|agg|aggregate|wts?|mixed|poisson|fixed)',
+                r' ((dfreq )([0-9]+ )|([0-9]+ )(claims?|premium|loss|exposure)'
+                r'|d?sev|dfreq|occurrence|agg|aggregate|wts?|mixed|poisson|fixed)',
                            r'\n  \1', clean)
         if clean[:4] == 'port':
             # put in extra tabs at agg for portfolios

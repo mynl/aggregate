@@ -7,28 +7,30 @@
 # May 2022 to upload manually: twine upload dist/aggregate-0.9*.*
 # enter user name and pword (mildenhall) (py... password! not Github)
 
-import aggregate
 from setuptools import setup
 from pathlib import Path
+
+# change here and in __init__.py
+version = '0.10.7'
 
 tests_require = ['unittest', 'sly']
 install_requires = [
     'cycler',
     'ipykernel',
     'jinja2',
-    'matplotlib',
+    'matplotlib>=3.5',
     'numpy',
     'pandas',
     'psutil',
     'scipy',
     'sly',
     'titlecase',
+    # 'setuptools',
     # docs
     # 'docutils',
     # 'jupyter-sphinx',
     # 'nbsphinx',
     # 'recommonmark',
-    # 'setuptools',
     # 'sphinx',
     # 'sphinx-panels',
     # 'sphinx-rtd-dark-mode',
@@ -87,8 +89,6 @@ All contributions, bug reports, bug fixes, documentation improvements,
 enhancements and ideas are welcome.
 
 """
-
-version = aggregate.__version__
 
 setup(name="aggregate",
       description="Tools for creating and working with aggregate probability distributions.",

@@ -1129,16 +1129,7 @@ class Aggregate(Frequency):
         :return:
         """
         # [ORIGINALLY] wrap default with name
-        # return f'{super(Aggregate, self).__repr__()} name: {self.name}'
-
-        s = [self.info]
-        with pd.option_context('display.width', 200,
-                               'display.max_columns', 15,
-                               'display.float_format', lambda x: f'{x:,.5g}'):
-            # get it on one row
-            s.append(str(self.describe))
-        # s.append(super().__repr__())
-        return '\n'.join(s)
+        return f'{self.name}, {super(Aggregate, self).__repr__()}'
 
     def __str__(self):
         """
@@ -1147,7 +1138,14 @@ class Aggregate(Frequency):
         :return:
         """
         # pull out agg statistics_df
-        return repr(self)
+        s = [self.info]
+        with pd.option_context('display.width', 200,
+                               'display.max_columns', 15,
+                               'display.float_format', lambda x: f'{x:,.5g}'):
+            # get it on one row
+            s.append(str(self.describe))
+        # s.append(super().__repr__())
+        return '\n'.join(s)
 
         # ags = self.statistics_total_df.loc['mixed', :]
         # s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
@@ -1180,9 +1178,14 @@ class Aggregate(Frequency):
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
             s.append(f'approximation            {self.approximation}')
-            s.append(f'reinsurance              {self.reinsurance_kinds()}')
-            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ")}')
-            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg")}')
+            s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
+            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
+            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg").lower()}')
+            if self.valid is None:
+                vr = 'n/a (reinsurance)'
+            else:
+                vr = "not unreasonable" if self.valid else "fails"
+            s.append(f'validation               {vr}')
             s.append('')
         return '\n'.join(s)
 
@@ -3210,12 +3213,8 @@ class Severity(ss.rv_continuous):
                           'geninvgauss', 'johnsonsb', 'johnsonsu', 'kappa4', 'levy_stable', 'loguniform',
                           'mielke', 'nct', 'ncx2', 'norminvgauss', 'powerlognorm', 'reciprocal',
                           'studentized_range', 'trapezoid', 'trapz', 'truncnorm']:
-            #             # distributions with zero or two shape parameters
-            # require specific inputs
-            # for Kent examples input sev_scale=maxl, sev_mean=el and sev_cv as input
-            #     beta sev_a and sev_b params given expected loss, max loss exposure and sev_cv
-            #     Kent E.'s specification. Just used to create the CAgg classes for his examples (in agg.examples)
-            #     https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
+            # distributions with two shape parameters require specific inputs
+            # https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
             if sev_name == 'beta' and sev_mean > 0 and sev_cv > 0:
                 m = sev_mean / sev_scale
                 v = m * m * sev_cv * sev_cv

@@ -9,10 +9,9 @@ Installation
 
 To install from PyPI ::
 
-    pip install sly
     pip install aggregate
 
-See https://pypi.org/project/aggregate/. You must ensure all the packages listed in requirements.txt are already installed (see `Dependencies`_ ). Apart from ``sly``, they are all standard.
+See https://pypi.org/project/aggregate/.
 
 Source Code
 ===========
@@ -32,7 +31,8 @@ BSD 3.
 Dependencies
 =============
 
-See requirements.txt. The top block is required for installation. The bottom block is required to build the documentation.
+See requirements.txt. The top block is required for installation. The bottom block is required to build the
+documentation. Apart from``sly``, they are all standard.
 
 .. literalinclude:: ../requirements.txt
 
@@ -55,7 +55,7 @@ This help is structured around **access**, **application**, **theory**, and **im
 #. :doc:`5_Technical_Guides`, covering the underlying **theory** and its specific **implementation**.
 #. :doc:`6_Development`, giving some history, the design philosophy, and ideas for future development.
 
-There is also a :doc:`7_bibliography`.
+There is also a :doc:`Bibliography<7_bibliography>`.
 
 Help Coding Conventions
 =======================

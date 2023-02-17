@@ -344,7 +344,9 @@ Either or both of ``SCALE`` and ``LOC`` can be present. In the mean and CV form,
     plt.gcf().suptitle(f'{s0.name}, mean {m:.2f}, CV {v**.5/m:.2f} ({mf:.2f}, {vf**.5/mf:.2f})');
     print(m,v,mf,vf)
 
-``10 * lognorm 1 cv 0.5  + 70`` results in a distribution with mean 80 and CV 0.5, but the underlying lognormal has XXXX TODO SORTOUT!
+.. warning::
+
+    Constructions like ``10 * lognorm 1 cv 0.5  + 70`` are currently unstable and should not be used. This is a KNOWN BUG and is on the todo list!
 
 .. ipython:: python
     :okwarning:
@@ -470,7 +472,7 @@ This example uses :meth:`build` to make an :class:`Aggregate` with a Poisson fre
                 'poisson')
     qd(a02)
 
-``qd`` displays the dataframe ``a.describe``.
+``qd`` displays the dataframe ``a.describe``. This example fails the aliasing validation test because the aggregate mean error is suspiciously greater than the severity. (Run with logger level 20 for more diagnostics.) However, it passes both the severity mean and aggregate mean tests.
 
 .. _10 min quick diagnostics:
 
@@ -504,7 +506,21 @@ Aggregate Algorithm in Detail
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-Here's the ``aggregate`` FFT convolution algorithm stripped down to bare essentials and coded in raw Python to show you what happens behind the curtain.
+Here's the ``aggregate`` FFT convolution algorithm stripped down to bare essentials and coded in raw Python to show you what happens behind the curtain. The algorithm steps are:
+
+#. Inputs
+
+    - Severity distribution cdf. Use ``scipy.stats``.
+    - Frequency distribution probability generating function. For a Poisson with mean :math:`\lambda` the PGF is :math:`\mathscr P(z) = \exp(\lambda(z - 1))`.
+    - The bucket size :math:`b`. Use the value ``simple.bs``.
+    - The number of buckets :math:`n=2^{log_2}`. Use the default ``log2=16`` found in ``simple.log2``.
+    - A padding parameter, equal to 1 by default, from ``simple.padding``.
+
+#. Discretize the severity cdf.
+#. Apply the FFT to discrete severity with padding to size ``2**(log2 + padding)``.
+#. Apply the frequency pgf to the FFT.
+#. Apply the inverse FFT to create is a discretized version of the aggregate distribution and output it.
+
 Let's recreate the following simple example. The variable names for the means and shape are for clarity. ``sev_shape`` is :math:`\sigma` for a lognormal.
 
 .. ipython:: python
@@ -520,23 +536,7 @@ Let's recreate the following simple example. The variable names for the means an
                    'poisson')
     qd(simple)
 
-
-The algorithm steps are:
-
-#. Inputs
-
-    - Severity distribution cdf. Use ``scipy.stats``.
-    - Frequency distribution probability generating function. For a Poisson with mean :math:`\lambda` the PGF is :math:`\mathscr P(z) = \exp(\lambda(z - 1))`.
-    - The bucket size :math:`b`. Use the value ``simple.bs``.
-    - The number of buckets :math:`n=2^{log_2}`. Use the default ``log2=16`` found in ``simple.log2``.
-    - A padding parameter, equal to 1 by default, from ``simple.padding``.
-
-#. Discretize the severity cdf.
-#. Apply the FFT to discrete severity with padding to size ``2**(log2 + padding)``.
-#. Apply the frequency pgf to the FFT.
-#. Apply the inverse FFT to create is a discretized version of the aggregate distribution and output it.
-
-The next few lines of code implement this algorithm. Start by importing the probability distribution and FFT routines. ``rfft`` and ``irfft`` take the FFT and inverse FFT of real input.
+The next few lines of code implement the FFT convolution algorithm. Start by importing the probability distribution and FFT routines. ``rfft`` and ``irfft`` take the FFT and inverse FFT of real input.
 
 .. ipython:: python
     :okwarning:
@@ -783,7 +783,7 @@ Run the command::
 
     Distortion.test()
 
-for graphs of samples from each available family.
+for graphs of samples from each available family. ``tt`` is not a distortion because it is not concave. It is included for historical reasons.
 
 .. _10 min Portfolio:
 

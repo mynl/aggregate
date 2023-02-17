@@ -1,7 +1,8 @@
 Bahnemann Monograph
 --------------------
 
-Examples from the CAS published monograph :cite:t:`Bahnemann2015`, Distributions for actuaries, which is a text for CAS Part 8.
+Examples from the CAS published monograph :cite:t:`Bahnemann2015`, Distributions for actuaries, which is a text for CAS Part 8. It is
+available for free on the [CAS Website](https://www.casact.org/monograph/cas-monograph-no-2).
 
 Contents
 ~~~~~~~~~
@@ -23,6 +24,7 @@ Chapter 4: Aggregate Claims
 * :ref:`Example 6.7, Deductible Credits <example 6_7>`
 * :ref:`Summary of Created aggregate objects <bahn summary>`
 
+.. _example 4_1:
 
 Simple Discrete Aggregate, Example 4.1
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

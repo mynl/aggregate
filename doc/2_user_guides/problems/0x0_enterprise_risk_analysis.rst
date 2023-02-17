@@ -3,7 +3,7 @@ Enterprise Risk Analysis
 
 This section re-analyzes reinsurance structure alternatives introduced in :cite:t:`Brehm2007`,
 Enterprise Risk Analysis for Property & Liability Insurance Companies.
-
+This book is the ERM text on the syllabus for CAS Exam Part 7.
 
 Reinsurance Example
 ~~~~~~~~~~~~~~~~~~~~

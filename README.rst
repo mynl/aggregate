@@ -75,7 +75,6 @@ Installation
 
 ::
 
-  pip install sly
   pip install aggregate
 
 

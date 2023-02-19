@@ -32,7 +32,7 @@ Dependencies
 =============
 
 See requirements.txt. The top block is required for installation. The bottom block is required to build the
-documentation. Apart from``sly``, they are all standard.
+documentation. Apart from ``sly``, they are all standard.
 
 .. literalinclude:: ../requirements.txt
 

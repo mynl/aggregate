@@ -504,6 +504,7 @@ class Aggregate(Frequency):
 
             # really convenient to have p=p_total to be consistent with Portfolio objects
             self._density_df = pd.DataFrame(dict(loss=self.xs, p_total=self.agg_density))
+            self._density_df = self._density_df.set_index('loss', drop=False)
             self._density_df['p'] = self._density_df.p_total
             # remove the fuzz, same method as Portfolio.remove_fuzz
             eps = np.finfo(float).eps
@@ -528,20 +529,6 @@ class Aggregate(Frequency):
             self._density_df['F'] = self._density_df.p.cumsum()
             self._density_df['F_sev'] = self._density_df.p_sev.cumsum()
 
-            # S is more difficult. Can use 1-F or reverse cumsum pf p. Former is accurate on the
-            # left, latter more accurate in the right tail. For lev and similar calcs, care about
-            # the left (int of S). Upshot: need to pick the fill value carefully. Here is what
-            # Portfolio does
-            # fill_value = min(self._density_df.p_total.iloc[-1], max(0, 1. - (self._density_df.F.iloc[-1])))
-            fill_value = min(max(0, 1. - (self._density_df.F.iloc[-1])),
-                             max(0, 1. - (self._density_df.p_total.iloc[1:].sum())))
-            # expect next two rows to be the same...but they are not in certain situations...
-            # the second is more on point.
-            # self._density_df['S'] = self._density_df.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
-            # change Jan 2023 - general principle S is best computed forwards
-            # self._density_df['S'] = fill_value + self._density_df.p.shift(-1, fill_value=0)[::-1].cumsum()
-            # fill_value = max(0, 1. - (self._density_df.F_sev.iloc[-1]))
-            # self._density_df['S_sev'] = self._density_df.p_sev.shift(-1, fill_value=fill_value)[::-1].cumsum()
             # Update 2021-01-28: S is best computed forwards
             self._density_df['S'] = 1 - self._density_df.p_total.cumsum()
             self._density_df['S_sev'] = 1 - self._density_df.p_sev.cumsum()
@@ -551,22 +538,6 @@ class Aggregate(Frequency):
             self._density_df['exa'] = self._density_df['lev']
             self._density_df['exlea'] = \
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
-
-            # fix very small values, see port add_exa
-            # well, well, well. WTF is this?
-            # n_ = self._density_df.shape[0]
-            # if n_ < 1100:
-            #     mult = 1
-            # elif n_ < 15000:
-            #     mult = 10
-            # else:
-            #     mult = 100
-            # loss_max = self._density_df[['loss', 'exlea']].query(' exlea > loss ').loss.max()
-            # if np.isnan(loss_max):
-            #     loss_max = 0
-            # else:
-            #     loss_max += mult * self.bs
-            # self._density_df.loc[0:loss_max, 'exlea'] = 0
 
             # expected value and epd
             self._density_df['e'] = self.est_m # np.sum(self._density_df.p * self._density_df.loss)
@@ -3094,6 +3065,7 @@ class Severity(ss.rv_continuous):
         self.note = note
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
+        self.sev_loc = sev_loc
         logger.debug(
             f'Severity.__init__  | creating new Severity {self.sev_name} at {super().__repr__()}')
         # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
@@ -3620,7 +3592,7 @@ class Severity(ss.rv_continuous):
             ex2 = self.sev2
             ex3 = self.sev3
 
-        elif self.sev_name in ['lognorm', 'pareto', 'gamma']:
+        elif self.sev_name in ['lognorm', 'pareto', 'gamma'] and self.sev_loc == 0:
             # have exact and note this computes the answer directly
             # no need for the subsequent adjustment
             logger.info('Analytic moments')

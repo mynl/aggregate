@@ -541,6 +541,10 @@ class UnderwritingParser(Parser):
         self.logger(
             f'reins_clause <-- expr PART_OF expr XS expr {p[0]} p/o {p[2]} xs {p[4]}', p)
         # here expr is the currency amount of cover
+        if p[0] / p[2] < 0.05:
+            logger.warning(
+                f'Part of clause with proportion {p[0] / p[2]} is suspiciously small. '
+                 'Did you mean share of?')
         return (p[0] / p[2], p[2], p[4])
 
     # severity term ============================================

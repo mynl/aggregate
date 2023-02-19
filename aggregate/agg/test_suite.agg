@@ -47,8 +47,8 @@ agg B.Basic08 dfreq [0 1 2] [.5 .3 .2] sev.One
 agg B.Basic09 dfreq [0 1 2] [.5 .3 .2] sev lognorm 10 cv .3
 agg B.Dice10 dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
 agg B.Dice11 dfreq [1]   dsev [1:6]                 note{Same as previous example.}
-agg B.Dice12 dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two die.}
-agg B.Dice13 dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five die.}
+agg B.Dice12 dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two dice.}
+agg B.Dice13 dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five dice.}
 agg B.Dice14 dfreq [1:6] dsev [1:6]                 note{Sum of a dice roll of dice rolls}
 agg B.Dice15 dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
 

@@ -344,9 +344,7 @@ Either or both of ``SCALE`` and ``LOC`` can be present. In the mean and CV form,
     plt.gcf().suptitle(f'{s0.name}, mean {m:.2f}, CV {v**.5/m:.2f} ({mf:.2f}, {vf**.5/mf:.2f})');
     print(m,v,mf,vf)
 
-.. warning::
-
-    Constructions like ``10 * lognorm 1 cv 0.5  + 70`` are currently unstable and should not be used. This is a KNOWN BUG and is on the todo list!
+Combining scaling, shifts, and mean/cv entry like so ``10 * lognorm 1 cv 0.5  + 70`` results in a distribution with mean ``10 * 1 + 70 = 80``, a standard deviation of ``10 * 0.5 = 5``, and a cv of ``5 / 80``.
 
 .. ipython:: python
     :okwarning:

@@ -198,8 +198,8 @@ class Underwriter(object):
         import aggregate
         s = []
         s.append(f'underwriter        {self.name}')
-        s.append(f'knowledge          {len(self._knowledge)} programs')
         s.append(f'version            {aggregate.__version__}')
+        s.append(f'knowledge          {len(self._knowledge)} programs')
         s.append(f'update             {self.update}')
         for k in ['log2', 'update', 'debug']:
             s.append(f'{k:<19s}{getattr(self, k)}')
@@ -881,4 +881,4 @@ class Underwriter(object):
 # self = dbuild = None
 logger_level(30)
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
-debug_build = Underwriter(name='Debug', update=True, debug=True, log2=13)
+debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

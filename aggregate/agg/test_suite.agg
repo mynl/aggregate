@@ -5,8 +5,8 @@
 
 # Contents
 #
-# A. Novice examples interms of dice
-# B. Basic examples using dfreq and dsev notation
+# A. Creating Aggregates, Portfolios, and Distortion objects
+# B. Basic examples using dfreq and dsev notation, including dice examples
 # C. Frequency only fixed sev
 # D. Severity only, fixed freq, different distributions
 # E. Severity transformations: shift, scale, layer, and attachment, unconditional severities
@@ -28,10 +28,14 @@ sev One dsev [1]
 # Guides examples
 # ===============
 
-# Traffic Example
-# ---------------
-agg A.Traffic dfreq [0 1 2 3] [4/16 6/16 4/16 2/16] dsev [1 2 4] [10/16 3/16 3/16]
-agg A.Traffic.Po 1.25 claims                        dsev [1 2 4] [10/16 3/16 3/16] poisson
+# Simple Dice Examples
+# =====================
+agg A.Dice00 dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
+agg A.Dice01 dfreq [1]   dsev [1:6]                 note{Same as previous example.}
+agg A.Dice02 dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two dice.}
+agg A.Dice03 dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five dice.}
+agg A.Dice04 dfreq [1:6] dsev [1:6]                 note{Sum of a dice roll of dice rolls}
+agg A.Dice05 dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
 
 # Basic examples using freq and dsev notation
 # ===========================================
@@ -45,12 +49,6 @@ agg B.Basic06 dfreq [1:3] [.5 1/4 1/4] dsev [1 2 10] [.4 .4 .2]     note{specify
 agg B.Basic07 dfreq [0 1 2] [.5 .3 .2] sev sev.One
 agg B.Basic08 dfreq [0 1 2] [.5 .3 .2] sev.One
 agg B.Basic09 dfreq [0 1 2] [.5 .3 .2] sev lognorm 10 cv .3
-agg B.Dice10 dfreq [1:6] dsev [1]                   note{The roll of a single dice.}
-agg B.Dice11 dfreq [1]   dsev [1:6]                 note{Same as previous example.}
-agg B.Dice12 dfreq [2]   dsev [1:6]                 note{Sum of the rolls of two dice.}
-agg B.Dice13 dfreq [5]   dsev [1:6]                 note{Sum of the rolls of five dice.}
-agg B.Dice14 dfreq [1:6] dsev [1:6]                 note{Sum of a dice roll of dice rolls}
-agg B.Dice15 dfreq [1:4] dsev [1:16]                note{Something you can't do easily by hand}
 
 # Frequency only, fixed severity
 # ==============================
@@ -70,10 +68,8 @@ agg C.Freq12.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25
 agg C.Freq13.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25
 agg C.Freq14.Beta         10 claims sev.One mixed beta .5 4
 
-
 # Severity only, fixed freq, different distributions
 # ==================================================
-
 # zero parameter
 agg D.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}
 agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed
@@ -81,7 +77,6 @@ agg D.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will th
 agg D.Sev04 1 claim sev 100 * norm    +500 fixed
 agg D.Sev05 1 claim sev 100 * uniform + 50 fixed
 agg D.Sev05b 2 claims sev 100*uniform + 50 fixed
-
 # one parameter
 agg D.Sev06 1 claim sev 10 * gamma 0.3      fixed
 agg D.Sev07 1 claim sev      gamma 12 cv .3 fixed
@@ -91,10 +86,8 @@ agg D.Sev10 1 claim sev 100 * invgamma 4.07 fixed                   note{remembe
 agg D.Sev11 1 claim sev 100 * weibull_min 1.5 fixed
 agg D.Sev12 1 claim sev invgauss 10 cv .5 fixed
 agg D.Sev13 1 claim sev 10 * pareto 2.6  + -10 fixed                note{entering Pareto is awkward}
-
 # two parameter distributions
 agg D.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed
-
 # empirical severities, continuous and discrete
 agg D.Sev15 1   claim  sev  dhistogram xps [1 10 40] [.5 .3 .2] fixed  note{old notation}
 agg D.Sev16 dfreq [1] dsev [1 10 40] [.5 .3 .2]                        note{preferred new notation}
@@ -186,7 +179,7 @@ agg J.Re11  5 claims 100 x 0 sev lognorm 10 cv .75 occurrence ceded to 15 x 5 po
 agg J.Re12  5 claims 100 x 0 dsev [1:100]          occurrence ceded to 15 x 5 poisson aggregate net of   20 x 0
 agg J.Re13  5 claims 100 x 0 dsev [1:100]          occurrence net of   15 x 5 poisson aggregate ceded to 20 x 0
 agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv [.2 .35 .5] wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 x 2.0      mixed gamma 0.5  aggregate ceded to 1.5 x 1.5 and 5.0 po 10.0 xs 12.5
-agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 x 1 and 2.5 po 5 x 5 and 25% po 30 x 20 and inf xs 100  poisson          aggregate net of 10 x 15
+agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 x 1 and 2.5 po 5 x 5 and 25% so 30 x 20 and inf xs 100  poisson          aggregate net of 10 x 15
 agg J.Re16 5 claims dsev [0:100] occurrence ceded to tower [10:50:10] poisson
 agg J.Re17 5 claims dsev [0:100] poisson aggregate ceded to tower [200:500:100]
 

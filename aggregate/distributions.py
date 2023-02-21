@@ -608,6 +608,8 @@ class Aggregate(Frequency):
         How losses are layered by the occurrence reinsurance. Expected loss,
         CV layer loss, and expected counts to layers. 
         """
+        if self.reinsurance_audit_df is None:
+            return None
         bit0 = self.reinsurance_audit_df.loc['occ'].xs('ex', axis=1, level=1)
         bit = self.reinsurance_audit_df.loc['occ'].xs('cv', axis=1, level=1)
         bit1 = pd.DataFrame(index=bit.index)
@@ -636,7 +638,9 @@ class Aggregate(Frequency):
         application of the agg reinsurance. The pure occ and agg parts are in
         reinsurance_audit_df.
         """
-        if self._reinsurance_report_df is None:
+        if self.reinsurance_df is None:
+            return None
+        elif self._reinsurance_report_df is None:
             bit = self.reinsurance_df
             self._reinsurance_report_df = pd.DataFrame({c: xsden_to_meancvskew(bit.loss, bit[c])
                                                         for c in bit.columns[1:]},
@@ -686,7 +690,8 @@ class Aggregate(Frequency):
         if self._reinsurance_audit_df is None:
             # really should have one of these anyway...
             if self.agg_density is None:
-                raise ValueError('Update Aggregate before asking for density_df')
+                logger.warning('Update Aggregate before asking for density_df')
+                return None
 
             ans = []
             keys = []
@@ -892,7 +897,7 @@ class Aggregate(Frequency):
         self.bs = 0
         self.log2 = 0
         # default validation error
-        self.validation_eps = 1e-4
+        self.validation_eps = VALIDATION_EPS
         # self.ex = 0 --> est_m
         self.est_m = 0
         self.est_cv = 0
@@ -1127,10 +1132,9 @@ class Aggregate(Frequency):
 
     @property
     def info(self):
-        s = []
-        s.append(f'aggregate object name    {self.name}')
-        s.append(f'claim count              {self.n:0,.2f}')
-        s.append(f'frequency distribution   {self.freq_name}')
+        s = [f'aggregate object name    {self.name}',
+             f'claim count              {self.n:0,.2f}',
+             f'frequency distribution   {self.freq_name}']
         n = len(self.statistics_df)
         if n == 1:
             sv = self.sevs[0]
@@ -1149,6 +1153,7 @@ class Aggregate(Frequency):
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
             s.append(f'approximation            {self.approximation}')
+            s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
             s.append(f'aggregate reinsurance    {self.reinsurance_description("agg").lower()}')
@@ -1810,8 +1815,8 @@ class Aggregate(Frequency):
 
         :return:
         """
-        n = 1 if  self.occ_reins is not None else 0
-        n += 2 if  self.agg_reins is not None else 0
+        n = 1 if self.occ_reins is not None else 0
+        n += 2 if self.agg_reins is not None else 0
         if n == 0:
             return "None"
         elif n == 1:

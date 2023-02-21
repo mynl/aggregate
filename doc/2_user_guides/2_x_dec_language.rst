@@ -45,5 +45,5 @@ Objects created by :meth:`build` in the DecL guide.
     :okexcept:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^DecL:').iterrows():
+    for n, r in build.qlist('^DecL:').iterrows():
         pprint_ex(r.program, split=20)

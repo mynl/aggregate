@@ -216,7 +216,7 @@ class Portfolio(object):
         self.last_a = None
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
-        self.validation_eps = 1e-3
+        self.validation_eps = VALIDATION_EPS
 
     @property
     def distortion(self):

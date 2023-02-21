@@ -5,9 +5,9 @@
 aggregate Documentation
 #######################
 
-.. ****************
-  Introduction
-  ****************
+****************
+Introduction
+****************
 
 :mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
@@ -19,7 +19,7 @@ This help document is in six parts plus a bibliography.
    img-top-cls: pl-5 pr-5
 
 .. panels::
-   :img-top-cls: height=100px bg-success
+   :img-top-cls: height=50px bg-success
 
    ---
    :img-top: _static/gs.png

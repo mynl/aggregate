@@ -287,7 +287,7 @@ Objects created by :meth:`build` in this guide.
     :okexcept:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^Student:').iterrows():
+    for n, r in build.qlist('^Student:').iterrows():
         pprint_ex(r.program, split=20)
 
 

@@ -502,7 +502,7 @@ Here is a summary of all the objects created in this section.
     :okwarning:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^Bahn').iterrows():
+    for n, r in build.qlist('^Bahn').iterrows():
         pprint_ex(r.program, split=20)
 
 .. ipython:: python

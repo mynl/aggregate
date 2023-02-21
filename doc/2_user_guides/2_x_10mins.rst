@@ -197,9 +197,9 @@ A row in the knowledge can be accessed by name using ``build``. This example mod
 .. ipython:: python
     :okwarning:
 
-    print(build['B.Dice10'])
+    print(build['A.Dice00'])
 
-The argument ``'B.Dice10'`` is passed through to the underlying dataframe's ``getitem``.
+The argument ``'A.Dice00'`` is passed through to the underlying dataframe's ``getitem``.
 
 .. _10 min create from knowledge:
 
@@ -208,23 +208,23 @@ A row in the knowledge can be created as a Python object using:
 .. ipython:: python
     :okwarning:
 
-    aDice = build('B.Dice10')
+    aDice = build('A.Dice00')
     qd(aDice)
 
-The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``B.Dice10`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
+The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``A.Dice00`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
 
-The method :meth:`build.qshow` (quick show) searches the knowledge using a regex (regular expression) applied to the names, returning a dataframe of specifications. :meth:`build.qlist` (quick list) just displays them.
+The method :meth:`build.qlist` (quick list) searches the knowledge using a regex (regular expression) applied to the names, and returning a dataframe of specifications. :meth:`build.qshow` (quick show) just displays them.
 
 .. ipython:: python
     :okwarning:
 
-    build.qlist('Dice')
+    build.qshow('Dice')
 
 The method :meth:`build.show` also searches the knowledge using a regex applied to the names, but it creates and plots each match by default. Be careful not to create too many objects! Try running::
 
-    ans, df = build.show('Dice', return_df=True)
+    build.show('Dice')
 
-It returns a list ``ans`` of created objects and a dataframe ``df`` containing information about each.
+Add argument ``return_df=True`` to return a list of created objects and a dataframe containing information about each.
 
 .. _10 min bts:
 
@@ -1618,7 +1618,7 @@ Each of the objects created by :meth:`build` is automatically stored in the know
     :okwarning:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^TenM:').iterrows():
+    for n, r in build.qlist('^TenM:').iterrows():
         pprint_ex(r.program, split=20)
 
 

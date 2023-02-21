@@ -216,8 +216,8 @@ class Underwriter(object):
         s.append( '')
         s.append( 'help')
         s.append( 'build.knowledge    list of all programs')
-        s.append( 'build.qlist(pat)   list programs matching pattern')
-        s.append( 'build.show(name)   build and display name')
+        s.append( 'build.qshow(pat)   show programs matching pattern')
+        s.append( 'build.show(pat)    build and display matching pattern')
         return '\n'.join(s)
 
     # def _repr_html_(self):
@@ -285,6 +285,11 @@ class Underwriter(object):
     @property
     def knowledge(self):
         return self._knowledge.sort_index()[['program', 'spec']]
+
+    def test_suite(self):
+        f = self.default_dir / 'test_suite.agg'
+        txt = f.read_text(encoding='utf-8')
+        return txt
 
     def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
@@ -746,18 +751,28 @@ class Underwriter(object):
         df_out.index.name = 'index'
         return df_out
 
-    def qshow(self, regex):
+    def qlist(self, regex):
         """
         Wrapper for show to just list elements in knowledge that match ``regex``.
-
-        Either returns a dataframe or prints the dataframe.
-
+        Returns a dataframe.
         """
         return self.show(regex, kind='', plot=False, describe=False, return_df=True)
 
-    def qlist(self, regex):
-        qd(self.show(regex, kind='', plot=False, describe=False),
-           line_width=160, max_colwidth=60, justify='left')
+    def qshow(self, regex):
+        """
+        Wrapper for show to just show (display) elements in knowledge that match ``regex``.
+        No reutrn value.
+        """
+        def ff(x):
+            fs = '{x:120s}'
+            return fs.format(x=x)
+        bit = self.show(regex, kind='', plot=False, describe=False)[['program']]
+        bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}', '').str.replace('  +', ' ') #, flags=re.MULTILINE)
+        # bit['program'] = bit['program'].str.replace(' ( +)', ' ') #, flags=re.MULTILINE)
+        # bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}$|  *', ' '   ) #, flags=re.MULTILINE)
+        qd(bit,
+           line_width=160, max_colwidth=130, col_space=15, justify='left',
+           max_rows=200, formatters={'program': ff})
 
     def show(self, regex, kind='', plot=True, describe=True, logger_level=30, return_df=False):
         """

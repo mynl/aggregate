@@ -488,7 +488,7 @@ The following objects are created by :meth:`build` in this guide.
     :okexcept:
 
     from aggregate import pprint_ex
-    for n, r in build.qshow('^Cat:').iterrows():
+    for n, r in build.qlist('^Cat:').iterrows():
         pprint_ex(r.program, split=20)
 
 .. ipython:: python

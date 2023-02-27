@@ -67,7 +67,7 @@ The next figure (compare Figure 1 in the paper, shown below) shows that padding,
   :width: 800
   :alt: Original paper figure.
 
-Clearly there is not enough *space* with only 2**8 buckets. Expanding to 2**16 and using a finer bucket covers a more realistic range. The log density plot shows a change in regime from Poisson body to Pareto tail. The extreme tail can be approximated by differentiating Feller's theorem, which says the survival function is converges to :math:`20\mathsf{Pr}(X>x)` where :math:`X` is the Pareto severity (right hand plot)
+Clearly there is not enough *space* with only 2**8 buckets. Expanding to 2**16 and using a finer bucket covers a more realistic range. The log density plot shows a change in regime from Poisson body to Pareto tail. The extreme tail can be approximated by differentiating Feller's theorem, which says the survival function is converges to :math:`20\mathsf{Pr}(X>x)` where :math:`X` is the Pareto severity (right hand plot). The multiplication by four accounts for the different ``bs`` values.
 
 
 .. ipython:: python
@@ -77,14 +77,13 @@ Clearly there is not enough *space* with only 2**8 buckets. Expanding to 2**16 a
     ax0, ax1 = axs.flat
 
     df.plot(ax=ax0, logy=False)
-    # 4 = ratio of bs
-    (bit * 4).plot(ax=ax0, lw=3, alpha=.5)
+    (bit * 4).plot(ax=ax0, lw=3, alpha=.5);
 
-    bit.plot(ax=ax1, logy=True)
+    bit.plot(ax=ax1, logy=True);
     # density from tail, need to divide by bs
-    ax1.plot(bit.index, (20*4/3*a.bs)*(3/(3+bit.index))**5, label='Feller approximation')
-    ax0.set(xlim=[-5, a.q(0.99999)])
-    ax0.legend(loc='upper right')
+    ax1.plot(bit.index, (20*4/3*a.bs)*(3/(3+bit.index))**5, label='Feller approximation');
+    ax0.set(xlim=[-5, a.q(0.99999)]);
+    ax0.legend(loc='upper right');
     @savefig ef_2.png scale=20
     ax1.legend(loc='upper right');
 

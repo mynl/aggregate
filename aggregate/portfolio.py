@@ -279,6 +279,7 @@ class Portfolio(object):
             else:
                 s.append(f'bs                       1 / {int(1/self.bs)}')
             s.append(f'log2                     {self.log2}')
+            s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'padding                  {self.padding}')
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
@@ -779,7 +780,7 @@ class Portfolio(object):
                 else:
                     self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
                                                           fill_value=(self.ex, sup))
-            if type(p) in [float, np.float]:
+            if isinstance(p, (float, np.float64)):
                 return float(self._tail_var(p))
             else:
                 return self._tail_var(p)
@@ -789,7 +790,7 @@ class Portfolio(object):
                 self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta_total, self.density_df.F,
                                                       kind='linear', bounds_error=False,
                                                       fill_value='extrapolate')
-            if type(p) in [int, np.int, float, np.float]:
+            if isinstance(p, (int, np.int32, np.int64, float, np.float64)):
                 return float(self._inverse_tail_var(p))
             else:
                 return self._inverse_tail_var(p)
@@ -2650,7 +2651,7 @@ class Portfolio(object):
 
         ans = pd.DataFrame(
             columns=['$a$', 'LR', '$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$', 'Levg', '$K$',
-                     'ROE', 'param', 'error', 'method'], dtype=np.float)
+                     'ROE', 'param', 'error', 'method'], dtype=float)
         ans = ans.set_index(['$a$', 'LR', 'method'], drop=True)
         dists = {}
         if As is None:
@@ -2706,39 +2707,30 @@ class Portfolio(object):
         df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'error']
         return df
 
-    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', axiter=None, num_plots=1, efficient=True):
+    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', efficient=True):
         """
         Apply a list of distortions, summarize pricing and produce graphical output
         show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
 
-        :param axiter:
         :param kind:
         :param dist_dict: dictionary of Distortion objects
         :param As: input asset levels to consider OR
         :param Ps: input probs (near 1) converted to assets using ``self.q()``
-        :param num_plots: 0, 1 or 2
         :return:
         """
         ans = []
         if As is None:
             As = np.array([float(self.q(p, kind)) for p in Ps])
 
-        if num_plots == 2 and axiter is None:
-            axiter = axiter_factory(None, len(dist_dict))
-        elif num_plots == 3 and axiter is None:
-            axiter = axiter_factory(None, 30)
-        else:
-            pass
-
         for g in dist_dict.values():
             _x = self.apply_distortion(g, efficient=efficient)
             df = _x.augmented_df
             # extract range of S values
             if As[0] in df.index:
-                temp = df.loc[As, :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
+                temp = df.loc[As, :].filter(regex=r'^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             else:
-                logger.error(f'NOT ERROR, FYI: {As} not in index...max value is {max(df.index)}...selecing that!')
-                temp = df.iloc[[-1], :].filter(regex='^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
+                logger.warning(f'{As} not in index...max value is {max(df.index)}...selecing that!')
+                temp = df.iloc[[-1], :].filter(regex=r'^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
             # jump = sensible_jump(len(temp), num_assets)
             # temp = temp.loc[::jump, :].copy()
             temp['method'] = g.name
@@ -2765,16 +2757,6 @@ class Portfolio(object):
             mn = 0
         if mn1 < mn:
             mn -= 0.1
-
-        # by line columns=method x capital
-        if num_plots >= 1:
-            raise ValueError('dropped seaborn')
-            # sns.catplot(x='line', y='value', row='return', col='method', height=2.5, kind='bar',
-            #             data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
-            # sns.catplot(x='method', y='value', row='return', col='line', height=2.5, kind='bar',
-            #             data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx), ylabel='LR')
-            # sns.factorplot(x='return', y='value', row='line', col='method', size=2.5, kind='bar',
-            #                data=ans_stacked.query(' stat=="lr" ')).set(ylim=(mn, mx))
 
         return ans_table, ans_stacked
 

@@ -558,7 +558,7 @@ class Distortion(object):
         :return:
         """
 
-        df = pd.DataFrame(index=np.linspace(0,1,10001), dtype=np.float)
+        df = pd.DataFrame(index=np.linspace(0,1,10001), dtype=float)
 
         for i in range(samples):
             rebit = data.sample(frac=proportion, replace=False, random_state=random_state)

@@ -33,6 +33,16 @@ from .spectral import Distortion
 logger = logging.getLogger(__name__)
 
 
+def max_log2(x):
+    """
+    Return the largest power of two d so that (x + 2**-d) - x == 2**-d, with d <= 30.
+    Used in dhistogram severity types to determine the size of the step.
+    """
+    d = min(30, -np.log2(np.finfo(float).eps) - np.ceil(np.log2(x)))
+    assert (x + 2**-d) - x == 2**-d
+    return d
+
+
 class Frequency(object):
     """
     Manages Frequency distributions: creates moment function and MGF.
@@ -1536,7 +1546,12 @@ class Aggregate(Frequency):
             logger.info('FAIL: Agg mean error > eps')
             return False
 
-        if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
+        # first line stops failing validation when the agg rel error is very very small
+        # default eps is 1e-4, so this is 1e-12. there were examples in the documentation
+        # which failed with errors around 1e-14.
+        if (abs(df.loc['Agg', 'Err E[X]']) > eps ** 3 and
+                abs(df.loc['Sev', 'Err E[X]']) > 0 and
+                abs(df.loc['Agg', 'Err E[X]']) > 10 * abs(df.loc['Sev', 'Err E[X]'])):
             logger.info('FAIL: Agg mean error > 10 * sev error')
             return False
 
@@ -2702,7 +2717,7 @@ class Aggregate(Frequency):
                 else:
                     self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
                                                           fill_value=(self.est_m, sup))
-            if type(p) in [float, np.float]:
+            if isinstance(p, (float, np.float64)):
                 return float(self._tail_var(p))
             else:
                 return self._tail_var(p)
@@ -2712,7 +2727,7 @@ class Aggregate(Frequency):
                 self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta, self.density_df.F,
                                                               kind='linear', bounds_error=False,
                                                               fill_value='extrapolate')
-            if type(p) in [int, np.int, float, np.float]:
+            if isinstance(p, (int, np.int32, np.int64, float, np.float64)):
                 return float(self._inverse_tail_var(p))
             else:
                 return self._inverse_tail_var(p)
@@ -3133,7 +3148,10 @@ class Severity(ss.rv_continuous):
                 # bucket size so buckets are not "split". This is fragile
                 # TODO: make 30 depend on the magnitude of xs to avoid underflow problems
                 # we won't likely ever have more than 1B = 2**30 buckets
-                xss = np.sort(np.hstack((xs - 2 ** -30, xs)))
+                # Feb 2023: for large x a fixed 2**30 results in underflow, hence:
+                d = max_log2(np.max(xs))
+                logger.info(f'Severity.init | {sev_name} d={d}')
+                xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
                 self.fz = ss.rv_histogram((pss, xss))
             else:

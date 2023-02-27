@@ -201,8 +201,9 @@ class Underwriter(object):
         s.append(f'version            {aggregate.__version__}')
         s.append(f'knowledge          {len(self._knowledge)} programs')
         s.append(f'update             {self.update}')
-        for k in ['log2', 'update', 'debug']:
+        for k in ['log2', 'debug']:
             s.append(f'{k:<19s}{getattr(self, k)}')
+        s.append(f'validation_eps     {VALIDATION_EPS}')
         sd = self.site_dir.resolve().relative_to(Path.home())
         sd = f'~/{sd}'
         dd = self.default_dir.resolve()

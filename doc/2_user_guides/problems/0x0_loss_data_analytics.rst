@@ -664,7 +664,7 @@ Since the insured and total aggregates have no variance it is hard to estimate a
         agg building 1 claim 100 xs 0 sev 100 * gamma 2 fixed
         agg motor    1 claim 200 xs 0 sev 200 * gamma 2 fixed
     ''')
-    qd(retained.describe)
+    qd(retained)
 
     insured = build('''port insured
         agg building 1 claim inf xs 100 sev 100 * gamma 2 ! fixed
@@ -672,7 +672,7 @@ Since the insured and total aggregates have no variance it is hard to estimate a
         agg d.and.o  1 claim            sev 1000 * pareto 2 - 1000 fixed
         agg cyber    1 claim            sev 2000 * pareto 3 - 2000 fixed
     ''', log2=18, bs=1)
-    qd(insured.describe)
+    qd(insured)
 
     total = build('''port total
         agg building 1 claim sev 100 * gamma 2 fixed
@@ -680,7 +680,7 @@ Since the insured and total aggregates have no variance it is hard to estimate a
         agg d.and.o  1 claim sev 1000 * pareto 2 - 1000 fixed
         agg cyber    1 claim sev 2000 * pareto 3 - 2000 fixed
     ''', log2=18, bs=1)
-    qd(total.describe)
+    qd(total)
 
 
 The spacing in the agg programs is for clarity. We could also program using ``dfreq`` as ``agg motor dfreq [1] 100 xs 0 sev...``. Next, assemble the requested data elements.

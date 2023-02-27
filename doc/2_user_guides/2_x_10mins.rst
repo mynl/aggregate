@@ -1024,7 +1024,7 @@ The ``describe`` dataframe contains gross analytic and estimated (net or ceded) 
         print(a05n.describe)
     qd(p07.describe)
 
-Printing with default settings shows what ``qd`` adds.
+Printing the object using ``qd`` add ``log2``, ``bs``, and validation information.
 
 
 .. _10 min density_df:

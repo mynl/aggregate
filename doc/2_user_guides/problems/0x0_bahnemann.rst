@@ -70,7 +70,7 @@ The text considers a Tweedie with expected claim count :math:`\lambda=2.5` and g
 
     a = build('agg Bahn.4.2 2.5 claims '
               'sev 400 * gamma 3 poisson')
-    qd(a.describe)
+    qd(a)
     mv(a)
 
 Extract various points of the pmf, cdf, and sf. The adjustment to the index is cosmetic. ``aggregate`` returns the entire distribution. The left plot shows the mixed density, with a mass at zero; right shows the cdf.
@@ -117,7 +117,7 @@ Here is Table 4.4. The FFT overstates :math:`F(0)` because of discretization err
 
     a2 = build('agg Bahn.4.2b 10 claims '
                'sev 6000 * gamma 0.05 poisson')
-    qd(a2.describe)
+    qd(a2)
     fz = a2.approximate('all')
     bit = a2.density_df.loc[
         sorted(np.hstack((500, np.arange(0, 20000, 2000)))),

@@ -30,7 +30,7 @@ The first function, called :math:`\kappa_i(x)` in PIR, is computed automatically
     rat = bit.filter(regex='exeqa_P').apply(
         lambda x: x / bit.loss.to_numpy(), axis=0)
     ax = rat.plot.bar(ylim=[-0.05,1.05], stacked=True, figsize=(3.5, 2.45))
-    ax.set(xlim=[-0.5, 15.5], ylim=[0,1])
+    ax.set(xlim=[-0.5, 15.5], ylim=[0,1]);
     @savefig denuit_19.png scale=20
     ax.legend().set(visible=False);
 

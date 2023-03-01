@@ -38,8 +38,9 @@ def max_log2(x):
     Return the largest power of two d so that (x + 2**-d) - x == 2**-d, with d <= 30.
     Used in dhistogram severity types to determine the size of the step.
     """
-    d = min(30, -np.log2(np.finfo(float).eps) - np.ceil(np.log2(x)))
-    assert (x + 2**-d) - x == 2**-d
+    d = min(30, -np.log2(np.finfo(float).eps) - np.ceil(np.log2(x)) - 1)
+    if (x + 2**-d) - x != 2**-d:
+        raise ValueError('max_log2 failed')
     return d
 
 

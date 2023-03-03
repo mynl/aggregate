@@ -367,7 +367,7 @@ class Distortion(object):
     def name(self, value):
         self._name = value
 
-    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', c=None, **kwargs):
+    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True, scale='linear', c=None, size='small', **kwargs):
         """
         Quick plot of the distortion
 
@@ -377,7 +377,8 @@ class Distortion(object):
         :param ax:
         :param plot_points:
         :param scale: linear as usual or return plots -log(gs)  vs -logs and inverts both scales
-        :param kwargs:  passed to plot
+        :param size: 'small' or 'large' for size of plot, FIG_H or FIG_W. The default is 'small'.
+        :param kwargs:  passed to matplotlib.plot
         :return:
         """
 
@@ -392,22 +393,24 @@ class Distortion(object):
 
         y1 = self.g(xs)
         if both:
-            y2 = self.g_inv(xs)
+            y2 = self.g_dual(xs)
 
         if ax is None:
-            fig, ax = plt.subplots(1,1, figsize=(FIG_H, FIG_H), constrained_layout=True)
+            sz = FIG_H if size=='small' else FIG_W
+            fig, ax = plt.subplots(1,1, figsize=(sz, sz), constrained_layout=True)
 
         if scale == 'linear':
-            ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
+            ax.plot(xs, y1, c='C1', label='$g$', **kwargs)
             if both:
-                ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
-            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+                ax.plot(xs, y2, c='C2', label='$g\check$', **kwargs)
+            ax.plot(xs, xs, color='C0')
+            # ax.plot(xs, xs, lw=0.5, color='C0', alpha=0.5)
         elif scale == 'return':
-            ax.plot(xs, y1, c='C0', label='$g$', **kwargs)
+            ax.plot(xs, y1, c='C1', label='$g$', **kwargs)
             if both:
-                ax.plot(xs, y2, c='C1', label='$g^{-1}$', **kwargs)
+                ax.plot(xs, y2, c='C2', label='$g\check$', **kwargs)
             ax.set(xscale='log', yscale='log', xlim=[1/5000, 1], ylim=[1/5000, 1])
-            ax.plot(xs, xs, lw=0.5, color='black', alpha=0.5)
+            ax.plot(xs, xs, color='C0')
 
         if self._name == 'convex' and plot_points:
             if len(self.df) > 50:
@@ -417,14 +420,15 @@ class Distortion(object):
             else:
                 alpha = 1
             if c is None:
-                c = 'C2'
+                c = 'C4'
             if scale == 'linear':
                 ax.scatter(x=self.df[self.col_x], y=self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
             elif scale == 'return':
                 ax.scatter(x=1/self.df[self.col_x], y=1/self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
 
         ax.set(title=fill(str(self), 20), aspect='equal');
-
+        if both:
+            ax.legend()
         return ax
 
     @classmethod

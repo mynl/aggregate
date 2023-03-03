@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib import ticker
 import matplotlib as mpl
 from .. import build
-from .. constants import FIG_H, FIG_W
+from .. constants import FIG_H, FIG_W, PLOT_FACE_COLOR
+from .. spectral import Distortion
 
 
 def adjusting_layer_losses():
@@ -203,3 +204,68 @@ def power_variance_family():
     ql(-1, -2, 'Tweedie', False, 1)
     ax.set(title='Power Variance Exponential Family Distributions');
 
+
+def dual_distortion(dist=None, s=0.3):
+    """
+    Illustrate how the dual distortion relates to the distortion.
+
+    """
+
+    def setbg(t):
+        """ make text boxes opaque and same color as plot background """
+        t.set_bbox(dict(facecolor=PLOT_FACE_COLOR, alpha=0.85, edgecolor='none', boxstyle='square,pad=.1'))
+
+    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W), constrained_layout=True)
+    ax0, ax1 = axs.flat
+
+    if dist is None:
+        dist = Distortion('ph', 0.4)
+
+    ps = np.linspace(0,1,1001)
+    gp = dist.g(ps)
+    dp = dist.g_dual(ps)
+
+    ax0.plot(ps, gp, c='C1', label='Premium, $g(s)$')
+    ax0.plot(ps, ps, c='C0', label='Loss cost, $s$')
+    ax0.legend()
+    ax0.axis([-0.025, 1.025, -0.025, 1.025])
+    # ax0.set(xlim=[0,1], ylim=[0,1])
+
+
+    ax1.plot(ps, gp, c='C1', label='$g$')
+    ax1.plot(ps, ps, c='C0', label='$s$')
+    ax1.plot(ps, dp, c='C2', label=r'Dual, $g\check$')
+
+    ax1.plot([s, s], [dist.g(s), 1],            ls='--', c='C2', alpha=1, linewidth=2.5)
+    ax1.plot([s, s], [0, s],                    ls='--', c='C0', alpha=1, linewidth=2.5)
+    ax1.plot([s, s], [s, dist.g(s)],            ls='--', c='C1', alpha=1, linewidth=2.5)
+    ax1.plot([1-s, 1-s], [0, dist.g_dual(1-s)], ls='--', c='C2', alpha=1, linewidth=2.5)
+    t = ax1.text(s * 1.05, (1 + dist.g(s))/2, 'Capital\n$=1-g(s)$', ha='left', va='center')
+    setbg(t)
+    t = ax1.text(s * .95, (s + dist.g(s))/2, 'Margin\n$=g(s)-s$', ha='right', va='center')
+    setbg(t)
+    t = ax1.text(s * .95, s/2, 'Loss\n$=s$', ha='right', va='center')
+    setbg(t)
+    t = ax1.text((1-s) * 1.05, dist.g_dual(1 - s)/2, 'Bid price\n$=g\check(1-s)$', ha='left', va='center')
+    setbg(t)
+
+    x1, y1 = s, 1-s
+    x2, y2 = 1-s, s
+
+    ax1.annotate("",
+                xy=(x1, y1), xycoords='data',
+                xytext=(x2, y2), textcoords='data',
+                arrowprops=dict(arrowstyle="<->", color="k",
+                                shrinkA=5, shrinkB=5,
+                                patchA=None, patchB=None,
+                                connectionstyle='bar,angle=90,fraction=-0.3333',
+                                ),
+                )
+
+    ax1.legend()
+    ax1.axis([-0.025, 1.025, -0.025, 1.025])
+    # ax1.set(xlim=[0,1], ylim=[0,1])
+    axs[0].set(title=None, xlabel='$s$, probability of loss to layer $1_{U<s}$',
+               ylabel='Price of layer $1_{U<s}$', aspect='equal')
+    axs[1].set(title=None, xlabel='$s$, probability of loss to layer $1_{U<s}$',
+               aspect='equal')

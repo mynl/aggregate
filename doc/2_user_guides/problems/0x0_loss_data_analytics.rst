@@ -168,7 +168,7 @@ half a bucket size. (Also available: ``sev.sf`` and ``sev.pdf``.)
 Coverage Modifications
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. _lda deductibles:
+.. _lda deductible:
 
 **Deductible Example (3.4.1)**
 

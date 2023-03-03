@@ -3,12 +3,17 @@
 from itertools import count
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon
+import matplotlib.patches as patches
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
 from .. import build
 from .. import Distortion
 from .. constants import FIG_W, FIG_H, PLOT_FACE_COLOR
+
+
 
 def fig_4_1():
     """
@@ -199,53 +204,40 @@ def fig_4_8():
 
 
 
-def fig_10_3():
+def fig_10_3(dist=None, s=0.3):
     """
     Figure 10.3 Illustrating distortion functions
+    (s, g(s)) with vertical line at s and split loss, premium, margin, and capital labelled
     """
     fig, axs = plt. subplots(1, 2, figsize=(2 * FIG_W, FIG_W), constrained_layout=True)
-    d = Distortion('ph', 0.4)
-    s = 0.3
-    g_loss_margin_equity(axs, d, s)
-    for ax in axs.flat:
-        ax.set(title=None, xlabel='$s$, probability of loss to layer',
-               ylabel='$g(s)$, price of layer $1_{U<s}$', aspect='equal')
+    if dist is None:
+        dist = Distortion('ph', 0.4)
 
-
-def g_loss_margin_equity(axs, dist, s=0.25):
-    '''
-    (s, g(s)) with vertical line at s and split loss, premium, margin, and capital labelled
-    :param a:
-    :param dist:
-    :param s:
-    :return:
-    '''
-    # s, g(s), premium, loss, margin on [0,1]^2
-    # s = 0.25
     g = dist.g
     N = 1000
     ps = np.linspace(0, 1, N, endpoint=False)
     gs = g(ps)
-    gs[0] = 1.0
     sm = 0.085
     g_s = g(s)
     lbl = str(dist).replace('\n', ' ')
 
     def setbg(t):
+        """ make text boxes opaque and same color as plot background """
         t.set_bbox(dict(facecolor=PLOT_FACE_COLOR, alpha=0.85, edgecolor='none', boxstyle='square,pad=.1'))
 
     for a in axs.flat:
-        a.plot(ps[1:], gs[1:], lw=1.5)
-        a.plot(ps, ps, linewidth=1.5, c='k', ls='--', alpha=1)
-        a.axis([0.0, 1.025, 0.0, 1.025])
+        a.plot(ps, gs, c='C1', lw=1.5, label='Premium, $g(s)$')
+        a.plot(ps, ps, linewidth=1.5, c='C0', alpha=1, label='Loss cost, $s$')
+        a.axis([-0.025, 1.025, -0.025, 1.025])
         a.set(aspect='equal', xlabel='$s$', ylabel='$g(s)$',
               title=f'Insurance Statistics\n{lbl}')
         # a.grid(lw=0.25)
+    axs[0].legend(loc='upper left')
 
     # a is the right hand plot
-    a.plot([s, s], [0, s], c='k', alpha=0.25, linewidth=2.5)
-    a.plot([s, s], [s, g_s], c='k', alpha=.75, linewidth=2.5)
-    a.plot([s, s], [g_s, 1], c='k', alpha=0.45, linewidth=2.5)
+    a.plot([s, s], [0, s],   c='C0', ls='--', alpha=1, linewidth=2.5)
+    a.plot([s, s], [s, g_s], c='C1', ls='--', alpha=1, linewidth=2.5)
+    a.plot([s, s], [g_s, 1], c='C2', ls='--', alpha=1, linewidth=2.5)
     a.text(s + sm, s / 2, 'Loss $=s$', va='center')
     t = a.text(s + sm, (g_s + s) / 2, 'Margin\n$=g(s)-s$', va='center')
     setbg(t)
@@ -266,17 +258,212 @@ def g_loss_margin_equity(axs, dist, s=0.25):
     p1m = (s + 1.5 * delta, dist.g(s))
 
     # capital
-    curlyBrace(a, p0, p1, str_text=None, int_line_num=2, k_r=0.055, c='k', lw=0.5)
+    curlyBrace(a, p0, p1, str_text=None,   int_line_num=2, k_r=0.055, c='k', lw=0.5)
     # margin
     curlyBrace(a, p1m, p2m, str_text=None, int_line_num=2, k_r=0.075, c='k', lw=0.5)
     # loss
-    curlyBrace(a, p2, p3, str_text=None, int_line_num=2, k_r=0.075, c='k', alpha=0.5, lw=0.5)
+    curlyBrace(a, p2, p3, str_text=None,   int_line_num=2, k_r=0.075, c='k', lw=0.5)
     # premium
     g_s = dist.g(s)
     curlyBrace(a, (.625, g_s), (.625, 0), str_text=None, int_line_num=2, k_r=0.0375, c='k', lw=0.5)
     a.text(.625 + sm, g_s / 2, 'Premium\n$=g(s)$', va='center', ha='left')
     # a.plot([0, s], [g_s, g_s], lw=1, c='k')
     a.plot([0, .626], [g_s, g_s], lw=.5, c='k', ls='-')
+
+    for ax in axs.flat:
+        ax.set(title=None, xlabel='$s$, probability of loss to layer $1_{U<s}$',
+               ylabel='Price of layer $1_{U<s}$', aspect='equal')
+
+
+def fig_10_5(port=None, dist=None, s=0.3):
+    """
+    three plot version of previous with more explanation of first picture
+
+    return_period_max = defines extend of yaxis
+    return_period_x = capital level to illustrate
+
+    map from s space into loss space
+    extended version of ch04_s_gs_loss_premium_capital which
+    includes the horizontal bar [ loss ][m][  equity  ]
+    plotted on the provided second axis
+
+    Suggested figure set up for extended:
+
+            f = plt.Figure(figsize=(4,3), tight_layout=True)
+            a = f.add_axes([0, 100/3+1/27, 1, 2/3], label='a')
+            b = f.add_axes([0, 0, 1, 1/3], label='b')
+
+    """
+
+    return_period_max = 100
+    return_period_x = 1 / s
+
+    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_H, FIG_W), constrained_layout=True)
+    ax0, ax1, ax2 = axs.flat
+
+    if port is None:
+        port = build('port Test agg A 10 claims sev lognorm 50 cv 1 mixed gamma .5', bs=1/16)
+    if dist is None:
+        dist = build('distortion myph ph 0.4')
+
+    g = dist.g
+    K = port.q(1 - 1 / return_period_max)  # 200 year capital
+    xs = port.density_df.loss
+    S = port.density_df.S
+    gS = g(S)
+    gS[0] = 1.0
+
+    x = port.q(1 - 1 / return_period_x)
+    Fx = port.cdf(x)
+    gFx = 1 - g(1-Fx)
+
+    idx = int(port.cdf(K) * len(S))
+    lev = np.trapz(S.iloc[:idx], x=xs.iloc[:idx]) + xs[0]
+    levg = np.trapz(np.array(gS)[:idx], x=xs.iloc[:idx]) + xs[0]
+
+    dist_name = str(dist).replace('\n', ' ')
+
+    ax0.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$')
+    ax0.plot(1-gS, xs, lw=1.5, c='C1',
+           label=f'Premium $g(S(x))$\nDistortion {dist_name}')
+
+    ax0.plot([Fx, Fx], [0, x], linewidth=0.25, c='C7')
+    ax0.plot([gFx, gFx], [0, x], linewidth=0.25, c='C1')
+    # ax0.plot([0, Fx], [x, x], linewidth=0.25, c='k')
+    ax0.plot([0, gFx], [x, x],  linewidth=2.5, ls='--', c='C2', alpha=1)
+    ax0.plot([Fx, 1], [x, x],   linewidth=2.5, ls='--', c='C0', alpha=1)
+    ax0.plot([gFx, Fx], [x, x], linewidth=2.5, ls='--', c='C1', alpha=1)
+
+    ax0.set(ylabel='Asset layer', xlabel='Probability of\nnon-exceedance',
+          ylim=(0, K), xlim=(0, 1))  # -0.01, 1.01))
+    ax0.xaxis.set_ticks([0, gFx,Fx, 1])
+    ax0.xaxis.set_ticklabels(['0', '$\\tilde p$', '$p$', '1'])
+    ax0.yaxis.set_ticks([0, x, K])
+    ax0.yaxis.set_ticklabels(['', '$x$', '$a$'])
+
+    ax0.annotate('Layer\ncapital', ((gFx)/2+0.04, x), ((gFx)/2-0.1+0.04, x +0.3*lev),
+                 va='baseline', ha='center', arrowprops={'arrowstyle': '->'})
+    ax0.annotate('Layer\nmargin', ((Fx+gFx)/2, x), ((Fx+gFx)/2-0.1, x +0.3*lev),
+                 va='baseline', ha='center', arrowprops={'arrowstyle': '->'})
+    ax0.annotate('Layer\nloss', ((Fx+1)/2, x), ((Fx+1)/2, x - 0.5*lev),
+                 va='baseline', ha='center', arrowprops={'arrowstyle': '->'})
+
+    # middle plot =======================================================================
+    ax1.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$')
+    ax1.plot(1-gS, xs, lw=1.5, c='C1',
+           label=f'Premium $g(S(x))$\ndistortion {dist_name}')
+
+    loss_line = [(port.cdf(i), i) for i in np.linspace(K, .01, 200)]
+    prem_line = [(1-g(1 - port.cdf(i)), i) for i in np.linspace(K, .01, 200)]
+
+    # top patch
+    patches = [Polygon([(0, 0), (0, K), (1 - g(1-port.cdf(K)), K)] + prem_line, True)]
+    # bottom
+    patches.append(Polygon([(1, 0), (1, K), (port.cdf(K), K)] + loss_line, True))
+    # middle
+    patches.append(Polygon([(1, 0)] + loss_line[::-1] + prem_line, True))
+
+    # under loss, eq, margin
+    p = PatchCollection(patches, alpha=.25, facecolors=['lightsteelblue', 'C0', 'C1' ])
+    ax1.add_collection(p)
+
+    ax1.text(0.5, lev / 2, 'Loss', ha='center')
+    ax1.text(0.5, (lev + levg) / 2, 'Margin', ha='center')
+    ax1.text(0.5, (K + levg) / 2, 'Capital', ha='center')
+    ax1.set(ylabel=None, xlabel='Probability of\nnon-exceedance',
+            ylim=(0, K), xlim=(0, 1))
+    ax1.xaxis.set_ticks([0, 1])
+    ax1.xaxis.set_ticklabels(['0', '1'])
+    ax1.yaxis.set_ticks(np.linspace(0, K, 1))
+    ax1.yaxis.set_ticklabels('')
+    ax1.legend().set_visible(False)
+
+    # right hand plot =================================================================
+    ax2.bar(0, height=lev, width=1,
+          align='edge', alpha=.25)
+    ax2.bar(0, height=levg - lev, bottom=lev, width=1,
+          align='edge', alpha=.25)
+    ax2.axhline(lev, c='C0', lw=1.5)
+    ax2.axhline(levg, c='C1', lw=1.5)
+    ax2.text(0.5, lev / 2, f'Loss', ha='center', va='center')
+    ax2.text(0.5, (lev + levg) / 2, f'Margin', ha='center', va='center')
+    ax2.text(0.5, (K + levg) / 2, f'Capital', ha='center')
+    ax2.set(xlabel=None)
+    ax2.yaxis.set_visible(False)
+    ax2.xaxis.set_ticks([0, 1])
+    ax2.xaxis.set_ticklabels(['0', '1'])
+    ax2.set(ylim=[0, K], xlim=[-.0, 1.], xlabel='Traditional\nlayer diagram')
+
+
+def fig_10_6(port=None, dist=None):
+    """
+    Same distortion and portfolio as 10_5
+    Slight clarification of the diagram vs. book version.
+
+    """
+    fig = plt.figure(constrained_layout=True, figsize=(6,4))
+    gs = fig.add_gridspec(2, 3)
+    gs2 = fig.add_gridspec(1, 1)
+
+    if port is None:
+        port = build('port Test agg A 10 claims sev lognorm 50 cv 1 mixed gamma .5', bs=1/16)
+    if dist is None:
+        dist = build('distortion myph ph 0.45')
+
+    g = dist.g
+    ps = np.linspace(0, 1, 400, endpoint=False)
+    gps = g(ps)
+
+    ax0 = fig.add_subplot(gs[1,0])
+    ax0.set(
+        xlabel='Layer $1_{U<s}$', ylabel='$s$, $g(s)$')
+    ax0.plot(ps, gps, c='C1',   lw=1.5)
+    ax0.plot(ps, ps,  c='C0',   lw=1.5)
+    xl = ax0.get_xlim()
+    yl = ax0.get_ylim()
+    ax0.plot([-1,2], [2,-1], c='C7', ls=':', lw=1)
+    ax0.set(xlim=xl, ylim=yl, aspect='equal')
+    ax0.text(.75, 0.2, 'reflect', rotation=-45, va='baseline', ha='center')
+
+    ax1 = fig.add_subplot(gs[1,1])
+    ax1.set(
+        ylabel='Layer $1_{U>p}$', xlabel='$p=1-s$, price',
+        aspect='equal')
+    ax1.plot(1-gps, 1-ps, c='C1',  lw=1.5)
+    ax1.plot(ps,    ps,   c='C0',  lw=1.5)
+
+    q = [port.q(p) for p in ps]
+    ax2 = fig.add_subplot(gs[:, 2])
+    ax2.set(title='Lee diagram',
+            xlabel='Pr(non-exceedance) $p$', ylabel='Asset layer of $X$')
+    ax2.plot(1-g(1-ps), q, c='C1',  lw=1.5)
+    ax2.plot(ps,        q, c='C0',  lw=1.5)
+
+    for ax in [ax0, ax1, ax2]:
+        ax.yaxis.set_ticklabels([])
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.xaxis.set_ticklabels(['0', '0', '',  '', '', '', '1'])
+        if ax is ax2:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2*ax2.get_ylim()[-1]))
+        else:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        # ax.grid(lw=.25)
+
+    style = "Simple, tail_width=0.5, head_width=4, head_length=8"
+    kw = dict(arrowstyle=style, color="k", lw=0.5)
+
+    ax_top = fig.add_subplot(gs[0,1])
+    ax_top.text(0.15, 0.55, "Apply\n$q(p)=F^{-1}(p)$\nto $y$ axis", ha='left',   va='baseline')
+    ax_top.text(0.5, 0,    '$(1-g(s), 1-s)$',                           ha='center', va='baseline')
+    ax_top.axis('off')
+
+    arrow_apply_q = patches.FancyArrowPatch((0.5, 0.61), (2/3+0.05, 0.85), connectionstyle="angle3", **kw)
+    # the background layer
+    ax = fig.add_subplot(gs2[0,0])
+    ax.axis('off')
+    ax.set(xlim=[0,1], ylim=[0,1])
+    ax.add_patch(arrow_apply_q)
+
 
 def natural_scale(port):
     """

@@ -102,7 +102,13 @@ class Portfolio(object):
                 agg_name = spec.name
             elif isinstance(spec, str) and isinstance(spec_list, pd.DataFrame):
                 if spec not in ['total', 'p_total']:
-                    s = spec_list[[spec, 'p_total']].groupby(spec).sum()
+                    # hack: issue: close values mess up the discrete distribution
+                    # 2**-30 = 9.313225746154785e-10 approx 1e-9, so to ensure we don't
+                    # have any merging issues in the discrete distribution, we round
+                    # to 8 decimal places.
+                    temp = spec_list[[spec, 'p_total']]
+                    temp['rounded'] = np.round(temp[spec].astype(float), 8)
+                    s = temp.groupby('rounded').sum()
                     a = Aggregate(name=spec,
                                   exp_en=1,
                                   sev_name='dhistogram', sev_xs=s.index.values, sev_ps=s.p_total.values,

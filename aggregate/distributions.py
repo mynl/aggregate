@@ -1,5 +1,6 @@
-import collections
 from collections import namedtuple
+from collections.abc import Iterable
+from functools import lru_cache
 import json
 import inspect
 import itertools
@@ -986,9 +987,9 @@ class Aggregate(Frequency):
         ma = MomentAggregator(self.freq_moms)
 
         # broadcast arrays: force answers all to be arrays (?why only these items?!)
-        if not isinstance(exp_el, collections.Iterable):
+        if not isinstance(exp_el, Iterable):
             exp_el = np.array([exp_el])
-        if not isinstance(sev_wt, collections.Iterable):
+        if not isinstance(sev_wt, Iterable):
             sev_wt = np.array([sev_wt])
 
         # broadcast together and create container for the severity distributions
@@ -1047,6 +1048,8 @@ class Aggregate(Frequency):
                 _el = _en * sev1
             elif _el > 0:
                 _en = _el / sev1
+            else:
+                raise ValueError('Missing loss and claim count - THIS SHOULD NEVER HAPPEN')
             # if premium compute loss ratio, if loss ratio compute premium
             if _pr > 0:
                 _lr = _el / _pr
@@ -1061,7 +1064,7 @@ class Aggregate(Frequency):
             # scale for the mix - OK because we have split the exposure and severity components
             _pr *= _swt
             _el *= _swt
-            _lr *= _swt
+            # _lr *= _swt  ?? seems wrong
             _en *= _swt
 
             # accumulate moments
@@ -3420,6 +3423,8 @@ class Severity(ss.rv_continuous):
         skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / var ** 1.5
         return np.array([ex1, var, skew, np.nan])
 
+    # expensive call, convenient to cache
+    @lru_cache
     def moms(self):
         """
         Revised moments for Severity class. Trying to compute moments of

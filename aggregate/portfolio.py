@@ -1,5 +1,5 @@
-import collections
 from collections import namedtuple
+from collections.abc import Iterable
 from copy import deepcopy
 import json
 import logging
@@ -1770,11 +1770,11 @@ class Portfolio(object):
                 _t = 'log Density'
             else:
                 _t = 'Density'
-            if 'subplots' in kwargs and isinstance(ax, collections.Iterable):
+            if 'subplots' in kwargs and isinstance(ax, Iterable):
                 for a, l in zip(ax, line):
                     a.set(title=f'{l} {_t}')
                     a.legend().set_visible(False)
-            elif isinstance(ax, collections.Iterable):
+            elif isinstance(ax, Iterable):
                 for a in ax:
                     a.set(title=f'{_t}')
             else:

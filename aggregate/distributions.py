@@ -1048,8 +1048,8 @@ class Aggregate(Frequency):
                 _el = _en * sev1
             elif _el > 0:
                 _en = _el / sev1
-            else:
-                raise ValueError('Missing loss and claim count - THIS SHOULD NEVER HAPPEN')
+            # neither of these options can be triggered, by a dfreq dsev, for example.
+
             # if premium compute loss ratio, if loss ratio compute premium
             if _pr > 0:
                 _lr = _el / _pr

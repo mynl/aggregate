@@ -34,7 +34,7 @@ Algorithm Inputs
 """""""""""""""""""""""
 
 #. Severity distribution (cdf, sf, and moments), optionally including loss pick and occurrence reinsurance adjustments.
-#. Frequency distribution (probability generating function :math:`M_N(z):=\mathscr P[z^N]`, and moments).
+#. Frequency distribution (probability generating function :math:`\mathscr P[z^N]:= \mathsf E[z^N]`, and moments).
 #. Number of buckets, expressed as log base 2, :math:`n=2^\mathit{log2}`.
 #. Bucket size, :math:`b`.
 #. Severity calculation method: ``round``, ``forwards``, or ``backwards``

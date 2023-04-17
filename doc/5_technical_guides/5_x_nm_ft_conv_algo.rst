@@ -92,7 +92,7 @@ This section explains why the output output :math:`\mathsf a=(a_0,\dots,a_{m-1})
 
     Functions that are localized in the time domain have Fourier transforms that are spread out across the frequency domain and vice versa, a phenomenon known as the uncertainty principle. The critical case for this principle is the Gaussian function: the Fourier transform of a Gaussian function is another Gaussian function.
 
-    Generalizations include the discrete-time Fourier transform (DTFT, group $Z$), the discrete Fourier transform (DFT, group $Z\pmod N$) and the Fourier series or circular Fourier transform (group = $S^1$, the unit circle being a closed finite interval with endpoints identified). The latter is routinely employed to handle periodic functions. The fast Fourier transform (FFT) is an algorithm for computing the DFT.
+    Generalizations include the discrete-time Fourier transform (DTFT, group $Z$), the discrete Fourier transform (DFT, group :math:`Z\pmod N`) and the Fourier series or circular Fourier transform (group = :math:`S^1`, the unit circle being a closed finite interval with endpoints identified). The latter is routinely employed to handle periodic functions. The fast Fourier transform (FFT) is an algorithm for computing the DFT.
 
 The Fourier transform (FT) of a distribution function :math:`F` is usually written :math:`\hat F`. The FT contains the same information as the distribution and there is a dictionary back and forth between the two, using the inverse FT.
 Some computations with distributions are easier to perform using their FT, which is what makes them useful.

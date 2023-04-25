@@ -297,7 +297,7 @@ Compute pricing in the four ways described above.
    test = pd.Series((d.price(bit.loc[:a.q(0.99), 'p_total'], kind='both')[-1],
                      d.price(a.density_df.p_total, a.q(0.99), kind='both')[-1],
                      d.price2(bit.p_total).loc[a.q(0.99)].ask, \
-                     d.price2(bit.p_total, a.q(0.99)).ask,
+                     d.price2(bit.p_total, a.q(0.99)).ask.iloc[0],
                      a.price(0.99, d).iloc[0, 1],
                      dm.price,
                      bit.loc[:a.q(0.99)-a.bs, 'gS'].sum() * a.bs,

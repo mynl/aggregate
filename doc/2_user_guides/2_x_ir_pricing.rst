@@ -144,7 +144,7 @@ answer is returned in a ``namedtuple``.
                     , approximation='exact', log2=19, bs=1/4, normalize=False)
         er_table = np.linspace(.1, 2., 20)
         df = a01.density_df
-        ix = [df.index.get_loc(er * a01.est_m, method='nearest') for er in er_table]
+        ix = df.index.get_indexer(er_table * a01.est_m, method='nearest')
         df = a01.density_df.iloc[ix][['loss', 'F', 'S', 'e', 'lev']]
         df['er'] = er_table
         df['charge'] = (df.e - df.lev) / a01.est_m

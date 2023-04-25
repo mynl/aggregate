@@ -557,8 +557,8 @@ class Portfolio(object):
         :param x:
         :return:
         """
-        ix = self.density_df.index.get_loc(x, 'nearest')
-        return self.density_df.iat[ix, 0]
+        ix = self.density_df.index.get_indexer([x], 'nearest')[0]
+        return self.density_df.iloc[ix, 0]
 
     def audits(self, kind='all', **kwargs):
         """

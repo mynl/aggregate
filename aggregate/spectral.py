@@ -758,4 +758,4 @@ class Distortion(object):
             return ans
         else:
             # no longer guaranteed that a is in ser.index
-            return ans.iloc[ans.index.get_loc(a, method='nearest')]
+            return ans.iloc[ans.index.get_indexer([a], method='nearest')]

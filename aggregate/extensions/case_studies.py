@@ -1359,7 +1359,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                     ns = 10000
                 qs = pd.qcut(bit0.index, ns, duplicates='drop')
                 bit0['qs'] = qs
-                bit0 = bit0.reset_index(drop=False).groupby(qs).agg(np.mean).set_index('return')
+                bit0 = bit0.reset_index(drop=False).groupby('qs').agg(np.mean).set_index('return')
                 self.exeqa[port.name] = bit0
 
             ps = 1 / bit0.index

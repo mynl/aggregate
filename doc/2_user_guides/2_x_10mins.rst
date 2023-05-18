@@ -483,11 +483,11 @@ The quick display reports a set of quick diagnostics, showing
 * Relative errors ``Err E[X]`` for the means.
 * Coefficient of variation ``CV(X)`` and estimated CV, ``Est CV(X)``
 * Skewness ``Skew(X)`` and estimated skewness, ``Est Skew(X)``
-* The (log to base 2) of the number of buckets used, ``log2``
-* The bucket size ``bs`` used in discretization
 
-These statistics make it help to test if the numerical estimation is  valid. Look for a small error in the mean and close second (CV) and third (skew) moments.
-The last item ``valid = True`` shows the model passes some basic validation tests. Strictly, it means the model did not fail any tests: it is not unreasonable. The test should be interpreted like a null hypothesis; you expect it to be True and are worried when it is False.
+The line below the table shows the (log to base 2) of the number of buckets used, ``log2`` and the bucket size ``bs`` used in discretization.
+
+These statistics make it easy to see if the numerical estimation is invalid. Look for a small error in the mean and close second (CV) and third (skew) moments.
+The last item ``validation: not unreasonable`` shows the model did not fail any tests. The test should be interpreted like a null hypothesis; you expect it to be True and are worried when it is False.
 
 In this case, the aggregate mean error is too high because the discretization bucket size ``bs`` is too small. Update with a larger bucket.
 

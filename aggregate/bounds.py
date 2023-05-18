@@ -413,9 +413,11 @@ class Bounds(object):
         # you add zero, so there will be one additional point
         # n_tps += 1
         p_star = self.p_star(line, premium, b, kind)
-        if p_star in self.tps:
-            logger.critical('p_star in tps')
-            # raise ValueError()
+        logger.info(f'compute weights: p_star {p_star} with premium {premium}, b={b}, and kind={kind}')
+        # if p_star in self.tps:
+        #     logger.critical(f'a Found p_star = {p_star} in tps!!')
+        # else:
+        #     logger.info('p_star not in tps')
 
         lhs = self.tps[self.tps <= p_star]
         rhs = self.tps[self.tps > p_star]
@@ -437,7 +439,7 @@ class Bounds(object):
 
         if p_star in self.tps:
             # raise ValueError('Found pstar in ps')
-            logger.critical(f'Found p_star = {p_star} in ps!!')
+            logger.critical(f'Found p_star = {p_star} in tps; setting weight to 1.')
             df.at[(p_star, p_star), 'weight'] = 1.0
 
         logger.info(f'p_star={p_star:.4f}, len(p<=p*) = {len(df.index.levels[0])}, '

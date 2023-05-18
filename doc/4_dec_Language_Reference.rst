@@ -58,7 +58,7 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic'
     DISTORTION = 'dist(ortion)?'
     NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
     ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'

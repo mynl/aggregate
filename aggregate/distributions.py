@@ -27,7 +27,7 @@ from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
     pprint_ex, approximate_work, moms_analytic, picks_work, \
-    integral_by_doubling
+    integral_by_doubling, logarithmic_theta
 
 from .spectral import Distortion
 
@@ -216,6 +216,19 @@ class Frequency(object):
                 θ = κ * c
                 λ = n / κ  # poisson parameter for number of claims
                 return np.exp(λ * ((1 - θ * (z - 1)) ** -a - 1))
+
+        elif self.freq_name == 'logarithmic':
+            # Aka logser in scipy stats, log series
+            def _freq_moms(n):
+                theta = logarithmic_theta(n)
+                a = -1 / np.log(1 - theta)
+                freq_2 = a * theta / (1 - theta)**2
+                freq_3 = a * theta * (1 + theta) / (1 - theta)**3
+                return n, freq_2, freq_3
+
+            def mgf(n, z):
+                theta = logarithmic_theta(n)
+                return np.log(1 - theta * z) / np.log(1 - theta)
 
         elif self.freq_name in ['neyman', 'neymana', 'neymanA']:
             # Neyman A, Panjer Willmot green book. p. 324?

@@ -335,7 +335,7 @@ Invert a stable distribution. Here there is more aliasing error because the dist
         Φ = np.tan(np.pi * alpha / 2) if alpha != 1 else -2 / np.pi * np.log(np.abs(t))
         return np.exp(- np.abs(t) ** alpha * (1 - 1j * beta * np.sign(t) * Φ))
 
-    df = ft_invert(
+    df = ft.ft_invert(
              log2=12,
              chf=levy_chf,
              frz_generator=ss.levy_stable,

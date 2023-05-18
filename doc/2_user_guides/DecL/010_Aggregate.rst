@@ -9,13 +9,13 @@ The Dec Language, or simply DecL, is designed to make it easy to go from "Dec pa
 
 Coverage expressed concisely in words on a Dec page is often incomplete and hard to program. Consider the declaration
 
-    "Aggregate losses from trucking policy with a premium of 5000, a limit of 1000, and a deductible of 50.""
+    "Aggregate losses from trucking policy with a premium of 2000, a limit of 1000, and no deductible."
 
 To estimate the distribution of outcomes for this policy, the actuary must:
 
-#. Estimate the priced loss ratio on the policy to determine the loss pick (expected loss) as premium times loss ratio. Say they select 65%.
-#. Select a suitable trucking ground-up severity curve, say lognormal with mean 50 and CV 1.75.
-#. Compute the expected conditional layer severity for the layer 1000 xs 50.
+#. Estimate the priced loss ratio on the policy to determine the loss pick (expected loss) as premium times loss ratio. Say they select 67.5%.
+#. Select a suitable trucking ground-up severity curve, say lognormal with mean 100 and CV 1.75.
+#. Compute the expected conditional layer severity for the layer 1000 xs 0.
 #. Divide severity into the loss pick to determine the expected claim count.
 #. Select a suitable frequency distribution, say Poisson.
 #. Calculate a numerical approximation to the resulting compound-Poisson aggregate distribution
@@ -23,9 +23,9 @@ To estimate the distribution of outcomes for this policy, the actuary must:
 A DecL program takes care of many of these details. The DecL program corresponding to the trucking policy is simply::
 
     agg Trucking                      \
-        5000 premium at 0.65 lr       \
-        1000 xs 50                    \
-        sev lognorm 50 cv 1.75        \
+        2000 premium at 0.675 lr      \
+        1000 xs 0                     \
+        sev lognorm 100 cv 1.75       \
         poisson
 
 It specifies the loss ratio and distributions selected in steps 1, 2 and 5; these require actuarial judgment and cannot be automated. Based on this input, the ``aggregate`` package computes the rest of steps 1, 3, 4, and 6. The details of the program are explained in the rest of this chapter.
@@ -61,8 +61,9 @@ where ``<...>`` denotes an optional clause. All programs are one-line long and h
 DecL programs are built (interpreted) using the ``build`` function. Python automatically concatenates strings between parenthesis (no need for ``\``), making it is easiest and clearest to enter a program as::
 
     build('agg Trucking '
-          '5000 premium at 0.65 lr 1000 xs 50 '
-          'sev lognorm 50 cv 1.75 '
+          '2000 premium at 0.675 lr '
+          '1000 xs 0 '
+          'sev lognorm 100 cv 1.75 '
           'poisson')
 
 The entries in this example are as follows.
@@ -72,9 +73,9 @@ The entries in this example are as follows.
 
 * ``Trucking`` is a string name. It can contain letters and numbers and periods and must start with a letter. It is case sensitive. It cannot contain an underscore. It cannot be a DecL keyword. E.g., ``Motor``, ``NE.Region``, ``Unit.A`` but not ``12Line`` or ``NE_Region``.
 
-* The exposure clause is ``5000 premium at 0.65 lr 1000 xs 50``. (Percent notation is acceptable: the loss ratio can be entered as ``65% lr``.) It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 50``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
+* The exposure clause is ``2000 premium at 0.675 lr 1000 xs 0``. (Percent notation is acceptable: the loss ratio can be entered as ``67.5% lr``.) It determines the volume of insurance, see :doc:`020_exposure`. It includes ``1000 xs 0``, an optional :ref:`layers subclause<2_agg_class_layers_subclause>` to set policy occurrence limits and deductibles.
 
-* The severity clause ``sev lognorm 50 cv 1.75`` determines the **ground-up** severity, see :ref:`severity <2_agg_class_severity_clause>`. ``sev`` is a keyword
+* The severity clause ``sev lognorm 100 cv 1.75`` determines the **ground-up** severity, see :ref:`severity <2_agg_class_severity_clause>`. ``sev`` is a keyword
 
 
 * The ``frequency`` clause, ``poisson``, specifies the frequency distribution, see :ref:`frequency <2_agg_class_frequency_clause>`.

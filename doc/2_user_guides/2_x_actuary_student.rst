@@ -25,31 +25,30 @@ Realistic Insurance Example
 ---------------------------
 
 **Assumptions.**
-You are given the following information about a book of liability
+You are given the following information about a book of trucking liability
 insurance business.
 
 1. Premium equals 2000 and the expected loss ratio equals 67.5%.
-2. Ground-up severity has been fit to a lognormal distribution with a mean of 50 and CV (coefficient of variation) of 1.25.
+2. Ground-up severity has been fit to a lognormal distribution with a mean of 100 and CV (coefficient of variation) of 1.75.
 3. All policies have a limit of 1000 with no deductible or retention.
 4. Frequency is modeled using a Poisson distribution.
 
 You model aggregate losses using the collective risk model.
 
-**Questions.**
+**Questions.** Model aggregate losses using the collective risk model and compute the following:
 
-1. Compute the expected insured severity and expected claim count.
-2. Compute the aggregate expected value, standard deviation, CV, and skewness.
-3. Compute:
 
-   1. The probability aggregate losses exceed the premium.
-   2. The probability aggregate losses exceed 2500
-   3. The expected value of aggregate losses limited to 2500
-   4. The expected policyholder deficit in excess of 2500
+1. The expected insured severity and expected claim count.
+2. The aggregate expected value, standard deviation, CV, and skewness.
+3. The probability aggregate losses exceed the premium.
+4. The probability aggregate losses exceed 2500
+5. The expected value of aggregate losses limited to 2500
+6. The expected policyholder deficit in excess of 2500
 
 **Answers.**
 
 Build an aggregate object using simple DecL program.
-The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printed and formatted automatically by ``qd(a01)``.
+The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printed and formatted automatically by ``qd(a01)``. Note the validation report in the last line.
 
 .. ipython:: python
     :okwarning:
@@ -59,12 +58,11 @@ The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printe
     a01 = build('agg Actuary:01 '
                 '2000 premium at 0.675 lr '
                 '1000 xs 0 '
-                'sev lognorm 50 cv 1.25 '
-                'poisson'
-                , bs=1/8)
+                'sev lognorm 100 cv 1.75 '
+                'poisson')
     qd(a01)
 
-The survival function ``a01.sf`` answers 3.1 and 3.2. ``qd`` is used to print with reasonable defaults. The dataframe ``a01.density_df`` computes limited expected values (levs) and expected policyholder deficit indexed by loss level, and other values. Querying it answers 3.3.
+The survival function ``a01.sf`` answers 3 and 4. ``qd`` is used to print with reasonable defaults. The dataframe ``a01.density_df`` computes limited expected values (levs) and expected policyholder deficit indexed by loss level, and other values. Querying it answers 5 and 6.
 
 .. ipython:: python
     :okwarning:

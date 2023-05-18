@@ -20,7 +20,7 @@ import scipy.stats as ss
 import scipy.fft as sft
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
-from scipy.optimize import broyden2, newton_krylov
+from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize.nonlin import NoConvergence
 from scipy.special import kv, binom, gamma, loggamma
 from scipy.stats import multivariate_t
@@ -3253,3 +3253,16 @@ def integral_by_doubling(func, x0, err=1e-8):
         if counter > 96:
             raise ValueError(f'counter = {counter} and error = {err}')
     return -ans
+
+@lru_cache(maxsize=128)
+def logarithmic_theta(mean):
+    """
+    Solve for theta parameter given mean, see JKK p. 288
+    """
+    f = lambda x: x / (-np.log(1 - x) * (1 - x)) - mean
+    theta = brentq(f, 1e-10, 1-1e-10)
+    if not np.allclose(mean, theta / (-np.log(1 - theta) * (1 - theta))):
+        print('num method failed')
+    else:
+        return theta
+

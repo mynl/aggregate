@@ -749,7 +749,7 @@ class Portfolio(object):
         assert self.density_df is not None
 
         if kind == 'tail':
-             # original
+            # original
             # _var = self.q(p)
             # ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
             # pip = (self.density_df.loc[_var, 'F'] - p) * _var
@@ -759,6 +759,8 @@ class Portfolio(object):
             if self._tail_var2 is None:
                 self._tail_var2 = self.density_df[['p_total', 'loss']].product(axis=1).iloc[::-1].cumsum().iloc[::-1]
             _var = self.q(p)
+            if p >= 1.:
+                return _var
             ex = self._tail_var2.loc[_var + self.bs]
             pip = (self.density_df.loc[_var, 'F'] - p) * _var
             t_var = 1 / (1 - p) * (ex + pip)

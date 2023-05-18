@@ -349,8 +349,9 @@ class Bounds(object):
         :param b:
         :return:
         """
-        assert self.tvar_function is not None
-        assert b == self.b
+        if self.tvar_function is None:
+            logger.critical('tvar_function is None, must call make_tvar_function first')
+        assert b == self.b, f'b ({b}) must equal b used when calibrated, self.b ({self.b})'
 
         if kind == 'interp':
             tvar = self.tvar_function(p)

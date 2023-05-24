@@ -11,6 +11,8 @@ from . figures import *
 from . risk_progression import *
 from . bodoff import *
 from . ft import *
+from . pentagon import Pentagon, mapper, make_possible_pentagons
+
 
 # module level doc-string
 __doc__ = """

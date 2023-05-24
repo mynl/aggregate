@@ -504,7 +504,7 @@ class Bounds(object):
             (m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
         self.cloud_df.index.name = 's'
 
-    def cloud_view(self, axs, n_resamples, scale='linear', alpha=0.05, pricing=True, distortions=None,
+    def cloud_view(self, *, axs=None, n_resamples=0, scale='linear', alpha=0.05, pricing=True, distortions=None,
                    title='', lim=(-0.025, 1.025), check=False, add_average=True):
         """
         visualize the cloud with n_resamples
@@ -525,7 +525,12 @@ class Bounds(object):
         :return:
         """
         assert scale in ['linear', 'return']
+        if axs is None:
+            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W), constrained_layout=True)
+        else:
+            fig = axs.flat[0].get_figure()
         assert not distortions or (len(axs.flat) > 1)
+
         bit = None
         if check:
             n_resamples = min(n_resamples, 5)
@@ -633,6 +638,7 @@ class Bounds(object):
             ax.legend(ncol=1, loc='lower right')
         for ax in axs:
             ax.set(title=None)
+        return fig, axs
 
     def weight_image(self, ax, levels=20, colorbar=True):
         bit = self.weight_df.weight.unstack()
@@ -641,6 +647,15 @@ class Bounds(object):
         ax.set(xlabel='p1', ylabel='p0', title='Weight for p1', aspect='equal')
         if colorbar:
             ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='Weight to p_upper')
+
+    def distortion(self, pl, pu):
+        """
+        Return the BiTVaR with probabilities pl and pu
+        """
+        assert self.weight_df is not None, 'Must create weight_df before running this function'
+
+        tl, tu, w = self.weight_df.loc[(pl, pu)]
+        return Distortion('bitvar', w, df=[pl, pu])
 
     def quick_price(self, distortion, a):
         """
@@ -879,8 +894,14 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     ax.legend()
 
     ax = axd['E']
-    port.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=port.name)
-    pnew.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=pnew.name)
+    try:
+        port.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=port.name)
+    except AttributeError:
+        logger.error('Attribute error...continuing')
+    try:
+        pnew.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=pnew.name)
+    except AttributeError:
+        logger.error('Attribute error...continuing')
     ax.legend()
     ax.set(title='Total, log densities')
 
@@ -897,14 +918,14 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
 
 def similar_risks_example():
     """
-    Interesting beta risks and how to use similar_risks_sa.
+    Interesting beta risks and how to use similar_risks_graphs_sa.
 
 
     :return:
     """
     # stand alone hlep from the code; split at program = to run different options
     uw = Underwriter()
-    p_base = uw.write('''
+    p_base = uw.build('''
     port UNIF
         agg ONE 1 claim sev 1 * beta 1 1 fixed
     ''')
@@ -930,10 +951,10 @@ def similar_risks_example():
 
     bounds.cloud_view(axs.flatten(), 0, alpha=1, pricing=True,
                       title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={p_star:.3f}',
-                      distortions=[{k: p_base.dists[k] for k in ['roe', 'tvar']},
+                      distortions=[{k: p_base.dists[k] for k in ['ccoc', 'tvar']},
                                    {k: p_base.dists[k] for k in ['ph', 'wang', 'dual']}])
     for ax in axs.flatten()[1:]:
-        ax.legend(ncol=1, loc='lower right')
+            ax.legend(ncol=1, loc='lower right')
     for ax in axs.flatten():
         ax.set(title=None)
 
@@ -949,7 +970,7 @@ def similar_risks_example():
         # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts[.375 .375 .25] fixed
 
     '''
-    p_new = uw.write(program)
+    p_new = uw.build(program)
     p_new.update(11, 1 / 1024, remove_fuzz=True)
 
     p_new.plot(figsize=(6, 4))

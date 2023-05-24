@@ -11,7 +11,7 @@ from setuptools import setup
 from pathlib import Path
 
 # change here and in __init__.py
-version = '0.11.8'
+version = '0.12.0'
 
 tests_require = ['unittest', 'sly']
 install_requires = [

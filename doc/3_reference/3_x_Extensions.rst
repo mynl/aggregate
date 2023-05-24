@@ -21,15 +21,18 @@ Case Study Support
    :members:
 
 
+Pentagon
+---------
+
+.. automodule:: aggregate.extensions.pentagon
+   :members:
+
+
 Samples
 ---------
 
 .. warning::
-   All functionality in ``extensions.samples`` should be regarded as experimental and subject to change in future releases. What's useful will generally be integrated into the base package
-
-
-.. automodule:: aggregate.extensions.samples
-   :members:
+   All functionality in ``extensions.samples`` has been moved into the base package.
 
 
 Figures
@@ -39,13 +42,11 @@ Figures
    :members:
 
 
-
 PIR Figures
 -------------
 
 .. automodule:: aggregate.extensions.pir_figures
    :members:
-
 
 
 Test Suite

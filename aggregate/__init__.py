@@ -18,7 +18,7 @@ from . utilities import get_fmts, pprint, pprint_ex, ft, \
     partial_e, partial_e_numeric, moms_analytic, qd, \
     sEngFormatter, mv, picks_work, GCN, lognorm_approx, \
     integral_by_doubling, logarithmic_theta
-from . spectral import Distortion
+from . spectral import Distortion, approx_ccoc
 from . distributions import Frequency, Severity, Aggregate
 from . portfolio import Portfolio, make_awkward
 from . underwriter import Underwriter, build, debug_build
@@ -42,7 +42,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "alpha"
 # only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.11.8"
+__version__ = "0.12.0"
 
 # set up
 from pathlib import Path

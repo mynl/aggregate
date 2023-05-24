@@ -759,3 +759,18 @@ class Distortion(object):
         else:
             # no longer guaranteed that a is in ser.index
             return ans.iloc[ans.index.get_indexer([a], method='nearest')]
+
+def approx_ccoc(roe, eps=1e-14, display_name=None):
+    """
+    Create a continuous approximation to the CCoC distortion with return roe.
+    Helpful utility function for creating a distortion.
+
+    :param roe: return on equity
+    :param eps: small number to avoid mass at zero
+    """
+
+    return Distortion('bitvar', roe/(1 + roe), df=[0, 1-eps],
+                      display_name=f'aCCoC {roe:.2%}' if display_name is None
+                      else display_name
+                      )
+

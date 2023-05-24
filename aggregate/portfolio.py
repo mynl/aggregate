@@ -13,6 +13,7 @@ import numpy as np
 from numpy.random import PCG64
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
+from pandas.plotting import scatter_matrix
 from pathlib import Path
 import re
 import scipy.stats as ss
@@ -169,12 +170,14 @@ class Portfolio(object):
         self.statistics_df = pd.concat([temp_report, temp], axis=1)
         # future storage
         self.density_df = None
+        self.independent_density_df = None
         self.augmented_df = None
         self._epd_2_assets = None
         self._assets_2_epd = None
         self._priority_capital_df = None
         self.priority_analysis_df = None
         self.audit_df = None
+        self.independent_audit_df = None
         self.padding = 0
         self.tilt_amount = 0
         self._linear_quantile_function = None
@@ -223,6 +226,362 @@ class Portfolio(object):
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
         self.validation_eps = VALIDATION_EPS
+
+    def add_exa_sample(self, sample, S_calculation='forwards'):
+        """
+        Computes a version of density_df using sample to compute E[Xi | X].
+        Then fill in the other ex.... variables using code from
+        Portfolio.add_exa, stripped down to essentials.
+
+        If no p_total is given then samples are assumed equally likely.
+        total is added if not given (sum across rows)
+        total is then aligned to the bucket size self.bs using (total/bs).round(0)*bs.
+        The other loss columns are then scaled so they sum to the adjusted total
+
+        Next, group by total, sum p_total and average the lines to create E[Xi|X]
+
+        This sample is merged into a stripped down density_df. Then
+        the other ex... columns are added. Excludes eta mu columns.
+
+        Anticipated use: replace density_df with this, invalidate quantile
+        function and then compute various allocation metrics.
+
+        The index on the input sample is ignored.
+
+        Formally ``extensions.samples.add_exa_sample``.
+
+        """
+
+        # starter information
+        # cut_eps = np.finfo(float).eps
+        bs = self.bs
+
+        # working copy
+        sample_in = sample.copy()
+
+        if 'total' not in sample:
+            # p_total may be in sample
+            cols = list(sample.columns)
+            if 'p_total' in sample:
+                cols.remove('p_total')
+            sample_in['total'] = sample_in[cols].sum(axis=1)
+        # index may be called total; that causes confusion; throw away input index
+        sample_in = sample_in.reset_index(drop=True)
+
+        # want to align the index to that of self.density_df; all multiples of self.bs
+        # at the same time, want to scale all elements
+        # temp0 gives the multiples of bs for the index; temp is the scaling for
+        # all the other columns; temp0 will all be exact
+        temp0 = (sample_in.total / bs).round(0) * bs
+        temp = (temp0 / sample_in.total).to_numpy().reshape((len(sample_in), 1))
+        # re-scale loss samples so they sum to total, need to extract p_total first
+        if 'p_total' not in sample_in:
+            # equally likely probs
+            logger.info('Adding p_total to sample_in')
+            # logger.info('Adding p_total to sample_in')
+            p_total = 1.0 / len(sample_in)
+        else:
+            # use input probs
+            p_total = sample_in['p_total']
+
+        # re-scale
+        sample_in = sample_in * temp
+        # exact for total
+        sample_in['total'] = temp0
+        # and put probs back
+        sample_in['p_total'] = p_total
+
+        # Group by X values, aggregate probs and compute E[Xi  | X]
+        exeqa_sample = sample_in.groupby(by='total').agg(
+            **{f'exeqa_{i}': (i, np.mean) for i in self.line_names})
+        # need to do this after rescaling to get correct (rounded) total values
+        probs = sample_in.groupby(by='total').p_total.sum()
+        # want all probs to be positive
+        probs = np.maximum(0, probs.fillna(0.0))
+
+        # working copy of self's density_df with relevant columns
+        df = self.density_df.filter(
+            regex=f'^(loss|(p|e)_({self.line_name_pipe})|(e|p)_total)$').copy()
+
+        # want every value in sample_in.total to be in the index of df
+        # this code verifies that has occurred
+        # for t in sample_in.total:
+        #     try:
+        #         df.index.get_loc(t)
+        #     except KeyError:
+        #         print(f'key error for t={t}')
+        #
+        # or, if you prefer,
+        #
+        # test = df[['loss', 'p_total']].merge(sample_in, left_index=True, right_on='total', how='outer', indicator=True)
+        # test.groupby('_merge')[['loss']].count()
+        #
+        # shows nothing right_only.
+
+        # fix p_total and hence S and F
+        # fill in these values (note, all this is to get an answer the same
+        # shape as df, so it can be swapped in)
+        df['p_total'] = probs
+        df['p_total'] = df['p_total'].fillna(0.)
+
+        # macro, F, S
+        df['F'] = df.p_total.cumsum() # np.cumsum(df.p_total)
+
+        if S_calculation == 'forwards':
+            df['S'] = 1 - df.F
+        else:
+            # add_exa method; you'd think the fill value should be 0, which
+            # will be the case when df.p_total sums to 1 (or more)
+            df['S'] =  \
+                df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1],
+                                                    max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
+
+        # this avoids irritations later on
+        df.F = np.minimum(df.F, 1)
+        df.S = np.minimum(df.S, 1)
+        # where is S=0
+        Seq0 = (df.S == 0)
+
+        # invalidate quantile functions
+        self._linear_quantile_function = None
+
+        # E[X_i | X=a], E(xi eq a)
+        # all in one go (outside loop)
+        df = pd.merge(df,
+                      exeqa_sample,
+                      how='left',
+                      left_on='loss',
+                      right_on='total').fillna(0.0).set_index('loss', drop=False)
+        # check exeqa sums to correct total. note this only happens ae, ie when
+        # p_total > 0
+        assert np.allclose(df.query('p_total > 0').loss,
+                           df.query('p_total > 0')[[f'exeqa_{i}' for i in self.line_names]].sum(axis=1))
+
+        assert df.index.is_unique
+        df['exeqa_total'] = df.loss
+
+        # add additional variables via loop
+        for col in self.line_names_ex:
+            # ### Additional Variables
+            # * exeqa_line = $E(X_i \mid X=a)$
+            # * exlea_line = $E(X_i \mid X\le a)$
+            # * e_line = $E(X_i)$
+            # * exgta_line = $E(X_i \mid X \ge a)$
+            # * exi_x_line = $E(X_i / X \mid X = a)$
+            # * and similar for le and gt a
+            # * exa_line = $E(X_i(a))$
+            # * Price based on same constant ROE formula (later we will do $g$s)
+
+            # need the stand alone LEV calc
+            # E(min(Xi, a)
+            # needs to be shifted down by one for the partial integrals....
+            # stemp = 1 - df['p_' + col].cumsum()
+            stemp = df['p_' + col].shift(-1, fill_value=min(df['p_' + col].iloc[-1],
+                                                            max(0, 1. - (df['p_' + col].sum()))))[::-1].cumsum()[::-1]
+            df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+
+            # E[X_i | X<= a] temp is used in le and gt calcs
+            temp = np.cumsum(df['exeqa_' + col] * df.p_total)
+            df['exlea_' + col] = temp / df.F
+
+            # E[X_i | X>a]
+            df['exgta_' + col] = (df['e_' + col] - temp) / df.S
+
+            # E[X_i / X | X > a]  (note=a is trivial!)
+            temp = df.loss.iloc[0]  # loss=0, should always be zero
+            df.loss.iloc[0] = 1  # avoid divide by zero
+            # unconditional E[X_i/X]
+            df['exi_x_' + col] = np.sum(
+                df['exeqa_' + col] * df.p_total / df.loss)
+            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
+            df['exi_xlea_' + col] = temp_xi_x / df.F
+            df.loc[0, 'exi_xlea_' + col] = 0  # selection, 0/0 problem
+            # more generally F=0 error:                      V
+            # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
+            # ?? not an issue for samples; don't have exlea_total anyway??
+            # put value back
+            df.loss.iloc[0] = temp
+
+            fill_value = np.nan
+
+            assert df.index.is_unique, "Index is not unique!"
+
+            df['exi_xgta_' + col] = ((df[f'exeqa_{col}'] / df.loss *
+                                      df.p_total).shift(-1, fill_value=fill_value)[
+                                     ::-1].cumsum()) / df.S
+            # need this NOT to be nan otherwise exa won't come out correctly
+            df.loc[Seq0, 'exi_xgta_' + col] = 0.
+
+            df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
+            df.loc[0, 'exi_xeqa_' + col] = 0
+
+            # need the loss cost with equal priority rule
+            df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1,
+                                                                    fill_value=0).cumsum() * self.bs
+
+        # put in totals for the ratios... this is very handy in later use
+        for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
+            df[metric + 'sum'] = df.filter(regex=metric).sum(axis=1)
+
+        df = df.set_index('loss', drop=False)
+        df.index.name = None
+        return df
+
+    @staticmethod
+    def create_from_sample(name, sample_df, bs, log2=16, **kwargs):
+        """
+        Create from a multivariate sample, update with bs, execute switcheroo,
+        and return new Portfolio object.
+        """
+        logger.info(f'Creating Porfolio {name} from sample_df')
+        port = Portfolio(name, sample_df)
+        logger.info(f'Updating with bs={bs}, log2={log2}, remove_fuzz=True')
+        port.update(bs=bs, log2=log2, remove_fuzz=True, **kwargs)
+        # archive the original density_df
+        port.independent_density_df = port.density_df.copy()
+        # execute switeroo
+        logger.info('Creating exa_sample and executing switcheroo')
+        port.density_df = port.add_exa_sample(sample_df)
+        # update total stats
+        logger.info('Updating total statistics (WARNING: these are now emprical)')
+        port.independent_audit_df = port.audit_df.copy()
+        # just update the total stats
+        port.make_audit_df(['total'], None)
+        # return new created object
+        logger.info('Returning new Portfolio object')
+        return port
+
+    def sample_compare(self, ax=None):
+        """
+        Compare the sample sum to the independent sum of the marginals.
+
+        """
+        if self.independent_density_df is None:
+            raise ValueError('No independent_density_df, cannot compare')
+
+        if ax is not None:
+            ax.plot(self.independent_density_df.index, self.independent_density_df['S'], lw=1, label='independent')
+            ax.plot(self.density_df.index, self.density_df['S'], lw=1, label='sample')
+            ax.legend()
+
+        df = pd.concat((self.independent_audit_df.T, self.audit_df.T),
+            keys=['independent', 'sample'], axis=1).xs('total', 1,1, drop_level=False)
+        return df
+
+    def sample_density_compare(self, fuzz=0):
+        """
+        Compare from density_df
+        """
+        bit = pd.concat((self.independent_density_df.filter(regex='p_'),
+                         self.density_df.filter(regex='p_total|exeqa_')),
+                        axis=1, keys=['independent', 'sample'])
+        bit = bit.loc[(bit[('independent', 'p_total')] > fuzz) + (bit[('sample', 'p_total')] > fuzz)]
+        bit[('', 'difference')] = bit[('independent', 'p_total')] - bit[('sample', 'p_total')]
+        return bit
+
+    def pricing_bounds(self, premium, a=0, p=0, n_tps=64, kind='tail', slow=False, verbose=250):
+        """
+        Compute the natural allocation premium ranges by unit consistent with
+        total premium at asset level a or p (one of which must be provided).
+
+        Unlike typical case with even s values, this is run at the actual S
+        values of the Portfolio.
+
+        Visualize::
+
+            from pandas.plotting import scatter_matrix
+            ans = port.pricing_bounds(premium, p=0.98)
+            scatter_matrix(ans.allocs, marker='.', s=5, alpha=1,
+                           figsize=(10, 10), diagonal='kde' )
+        """
+        from .bounds import Bounds
+        if a == 0:
+            assert p > 0, 'Must provide either a or p'
+            a = self.q(p)
+
+        # need a -= self.bs?
+        S = self.density_df.loc[:a, 'S'].copy()
+        # last entry needs to include all remaining losses from a-bs onwards, hence:
+        S.iloc[-1] = 0.
+        bounds = Bounds(self)
+        bounds.tvar_cloud('total', premium, a, n_tps + 1, S.values, kind=kind)
+
+        # TODO: (hack) pl=1 and s=1 is driving an error NAN - need to replace with 0. But WHY?
+        gS = bounds.cloud_df.fillna(0).values.T
+        gps = -np.diff(gS, axis=1, prepend=1)
+        # sum products for allocations
+        deal_losses = self.density_df.filter(regex='exeqa_[A-Z]').loc[:a]
+        if self.sf(a) > 0:
+            # see notes below in slow method
+            logger.info('Adjusting tail of deal_losses')
+            deal_losses.iloc[-1] = self.density_df.loc[a-self.bs].filter(regex='exi_xgta_[A-Z]') * a
+
+        # compute the allocations
+        allocs = pd.DataFrame(
+            gps @ (deal_losses.to_numpy() * self.bs),
+            columns=[i.replace('exeqa_', 'alloc_') for i in deal_losses.columns],
+            index=bounds.weight_df.index)
+
+        # this is a good audit: should have max = min
+        allocs['total'] = allocs.sum(1)
+        # summary stats
+        stats = pd.concat((pd.concat((allocs.min(0), allocs.mean(0), allocs.max(0)),
+                                     keys=['min', 'mean', 'max'], axis=0).unstack(1),
+                           pd.concat((allocs.idxmin(0), allocs.idxmax(0)),
+                                     keys=['min', 'max'], axis=0).unstack(1)),
+                          axis=1).fillna('')
+
+        if slow:
+            # alternative method (slow)
+            logger.info('Calculating extreme natural allocations: mechanical method')
+            # probabilities of total loss
+            pt = self.density_df.p_total
+            S = 1 - np.minimum(1, pt.loc[:a].cumsum())
+            # individual deal losses
+            deal_losses = self.density_df.loc[:a].filter(regex='exeqa_')
+            if self.sf(a) > 0:
+                # need to adjust for losses in default region
+                # use the linear natural allocation (note price uses the lifted allocation)
+                # replace the last row with E[Xi/X | X>=a] a
+                # need >=, so pull from the prior row
+                # exi_xgta includes a sum column for the total, must exclude that
+                deal_losses.iloc[-1] = self.density_df.\
+                                           drop(columns='exi_xgta_sum').\
+                                           loc[[a-self.bs]].filter(regex='exi_xgta_') * a
+            # deal_losses
+            # linear natural allocation for each total outcome
+            ans = {}
+            i = 0
+            for _, r in bounds.weight_df.reset_index().iterrows():
+                pl, pu, tl, tu, w = r.values
+                d = Distortion('bitvar', w, df=[pl, pu])
+                # pricing kernel, this in-lines the function rap (that was in extensions.sample)
+                gS = np.array(d.g(S))
+                z = -np.diff(gS[:-1], prepend=1, append=0)
+                ans[(pl, pu)] = z @ deal_losses
+                i += 1
+                if verbose and i % verbose == 0:
+                    logger.info(f'Completed {i} out of {len(bounds.weight_df)} biTVaRs')
+
+            # all pricing ranges: rows = (pl, pu) pairs defining extreme distortion
+            # cols = deals
+            allocs_slow = pd.concat(ans.values(), keys=ans.keys()).unstack(2)
+            # get max/min/mean natural allocation by deal and compare to actual pricing
+            comp = {}
+            for c in allocs_slow.iloc[:, :-1]:
+                col = allocs_slow[c]
+                nm = c.split('_')[1]
+                comp[nm] = [col.min(), col.mean(), col.max()]
+
+            comp = pd.DataFrame(comp.values(),
+                                 index=comp.keys(),
+                                 columns=['min', 'mean', 'max'])
+        else:
+            comp = allocs_slow = None
+        # assemble answer
+        ans = namedtuple('pricing_bounds', 'bounds allocs stats comp allocs_slow p_star')
+        p_star = bounds.p_star('total', premium, a)
+        return ans(bounds, allocs, stats, comp, allocs_slow, p_star)
 
     @property
     def distortion(self):
@@ -313,7 +672,7 @@ class Portfolio(object):
         if self.bs > 0:
             s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
         df = self.describe
-        return '\n'.join(s) + df.to_html()
+        return '\n'.join(s) + df.fillna('').to_html()
 
     def __str__(self):
         """ Default behavior """
@@ -1171,33 +1530,7 @@ class Portfolio(object):
         theoretical_stats = self.statistics_df.T.filter(regex='agg')
         theoretical_stats.columns = ['EX1', 'EX2', 'EX3', 'Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']
         theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
-        # self.audit_percentiles = [0.9, 0.95, 0.99, 0.995, 0.996, 0.999, 0.9999, 1 - 1e-6]
-        self.audit_df = pd.DataFrame(
-            columns=['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', "EmpKurt", 'EmpEX1', 'EmpEX2', 'EmpEX3'] +
-                    ['P' + str(100 * i) for i in self.audit_percentiles])
-        for col in self.line_names_ex:
-            sump = np.sum(self.density_df[f'p_{col}'])
-            t = self.density_df[f'p_{col}'] * self.density_df['loss']
-            ex1 = np.sum(t)
-            t *= self.density_df['loss']
-            ex2 = np.sum(t)
-            t *= self.density_df['loss']
-            ex3 = np.sum(t)
-            t *= self.density_df['loss']
-            ex4 = np.sum(t)
-            m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
-            # empirical kurtosis
-            kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
-            ps = np.zeros((len(self.audit_percentiles)))
-            temp = self.density_df[f'p_{col}'].cumsum()
-            for i, p in enumerate(self.audit_percentiles):
-                ps[i] = (temp > p).idxmax()
-            newrow = [sump, m, cv, s, kurt, ex1, ex2, ex3] + list(ps)
-            self.audit_df.loc[col, :] = newrow
-        self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
-        self.audit_df['MeanErr'] = self.audit_df['EmpMean'] / self.audit_df['Mean'] - 1
-        self.audit_df['CVErr'] = self.audit_df['EmpCV'] / self.audit_df['CV'] - 1
-        self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
+        self.make_audit_df(columns=self.line_names_ex, theoretical_stats=theoretical_stats)
 
         # add exa details
         if add_exa:
@@ -1221,6 +1554,48 @@ class Portfolio(object):
         self._linear_quantile_function = None
         self.q_temp = None
         self._cdf = None
+
+    def make_audit_df(self, columns, theoretical_stats=None):
+        """
+        Add or update the audit_df.
+
+        """
+        # these are the values set by the audit
+        column_names = ['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', "EmpKurt", 'EmpEX1', 'EmpEX2', 'EmpEX3'] + \
+                        ['P' + str(100 * i) for i in self.audit_percentiles]
+        if self.audit_df is None:
+            self.audit_df = pd.DataFrame(columns=column_names)
+        for col in columns:
+            sump = np.sum(self.density_df[f'p_{col}'])
+            t = self.density_df[f'p_{col}'] * self.density_df['loss']
+            ex1 = np.sum(t)
+            t *= self.density_df['loss']
+            ex2 = np.sum(t)
+            t *= self.density_df['loss']
+            ex3 = np.sum(t)
+            t *= self.density_df['loss']
+            ex4 = np.sum(t)
+            m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
+            # empirical kurtosis
+            kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
+            ps = np.zeros((len(self.audit_percentiles)))
+            temp = self.density_df[f'p_{col}'].cumsum()
+            for i, p in enumerate(self.audit_percentiles):
+                ps[i] = (temp > p).idxmax()
+            newrow = [sump, m, cv, s, kurt, ex1, ex2, ex3] + list(ps)
+            # TODO this is fragile if you request another set of percentiles
+            # add the row, then subset it (when called first time you don't have
+            # the Err columns)
+            self.audit_df.loc[col, column_names] = newrow
+        if theoretical_stats is not None and 'Mean' not in self.audit_df.columns:
+            # merges on the first five columns: mean, cv, sk, limit, p99.9E
+            self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
+        try:
+            self.audit_df['MeanErr'] = self.audit_df['EmpMean'] / self.audit_df['Mean'] - 1
+            self.audit_df['CVErr'] = self.audit_df['EmpCV'] / self.audit_df['CV'] - 1
+            self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
+        except ZeroDivisionError as e:
+            raise e
 
     @property
     def valid(self):
@@ -1258,6 +1633,7 @@ class Portfolio(object):
                 any_false = True
 
         if any_false:
+            logger.warning(f'Exiting: Portfolio validation steps skipped due to failed aggregate validation')
             return False
         else:
             logger.info('All aggregate objects are not unreasonable')
@@ -1300,6 +1676,7 @@ class Portfolio(object):
         except (TypeError, ZeroDivisionError):
             pass
 
+        logger.info('Portfolio does not fail any validation: not unreasonable')
         return True
 
     @property
@@ -1687,6 +2064,19 @@ class Portfolio(object):
 
         # ax = axd['C']
         # self.density_df.filter(regex='p_[a-zA-Z]')[::-1].cumsum().plot(ax=ax, xlim=xl, logy=True)
+
+    def scatter(self, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde', **kwargs):
+        """
+        Create a scatter plot of marginals against one another, using pandas.plotting scatter_matrix.
+
+        Designed for use with samples. Plots exeqa columns
+
+
+        """
+        bit = self.density_df.query('p_total > 0').filter(regex='exeqa_[a-zA-Z]')
+        ax = scatter_matrix(bit, marker='.', s=5, alpha=1,
+                       figsize=(10, 10), diagonal='kde', **kwargs)
+        return ax
 
     def plot_old(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
              aspect=1, **kwargs):
@@ -3427,7 +3817,7 @@ class Portfolio(object):
         temp.drop(columns=['BEST', 'WORST'])
         return Answer(gamma_df=temp.sort_index(axis=1), base=self.name, assets=a, p=p, kind=kind)
 
-    def price(self, p, g, view='ask', kind='var', efficient=True):
+    def price(self, p, g, *, allocation='lifted', view='ask', kind='var', efficient=True):
         """
         Price using regulatory and pricing g functions
 
@@ -3442,11 +3832,14 @@ class Portfolio(object):
 
         :param p: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
         :param g:  pricing distortion function or dictionary spec or dictionary with distortion name, and lr or roe.
+        :param allocation: 'lifted' (default) or 'linear'
         :param view: bid or ask [NOT FULLY INTEGRATED... MUST PASS IN A DISTORTION]
         :param kind: var (default), upper var, tvar, epd; passed to `var_dict`
         :param efficient: for apply_distortion
         :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
+
+        assert allocation in ('lifted', 'linear'), "allocation must be 'lifted' or 'linear'"
 
         # figure regulatory assets; applied to unlimited losses
         if p > 1:
@@ -3480,32 +3873,55 @@ class Portfolio(object):
         else:
             raise ValueError(f'Inadmissible type {type(g)} passed to price. Expected Distortion or dict.')
 
-        ans_ad = self.apply_distortion(g, view=view, create_augmented=False, efficient=efficient)
-        if a_reg in ans_ad.augmented_df.index:
-            aug_row = ans_ad.augmented_df.loc[a_reg]
-        else:
-            logger.warning('Regulatory assets not in augmented_df. Using last.')
-            aug_row = ans_ad.augmented_df.iloc[-1]
+        if allocation == 'lifted':
+            ans_ad = self.apply_distortion(g, view=view, create_augmented=False, efficient=efficient)
+            if a_reg in ans_ad.augmented_df.index:
+                aug_row = ans_ad.augmented_df.loc[a_reg]
+            else:
+                logger.warning('Regulatory assets not in augmented_df. Using last.')
+                aug_row = ans_ad.augmented_df.iloc[-1]
 
-        # holder for the answer
-        df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
-        df.columns.name = 'statistic'
-        df = df.set_index('line', drop=True)
+            # holder for the answer
+            df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
+            df.columns.name = 'statistic'
+            df = df.set_index('line', drop=True)
 
-        for line in self.line_names_ex:
-            df.loc[line, :] = [aug_row[f'exa_{line}'], aug_row[f'exag_{line}'],
-                               aug_row[f'T.M_{line}'], aug_row[f'T.Q_{line}']]
-        df['a'] = df.P + df.Q
-        df['LR'] = df.L / df.P
-        df['PQ'] = df.P / df.Q
-        df['ROE'] = df.M / df.Q
-        price = df.loc['total', 'P']
-        reg_p = self.cdf(a_reg)
+            for line in self.line_names_ex:
+                df.loc[line, :] = [aug_row[f'exa_{line}'], aug_row[f'exag_{line}'],
+                                   aug_row[f'T.M_{line}'], aug_row[f'T.Q_{line}']]
+            df['a'] = df.P + df.Q
+            df['LR'] = df.L / df.P
+            df['PQ'] = df.P / df.Q
+            df['ROE'] = df.M / df.Q
+            price = df.loc['total', 'P']
+            reg_p = self.cdf(a_reg)
+
+        elif allocation == 'linear':
+            raise NotImplementedError('linear allocation not implemented yet')
+
+
 
         PricingResult = namedtuple('PricingResult', ['price', 'assets', 'reg_p', 'distortion', 'df'])
         ans = PricingResult(price, a_reg, reg_p, g, df)
 
         return ans
+
+    def price_ccoc(self, p, ccoc):
+        """
+        Convenience function to price with a constant cost of captial equal ``ccoc``
+        at VaR level ``p``. Does not invoke a Distortion. Returns standard DataFrame
+        format.
+
+        """
+        a = self.q(p)
+        el = self.density_df.loc[a, 'exa_total']
+        p = (el + ccoc * a) / (1 + ccoc)
+        q = a - p
+        m = p - el
+        df = pd.DataFrame([[el, p, p - el, a - p, a, el / p, p / q, m / q]],
+                          columns=['L', 'P', "M", 'Q', 'a', 'LR', 'PQ', 'COC'],
+                          index=['total'])
+        return df
 
     def analyze_distortions(self, a=0, p=0, kind='lower',  efficient=True,
                             augmented_dfs=None, regex='', add_comps=True):
@@ -5589,6 +6005,32 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             return wdists, df, pricer, dists, wts
         else:
             return wdists
+
+    def bodoff(self, *, p=0.99, a=0):
+        """
+        Determine Bodoff layer asset allocation at asset level a or
+        VaR percentile p, one of which must be provided. Uses formula
+        14.42 on p. 284 of Pricing Insurance Risk.
+
+        :param p: VaR percentile
+        :param a: asset level
+        :return: Bodoff layer asset allocation by unit
+        """
+
+        if p==0 and a==0:
+            raise ValueError('Must provide either p or a')
+
+        if p > 0:
+            a = self.q(p)
+
+        ans = self.density_df.filter(regex='exi_xgta_') \
+            .loc[:a - self.bs, :].sum() * self.bs
+        ans = ans.to_frame().T
+        ans.index = [a]
+        ans.index.name = 'a'
+        ans = ans.drop(columns='exi_xgta_sum')
+        ans.columns = [i.replace('exi_xgta_', '') for i in ans.columns]
+        return ans
 
     def sample(self, n, replace=True, random_state=None, desired_correlation=None, keep_total=True):
         """

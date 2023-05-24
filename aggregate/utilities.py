@@ -2855,6 +2855,17 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
             print(x)
 
 
+def qdp(df):
+    """
+    Quick describe with nice percentiles and cv for a dataframe.
+    """
+    d = df.describe()
+    # replace with non-sample sd
+    d.loc['std'] = df.std(ddof=0)
+    d.loc['cv'] = d.loc['std'] / d.loc['mean']
+    return d
+
+
 def qt(a):
     """
     Quick test diagnostics for an Aggregate object.

@@ -90,7 +90,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions import qdp
+    from aggregate.utilities import qdp
     from pandas.plotting import scatter_matrix
     p02 = build('port Samp:02 '
             'agg A 1 claim sev lognorm 10 cv .2 fixed '
@@ -107,7 +107,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
     df = p02.sample(10**4, random_state=101)
     qd(df.head(), float_format=fc)
 
-  :meth:`qdp` prints the pandas ``describe`` statistics dataframe for a dataframe, adding the CV.
+  :meth:`qdp` prints the pandas ``describe`` statistics dataframe for a dataframe, and adds the CV.
 
   .. ipython:: python
     :okwarning:
@@ -304,10 +304,8 @@ The :class:`Portfolio` total is a convolution of the input marginals and include
 Using Samples and the Switcheroo Trick
 ---------------------------------------
 
-:class:`Portfolio` objects created from a sample ignore the dependency structure; the ``aggregate`` convolution algorithm always assumes independence. It is highly desirable to retain the sample's dependency structure. Many calculations rely only on :math:`\mathsf E[X_i\mid X]` and not the input densities per se. Thus, we reflect dependency if we alter the values :math:`\mathsf E[X_i\mid X]` based on a sample and recompute everything that depends on them. The method :meth:`aggregate.extensions.add_exa_sample` implements this idea.
+:class:`Portfolio` objects created from a sample ignore the dependency structure; the ``aggregate`` convolution algorithm always assumes independence. It is highly desirable to retain the sample's dependency structure. Many calculations rely only on :math:`\mathsf E[X_i\mid X]` and not the input densities per se. Thus, we reflect dependency if we alter the values :math:`\mathsf E[X_i\mid X]` based on a sample and recompute everything that depends on them. The method :meth:`Portfolio.add_exa_sample` implements this idea.
 
-.. warning::
-    ``add_exa_sample`` function is experimental and subject to change in future releases.
 
 **Example.**
 
@@ -324,10 +322,9 @@ The function is applied to a copy of the original :class:`Portfolio` object beca
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions import add_exa_sample
     p03sw = Portfolio('Samp:03sw', sample)
     p03sw.update(bs=1, log2=8)
-    df = add_exa_sample(p03sw, sample)
+    df = p03sw.add_exa_sample(sample)
     qd(df.query('p_total > 0').filter(regex='p_total|exeqa_[ABC]'))
 
 Swap the ``density_df`` dataframe --- the **switcheroo trick**.
@@ -336,6 +333,8 @@ Swap the ``density_df`` dataframe --- the **switcheroo trick**.
     :okwarning:
 
     p03sw.density_df = df
+
+See the function ``Portfolio.create_from_sample`` for a single step create from sample, update, add exa calc, and switcheroo.
 
 Most :class:`Portfolio` spectral functions depend only on marginal conditional expectations. Applying these functions through ``p03sw`` reflects dependencies. Calibrate some distortions to a 15% return. The maximum loss is only 45, so use a 1-VaR, no default capital standard.
 

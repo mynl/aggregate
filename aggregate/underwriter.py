@@ -287,6 +287,11 @@ class Underwriter(object):
     def knowledge(self):
         return self._knowledge.sort_index()[['program', 'spec']]
 
+    @property
+    def version(self):
+        import aggregate
+        return aggregate.__version__
+
     def test_suite(self):
         f = self.default_dir / 'test_suite.agg'
         txt = f.read_text(encoding='utf-8')

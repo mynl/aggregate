@@ -1556,11 +1556,11 @@ class Aggregate(Frequency):
             return False
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
-            logger.info('FAIL: Sev mean error > eps')
+            logger.warning('FAIL: Sev mean error > eps')
             return False
 
         if df.loc['Agg', 'Err E[X]'] > eps:
-            logger.info('FAIL: Agg mean error > eps')
+            logger.warning('FAIL: Agg mean error > eps')
             return False
 
         # first line stops failing validation when the agg rel error is very very small
@@ -1569,29 +1569,30 @@ class Aggregate(Frequency):
         if (abs(df.loc['Agg', 'Err E[X]']) > eps ** 3 and
                 abs(df.loc['Sev', 'Err E[X]']) > 0 and
                 abs(df.loc['Agg', 'Err E[X]']) > 10 * abs(df.loc['Sev', 'Err E[X]'])):
-            logger.info('FAIL: Agg mean error > 10 * sev error')
+            logger.warning('FAIL: Agg mean error > 10 * sev error')
             return False
 
         try:
             if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Sev CV error > eps')
+                logger.warning('FAIL: Sev CV error > eps')
                 return False
 
             if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Agg CV error > eps')
+                logger.warning('FAIL: Agg CV error > eps')
                 return False
 
             if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
-                logger.info('FAIL: Sev skew error > eps')
+                logger.warning('FAIL: Sev skew error > eps')
                 return False
 
             if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
-                logger.info('FAIL: Agg skew error > eps')
+                logger.warning('FAIL: Agg skew error > eps')
                 return False
         except (TypeError, ZeroDivisionError):
             logger.info('Caution: not all validation tests applied')
             pass
 
+        logger.info(f'Aggregate {self.name} does not fail any validation: not unreasonable')
         return True
 
     def picks(self, attachments, layer_loss_picks, debug=False):

@@ -2605,7 +2605,7 @@ def make_corr_matrix(vine_spec):
     return A
 
 
-def random_corr_matrix(n, p=1, positive=False):
+def random_corr_matrix(n, p=1, positive=False, random_state=None):
     """
     make a random correlation matrix
 
@@ -2621,12 +2621,27 @@ def random_corr_matrix(n, p=1, positive=False):
 
     positive=True for all entries to be positive
 
+    random_state = numpy bitGenerator for reproducibility (eg np.random.PCG64(1234))
+    int, bitGenerator, Generator, or None [Allows chaining through of random
+    states]
+
     """
 
-    if positive is True:
-        A = np.random.rand(n,n)**p
+    if random_state is None:
+        rg = np.random.Generator()
+    elif isinstance(random_state, np.random.Generator):
+        rg = random_state
+    elif isinstance(random_state, np.random.BitGenerator):
+        rg = np.random.Generator(random_state)
+    elif isinstance(random_state, int):
+        rg = np.random.Generator(np.random.PCG64(random_state))
     else:
-        A = 1 - 2 * np.random.rand(n,n)**p
+        raise ValueError(f'Unknown random_state {random_state}')
+
+    if positive is True:
+        A = rg.random((n, n))**p
+    else:
+        A = 1 - 2 * rg.random((n, n))**p
     np.fill_diagonal(A, 1)
 
     return make_corr_matrix(A)

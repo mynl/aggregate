@@ -21,6 +21,7 @@ from scipy import interpolate
 from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from textwrap import fill
+import warnings
 from IPython.core.display import HTML, display
 
 from .constants import *
@@ -91,9 +92,9 @@ class Portfolio(object):
             logger.info('Creating from sample DataFrame')
             spec_list = spec_list[0]
         if isinstance(spec_list, pd.DataFrame):
+            spec_list = spec_list.copy().astype(float)
             if 'p_total' not in spec_list:
                 logger.info('Adding p_total column to DataFrame with equal probs')
-                spec_list = spec_list.copy()
                 spec_list['p_total'] = np.repeat(1 / len(spec_list), len(spec_list))
 
         for spec in spec_list:
@@ -432,8 +433,13 @@ class Portfolio(object):
         """
         Create from a multivariate sample, update with bs, execute switcheroo,
         and return new Portfolio object.
+
+        OED: switcheroo, n. a change of position or an exchange, esp. one intended
+        to surprise or deceive; a reversal or turn-about; spec. an unexpected change
+        or ‘twist’ in a story. Also attributive, reversible, reversed.
+
         """
-        logger.info(f'Creating Porfolio {name} from sample_df')
+        logger.info(f'Creating Porfolio {name} from sample_df. Handles adding total and converting to floats.')
         port = Portfolio(name, sample_df)
         logger.info(f'Updating with bs={bs}, log2={log2}, remove_fuzz=True')
         port.update(bs=bs, log2=log2, remove_fuzz=True, **kwargs)
@@ -504,13 +510,14 @@ class Portfolio(object):
         # last entry needs to include all remaining losses from a-bs onwards, hence:
         S.iloc[-1] = 0.
         bounds = Bounds(self)
-        bounds.tvar_cloud('total', premium, a, n_tps + 1, S.values, kind=kind)
+        bounds.add_one = True
+        bounds.tvar_cloud('total', premium, a, n_tps, S.values, kind=kind)
 
         # TODO: (hack) pl=1 and s=1 is driving an error NAN - need to replace with 0. But WHY?
         gS = bounds.cloud_df.fillna(0).values.T
         gps = -np.diff(gS, axis=1, prepend=1)
         # sum products for allocations
-        deal_losses = self.density_df.filter(regex='exeqa_[A-Z]').loc[:a]
+        deal_losses = self.density_df.filter(regex='exeqa_[A-Z0-9]').loc[:a]
         if self.sf(a) > 0:
             # see notes below in slow method
             logger.info('Adjusting tail of deal_losses')
@@ -518,7 +525,7 @@ class Portfolio(object):
 
         # compute the allocations
         allocs = pd.DataFrame(
-            gps @ (deal_losses.to_numpy() * self.bs),
+            gps @ (deal_losses.to_numpy()),
             columns=[i.replace('exeqa_', 'alloc_') for i in deal_losses.columns],
             index=bounds.weight_df.index)
 
@@ -580,7 +587,7 @@ class Portfolio(object):
             comp = allocs_slow = None
         # assemble answer
         ans = namedtuple('pricing_bounds', 'bounds allocs stats comp allocs_slow p_star')
-        p_star = bounds.p_star('total', premium, a)
+        p_star = bounds.p_star('total', premium, a, kind=kind)
         return ans(bounds, allocs, stats, comp, allocs_slow, p_star)
 
     @property
@@ -2330,7 +2337,7 @@ class Portfolio(object):
 
     def add_exa(self, df, ft_nots=None):
         """
-        Use fft to add exa_XXX = E(X_i | X=a) to each dist
+        Use fft to add exeqa_XXX = E(X_i | X=a) to each dist
 
         also add exlea = E(X_i | X <= a) = sum_{x<=a} exa(x)*f(x) where f is for the total
         ie. self.density_df['exlea_attrit'] = np.cumsum( self.density_df.exa_attrit *
@@ -3024,7 +3031,7 @@ class Portfolio(object):
         return dist
 
     def calibrate_distortions(self, LRs=None, COCs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
-                              strict=True, S_calc='cumsum'):
+                              strict='ordered', S_calc='cumsum'):
         """
         Calibrate assets a to loss ratios LRs and asset levels As (iterables)
         ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate online
@@ -3817,9 +3824,9 @@ class Portfolio(object):
         temp.drop(columns=['BEST', 'WORST'])
         return Answer(gamma_df=temp.sort_index(axis=1), base=self.name, assets=a, p=p, kind=kind)
 
-    def price(self, p, g, *, allocation='lifted', view='ask', kind='var', efficient=True):
+    def price(self, p, distortion=None, *, allocation='lifted', view='ask', efficient=True):
         """
-        Price using regulatory and pricing g functions
+        Price using regulatory capital and pricing distortion functions.
 
         Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
         the regulatory distortion derived from p. p can be input as a probability level converted
@@ -3827,82 +3834,154 @@ class Portfolio(object):
 
         Regulatory capital distortion is applied on unlimited basis.
 
-        ``g`` is a dictionary that creates a distortion or the dictionary `{ 'name': distortion_name, 'lr'|'roe':}`.
-        The function then calls calibrate distortion to figure the distortion.
+        Do not attempt to use with a weight_df dataframe from Bounds. For that, use the bounds
+        object logic directly which is much more efficient.
 
-        :param p: a distortion function spec or just a number; if >1 assets if <1 a prob converted to quantile
-        :param g:  pricing distortion function or dictionary spec or dictionary with distortion name, and lr or roe.
-        :param allocation: 'lifted' (default) or 'linear'
-        :param view: bid or ask [NOT FULLY INTEGRATED... MUST PASS IN A DISTORTION]
-        :param kind: var (default), upper var, tvar, epd; passed to `var_dict`
-        :param efficient: for apply_distortion
+        The argument ``kind`` has been dropped, it is always ``'var'``. If that is not the case, convert your
+        asset level to a VaR threshold.
+
+        Updated: May 2023
+
+        :param p: float; if >1 assets if <1 a prob converted to quantile
+        :param distortion: a distortion, list or dictionary (name: dist) of distortions. If None then
+          ``self.dists`` dictionary is used.
+        :param allocation: 'lifted' (default for legacy reasons) or 'linear': treatment in default scenarios. See PIR.
+        :param view: bid or ask
+        :param efficient: for apply_distortion, lifted only
         :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
 
+        warnings.warn('In 0.13.0 the default allocation will become linear not lifted.', DeprecationWarning)
+
         assert allocation in ('lifted', 'linear'), "allocation must be 'lifted' or 'linear'"
+        PricingResult = namedtuple('PricingResult', ['df', 'price', 'a_reg', 'reg_p'])
+
+        if isinstance(distortion, Distortion):
+            distortion = {str(distortion): distortion}
+        elif isinstance(distortion, list):
+            distortion = {str(d): d for d in distortion}
+        elif distortion is None:
+            assert self.dists is not None, 'Must pass a distortion or calibrate distortions prior to calling'
+            distortion = self.dists
 
         # figure regulatory assets; applied to unlimited losses
         if p > 1:
             a_reg = self.snap(p)
+            reg_p = self.cdf(a_reg)
         else:
-            vd = self.var_dict(p, kind, snap=True)
-            a_reg = vd['total']
-
-        # relevant row for all statistics_df
-        row = self.density_df.loc[a_reg]
-
-        # figure pricing distortion
-        if isinstance(g, Distortion):
-            # just use it
-            pass
-        elif isinstance(g, dict):
-            # spec as dict
-            prem = 0
-            if 'lr' in g:
-                # given LR, figure premium
-                prem = row['exa_total'] / g['lr']
-            elif 'roe' in g:
-                # given roe, figure premium
-                roe = g['roe']
-                delta = roe / (1 + roe)
-                prem = row['exa_total'] + delta * (a_reg - row['exa_total'])
-            if prem > 0:
-                g = self.calibrate_distortion(name=g['name'], premium_target=prem, assets=a_reg)
-            else:
-                g = Distortion(**g)
-        else:
-            raise ValueError(f'Inadmissible type {type(g)} passed to price. Expected Distortion or dict.')
+            a_reg = self.q(p)
+            reg_p = p
 
         if allocation == 'lifted':
-            ans_ad = self.apply_distortion(g, view=view, create_augmented=False, efficient=efficient)
-            if a_reg in ans_ad.augmented_df.index:
-                aug_row = ans_ad.augmented_df.loc[a_reg]
-            else:
-                logger.warning('Regulatory assets not in augmented_df. Using last.')
-                aug_row = ans_ad.augmented_df.iloc[-1]
+            dfs = {}
+            price = {}
+            for k, v in distortion.items():
+                # this code is unchanged from original
+                logger.info(f'Executing for {k}, lifted')
+                ans_ad = self.apply_distortion(v, view=view, create_augmented=False, efficient=efficient)
+                if a_reg in ans_ad.augmented_df.index:
+                    aug_row = ans_ad.augmented_df.loc[a_reg]
+                else:
+                    logger.warning('Regulatory assets not in augmented_df. Using last.')
+                    aug_row = ans_ad.augmented_df.iloc[-1]
 
-            # holder for the answer
-            df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
-            df.columns.name = 'statistic'
-            df = df.set_index('line', drop=True)
+                # holder for the answer
+                df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
+                df.columns.name = 'statistic'
+                df = df.set_index('line', drop=True)
 
-            for line in self.line_names_ex:
-                df.loc[line, :] = [aug_row[f'exa_{line}'], aug_row[f'exag_{line}'],
-                                   aug_row[f'T.M_{line}'], aug_row[f'T.Q_{line}']]
-            df['a'] = df.P + df.Q
-            df['LR'] = df.L / df.P
-            df['PQ'] = df.P / df.Q
-            df['ROE'] = df.M / df.Q
-            price = df.loc['total', 'P']
-            reg_p = self.cdf(a_reg)
+                for line in self.line_names_ex:
+                    df.loc[line, :] = [aug_row[f'exa_{line}'], aug_row[f'exag_{line}'],
+                                       aug_row[f'T.M_{line}'], aug_row[f'T.Q_{line}']]
+                df['a'] = df.P + df.Q
+                df['LR'] = df.L / df.P
+                df['PQ'] = df.P / df.Q
+                df['ROE'] = df.M / df.Q
+                price[k] = df.loc['total', 'P']
+                dfs[k] = df.sort_index()
+
+            df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
+            ans = PricingResult(df, price, a_reg, reg_p)
 
         elif allocation == 'linear':
-            raise NotImplementedError('linear allocation not implemented yet')
+            # code mirrors pricing_bounds
+            # slice for extracting
+            sle = slice(self.bs, a_reg)
+            S = self.density_df.loc[sle, ['S']].copy()
+            loss = self.density_df.loc[sle, ['loss']]
+            # deal losses for allocations
+            exeqa = self.density_df.filter(regex='exeqa_').loc[sle]
 
+            # last entry needs to include all remaining losses from a-bs onwards, hence:
+            S.loc[a_reg, 'S'] = 0.
+            ps = pd.DataFrame(-np.diff(S, prepend=1, axis=0), index=S.index)
 
+            dfs = {}
+            price = {}
+            for k, v in distortion.items():
+                logger.info(f'Executing for {k}, linear')
+                if view == 'ask':
+                    gS = v.g(S)
+                else:
+                    gS = 1 - v.g(1 - S)
+                gS = pd.DataFrame(gS, index=S.index, columns=['S'])
+                gps = pd.DataFrame(-np.diff(gS, prepend=1, axis=0), index=S.index)
 
-        PricingResult = namedtuple('PricingResult', ['price', 'assets', 'reg_p', 'distortion', 'df'])
-        ans = PricingResult(price, a_reg, reg_p, g, df)
+                if self.sf(a_reg) > (1 - self.density_df.p_total.sum()):
+                    # NOTE: this adjustment requires the whole tail; it has been computed in
+                    # density_df. However, when you come to risk adjusted version it hasn't
+                    # been computed. That's why the code above falls back to apply distortion.
+                    # see notes below in slow method
+
+                    # print('Adjusting tail losses')
+                    # painful issue here with the naming leading to
+                    rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
+                    # this regex does not capture the sum column if present
+                    exeqa.loc[a_reg, :] = self.density_df.filter(regex='exi_xgta_.+$(?<!exi_xgta_sum)').\
+                    rename(columns=rner).loc[a_reg - self.bs] * a_reg
+                    # the lifted/natural difference is that here scenarios in the tail are not re-
+                    # weighted using risk adjusted probabilities. They are collapsed with objective
+                    # probs.
+
+                # these are at the layer level
+                exp_loss =   ((ps.to_numpy() * self.bs) / loss.to_numpy() * exeqa )[::-1].cumsum()[::-1]
+                alloc_prem = ((gps.to_numpy() * self.bs) / loss.to_numpy() * exeqa)[::-1].cumsum()[::-1]
+                margin = alloc_prem - exp_loss
+
+                # deal with last row KLUDGE, s=0, coc = gs-s/(1-gs)=0
+                # think about what this should be... poss shift?
+
+                rcoc = (1 - gS) / (gS - S)
+                # this can have quirkiness on the left
+                left = self.q(1e-6)
+                if left > 0:
+                    rcoc.loc[:left, 'S'] = rcoc.loc[left, 'S']
+                    # left = self.bs # this is a kludge
+                gprime = v.g_prime(1)
+                fv = gprime / (1 - gprime)
+                # if gS-S=0 then gS=S=1 is possible (certain small losses); then fully loss funded, no equity, hence:
+                rcoc = rcoc.fillna(fv).shift(1, fill_value=fv)
+                # at S=0 also have gS-S=0, could have infinite
+                capital = margin * rcoc.values
+
+                exp_loss_sum = exp_loss.sum()
+                alloc_prem_sum = alloc_prem.sum()
+                capital_sum = capital.sum()
+
+                df = pd.concat((exp_loss_sum, alloc_prem_sum, capital_sum), axis=1, keys=['L', 'P', 'Q']) . \
+                        rename(index=lambda x: x.replace('exeqa_', '')). \
+                        sort_index()
+                df['M'] = df.P - df.L
+                df['LR'] = df.L / df.P
+                df['PQ'] = df.P / df.Q
+                df['COC'] = df.M / df.Q
+                df['a'] = df.P + df.Q
+                price[k] = df.loc['total', 'P']
+                df = df[['L', 'P', 'M', 'Q', 'a', 'LR', 'PQ', 'COC']]
+                dfs[k] = df
+
+            df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
+            ans = PricingResult(df, price, a_reg, reg_p)
 
         return ans
 

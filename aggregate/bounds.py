@@ -210,7 +210,7 @@ class Bounds(object):
                 # exclude 1 (sup distortion) at the end; 0=mean
                 ps = np.linspace(0, 1, n, endpoint=False)
         # always ensure that 1  is in ps for t mode when b < inf if Fb < 1
-        if mode == 't' and self.Fb < 1 or self.add_one:
+        if mode == 't' and (self.Fb < 1 or self.add_one):
             ps = np.hstack((ps, 1))
         return ps
 
@@ -504,7 +504,7 @@ class Bounds(object):
             (m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
         self.cloud_df.index.name = 's'
 
-    def cloud_view(self, *, axs=None, n_resamples=0, scale='linear', alpha=0.05, pricing=True, distortions=None,
+    def cloud_view(self, *, axs=None, n_resamples=0, scale='linear', alpha=0.05, pricing=True, distortions='ordered',
                    title='', lim=(-0.025, 1.025), check=False, add_average=True):
         """
         visualize the cloud with n_resamples
@@ -530,6 +530,13 @@ class Bounds(object):
         else:
             fig = axs.flat[0].get_figure()
         assert not distortions or (len(axs.flat) > 1)
+
+        if distortions == 'ordered':
+            assert isinstance(self.distribution_spec, Portfolio), \
+                'distortion=ordered only available for Portfolio'
+            distortions = [
+                {k: self.distribution_spec.dists[k] for k in ['ccoc', 'tvar']},
+                {k: self.distribution_spec.dists[k] for k in ['ph', 'wang', 'dual']}]
 
         bit = None
         if check:

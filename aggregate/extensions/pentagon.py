@@ -1,4 +1,5 @@
 
+from collections import namedtuple
 from functools import cache
 from itertools import combinations
 import logging
@@ -17,6 +18,8 @@ mapper = dict(
       coc=1 << 6,
       pq=1 << 7
      )
+
+pent_ans = namedtuple('pent_ans', 'L P M a Q LR PQ COC')
 
 # old method and / or creating the relvant dataframes
 def code(r):
@@ -63,7 +66,7 @@ def make_possible_pentagons():
 
 class Pentagon():
     # class level variables
-    index = ['L', 'P', 'M', 'a', 'Q', 'lr', 'pq', 'coc']
+    index = ['L', 'P', 'M', 'a', 'Q', 'LR', 'PQ', 'COC']
 
     def __init__(self, obj=None):
         """
@@ -76,12 +79,15 @@ class Pentagon():
         self.M = None
         self.a = None
         self.Q = None
-        self.lr = None
-        self.pq = None
-        self.coc = None
+        self.LR = None
+        self.PQ = None
+        self.COC = None
 
     def __str__(self):
         return str(self.as_series())
+
+    def as_tuple(self):
+        return pent_ans(*self.values)
 
     def as_series(self):
         """ return values as a pandas Series """
@@ -101,18 +107,18 @@ class Pentagon():
         """
         Add the ratios (lr, pq, coc) to a partially solved model and / or check they have the expected value
         """
-        if self.lr is None:
-            self.lr = self.L / self.P
+        if self.LR is None:
+            self.LR = self.L / self.P
         else:
-            assert np.allclose(self.lr, self.L / self.P, atol=1e-14, rtol=1e-14), f'{self.lr} != {self.L / self.P}'
-        if self.pq is None:
-            self.pq = self.P / self.Q
+            assert np.allclose(self.LR, self.L / self.P, atol=1e-14, rtol=1e-14), f'{self.LR} != {self.L / self.P}'
+        if self.PQ is None:
+            self.PQ = self.P / self.Q
         else:
-            assert np.allclose(self.pq, self.P / self.Q, atol=1e-14, rtol=1e-14), f'{self.pq} != {self.P / self.Q}'
-        if self.coc is None:
-            self.coc = self.M / self.Q
+            assert np.allclose(self.PQ, self.P / self.Q, atol=1e-14, rtol=1e-14), f'{self.PQ} != {self.P / self.Q}'
+        if self.COC is None:
+            self.COC = self.M / self.Q
         else:
-            assert np.allclose(self.coc, self.M / self.Q, atol=1e-14, rtol=1e-14), f'{self.coc} != {self.M / self.Q}'
+            assert np.allclose(self.COC, self.M / self.Q, atol=1e-14, rtol=1e-14), f'{self.COC} != {self.M / self.Q}'
 
     def solve_obj(self, p, *, P=None, M=None, Q=None, lr=None, pq=None, coc=None):
         """
@@ -145,9 +151,9 @@ class Pentagon():
         self.M = M
         self.a = a
         self.Q = Q
-        self.lr = lr
-        self.pq = pq
-        self.coc = coc
+        self.LR = lr
+        self.PQ = pq
+        self.COC = coc
 
         ser = pd.Series([L, P, M, a, Q, lr, pq, coc],
             index=self.index)
@@ -165,12 +171,12 @@ class Pentagon():
 
             case ('L', 'M', 'coc'):
                 self.P = self.L + self.M
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('L', 'M', 'pq'):
                 self.P = self.L + self.M
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('L', 'P', 'Q'):
@@ -183,12 +189,12 @@ class Pentagon():
 
             case ('L', 'P', 'coc'):
                 self.M = self.P - self.L
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('L', 'P', 'pq'):
                 self.M = self.P - self.L
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('L', 'a', 'Q'):
@@ -196,51 +202,51 @@ class Pentagon():
                 self.M = self.P - self.L
 
             case ('L', 'Q', 'lr'):
-                self.P = self.L / self.lr
+                self.P = self.L / self.LR
                 self.M = self.P - self.L
                 self.a = self.P + self.Q
 
             case ('L', 'Q', 'coc'):
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.P = self.L + self.M
                 self.a = self.P + self.Q
 
             case ('L', 'Q', 'pq'):
-                self.P = self.Q * self.pq
+                self.P = self.Q * self.PQ
                 self.M = self.P - self.L
                 self.a = self.P + self.Q
 
             case ('L', 'a', 'lr'):
-                self.P = self.L / self.lr
+                self.P = self.L / self.LR
                 self.M = self.P - self.L
                 self.Q = self.a - self.P
 
             case ('L', 'a', 'coc'):
-                self.M = self.coc / (1 + self.coc) * (self.a - self.L)
+                self.M = self.COC / (1 + self.COC) * (self.a - self.L)
                 self.P = self.L + self.M
                 self.Q = self.a - self.P
 
             case ('L', 'a', 'pq'):
-                self.P = self.a * self.pq / (1 + self.pq)
+                self.P = self.a * self.PQ / (1 + self.PQ)
                 self.M = self.P - self.L
                 self.Q = self.a - self.P
 
             case ('L', 'lr', 'coc'):
-                self.P = self.L / self.lr
+                self.P = self.L / self.LR
                 self.M = self.P - self.L
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('L', 'lr', 'pq'):
-                self.P = self.L / self.lr
+                self.P = self.L / self.LR
                 self.M = self.P - self.L
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('L', 'pq', 'coc'):
-                self.P = self.pq / (self.pq - self.coc) * self.L
+                self.P = self.PQ / (self.PQ - self.COC) * self.L
                 self.M = self.P - self.L
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('P', 'M', 'Q'):
@@ -253,12 +259,12 @@ class Pentagon():
 
             case ('P', 'M', 'coc'):
                 self.L = self.P - self.M
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('P', 'M', 'pq'):
                 self.L = self.P - self.M
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('M', 'a', 'Q'):
@@ -267,130 +273,130 @@ class Pentagon():
                 self.M = self.P - self.L
 
             case ('M', 'Q', 'lr'):
-                self.L = self.M  * self.lr / (1 - self.lr)
+                self.L = self.M  * self.LR / (1 - self.LR)
                 self.P = self.L + self.M
                 self.a = self.P + self.Q
 
             case ('M', 'Q', 'pq'):
-                self.P = self.Q * self.pq
+                self.P = self.Q * self.PQ
                 self.L = self.P - self.M
                 self.a = self.P + self.Q
 
             case ('M', 'a', 'lr'):
-                self.P = self.M  / (1 - self.lr)
+                self.P = self.M  / (1 - self.LR)
                 self.L = self.P - self.M
                 self.Q = self.a - self.P
 
             case ('M', 'a', 'coc'):
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.P = self.a - self.Q
                 self.L = self.P - self.M
 
             case ('M', 'a', 'pq'):
-                self.P = self.a * self.pq / (1 + self.pq)
+                self.P = self.a * self.PQ / (1 + self.PQ)
                 self.L = self.P - self.M
                 self.Q = self.a - self.P
 
             case ('M', 'lr', 'coc'):
-                self.P = self.M / (1 - self.lr)
+                self.P = self.M / (1 - self.LR)
                 self.L = self.P - self.M
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('M', 'lr', 'pq'):
-                self.P = self.M / (1 - self.lr)
+                self.P = self.M / (1 - self.LR)
                 self.L = self.P - self.M
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('M', 'pq', 'coc'):
-                self.P = self.pq / self.coc * self.M
+                self.P = self.PQ / self.COC * self.M
                 self.L = self.P - self.M
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('P', 'Q', 'lr'):
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.a = self.P + self.Q
                 self.M = self.P - self.L
 
             case ('P', 'Q', 'coc'):
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
                 self.a = self.P + self.Q
 
             case ('P', 'a', 'lr'):
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
                 self.Q = self.a - self.P
 
             case ('P', 'a', 'coc'):
                 self.Q = self.a - self.P
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
 
             case ('P', 'lr', 'coc'):
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
-                self.Q = self.M / self.coc
+                self.Q = self.M / self.COC
                 self.a = self.P + self.Q
 
             case ('P', 'lr', 'pq'):
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
 
             case ('P', 'pq', 'coc'):
-                self.Q = self.P / self.pq
+                self.Q = self.P / self.PQ
                 self.a = self.P + self.Q
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
 
             case ('a', 'Q', 'lr'):
                 self.P = self.a - self.Q
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
 
             case ('a', 'Q', 'coc'):
                 self.P = self.a - self.Q
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
 
             case ('Q', 'lr', 'coc'):
-                self.M = self.Q * self.coc
-                self.P = self.M / (1 - self.lr)
+                self.M = self.Q * self.COC
+                self.P = self.M / (1 - self.LR)
                 self.L = self.P - self.M
                 self.a = self.P + self.Q
 
             case ('Q', 'lr', 'pq'):
-                self.P = self.Q * self.pq
-                self.L = self.P * self.lr
+                self.P = self.Q * self.PQ
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
                 self.a = self.P + self.Q
 
             case ('Q', 'pq', 'coc'):
-                self.P = self.Q * self.pq
-                self.M = self.Q * self.coc
+                self.P = self.Q * self.PQ
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
                 self.a = self.P + self.Q
 
             case ('a', 'lr', 'coc'):
-                self.P = self.a * self.coc / (self.coc + 1 - self.lr)
+                self.P = self.a * self.COC / (self.COC + 1 - self.LR)
                 self.Q = self.a - self.P
-                self.L = self.P * self.lr
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
 
             case ('a', 'lr', 'pq'):
-                self.P = self.pq * self.a / (1 + self.pq)
-                self.L = self.P * self.lr
+                self.P = self.PQ * self.a / (1 + self.PQ)
+                self.L = self.P * self.LR
                 self.M = self.P - self.L
                 self.Q = self.a - self.P
 
             case ('a', 'pq', 'coc'):
-                self.P = self.pq * self.a / (1 + self.pq)
+                self.P = self.PQ * self.a / (1 + self.PQ)
                 self.Q = self.a - self.P
-                self.M = self.Q * self.coc
+                self.M = self.Q * self.COC
                 self.L = self.P - self.M
 
             case _:
@@ -398,7 +404,6 @@ class Pentagon():
 
         # fill in the ratios
         self.ratios()
-        return self.as_frame()
 
     @classmethod
     def test_cases(cls, L, P, a):

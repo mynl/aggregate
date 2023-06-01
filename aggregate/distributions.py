@@ -2759,12 +2759,27 @@ class Aggregate(Frequency):
         Draw a sample of n items from the aggregate distribution. Wrapper around
         pd.DataFrame.sample.
 
+        random_state = numpy bitGenerator for reproducibility (eg np.random.PCG64(1234))
+        int, bitGenerator, Generator, or None [Allows chaining through of random
+        states]
+
         """
-        bg = PCG64(random_state)
+
+        if random_state is None:
+            rg = np.random.Generator()
+        elif isinstance(random_state, np.random.Generator):
+            rg = random_state
+        elif isinstance(random_state, np.random.BitGenerator):
+            rg = np.random.Generator(random_state)
+        elif isinstance(random_state, int):
+            rg = np.random.Generator(np.random.PCG64(random_state))
+        else:
+            raise ValueError(f'Unknown random_state {random_state}')
+
         if self.density_df is None:
             raise ValueError('Must update before sampling.')
         return self.density_df[['loss']].sample(n=n, weights=self.density_df.p_total,
-                                                replace=replace, random_state=bg,
+                                                replace=replace, random_state=rg,
                                                 ignore_index=True)
 
     @property

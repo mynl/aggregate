@@ -192,6 +192,28 @@ BSD 3 licence.
 Versions
 ---------
 
+0.12.1
+~~~~~~~~~
+
+* Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
+  allow a dictionary of distortions
+* ``ordered='strict'`` default for ``Portfolio.calibrate_distortions``
+* Pentagon can return a namedtuple and solve does not return a dataframe (it has no return value)
+
+* TODO: sort out random state through Iman-Conover calcs.
+
+0.12.0
+~~~~~~~
+
+* ``add_exa_sample`` becomes method of ``Portfolio``
+* Added ``create_from_sample`` method to ``Portfolio``
+* Added ``bodoff`` method to compute layer capital allocation to ``Portfolio``
+* Improved validation error reporting
+* ``extensions.samples`` module deleted
+* Added ``spectral.approx_ccoc`` to create a ct approx to the CCoC distortion
+* ``qdp`` moved to ``utilities`` (describe plus some quantiles)
+* Added ``Pentagon`` class in ``extensions``*
+
 Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
 
 * MAJOR version changes with incompatible API changes.

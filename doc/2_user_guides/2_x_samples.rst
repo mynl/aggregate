@@ -53,7 +53,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    from aggregate import build, qd
+    from aggregate import build, qd, set_seed
     a01 = build('agg Samp:01 '
               '1 claim '
               'sev lognorm 10 cv .4 '
@@ -66,7 +66,8 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    df = a01.sample(10**5, random_state=102)
+    set_seed(102)
+    df = a01.sample(10**5)
     fc = lambda x: f'{x:8.2f}'
     qd(df.head(), float_format=fc)
 
@@ -104,7 +105,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    df = p02.sample(10**4, random_state=101)
+    df = p02.sample(10**4)
     qd(df.head(), float_format=fc)
 
   :meth:`qdp` prints the pandas ``describe`` statistics dataframe for a dataframe, and adds the CV.
@@ -149,8 +150,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    df2 = p02.sample(10**4, random_state=102,
-        desired_correlation=rcm)
+    df2 = p02.sample(10**4, desired_correlation=rcm)
     qd(df2.iloc[:, :3].corr('pearson'))
 
   The scatterplot now shows correlated marginals. The histograms are unchanged.

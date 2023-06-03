@@ -208,8 +208,8 @@ Versions
 
 * ``Portfolio`` added ``n_units`` property
 * ``Portfolio`` simplified ``__repr__``
-*  Added ``block_iman_conover``  to ``utilitiles``. Note tester code in the documentation. Very Nice! 😁😁😁
-
+* Added ``block_iman_conover``  to ``utilitiles``. Note tester code in the documentation. Very Nice! 😁😁😁
+* New VaR, quantile and TVaR functions: much faster and more accurate. Builder function in ``utilities``.
 
 0.12.0
 ~~~~~~~

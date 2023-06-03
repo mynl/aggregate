@@ -28,8 +28,8 @@ This fact can be used to create sequences with nasty accumulating errors.
 
 .. Knuth observations.
 
-Exercise Redux
-""""""""""""""""""
+**Exercise Redux**
+
 
 Recall the exercise to compute  quantiles of a :ref:`dice roll <prob dice quantiles>`.
 ``aggregate`` produces the consistent results---if we look carefully and account for the foibles of floating point numbers. The case :math:`p=0.1` is easy. But the case :math:`p=1/6` appears wrong. There are two ways we can model the throw of a dice: with frequency 1 to 6 and fixed severity 1, or as fixed frequency 1 and severity 1 to 6. They give different answers. The lower quantile is wrong in the first case (it equals 1) and the upper quantile in the second (2).
@@ -63,8 +63,8 @@ two dataframes for the different dice models are:
 Based on these numbers, the reported quantiles are correct. :math:`p=1/6` is strictly greater than ``d.cdf(1)`` and strictly less than ``d2.cdf(1)``, as shown in the last row! ``d`` and ``d2`` are different because the former runs through the FFT routine to convolve the trivial severity, whereas the latter does not.
 
 
-Exercise
-"""""""""
+**Exercise**
+
 
 :math:`X` is a random variable defined on a sample space
 with ten equally likely events. The event outcomes are

@@ -289,7 +289,7 @@ Compute pricing in the four ways described above.
    :okwarning:
 
    dm = pa.price(.99, d)
-   f'Exact value {dm.price:.15f}'
+   f'Exact value {dm.price[str(d)]:.15f}'
    bit = a.density_df[['loss', 'p_total', 'S']]
    bit['aS'] = 1 - bit.p_total.cumsum()
    bit['gS'] = d.g(bit.S)

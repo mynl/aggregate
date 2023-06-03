@@ -24,7 +24,7 @@ author = agg.__author__
 
 # generally want True, so warning to be an error
 # helpful in debugging to set equal to False
-ipython_warning_is_error = True
+ipython_warning_is_error = False  # CHANGE BACK!
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

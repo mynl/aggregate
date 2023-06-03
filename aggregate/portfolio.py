@@ -10,7 +10,6 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import (MultipleLocator, StrMethodFormatter, MaxNLocator,
                                FixedLocator, FixedFormatter, AutoMinorLocator)
 import numpy as np
-from numpy.random import PCG64
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
 from pandas.plotting import scatter_matrix
@@ -33,6 +32,8 @@ from .utilities import ft, \
     suptitle_and_tight, pprint_ex, \
     MomentAggregator, Answer, subsets, round_bucket, \
     make_mosaic_figure, iman_conover, approximate_work
+import aggregate.random as ar
+
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
@@ -531,6 +532,8 @@ class Portfolio(object):
 
         # this is a good audit: should have max = min
         allocs['total'] = allocs.sum(1)
+
+        allocs = allocs.rename(columns=lambda x: x.replace('alloc_', ''))
         # summary stats
         stats = pd.concat((pd.concat((allocs.min(0), allocs.mean(0), allocs.max(0)),
                                      keys=['min', 'mean', 'max'], axis=0).unstack(1),
@@ -626,6 +629,23 @@ class Portfolio(object):
         # this messes up when port = self has been enhanced...
 
         # cannot use ex, etc. because object may not have been updated
+        return f'{self.name} at {super().__repr__()}'
+
+    def _repr_html_(self):
+        """
+        Updated to mimic Aggregate
+        """
+        s = [f'<h3>Portfolio object: {self.name}</h3>']
+        _n = len(self.agg_list)
+        _s = "" if _n <= 1 else "s"
+        s.append(f'Portfolio contains {_n} aggregate component{_s}.')
+        if self.bs > 0:
+            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+        df = self.describe
+        return '\n'.join(s) + df.fillna('').to_html()
+
+    def __str__(self):
+        """ Default behavior """
         if self.audit_df is None:
             ex = self.statistics_df.loc[('agg', 'mean'), 'total']
             empex = np.nan
@@ -667,23 +687,6 @@ class Portfolio(object):
                 s.append(str(self.describe))
         # s.append(super(Portfolio, self).__repr__())
         return '\n'.join(s)
-
-    def _repr_html_(self):
-        """
-        Updated to mimic Aggregate
-        """
-        s = [f'<h3>Portfolio object: {self.name}</h3>']
-        _n = len(self.agg_list)
-        _s = "" if _n <= 1 else "s"
-        s.append(f'Portfolio contains {_n} aggregate component{_s}.')
-        if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
-        df = self.describe
-        return '\n'.join(s) + df.fillna('').to_html()
-
-    def __str__(self):
-        """ Default behavior """
-        return repr(self)
 
     def __hash__(self):
         """
@@ -6111,19 +6114,17 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         ans.columns = [i.replace('exi_xgta_', '') for i in ans.columns]
         return ans
 
-    def sample(self, n, replace=True, random_state=None, desired_correlation=None, keep_total=True):
+    def sample(self, n, replace=True, desired_correlation=None, keep_total=True):
         """
         Pull multivariate sample. Apply Iman Conover to induce correlation if required.
 
         """
-        # bit generator
-        bg = PCG64(random_state)
         df = pd.DataFrame(index=range(n))
         for c in self.line_names:
             pc = f'p_{c}'
             df[c] = self.density_df[['loss', pc]].\
                     query(f'`{pc}` > 0').\
-                    sample(n, replace=replace, weights=pc, ignore_index=True, random_state=bg).\
+                    sample(n, replace=replace, weights=pc, ignore_index=True, random_state=ar.RANDOM).\
                     drop(columns=pc)
 
         if desired_correlation is not None:
@@ -6146,6 +6147,9 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         # what these should have been called!
         return self.line_names_ex
 
+    @property
+    def n_units(self):
+        return len(self.line_names)
 
 def check01(s):
     """ add 0 1 at start end """

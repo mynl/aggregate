@@ -192,15 +192,24 @@ BSD 3 licence.
 Versions
 ---------
 
-0.12.1
+0.13.0
 ~~~~~~~~~
 
 * Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
   allow a dictionary of distortions
 * ``ordered='strict'`` default for ``Portfolio.calibrate_distortions``
 * Pentagon can return a namedtuple and solve does not return a dataframe (it has no return value)
+* Added random.py module to hold random state. Incorporated into
 
-* TODO: sort out random state through Iman-Conover calcs.
+    - Utilities: Iman Conover (ic_noise permuation) and rearrangement algorithms
+    - ``Portfolio`` sample
+    - ``Aggregate`` sample
+    - Spectral ``bagged_distortion``
+
+* ``Portfolio`` added ``n_units`` property
+* ``Portfolio`` simplified ``__repr__``
+*  Added ``block_iman_conover``  to ``utilitiles``. Note tester code in the documentation. Very Nice! 😁😁😁
+
 
 0.12.0
 ~~~~~~~

@@ -9,7 +9,6 @@ import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
 import numpy as np
 from numpy.linalg import inv
-from numpy.random import PCG64
 import pandas as pd
 from scipy.integrate import quad
 import scipy.stats as ss
@@ -28,8 +27,9 @@ from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
     pprint_ex, approximate_work, moms_analytic, picks_work, \
     integral_by_doubling, logarithmic_theta
-
+import aggregate.random as ar
 from .spectral import Distortion
+
 
 logger = logging.getLogger(__name__)
 
@@ -2754,32 +2754,18 @@ class Aggregate(Frequency):
         else:
             raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default) or tail')
 
-    def sample(self, n, replace=True, random_state=None):
+    def sample(self, n, replace=True):
         """
         Draw a sample of n items from the aggregate distribution. Wrapper around
         pd.DataFrame.sample.
 
-        random_state = numpy bitGenerator for reproducibility (eg np.random.PCG64(1234))
-        int, bitGenerator, Generator, or None [Allows chaining through of random
-        states]
 
         """
-
-        if random_state is None:
-            rg = np.random.Generator()
-        elif isinstance(random_state, np.random.Generator):
-            rg = random_state
-        elif isinstance(random_state, np.random.BitGenerator):
-            rg = np.random.Generator(random_state)
-        elif isinstance(random_state, int):
-            rg = np.random.Generator(np.random.PCG64(random_state))
-        else:
-            raise ValueError(f'Unknown random_state {random_state}')
 
         if self.density_df is None:
             raise ValueError('Must update before sampling.')
         return self.density_df[['loss']].sample(n=n, weights=self.density_df.p_total,
-                                                replace=replace, random_state=rg,
+                                                replace=replace, random_state=ar.RANDOM,
                                                 ignore_index=True)
 
     @property

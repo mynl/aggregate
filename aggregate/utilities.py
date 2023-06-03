@@ -2,7 +2,7 @@ from collections import namedtuple
 from cycler import cycler
 import decimal
 from functools import lru_cache
-from io import StringIO, BytesIO
+from io import BytesIO
 import itertools
 from itertools import product
 import logging.handlers
@@ -14,7 +14,6 @@ import matplotlib.ticker as ticker
 from numbers import Number
 import numpy as np
 import pandas as pd
-from pandas.io.formats.format import EngFormatter
 import re
 import scipy.stats as ss
 import scipy.fft as sft
@@ -22,12 +21,13 @@ from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize.nonlin import NoConvergence
-from scipy.special import kv, binom, gamma, loggamma
+from scipy.special import kv, binom, loggamma
 from scipy.stats import multivariate_t
-# from time import time_ns
 from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
 
 from .constants import *
+import aggregate.random as ar
+
 
 logger = logging.getLogger(__name__)
 
@@ -2303,7 +2303,7 @@ def ic_noise(n, d):
     # steps 2 and 3
     for j in range(0, score.shape[1]):
         # shuffle each column
-        score[:, j] = np.random.permutation(p)
+        score[:, j] = ar.RANDOM.permutation(p)
 
     # actual correlation of reference (this will be close to, but not equal to, the identity)
     # @ denotes matrix multiplication
@@ -2313,7 +2313,7 @@ def ic_noise(n, d):
     # step 6
     return score @ np.linalg.inv(E.T)
 
-
+@lru_cache()
 def ic_t_noise(n, d, dof):
     """
     as above using multivariate t distribution noise
@@ -2345,7 +2345,7 @@ def ic_rank(N):
 def ic_reorder(ranks, samples):
     """
     put samples into the order determined by ranks
-    ranks is calibrated to the reference distribution
+    array is calibrated to the reference distribution
     space for the answer
     """
     rank_samples = np.zeros((samples.shape[0], samples.shape[1]))
@@ -2436,6 +2436,131 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
     return df
 
 
+def block_iman_conover(unit_losses, intra_unit_corrs, inter_unit_corr, as_frame=False):
+    """
+    Apply Iman Conover to the unit loss blocks in ``unit_losses`` with correlation matrices in ``intra``.
+
+    Then determine the ordering for the unit totals with correlation ``inter``.
+
+    Re-order each unit, row by row, so that the totals have the desired correlation structure, but
+    leaving the intra unit correlation unchanged.
+
+    ``unit_losses = [np.arrays or pd.Series]`` of losses by subunit within units, without totals
+
+    ``len(unit_losses) == len(intra_unit corrs)``
+
+    For simplicity all normal copula; can add other later if required.
+
+    No totals input or output anywhere.
+
+    ``if as_frame`` then a dataframe version returned, for auditing.
+
+    Here is some tester code, using great.test_df to make random unit losses. Vary num_units and
+    num_sims as required.
+
+    ::
+
+        def bic_tester(num_units=3, num_sims=10000):
+            from aggregate import random_corr_matrix
+            # from great import test_df
+
+            # create samples
+            R = range(num_units)
+            unit_losses = [test_df(num_sims, 3 + i) for i in R]
+            totals = [u.sum(1) for u in unit_losses]
+
+            # manual dataframe to check against
+            manual = pd.concat(unit_losses + totals, keys=[f'Unit_{i}' for i in R] + ['Total' for i in R], axis=1)
+
+            # for input to method
+            unit_losses = [i.to_numpy() for i in unit_losses]
+            totals = [i.to_numpy() for i in totals]
+
+            # make corrs
+            intra_unit_corrs = [random_corr_matrix(i.shape[1], p=.5, positive=True) for i in unit_losses]
+            inter_unit_corr = random_corr_matrix(len(totals), p=1, positive=True)
+
+            # apply method
+            bic = block_iman_conover(unit_losses, intra_unit_corrs, inter_unit_corr, True)
+
+            # extract frame answer, put col names back
+            bic.frame.columns = manual.columns
+            dm = bic.frame
+
+            # achieved corr
+            for i, target in zip(dm.columns.levels[0], intra_unit_corrs + [inter_unit_corr]):
+                print(i)
+                print((dm[i].corr() - target).abs().max().max())
+                # print(dm[i].corr() - target)
+
+            # total corr across subunits
+            display(dm.drop(columns=['Total']).corr())
+
+            # total corr across subunits
+            display(dm.drop(columns=['Total']).corr())
+
+            return manual, bic, intra_unit_corrs, inter_unit_corr
+
+        manual, bic, intra, inter = bic_tester(3, 10000)
+
+    """
+
+    if isinstance(unit_losses, dict):
+        unit_losses = unit_losses.values()
+
+    if isinstance(intra_unit_corrs, dict):
+        intra_unit_corrs = intra_unit_corrs.values()
+
+    # shuffle unit losses
+    # IC returns a dataframe
+    unit_losses = [iman_conover(l, c, dof=0, add_total=False).to_numpy() for l, c in zip(unit_losses, intra_unit_corrs)]
+
+    # extract totals
+    totals = [l.sum(1) for l in unit_losses]
+    totals = np.vstack(totals)
+
+    # apply the interunit correlation to totals: this code copies iman_conover because we want
+    # to keep the same ordering matrices
+
+    # block shuffle units; this code is IC by hand to keep track of R and apply to the units
+    d, n = totals.shape
+
+    # "square root" of "variance"
+    # step 7
+    C = np.linalg.cholesky(inter_unit_corr)
+
+    # make a perfectly uncorrelated reference: noise function = steps 1-6; product is step 8 (transposed)
+    N = ic_noise(n, d) @ C.T
+
+    # required ordering of marginals determined by reference sample, step 9
+    R = ic_rank(N)
+
+    # re-order totals and the corresponding unit losses
+    for i, (u, t) in enumerate(zip(unit_losses, totals)):
+        r = np.argsort(t)
+        unit_losses[i] = u[r]
+        totals[i] = t[r]
+
+    # put into the desired IC ordering,
+    for i, (u, t, r) in enumerate(zip(unit_losses, totals, R.T)):
+        totals[i] = t[r]
+        unit_losses[i] = u[r]
+
+    # assembled sample
+    combined = np.hstack(unit_losses)
+
+    if as_frame:
+        fr = pd.concat((pd.DataFrame(combined), pd.DataFrame(totals.T)), axis=1, keys=['units', 'totals'])
+
+    else:
+        fr = None
+
+    BlockImanConover = namedtuple('BlockImanConover', 'totals combined frame')
+    ans = BlockImanConover(totals, combined, fr)
+
+    return ans
+
+
 def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
     """
     Implementation of the Rearragement Algorithm (RA). Determines the worst p-VaR
@@ -2519,7 +2644,7 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
     # iterate over each column, sort, truncate (if p>0)
     for m in df:
         sorted_marginals[m] = df[m].sort_values(ascending=False).reset_index(drop=True).iloc[:N]
-        df_out[m] = np.random.permutation(sorted_marginals[m])
+        df_out[m] = ar.RANDOM.permutation(sorted_marginals[m])
 
     # change in VaR and last VaR computed, to control looping
     chg_var = max(100, 2 * tau)
@@ -2605,7 +2730,7 @@ def make_corr_matrix(vine_spec):
     return A
 
 
-def random_corr_matrix(n, p=1, positive=False, random_state=None):
+def random_corr_matrix(n, p=1, positive=False):
     """
     make a random correlation matrix
 
@@ -2621,27 +2746,12 @@ def random_corr_matrix(n, p=1, positive=False, random_state=None):
 
     positive=True for all entries to be positive
 
-    random_state = numpy bitGenerator for reproducibility (eg np.random.PCG64(1234))
-    int, bitGenerator, Generator, or None [Allows chaining through of random
-    states]
-
     """
 
-    if random_state is None:
-        rg = np.random.Generator()
-    elif isinstance(random_state, np.random.Generator):
-        rg = random_state
-    elif isinstance(random_state, np.random.BitGenerator):
-        rg = np.random.Generator(random_state)
-    elif isinstance(random_state, int):
-        rg = np.random.Generator(np.random.PCG64(random_state))
-    else:
-        raise ValueError(f'Unknown random_state {random_state}')
-
     if positive is True:
-        A = rg.random((n, n))**p
+        A = ar.RANDOM.random((n, n))**p
     else:
-        A = 1 - 2 * rg.random((n, n))**p
+        A = 1 - 2 * ar.RANDOM.random((n, n))**p
     np.fill_diagonal(A, 1)
 
     return make_corr_matrix(A)

@@ -9,6 +9,7 @@ from textwrap import fill
 import logging
 
 from .constants import *
+from .random import RANDOM
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +546,7 @@ class Distortion(object):
             raise ValueError(f'Inadmissible value {source} passed to convex_example, expected yield or cat')
 
     @staticmethod
-    def bagged_distortion(data, proportion, samples, display_name="", random_state=None):
+    def bagged_distortion(data, proportion, samples, display_name=""):
         """
         Make a distortion by bootstrap aggregation (Bagging) resampling, taking the convex envelope,
         and averaging from data.
@@ -558,14 +559,13 @@ class Distortion(object):
         :param proportion: proportion of data for each sample
         :param samples: number of resamples
         :param display_name: display_name of created distortion
-        :param random_state: for pd.sample....ensures reproducibility
         :return:
         """
 
         df = pd.DataFrame(index=np.linspace(0,1,10001), dtype=float)
 
         for i in range(samples):
-            rebit = data.sample(frac=proportion, replace=False, random_state=random_state)
+            rebit = data.sample(frac=proportion, replace=False, random_state=RANDOM)
             rebit.loc[-1] = [0, 0]
             rebit.loc[max(rebit.index)+1] = [1, 1]
             d = Distortion('convex', 0, df=rebit, col_x='EL', col_y='Spread')

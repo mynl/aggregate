@@ -1,5 +1,16 @@
 # TODO stack
 
+
+Issues
+=======
+
+* Get RTD to use toml file and retire requirements.txt.
+
+
+
+OLD
+====
+
 (venv) (base) C:\temp\z\latest>set pythonpath
 PYTHONPATH=C:\Users\steve\S\TELOS\Python\aggregate_project;C:\Users\steve\S\TELOS\Python\great_project;c:\Users\steve\S\TELOS\Python\meta_reddit;
 

@@ -65,3 +65,6 @@ packages = ["aggregate", "aggregate.extensions"]
 
 [tool.setuptools.dynamic]
 version  = { attr = "aggregate.__version__" }
+
+[project.scripts]
+agg = "great.scripts:my_script"

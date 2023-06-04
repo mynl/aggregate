@@ -4,10 +4,10 @@ __pycache__/
 *$py.class
 
 .idea/
+venv-agg/
 
 # Sphinx documentation
 doc/_build
-doc/dm
 doc/dm/temp
 doc/savefig
 # doc/_templates

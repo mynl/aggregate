@@ -23,7 +23,7 @@ from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize.nonlin import NoConvergence
 from scipy.special import kv, binom, loggamma
 from scipy.stats import multivariate_t
-from IPython.core.display import HTML, display, Image as ipImage, SVG as ipSVG
+from IPython.core.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG
 
 from .constants import *
 import aggregate.random as ar
@@ -3401,4 +3401,155 @@ def logarithmic_theta(mean):
         print('num method failed')
     else:
         return theta
+
+
+def make_var_tvar(ser):
+    """
+    Make var (lower quantile), upper quantile, and tvar functions from a ``pd.Series`` ``ser``, which
+    has index given by losses and p_total values.
+
+    ``ser`` must have a unique monotonic increasing index and all p_totals > 0.
+
+    Such a series comes from ``a.density_df.query('p_total > 0').p_total``, for example.
+
+    Tested using numpy vs pd.Series lookup functions, and this version is much
+    faster. See ``var_tvar_test_suite`` function below for testers (obviously
+    run before this code was integrated).
+
+    Changed in v. 0.13.0
+
+    """
+
+    # audits
+    assert ser.index.is_unique, 'index values must be unique'
+    assert ser.index.is_monotonic_increasing, 'index values must be increasing'
+
+    # detach from the outside scope
+    ser = ser.copy()
+
+    # create needed arrays
+    x_np = np.array(ser.index)
+    cser = ser.cumsum()
+    cser_F_np = cser.to_numpy()
+    # detach the index values
+    cser_idx = pd.Index(cser.values)
+    tvar_unconditional = ((ser * ser.index)[::-1].cumsum()[::-1]).to_numpy()
+
+    # these last three are annoyting because np.where does not short circuit
+    tvar_unconditional = np.hstack((tvar_unconditional, np.inf, np.inf))
+    cser_F_np2 = np.hstack((cser_F_np, 1))
+    x_np2l = np.hstack((x_np, x_np[-1]))
+    x_np2u = np.hstack((x_np, np.inf))
+    x_max = cser_F_np[-2]
+
+    # tests show this is about 6 times faster than
+    # q = interp1d(cser, ser.index, kind='next', bounds_error=False, fill_value=(ser.index.min(), ser.index.max()))
+    def q_lower(p):
+        nonlocal x_np2l, cser_F_np
+        return x_np2l[np.searchsorted(cser_F_np, p, side='left')]
+
+    def q_upper(p):
+        nonlocal x_np2u, cser_F_np
+        return x_np2u[np.searchsorted(cser_F_np, p, side='right')]
+
+    def tvar(p):
+        """
+        Vectorized TVaR computation.
+        """
+        nonlocal cser_F_np, x_np, tvar_unconditional
+        if isinstance(p, (float, int)):
+            # easy
+            if p >= cser_F_np[-2]:
+                return x_np[-1]
+            else:
+                idx = np.searchsorted(cser_F_np, p, side='right')
+                return ((cser_F_np[idx] - p) * x_np[idx] + tvar_unconditional[idx + 1]) / (1 - p)
+        else:
+            # vectorized
+            p = np.array(p)
+            idx = np.searchsorted(cser_F_np, p, side='right')
+            return np.where(idx >= len(cser_F_np) - 1,
+                            x_np[-1],
+                           ((cser_F_np2[idx] - p) * x_np2u[idx] + tvar_unconditional[idx + 1]) / (1 - p))
+
+    QuantileFunctions = namedtuple("QuantileFUnctions", 'q q_lower var q_upper tvar')
+    return QuantileFunctions(q_lower, q_lower, q_lower, q_upper, tvar)
+
+
+def test_var_tvar(program, bs=0, n_ps=1025, normalize=False, speed_test=False, log2=16):
+    """
+    Run a test suite of programs against new var and tvar functions compared to
+    old aggregate.Aggregate versions
+
+    Suggestion::
+
+        args = [
+            ('agg T dfreq [1,2,4,8] dsev [1]', 0, 1025, False),
+            ('agg T dfreq [1:8] dsev [2:3]', 0, 1025, False),
+            ('agg D dfreq [1:6] dsev [1]', 0, 7, False),
+            ('agg T2 10 claims 100 x 0 sev lognorm 10 cv 1 poisson ', 1/64, 1025, False),
+            ('agg T2 10 claims sev lognorm 10 cv 4 poisson ', 1/16, 1025, False),
+            ('agg T2 10 claims sev lognorm 10 cv 4 mixed gamma 1.2 ', 1/8, 1025, False),
+            ('agg Dice dfreq [1] dsev [1:6]', 0, 7, False)
+        ]
+
+        from IPython.display import display, Markdown
+        for t in args:
+            display(Markdown(f'## {t[0]}'))
+            bs = t[1]
+            test_suite(*t, speed_test=False, log2=16 if bs!= 1/8 else 20)
+
+    Expected output to show that new functions are 3+ orders of magnitude faster, and
+    agree with the old functions. q and q_upper agree everywhere except the jumps.
+
+    """
+
+    from aggregate import build, qd
+
+    a = build(program, bs=bs, normalize=normalize, log2=log2)
+    qd(a)
+    ser = a.density_df.query('p_total > 0').p_total
+
+    print(f'\ntotal probability = {ser.sum():.16f}')
+    print()
+
+    qf = make_var_tvar(ser)
+    ps = np.linspace(0, 1, n_ps)
+
+    if speed_test:
+        pass
+        # print('Timeit Tests\n============\n')
+        # print('new var')
+        # %timeit qf.var(ps)
+        # print('agg.var')
+        # %timeit [a.q(i) for i in ps]
+        # %timeit qf.q_upper(ps)
+        # print('new tvar')
+        # %timeit qf.tvar(ps)
+        # print('agg.tvar')
+        # %timeit [a.tvar(i, kind='tail') for i in ps]
+        # print()
+
+    # report results
+    test_df = pd.DataFrame({
+        'q': qf.var(ps),
+        'a.q': [a.q(i) for i in ps],
+        'q_upper': qf.q_upper(ps),
+        'a.q upper': [a.q(i, kind='upper') for i in ps],
+        'tvar': qf.tvar(ps),
+        'a.tvar tail': [a.tvar(i, kind='tail') for i in ps]
+            }, index=ps)
+
+    for tq in ['q != `a.q`', '`a.q upper` != q_upper', 'q != q_upper', 'abs(tvar - `a.tvar tail`) > 1e-12']:
+        df = test_df.query(tq)
+        display(df.head(10).style.format(precision=5).set_caption(f'{tq} with {len(df)} rows'))
+
+    display(test_df.sample(min(25, len(test_df))).sort_index().style.format(precision=5).set_caption('Whole Dataframe Sample of 25 Values'))
+
+    fig, ax = plt.subplots(1, 1, figsize=(6,4))
+    test_df.plot(lw=1, ax=ax, drawstyle='steps-pre')
+    for l, ls in zip(ax.lines, ['-', '--', ':', '-.', '-', ':']):
+        l.set_linestyle(ls)
+    ax.legend()
+    ax.set(title=program)
 

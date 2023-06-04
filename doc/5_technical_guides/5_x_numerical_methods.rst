@@ -62,6 +62,4 @@ Books on Fourier analysis and Fourier transforms,
 .. include:: 5_x_nm_overview.rst
 .. include:: 5_x_nm_discrete_rep.rst
 .. include:: 5_x_nm_ft_conv_algo.rst
-.. include:: 5_x_nm_error_analysis_params.rst
-.. include:: 5_x_nm_other_algos.rst
 .. include:: 5_x_nm_floats.rst

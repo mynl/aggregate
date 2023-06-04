@@ -216,7 +216,8 @@ Bodoff introduces four thought experiments:
 4. Bernoulli / exponential compound distribution (see :ref:`Bodoff Example 4`.)
 
 The units are independent. The next block of code sets up and validates :class:`Portfolio`
-objects for each.
+objects for each. The Bodoff portfolios are part of the base library and can be extracted with
+``build.qlist``.
 
 .. ipython:: python
    :okwarning:
@@ -225,24 +226,7 @@ objects for each.
    from collections import OrderedDict
    from aggregate import build, qd
    from aggregate.extensions import bodoff_exhibit
-   bodoff = []
-   bodoff.append('''port Bodoff:1 note{Bodoff Thought Experiment No. 1}
-       agg X1 1 claim dsev [0,  99] [0.80, 0.20] fixed
-       agg X2 1 claim dsev [0, 100] [0.95, 0.05] fixed
-   ''')
-   bodoff.append('''port Bodoff:2 note{Bodoff Thought Experiment No. 2}
-       agg X1 1 claim dsev [0,  50] [0.80, 0.20] fixed
-       agg X2 1 claim dsev [0, 100] [0.95, 0.05] fixed
-   ''')
-   bodoff.append('''port Bodoff:3 note{Bodoff Thought Experiment No. 3}
-       agg X1 1 claim dsev [0,   5] [0.80, 0.20] fixed
-       agg X2 1 claim dsev [0, 100] [0.95, 0.05] fixed
-   ''' )
-   bodoff.append('''port Bodoff:4
-       agg a .25 claims sev   4 * expon bernoulli
-       agg b .05 claims sev  20 * expon bernoulli
-       agg c .01 claims sev 100 * expon bernoulli
-   ''')
+   bodoff = list(build.qlist('.*Bodoff').program)
    ports = OrderedDict()
    for s in bodoff:
        port = build(s)

@@ -7,6 +7,7 @@ REM pushd stores the current directory and sets the cwd to its argument
 REM percent i is the i-th argument
 REM percent tilde i expands the argument and removes any quotes
 REM See https://stackoverflow.com/questions/5034076/what-does-dp0-mean-and-how-does-it-work
+REM The %~dp0 (that’s a zero) variable when referenced within a Windows batch file will expand to the drive letter and path of that batch file.
 
 pushd %~dp0
 
@@ -15,6 +16,7 @@ REM Command file for Sphinx documentation
 if "%SPHINXBUILD%" == "" (
 	set SPHINXBUILD=python -msphinx
 )
+
 set SOURCEDIR=.
 set BUILDDIR=_build
 set SPHINXPROJ=aggregate
@@ -43,9 +45,6 @@ goto end
 %SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% %SPHINXOPTS%
 
 :end
-
-
-REM xcopy /S .\_build\singlehtml\*.* \s\telos\python\aggregate\
 
 
 REM get back to where you started

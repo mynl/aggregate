@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aggregate"
+dynamic = ["version"]
+description = "Tools for creating and working with aggregate probability distributions."
+readme = "README.rst"
+authors = [
+    {name = "Stephen J. Mildenhall", email = "steve@convexrisk.com"},
+]
+maintainers = [
+    {name = "Stephen J. Mildenhall", email = "steve@convexrisk.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Education",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "IPython",
+    "cycler",
+    "ipykernel",
+    "jinja2",
+    "matplotlib>=3.5",
+    "numpy",
+    "pandas",
+    "psutil",
+    "scipy",
+    "sly",
+    "titlecase",
+]
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.10"
+
+[project.urls]
+Documentation = "https://aggregate.readthedocs.io/en/latest/"
+"Source Code" = "https://github.com/mynl/aggregate"
+
+[project.optional-dependencies]
+dev = [
+    "docutils==0.16",
+    "jupyter-sphinx",
+    "nbsphinx",
+    "recommonmark>=0.7.1",
+    "setuptools>=62.3.2",
+    "sphinx>=1.4",
+    "sphinx-panels",
+    "sphinx-rtd-dark-mode",
+    "sphinxcontrib-bibtex",
+    "sphinx-copybutton",
+    "sphinx-toggleprompt",
+    "sphinx-multitoc-numbering"
+]
+
+[tool.setuptools]
+include-package-data = true
+packages = ["aggregate", "aggregate.extensions"]
+
+[tool.setuptools.dynamic]
+version  = { attr = "aggregate.__version__" }

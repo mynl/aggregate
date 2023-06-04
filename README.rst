@@ -78,6 +78,53 @@ Installation
   pip install aggregate
 
 
+
+Version History
+-----------------
+
+0.13.0 (June 2023)
+~~~~~~~~~~~~~~~~~~~~
+
+* Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
+  allow a dictionary of distortions
+* ``ordered='strict'`` default for ``Portfolio.calibrate_distortions``
+* Pentagon can return a namedtuple and solve does not return a dataframe (it has no return value)
+* Added random.py module to hold random state. Incorporated into
+
+    - Utilities: Iman Conover (ic_noise permuation) and rearrangement algorithms
+    - ``Portfolio`` sample
+    - ``Aggregate`` sample
+    - Spectral ``bagged_distortion``
+
+* ``Portfolio`` added ``n_units`` property
+* ``Portfolio`` simplified ``__repr__``
+* Added ``block_iman_conover``  to ``utilitiles``. Note tester code in the documentation. Very Nice! 😁😁😁
+* New VaR, quantile and TVaR functions: 1000x speedup and more accurate. Builder function in ``utilities``.
+* pyproject.toml project specification, updated build process, now creates whl file rather than egg file.
+
+0.12.0 (May 2023)
+~~~~~~~~~~~~~~~~~~~
+
+* ``add_exa_sample`` becomes method of ``Portfolio``
+* Added ``create_from_sample`` method to ``Portfolio``
+* Added ``bodoff`` method to compute layer capital allocation to ``Portfolio``
+* Improved validation error reporting
+* ``extensions.samples`` module deleted
+* Added ``spectral.approx_ccoc`` to create a ct approx to the CCoC distortion
+* ``qdp`` moved to ``utilities`` (describe plus some quantiles)
+* Added ``Pentagon`` class in ``extensions``
+
+Earlier versions
+~~~~~~~~~~~~~~~~~~
+
+See github commit notes.
+
+Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
+
+* MAJOR version changes with incompatible API changes.
+* MINOR version changes with added functionality in a backwards compatible manner.
+* PATCH version changes with backwards compatible bug fixes.
+
 Getting started
 ---------------
 
@@ -92,8 +139,8 @@ Here is a model of the sum of three dice rolls. The DataFrame ``describe`` compa
   qd(a)
 
 >>>        E[X] Est E[X]    Err E[X]   CV(X) Est CV(X)   Err CV(X) Skew(X) Est Skew(X)
->>>  X                                                                                
->>>  Freq     3                            0                                          
+>>>  X
+>>>  Freq     3                            0
 >>>  Sev    3.5      3.5           0 0.48795   0.48795 -3.3307e-16       0  2.8529e-15
 >>>  Agg   10.5     10.5 -3.3307e-16 0.28172   0.28172 -8.6597e-15       0 -1.5813e-13
 
@@ -104,32 +151,6 @@ Here is a model of the sum of three dice rolls. The DataFrame ``describe`` compa
 >>>  Probability sum < 12 = 0.741
 >>>  Median = 10
 
-The Tweedie is a common distribution used
-in GLM modeling. It is a compound Poisson aggregate with gamma severity. Users may be
-surprised at the form of the density for small p. Here is a Tweedie with
-mean 10, p=1.005, dispersion (phi, sigma^2)=4
-
-::
-
-  t = build('agg Tweedie tweedie 5 1.005 1')
-  qd(t)
-
->>>        E[X] Est E[X]    Err E[X]    CV(X) Est CV(X)   Err CV(X)  Skew(X) Est Skew(X)
->>> X
->>> Freq 4.9848                       0.44789                        0.44789
->>> Sev   1.003    1.003 -8.6819e-14 0.070888  0.070888  4.9123e-07  0.14178     0.14178
->>> Agg       5   4.9992 -0.00015419  0.44902   0.44885 -0.00036361  0.45126     0.44581
-
-::
-
-  # check variance
-  print(1 * 5**1.005, t.agg_var)
-
->>> 5.04039827609 5.04039827609
-
-.. image:: tweedie.png
-  :width: 400
-  :alt: Alternative text
 
 ``aggregate`` can use any ``scipy.stats`` continuous random variable as a severity, and
 supports all common frequency distributions. Here is a compound-Poisson with lognormal
@@ -187,47 +208,6 @@ License
 -------
 
 BSD 3 licence.
-
-
-Versions
----------
-
-0.13.0
-~~~~~~~~~
-
-* Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
-  allow a dictionary of distortions
-* ``ordered='strict'`` default for ``Portfolio.calibrate_distortions``
-* Pentagon can return a namedtuple and solve does not return a dataframe (it has no return value)
-* Added random.py module to hold random state. Incorporated into
-
-    - Utilities: Iman Conover (ic_noise permuation) and rearrangement algorithms
-    - ``Portfolio`` sample
-    - ``Aggregate`` sample
-    - Spectral ``bagged_distortion``
-
-* ``Portfolio`` added ``n_units`` property
-* ``Portfolio`` simplified ``__repr__``
-* Added ``block_iman_conover``  to ``utilitiles``. Note tester code in the documentation. Very Nice! 😁😁😁
-* New VaR, quantile and TVaR functions: much faster and more accurate. Builder function in ``utilities``.
-
-0.12.0
-~~~~~~~
-
-* ``add_exa_sample`` becomes method of ``Portfolio``
-* Added ``create_from_sample`` method to ``Portfolio``
-* Added ``bodoff`` method to compute layer capital allocation to ``Portfolio``
-* Improved validation error reporting
-* ``extensions.samples`` module deleted
-* Added ``spectral.approx_ccoc`` to create a ct approx to the CCoC distortion
-* ``qdp`` moved to ``utilities`` (describe plus some quantiles)
-* Added ``Pentagon`` class in ``extensions``*
-
-Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
-
-* MAJOR version changes with incompatible API changes.
-* MINOR version changes with added functionality in a backwards compatible manner.
-* PATCH version changes with backwards compatible bug fixes.
 
 Help and contributions
 -------------------------

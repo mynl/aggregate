@@ -377,17 +377,12 @@ magnified. The value :math:`c=0.02` was selected to balance these two
 effects.
 
 .. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/NMNvsOtherFreqContours.pdf
-   :alt: Comparison of negative multinomial (top) and single frequency
-   bivariate claim count (bottom) bivariate distributions.
-   :name: fig:NMNContours
 
    Comparison of negative multinomial (top) and single frequency
    bivariate claim count (bottom) bivariate distributions.
 
+
 .. figure:: C:/SteveBase/papers/CAS_WP/FinalICExhibits/NMNvsOtherFreqMarginals.pdf
-   :alt: Comparison of negative multinomial and single frequency
-   bivariate claim count marginal and total distributions.
-   :name: fig:NMNMarginals
 
    Comparison of negative multinomial and single frequency bivariate
    claim count marginal and total distributions.

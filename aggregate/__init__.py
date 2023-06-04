@@ -17,7 +17,8 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         LoggerManager, knobble_fonts, approximate_work,
                         partial_e, partial_e_numeric, moms_analytic, qd,
                         sEngFormatter, mv, picks_work, GCN, lognorm_approx,
-                        integral_by_doubling, logarithmic_theta, block_iman_conover)
+                        integral_by_doubling, logarithmic_theta, block_iman_conover,
+                        make_var_tvar, test_var_tvar)
 from .spectral import Distortion, approx_ccoc
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward

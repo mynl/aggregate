@@ -153,9 +153,8 @@ def fig_4_8():
     xv = np.hstack((1e-10, df.x.values))
     adc = build(f'agg Empirical 1 claim sev chistogram xps {xv} {df.p.values} fixed', bs=1/128)
     qps = np.linspace(0,1,1000, endpoint=True)
-    tvar =np.array([ad.tvar(p) for p in qps])
-    tvarx =np.array([ad.tvar(p, kind='tail') for p in qps])
-    ctvar =np.array([adc.tvar(p) for p in qps])
+    tvar = ad.tvar(qps) # np.array([ad.tvar(p) for p in qps])
+    ctvar =adc.tvar(qps)
 
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_H, FIG_W  + .3), sharey=True)
     ax0,ax1 = axs.flat
@@ -168,7 +167,6 @@ def fig_4_8():
     ax.plot(cps[:2], [0,0], ls='--', label='_none_')
     ax.plot(cps[1:], xs[1:], 'o', ms=5, c='C0', label='_none_')
     ax.plot(qps, tvar, c='C0', lw=1, label='TVaR')
-    ax.plot(qps, tvarx, c='C3', lw=1, label='TVaR Ex')
 
     ax.xaxis.set_major_locator(ticker.MultipleLocator(.2))
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(.1))

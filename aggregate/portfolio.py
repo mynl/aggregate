@@ -26,12 +26,13 @@ from IPython.core.display import HTML, display
 from .constants import *
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
-from .utilities import ft, \
-    ift, sln_fit, sgamma_fit, \
-    axiter_factory, AxisManager, html_title, \
-    suptitle_and_tight, pprint_ex, \
-    MomentAggregator, Answer, subsets, round_bucket, \
-    make_mosaic_figure, iman_conover, approximate_work
+from .utilities import (ft,
+                        ift, sln_fit, sgamma_fit,
+                        axiter_factory, AxisManager, html_title,
+                        suptitle_and_tight, pprint_ex,
+                        MomentAggregator, Answer, subsets, round_bucket,
+                        make_mosaic_figure, iman_conover, approximate_work,
+                        make_var_tvar)
 import aggregate.random as ar
 
 
@@ -182,7 +183,7 @@ class Portfolio(object):
         self.independent_audit_df = None
         self.padding = 0
         self.tilt_amount = 0
-        self._linear_quantile_function = None
+        self._var_tvar_function = None
         self._cdf = None
         self._pdf = None
         self._tail_var = None
@@ -345,7 +346,7 @@ class Portfolio(object):
         Seq0 = (df.S == 0)
 
         # invalidate quantile functions
-        self._linear_quantile_function = None
+        self._var_tvar_function = None
 
         # E[X_i | X=a], E(xi eq a)
         # all in one go (outside loop)
@@ -976,6 +977,50 @@ class Portfolio(object):
 
     def q(self, p, kind='lower'):
         """
+        Return quantile function of density_df.p_total.
+
+        Definition 2.1 (Quantiles)
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
+
+        ``kind=='middle'`` has been removed.
+
+        :param p:
+        :param kind: 'lower' or 'upper'.
+        :return:
+        """
+
+        if kind == 'middle':
+            logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
+            kind = 'lower'
+
+        assert kind in ['lower', 'upper'], 'kind must be lower or upper'
+
+        if self._var_tvar_function is None:
+            # revised June 2023
+            ser = self.density_df.query('p_total > 0').p_total
+            self._make_var_tvar(ser)
+
+        return self._var_tvar_function[kind](p)
+
+    def _make_var_tvar(self, ser):
+        """
+        There is no severity version here, so this knows where to store the answer, cf Aggregate version.
+        """
+        self._var_tvar_function = {}
+        qf = make_var_tvar(ser)
+        self._var_tvar_function['upper'] = qf.q_upper
+        self._var_tvar_function['lower'] = qf.q_lower
+        self._var_tvar_function['tvar'] = qf.tvar
+
+    def q_old_0_12_0(self, p, kind='lower'):
+        """
+        Old version from 0.12.0.
+
+        Set self._var_tvar_function to None to recompute these.
+
+        TODO: Will be removed soon.
+
         return lowest quantile, appropriate for discrete bucketing.
         quantile guaranteed to be in the index
         nearest does not work because you always want to pick rounding up
@@ -991,9 +1036,9 @@ class Portfolio(object):
         :param kind: allow upper or lower quantiles
         :return:
         """
-        if self._linear_quantile_function is None:
+        if self._var_tvar_function is None:
             # revised Dec 2019
-            self._linear_quantile_function = {}
+            self._var_tvar_function = {}
             self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
             self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
             self.q_temp.loc[0, 'loss'] = 0
@@ -1012,24 +1057,24 @@ class Portfolio(object):
             self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
             # create interp functions
             # old
-            # self._linear_quantile_function['upper'] = \
+            # self._var_tvar_function['upper'] = \
             #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
             #                          fill_value='extrapolate')
-            # self._linear_quantile_function['lower'] = \
+            # self._var_tvar_function['lower'] = \
             #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
             #                          fill_value='extrapolate')
             # revised
-            self._linear_quantile_function['upper'] = \
+            self._var_tvar_function['upper'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
                                      fill_value='extrapolate')
-            self._linear_quantile_function['lower'] = \
+            self._var_tvar_function['lower'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
                                      fill_value='extrapolate')
             # change to using loss_s
-            self._linear_quantile_function['middle'] = \
+            self._var_tvar_function['middle'] = \
                 interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
                                      fill_value='extrapolate')
-        l = float(self._linear_quantile_function[kind](p))
+        l = float(self._var_tvar_function[kind](p))
         # because we are not interpolating the returned value must (should) be in the index...
         assert kind == 'middle' or l in self.density_df.index
         return l
@@ -1091,7 +1136,46 @@ class Portfolio(object):
         """
         return self.q(p)
 
-    def tvar(self, p, kind='interp'):
+    def tvar(self, p, kind=''):
+        """
+        Compute the tail value at risk at threshold p. Revised June 2023.
+
+        Really this function returns ES, CVaR, but in modern terminology
+        this is called TVaR.
+
+        Definition 2.6 (Tail mean and Expected Shortfall)
+        Assume E[X−] < ∞. Then
+        x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
+        is α-tail mean at level α the of X.
+        Acerbi and Tasche (2002)
+
+        McNeil etc. p66-70 - this follows from def of ES as an integral
+        of the quantile function
+
+
+        :param p:
+        :param kind: No longer neeed as the new method is exact (equals the old
+        tail) and about 1000x faster.
+        :return:
+        """
+
+        if kind != '':
+            logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
+                           'Argument kind will be removed in the future.')
+
+        if kind == 'inverse':
+            logger.warning('kind=inverse called...??!!')
+
+        assert self.density_df is not None, 'Must recompute prior to computing tail value at risk.'
+
+        if self._var_tvar_function is None:
+            # revised June 2023
+            ser = self.density_df.query('p_total > 0').p_total
+            self._make_var_tvar(ser)
+
+        return self._var_tvar_function['tvar'](p)
+
+    def tvar_old_0_12_0(self, p, kind='interp'):
         """
         Compute the tail value at risk at threshold p
 
@@ -1475,7 +1559,7 @@ class Portfolio(object):
             logger.warning(f'Nothing has changed since last update at {self.last_update}')
             return
 
-        self._linear_quantile_function = None
+        self._var_tvar_function = None
 
         ft_line_density = {}
         # line_density = {}
@@ -1561,7 +1645,7 @@ class Portfolio(object):
         if trim_df:
             self.trim_df()
         # invalidate stored functions
-        self._linear_quantile_function = None
+        self._var_tvar_function = None
         self.q_temp = None
         self._cdf = None
 
@@ -3844,6 +3928,9 @@ class Portfolio(object):
         asset level to a VaR threshold.
 
         Updated: May 2023
+        Turns out, really awkward to return the dictionary. In most calls there is just one
+        distortion passed in. The result of the last distortion are reported in ans.price, and there
+        is a new price_dict for the price of each distortion. T
 
         :param p: float; if >1 assets if <1 a prob converted to quantile
         :param distortion: a distortion, list or dictionary (name: dist) of distortions. If None then
@@ -3857,7 +3944,7 @@ class Portfolio(object):
         warnings.warn('In 0.13.0 the default allocation will become linear not lifted.', DeprecationWarning)
 
         assert allocation in ('lifted', 'linear'), "allocation must be 'lifted' or 'linear'"
-        PricingResult = namedtuple('PricingResult', ['df', 'price', 'a_reg', 'reg_p'])
+        PricingResult = namedtuple('PricingResult', ['df', 'price', 'price_dict', 'a_reg', 'reg_p'])
 
         if isinstance(distortion, Distortion):
             distortion = {str(distortion): distortion}
@@ -3878,6 +3965,7 @@ class Portfolio(object):
         if allocation == 'lifted':
             dfs = {}
             price = {}
+            last_price = 0
             for k, v in distortion.items():
                 # this code is unchanged from original
                 logger.info(f'Executing for {k}, lifted')
@@ -3900,11 +3988,12 @@ class Portfolio(object):
                 df['LR'] = df.L / df.P
                 df['PQ'] = df.P / df.Q
                 df['ROE'] = df.M / df.Q
-                price[k] = df.loc['total', 'P']
+                price[k] = last_price = df.loc['total', 'P']
                 dfs[k] = df.sort_index()
 
             df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
-            ans = PricingResult(df, price, a_reg, reg_p)
+
+            ans = PricingResult(df, last_price, price, a_reg, reg_p)
 
         elif allocation == 'linear':
             # code mirrors pricing_bounds
@@ -3921,6 +4010,7 @@ class Portfolio(object):
 
             dfs = {}
             price = {}
+            last_price = 0
             for k, v in distortion.items():
                 logger.info(f'Executing for {k}, linear')
                 if view == 'ask':
@@ -3979,12 +4069,12 @@ class Portfolio(object):
                 df['PQ'] = df.P / df.Q
                 df['COC'] = df.M / df.Q
                 df['a'] = df.P + df.Q
-                price[k] = df.loc['total', 'P']
+                price[k] = last_price = df.loc['total', 'P']
                 df = df[['L', 'P', 'M', 'Q', 'a', 'LR', 'PQ', 'COC']]
                 dfs[k] = df
 
             df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
-            ans = PricingResult(df, price, a_reg, reg_p)
+            ans = PricingResult(df, last_price, price, a_reg, reg_p)
 
         return ans
 

@@ -26,7 +26,7 @@ from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
     MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
     make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
     pprint_ex, approximate_work, moms_analytic, picks_work, \
-    integral_by_doubling, logarithmic_theta
+    integral_by_doubling, logarithmic_theta, make_var_tvar
 import aggregate.random as ar
 from .spectral import Distortion
 
@@ -951,8 +951,8 @@ class Aggregate(Frequency):
         self._tail_var2 = None
         self._inverse_tail_var = None
         # self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
-        self._linear_quantile_function = None
-        self._sev_linear_quantile_function = None
+        self._var_tvar_function = None
+        self._sev_var_tvar_function = None
         self._cdf = None
         self._pdf = None
         self._sev = None
@@ -1367,8 +1367,8 @@ class Aggregate(Frequency):
         :return:
         """
         self._density_df = None  # invalidate
-        self._linear_quantile_function = None
-        self._sev_linear_quantile_function = None
+        self._var_tvar_function = None
+        self._sev_var_tvar_function = None
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
@@ -2600,44 +2600,39 @@ class Aggregate(Frequency):
 
     def q(self, p, kind='lower'):
         """
-        Compute quantile, returning element in the index. Exact same code from Portfolio.q.
+        Return quantile function of density_df.p_total.
+
+        Definition 2.1 (Quantiles)
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
+        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
+
+        ``kind=='middle'`` has been removed.
 
         :param p:
-        :param kind: lower, middle reproduces middle_q, upper
+        :param kind: 'lower' or 'upper'.
         :return:
         """
-        if self._linear_quantile_function is None:
-            # revised Dec 2019
-            try:
-                self._linear_quantile_function = {}
-                self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
-                self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
-                self.q_temp.loc[0, 'loss'] = 0
-                self.q_temp = self.q_temp.sort_index()
-                # that q_temp left cts, want right continuous:
-                self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
-                self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
-                self._linear_quantile_function['upper'] = \
-                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
-                                         fill_value='extrapolate')
-                # Jan 2020 see note in Portfolio: changed previous to next
-                self._linear_quantile_function['lower'] = \
-                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
-                                         fill_value='extrapolate')
-                # changed to loss_s
-                self._linear_quantile_function['middle'] = \
-                    interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
-                                         fill_value='extrapolate')
-            except Exception as e:
-                # if fails reset in case this code is within a try .... except block
-                self._linear_quantile_function = None
-                raise e
-        l = float(self._linear_quantile_function[kind](p))
-        # because we are not interpolating the returned value must (should) be in the index...
-        if not (kind == 'middle' or l in self.density_df.index):
-            logger.error(f'Unexpected weirdness in {self.name} quantile...computed {p}th {kind} percentile as {l} '
-                         'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
-        return l
+
+        if kind == 'middle':
+            logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
+            kind = 'lower'
+
+        assert kind in ['lower', 'upper'], 'kind must be lower or upper'
+
+        if self._var_tvar_function is None:
+            # revised June 2023
+            ser = self.density_df.query('p_total > 0').p_total
+            self._var_tvar_function = self._make_var_tvar(ser)
+
+        return self._var_tvar_function[kind](p)
+
+    def _make_var_tvar(self, ser):
+        dict_ans = {}
+        qf = make_var_tvar(ser)
+        dict_ans['upper'] = qf.q_upper
+        dict_ans['lower'] = qf.q_lower
+        dict_ans['tvar'] = qf.tvar
+        return dict_ans
 
     def q_sev(self, p):
         """
@@ -2647,29 +2642,31 @@ class Aggregate(Frequency):
         :param p:
         :return:
         """
-        if self._sev_linear_quantile_function is None:
-            try:
-                self._sev_linear_quantile_function = {}
-                self.q_temp_sev = self.density_df[['loss', 'F_sev']].groupby('F_sev').agg({'loss': np.min})
-                self.q_temp_sev.loc[1, 'loss'] = self.q_temp_sev.loss.iloc[-1]
-                self.q_temp_sev.loc[0, 'loss'] = 0
-                self.q_temp_sev = self.q_temp_sev.sort_index()
-                self._sev_linear_quantile_function = \
-                    interpolate.interp1d(self.q_temp_sev.index, self.q_temp_sev.loss, kind='next', bounds_error=False,
-                                         fill_value='extrapolate')
-            except Exception as e:
-                # if fails reset in case this code is within a try .... except block
-                self._sev_linear_quantile_function = None
-                raise e
-        l = float(self._sev_linear_quantile_function(p))
-        # because we are not interpolating the returned value must (should) be in the index...
-        if l not in self.density_df.index:
-            logger.error(f'Unexpected weirdness in {self.name} severity quantile...computed {p}th percentile as {l} '
-                         'which is not in the index but is expected to be. Make sure bs has nice binary expansion!')
-        return l
 
-    def tvar(self, p, kind='interp'):
+        if self._sev_var_tvar_function is None:
+            # revised June 2023
+            ser = self.density_df.query('p_sev > 0').p_sev
+            self._sev_var_tvar_function = self._make_var_tvar(ser)
+
+        return self._sev_var_tvar_function['lower'](p)
+
+    def tvar_sev(self, p):
         """
+        TVaR of severity - now available for free!
+
+        added June 2023
+        """
+        if self._var_tvar_function is None:
+            ser = self.density_df.query('p_total > 0').p_total
+            self._sev_var_tvar_function = self._make_var_tvar(ser)
+
+        return self._var_tvar_function['tvar'](p)
+
+
+    def tvar(self, p, kind=''):
+        """
+        Updated June 2023, 0.13.0
+
         Compute the tail value at risk at threshold p
 
         Definition 2.6 (Tail mean and Expected Shortfall)
@@ -2695,64 +2692,22 @@ class Aggregate(Frequency):
         :param kind:
         :return:
         """
-        # match Portfolio method
-        assert self.density_df is not None
+        if kind != '':
+            if getattr(self, 'c', None) is None:
+                logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
+                           'Argument kind will be removed in the future.')
+            self.c = 1
+        if kind == 'inverse':
+            logger.warning('kind=inverse called...??!!')
 
-        if kind == 'tail':
-            # original
-            # _var = self.q(p)
-            # ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
-            # pip = (self.density_df.loc[_var, 'F'] - p) * _var
-            # t_var_old = 1 / (1 - p) * (ex + pip)
-            # revised
-            if self._tail_var2 is None:
-                self._tail_var2 = self.density_df[['p_total', 'loss']].product(axis=1).iloc[::-1].cumsum().iloc[::-1]
-            _var = self.q(p)
-            if p >= 1.:
-                return _var
-            ex = self._tail_var2.loc[_var + self.bs]
-            pip = (self.density_df.loc[_var, 'F'] - p) * _var
-            t_var = 1 / (1 - p) * (ex + pip)
-            return t_var
-        elif kind == 'interp':
-            # original implementation interpolated
-            if self._tail_var is None:
-                # make tvar function
-                sup = (self.density_df.p_total[::-1] > 0).idxmax()
-                if sup == self.density_df.index[-1]:
-                    sup = np.inf
-                    _x = self.density_df.F
-                    _y = self.density_df.exgta
-                else:
-                    _x = self.density_df.F.values[:self.density_df.index.get_loc(sup)]
-                    _y = self.density_df.exgta.values[:self.density_df.index.get_loc(sup)]
-                p0 = self.density_df.at[0.0, 'F']
-                if p0 > 0:
-                    ps = np.linspace(0, p0, 200, endpoint=False)
-                    tempx = np.hstack((ps, _x))
-                    tempy = np.hstack((self.est_m / (1 - ps), _y))
-                    self._tail_var = interpolate.interp1d(tempx, tempy,
-                                                          kind='linear', bounds_error=False,
-                                                          fill_value=(self.est_m, sup))
-                else:
-                    self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
-                                                          fill_value=(self.est_m, sup))
-            if isinstance(p, (float, np.float64)):
-                return float(self._tail_var(p))
-            else:
-                return self._tail_var(p)
-        elif kind == 'inverse':
-            if self._inverse_tail_var is None:
-                # make tvar function
-                self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta, self.density_df.F,
-                                                              kind='linear', bounds_error=False,
-                                                              fill_value='extrapolate')
-            if isinstance(p, (int, np.int32, np.int64, float, np.float64)):
-                return float(self._inverse_tail_var(p))
-            else:
-                return self._inverse_tail_var(p)
-        else:
-            raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default) or tail')
+        assert self.density_df is not None, 'Must recompute prior to computing tail value at risk.'
+
+        if self._var_tvar_function is None:
+            # revised June 2023
+            ser = self.density_df.query('p_total > 0').p_total
+            self._var_tvar_function = self._make_var_tvar(ser)
+
+        return self._var_tvar_function['tvar'](p)
 
     def sample(self, n, replace=True):
         """

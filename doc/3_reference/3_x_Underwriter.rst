@@ -13,7 +13,7 @@ Underwriter Class
 
 
 Other Underwriter functions
--------------------------
+-----------------------------
 
 .. automodule:: aggregate.underwriter
    :exclude-members: Underwriter

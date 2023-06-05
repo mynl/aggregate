@@ -26,6 +26,7 @@ from .underwriter import Underwriter, build, debug_build
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random import *
+from .scripts import *
 
 
 import sys
@@ -43,9 +44,9 @@ __author__ = "Stephen J. Mildenhall"
 __copyright__ = "2018-2022, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
-__status__ = "alpha"
+__status__ = "beta"
 # only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 # set up
 from pathlib import Path

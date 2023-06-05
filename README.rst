@@ -82,8 +82,14 @@ Installation
 Version History
 -----------------
 
-0.13.0 (June 2023)
-~~~~~~~~~~~~~~~~~~~~
+0.14.0 (June 4, 2023)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added scripts.py for entry points
+* Updated .readthedocs.yaml to build from toml not requirements.txt
+
+0.13.0 (June 4, 2023)
+~~~~~~~~~~~~~~~~~~~~~~~
 
 * Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
   allow a dictionary of distortions

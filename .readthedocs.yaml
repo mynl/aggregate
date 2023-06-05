@@ -25,5 +25,9 @@ formats:
 
 # Optionally declare the Python requirements required to build your docs
 python:
+   version: "3.10"
    install:
-   - requirements: requirements.txt
+    - method: pip
+      path: .
+      extra_requirements:
+        - pyproject.toml

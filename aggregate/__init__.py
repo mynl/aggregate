@@ -23,7 +23,7 @@ from .spectral import Distortion, approx_ccoc
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
 from .underwriter import Underwriter, build, debug_build
-from .bounds import Bounds, plot_max_min, plot_lee
+from .bounds import Bounds, plot_max_min, plot_lee, BoundsOld
 from .constants import *
 from .random import *
 from .scripts import *

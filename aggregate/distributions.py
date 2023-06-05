@@ -2692,11 +2692,11 @@ class Aggregate(Frequency):
         :param kind:
         :return:
         """
-        if kind != '':
-            if getattr(self, 'c', None) is None:
-                logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
-                           'Argument kind will be removed in the future.')
+        if kind != '' and getattr(self, 'c', None) is None:
+            logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
+                       'Argument kind will be removed in the future.')
             self.c = 1
+
         if kind == 'inverse':
             logger.warning('kind=inverse called...??!!')
 

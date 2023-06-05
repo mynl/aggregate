@@ -1159,9 +1159,10 @@ class Portfolio(object):
         :return:
         """
 
-        if kind != '':
+        if kind != '' and getattr(self, 'tvar-warning', 0) == 0:
             logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
                            'Argument kind will be removed in the future.')
+            setattr(self, 'tvar-warning', 1)
 
         if kind == 'inverse':
             logger.warning('kind=inverse called...??!!')

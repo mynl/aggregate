@@ -30,4 +30,4 @@ python:
       path: .
       extra_requirements:
         - pyproject.toml
-        - all
+        - dev

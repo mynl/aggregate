@@ -82,7 +82,7 @@ Installation
 Version History
 -----------------
 
-0.14.0 (June 4, 2023)
+0.14.1 (June 2023)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 * Added scripts.py for entry points

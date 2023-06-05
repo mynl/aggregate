@@ -46,7 +46,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.14.0"
+__version__ = "0.14.1"
 
 # set up
 from pathlib import Path

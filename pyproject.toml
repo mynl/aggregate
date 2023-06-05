@@ -67,4 +67,4 @@ packages = ["aggregate", "aggregate.extensions"]
 version  = { attr = "aggregate.__version__" }
 
 [project.scripts]
-agg = "great.scripts:my_script"
+agg = "aggregate.scripts:main"

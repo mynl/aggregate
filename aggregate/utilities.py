@@ -3432,7 +3432,7 @@ def make_var_tvar(ser):
     cser = ser.cumsum()
     cser_F_np = cser.to_numpy()
     # detach the index values
-    cser_idx = pd.Index(cser.values)
+    # cser_idx = pd.Index(cser.values)
     tvar_unconditional = ((ser * ser.index)[::-1].cumsum()[::-1]).to_numpy()
 
     # these last three are annoyting because np.where does not short circuit
@@ -3440,7 +3440,7 @@ def make_var_tvar(ser):
     cser_F_np2 = np.hstack((cser_F_np, 1))
     x_np2l = np.hstack((x_np, x_np[-1]))
     x_np2u = np.hstack((x_np, np.inf))
-    x_max = cser_F_np[-2]
+    # x_max = cser_F_np[-2]
 
     # tests show this is about 6 times faster than
     # q = interp1d(cser, ser.index, kind='next', bounds_error=False, fill_value=(ser.index.min(), ser.index.max()))

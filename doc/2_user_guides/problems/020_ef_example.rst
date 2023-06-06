@@ -30,21 +30,15 @@ The last dataframe shows poor accuracy. Try different ways to compute the aggreg
     :okwarning:
 
     from pandas import option_context
-
     df = a.density_df[['p_total']].rename(columns={'p_total': 'Pad 0, tilt 0'})
-
     a.update(bs=1/8, log2=8, padding=1, normalize=False)
     df['Pad 1, tilt 0'] = a.density_df.p_total
-
     a.update(bs=1/8, log2=8, padding=2, normalize=False)
     df['Pad 2, tilt 0'] = a.density_df.p_total
-
     a.update(bs=1/8, log2=8, padding=0, tilt_vector=0.01, normalize=False)
     df['Pad 0, tilt 0.01'] = a.density_df.p_total
-
     a.update(bs=1/32, log2=16, padding=1, normalize=False)
     bit = a.density_df[['p_total']].rename(columns={'p_total': 'log2 16, pad 1, tilt 0'})
-
     qd(a)
 
 The last dataframe shows a good approximation.
@@ -61,7 +55,6 @@ The next figure (compare Figure 1 in the paper, shown below) shows that padding,
     ax0.legend(loc='upper left')
     @savefig ef_1.png scale=20
     ax1.legend(loc='lower right');
-
 
 .. image:: img/ef_fig1.png
   :width: 800

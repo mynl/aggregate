@@ -133,6 +133,6 @@ The next two examples illustrate the different behavior.
               'wts [.8 .2] '
               'mixed gamma 0.4 ')
    qd(a14)
-      qd(a14.report_df.loc[['limit', 'attachment', 'freq_m',
+   qd(a14.report_df.loc[['limit', 'attachment', 'freq_m',
       'agg_m', 'agg_cv']].T.iloc[:-4])
 

@@ -19,6 +19,7 @@ classifiers = [
     "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Topic :: Education",
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Mathematics",
@@ -66,5 +67,3 @@ packages = ["aggregate", "aggregate.extensions"]
 [tool.setuptools.dynamic]
 version  = { attr = "aggregate.__version__" }
 
-[project.scripts]
-agg = "aggregate.scripts:main"

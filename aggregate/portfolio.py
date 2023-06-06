@@ -18,6 +18,7 @@ import re
 import scipy.stats as ss
 from scipy import interpolate
 from scipy.interpolate import interp1d
+from scipy.optimize import bisect
 from scipy.spatial import ConvexHull
 from textwrap import fill
 import warnings
@@ -1261,24 +1262,30 @@ class Portfolio(object):
 
     def tvar_threshold(self, p, kind):
         """
-        Find the value pt such that TVaR(pt) = VaR(p) using numerical Newton Raphson
+        Find the value pt such that TVaR(pt) = VaR(p) using Bisection method.
+        Will fail if p=0 because signs are the same.
         """
+        # target value
         a = self.q(p, kind)
+
+        if p == 0:
+            # mean is mean
+            return 0
 
         def f(p):
             return self.tvar(p) - a
-
-        loop = 0
-        p1 = 1 - 2 * (1 - p)
-        fp1 = f(p1)
-        delta = 1e-5
-        while abs(fp1) > 1e-6 and loop < 10:
-            df1 = (f(p1 + delta) - fp1) / delta
-            p1 = p1 - fp1 / df1
-            fp1 = f(p1)
-            loop += 1
-        if loop == 10:
-            raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}')
+        p1 = bisect(f, 0, 1)
+        # loop = 0
+        # p1 = max(.1, 1 - 2 * (1 - p))
+        # fp1 = f(p1)
+        # delta = 1e-5
+        # while abs(fp1) > 1e-6 and loop < 20:
+        #     df1 = (f(p1 + delta / 2) - f(p1 - delta / 2)) / delta
+        #     p1 = p1 - fp1 / df1
+        #     fp1 = f(p1)
+        #     loop += 1
+        # if loop == 20:
+        #     raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}; last guess {p1}')
         return p1
 
     def equal_risk_var_tvar(self, p_v, p_t):

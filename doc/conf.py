@@ -24,7 +24,7 @@ author = agg.__author__
 
 # generally want True, so warning to be an error
 # helpful in debugging to set equal to False
-ipython_warning_is_error = False  # CHANGE BACK!
+ipython_warning_is_error = True  # CHANGE BACK!
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -73,6 +73,18 @@ master_doc = 'index'
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
+
+# GPT suggestions for the reference problem
+autonumbering_enabled = True
+
+# warnings_filters = {
+#     'suppress': [
+#         'ref.ref_has_no_links',
+#         'ref.term_not_defined',
+#         'autosectionlabel.label_from_unnamed_label',
+#     ]
+# }
+
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True

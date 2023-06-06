@@ -23,13 +23,13 @@ from .spectral import Distortion, approx_ccoc
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
 from .underwriter import Underwriter, build, debug_build
-from .bounds import Bounds, plot_max_min, plot_lee, BoundsOld
+from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random import *
-from .scripts import *
 
 
 import sys
+
 
 # knobble warnings
 # https://docs.python.org/3/library/warnings.html#temporarily-suppressing-warnings
@@ -46,7 +46,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.14.1"
+__version__ = "0.14.2"
 
 # set up
 from pathlib import Path
@@ -61,13 +61,15 @@ for p in ['cases', 'parser', 'temp', 'generated']:
 del p, base_dir
 
 
-# imports
-
 # as a default turn off all logging
 logger_level(30)
 knobble_fonts()
 
 # module level doc-string
 __doc__ = """
-:mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity. It makes working with an aggregate (compound) probability distribution as easy as the lognormal, delivering the speed and accuracy of parametric distributions to situations that usually require simulation. :mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
+:mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that 
+reflect underlying frequency and severity. It makes working with an aggregate (compound) probability 
+distribution as easy as the lognormal, delivering the speed and accuracy of parametric distributions 
+to situations that usually require simulation. :mod:`aggregate` includes an expressive language called 
+DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
 """

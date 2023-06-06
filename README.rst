@@ -87,6 +87,9 @@ Version History
 
 * Added scripts.py for entry points
 * Updated .readthedocs.yaml to build from toml not requirements.txt
+* Fixes to documentation
+* ``Portfolio.tvar_threshold`` updated to use ``scipy.optimize.bisect``
+
 
 0.13.0 (June 4, 2023)
 ~~~~~~~~~~~~~~~~~~~~~~~

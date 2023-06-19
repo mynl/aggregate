@@ -88,8 +88,8 @@ Version History
 * Added pygments lexer for decl (called agg, agregate, dec, or decl)
 * Added to the documentation
 
-0.14.1 (June 2023)
-~~~~~~~~~~~~~~~~~~~~~~~
+0.14.1
+~~~~~~~
 
 * Added scripts.py for entry points
 * Updated .readthedocs.yaml to build from toml not requirements.txt

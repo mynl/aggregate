@@ -41,7 +41,7 @@ if not sys.warnoptions:
 __docformat__ = 'restructuredtext'
 __project__ = 'aggregate'
 __author__ = "Stephen J. Mildenhall"
-__copyright__ = "2018-2022, Convex Risk LLC"
+__copyright__ = "2018-2023, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"

@@ -1541,7 +1541,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                     for i in range(3):
                         pu = (1 + pu) / 2
                         tvarb = bounds.tvar_with_bound(pu, a)
-                        tvar = bounds.tvar_function(pu)
+                        tvar = bounds.tvar_unlimited_function(pu)
                         q = port.q(pu)
                         df.loc[pu, :] = [tvar, tvarb, q]
                     df = df.sort_index()
@@ -1592,7 +1592,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             port = self.ports['gross']
             premium, a = self.pricing_summary.loc[['P', 'a'], 'gross']
             p_star = bounds.p_star('total', premium, a)
-            bounds.cloud_view(axs.flatten(), 0, alpha=1, pricing=True,
+            bounds.cloud_view(axs=axs, n_resamples=0, alpha=1, pricing=True,
                               title=f'Premium={premium:,.1f}, p={self.reg_p:.1g}\na={a:,.0f}, p*={p_star:.3f}',
                               distortions=[{k: port.dists[k] for k in ['ccoc', 'tvar']},
                                            {k: port.dists[k] for k in ['ph', 'wang', 'dual']}])

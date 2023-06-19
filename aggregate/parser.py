@@ -993,7 +993,7 @@ def grammar(add_to_doc=False, save_to_fn=''):
     :param save_to_fn: save the grammar to a file
     """
 
-    pout = Path(__file__).parent / '../doc/4_agg_language_reference/ref_include.rst'
+    pout = Path(__file__).parent / '../docs/4_agg_language_reference/ref_include.rst'
 
     # get the grammar from the top of the file
     txt = Path(__file__).read_text(encoding='utf-8')

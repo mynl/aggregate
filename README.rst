@@ -82,8 +82,28 @@ Installation
 Version History
 -----------------
 
-0.13.0 (June 2023)
-~~~~~~~~~~~~~~~~~~~~
+0.15.0
+~~~~~~~~~
+
+* Added pygments lexer for decl (called agg, agregate, dec, or decl)
+* Added to the documentation
+
+0.14.1 (June 2023)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added scripts.py for entry points
+* Updated .readthedocs.yaml to build from toml not requirements.txt
+* Fixes to documentation
+* ``Portfolio.tvar_threshold`` updated to use ``scipy.optimize.bisect``
+* Added ``kaplan_meier`` to ``utilities`` to compute product limit estimator survival
+  function from censored data. This applies to a loss listing with open (censored)
+  and closed claims.
+* doc to docs []
+* Enhanced ``make_var_tvar`` for cases where all probabilities are equal, using linspace rather
+  than cumsum.
+
+0.13.0 (June 4, 2023)
+~~~~~~~~~~~~~~~~~~~~~~~
 
 * Updated ``Portfolio.price`` to implement ``allocation='linear'`` and
   allow a dictionary of distortions

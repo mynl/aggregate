@@ -3429,10 +3429,16 @@ def make_var_tvar(ser):
 
     # create needed arrays
     x_np = np.array(ser.index)
-    cser = ser.cumsum()
+    # better not to cumulate array when all elements are equal (because of
+    # floating point issues). This does make some difference. 
+    if np.all(np.isclose(ser, ser.iloc[0], atol=2**-53)):
+        d = 1 / len(ser)
+        cser = pd.Series(np.linspace(d, 1, len(ser)), index=ser.index)
+    else:
+        cser = ser.cumsum()
     cser_F_np = cser.to_numpy()
     # detach the index values
-    cser_idx = pd.Index(cser.values)
+    # cser_idx = pd.Index(cser.values)
     tvar_unconditional = ((ser * ser.index)[::-1].cumsum()[::-1]).to_numpy()
 
     # these last three are annoyting because np.where does not short circuit
@@ -3440,7 +3446,7 @@ def make_var_tvar(ser):
     cser_F_np2 = np.hstack((cser_F_np, 1))
     x_np2l = np.hstack((x_np, x_np[-1]))
     x_np2u = np.hstack((x_np, np.inf))
-    x_max = cser_F_np[-2]
+    # x_max = cser_F_np[-2]
 
     # tests show this is about 6 times faster than
     # q = interp1d(cser, ser.index, kind='next', bounds_error=False, fill_value=(ser.index.min(), ser.index.max()))
@@ -3553,3 +3559,61 @@ def test_var_tvar(program, bs=0, n_ps=1025, normalize=False, speed_test=False, l
     ax.legend()
     ax.set(title=program)
 
+
+def kaplan_meier(df, loss='loss', closed='closed'):
+    """
+    Compute Kaplan Meier Product limit estimator based on a sample
+    of losses in the dataframe df. For each loss you know the current
+    evaluation in column ``loss`` and a 0/1 indicator for open/closed
+    in ``closed``.
+
+    The output dataframe has columns
+
+    * index x_i, size of loss
+    * open - the number of open events of size x_i (open claim with this size)
+    * closed - the number closed at size x_i
+    * events - total number of events of size x_i
+    * n - number at risk at x_i
+    * s - probability of suriviving past x_i = 1 - closed / n
+    * pl - cumulative probability of surviving past x_i
+
+    See ipython workbook kaplan_meier.ipynb for a check against lifelines
+    and some kaggle data (telco customer churn,
+    https://www.kaggle.com/datasets/blastchar/telco-customer-churn?resource=download
+    https://towardsdatascience.com/introduction-to-survival-analysis-the-kaplan-meier-estimator-94ec5812a97a
+
+    :param df: dataframe of data
+    :param loss: column containing loss amount data
+    :param closed: column indicating if the obervation is a closed claim (1) or open (0)
+    :return: dataframe as described above
+    """
+
+    df = df[[loss, closed]].rename(columns={loss: 'loss', closed: 'closed'}).copy()
+    df['open'] = 1 - df.closed
+    df = df.sort_values(['loss', 'closed'], ascending=[False, True]).reset_index(drop=True)
+
+    df = df.groupby(['loss', 'closed']).count()
+    # c has index loss amount and closed indicator, and column number of observations
+    c = df.unstack(1)
+    # total number of observables at each loss event size
+    c['t'] = c.sum(1)
+    # total number at risk at each event size
+    c['n'] = c.t[::-1].cumsum()
+    # better column names
+    c.columns = ['open', 'closed', 'events', 'n']
+    #
+    c = c.fillna(0)
+    # prob of surviving past each observed event size
+    c['s'] = 1 -  c.closed / c.n
+    # KM product estimator
+    c['pl'] = c.s.cumprod()
+    return c
+
+
+def kaplan_meier_np(loss, closed):
+    """
+    Feeder to kaplan_meier where loss is np array  of loss amounts and
+    closed a same sized array of 0=open, 1=closed indicators.
+    """
+    df = pd.DataFrame({'loss': loss, 'closed': closed})
+    return kaplan_meier(df)

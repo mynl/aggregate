@@ -1,3 +1,4 @@
+from itertools import cycle
 import logging
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -41,15 +42,15 @@ class Bounds(object):
         # although passed as input to certain functions (tvar with bounds) b is actually fixed
         self.b = 0
         self.Fb = 0
-        self.tvar_function = None
+        # change in 0.14.0 with new tvar methodology, got rid of confusingly named tvar_function.
+        # TVaR for X
+        self.tvar_unlimited_function = None
+        # Series of tvar values
         self.tvars = None
         self.tps = None
         self.weight_df = None
         self.idx = None
         self.hinges = None
-        # in cases where we hold the tvar function here
-        self._tail_var = None
-        self._inverse_tail_var = None
         self.cloud_df = None
         # uniform mode
         self._t_mode = 'u'
@@ -58,18 +59,16 @@ class Bounds(object):
         self._tvar_df = None
         # hack for beta distribution, you want to force 1 to be in tvar ps, but Fp = 1
         # TODO figure out why p_star grinds to a halt if you input b < inf
-        self.add_one = False
+        self.add_one = True
+        logger.info('Deprecatation warning. The kind argument is now ignored. Functionality '
+                       'is equivalent to kind="tail", which was the most accurate method.')
 
     def __repr__(self):
         """
         Gets called automatically but so we can tweak.
-
         :return:
         """
-        return 'My Bounds Object at ' + super(Bounds, self).__repr__()
-
-    def __str__(self):
-        return 'Hello' + super(Bounds, self).__repr__()
+        return 'Bounds Object at ' + super(Bounds, self).__repr__()
 
     @property
     def tvar_df(self):
@@ -89,98 +88,83 @@ class Bounds(object):
 
     def make_tvar_function(self, line, b=np.inf):
         """
-        make the tvar function from a Series p_total indexed by loss
-        Includes determining sup and putting in value for zero
-        If sup is largest value in index, sup set to inf
+        Change in 0.14.0 with new tvar methodology, this function reflects the b limit, it is the
+        TVaR of min(X, b)
 
-        also sets self.Fb
+        Make unlimited TVaR function for line, ``self.tvar_unlimited_function``, and set self.Fb.
 
-        Applies to min(Line, b)
+        - Portfolio or Aggregate: get from object
+        - DataFrame: make from p_{line} column
+        - Series: make from Series
 
-        :param line:
+        In the last two cases, uses aggregate.utilties.make_var_tvar_function.
+
+        Includes determining sup and putting in value for zero.
+        If sup is largest value in index, sup set to inf.
+
+        You generally want to apply with a limit, call ``self.tvar_with_bounds``.
+
+        :param line: only used for portfolio objects, to specify line (or 'total')
         :param b:  bound on the losses, e.g., to model limited liability insurer
         :return:
         """
+
         self.b = b
+        p_total = None
+
+        # Note Fb calc varies by type
         if isinstance(self.distribution_spec, Portfolio):
             assert line in self.distribution_spec.line_names_ex
             if line == 'total':
-                self.tvar_function = self.distribution_spec.tvar
+                self.tvar_unlimited_function = self.distribution_spec.tvar
                 self.Fb = self.distribution_spec.cdf(b)
             else:
                 ag = getattr(self.distribution_spec, line)
-                self.tvar_function = ag.tvar
+                self.tvar_unlimited_function = ag.tvar
                 self.Fb = ag.cdf(b)
             if np.isinf(b):
                 self.Fb = 1.0
-            return
 
         elif isinstance(self.distribution_spec, Aggregate):
-            self.tvar_function = self.distribution_spec.tvar
+            self.tvar_unlimited_function = self.distribution_spec.tvar
             self.Fb = self.distribution_spec.cdf(b)
             if np.isinf(b):
                 self.Fb = 1.0
-            return
 
-        elif isinstance(self.distribution_spec, pd.DataFrame):
-            assert f'p_{line}' in self.distribution_spec.columns
-            # given a port.density_df
-            p_total = self.distribution_spec[f'p_{line}']
-
-        elif isinstance(self.distribution_spec, pd.Series):
-            logger.info('tvar_array using Series')
-            p_total = self.distribution_spec
-
-        # need to create tvar function on the fly, using same method as Portfolio and Aggregate:
-        bs = p_total.index[1]
-        F = p_total.cumsum()
-        if np.isinf(b):
-            self.Fb = 0
         else:
-            self.Fb = F[b]
+            # next two instances fall through
+            if isinstance(self.distribution_spec, pd.DataFrame):
+                assert f'p_{line}' in self.distribution_spec.columns
+                # given a port.density_df
+                p_total = self.distribution_spec[f'p_{line}']
 
-        S = p_total.shift(-1, fill_value=min(p_total.iloc[-1], max(
-            0, 1. - (p_total.sum()))))[::-1].cumsum()[::-1]
-        lev = S.shift(1, fill_value=0).cumsum() * bs
-        ex1 = lev.iloc[-1]
-        ex = np.sum(p_total * p_total.index)
-        logger.info(
-            f'Computed mean loss for {line} = {ex:,.15f} (diff {ex - ex1:,.15f}) max F = {max(F)}')
-        exgta = (ex - lev) / S + S.index
-        sup = (p_total[::-1] > 0).idxmax()
-        if sup == p_total.index[-1]:
-            sup = np.inf
-        exgta[S == 0] = sup
-        logger.info(
-            f'sup={sup}, max = {(p_total[::-1] > 0).idxmax()} "inf" = {p_total.index[-1]}')
+            elif isinstance(self.distribution_spec, pd.Series):
+                logger.info('tvar_array using Series')
+                p_total = self.distribution_spec
 
-        def _tvar(p, kind='interp'):
-            """
-            UNLIMITED tvar function!
-            :param p:
-            :param kind:
-            :return:
-            """
-            if kind == 'interp':
-                # original implementation interpolated
-                if self._tail_var is None:
-                    # make tvar function
-                    self._tail_var = interp1d(F, exgta, kind='linear', bounds_error=False,
-                                              fill_value=(0, sup))
-                return self._tail_var(p)
-            elif kind == 'inverse':
-                if self._inverse_tail_var is None:
-                    # make tvar function
-                    self._inverse_tail_var = interp1d(exgta, F, kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
-                return self._inverse_tail_var(p)
+            # if here, then p_total is a series, index = loss, values = p_total pmf
+            from .utilities import make_var_tvar
+            # ensure p_total suitable for make_var_tvar
+            assert p_total.index.is_unique, 'Index must be unique'
+            assert p_total.index.is_monotonic_increasing, 'Index must be monotone increasing'
+            # subset to p_total > 0
+            p_total = p_total[p_total > 0]
+            # now can call make_var_tvar and extract the tvar function
+            self.tvar_unlimited_function = make_var_tvar(p_total).tvar
 
-        self.tvar_function = _tvar
+            # set F(b)
+            if np.isinf(b):
+                self.Fb = 0
+            else:
+                F = p_total.cumsum()
+                self.Fb = F[b]
 
     def make_ps(self, n, mode):
         """
-        Mode are you making s points (always uniform) or tvar p points (use t_mode)?
-        self.t_mode == 'u': make uniform s points against which to evaluate g from 0 to 1 inclusive with more around 0
+        If add_one then you want n = 2**m + 1 to ensure nicely spaced points.
+
+        Mode: making s points (always uniform) or tvar p points (use t_mode).
+        self.t_mode == 'u': make uniform s points against which to evaluate g from 0 to 1
         self.t_mode == 'gl': make Gauss-Legndre p points at which TVaRs are evaluated from 0 inclusive to 1 exclusive with more around 1
 
         :param n:
@@ -199,55 +183,39 @@ class Bounds(object):
             if mode == 's':
                 x, wts = lg(n - 2)
                 ps = np.hstack((0, (x + 1) / 2, 1))
-
             elif mode == 't':
                 x, wts = lg(n * 2 + 1)
                 ps = x[n:]
+
         elif self.t_mode == 'u':
             if mode == 's':
                 ps = np.linspace(1 / n, 1, n)
             elif mode == 't':
                 # exclude 1 (sup distortion) at the end; 0=mean
                 ps = np.linspace(0, 1, n, endpoint=False)
+
         # always ensure that 1  is in ps for t mode when b < inf if Fb < 1
         if mode == 't' and (self.Fb < 1 or self.add_one):
             ps = np.hstack((ps, 1))
+
         return ps
 
-    def tvar_array(self, line, n_tps=256, b=np.inf, kind='interp'):
+    def tvar_array(self, line, n_tps=257, b=np.inf, kind='interp'):
         """
         Compute tvars at n equally spaced points, tps.
 
 
         :param line:
-        :param n_tps:  number of tvar p points, default 256
+        :param n_tps:  number of tvar p points, default 257 (assuming add-one mode)
         :param b: cap on losses applied before computing TVaRs (e.g., adjust losses for finite assets b).
                Use np.inf for unlimited losses.
-        :param kind: if interp  uses the standard function, easy, for continuous distributions; if 'tail' uses
-               explicit integration of tail values, for discrete distributions
+        :param kind: now ignored.
         :return:
         """
-        assert kind in ('interp', 'tail')
         self.make_tvar_function(line, b)
-
         logger.info(f'F(b) = {self.Fb:.5f}')
-        # tvar p values should linclude 0 (the mean) but EXCLUDE 1
-        # self.tps = np.linspace(0.5 / n_tps, 1 - 0.5 / n_tps, n_tps)
         self.tps = self.make_ps(n_tps, 't')
-
-        if kind == 'interp':
-            self.tvars = self.tvar_function(self.tps)
-            if not np.isinf(b):
-                # subtract S(a)(TVaR(F(a)) - a)
-                # do all at once here - do not call self.tvar_with_bounds function
-                self.tvars = np.where(self.tps <= self.Fb,
-                                      self.tvars -
-                                      (1 - self.Fb) * (self.tvar_function(self.Fb) -
-                                                       b) / (1 - self.tps),
-                                      b)
-        elif kind == 'tail':
-            self.tvars = np.array(
-                [self.tvar_with_bound(i, b, kind) for i in self.tps])
+        self.tvars = self.tvar_with_bound(self.tps, b)
 
     def p_star(self, line, premium, b=np.inf, kind='interp'):
         """
@@ -267,110 +235,68 @@ class Bounds(object):
         :param line:
         :param premium: target premium
         :param b:  bound
+        :param kind: now ignored
         :return:
         """
-        assert kind in ('interp', 'tail')
         if premium > b:
             raise ValueError(
                 f'p_star must have premium ({premium}) <= largest loss bound ({b})')
 
-        if kind == 'interp':
+        self.make_tvar_function(line, b)
 
-            self.make_tvar_function(line, b)
+        if premium < self.tvar_unlimited_function(0):
+            raise ValueError(
+                f'p_star must have premium ({premium}) >= mean ({self.tvar_unlimited_function(0)})')
 
-            if np.isinf(b):
-                p_star = self.tvar_function(premium, 'inverse')
+        def f(p):
+            return self.tvar_with_bound(p, b, 'tail') - premium
+
+        fp = 100
+        p = 0.5
+        iters = 0
+        delta = 1e-10
+        while abs(fp) > 1e-6 and iters < 20:
+            fp = f(p)
+            fpp = (f(p + delta) - f(p)) / delta
+            pnew = p - fp / fpp
+            if 0 <= pnew <= 1:
+                p = pnew
+            elif pnew < 0:
+                p = p / 2
             else:
-                # nr, remember F(a) is self.Fa set by make_tvar_function
-                k = (1 - self.Fb) * (self.tvar_function(self.Fb) - b)
+                #  pnew > 1:
+                p = (1 + p) / 2
 
-                def f(p):
-                    return self.tvar_function(p) - k / (1 - p) - premium
-
-                # should really compute f' numerically, but...
-                fp = 100
-                p = 0.5
-                iters = 0
-                delta = 1e-10
-                while abs(fp) > 1e-6 and iters < 20:
-                    fp = f(p)
-                    fpp = (f(p + delta) - f(p)) / delta
-                    pnew = p - fp / fpp
-                    if 0 <= pnew <= 1:
-                        p = pnew
-                    elif pnew < 0:
-                        p = p / 2
-                    else:
-                        #  pnew > 1:
-                        p = (1 + p) / 2
-
-                if iters == 20:
-                    logger.warning(
-                        f'Questionable convergence solving for p_star, last error {fp}.')
-                p_star = p
-
-        elif kind == 'tail':
-            def f(p):
-                return self.tvar_with_bound(p, b, 'tail') - premium
-
-            fp = 100
-            p = 0.5
-            iters = 0
-            delta = 1e-10
-            while abs(fp) > 1e-6 and iters < 20:
-                fp = f(p)
-                fpp = (f(p + delta) - f(p)) / delta
-                pnew = p - fp / fpp
-                if 0 <= pnew <= 1:
-                    p = pnew
-                elif pnew < 0:
-                    p = p / 2
-                else:
-                    #  pnew > 1:
-                    p = (1 + p) / 2
-
-            if iters == 20:
-                logger.warning(
-                    f'Questionable convergence solving for p_star, last error {fp}.')
-            p_star = p
-
+        if iters == 20:
+            logger.warning(
+                f'Questionable convergence solving for p_star, last error {fp}.')
+        p_star = p
         return p_star
 
     def tvar_with_bound(self, p, b=np.inf, kind='interp'):
         """
         Compute tvar taking bound into account.
-        Assumes tvar_function setup.
+        Assumes tvar_unfunction setup.
 
         Warning: b must equal the b used when calibrated. The issue is computing F
-        varies with the type of underlying portfolio. This is fragile.
+        which varies with the type of underlying portfolio. This is fragile.
         Added storing b and checking equal. For backwards comp. need to keep b argument
 
         :param p:
         :param b:
+        :param kind: now ignored
         :return:
         """
-        if self.tvar_function is None:
-            logger.critical('tvar_function is None, must call make_tvar_function first')
+        assert self.tvar_unlimited_function is not None, 'tvar_unlimited_function is None, must call make_tvar_function first'
         assert b == self.b, f'b ({b}) must equal b used when calibrated, self.b ({self.b})'
 
-        if kind == 'interp':
-            tvar = self.tvar_function(p)
-            if not np.isinf(b):
-                if p < self.Fb:
-                    tvar = tvar - (1 - self.Fb) * \
-                        (self.tvar_function(self.Fb) - b) / (1 - p)
-                else:
-                    tvar = b
-        elif kind == 'tail':
-            # use the tail method for discrete distributions
-            tvar = self.distribution_spec.tvar(p, 'tail')
-            if not np.isinf(b):
-                if p < self.Fb:
-                    tvar = tvar - \
-                        (1 - self.Fb) * \
-                        (self.distribution_spec.tvar(self.Fb, 'tail') - b) / (1 - p)
-                else:
-                    tvar = b
+        tvar = self.tvar_unlimited_function(p)
+        if b == np.inf:
+            # no adjustment needed for unlimited losses
+            return tvar
+        tvar = np.where(p < self.Fb,
+                        tvar - (1 - self.Fb) * (self.tvar_unlimited_function(self.Fb) - b) / (1 - p),
+                        b)
         return tvar
 
     def compute_weight(self, premium, p0, p1, b=np.inf, kind='interp'):
@@ -385,7 +311,7 @@ class Bounds(object):
         """
 
         assert p0 < p1
-        assert self.tvar_function is not None
+        assert self.tvar_unlimited_function is not None
 
         lhs = self.tvar_with_bound(p0, b, kind)
         rhs = self.tvar_with_bound(p1, b, kind)
@@ -507,18 +433,14 @@ class Bounds(object):
     def cloud_view(self, *, axs=None, n_resamples=0, scale='linear', alpha=0.05, pricing=True, distortions='ordered',
                    title='', lim=(-0.025, 1.025), check=False, add_average=True):
         """
-        visualize the cloud with n_resamples
-
-        after you have recomputed...
-
-        if there are distortions plot on second axis
+        Visualize the distortion cloud with n_resamples. Execute after computing weights.
 
         :param axs:
         :param n_resamples: if random sample
         :param scale: linear or return
         :param alpha: opacity
         :param pricing: restrict to p_max = 0, ensuring g(s)<1 when s<1
-        :param distortions:
+        :param distortions: 'ordered' shows the usual calibrated distortions, else list of dicts name:distortion.
         :param title: optional title (applied to all plots)
         :param lim: axis limits
         :param check:   construct and plot Distortions to check working ; reduces n_resamples to 5
@@ -526,9 +448,14 @@ class Bounds(object):
         """
         assert scale in ['linear', 'return']
         if axs is None:
-            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W), constrained_layout=True)
+            # include squeeze to make consistent with %%sf cell magic
+            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W), constrained_layout=True, squeeze=False)
+            axs = axs[0]
         else:
-            fig = axs.flat[0].get_figure()
+            if axs.ndim == 2:
+                axs = axs[0]
+            fig = axs[0].get_figure()
+
         assert not distortions or (len(axs.flat) > 1)
 
         if distortions == 'ordered':
@@ -605,12 +532,11 @@ class Bounds(object):
                     'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
                 lss = list(mpl.lines.lineStyles.keys())
                 for ax, dist_dict in zip(axs[1:], distortions):
-                    ii = 1
+                    lssi = iter(cycle(lss))
                     for k, d in dist_dict.items():
                         gs = d.g(s)
                         k = name_mapper.get(k, k)
-                        ax.plot(s, gs, lw=1, ls=lss[ii], label=k)
-                        ii += 1
+                        ax.plot(s, gs, lw=1, ls=next(lssi), label=k)
                     plot_max_min(ax)
                     ax.plot([0, 1], [0, 1], c='k', lw=.25,
                             ls='-', label='_nolegend_')

@@ -7,9 +7,9 @@ __pycache__/
 venv-agg/
 
 # Sphinx documentation
-doc/_build
-doc/dm/temp
-doc/savefig
+docs/_build
+docs/dm/temp
+docs/savefig
 # doc/_templates
 # doc/_theme
 

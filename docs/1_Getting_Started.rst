@@ -31,11 +31,9 @@ BSD 3.
 Dependencies
 =============
 
-See requirements.txt. The top block is required for installation. The bottom block is required to build the
-documentation. Apart from ``sly``, they are all standard.
+See pyproject.toml. Requirements are split between those needed to run the project, and a larger set needed to build the documentation.
 
-.. literalinclude:: ../requirements.txt
-
+Apart from ``sly`` and ``titlecase``, all run-dependencies are standard.
 
 Help Parameters and Examples
 ================================

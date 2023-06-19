@@ -230,9 +230,10 @@ objects for each. The Bodoff portfolios are part of the base library and can be 
    ports = OrderedDict()
    for s in bodoff:
        port = build(s)
+       port.name = port.name.replace('L.', '')
        ports[port.name] = port
    for port in ports.values():
-       if port.name != 'Bodoff:4':
+       if port.name != 'Bodoff4':
            port.update(bs=1, log2=8, remove_fuzz=True, padding=1)
        else:
            port.update(bs=1/8, log2=16, remove_fuzz=True, padding=2)
@@ -272,7 +273,7 @@ the probability mass at 100. A ``co ES`` allocation would re-scale the
 .. ipython:: python
    :okwarning:
 
-   port = ports['Bodoff:1']
+   port = ports['Bodoff1']
    reg_p = 0.99
    a = port.q(reg_p, 'lower')
    print(f'VaR assets = {a}')
@@ -309,7 +310,7 @@ around the loss points, :math:`96\le x \le 103`.
    ax0.set(ylim=(-0.025, .25), xlim=(-.5, 210), xlabel='Loss', ylabel='Survival function');
    ax1.set(ylim=(-0.025, .3), xlim=[96,103], xlabel='Loss (zoom)', ylabel='Survival function');
    for ax in axs.flat[2:]:
-       df.query('(S>0) and loss<=210').filter(regex='exi_xgta_X').plot(drawstyle="steps-post", lw=1, ax=ax)
+       df.query('(S>0) and loss<=210').filter(regex='exi_xgta_[wq]').plot(drawstyle="steps-post", lw=1, ax=ax)
        ax.lines[1].set(lw=2, alpha=.5)
        ax.grid(lw=.25)
        ax.legend(loc='upper right')
@@ -327,7 +328,7 @@ Bodoff Example 1.
    :okwarning:
 
    fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.45), constrained_layout=True)
-   ps =np.linspace(0, 1, 101)
+   ps = np.linspace(0, 1, 101)
    tp = port.tvar(ps)
    ax.plot(ps, tp, lw=1, label='ES');
    ax.plot(df.F, port.density_df.exgta_total, lw=1, label='TVaR', drawstyle='steps-post');
@@ -350,9 +351,9 @@ same issues in Examples 2 and 3 as it does in Example 1.
 .. ipython:: python
    :okwarning:
 
-   basic1 = bodoff_exhibit(ports['Bodoff:1'], reg_p)
-   basic2 = bodoff_exhibit(ports['Bodoff:2'], reg_p)
-   basic3 = bodoff_exhibit(ports['Bodoff:3'], reg_p)
+   basic1 = bodoff_exhibit(ports['Bodoff1'], reg_p)
+   basic2 = bodoff_exhibit(ports['Bodoff2'], reg_p)
+   basic3 = bodoff_exhibit(ports['Bodoff3'], reg_p)
    basic_all = pd.concat((basic1, basic2, basic3), axis=1,
       keys=[f'Ex {i}' for i in range(1,4)])
    qd(basic_all, col_space=7)
@@ -373,7 +374,7 @@ to work with for both simulation methods and FFT methods.
 .. ipython:: python
    :okwarning:
 
-   p4 = ports['Bodoff:4']
+   p4 = ports['Bodoff4']
    df91 = pd.DataFrame(columns=list('abc'), dtype=float)
    tv = p4.var_dict(.99, 'tvar')
    df91.loc['sa TVaR 0.99'] = np.array(list(tv.values())[:-1]) / sum(list(tv.values())[:-1])
@@ -413,7 +414,7 @@ Set up the target return, premium, and regulatory capital threshold (99% VaR):
    reg_p = 0.99
    v = 1 / (1 + roe)
    d = 1 - v
-   port = ports['Bodoff:4']
+   port = ports['Bodoff4']
    a = port.q(reg_p)
    el = port.density_df.at[a, 'lev_total']
    premium = v * el + d * a
@@ -513,11 +514,9 @@ The last row gives the percentile layer capital.
 .. ipython:: python
    :okwarning:
 
-   cas15 = build('''
-   port CASq15 
-       agg X1 1 claim dsev [0,  5] [0.85, 0.15] fixed
-       agg X2 1 claim dsev [0, 15] [0.99, 0.01] fixed
-   ''')
+   cas15 = build('port CASq15 '
+        'agg X1 1 claim dsev [0,  5] [0.85, 0.15] fixed '
+        'agg X2 1 claim dsev [0, 15] [0.99, 0.01] fixed ')
    qd(cas15)
    # cas15.update(bs=1, log2=8, remove_fuzz=True, padding=1)
    cas15.density_df = cas15.density_df.apply(lambda x: np.round(x, 10))

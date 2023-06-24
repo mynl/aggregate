@@ -14,6 +14,9 @@ import matplotlib.ticker as ticker
 from numbers import Number
 import numpy as np
 import pandas as pd
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
 import re
 import scipy.stats as ss
 import scipy.fft as sft
@@ -104,10 +107,13 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
         ans.append(clean)
     ans = '\n'.join(ans)
     if html is True:
-        ans = f'<p><code>{ans}\n</code></p>'
-        notes = re.findall('note\{([^}]*)\}', txt)
-        for i, n in enumerate(notes):
-            ans += f'<p><small>Note {i+1}. {n}</small><p>'
+        # ans = f'<p><code>{ans}\n</code></p>'
+        # notes = re.findall('note\{([^}]*)\}', txt)
+        # for i, n in enumerate(notes):
+        #     ans += f'<p><small>Note {i+1}. {n}</small><p>'
+        # use pygments to colorize
+        agg_lex = get_lexer_by_name('agg')
+        ans = highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False))
     if tacit is False and html is True:
         display(HTML(ans))
     elif tacit is False:
@@ -3000,7 +3006,13 @@ def qt(a):
     n = 40
     sev = 'sev mean: pass' if abs(sev_err) < a.validation_eps else f'sev mean: fails {sev_err: .4e}'
     agg = 'agg mean: pass' if abs(agg_err) < a.validation_eps else f'agg mean: fails {agg_err: .4e}'
-    print(f"{'-' * n}\n{sev}\n{agg}\n{'-' * n}")
+    explanation = ''
+    if abs(sev_err) < a.validation_eps and abs(agg_err) < a.validation_eps:
+        bs = a.bs * 2
+        if bs != int(bs):
+            bs = '/'.join([str(i) for i in bs.as_integer_ratio()])
+        explanation = f'\nvalidation suggests possible aliasing\ntry increasing bucket size to {bs}'
+    print(f"{'-' * n}\n{sev}\n{agg}{explanation}\n{'-' * n}")
 
 
 def mv(x, y=None):

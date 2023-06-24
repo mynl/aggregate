@@ -82,6 +82,12 @@ Installation
 Version History
 -----------------
 
+0.15.1
+~~~~~~~~~~
+
+* using pygments style in ``pprint_ex`` html mode
+* removed old setup scripts and files and stack.md
+
 0.15.0
 ~~~~~~~~~
 

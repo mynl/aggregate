@@ -82,17 +82,30 @@ Installation
 Version History
 -----------------
 
-0.15.1
+Ideas
+~~~~~~~~~
+
+* Show hazard rate
+* Check neymana freq works...seems it shouldn't?
+
+0.16.0
 ~~~~~~~~~~
 
-* using pygments style in ``pprint_ex`` html mode
-* removed old setup scripts and files and stack.md
+* Implemented ZM and ZT distributions using decorators!
+* Added panjer_ab to Frequency, reports a and b values, p_k = (a + b / k) p_{k-1}
+* Added panjer_analysis function to utilities, graph implied a and b values
+  plots k p_k / p_{k-1} vs k which should equal a k + b
+* Added freq_dist(log2) option to Freq to return the frequency distribution stand-alone
+* Added negbin frequency where freq_a equals the variance multiplier
+
 
 0.15.0
 ~~~~~~~~~
 
 * Added pygments lexer for decl (called agg, agregate, dec, or decl)
 * Added to the documentation
+* using pygments style in ``pprint_ex`` html mode
+* removed old setup scripts and files and stack.md
 
 0.14.1
 ~~~~~~~

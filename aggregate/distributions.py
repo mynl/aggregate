@@ -1,6 +1,6 @@
 from collections import namedtuple
 from collections.abc import Iterable
-from functools import lru_cache
+from functools import lru_cache, wraps
 import json
 import inspect
 import itertools
@@ -15,21 +15,20 @@ import scipy.stats as ss
 from scipy import interpolate
 from scipy.optimize import newton
 from scipy.special import kv, gammaln, hyp1f1
-from scipy.optimize import broyden2, newton_krylov
+from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize.nonlin import NoConvergence
 from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import *
-from .utilities import sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift, \
-    axiter_factory, estimate_agg_percentile, suptitle_and_tight, \
-    MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler, \
-    make_mosaic_figure, nice_multiple, xsden_to_meancvskew, \
-    pprint_ex, approximate_work, moms_analytic, picks_work, \
-    integral_by_doubling, logarithmic_theta, make_var_tvar
+from .utilities import (sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift,
+                        axiter_factory, estimate_agg_percentile, suptitle_and_tight,
+                        MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler,
+                        make_mosaic_figure, nice_multiple, xsden_to_meancvskew,
+                        pprint_ex, approximate_work, moms_analytic, picks_work,
+                        integral_by_doubling, logarithmic_theta, make_var_tvar, )
 import aggregate.random as ar
 from .spectral import Distortion
-
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +39,11 @@ def max_log2(x):
     Used in dhistogram severity types to determine the size of the step.
     """
     d = min(30, -np.log2(np.finfo(float).eps) - np.ceil(np.log2(x)) - 1)
-    if (x + 2**-d) - x != 2**-d:
+    if (x + 2 ** -d) - x != 2 ** -d:
         raise ValueError('max_log2 failed')
     return d
+
+
 
 
 class Frequency(object):
@@ -115,10 +116,6 @@ class Frequency(object):
         :param freq_zm: freq_zm True if zero modified, default False
         :param freq_p0: modified p0, probability of zero claims
         """
-        # check zero mod is acceptable? --> parser
-        # if freq_zm is True:
-        #     assertg freq_name in ['poisson', 'binomial', 'geometric',
-        #             'logarithmic']
         self.freq_name = freq_name
         self.freq_a = freq_a
         self.freq_b = freq_b
@@ -127,8 +124,76 @@ class Frequency(object):
 
         if freq_zm is True:
             # add implemented methods here....
-            if freq_name not in ('poisson', 'gamma'):
+            if freq_name not in ('poisson', 'negbin', 'geometric', 'logarithmic', 'binomial'):
                 raise NotImplementedError(f'Zero modification not implemented for {freq_name}')
+
+        def solve_n_base(n, p0):
+            """
+            Find n_base so that ZM distribution with unmodified mean n_base
+            adjusted to p0 has mean n. Must solve::
+
+                   (1 - p0) / (1 - p0_base) n_base = n
+                ==>(1 - p0) n_base / (1 - prn_eq_0(n_base)) = n
+
+            If p0 < exp(-n) there is less weight on 0, increasing the mean of the ZM
+            distribution, so n_base < n, otherwise it is greater.
+
+            This is generic code, independent of distribution. Expects a function
+            prn_eq_0(x) giving the probability a non-modified distribution of mean
+            x takes the value 0.
+
+            Code is used to create ZM distribution wrappers.
+
+            """
+            nonlocal prn_eq_0
+            f = lambda x: (1 - p0) * x / (1 - prn_eq_0(x)) - n
+
+            if p0 < prn_eq_0(n):
+                # ZM has higher mean, search to left of n
+                n_base = brentq(f, a=0, b=n)
+            else:
+                # search to right
+                n_base = brentq(f, a=n, b=n /(1 - p0))
+
+            return n_base
+
+        # build decorators for zm
+        def zero_modify_moms(moms_func):
+            """
+            Decorator to zero modify the frequency function moms_func(n).
+
+            Assmes there is a nonlocal function prn_eq_0(x), giving the unmodified prob(N=0)
+            when the mean is x, and the global solve_n_base function. The value p0 is also
+            non-local.
+            """
+            nonlocal prn_eq_0, freq_p0, freq_zm, solve_n_base
+            if freq_zm is False:
+                return moms_func
+            # else work to do
+            @wraps(moms_func)
+            def wrapped_moms_func(n):
+                n_base = solve_n_base(n, freq_p0)
+                ans = np.array(moms_func(n_base))
+                return (1 - freq_p0) / (1 - prn_eq_0(n_base)) * ans
+            return wrapped_moms_func
+
+        def zero_modify_mgf(mgf_func):
+            """
+            Decorator to zero modify mgf(n, z), as above.
+
+            The wrapped mgf is a weighted average of the trivial and original mgfs.
+            """
+            nonlocal prn_eq_0, freq_p0, freq_zm, solve_n_base
+            if freq_zm is False:
+                return mgf_func
+            # else work to do
+            @wraps(mgf_func)
+            def wrapped_mgf_func(n, z):
+                n_base = solve_n_base(n, freq_p0)
+                # weight on non-trivial component
+                wt = (1 - freq_p0) / (1 - prn_eq_0(n_base))
+                return (1 - wt) + wt * mgf_func(n_base, z)
+            return wrapped_mgf_func
 
         logger.debug(
             f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
@@ -156,42 +221,85 @@ class Frequency(object):
                 return z * n + np.ones_like(z) * (1 - n)
 
         elif self.freq_name == 'binomial':
+            p = self.freq_a
+
+            def prn_eq_0(n):
+                N = n / p  # correct mean
+                return (1 - p) ** N
+
+            @zero_modify_moms
             def _freq_moms(n):
                 # binomial(N, p) with mean n, N=n/p
                 # http://mathworld.wolfram.com/BinomialDistribution.html
-                p = self.freq_a
+                # p = self.freq_a
                 N = n / p  # correct mean
                 freq_1 = N * p
                 freq_2 = N * p * (1 - p + N * p)
                 freq_3 = N * p * (1 + p * (N - 1) * (3 + p * (N - 2)))
                 return freq_1, freq_2, freq_3
 
+            @zero_modify_mgf
             def mgf(n, z):
-                N = n / self.freq_a
-                return (z * self.freq_a + np.ones_like(z) * (1 - self.freq_a)) ** N
+                N = n / p # self.freq_a
+                return (z * p + np.ones_like(z) * (1 - p)) ** N
+
+        elif self.freq_name == 'negbin':
+            # freq_a parameter inputs the variance multiplier, variance as a multiple of mean
+            # go with the b, beta parameterization, mean rb and variance rb(1 + b). Thus
+            # b = v - 1 and r = n / b
+            beta = self.freq_a - 1
+
+            def prn_eq_0(n):
+                r = n / beta
+                return (1 + beta) ** -r
+
+            @zero_modify_moms
+            def _freq_moms(n):
+                r = n / beta
+                freq_2 = r * (1 + beta) ** -r * (1 + r * (1 + beta))
+                freq_3 = r * (1 + beta) ** -r * (1 + r * (1 + beta * (3 + r * (2 + beta))))
+                return n, freq_2, freq_3
+
+            @zero_modify_mgf
+            def mgf(n, z):
+                r = n / beta
+                return (1 - beta * (z - 1)) ** -r
 
         elif self.freq_name == 'poisson' and self.freq_a == 0:
+            def prn_eq_0(n):
+                return np.exp(-n)
+
+            @zero_modify_moms
             def _freq_moms(n):
                 # Poisson
                 freq_2 = n * (1 + n)
                 freq_3 = n * (1 + n * (3 + n))
                 return n, freq_2, freq_3
 
+            @zero_modify_mgf
             def mgf(n, z):
                 return np.exp(n * (z - 1))
 
         elif self.freq_name == 'geometric' and self.freq_a == 0:
             # as for poisson, single parameter
-            # https://mathworld.wolfram.com/GeometricDistribution.html and Wikipedia
+            # https://mathworld.wolfram.com/GeometricDistribution.html
+            # https://en.wikipedia.org/wiki/Geometric_distribution
             # e.g. tester: agg =uw('agg GEOM 3 claims sev dhistogram xps [1] [1] geometric')
+            # two flavors, with mean 1/p and 1/p - 1, we are using the latter, supported
+            # on 0, 1, 2,
+            p = 1 / (n + 1)
+            def prn_eq_0(n):
+                return p
+
+            @zero_modify_moms
             def _freq_moms(n):
-                p = 1 / (n + 1)
                 freq_2 = (2 - p) * (1 - p) / p ** 2
                 freq_3 = (1 - p) * (6 + (p - 6) * p) / p ** 3
                 return n, freq_2, freq_3
 
+            @zero_modify_mgf
             def mgf(n, z):
-                p = 1 / (n + 1)
+                # p = 1 / (n + 1)
                 return p / (1 - (1 - p) * z)
 
         elif self.freq_name == 'pascal':
@@ -219,13 +327,21 @@ class Frequency(object):
 
         elif self.freq_name == 'logarithmic':
             # Aka logser in scipy stats, log series
+            # supported on 1, 2, 3, ...
+            # https://mathworld.wolfram.com/LogarithmicDistribution.html
+            # https://en.wikipedia.org/wiki/Logarithmic_distribution
+            def prn_eq_0(n):
+                return 0.
+
+            @zero_modify_moms
             def _freq_moms(n):
                 theta = logarithmic_theta(n)
-                a = -1 / np.log(1 - theta)
-                freq_2 = a * theta / (1 - theta)**2
-                freq_3 = a * theta * (1 + theta) / (1 - theta)**3
+                a_logser = -1 / np.log(1 - theta)
+                freq_2 = a_logser * theta / (1 - theta) ** 2
+                freq_3 = a_logser * theta * (1 + theta) / (1 - theta) ** 3
                 return n, freq_2, freq_3
 
+            @zero_modify_mgf
             def mgf(n, z):
                 theta = logarithmic_theta(n)
                 return np.log(1 - theta * z) / np.log(1 - theta)
@@ -233,6 +349,7 @@ class Frequency(object):
         elif self.freq_name in ['neyman', 'neymana', 'neymanA']:
             # Neyman A, Panjer Willmot green book. p. 324?
             m2 = self.freq_a  # number of outcomes per cluster, mean n = m1 m2
+
             def _freq_moms(n):
                 # central
                 # freq_2 = n * (1 + m2)
@@ -486,7 +603,6 @@ class Frequency(object):
 
 
 class Aggregate(Frequency):
-
     # TODO must be able to automate this with inspect
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
@@ -565,7 +681,7 @@ class Aggregate(Frequency):
                 (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
 
             # expected value and epd
-            self._density_df['e'] = self.est_m # np.sum(self._density_df.p * self._density_df.loss)
+            self._density_df['e'] = self.est_m  # np.sum(self._density_df.p * self._density_df.loss)
             self._density_df.loc[:, 'epd'] = \
                 np.maximum(0, (self._density_df.loc[:, 'e'] - self._density_df.loc[:, 'lev'])) / \
                 self._density_df.loc[:, 'e']
@@ -652,7 +768,7 @@ class Aggregate(Frequency):
             bit, bit1, bit2, bit3),
             axis=1, keys=['ex', 'cv', 'en', 'severity', 'pct'],
             names=['stat', 'view'])
-        return ans 
+        return ans
 
     @property
     def reinsurance_report_df(self):
@@ -937,8 +1053,8 @@ class Aggregate(Frequency):
 
         self.note = note
         self.program = ''  # can be set externally
-        self.en = None     # this is for a sublayer e.g. for limit profile
-        self.n = 0         # this is total frequency
+        self.en = None  # this is for a sublayer e.g. for limit profile
+        self.n = 0  # this is total frequency
         self.attachment = None
         self.limit = None
         self.agg_density = None
@@ -1010,7 +1126,7 @@ class Aggregate(Frequency):
             # do not perform the exp / sev product, in this case
             # broadcast all exposure and sev terms together
             exp_el, exp_premium, exp_lr, en, attachment, limit, \
-            sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
+                sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt = \
                 np.broadcast_arrays(exp_el, exp_premium, exp_lr, exp_en, exp_attachment, exp_limit,
                                     sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
             exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
@@ -1053,7 +1169,8 @@ class Aggregate(Frequency):
         for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
 
             # WARNING: note sev_xs and sev_ps are NOT broadcast
-            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt, sev_conditional)
+            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt,
+                                    sev_conditional)
             sev1, sev2, sev3 = self.sevs[r].moms()
 
             # input claim count trumps input loss
@@ -1117,7 +1234,7 @@ class Aggregate(Frequency):
         self.agg_var = self.agg_sd * self.agg_sd
         # severity exact moments
         self.sev_m, self.sev_cv, self.sev_skew = self.statistics_total_df.loc['mixed',
-                                                                                          ['sev_m', 'sev_cv', 'sev_skew']]
+        ['sev_m', 'sev_cv', 'sev_skew']]
         self.sev_sd = self.sev_m * self.sev_cv
         self.sev_var = self.sev_sd * self.sev_sd
 
@@ -1173,7 +1290,7 @@ class Aggregate(Frequency):
         else:
             s.append(f'severity distribution    {n} components')
         if self.bs > 0:
-            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
             s.append(f'bs                       {bss}')
             s.append(f'log2                     {self.log2}')
             s.append(f'padding                  {self.padding}')
@@ -1210,7 +1327,7 @@ class Aggregate(Frequency):
         else:
             s.append(f'Severity with {n} components.')
         if self.bs > 0:
-            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1/self.bs:,.0f}'
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
         return '\n'.join(s)
 
@@ -1269,9 +1386,10 @@ class Aggregate(Frequency):
         elif sev_calc == 'forward' or sev_calc == 'continuous':
             adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
         elif sev_calc == 'backward':
-            adj_xs = np.hstack((-self.bs, self.xs)) # , np.inf))
+            adj_xs = np.hstack((-self.bs, self.xs))  # , np.inf))
         elif sev_calc == 'moment':
-            raise NotImplementedError('Moment matching discretization not implemented. Embrechts says it is not worth it.')
+            raise NotImplementedError(
+                'Moment matching discretization not implemented. Embrechts says it is not worth it.')
             #
             # adj_xs = np.hstack((self.xs, np.inf))
         else:
@@ -1380,7 +1498,7 @@ class Aggregate(Frequency):
         self.log2 = int(np.log2(len(xs)))
 
         if type(tilt_vector) == float:
-            tilt_vector = np.exp(-tilt_vector * np.arange(2**self.log2))
+            tilt_vector = np.exp(-tilt_vector * np.arange(2 ** self.log2))
 
         # make the severity vector: a claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
@@ -1609,6 +1727,23 @@ class Aggregate(Frequency):
             sd = self.sev_density
         return picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
                           sf=self.sev.sf, debug=debug)
+
+    def freq_pmf(self, log2):
+        """
+        Return the frequency probability mass function (pmf) computed using 2**log2 buckets.
+        Uses self.en to compute the expected frequency. The :class:`Frequency` does not
+        know the expected claim count, so this is a method of :class:`Aggregate`.
+
+        """
+        n = 1 << log2
+        z = np.zeros(n)
+        z[1] = 1
+        fz = ft(z, 0, None)
+        fz = self.mgf(self.en, fz)
+        dist = ift(fz, 0, None)
+        if self.n != self.en:
+            logger.warning(f'Frequency.pmf | n {self.n} != en {self.en}; using n')
+        return dist
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
@@ -2054,7 +2189,7 @@ class Aggregate(Frequency):
             if mx <= 60:
                 # stem plot for small means
                 axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0.', label='Aggregate')
-                axd['A'].stem(df.index, df.p_sev,   basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
+                axd['A'].stem(df.index, df.p_sev, basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
             else:
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
                 df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
@@ -2105,7 +2240,7 @@ class Aggregate(Frequency):
             (df.p_total / self.bs).plot(ax=axd['B'], lw=2, label='Aggregate')
             (df.p_sev / self.bs).plot(ax=axd['B'], lw=1, label='Severity')
             ylim = axd['B'].get_ylim()
-            ylim = [1e-15, ylim[1]*2]
+            ylim = [1e-15, ylim[1] * 2]
             axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
             axd['B'].legend().set(visible=False)
 
@@ -2351,7 +2486,7 @@ class Aggregate(Frequency):
             df.loc['sev_m', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_1']
             df.loc['sev_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_cv']
             df.loc['sev_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_skew']
-            df.loc['agg_m', 'empirical']  = self.audit_df.loc['mixed', 'emp_agg_1']
+            df.loc['agg_m', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_1']
             df.loc['agg_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_cv']
             df.loc['agg_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_skew']
             df = df
@@ -2384,11 +2519,11 @@ class Aggregate(Frequency):
         # edit to make equivalent to Portfolio statistics
         df = df.T
         if df.shape[1] == 1:
-            df.columns = [df.iloc[0,0]]
+            df.columns = [df.iloc[0, 0]]
             df = df.iloc[1:]
         df.index = df.index.str.split("_", expand=True, )
         df = df.rename(index={'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean', np.nan: ''})
-        df.index.names =['component', 'measure']
+        df.index.names = ['component', 'measure']
         df.columns.name = 'name'
         return df
 
@@ -2569,7 +2704,7 @@ class Aggregate(Frequency):
                               index=range(total_row + 1))
         sev_df['agg_mean'] *= sev_df['en']
         sev_df['agg_wt'] = sev_df['agg_mean'] / \
-            sev_df.loc[0:total_row-1, 'agg_mean'].sum()
+                           sev_df.loc[0:total_row - 1, 'agg_mean'].sum()
         sev_df['abs'] = sev_df['est_mean'] - sev_df['mean']
         sev_df['rel'] = sev_df['abs'] / sev_df['mean']
         sev_df['trunc_error'] = \
@@ -2665,7 +2800,6 @@ class Aggregate(Frequency):
 
         return self._var_tvar_function['tvar'](p)
 
-
     def tvar(self, p, kind=''):
         """
         Updated June 2023, 0.13.0
@@ -2697,7 +2831,7 @@ class Aggregate(Frequency):
         """
         if kind != '' and getattr(self, 'c', None) is None:
             logger.warning('kind is no longer used in TVaR, new method equivalent to kind=tail but much faster. '
-                       'Argument kind will be removed in the future.')
+                           'Argument kind will be removed in the future.')
             self.c = 1
 
         if kind == 'inverse':
@@ -2743,13 +2877,17 @@ class Aggregate(Frequency):
                 if wts.sum() == len(self.sevs):
                     wts = self.statistics_df.freq_1.values
                 wts = wts / wts.sum()
+
                 # tried a couple of different approaches here and this is as fast as any
                 def _sev_cdf(x):
                     return np.sum([wts[i] * self.sevs[i].cdf(x) for i in range(len(self.sevs))], axis=0)
+
                 def _sev_sf(x):
                     return np.sum([wts[i] * self.sevs[i].sf(x) for i in range(len(self.sevs))], axis=0)
+
                 def _sev_pdf(x):
                     return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
+
                 self._sev = SevFunctions(cdf=_sev_cdf, sf=_sev_sf, pdf=_sev_pdf)
         return self._sev
 
@@ -3048,7 +3186,7 @@ class Severity(ss.rv_continuous):
         super().__init__(self, name=sev_name)
         # ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
 
-        self.program = ''    # may be set externally
+        self.program = ''  # may be set externally
         self.limit = exp_limit
         self.attachment = exp_attachment
         self.detachment = exp_limit + exp_attachment
@@ -3218,7 +3356,7 @@ class Severity(ss.rv_continuous):
             if sev_mean > 0:
                 logger.info(f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
                 sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
-            elif sev_scale > 0 and sev_mean==0:
+            elif sev_scale > 0 and sev_mean == 0:
                 logger.info(f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
                 gen = getattr(ss, sev_name)
                 self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
@@ -3546,11 +3684,12 @@ class Severity(ss.rv_continuous):
             """
 
             # argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
-            argkw = dict(limit=100, epsrel=1e-6 if level==1 else 1e-4, full_output=1)
+            argkw = dict(limit=100, epsrel=1e-6 if level == 1 else 1e-4, full_output=1)
             ex = quad(f, lower, upper, **argkw)
             if len(ex) == 4 or ex[0] == np.inf:  # 'The integral is probably divergent, or slowly convergent.':
                 msg = ex[-1].replace("\n", " ") if ex[-1] == str else "no message"
-                logger.info(f'E[X^{level}]: ansr={ex[0]}, error={ex[1]}, steps={ex[2]["last"]}; message {msg} -> splitting integral')
+                logger.info(
+                    f'E[X^{level}]: ansr={ex[0]}, error={ex[1]}, steps={ex[2]["last"]}; message {msg} -> splitting integral')
                 # blow off other steps....
                 # use nan to mean "unreliable
                 # return np.nan   #  ex[0]
@@ -3561,15 +3700,17 @@ class Severity(ss.rv_continuous):
                         f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
                     exa = quad(f, 1e-16, ϵ, **argkw)
                     exb = quad(f, ϵ, upper, **argkw)
-                    logger.info(f'Severity.moms | [1e-16, {ϵ}] split EX^{level}: ansr={exa[0]}, error={exa[1]}, steps={exa[2]["last"]}')
-                    logger.info(f'Severity.moms | [{ϵ}, {upper}] split EX^{level}: ansr={exb[0]}, error={exb[1]}, steps={exb[2]["last"]}')
+                    logger.info(
+                        f'Severity.moms | [1e-16, {ϵ}] split EX^{level}: ansr={exa[0]}, error={exa[1]}, steps={exa[2]["last"]}')
+                    logger.info(
+                        f'Severity.moms | [{ϵ}, {upper}] split EX^{level}: ansr={exb[0]}, error={exb[1]}, steps={exb[2]["last"]}')
                     ex = (exa[0] + exb[0], exa[1] + exb[1])
                     # if exa[2]['last'] < argkw['limit'] and exb[2]['last'] < argkw['limit']:
                     #     ex = (exa[0] + exb[0], exa[1] + exb[1])
                     # else:
                     #     # reached limit, unreliable
                     #     ex = (np.nan, np.nan)
-            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1]/ex[0] if ex[0]!=0 else np.inf}')
+            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1] / ex[0] if ex[0] != 0 else np.inf}')
             return ex[:2]
 
         ex1a = 0
@@ -3614,7 +3755,7 @@ class Severity(ss.rv_continuous):
             max_rel_error = 1e-3
             if moments_finite[0]:
                 ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-                if ex1[0] !=0 and ex1[1] / ex1[0] < max_rel_error:
+                if ex1[0] != 0 and ex1[1] / ex1[0] < max_rel_error:
                     ex1 = ex1[0]
                 else:
                     ex1 = np.nan
@@ -3626,7 +3767,7 @@ class Severity(ss.rv_continuous):
             if continue_calc and moments_finite[1]:
                 ex2 = safe_integrate(lambda x: self.fz.isf(x) ** 2, lower, upper, 2)
                 # we know the mean; use that scale to determine if the absolute error is reasonable?
-                if ex2[1] / ex2[0] < max_rel_error: # and ex2[1] < 0.01 * ex1**2:
+                if ex2[1] / ex2[0] < max_rel_error:  # and ex2[1] < 0.01 * ex1**2:
                     ex2 = ex2[0]
                 else:
                     ex2 = np.nan
@@ -3716,4 +3857,3 @@ class Severity(ss.rv_continuous):
         ax = axd['D']
         ax.plot(ys, xs, drawstyle=ds)
         ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$', xlim=[-0.025, 1.025])
-

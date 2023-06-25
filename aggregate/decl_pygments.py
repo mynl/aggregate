@@ -78,7 +78,7 @@ class AggLexer(RegexLexer):
             (words(
                 ('binomial', 'pascal', 'poisson', 'bernoulli', 'geometric',
                     'fixed', 'neyman' 'neymana', 'neymanA', 'logarithmic',
-                    'dfreq',),
+                    'dfreq', 'negbin'),
                 suffix=r'\b'
             ), Name.Function),
 

@@ -71,7 +71,7 @@ class UnderwritingLexer(Lexer):
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic|negbin'
     DISTORTION = 'dist(ortion)?'
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
     NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
@@ -465,7 +465,7 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.logger(
             f'freq <-- FREQ {p.FREQ} (zero param distributions)', p)
-        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric', 'logarithmic'):
+        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric', 'logarithmic', 'negbin'):
             logger.error(
                 f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli, geometric, logarithmic or fixed.')
         return {'freq_name': p.FREQ}
@@ -1031,7 +1031,7 @@ def grammar(add_to_doc=False, save_to_fn=''):
     # finally add the language words
     # this is a bit manual, but these shouldnt change much...
     # lang_words = '\n\nlanguage words go here\n\n'
-    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed'
+    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed|logarithmic|negbin'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
 

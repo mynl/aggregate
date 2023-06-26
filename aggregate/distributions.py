@@ -101,7 +101,8 @@ class Frequency(object):
     :param freq_b:
     """
 
-    __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0']
+    __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
+                 'panjer_ab', 'unmodified_mean', 'prn_eq_0']
 
     def __init__(self, freq_name, freq_a, freq_b, freq_zm, freq_p0):
         """
@@ -121,6 +122,9 @@ class Frequency(object):
         self.freq_b = freq_b
         self.freq_zm = freq_zm
         self.freq_p0 = freq_p0
+        self.panjer_ab = None
+        self.unmodified_mean = None
+        self.prn_eq_0 = None
 
         if freq_zm is True:
             # add implemented methods here....
@@ -154,7 +158,7 @@ class Frequency(object):
             else:
                 # search to right
                 n_base = brentq(f, a=n, b=n /(1 - p0))
-
+            self.unmodified_mean = n_base
             return n_base
 
         # build decorators for zm
@@ -227,19 +231,23 @@ class Frequency(object):
                 N = n / p  # correct mean
                 return (1 - p) ** N
 
+            self.prn_eq_0 = prn_eq_0
             @zero_modify_moms
             def _freq_moms(n):
                 # binomial(N, p) with mean n, N=n/p
                 # http://mathworld.wolfram.com/BinomialDistribution.html
                 # p = self.freq_a
+                nonlocal p
                 N = n / p  # correct mean
                 freq_1 = N * p
                 freq_2 = N * p * (1 - p + N * p)
                 freq_3 = N * p * (1 + p * (N - 1) * (3 + p * (N - 2)))
+                self.panjer_ab = (-p / (1 - p), (N + 1) * p / (1 - p))
                 return freq_1, freq_2, freq_3
 
             @zero_modify_mgf
             def mgf(n, z):
+                nonlocal p
                 N = n / p # self.freq_a
                 return (z * p + np.ones_like(z) * (1 - p)) ** N
 
@@ -247,21 +255,32 @@ class Frequency(object):
             # freq_a parameter inputs the variance multiplier, variance as a multiple of mean
             # go with the b, beta parameterization, mean rb and variance rb(1 + b). Thus
             # b = v - 1 and r = n / b
+            # Univariate Discrete Distributions, 3rd Edition (Norman L. Johnson, Adrienne W. Kemp etc.)
+            # p. 208 uses P (our beta) and k (our r) for the parameters (see pgf)
             beta = self.freq_a - 1
-
+            p = 1 / self.freq_a
+            q = 1 - p
             def prn_eq_0(n):
+                nonlocal beta
                 r = n / beta
                 return (1 + beta) ** -r
 
+            self.prn_eq_0 = prn_eq_0
+
             @zero_modify_moms
             def _freq_moms(n):
+                nonlocal beta
                 r = n / beta
-                freq_2 = r * (1 + beta) ** -r * (1 + r * (1 + beta))
-                freq_3 = r * (1 + beta) ** -r * (1 + r * (1 + beta * (3 + r * (2 + beta))))
+                freq_2 = n * (1 + beta * (1 + r))
+                # https://mathworld.wolfram.com/NegativeBinomialDistribution.html
+                # eqn 17
+                freq_3 = q * (r * p * p + 3 * p * q * r + q * q * r * (r + 1)) / p ** 3
+                self.panjer_ab = (beta / (1 + beta), (r - 1) * beta / (1 + beta))
                 return n, freq_2, freq_3
 
             @zero_modify_mgf
             def mgf(n, z):
+                nonlocal beta
                 r = n / beta
                 return (1 - beta * (z - 1)) ** -r
 
@@ -269,11 +288,14 @@ class Frequency(object):
             def prn_eq_0(n):
                 return np.exp(-n)
 
+            self.prn_eq_0 = prn_eq_0
+
             @zero_modify_moms
             def _freq_moms(n):
                 # Poisson
                 freq_2 = n * (1 + n)
                 freq_3 = n * (1 + n * (3 + n))
+                self.panjer_ab = (0., n)
                 return n, freq_2, freq_3
 
             @zero_modify_mgf
@@ -287,23 +309,31 @@ class Frequency(object):
             # e.g. tester: agg =uw('agg GEOM 3 claims sev dhistogram xps [1] [1] geometric')
             # two flavors, with mean 1/p and 1/p - 1, we are using the latter, supported
             # on 0, 1, 2,
-            p = 1 / (n + 1)
             def prn_eq_0(n):
+                p = 1 / (n + 1)
                 return p
+
+            self.prn_eq_0 = prn_eq_0
 
             @zero_modify_moms
             def _freq_moms(n):
+                p = 1 / (n + 1)
                 freq_2 = (2 - p) * (1 - p) / p ** 2
                 freq_3 = (1 - p) * (6 + (p - 6) * p) / p ** 3
+                self.panjer_ab = (n / (1 + n), 0.)
                 return n, freq_2, freq_3
 
             @zero_modify_mgf
             def mgf(n, z):
-                # p = 1 / (n + 1)
+                p = 1 / (n + 1)
                 return p / (1 - (1 - p) * z)
 
         elif self.freq_name == 'pascal':
             # generalized Poisson-Pascal distribution, Panjer Willmot green book. p. 324
+            # Univariate Discrete Distributions, 3rd Edition (Norman L. Johnson, Adrienne W. Kemp etc.)
+            # p. 367, Poisson mixture of negative binomial distributions
+            # Taking k = 1 gives a Poisson mixture of geometric distri-
+            # butions, known as the Polya–Aeppli distribution
             # solve for local c to hit overall c=ν^2 value input
             ν = self.freq_a  # desired overall cv
             κ = self.freq_b  # claims per occurrence
@@ -333,12 +363,15 @@ class Frequency(object):
             def prn_eq_0(n):
                 return 0.
 
+            self.prn_eq_0 = prn_eq_0
+
             @zero_modify_moms
             def _freq_moms(n):
                 theta = logarithmic_theta(n)
                 a_logser = -1 / np.log(1 - theta)
                 freq_2 = a_logser * theta / (1 - theta) ** 2
                 freq_3 = a_logser * theta * (1 + theta) / (1 - theta) ** 3
+                self.panjer_ab = (theta, -theta)
                 return n, freq_2, freq_3
 
             @zero_modify_mgf
@@ -1741,8 +1774,10 @@ class Aggregate(Frequency):
         fz = ft(z, 0, None)
         fz = self.mgf(self.en, fz)
         dist = ift(fz, 0, None)
-        if self.n != self.en:
-            logger.warning(f'Frequency.pmf | n {self.n} != en {self.en}; using n')
+        # remove fuzz
+        dist[dist < np.finfo(float).eps] = 0
+        if not np.allclose(self.n,  self.en):
+            logger.warning(f'Frequency.pmf | n {self.n} != en {self.en}; using en')
         return dist
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):

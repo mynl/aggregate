@@ -85,16 +85,15 @@ Version History
 Ideas
 ~~~~~~~~~
 
-* Show hazard rate
-* Check neymana freq works...seems it shouldn't?
+* Show hazard rate?
 
 0.16.0
 ~~~~~~~~~~
 
 * Implemented ZM and ZT distributions using decorators!
-* Added panjer_ab to Frequency, reports a and b values, p_k = (a + b / k) p_{k-1}
-* Added panjer_analysis function to utilities, graph implied a and b values
-  plots k p_k / p_{k-1} vs k which should equal a k + b
+* Added panjer_ab to Frequency, reports a and b values, p_k = (a + b / k) p_{k-1}. These values can be tested
+  by computing implied a and b values from r_k = k p_k / p_{k-1} = ak + b; diff r_k = a and b is an easy
+  computation.
 * Added freq_dist(log2) option to Freq to return the frequency distribution stand-alone
 * Added negbin frequency where freq_a equals the variance multiplier
 

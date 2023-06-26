@@ -456,7 +456,8 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.logger(
             f'freq <-- FREQ expr {p.FREQ}', p)
-        if p.FREQ not in ['binomial', 'neyman', 'neymana', 'neymanA']:
+        # one parameter distributions
+        if p.FREQ not in ['binomial', 'neyman', 'neymana', 'neymanA', 'negbin']:
             logger.warning(
                 f'Illogical choice of frequency {p.FREQ}, expected binomial or neyman A')
         return {'freq_name': p.FREQ, 'freq_a': p.expr}
@@ -465,7 +466,8 @@ class UnderwritingParser(Parser):
     def freq(self, p):
         self.logger(
             f'freq <-- FREQ {p.FREQ} (zero param distributions)', p)
-        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric', 'logarithmic', 'negbin'):
+        # zero parameter distributions
+        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric', 'logarithmic'):
             logger.error(
                 f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli, geometric, logarithmic or fixed.')
         return {'freq_name': p.FREQ}

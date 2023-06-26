@@ -232,6 +232,7 @@ class Frequency(object):
                 return (1 - p) ** N
 
             self.prn_eq_0 = prn_eq_0
+
             @zero_modify_moms
             def _freq_moms(n):
                 # binomial(N, p) with mean n, N=n/p
@@ -258,8 +259,7 @@ class Frequency(object):
             # Univariate Discrete Distributions, 3rd Edition (Norman L. Johnson, Adrienne W. Kemp etc.)
             # p. 208 uses P (our beta) and k (our r) for the parameters (see pgf)
             beta = self.freq_a - 1
-            p = 1 / self.freq_a
-            q = 1 - p
+
             def prn_eq_0(n):
                 nonlocal beta
                 r = n / beta
@@ -272,9 +272,9 @@ class Frequency(object):
                 nonlocal beta
                 r = n / beta
                 freq_2 = n * (1 + beta * (1 + r))
-                # https://mathworld.wolfram.com/NegativeBinomialDistribution.html
-                # eqn 17
-                freq_3 = q * (r * p * p + 3 * p * q * r + q * q * r * (r + 1)) / p ** 3
+                # chat gpt (!)
+                # freq_3 = r * (r + 1) * (r + 2) * beta**3 + 3 * r * (r + 1) * beta ** 2 + r * beta
+                freq_3 = r * beta * (1 + beta * (1 + r) * (3 + beta * (2 + r)))
                 self.panjer_ab = (beta / (1 + beta), (r - 1) * beta / (1 + beta))
                 return n, freq_2, freq_3
 

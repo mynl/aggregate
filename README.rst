@@ -82,6 +82,11 @@ Installation
 Version History
 -----------------
 
+0.17.1
+~~~~~~~~
+
+* Adjusted pyproject.toml
+
 0.17.0 (July 2023)
 ~~~~~~~~~~~~~~~~~~~~
 

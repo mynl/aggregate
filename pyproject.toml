@@ -66,11 +66,11 @@ version  = { attr = "aggregate.__version__" }
 
 [tool.setuptools]
 include-package-data = true
+packages = ["aggregate", "aggregate.extensions"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-#packages = ["aggregate", "aggregate.extensions"]
-exclude = ["templates*", "agg*"]
+#[tool.setuptools.packages.find]
+#where = ["."]
+#exclude = ["templates*", "agg*"]
 
 [project.entry-points."pygments.lexers"]
 lexer = "aggregate.decl_pygments:AggLexer"

@@ -214,7 +214,7 @@ port L.Bodoff4 note{Bodoff Thought Experiment No. 4 (check!)} agg a 0.25 claims 
 # PIR book case studies
 # =====================
 # hints: reg_p=1; roe=0.10;
-# numbers in names ensure correct sort order 
+# numbers in names ensure correct sort order
 port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed note{bs=1; log2=8; padding=1}
 
 # hints: reg_p=.999, roe=0.10

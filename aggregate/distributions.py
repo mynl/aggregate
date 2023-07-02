@@ -26,8 +26,9 @@ from .utilities import (sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift,
                         MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler,
                         make_mosaic_figure, nice_multiple, xsden_to_meancvskew,
                         pprint_ex, approximate_work, moms_analytic, picks_work,
-                        integral_by_doubling, logarithmic_theta, make_var_tvar, )
-import aggregate.random as ar
+                        integral_by_doubling, logarithmic_theta, make_var_tvar,
+                        more, )
+import aggregate.random_agg as ar
 from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
@@ -1148,12 +1149,17 @@ class Aggregate(Frequency):
         self.statistics_total_df = self.statistics_df.copy()
         ma = MomentAggregator(self.freq_moms)
 
+        # overall freq CV with common mixing
+        mix_cv = self.freq_a
+
         # broadcast arrays: force answers all to be arrays (?why only these items?!)
         if not isinstance(exp_el, Iterable):
             exp_el = np.array([exp_el])
         if not isinstance(sev_wt, Iterable):
             sev_wt = np.array([sev_wt])
 
+        # counter to label components
+        r = 0
         # broadcast together and create container for the severity distributions
         if np.sum(sev_wt) == len(sev_wt):
             # do not perform the exp / sev product, in this case
@@ -1173,8 +1179,52 @@ class Aggregate(Frequency):
                          f'{len(sev_a)} sevs = {n_components} componets')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
+            # perform looping creation of severity distribution
+            # in this case wts are all 1, so no need to broadcast
+            for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
+                assert _swt==1, 'Expect weights all equal to 1'
+
+                # WARNING: note sev_xs and sev_ps are NOT broadcast
+                self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt,
+                                        sev_conditional)
+                sev1, sev2, sev3 = self.sevs[r].moms()
+
+                # input claim count trumps input loss
+                if _en > 0:
+                    _el = _en * sev1
+                elif _el > 0:
+                    _en = _el / sev1
+                # neither of these options can be triggered, by a dfreq dsev, for example.
+
+                # if premium compute loss ratio, if loss ratio compute premium
+                if _pr > 0:
+                    _lr = _el / _pr
+                elif _lr > 0:
+                    _pr = _el / _lr
+
+                # for empirical freq claim count entered as -1
+                if _en < 0:
+                    _en = np.sum(self.freq_a * self.freq_b)
+                    _el = _en * sev1
+
+                # scale for the mix - OK because we have split the exposure and severity components
+                _pr *= _swt
+                _el *= _swt
+                # _lr *= _swt  ?? seems wrong
+                _en *= _swt
+
+                # accumulate moments
+                ma.add_f1s(_en, sev1, sev2, sev3)
+
+                # store
+                self.statistics_df.loc[r, :] = \
+                    [self.name, _y, _at, _scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
+                r += 1
+
         else:
-            # perform exp / sev product
+            # perform exp / sev product; but there is only one severity distribution
+            # it could be a mixture - in which case we need to convert to en input (not loss)
+            # and potentially re-weight for excess covers.
             # broadcast exposure terms (el, epremium, en, lr, attachment, limit) and sev terms (sev_) separately
             # then we take an "outer product" of the two parts...
             exp_el, exp_premium, exp_lr, en, attachment, limit = \
@@ -1183,60 +1233,118 @@ class Aggregate(Frequency):
                 np.broadcast_arrays(sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt)
             exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
             exp_arrays = [exp_el, exp_premium, exp_lr, en, attachment, limit]
-            sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_wt]
-            all_arrays = [[k for j in i for k in j] for i in itertools.product(zip(*exp_arrays), zip(*sev_arrays))]
-            self.en = np.array([i[3] * i[-1] for i in all_arrays])
-            self.attachment = np.array([i[4] for i in all_arrays])
-            self.limit = np.array([i[5] for i in all_arrays])
-            n_components = len(all_arrays)
+            sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale]
+            n_components = len(exp_el) * len(sev_name)
+            self.en = np.empty(n_components, dtype=float)
+            self.attachment = np.empty(n_components, dtype=float)
+            self.limit = np.empty(n_components, dtype=float)
+            # all broadcast arrays have the same length, hence:
             logger.debug(
-                f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_arrays)} x {len(sev_arrays)} '
+                f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_el)} x {len(sev_name)} '
                 f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
-        # overall freq CV with common mixing
-        mix_cv = self.freq_a
-        # counter to label components
-        r = 0
-        # perform looping creation of severity distribution
-        for _el, _pr, _lr, _en, _at, _y, _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in all_arrays:
-
             # WARNING: note sev_xs and sev_ps are NOT broadcast
-            self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt,
-                                    sev_conditional)
-            sev1, sev2, sev3 = self.sevs[r].moms()
+            # In this case, there is only one ground up severity, but it is a mixture. We need to
+            # create it ground up to determine new weights, hence we get layer severity,
+            # and from that we can deduce layer claim counts and so forth.
+            # remember, the weights are irrelvant to Severity EXCEPT for the sev property.
+            gup_sevs = []
+            for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in zip(*sev_arrays, sev_wt):
+                gup_sevs.append(Severity(_sn, 0, np.inf, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt,
+                                         sev_conditional))
 
-            # input claim count trumps input loss
-            if _en > 0:
-                _el = _en * sev1
-            elif _el > 0:
-                _en = _el / sev1
-            # neither of these options can be triggered, by a dfreq dsev, for example.
+            # perform looping creation of severity distribution
+            for _el, _pr, _lr, _en, _at, _y, in zip(*exp_arrays):
+                # adjust weights for excess coverage
+                sev_wt0 = sev_wt.copy()
+                if _at > 0:
+                    w1 = sev_wt0 * np.array([s.sf(_at) for s in gup_sevs])
+                    sev_wt0 = w1 / w1.sum()
 
-            # if premium compute loss ratio, if loss ratio compute premium
-            if _pr > 0:
-                _lr = _el / _pr
-            elif _lr > 0:
-                _pr = _el / _lr
+                # store actual sevs in a group (all are also appended to self.sevs) so we can compute the expected value
+                # weight still irrelevant; but pull in layer and attaches which must vary for it to be meaningful
+                actual_sevs = []
+                for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _swt in zip(*sev_arrays, sev_wt):
+                    actual_sevs.append(Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps, _swt,
+                                                sev_conditional))
 
-            # for empirical freq claim count entered as -1
-            if _en < 0:
-                _en = np.sum(self.freq_a * self.freq_b)
-                _el = _en * sev1
+                # now we need to figure the severity across the mixture for this particular layer and  attach
+                moms = []
+                for s in actual_sevs:
+                    # just return the first moment
+                    moms.append(s.moms())
 
-            # scale for the mix - OK because we have split the exposure and severity components
-            _pr *= _swt
-            _el *= _swt
-            # _lr *= _swt  ?? seems wrong
-            _en *= _swt
+                # component mean (corresponding to the outside loop) can now be computed
+                component_mean = (np.nan_to_num(np.array([m[0] for m in moms])) * sev_wt0).sum()
 
-            # accumulate moments
-            ma.add_f1s(_en, sev1, sev2, sev3)
+                # figure claim count if not entered, for the group (at this point we have not weighted down)
+                # this forces subsequent calcuations to use (correct) en weighting even if premium or loss are
+                # entered
+                logger.info(f'{_y} xs {_at}, component_mean = {component_mean}, {[m[0] for m in moms]}')
+                if _en == 0:
+                    _en = _el / component_mean
 
-            # store
-            self.statistics_df.loc[r, :] = \
-                [self.name, _y, _at, _scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
-            r += 1
+                # for cases where a mixture component has no losses in the layer
+                # usually because of underflow.
+                zero = None
+
+                # break up the total claim count into parts and add sevs to self.sevs
+                # need the first variables for sev statistics
+                for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, s, _swt, (sev1, sev2, sev3) in \
+                        zip(*sev_arrays, actual_sevs, sev_wt0, moms):
+
+                    # store the severity
+                    if np.isnan(sev1):
+                        if zero is None:
+                            zero = Severity('dhistogram', 0, np.inf, 0, 0, 0, 0, 0, 0, [0], [1], 0, False)
+                        # replace this component with the zero distribution
+                        # ignore the (small) weights that are being ignored
+                        self.sevs[r] = zero
+                        _sn = 'dhistogram'
+                        logger.info(f'{_y} xs {_at} on {_ssc} x ({_at}, {_sm}, {_scv}, {_sa}, {_sb}) + {_sloc} '
+                                       f'component has sev=({sev1}, {sev2}, {sev3}), '
+                                       f' weight = {_swt}; replacing with zero.')
+                        sev1 = sev2 = sev3 = 0.0
+                    else:
+                        self.sevs[r] = s
+
+                    # input claim count, figure total loss for the component
+                    if _en > 0:
+                        _el = _en * sev1
+                    elif _en < 0:
+                        # for empirical freq claim count entered as -1
+                        _en = np.sum(self.freq_a * self.freq_b)
+                        _el = _en * sev1
+                    else:
+                        logger.info(f'{_y} xs {_at} on {_ssc} x ({_at}, {_sm}, {_scv}, {_sa}, {_sb}) + {_sloc} has '
+                                         f'_en = {_en}. Adjusting el to 0.')
+                        _el = 0.
+
+                    # if premium compute loss ratio, if loss ratio compute premium
+                    # TODO where are these used? are they correct?
+                    if _pr > 0:
+                        _lr = _el / _pr
+                    elif _lr > 0:
+                        _pr = _el / _lr
+
+                    # scale for the mix - OK because we have split the exposure and severity components
+                    _pr0 = _pr * _swt
+                    _el0 = _el * _swt
+                    _en0 = _en * _swt
+
+                    # accumulate moments
+                    ma.add_f1s(_en0, sev1, sev2, sev3)
+
+                    # store
+                    self.statistics_df.loc[r, :] = \
+                        [self.name, _y, _at, _scv, _el0, _pr0, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
+
+                    self.en[r] = _en0
+                    self.attachment[r] = _at
+                    self.limit[r] = _y
+
+                    r += 1
 
         # average exp_limit and exp_attachment
         avg_limit = np.sum(self.statistics_df.limit * self.statistics_df.freq_1) / ma.tot_freq_1
@@ -1276,6 +1384,7 @@ class Aggregate(Frequency):
         self._middle_q = None
         self._q = None
 
+
     def __repr__(self):
         """
         String version of _repr_html_
@@ -1306,6 +1415,13 @@ class Aggregate(Frequency):
         #     f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
         #     f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
         # return s
+
+    def more(self, regex):
+        """
+        More information about methods and properties matching regex
+
+        """
+        more(self, regex)
 
     @property
     def info(self):
@@ -1342,13 +1458,34 @@ class Aggregate(Frequency):
             s.append('')
         return '\n'.join(s)
 
+    def qt(self):
+        """
+        String with diagnostic information.
+
+        """
+        if self.valid:
+            return "not unreasonable"
+
+        sev_err = self.est_sev_m / self.sev_m - 1
+        agg_err = self.agg_m / self.est_m - 1
+        n = 40
+        sev = 'sev mean: pass' if abs(sev_err) < self.validation_eps else f'sev mean: fails {sev_err: .4e}'
+        agg = 'agg mean: pass' if abs(agg_err) < self.validation_eps else f'agg mean: fails {agg_err: .4e}'
+        explanation = ''
+        if abs(sev_err) < self.validation_eps and abs(agg_err) < self.validation_eps:
+            bs = self.bs * 2
+            if bs != int(bs):
+                bs = '/'.join([str(i) for i in bs.as_integer_ratio()])
+            explanation = f'\nvalidation suggests possible aliasing\ntry increasing bucket size to {bs}'
+        return f"{'-' * n}\n{sev}\n{agg}{explanation}\n{'-' * n}"
+
     def html_info_blob(self):
         """
         Text top of _repr_html_
 
         """
         s = [f'<h3>Aggregate object: {self.name}</h3>']
-        s.append(f'<p>Claim count: {self.n:0,.2f}, {self.freq_name} distribution.')
+        s.append(f'<p>{self.freq_name} frequency distribution.')
         n = len(self.statistics_df)
         if n == 1:
             sv = self.sevs[0]
@@ -1356,12 +1493,18 @@ class Aggregate(Frequency):
                 _la = 'unlimited'
             else:
                 _la = f'{sv.limit} xs {sv.attachment}'
-            s.append(f'Severity{sv.long_name} distribution, {_la}.')
+            s.append(f'Severity {sv.long_name} distribution, {_la}.')
         else:
             s.append(f'Severity with {n} components.')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
+        if self.agg_density is not None:
+            if self.valid:
+                s.append('<p>Validation: not unreasonable.</p>')
+            else:
+                s.append(f'<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n{self.qt()}</pre></p>')
+
         return '\n'.join(s)
 
     def _repr_html_(self):
@@ -2620,10 +2763,11 @@ class Aggregate(Frequency):
         """
         N = 1 << log2
         if not verbose:
-            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
             limit_est = self.limit.max() / N
             if limit_est == np.inf:
                 limit_est = 0
+                p = max(p, 1 - 10 ** -8)
+            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
             logger.debug(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
             return max(moment_est, limit_est)
         else:
@@ -3581,7 +3725,7 @@ class Severity(ss.rv_continuous):
 
             ==> E[X(a,d)^n] = int_a^d (x-a)^n f(x) dx + (d-a)^n S(d).
 
-        Let x = q(p), F(x) = p, f(x)dx = dp.
+        Let x = q(p), F(x) = p, f(x)dx = dp. for 1,2,...n(<=3).
 
         E[X(a,d)^n] = int_{F(a)}^{F(d)} (q(p)-a)^n dp + (d-a)^n S(d)
 
@@ -3748,7 +3892,7 @@ class Severity(ss.rv_continuous):
             logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1] / ex[0] if ex[0] != 0 else np.inf}')
             return ex[:2]
 
-        ex1a = 0
+        ex1a = None
         # we integrate isf not q, so upper and lower are swapped
         if self.attachment == 0:
             upper = 1
@@ -3772,7 +3916,7 @@ class Severity(ss.rv_continuous):
             ex2 = self.sev2
             ex3 = self.sev3
 
-        elif self.sev_name in ['lognorm', 'pareto', 'gamma'] and self.sev_loc == 0:
+        elif self.sev_name in ['lognorm', 'pareto', 'gamma', 'expon'] and self.sev_loc == 0:
             # have exact and note this computes the answer directly
             # no need for the subsequent adjustment
             logger.info('Analytic moments')
@@ -3826,7 +3970,7 @@ class Severity(ss.rv_continuous):
                 ex3 = np.inf
 
         # adjust if not determined by exact formula
-        if ex1a == 0:
+        if ex1a is None:
             dma = self.detachment - self.attachment
             uml = upper - lower
             a = self.attachment

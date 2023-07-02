@@ -12,7 +12,9 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import logger_level, round_bucket, Answer, LoggerManager, qd, show_fig
+from .utilities import (logger_level, round_bucket, Answer,
+                        LoggerManager, qd, show_fig, more,
+                        parse_note_ex)
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +299,17 @@ class Underwriter(object):
         txt = f.read_text(encoding='utf-8')
         return txt
 
+    @property
+    def test_suite_file(self):
+        """
+        Return the test_suite filename, or None if it does not exist
+        """
+        f = self.default_dir / 'test_suite.agg'
+        if f.exists():
+            return f
+        else:
+            return None
+
     def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
         Write a natural language program. Write carries out the following steps.
@@ -513,7 +526,7 @@ class Underwriter(object):
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.999, logger_level=None, **kwargs):
+    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.99999, logger_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -555,6 +568,8 @@ class Underwriter(object):
             elif isinstance(answer.object, Aggregate) and update is True:
                 # try to guess good defaults
                 d = answer.spec
+                # extract hints from note string
+                log2, bs, recommend_p, kwargs = parse_note_ex(d['note'], log2, bs, recommend_p, kwargs)
                 if d['sev_name'] == 'dhistogram' and log2 == 0:
                     bs_ = 1
                     # how big?
@@ -592,6 +607,9 @@ class Underwriter(object):
                 # there is no updating for severities
                 pass
             elif isinstance(answer.object, Portfolio) and update is True:
+                d = answer.spec
+                # extract hints from note string
+                log2, bs, recommend_p, kwargs = parse_note_ex(d['note'], log2, bs, recommend_p, kwargs)
                 # figure stuff
                 if log2 == -1:
                     log2_ = 13
@@ -600,10 +618,10 @@ class Underwriter(object):
                 else:
                     log2_ = log2
                 if bs == 0:
-                    bs_ = answer.object.best_bucket(log2_)
+                    bs_ = answer.object.best_bucket(log2_, recommend_p)
                 else:
                     bs_ = bs
-                logger.info(f'updating with {log2}, bs=1/{1 / bs_}')
+                logger.info(f'updating with {log2_}, bs=1/{1 / bs_}')
                 logger.info(f'({answer.kind}, {answer.name}): bs={bs_} and log2={log2_}')
                 answer.object.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
                                      debug=self.debug, **kwargs)
@@ -691,6 +709,12 @@ class Underwriter(object):
         """
         return self._interpreter_work(list(enumerate(program_list)), debug=True)
 
+    def interpreter_test_suite(self):
+        """
+        Run interpreter on the test suite
+        """
+        return self.interpreter_file(filename=self.test_suite_file)
+
     def _interpreter_work(self, iterable, debug=False):
         """
         Do all the work for the test, allows input to be marshalled into the tester
@@ -757,12 +781,19 @@ class Underwriter(object):
         df_out.index.name = 'index'
         return df_out
 
+    def more(self, regex):
+        """
+        More information about methods and properties matching regex
+
+        """
+        more(self, regex)
+
     def qlist(self, regex):
         """
         Wrapper for show to just list elements in knowledge that match ``regex``.
         Returns a dataframe.
         """
-        return self.show(regex, kind='', plot=False, describe=False, return_df=True)
+        return self.show(regex, kind='', plot=False, describe=False, verbose=True)
 
     def qshow(self, regex):
         """
@@ -780,14 +811,13 @@ class Underwriter(object):
            line_width=160, max_colwidth=130, col_space=15, justify='left',
            max_rows=200, formatters={'program': ff})
 
-    def show(self, regex, kind='', plot=True, describe=True, logger_level=30, return_df=False):
+    def show(self, regex, kind='', plot=True, describe=True, logger_level=30, verbose=False, **kwargs):
         """
         Create from knowledge by name or match to name.
         Optionally plot. Returns the created object plus dataframe with more detailed information.
-        ??How diff from describe??
-        Allows exploration of pre-loaded databases.
+        Allows exploration of preloaded databases.
 
-        Eg ``regex = "A.*[234]`` for A...2, 3 and 4.
+        Eg ``regex = "A.*[234]`` to run examples named A...2, 3 and 4.
 
         See ``qshow`` for a wrapper that just returns the matches, with no object
         creation or plotting.
@@ -807,6 +837,8 @@ class Underwriter(object):
         :param plot:    if True, plot   (default True)
         :param describe: if True, print the describe dataframe
         :param logger_level: work silently!
+        :param verbose: if True, return the dataframe and objects; else no return value
+        :param kwargs: passed to build for calculation instructions
         :return: dictionary of created objects and DataFrame with info about each.
         """
         # too painful getting the one thing out!
@@ -820,6 +852,10 @@ class Underwriter(object):
         else:
             df = self.knowledge.loc[kind].filter(regex=regex, axis=0).copy()
 
+        # severity causes an error: no est_m etc.
+        if "One" in df.index:
+            df = df.drop(index='One')
+
         if plot is False and describe is False:
             # just act like a filtered listing on knowledge
             return df.sort_values('name')
@@ -830,22 +866,24 @@ class Underwriter(object):
         df['agg_m'] = 0.
         df['agg_cv'] = 0.
         df['agg_sd'] = 0.
+        df['agg_skew'] = 0.
         df['emp_m'] = 0.
         df['emp_cv'] = 0.
         df['emp_sd'] = 0.
+        df['emp_skew'] = 0.
+        df['valid'] = False
 
         for n, row in df.iterrows():
             p = row.program
             try:
-                a = self.build(p)
+                a = self.build(p, **kwargs)
                 ans.append(a)
             except NotImplementedError:
                 logger.error(f'skipping {n}...element not implemented')
             else:
                 if describe:
                     # print('DecL Program:\n')
-                    a.pprogram
-                    # print('\n')
+                    getattr(a, 'pprogram', None)
                     qd(a)
                 if plot is True:
                     a.plot(figsize=(8, 2.4))
@@ -854,39 +892,35 @@ class Underwriter(object):
                     show_fig(a.figure, format='svg')
                 if describe:
                     print('\n')
-                # info
-                if isinstance(a, Portfolio):
-                    m, cv = a.describe.loc[('total', 'Agg'), ['Est E[X]', 'Est CV(X)']]
-                elif isinstance(a, Aggregate):
-                    m, cv = a.describe.loc['Agg', ['Est E[X]', 'Est CV(X)']]
-                else:
-                    m = cv = np.nan
-                df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd',
-                            'emp_m', 'emp_cv', 'emp_sd']] = (a.log2, a.bs, a.agg_m, a.agg_cv,
-                                                             a.agg_sd, m, cv, '')
+                df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
+                           'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']] = (
+                    a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, a.agg_skew, a.est_m, a.est_cv, a.est_sd,
+                    a.est_skew, a.valid)
         # if only one item, return it...much easier to use
-        if len(ans) == 1: ans = a
-        if return_df:
+        if len(ans) == 1:
+            # noinspection PyUnboundLocalVariable
+            ans = a
+        if verbose:
             return ans, df
 
-    def dir(self, filter=''):
+    def dir(self, pattern=''):
         """
         List all agg databases in site and default directories.
         If entries is True then read them and return named objects.
 
-        :param filter:  glob filter for filename; .agg is added
+        :param pattern:  glob pattern for filename; .agg is added
 
         """
 
-        if filter=='':
-            filter = '*.agg'
+        if pattern=='':
+            pattern = '*.agg'
         else:
-            filter += '.agg'
+            pattern += '.agg'
 
         entries = []
 
         for dn, d in zip(['site', 'default'], [self.site_dir, self.default_dir]):
-            for fn in d.glob(filter):
+            for fn in d.glob(pattern):
                 txt = fn.read_text(encoding='utf-8')
                 stxt = txt.split('\n')
                 for r in stxt:

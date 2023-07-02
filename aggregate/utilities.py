@@ -29,7 +29,7 @@ from scipy.stats import multivariate_t
 from IPython.core.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG
 
 from .constants import *
-import aggregate.random as ar
+import aggregate.random_agg as ar
 
 
 logger = logging.getLogger(__name__)
@@ -1089,7 +1089,7 @@ class MomentAggregator(object):
         sd = np.sqrt(var)
         if m == 0:
             cv = np.nan
-            logger.warning('MomentAggregator.static_moments_to_mcvsk | encountered zero mean, called with '
+            logger.info('MomentAggregator.static_moments_to_mcvsk | encountered zero mean, called with '
                          f'{ex1}, {ex2}, {ex3}')
         else:
             cv = sd / m
@@ -2786,7 +2786,11 @@ def show_fig(f, format='svg', **kwargs):
 
 def partial_e(sev_name, fz, a, n):
     """
-    compute the partial expected value of fz
+    Compute the partial expected value of fz. Computing moments is a bottleneck, so you
+    want analytic computation for the most commonly used types.
+
+    Exponential (for mixed exponentials) implemented separate from gamma even though it
+    is a special case.
 
     .. math:
 
@@ -2803,7 +2807,7 @@ def partial_e(sev_name, fz, a, n):
     :return: partial expected value
     """
 
-    if sev_name not in ['lognorm', 'gamma', 'pareto']:
+    if sev_name not in ['lognorm', 'gamma', 'pareto', 'expon']:
         raise NotImplementedError(f'{sev_name} NYI for analytic moments')
 
     if a == 0:
@@ -2816,6 +2820,17 @@ def partial_e(sev_name, fz, a, n):
         ans = [np.exp(k * mu + (k * sigma)**2 / 2) *
                (ss.norm.cdf((np.log(a) - mu - k * sigma**2)/sigma) if a < np.inf else 1.0)
                for k in range(n+1)]
+        return ans
+
+    elif sev_name == 'expon':
+        # really needed for MEDs
+        # expon is gamma with shape = 1
+        scale = fz.stats('m')
+        shape = 1.
+        lgs = loggamma(shape)
+        ans = [scale ** k * np.exp(loggamma(shape + k) - lgs) *
+               (ss.gamma(shape + k, scale=scale).cdf(a) if a < np.inf else 1.0)
+               for k in range(n + 1)]
         return ans
 
     elif sev_name == 'gamma':
@@ -3001,18 +3016,7 @@ def qt(a):
     """
     Quick test diagnostics for an Aggregate object.
     """
-    sev_err = a.est_sev_m / a.sev_m - 1
-    agg_err = a.agg_m / a.est_m - 1
-    n = 40
-    sev = 'sev mean: pass' if abs(sev_err) < a.validation_eps else f'sev mean: fails {sev_err: .4e}'
-    agg = 'agg mean: pass' if abs(agg_err) < a.validation_eps else f'agg mean: fails {agg_err: .4e}'
-    explanation = ''
-    if abs(sev_err) < a.validation_eps and abs(agg_err) < a.validation_eps:
-        bs = a.bs * 2
-        if bs != int(bs):
-            bs = '/'.join([str(i) for i in bs.as_integer_ratio()])
-        explanation = f'\nvalidation suggests possible aliasing\ntry increasing bucket size to {bs}'
-    print(f"{'-' * n}\n{sev}\n{agg}{explanation}\n{'-' * n}")
+    print(a.qt())
 
 
 def mv(x, y=None):
@@ -3629,3 +3633,73 @@ def kaplan_meier_np(loss, closed):
     """
     df = pd.DataFrame({'loss': loss, 'closed': closed})
     return kaplan_meier(df)
+
+
+def more(self, regex):
+    """
+    Investigate self for matches to the regex. If callable, try calling with no args, else display.
+
+    """
+    for i in dir(self):
+        if re.search(regex, i):
+            ob = getattr(self, i)
+            if not callable(ob):
+                display(Markdown(f'### Attribute: {i}\n'))
+                display(ob)
+            else:
+                display(Markdown(f'### Callable: {i}\n'))
+                try:
+                    print(ob())
+                except Exception as e:
+                    help(ob)
+
+
+def parse_note(txt):
+    """
+    Extract kwargs from txt note. Recognizes bs, log2, padding, normalize, recommend_p.
+    CSS format.
+    Split on ; and then look for k=v pairs
+    bs can be entered as 1/32 etc.
+
+    :param txt: input text
+    :return value: dictionary of keyword: typed value
+    """
+
+    stxt = txt.split(';')
+    ans = {}
+    for s in stxt:
+        kw = s.split('=')
+        if len(kw) == 2:
+            k = kw[0].strip()
+            v = kw[1].strip()
+            if re.match('bs|recommend_p', k):
+                if re.match(r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?/(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?', v):
+                    v = eval(v)
+                else:
+                    v = float(v)
+            elif re.match('log2|padding', k):
+                v = int(v)
+            elif 'normalize':
+                v = v == 'True'
+            ans[k] = v
+    return ans
+
+
+def parse_note_ex(txt, log2, bs, recommend_p, kwargs):
+    """
+    Avoid duplication: this is how the function is used in Underwriter.build.
+
+    """
+    kw = parse_note(txt)
+    if 'log2' in kw and log2 == 0:
+        log2 = kw.pop('log2')
+    if 'bs' in kw and bs == 0:
+        bs = kw.pop('bs')
+    if 'recommend_p' in kw:
+        # always take the recommend_p from the note
+        recommend_p = kw.pop('recommend_p')
+    # rest are passed through
+    kwargs.update(kw)
+    return log2, bs, recommend_p, kwargs
+
+

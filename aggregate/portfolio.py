@@ -33,8 +33,8 @@ from .utilities import (ft,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, Answer, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
-                        make_var_tvar)
-import aggregate.random as ar
+                        make_var_tvar, more)
+import aggregate.random_agg as ar
 
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
@@ -230,6 +230,13 @@ class Portfolio(object):
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
         self.validation_eps = VALIDATION_EPS
+
+    def more(self, regex):
+        """
+        More information about methods and properties matching regex
+
+        """
+        more(self, regex)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """

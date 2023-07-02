@@ -61,12 +61,17 @@ dev = [
     "sphinx-multitoc-numbering"
 ]
 
-[tool.setuptools]
-include-package-data = true
-packages = ["aggregate", "aggregate.extensions"]
-
 [tool.setuptools.dynamic]
 version  = { attr = "aggregate.__version__" }
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+#packages = ["aggregate", "aggregate.extensions"]
+exclude = ["templates*", "agg*"]
+
 [project.entry-points."pygments.lexers"]
-excl = "aggregate.decl_pygments:AggLexer"
+lexer = "aggregate.decl_pygments:AggLexer"
+

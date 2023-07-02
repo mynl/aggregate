@@ -1,4 +1,5 @@
 # hold global random state
+# July 2023: changed name to random_agg; can't have a module called random; it clashes with the built-in
 
 import numpy as np
 

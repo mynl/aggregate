@@ -28,6 +28,14 @@
 #
 # Calculator is more bother than it is worth... keep exp, ** and /, but drop everything else (use f strings!)
 # Result has SR conflicts but it parses all the test programs
+#
+# June 2023 have 21 shift/reduce conflicts.
+# 20 of them are five groups of four: EXP, (, NUMBER, INFINITY
+# The remaining one is [ around dfreq
+#
+# July 2023 changes
+# make atom ** factor into factor ** factor so that (1 / 3) ** (3 /4) works
+
 
 import logging
 import numpy as np
@@ -69,8 +77,8 @@ class UnderwritingLexer(Lexer):
     # per manual, need to list longer tokens before shorter ones
     # simple but effective notes
     NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
+    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
+    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
     FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic|negbin'
     DISTORTION = 'dist(ortion)?'
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
@@ -79,7 +87,7 @@ class UnderwritingLexer(Lexer):
 
     # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
-    ID = r'[a-zA-Z][\._:~a-zA-Z0-9]*'
+    ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
     EXPONENT = r'\^|\*\*'
     PLUS = r'\+'
     MINUS = r'\-'
@@ -146,10 +154,9 @@ class UnderwritingLexer(Lexer):
 
         1. Remove // comments, through end of line
         2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
-        3. Semicolon ; mapped to newline
-        4. Backslash (line continuation) mapped to space
-        5. \\n\\t is replaced with space, supporting the tabbed indented Portfolio layout
-        6. Split on newlines
+        3. Backslash (line continuation) mapped to space
+        4. \\n\\t is replaced with space, supporting the tabbed indented Portfolio layout
+        5. Split on newlines
 
         :param program:
         :return:
@@ -169,7 +176,7 @@ class UnderwritingLexer(Lexer):
 
         #  preprocessing: line continuation; \n\t or \n____ to space (for port agg element indents),
         # ; to new line, split on new line
-        program = program.replace('\\\n', ' '). replace('\n\t', ' ').replace('\n    ', ' ').replace(';', '\n')
+        program = program.replace('\\\n', ' '). replace('\n\t', ' ').replace('\n    ', ' ')
 
         # split program into lines, only accept len > 0
         program = [i.strip() for i in program.split('\n') if len(i.strip()) > 0]
@@ -184,6 +191,8 @@ class UnderwritingParser(Parser):
 
     # uncomment to write detailed grammar rules
     # debugfile = Path.home() / 'aggregate/parser/parser.out'
+    # this won't have been created the first time this runs in a clean environment, hence:
+    # debugfile.mkdir(parents=True, exist_ok=True)
     debugfile = None
     tokens = UnderwritingLexer.tokens
     precedence = (
@@ -192,7 +201,7 @@ class UnderwritingParser(Parser):
         ('nonassoc', INHOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
         ('left', TIMES, DIVIDE),
-        ('right', EXP),
+        # ('right', EXP),
         ('right', EXPONENT),
         ('nonassoc', PERCENT),
     )
@@ -236,7 +245,7 @@ class UnderwritingParser(Parser):
         if f_out == '':
             f_out = DEBUGFILE.with_suffix('.html')
         else:
-            f_out = Path(fn)
+            f_out = Path(f_out)
 
         txt = Path(DEBUGFILE).read_text(encoding='utf-8')
         txt = txt.replace('Grammar:\n', '<h1>Grammar:</h1>\n\n<pre>\n').replace('->', '<-')
@@ -904,6 +913,17 @@ class UnderwritingParser(Parser):
         self.logger(f'numbers <-- [numberl]', p)
         return p.numberl
 
+    # allow range notation in numbers
+    @_('"[" expr RANGE expr "]"')
+    def numbers(self, p):
+        self.logger('numbers <-- [expr : expr]', p)
+        return np.arange(p[1], p[3] + 1)
+
+    @_('"[" expr RANGE expr RANGE expr "]"')
+    def numbers(self, p):
+        self.logger('numbers <-- [expr : expr : expr]', p)
+        return np.arange(p[1], p[3] + 1, p[5])
+
     @_('numberl expr')
     def numberl(self, p):
         self.logger(
@@ -937,15 +957,23 @@ class UnderwritingParser(Parser):
         self.logger('term <-- factor', p)
         return p.factor
 
+    @_('"(" term ")"')
+    def factor(self, p):
+        return p.term
+
+    @_('EXP "(" term ")"')
+    def factor(self, p):
+        return exp(p.term)
+
     @_('power')
     def factor(self, p):
         self.logger('factor <-- power', p)
         return p.power
 
-    @_('atom EXPONENT factor')
+    @_('factor EXPONENT factor')
     def power(self, p):
-        self.logger('power <-- atom EXPONENT factor', p)
-        return p.atom ** p.factor
+        self.logger('power <-- factor EXPONENT factor', p)
+        return p[0] ** p[2]
 
     @_('atom')
     def power(self, p):
@@ -967,14 +995,6 @@ class UnderwritingParser(Parser):
         self.logger(f'atom <-- NUMBER, {p.NUMBER}', p)
         t = float(p.NUMBER)
         return t
-
-    @_('"(" term ")"')
-    def factor(self, p):
-        return p.term
-    #
-    @_('EXP "(" term ")"')
-    def factor(self, p):
-        return exp(p.term)
 
     def error(self, p):
         if p:
@@ -1017,7 +1037,7 @@ def grammar(add_to_doc=False, save_to_fn=''):
             try:
                 b1 = b[1].split("(self, p):")[0].strip()
             except:
-                logger.warning(f'Unexpected multirule behavior {it}')
+                logger.error(f'Unexpected multirule behavior {it}')
                 exit()
             if b1 in ans:
                 ans[b1] += b0

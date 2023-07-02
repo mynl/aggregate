@@ -9,7 +9,7 @@ from textwrap import fill
 import logging
 
 from .constants import *
-from .random import RANDOM
+from .random_agg import RANDOM
 
 logger = logging.getLogger(__name__)
 

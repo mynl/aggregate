@@ -118,18 +118,18 @@ expr                	::= term
 term                	::= term DIVIDE factor
                     	 | factor
 
-factor              	::= power
-                    	 | "(" term ")"
+factor              	::= "(" term ")"
                     	 | EXP "(" term ")"
+                    	 | power
 
-power               	::= atom EXPONENT factor
+power               	::= factor EXPONENT factor
                     	 | atom
 
 atom                	::= NUMBER PERCENT
                     	 | INFINITY
                     	 | NUMBER
 
-FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed'
+FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed|logarithmic|negbin'
 
 BUILTINID               ::= 'sev|agg|port|meta.ID'
 

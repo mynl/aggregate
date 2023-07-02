@@ -82,13 +82,53 @@ Installation
 Version History
 -----------------
 
-Ideas
-~~~~~~~~~
+0.17.0 (July 2023)
+~~~~~~~~~~~~~~~~~~~~
 
-* Show hazard rate?
+* ``more`` added as a proper method
+* Fixed debugfile in parser.py which stops installation if not None (need to
+  enure the directory exists)
+* Fixed build and MANIFEST to remove build warning
+* parser: semicolon no longer mapped to newline; it is now used to provide hints
+  notes
+* ``recommend_bucket`` uses p=max(p, 1-1e-8) if limit=inf. Default increased from 0.999
+  to 0.99999 based on examples; works well for limited severity but not well for unlimited severity.
+* Implemented calculation hints in note strings. Format is k=v; pairs; k
+  bs, log2, padding, recommend_p, normalize are recognized. If present they are used
+  if no arguments are passed explicitly to ``build``.
+* Added ``interpreter_test_suite()`` to ``Underwriter`` to run the test suite
+* Added ``test_suite_file`` to ``Underwriter`` to return ``Path`` to ``test_suite.agg``` file
+* Layers, attachments, and the reinsurance tower can now be ranges, ``[s:f:j]`` syntax
 
-0.16.0
-~~~~~~~~~~
+0.16.1 (July 2023)
+~~~~~~~~~~~~~~~~~~~~
+
+* IDs can now include dashes: Line-A is a legitimate date
+* Include templates and test-cases.agg file in the distribution
+* Fixed mixed severity / limit profile interaction. Mixtures now work with
+  exposure defined by losses and premium (as opposed to just claim count),
+  correctly account for excess layers (which requires re-weighting the
+  mixture components). Involves fixing the ground up severity and using it
+  to adjust weights first. Then, by layer, figure the severity and convert
+  exposure to claim count if necessary. Cases where there is no loss in the
+  layer (high layer from low mean / low vol componet) replace by zero. Use
+  logging level 20 for more details.
+* Added ``more`` function to ``Portfolio``, ``Aggregate`` and ``Underwriter`` classes.
+  Given a regex it returns all methods and attributes matching. It tries to call a method
+  with no arguments and reports the answer. ``more`` is defined in utilities
+  and can be applied to any object.
+* Moved work of ``qt`` from utilities into ``Aggregate``` (where it belongs).
+  Retained ``qt`` for backwards compatibility.
+* Parser: power <- atom ** factor to power <- factor ** factor to allow (1/2)**(3/4)
+* ``random` module renamed `random_agg`` to avoid conflict with Python ``random``
+* Implemented exact moments for exponential (special case of gamma) because
+  MED is a common distribution and computing analytic moments is very time
+  consuming for large mixtures.
+* Added ZM and ZT examples to test_cases.agg; adjusted Portfolio examples to
+  be on one line so they run through interpreter_file tests.
+
+0.16.0 (June 2023)
+~~~~~~~~~~~~~~~~~~~~
 
 * Implemented ZM and ZT distributions using decorators!
 * Added panjer_ab to Frequency, reports a and b values, p_k = (a + b / k) p_{k-1}. These values can be tested
@@ -98,16 +138,16 @@ Ideas
 * Added negbin frequency where freq_a equals the variance multiplier
 
 
-0.15.0
-~~~~~~~~~
+0.15.0 (June 2023)
+~~~~~~~~~~~~~~~~~~~~
 
 * Added pygments lexer for decl (called agg, agregate, dec, or decl)
 * Added to the documentation
 * using pygments style in ``pprint_ex`` html mode
 * removed old setup scripts and files and stack.md
 
-0.14.1
-~~~~~~~
+0.14.1 (June 2023)
+~~~~~~~~~~~~~~~~~~~~
 
 * Added scripts.py for entry points
 * Updated .readthedocs.yaml to build from toml not requirements.txt

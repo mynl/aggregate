@@ -18,14 +18,15 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         partial_e, partial_e_numeric, moms_analytic, qd,
                         sEngFormatter, mv, picks_work, GCN, lognorm_approx,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
-                        make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np)
+                        make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
+                        more, parse_note, parse_note_ex, )
 from .spectral import Distortion, approx_ccoc
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
 from .underwriter import Underwriter, build, debug_build
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
-from .random import *
+from .random_agg import *
 from .decl_pygments import *
 
 import sys
@@ -45,8 +46,8 @@ __copyright__ = "2018-2023, Convex Risk LLC"
 __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
-# only need to change here, feeds conf.py (docs) and setup.py (build)
-__version__ = "0.16.0"
+# only need to change here, feeds conf.py (docs) and pyproject.toml (build)
+__version__ = "0.17.0"
 
 # set up
 from pathlib import Path

@@ -47,15 +47,17 @@
 
 -----
 
-aggregate: a powerful aggregate distribution modeling library in Python
-========================================================================
+aggregate: a powerful Python actuarial modeling library
+========================================================
 
 Purpose
 -----------
 
-``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
-It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
-``aggregate`` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
+``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect
+underlying frequency and severity. It delivers the speed and accuracy of parametric distributions to situations
+that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution
+as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
+and is implemented in Python under an open source BSD-license.
 
 
 Documentation
@@ -86,6 +88,12 @@ Version History
 ~~~~~~~~
 
 * Adjusted pyproject.toml
+* pygments lexer tweaks
+* Simplified grammar: % and inf now handled as part of resolving NUMBER; still 16 = 5 * 3 + 1 SR conflicts
+* Reading databases on demand in Underwriter, resulting in faster object creation
+* Creating and testing exsitance of subdirectories in Undewriter on demand using properties
+* Creating directories moved into Extensions __init__.py
+* lexer and parser as properties for Underwriter object creation
 
 0.17.0 (July 2023)
 ~~~~~~~~~~~~~~~~~~~~

@@ -23,7 +23,7 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
 from .spectral import Distortion, approx_ccoc
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
-from .underwriter import Underwriter, build, debug_build
+from .underwriter import Underwriter, build
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *
@@ -49,17 +49,6 @@ __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
 __version__ = "0.17.1"
 
-# set up
-from pathlib import Path
-base_dir = Path.home() / 'aggregate'
-base_dir.mkdir(exist_ok=True)
-
-for p in ['cases', 'parser', 'temp', 'generated']:
-    (base_dir / p).mkdir(exist_ok=True)
-
-# print('All directories exist')
-
-del p, base_dir
 
 
 # as a default turn off all logging

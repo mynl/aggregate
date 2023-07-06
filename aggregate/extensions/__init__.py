@@ -14,6 +14,16 @@ from . ft import *
 from . pentagon import Pentagon, mapper, make_possible_pentagons
 
 
+# set up
+from pathlib import Path
+base_dir = Path.home() / 'aggregate'
+base_dir.mkdir(exist_ok=True)
+
+for p in ['cases', 'temp', 'generated']:
+    (base_dir / p).mkdir(exist_ok=True)
+
+del p, base_dir
+
 # module level doc-string
 __doc__ = """
 Extensions contains optional, nice to have code that extends basic functionality.

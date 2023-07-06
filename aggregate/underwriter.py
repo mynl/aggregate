@@ -4,7 +4,7 @@ import logging
 import pandas as pd
 from pathlib import Path
 import re
-from IPython.display import HTML, display
+# from IPython.display import HTML, display
 # from inspect import signature
 
 from .constants import *
@@ -65,55 +65,89 @@ class Underwriter(object):
             raise ValueError('log2 must be > 0. The number of buckets used equals 2**log2.')
         self.log2 = log2
         self.debug = debug
-        self.lexer = UnderwritingLexer()
-        self.parser = UnderwritingParser(self.safe_lookup, debug)
+        self._lexer = None
+        self._parser = None
+        # make sure all database entries are stored; they are read on demand
+        self.databases = databases
         # stop pyCharm complaining
-        # knowledge - accounts and line known to the underwriter
-        self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
-            ['kind', 'name'])
 
-        if databases == 'all':
-            databases = ['default', 'site']
-        elif type(databases) == str:
-            databases = [databases]
+        # do not read in until needed for faster loading
+        self._default_dir = None
+        self._site_dir = None
+        self._case_dir = None
+        self._template_dir = None
+        self._knowledge = None
 
-        # default_dir is installed by pip and contain installation files
-        self.default_dir = Path(__file__).parent / 'agg'
-
-        # site dir is in Users's home directory and stores their files
-        self.site_dir = Path.home() / 'aggregate/databases'
-        # check site dir exists
-        self.site_dir.mkdir(parents=True, exist_ok=True)
-
-        # case dir
-        self.case_dir = Path.home() / 'aggregate/cases'
-        # check case dir exists
-        self.case_dir.mkdir(parents=True, exist_ok=True)
-
-        self.template_dir = self.default_dir.parent / 'templates'
-        self.template_dir.mkdir(parents=True, exist_ok=True)
-
-        # make sure all database entries are stored:
-        if databases is None:
-            # nothing to do
-            databases = []
-
-        if 'default' in databases:
-            # add all databases in default_dir
-            databases.remove('default')
-            for fn in self.default_dir.glob('*.agg'):
-                self.read_database(fn)
-
-        if 'site' in databases:
-            # add all user databases
-            databases.remove('site')
-            databases += list(self.site_dir.glob('*.agg'))
-
-        for fn in databases:
-            self.read_database(fn)
-
-        # ?! ensure description prints correctly. A bit cheaky.
+        # ensure description prints correctly. A bit cheaky.
         pd.set_option('display.max_colwidth', 100)
+
+    @property
+    def lexer(self):
+        if self._lexer is None:
+            self._lexer = UnderwritingLexer()
+        return self._lexer
+
+    @property
+    def parser(self):
+        if self._parser is None:
+            self._parser = UnderwritingParser(self.safe_lookup, self.debug)
+        return self._parser
+
+    @property
+    def default_dir(self):
+        # default_dir is installed by pip and contain installation files
+        if self._default_dir is None:
+            self._default_dir = Path(__file__).parent / 'agg'
+            self._default_dir.mkdir(parents=True, exist_ok=True)
+        return self._default_dir
+
+    @property
+    def site_dir(self):
+        # site dir is in Users's home directory and stores their files
+        if self._site_dir is None:
+            self._site_dir = Path.home() / 'aggregate/databases'
+            self._site_dir.mkdir(parents=True, exist_ok=True)
+        return self._site_dir
+
+    @property
+    def case_dir(self):
+        # case dir is in Users's home directory and stores their files
+        if self._case_dir is None:
+            self._case_dir = Path.home() / 'aggregate/cases'
+            # check case dir exists
+            self._case_dir.mkdir(parents=True, exist_ok=True)
+        return self._case_dir
+
+    @property
+    def template_dir(self):
+        # template dir is in Users's home directory and stores their files
+        if self._template_dir is None:
+            self._template_dir = self.default_dir.parent / 'templates'
+            self._template_dir.mkdir(parents=True, exist_ok=True)
+        return self._template_dir
+
+    def read_databases(self):
+        if self.databases is None:
+            # nothing to do
+            self.databases = []
+        elif self.databases == 'all':
+            self.databases = ['default', 'site']
+        elif type(self.databases) == str:
+            self.databases = [self.databases]
+
+        if 'default' in self.databases:
+            # add all databases in default_dir
+            self.databases.remove('default')
+            self.databases.extend(self.default_dir.glob('*.agg'))
+
+        if 'site' in self.databases:
+            # add all user databases
+            self.databases.remove('site')
+            self.databases.extend(self.site_dir.glob('*.agg'))
+
+        # actually read databases
+        for fn in self.databases:
+            self.read_database(fn)
 
     def read_database(self, fn):
         """
@@ -177,6 +211,8 @@ class Underwriter(object):
         if not isinstance(item, (str, tuple)):
             raise ValueError(f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
 
+        assert self.knowledge is not None
+
         try:
             if type(item) == str:
                 # name == item, any type
@@ -201,7 +237,7 @@ class Underwriter(object):
         s = []
         s.append(f'underwriter        {self.name}')
         s.append(f'version            {aggregate.__version__}')
-        s.append(f'knowledge          {len(self._knowledge)} programs')
+        s.append(f'knowledge          {len(self.knowledge)} programs')
         s.append(f'update             {self.update}')
         for k in ['log2', 'debug']:
             s.append(f'{k:<19s}{getattr(self, k)}')
@@ -222,23 +258,6 @@ class Underwriter(object):
         s.append( 'build.qshow(pat)   show programs matching pattern')
         s.append( 'build.show(pat)    build and display matching pattern')
         return '\n'.join(s)
-
-    # def _repr_html_(self):
-    #     import aggregate
-    #     s = [f'<p><h3>Underwriter {self.name}</h3>',
-    #          f'Version {aggregate.__version__}. '
-    #          f'Knowledge contains {len(self._knowledge)} programs. '
-    #          'Run <code>build.knowledge</code> for a DataFrame listing by kind and name. '
-    #          'Run <code>build.show(name)</code> for more details, <code>name</code>, '
-    #          'accepts wildcards and regular expressions.'
-    #          '</p>'
-    #          # '<br>',
-    #          # self.knowledge.to_html(),
-    #          f'<p>Settings: '
-    #          ]
-    #     for k in ['log2', 'update', 'debug']:
-    #         s.append(f'<span style="color: red;">{k}</span>: {getattr(self, k)}; ')
-    #     return '\n'.join(s) + '</p>'
 
     def factory(self, answer):
         """
@@ -287,6 +306,11 @@ class Underwriter(object):
 
     @property
     def knowledge(self):
+        if self._knowledge is None:
+        # knowledge - accounts and line known to the underwriter
+            self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
+                ['kind', 'name'])
+            self.read_databases()
         return self._knowledge.sort_index()[['program', 'spec']]
 
     @property
@@ -419,7 +443,6 @@ class Underwriter(object):
         :param portfolio_program:
         :return:
         """
-
         # Preprocess ---------------------------------------------------------------------
         portfolio_program = self.lexer.preprocess(portfolio_program)
 
@@ -454,38 +477,6 @@ class Underwriter(object):
                 rv.append(Answer(kind=kind, name=name, spec=spec, program=program_line, object=None))
 
         return rv
-
-    # @staticmethod
-    # def add_defaults(dict_in, kind='agg'):
-    #     """
-    #     add default values to dict_inin. Leave existing values unchanged
-    #     Used to output to a data frame, where you want all columns completed
-    #
-    #     :param dict_in:
-    #     :param kind:
-    #     :return:
-    #     """
-    #
-    #     print('running add_defaults\n' * 10)
-    #
-    #     # use inspect to get the defaults
-    #     # obtain signature
-    #     sig = signature(Aggregate.__init__)
-    #
-    #     # self and name --> bound signature
-    #     bs = sig.bind(None, '')
-    #     bs.apply_defaults()
-    #     # remove self
-    #     bs.arguments.pop('self')
-    #     defaults = bs.arguments
-    #
-    #     if kind == 'agg':
-    #         defaults.update(dict_in)
-    #
-    #     elif kind == 'sev':
-    #         for k, v in defaults.items():
-    #             if k[0:3] == 'sev' and k not in dict_in and k != 'sev_wt':
-    #                 dict_in[k] = v
 
     def safe_lookup(self, buildinid):
         """
@@ -936,4 +927,5 @@ class Underwriter(object):
 # self = dbuild = None
 logger_level(30)
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
-debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)
+# uncomment to create debug build, add to __init__.py
+# debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

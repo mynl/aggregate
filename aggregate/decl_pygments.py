@@ -51,6 +51,8 @@ class AggLexer(RegexLexer):
             (r'note\{[^\}]*\}', Comment),
             (r'#.*$', Comment),
             ('!', Generic.Heading),
+            # these are for documenation
+            (r'\<|\>', Generic.Heading),
             # the regex for an ID from parser.py
             (r'mixed ', Operator, 'mixed_freq'),
             include('keywords'),
@@ -59,7 +61,7 @@ class AggLexer(RegexLexer):
         ],
 
         'mixed_freq': [
-            (words(('gamma', 'delaporte', 'ig', 'sig', 'beta'),
+            (words(('gamma', 'delaporte', 'ig', 'sig', 'beta', 'sichel'),
                    suffix=' '
                    ), Name.Function, '#pop'),
             (r'sichel\.',  Name.Function)
@@ -125,9 +127,9 @@ class AggLexer(RegexLexer):
 
             # all IDs from the parser.py file
             (words(
-                ('occurrence', 'unlimited', 'aggregate', 'exposure', 'tweedie',
+                ('occurrence', 'distortion', 'unlimited', 'aggregate', 'exposure', 'tweedie',
                     'premium', 'tower', 'unlim', 'picks', 'prem',
-                    'claims', 'ceded', 'claim', 'loss',
+                    'claims', 'ceded', 'claim', 'loss', 'dist',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                     'inf', 'and', 'exp', 'wt', 'at', 'cv', 'lr', 'xs',
                     'of', 'to', 'po', 'so', 'zm', 'zt', 'x', ),

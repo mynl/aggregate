@@ -108,6 +108,8 @@ builtin_agg         	::= expr INHOMOG_MULTIPLY builtin_agg
 name                	::= ID
 
 numbers             	::= "[" numberl "]"
+                    	 | "[" expr RANGE expr "]"
+                    	 | "[" expr RANGE expr RANGE expr "]"
                     	 | expr
 
 numberl             	::= numberl expr
@@ -125,9 +127,7 @@ factor              	::= "(" term ")"
 power               	::= factor EXPONENT factor
                     	 | atom
 
-atom                	::= NUMBER PERCENT
-                    	 | INFINITY
-                    	 | NUMBER
+atom                	::= NUMBER
 
 FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed|logarithmic|negbin'
 

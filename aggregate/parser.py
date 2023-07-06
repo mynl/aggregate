@@ -58,7 +58,7 @@ class UnderwritingLexer(Lexer):
 
     tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
               SEV, AGG, PORT,
-              NUMBER, INFINITY,
+              NUMBER, # INFINITY,
               PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
               LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
               XS, PICKS,
@@ -66,7 +66,7 @@ class UnderwritingLexer(Lexer):
               CV, WEIGHTS, EQUAL_WEIGHT, XPS,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
-              AND,  PERCENT,
+              AND, # PERCENT,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
               }
@@ -76,16 +76,17 @@ class UnderwritingLexer(Lexer):
 
     # per manual, need to list longer tokens before shorter ones
     # simple but effective notes
-    NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
+    NOTE = r'note\{[^\}]*\}'
     BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
     BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
     FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic|negbin'
     DISTORTION = 'dist(ortion)?'
     # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
-    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
-    # NUMBER = r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
+    # includes inf, -inf and percents
+    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?%?|\-?inf'
 
-    # do not allow _ in line names, use ~ or . or : instead: why: because p_ is used and _ is special
+    # do use _ in unit names as part of portfolios. Can use ~ or . or : instead:
+    # why? because p_ is used and _ is special
     # on honor system...really need two types of ID, it is OK in a portfolio name
     ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
     EXPONENT = r'\^|\*\*'
@@ -93,20 +94,17 @@ class UnderwritingLexer(Lexer):
     MINUS = r'\-'
     TIMES = r'\*'
     DIVIDE = '/'
-    PERCENT = '%'
     INHOMOG_MULTIPLY = '@'
     EQUAL_WEIGHT = '='
     RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
-    ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
     ID['exposure'] = EXPOSURE
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['tower'] = TOWER
     ID['mixed'] = MIXED
-    ID['unlim'] = INFINITY
     ID['picks'] = PICKS
     ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
@@ -122,7 +120,6 @@ class UnderwritingLexer(Lexer):
     ID['agg'] = AGG
     ID['xps'] = XPS
     ID['wts'] = WEIGHTS
-    ID['inf'] = INFINITY
     ID['and'] = AND
     ID['exp'] = EXP
     ID['wt'] = WEIGHTS
@@ -187,23 +184,36 @@ class UnderwritingParser(Parser):
     """
     Implements the Parser for the agg language.
 
+    Here are testers for the math expressions::
+
+        from aggregate import build
+        for t in ['-123', '-2%', '45%', '1e-3%', 'inf', '-inf', 'exp(1)', 'exp(1/2)', 'exp(-1)', '-1/8',
+                  'exp(10)/exp(3**2/2)', '2**10', '50/exp(.3**2/2)', '1/exp(1.9**2 / 2)']:
+            a = build(t)
+            print(a.name)
+            assert float(a.name) == eval(t.replace('%', '/100').replace('exp', 'np.exp').replace('inf', 'np.inf'))
+
+    To test on the test_suite::
+
+        df = build.interpreter_test_suite()
+        assert len(df.query('error != 0')) == 0
+
     """
 
+    debugfile = None
     # uncomment to write detailed grammar rules
     # debugfile = Path.home() / 'aggregate/parser/parser.out'
     # this won't have been created the first time this runs in a clean environment, hence:
-    # debugfile.mkdir(parents=True, exist_ok=True)
-    debugfile = None
+    # debugfile.parent.mkdir(parents=True, exist_ok=True)
     tokens = UnderwritingLexer.tokens
     precedence = (
-        # LOW is used to force shift in rules like
-        ('nonassoc', LOW),
+        ('nonassoc', LOW), #  used to force shift in rules
         ('nonassoc', INHOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
-        ('left', TIMES, DIVIDE),
-        # ('right', EXP),
+        ('left', TIMES),  # for scaling distributions
+        ('left', DIVIDE), # for internal math in expressions
+        # ('right', EXP),   # exponential function
         ('right', EXPONENT),
-        ('nonassoc', PERCENT),
     )
 
     def __init__(self, safe_lookup_function, debug=False):
@@ -980,20 +990,17 @@ class UnderwritingParser(Parser):
         self.logger('power <-- atom', p)
         return p.atom
 
-    @_('NUMBER PERCENT')
-    def atom(self, p):
-        self.logger('atom <-- atom PERCENT', p)
-        return float(p.NUMBER) / 100
-
-    @_('INFINITY')
-    def atom(self, p):
-        self.logger(f'atom <-- INFINITY', p)
-        return np.inf
-
     @_('NUMBER')
     def atom(self, p):
         self.logger(f'atom <-- NUMBER, {p.NUMBER}', p)
-        t = float(p.NUMBER)
+        if p.NUMBER.endswith('%'):
+            t = float(p.NUMBER[:-1]) / 100
+        elif p.NUMBER == "inf":
+            t = np.inf
+        elif p.NUMBER == "-inf":
+            t = -np.inf
+        else:
+            t = float(p.NUMBER)
         return t
 
     def error(self, p):

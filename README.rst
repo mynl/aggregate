@@ -94,6 +94,9 @@ Version History
 * Creating and testing exsitance of subdirectories in Undewriter on demand using properties
 * Creating directories moved into Extensions __init__.py
 * lexer and parser as properties for Underwriter object creation
+* Default ``recommend_p`` changed from 0.999 to 0.99999.
+* ``recommend_bucket`` now uses ``p=max(p, 1-1e-8)`` if severity is unlimited.
+
 
 0.17.0 (July 2023)
 ~~~~~~~~~~~~~~~~~~~~

@@ -12,13 +12,17 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
     """
     Illustrate wrapping by convolving a uniform distribution with mean ez
     en times (if ``ez>0`` or ``sev_clause!=''``) or using the input ``sev_clause``.
-    ``sev_clause`` should be a ``dsev`` tailored to ``bs==1``.
+    ``sev_clause`` should be a ``dsev`` tailored to ``bs==1`` or just a Poisson
+    if ez==1.
 
     Show in a space just big enough for the severity first and then
     big enough for the full aggregate. Center and right hand plot illustrate how the
     full components are sliced up and combined to the wrapped total.
 
     If small2 is zero it is taken to be the smallest value to "fit" the severity.
+
+    In Poisson ez==1 mode, small2 equals the size of the small window to use for
+    convolution. big2 is estimated to fit the whole distribution.
 
     (moved from figures.py)
 
@@ -38,6 +42,13 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
         z = np.diff(sev.sev.cdf(xs))
         # enough space for aggregate
         big2 = int(np.ceil(np.log2(q1 * en)))
+    elif ez == 1:
+        assert small2, 'Need to input small2 in Poisson mode'
+        z = np.zeros(1 << small2)
+        z[1] = 1
+        # full space
+        sigma = np.sqrt(en)
+        big2 = int(np.ceil(np.log2(en + 5 * sigma)))
     else:
         # enough space for severity and make sev
         if small2 == 0:
@@ -51,20 +62,26 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
         ds = 'steps-post'
     else:
         ds = 'default'
+    if ez == 1:
+        wrapped = irfft( np.exp(en * (rfft(z) - 1)))
+        full = irfft( np.exp(en * (rfft(z, 1 << big2) - 1)))
+    else:
+        wrapped = irfft( rfft(z) ** en )
+        full = irfft( rfft(z, 1 << big2) ** en )
 
-    wrapped = irfft( rfft(z) ** en )
     ax0.plot(wrapped, c='C0', drawstyle=ds)
+    ax0.xaxis.set_major_locator(mpl.ticker.MultipleLocator(4))
     ax0.set(title=f'Wrapped distribution\nlog2={small2}')
     lm = ax0.get_ylim()
     lm = (-lm[1] / 20, lm[1]* 1.1)
     ax0.set(ylim=lm)
 
-    full = irfft( rfft(z, 1<<big2) ** en )
     norm = mpl.colors.Normalize(0, 1, clip=True)
     cmappable = mpl.cm.ScalarMappable(norm=norm, cmap='plasma')
     mapper = cmappable.to_rgba
     cc = list(map(mapper, np.linspace(0, 1, 1 << big2-small2)))
     ax1.plot(full, label='Full computation', c='w', alpha=1, lw=3, drawstyle=ds)
+    ax1.xaxis.set_major_locator(mpl.ticker.MultipleLocator(32))
     for n, (s, c) in enumerate(zip(full.reshape((1<<big2-small2, 1<<small2)), cc)):
         ax1.plot(s, c=c, label=f'Part {n}', drawstyle=ds)
         ax1.plot(np.arange((1<<small2) * n, (1<<small2) * (n+1)), s, c=c, lw=2,
@@ -82,6 +99,7 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
     ax2.plot(wrapped_from_full.sum(0), lw=3
              , drawstyle=ds, label='Wrapped from full', c='C1')
     ax2.plot(wrapped, lw=1, label='Wrapped', c='C0', drawstyle=ds)
+    ax2.xaxis.set_major_locator(mpl.ticker.MultipleLocator(4))
     ax2.set(title='Wrapping components (grey)\nSums (blue, organge as left)')
     # ax2.legend(loc)
     ax2.set(ylim=lm)

@@ -84,6 +84,26 @@ Installation
 Version History
 -----------------
 
+0.17.2
+~~~~~~~
+
+* Cleanup of ``Aggregate`` class, concurrent with creating a cheat sheet
+
+    - many documentation updates
+    - ``plot_old`` deleted
+    - deleted ``delbaen_haezendonck_density``; not used; not doing anything
+      that isn't easy by hand. Includes dh_sev_density and dh_agg_density.
+    - deleted ``fit`` as alternative name for ``approximate``
+    - deleted unused fields
+
+
+* Frequency mfg renamed to freq_pgf to match other Frequency class methods and
+  to accuractely describe the function as a probability generating function
+  rather than a moment generating function.
+* Added ``introspect`` function to Utilities. Used to create a cheat sheet
+  for Aggregate.
+* Added cheat sheets, completed for Aggregate
+
 0.17.1
 ~~~~~~~~
 

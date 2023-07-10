@@ -1,0 +1,382 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Portfolio Cheat Sheet
+%
+% Start only Portfolio lines with \texttt so you can count them
+%
+% Created by Stephen J Mildenhall
+% (c) 2023
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+\usepackage[landscape]{geometry}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usetikzlibrary{decorations.pathmorphing}
+\usepackage{amsmath,amssymb}
+
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+
+\title{Aggregate Cheat Sheet}
+\usepackage[english]{babel}
+
+\advance\topmargin-.8in
+\advance\textheight3in
+\advance\textwidth3in
+\advance\oddsidemargin-1.5in
+\advance\evensidemargin-1.5in
+\parindent0pt
+\parskip2pt
+\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
+
+\definecolor{hred}{rgb}{1, 0.5, 0.5}
+\def\m{%
+\tikz[baseline=(char.base)]{
+    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
+}\;}
+
+\begin{document}
+
+\begin{center}{\huge{\textbf{\texttt{aggregate.Portfolio} Cheat Sheet}}}\end{center}
+
+\raggedright The \texttt{Portfolio} call signature is straightforward: \\
+ \texttt{\m Portfolio(name, note='')}${}^{[0]}$
+
+The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
+
+
+\begin{multicols*}{3}
+
+\tikzstyle{mybox} = [draw=black, fill=white, very thick,
+    rectangle, inner sep=10pt, inner ysep=10pt]
+\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
+
+
+%------------1. SPECIFICATION & CREATION ---------------
+\begin{tikzpicture}
+\node [mybox, draw=blue] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{agg\_list},
+\texttt{\m create\_from\_sample},
+\texttt{\m from\_DataFrame},
+\texttt{\m from\_dict\_of\_aggs},
+\texttt{\m from\_Excel},
+\texttt{line\_name\_pipe},
+\texttt{line\_names},
+\texttt{line\_names\_ex},
+\texttt{n\_units},
+\texttt{name},
+\texttt{\m nice\_program},
+\texttt{pprogram},
+\texttt{program},
+\texttt{spec},
+\texttt{spec\_ex},
+\texttt{statistics},
+\texttt{unit\_names},
+\texttt{unit\_names\_ex},
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt, fill=blue] at (box.north west) {1. Specification \& creation};
+\end{tikzpicture}
+
+
+%------------2. UPDATE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{\m add\_exa},
+\texttt{\m add\_exa\_details},
+\texttt{\m add\_exa\_sample},
+\texttt{approx\_freq\_ge},
+\texttt{approx\_type},
+\texttt{\m best\_bucket},
+\texttt{bs},
+\texttt{discretization\_calc},
+\texttt{\m ft},
+\texttt{\m ift},
+\texttt{log2},
+\texttt{normalize},
+\texttt{padding},
+\texttt{\m recommend\_bucket},
+\texttt{\m remove\_fuzz},
+\texttt{\m set\_a\_p},
+\texttt{sev\_calc},
+\texttt{tilt\_amount},
+\texttt{\m trim\_df},
+\texttt{\m update},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {2. Update};
+\end{tikzpicture}
+
+
+%------------ 3. MOMENTS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{agg\_cv},
+\texttt{agg\_m},
+\texttt{agg\_sd},
+\texttt{agg\_skew},
+\texttt{agg\_var},
+\texttt{est\_cv},
+\texttt{est\_m},
+\texttt{est\_sd},
+\texttt{est\_skew},
+\texttt{est\_var},
+\texttt{ex},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {3. Moments};
+\end{tikzpicture}
+
+
+%------------ 4. STATISTICAL FUNCTIONS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m cdf},
+\texttt{\m density\_sample},
+\texttt{\m get\_stat},
+\texttt{\m pdf},
+\texttt{\m percentiles},
+\texttt{\m pmf},
+\texttt{\m q},
+\texttt{\m q\_old\_0\_12\_0},
+\texttt{q\_temp},
+\texttt{\m resample},
+\texttt{\m sample},
+\texttt{\m sample\_compare},
+\texttt{\m sample\_density\_compare},
+\texttt{\m sf},
+\texttt{\m tvar},
+\texttt{\m tvar\_old\_0\_12\_0},
+\texttt{\m tvar\_threshold},
+\texttt{\m var},
+\texttt{\m var\_dict},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {4. Statistical functions};
+\end{tikzpicture}
+
+
+
+\columnbreak
+
+
+%------------ 5. VALIDATION ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m audits},
+\texttt{describe},
+\texttt{\m uat},
+\texttt{\m uat\_differential},
+\texttt{\m uat\_interpolation\_functions},
+\texttt{valid},
+\texttt{validation\_eps},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {5. Validation};
+\end{tikzpicture}
+
+
+%------------ 6. OUTPUT ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{audit\_df},
+\texttt{augmented\_df},
+\texttt{density\_df},
+\texttt{independent\_audit\_df},
+\texttt{independent\_density\_df},
+\texttt{\m make\_all},
+\texttt{\m make\_audit\_df},
+\texttt{priority\_analysis\_df},
+\texttt{\m report},
+\texttt{report\_df},
+\texttt{statistics\_df},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {6. Output dataframes};
+\end{tikzpicture}
+
+
+%------------ 7. REINSURANCE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+{\it None}
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {7. Reinsurance};
+\end{tikzpicture}
+
+
+
+%------------ 8. VISUALIZTION ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m biv\_contour\_plot},
+\texttt{EX\_accounting\_economic\_balance\_sheet},
+\texttt{EX\_multi\_premium\_capital},
+\texttt{EX\_premium\_capital},
+\texttt{figure},
+\texttt{\m plot},
+\texttt{\m plot\_old},
+\texttt{\m scatter},
+\texttt{\m twelve\_plot},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {8. Visualization \& Exhibits};
+\end{tikzpicture}
+
+\columnbreak
+
+
+%------------ 9. RISK ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{\m accounting\_economic\_balance\_sheet},
+\texttt{\m analysis\_collateral},
+\texttt{\m analysis\_priority},
+\texttt{\m analyze\_distortion},
+\texttt{\m analyze\_distortion\_add\_comps},
+\texttt{\m analyze\_distortion\_plots},
+\texttt{\m analyze\_distortions},
+\texttt{\m apply\_distortion},
+\texttt{\m apply\_distortions},
+\texttt{assets\_2\_epd},
+\texttt{\m bodoff},
+\texttt{\m calibrate\_blends},
+\texttt{\m calibrate\_distortion},
+\texttt{\m calibrate\_distortions},
+\texttt{\m cotvar},
+\texttt{dist\_ans},
+\texttt{distortion},
+\texttt{distortion\_df},
+\texttt{dists},
+\texttt{epd\_2\_assets},
+\texttt{\m equal\_risk\_epd},
+\texttt{\m equal\_risk\_var\_tvar},
+\texttt{\m gamma},
+\texttt{\m gradient},
+\texttt{\m merton\_perold},
+\texttt{\m multi\_premium\_capital},
+\texttt{\m natural\_profit\_segment\_plot},
+\texttt{\m premium\_capital},
+\texttt{\m price},
+\texttt{\m price\_ccoc},
+\texttt{\m pricing\_bounds},
+\texttt{priority\_capital\_df},
+\texttt{\m profit\_segment\_plot},
+\texttt{\m stand\_alone\_pricing},
+\texttt{\m stand\_alone\_pricing\_work},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {9. Risk and pricing};
+\end{tikzpicture}
+
+
+%------------  10. APPROXIMATIONS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m approximate},
+\texttt{\m as\_severity},
+\texttt{\m collapse},
+\texttt{\m fit},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {10. Approximations};
+\end{tikzpicture}
+
+
+%------------ 11. META ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{audit\_percentiles},
+\texttt{hash\_rep\_at\_last\_update},
+\texttt{info},
+\texttt{\m json},
+\texttt{last\_a},
+\texttt{last\_update},
+\texttt{\m limits},
+\texttt{line\_renamer},
+\texttt{\m more},
+\texttt{premium\_capital\_renamer},
+\texttt{renamer},
+\texttt{\m save},
+\texttt{\m short\_renamer},
+\texttt{\m show\_enhanced\_exhibits},
+\texttt{\m snap},
+\texttt{stat\_renamer},
+\texttt{tm\_renamer},
+
+    
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {11. Meta};
+\end{tikzpicture}
+
+\bigskip \raggedright
+{\bf Notes:} 
+
+[1]: matches \texttt{Aggregate}
+
+Any vectorizable input accepts numeric or iterable datatypes.  
+
+Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
+
+
+\vskip .25truein
+
+\begin{flushright}
+\copyright\ Stephen J Mildenhall, July 2023 \\
+\phantom{\copyright\ }\texttt{aggregate} version 0.18.0 
+\end{flushright}
+
+
+\end{multicols*}
+
+\end{document}

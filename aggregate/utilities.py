@@ -3703,3 +3703,38 @@ def parse_note_ex(txt, log2, bs, recommend_p, kwargs):
     return log2, bs, recommend_p, kwargs
 
 
+def introspect(ob):
+    """
+    Discover the non-private methods and properties of an object ob. Returns
+    a pandas DataFrame.
+    """
+    d = [i for i in dir(ob) if i[0] != '_']
+    df = pd.DataFrame({'name': d})
+    ans = []
+    for i in d:
+        g = getattr(ob, i)
+        c = callable(g)
+        v = ''
+        t = ''
+        h = ''
+        l = 0
+        if not c:
+            v = str(g)
+            t = type(g)
+            h = ''
+            if isinstance(getattr(ob.__class__, i, None), property):
+                c = 'property'
+            else:
+                c = 'field'
+            try:
+                l = len(g)
+            except:
+                pass
+        else:
+            c = 'method'
+            h = g.__doc__
+        ans.append([c, v, t, h, l])
+
+    df[['callable', 'value', 'type', 'help', 'length']] = ans
+    df = df.sort_values(['callable', 'length', 'name'])
+    return df

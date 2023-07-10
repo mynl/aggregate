@@ -52,7 +52,7 @@ class Frequency(object):
     Manages Frequency distributions: creates moment function and MGF.
 
     - freq_moms(n): returns EN, EN^2 and EN^3 when EN=n
-    - mgf(n, z): returns the moment generating function applied to z when EN=n
+    - freq_pgf(n, z): returns the moment generating function applied to z when EN=n
 
     Frequency distributions are either non-mixture types or mixture types.
 
@@ -102,15 +102,15 @@ class Frequency(object):
     :param freq_b:
     """
 
-    __slots__ = ['freq_moms', 'mgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
+    __slots__ = ['freq_moms', 'freq_pgf', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
                  'panjer_ab', 'unmodified_mean', 'prn_eq_0']
 
     def __init__(self, freq_name, freq_a, freq_b, freq_zm, freq_p0):
         """
-        Creates the mgf and moment function:
+        Creates the freq_pgf and moment function:
 
         * moment function(n) returns EN, EN^2, EN^3 when EN=n.
-        * mgf(n, z) is the mgf evaluated at log(z) when EN=n
+        * freq_pgf(n, z) is the freq_pgf evaluated at log(z) when EN=n
 
         :param freq_name: name of the frequency distribution, poisson, geometric, etc.
         :param freq_a:
@@ -182,23 +182,23 @@ class Frequency(object):
                 return (1 - freq_p0) / (1 - prn_eq_0(n_base)) * ans
             return wrapped_moms_func
 
-        def zero_modify_mgf(mgf_func):
+        def zero_modify_pgf(pgf_func):
             """
-            Decorator to zero modify mgf(n, z), as above.
+            Decorator to zero modify freq_pgf(n, z), as above.
 
-            The wrapped mgf is a weighted average of the trivial and original mgfs.
+            The wrapped freq_pgf is a weighted average of the trivial and original pgfs.
             """
             nonlocal prn_eq_0, freq_p0, freq_zm, solve_n_base
             if freq_zm is False:
-                return mgf_func
+                return pgf_func
             # else work to do
-            @wraps(mgf_func)
-            def wrapped_mgf_func(n, z):
+            @wraps(pgf_func)
+            def wrapped_pgf_func(n, z):
                 n_base = solve_n_base(n, freq_p0)
                 # weight on non-trivial component
                 wt = (1 - freq_p0) / (1 - prn_eq_0(n_base))
-                return (1 - wt) + wt * mgf_func(n_base, z)
-            return wrapped_mgf_func
+                return (1 - wt) + wt * pgf_func(n_base, z)
+            return wrapped_pgf_func
 
         logger.debug(
             f'Frequency.__init__ | creating new Frequency {self.freq_name} at {super(Frequency, self).__repr__()}')
@@ -210,7 +210,7 @@ class Frequency(object):
                 freq_3 = n * freq_2
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 return z ** n
 
         elif self.freq_name == 'bernoulli':
@@ -221,7 +221,7 @@ class Frequency(object):
                 freq_3 = n
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 # E(e^tlog(z)) = p z + (1-p), z = ft(severity)
                 return z * n + np.ones_like(z) * (1 - n)
 
@@ -247,8 +247,8 @@ class Frequency(object):
                 self.panjer_ab = (-p / (1 - p), (N + 1) * p / (1 - p))
                 return freq_1, freq_2, freq_3
 
-            @zero_modify_mgf
-            def mgf(n, z):
+            @zero_modify_pgf
+            def pgf(n, z):
                 nonlocal p
                 N = n / p # self.freq_a
                 return (z * p + np.ones_like(z) * (1 - p)) ** N
@@ -279,8 +279,8 @@ class Frequency(object):
                 self.panjer_ab = (beta / (1 + beta), (r - 1) * beta / (1 + beta))
                 return n, freq_2, freq_3
 
-            @zero_modify_mgf
-            def mgf(n, z):
+            @zero_modify_pgf
+            def pgf(n, z):
                 nonlocal beta
                 r = n / beta
                 return (1 - beta * (z - 1)) ** -r
@@ -299,8 +299,8 @@ class Frequency(object):
                 self.panjer_ab = (0., n)
                 return n, freq_2, freq_3
 
-            @zero_modify_mgf
-            def mgf(n, z):
+            @zero_modify_pgf
+            def pgf(n, z):
                 return np.exp(n * (z - 1))
 
         elif self.freq_name == 'geometric' and self.freq_a == 0:
@@ -324,8 +324,8 @@ class Frequency(object):
                 self.panjer_ab = (n / (1 + n), 0.)
                 return n, freq_2, freq_3
 
-            @zero_modify_mgf
-            def mgf(n, z):
+            @zero_modify_pgf
+            def pgf(n, z):
                 p = 1 / (n + 1)
                 return p / (1 - (1 - p) * z)
 
@@ -349,7 +349,7 @@ class Frequency(object):
                         3 * κ ** 2 * λ + κ ** 2 + 3 * κ * λ + 3 * κ + 1)
                 return n, n * (κ * (1 + c + λ) + 1), g
 
-            def mgf(n, z):
+            def pgf(n, z):
                 c = (n * ν ** 2 - 1 - κ) / κ
                 a = 1 / c
                 θ = κ * c
@@ -375,8 +375,8 @@ class Frequency(object):
                 self.panjer_ab = (theta, -theta)
                 return n, freq_2, freq_3
 
-            @zero_modify_mgf
-            def mgf(n, z):
+            @zero_modify_pgf
+            def pgf(n, z):
                 theta = logarithmic_theta(n)
                 return np.log(1 - theta * z) / np.log(1 - theta)
 
@@ -393,7 +393,7 @@ class Frequency(object):
                 freq_3 = n * ((1 + m2 * (3 + m2)) + 3 * freq_2 - 2 * n ** 2)
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 m1 = n / m2
                 return np.exp(m1 * (np.exp(m2 * (z - 1)) - 1))
 
@@ -408,7 +408,7 @@ class Frequency(object):
                 en3 = np.sum(self.freq_a ** 3 * self.freq_b)
                 return en, en2, en3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 # again, independent of n, not going overboard in method here...
                 return self.freq_b @ np.power(z, self.freq_a.reshape((self.freq_a.shape[0], 1)))
 
@@ -430,7 +430,7 @@ class Frequency(object):
                 freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 return (1 - θ * n * (z - 1)) ** -a
 
         elif self.freq_name == 'delaporte':
@@ -448,7 +448,7 @@ class Frequency(object):
                 freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 return np.exp(f * n * (z - 1)) * (1 - θ * n * (z - 1)) ** -a
 
         elif self.freq_name == 'ig':
@@ -466,7 +466,7 @@ class Frequency(object):
                 freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 return np.exp(1 / μ * (1 - np.sqrt(1 - 2 * μ ** 2 * λ * n * (z - 1))))
 
         elif self.freq_name == 'sig':
@@ -484,7 +484,7 @@ class Frequency(object):
                 freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 return np.exp(f * n * (z - 1)) * np.exp(1 / μ * (1 - np.sqrt(1 - 2 * μ ** 2 * λ * n * (z - 1))))
 
         elif self.freq_name == 'beta':
@@ -505,7 +505,7 @@ class Frequency(object):
                 freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                 return n, freq_2, freq_3
 
-            def mgf(n, z):
+            def pgf(n, z):
                 b = (r - n * (1 + c)) * (r - n) / (c * n * r)
                 a = (r - n * (1 + c)) / (c * r)
                 return hyp1f1(a, a + b, r * (z - 1))
@@ -617,7 +617,7 @@ class Frequency(object):
                     freq_3 = n * (1 + n * (3 * (1 + c) + n * g))
                     return n, freq_2, freq_3
 
-                def mgf(n, z):
+                def pgf(n, z):
                     kernel = n * (z - 1)
                     inner = np.sqrt(1 - 2 * β * kernel)
                     return inner ** (-λ) * kv(λ, μ * inner / β) / kv(λ, μ / β)
@@ -626,7 +626,7 @@ class Frequency(object):
             raise ValueError(f'Inadmissible frequency type {self.freq_name}...')
 
         self.freq_moms = _freq_moms
-        self.mgf = mgf
+        self.freq_pgf = pgf
 
     def __str__(self):
         """
@@ -758,7 +758,7 @@ class Aggregate(Frequency):
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
                     z = ft(sv, self.padding, None)
-                    ftz = self.mgf(self.n, z)
+                    ftz = self.freq_pgf(self.n, z)
                     if np.sum(self.en) == 1 and self.freq_name == 'fixed':
                         ad = sv.copy()
                     else:
@@ -1073,7 +1073,6 @@ class Aggregate(Frequency):
         self.log2 = 0
         # default validation error
         self.validation_eps = VALIDATION_EPS
-        # self.ex = 0 --> est_m
         self.est_m = 0
         self.est_cv = 0
         self.est_sd = 0
@@ -1093,33 +1092,19 @@ class Aggregate(Frequency):
         self.limit = None
         self.agg_density = None
         self.sev_density = None
-        self.dh_agg_density = None
-        self.dh_sev_density = None
         self.ftagg_density = None
         self.fzapprox = None
-        self._tail_var = None
-        self._tail_var2 = None
-        self._inverse_tail_var = None
-        # self.agg_m, self.agg_cv, self.agg_skew = 0, 0, 0
         self._var_tvar_function = None
         self._sev_var_tvar_function = None
         self._cdf = None
         self._pdf = None
         self._sev = None
-        # self._sev_cdf = None
-        # self._sev_sf = None
-        # self._sev_pdf = None
-        self.beta_name = ''  # name of the beta function used to create dh distortion
         self.sevs = None
         self.audit_df = None
-        self.verbose_audit_df = None
-        self._careful_q = None
         self._density_df = None
         self._reinsurance_audit_df = None
         self._reinsurance_report_df = None
         self._reinsurance_df = None
-        self.q_temp = None
-        self.q_temp_sev = None
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
         self.occ_netter = None
@@ -1381,9 +1366,6 @@ class Aggregate(Frequency):
 
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
-        self._middle_q = None
-        self._q = None
-
 
     def __repr__(self):
         """
@@ -1408,13 +1390,6 @@ class Aggregate(Frequency):
             s.append(str(self.describe))
         # s.append(super().__repr__())
         return '\n'.join(s)
-
-        # ags = self.statistics_total_df.loc['mixed', :]
-        # s = f"Aggregate: {self.name}\n\tEN={ags['freq_1']}, CV(N)={ags['freq_cv']:5.3f}\n\t" \
-        #     f"{len(self.sevs)} severit{'ies' if len(self.sevs) > 1 else 'y'}, EX={ags['sev_1']:,.1f}, " \
-        #     f"CV(X)={ags['sev_cv']:5.3f}\n\t" \
-        #     f"EA={ags['agg_1']:,.1f}, CV={ags['agg_cv']:5.3f}"
-        # return s
 
     def more(self, regex):
         """
@@ -1500,7 +1475,9 @@ class Aggregate(Frequency):
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
         if self.agg_density is not None:
-            if self.valid:
+            if self.reinsurance_kinds() != 'None':
+                s.append(f'<p>Validation: reinsurance, n/a.</p>')
+            elif self.valid:
                 s.append('<p>Validation: not unreasonable.</p>')
             else:
                 s.append(f'<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n{self.qt()}</pre></p>')
@@ -1721,7 +1698,7 @@ class Aggregate(Frequency):
                 # don't lose accuracy and time by going through this step if freq is fixed 1
                 # these are needed when agg is part of a portfolio
                 z = ft(self.sev_density, padding, tilt_vector)
-                self.ftagg_density = self.mgf(self.n, z)
+                self.ftagg_density = self.freq_pgf(self.n, z)
                 if np.sum(self.en) == 1 and self.freq_name == 'fixed':
                     logger.info('FIXED 1: skipping FFT calculation')
                     # copy to be safe
@@ -1915,7 +1892,7 @@ class Aggregate(Frequency):
         z = np.zeros(n)
         z[1] = 1
         fz = ft(z, 0, None)
-        fz = self.mgf(self.en, fz)
+        fz = self.freq_pgf(self.en, fz)
         dist = ift(fz, 0, None)
         # remove fuzz
         dist[dist < np.finfo(float).eps] = 0
@@ -2024,8 +2001,9 @@ class Aggregate(Frequency):
         For by layer detail create reins_audit_df
         Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
-        Treatment in stats?
+        Not reflected in statistics df.
 
+        :param debug: More verbose.
         :return:
         """
         # generic function makes netter and ceder functions
@@ -2057,11 +2035,11 @@ class Aggregate(Frequency):
 
     def apply_agg_reins(self, debug=False, padding=1, tilt_vector=None):
         """
-        Apply the entire agg reins structure and save output
-        For by layer detail create reins_audit_df
+        Apply the entire agg reins structure and save output.
+        For by layer detail create reins_audit_df.
         Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
-        Treatment in stats?
+        Not reflected in statistics df.
 
         :return:
         """
@@ -2174,8 +2152,8 @@ class Aggregate(Frequency):
 
     def apply_distortion(self, dist):
         """
-        apply distortion to the aggregate density and append as exag column to density_df
-        TODO: implement original and revised calculation method
+        Apply distortion to the aggregate density and append as exag column to density_df.
+        # TODO check consistent with other implementations.
         :param dist:
         :return:
         """
@@ -2192,30 +2170,20 @@ class Aggregate(Frequency):
 
     def pollaczeck_khinchine(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
         """
-        Return the PZ function relating surplus to eventual probability of ruin.
+        Return the Pollaczeck-Khinchine Capital function relating surplus to eventual probability of ruin.
+        Assumes frequency is Poisson.
 
-        Assumes frequency is Poisson
+        See Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
 
-        rho = prem / loss - 1 is the margin-to-loss ratio
-
-        cap = cap severity at cap - replace severity with X | X <= cap
-        excess = replace severit with X | X > cap (i.e. no shifting)
-        stop_loss = apply stop loss reinsurance to cap, so  X > stop_loss replaced with Pr(X > stop_loss) mass
-
-        Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
-
-        Pollaczeck-Khinchine Capital
-
-        returns ruin vector as pd.Series and function to lookup (no interpolation if
-        kind==index; else interp) capitals
-
-        :param rho:
-        :param cap:
-        :param excess:
-        :param stop_loss:
+        :param rho: rho = prem / loss - 1 is the margin-to-loss ratio
+        :param cap: cap = cap severity at cap, which replaces severity with X | X <= cap
+        :param excess:  excess = replace severity with X | X > cap (i.e. no shifting)
+        :param stop_loss: stop_loss = apply stop loss reinsurance to cap, so  X > stop_loss replaced
+          with Pr(X > stop_loss) mass
         :param kind:
-        :param padding:
-        :return:
+        :param padding: for update (the frequency tends to be high, so more padding may be needed)
+        :return: ruin vector as pd.Series and function to lookup (no interpolation if
+          kind==index; else interp) capitals
         """
 
         if self.sev_density is None:
@@ -2270,76 +2238,9 @@ class Aggregate(Frequency):
     # for backwards compatibility
     cramer_lundberg = pollaczeck_khinchine
 
-    def delbaen_haezendonck_density(self, xs, padding, tilt_vector, beta, beta_name=""):
-        """
-        Compare the base and Delbaen Haezendonck transformed aggregates.
-
-        * beta(x) = alpha + gamma(x)
-        * alpha = log(freq' / freq): log of the increase in claim count
-        * gamma = log(Radon Nikodym derv of adjusted severity) = log(tilde f / f)
-
-        Adjustment guarantees a positive loading iff beta is an increasing function
-        iff gamma is increasing iff tilde f / f is increasing.
-        cf. eqn 3.7 and 3.8.
-
-        Note conditions that E(exp(beta(X)) and E(X exp(beta(X)) must both be finite (3.4, 3.5)
-        form of beta function described in 2.23 via, 2.16-17 and 2.18
-
-        From examples on last page of paper: ::
-
-            beta(x) = a ==> adjust frequency by factor of e^a
-            beta(x) = log(1 + b(x - E(X)))  ==> variance principle EN(EX + bVar(X))
-            beta(x) = ax- logE_P(exp(a x))  ==> Esscher principle
-
-        To make a 'multiple' of an existing distortion you can use a simple wrapper class like this:
-
-        ::
-
-            class dist_wrap(agg.Distortion):
-                '''
-                wrap a distortion to include higher or lower freq
-                in DH α is actually exp(α)
-                this will pass isinstance(g2, agg.Distortion)
-                '''
-                def __init__(self, α, dist):
-                    def loc_g(s):
-                        return α * dist.g(s)
-                    self.g = loc_g
-                    self.name = dist.name
-
-        :param xs: is part of agg so can use that
-        :param padding: = 1 (default)
-        :param tilt_vector: None (default)
-        :param beta: function R+ to R with appropriate properties or name of prob distortion function
-        :param beta_name:
-        :return:
-        """
-        if self.agg_density is None:
-            # update
-            self.update_work(xs, padding, tilt_vector, 'exact')
-        if isinstance(beta, Distortion):
-            # passed in a distortion function
-            beta_name = beta.name
-            self.dh_sev_density = -np.diff(beta.g(1 - np.cumsum(np.hstack((0, self.sev_density)))))
-            # ex_beta from Radon N derv, e^beta = dh / objective, so E[e^beta] = int dh/obj x obj = sum(dh)
-            # which we expect to equal 1...hummm not adjusting the freq?!
-            ex_beta = np.sum(self.dh_sev_density)
-        else:
-            self.dh_sev_density = self.sev_density * np.exp(beta.g(xs))
-            ex_beta = np.sum(self.dh_sev_density)
-        self.dh_sev_density = self.dh_sev_density / ex_beta
-        adj_n = ex_beta * self.n
-        if self.freq_name == 'poisson':
-            # convolve for compound Poisson
-            ftagg_density = np.exp(adj_n * (ft(self.dh_sev_density, padding, tilt_vector) - 1))
-            self.dh_agg_density = np.real(ift(ftagg_density, padding, tilt_vector))
-        else:
-            raise ValueError('Must use compound Poisson for DH density')
-        self.beta_name = beta_name
-
     def plot(self, axd=None, xmax=0, **kwargs):
         """
-        New style basic plot with severity and aggregate, linear and log plots and Lee plot.
+        Basic plot with severity and aggregate, linear and log plots and Lee plot.
 
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
                the same scale. Only used on linear scales?
@@ -2428,167 +2329,6 @@ class Aggregate(Frequency):
             ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
             ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
             ax.legend().set(visible=False)
-
-    def plot_old(self, kind='quick', axiter=None, aspect=1, figsize=(10, 3)):
-        """
-        Plot computed density and aggregate. To be removed!
-
-        **kind** option:
-
-        * quick (default): Density for sev and agg on nominal and log scale; Lee diagram sev and agg
-        * long: severity, log sev density, sev dist, agg with sev, agg on own, agg on log, S, Lee, return period
-
-        :param kind: quick or long
-        :param axiter: optional axiter object
-        :param aspect: optional aspect ratio of individual plots
-        :param figsize: optional overall figure size
-        :return:
-        """
-
-        if self.agg_density is None:
-            raise ValueError('Cannot plot before update')
-            return
-        if self.sev_density is None:
-            self.update_work(self.xs, 1, None, sev_calc='discrete', force_severity='yes')
-
-        set_tight = (axiter is None)
-
-        if kind == 'long':
-            axiter = axiter_factory(axiter, 10, aspect=aspect, figsize=figsize)
-
-            max_lim = min(self.xs[-1], np.max(self.limit)) * 1.05
-            if max_lim < 1: max_lim = 1
-
-            next(axiter).plot(self.xs, self.sev_density)  # , drawstyle='steps-post')
-            axiter.ax.set(title='Severity', xlim=(0, max_lim))
-
-            next(axiter).plot(self.xs, self.sev_density)
-            axiter.ax.set(title='Log Severity')
-            if np.sum(self.sev_density == 1) >= 1:
-                # sev density is degenerate, 1,0,0,... log scales won't work
-                axiter.ax.set(title='Severity Degenerate')
-                axiter.ax.set(xlim=(0, max_lim * 2))
-            else:
-                axiter.ax.set(title='Log Severity')
-                axiter.ax.set(title='Log Severity', yscale='log')
-                axiter.ax.set(xlim=(0, max_lim))
-
-            next(axiter).plot(self.xs, self.sev_density.cumsum(), drawstyle='steps-post')
-            axiter.ax.set(title='Severity Distribution')
-            axiter.ax.set(xlim=(0, max_lim))
-
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
-            axiter.ax.plot(self.xs, self.sev_density, lw=0.5, drawstyle='steps-post', label='severity')
-            axiter.ax.set(title='Aggregate')
-            axiter.ax.legend()
-
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
-            axiter.ax.set(title='Aggregate')
-
-            next(axiter).plot(self.xs, self.agg_density, label='aggregate_project')
-            axiter.ax.set(yscale='log', title='Aggregate, log scale')
-
-            F = self.agg_density.cumsum()
-            next(axiter).plot(self.xs, 1 - F)
-            axiter.ax.set(title='Survival Function')
-
-            next(axiter).plot(self.xs, 1 - F)
-            axiter.ax.set(title='Survival Function, log scale', yscale='log')
-
-            next(axiter).plot(1 - F, self.xs, label='aggregate_project')
-            axiter.ax.plot(1 - self.sev_density.cumsum(), self.xs, label='severity')
-            axiter.ax.set(title='Lee Diagram')
-            axiter.ax.legend()
-
-            # figure for extended plotting of return period:
-            max_p = F[-1]
-            if max_p > 0.9999:
-                _n = 10
-            else:
-                _n = 5
-            if max_p >= 1:
-                max_p = 1 - 1e-10
-            k = (max_p / 0.99) ** (1 / _n)
-            extraps = 0.99 * k ** np.arange(_n)
-            q = interpolate.interp1d(F, self.xs, kind='linear', fill_value='extrapolate', bounds_error=False)
-            ps = np.hstack((np.linspace(0, 1, 100, endpoint=False), extraps))
-            qs = q(ps)
-            next(axiter).plot(1 / (1 - ps), qs)
-            axiter.ax.set(title='Return Period', xscale='log')
-
-        elif kind == 'quick':
-            if self.dh_agg_density is not None:
-                n = 4
-            else:
-                n = 3
-
-            axiter = axiter_factory(axiter, n, figsize, aspect=aspect)
-
-            F = np.cumsum(self.agg_density)
-            mx = np.argmax(F > 1 - 1e-5)
-            if mx == 0:
-                mx = len(F) + 1
-            else:
-                mx += 1  # a little extra room
-            dh_F = None
-            if self.dh_agg_density is not None:
-                dh_F = np.cumsum(self.dh_agg_density)
-                mx = max(mx, np.argmax(dh_F > 1 - 1e-5))
-                dh_F = dh_F[:mx]
-            F = F[:mx]
-
-            xs = self.xs[:mx]
-            d = self.agg_density[:mx]
-            sevF = np.cumsum(self.sev_density)
-            sevF = sevF[:mx]
-            f = self.sev_density[:mx]
-
-            ax = next(axiter)
-            # ? correct format?
-            ax.plot(xs, d, label='agg', drawstyle='steps-post')
-            ax.plot(xs, f, label='sev', drawstyle='steps-post')
-            if np.sum(f > 1e-6) < 20:
-                # if there are few points...highlight the points
-                ax.plot(xs, f, 'o', label=None, )
-            if self.dh_agg_density is not None:
-                ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
-                ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-            max_y = min(2 * np.max(d), np.max(f[1:])) * 1.05  # want some extra space...
-            if max_y > 0:
-                ax.set_ylim(0, max_y)
-            ax.legend()
-            ax.set_title('Density')
-            ax = next(axiter)
-            ax.plot(xs, d, label='agg')
-            ax.plot(xs, f, label='sev')
-            if self.dh_agg_density is not None:
-                ax.plot(xs, self.dh_agg_density[:mx], label='dh {:} agg'.format(self.beta_name))
-                ax.plot(xs, self.dh_sev_density[:mx], label='dh {:} sev'.format(self.beta_name))
-            ax.set_yscale('log')
-            ax.legend()
-            ax.set_title('Log Density')
-
-            ax = next(axiter)
-            ax.plot(F, xs, label='Agg')
-            ax.plot(sevF, xs, label='Sev')
-            if self.dh_agg_density is not None:
-                dh_F = np.cumsum(self.dh_agg_density[:mx])
-                ax.plot(dh_F, xs, label='dh {:} agg'.format(self.beta_name))
-            ax.legend()
-            ax.set_title('Lee Diagram')
-
-            if self.dh_agg_density is not None:
-                # if dh computed graph comparision
-                ax = next(axiter)
-                ax.plot(1 - F, 1 - dh_F, label='g(S) vs S')
-                ax.plot(1 - F, 1 - F, 'k', linewidth=.5, label=None)
-
-            if set_tight:
-                axiter.tidy()
-                suptitle_and_tight(f'Aggregate {self.name}')
-
-        else:
-            raise ValueError(f'Unknown option to plot_old, kind={kind}')
 
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """
@@ -3162,8 +2902,6 @@ class Aggregate(Frequency):
         agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
         return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
-
-    fit = approximate
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """

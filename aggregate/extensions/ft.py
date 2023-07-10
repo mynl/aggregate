@@ -379,7 +379,7 @@ def recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz):
     fz = rfft(z, ft_len)
     # aggregate by hand
     # fa = np.exp(en*(fz - 1))
-    fa = ag.mgf(en, fz)
+    fa = ag.freq_pgf(en, fz)
     a = irfft(fa)
 
     # center roll left by ez and 1 << log2-1, former

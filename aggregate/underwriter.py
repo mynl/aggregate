@@ -1,6 +1,7 @@
 # from collections import namedtuple
-import numpy as np
+from copy import deepcopy
 import logging
+import numpy as np
 import pandas as pd
 from pathlib import Path
 import re
@@ -502,8 +503,8 @@ class Underwriter(object):
         logger.debug(f'UnderwritingParser.safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
         if found_kind != kind:
             raise ValueError(f'Error: type of {name} is  {found_kind}, not expected {kind}')
-        # don't want to pass back the original
-        spec = spec.copy()
+        # don't want to pass back the original otherwise changes can be reflected in the knowledge
+        spec = deepcopy(spec)
         return spec
 
     @staticmethod

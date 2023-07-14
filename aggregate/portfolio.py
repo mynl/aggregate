@@ -90,7 +90,7 @@ class Portfolio(object):
         # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
         max_limit = 0
-        if (len(spec_list) == 1 and isinstance(spec_list[0], pd.DataFrame)):
+        if len(spec_list) == 1 and isinstance(spec_list[0], pd.DataFrame):
             # create from samples...slightly different looping behavior
             logger.info('Creating from sample DataFrame')
             spec_list = spec_list[0]
@@ -187,9 +187,6 @@ class Portfolio(object):
         self._var_tvar_function = None
         self._cdf = None
         self._pdf = None
-        self._tail_var = None
-        self._tail_var2 = None
-        self._inverse_tail_var = None
         self.bs = 0
         self.log2 = 0
         self.ex = 0
@@ -202,8 +199,6 @@ class Portfolio(object):
         self.approx_freq_ge = 0
         self.discretization_calc = ''
         self.normalize = None
-        # for storing the info about the quantile function
-        self.q_temp = None
         self._renamer = None
         self._line_renamer = None
         self._tm_renamer = None
@@ -226,7 +221,6 @@ class Portfolio(object):
 
         # enhanced portfolio items
         self.EX_premium_capital = None
-        self.last_a = None
         self.EX_multi_premium_capital = None
         self.EX_accounting_economic_balance_sheet = None
         self.validation_eps = VALIDATION_EPS
@@ -660,8 +654,8 @@ class Portfolio(object):
             empex = np.nan
             isupdated = False
         else:
-            ex = self.get_stat(stat="Mean")
-            empex = self.get_stat()
+            ex = self.audit_df.loc['total' 'Mean']
+            empex = self.audit_df.loc['total' 'EmpMean']
             isupdated = True
 
         s = [f'Portfolio object         {self.name:s}',
@@ -973,16 +967,6 @@ class Portfolio(object):
                        fontsize='x-large')
             return f  # for doc maker
 
-    def get_stat(self, line='total', stat='EmpMean'):
-        """
-        Other analysis suggests that iloc and iat are about same speed but slower than ix
-
-        :param line:
-        :param stat:
-        :return:
-        """
-        return self.audit_df.loc[line, stat]
-
     def q(self, p, kind='lower'):
         """
         Return quantile function of density_df.p_total.
@@ -1020,72 +1004,6 @@ class Portfolio(object):
         self._var_tvar_function['upper'] = qf.q_upper
         self._var_tvar_function['lower'] = qf.q_lower
         self._var_tvar_function['tvar'] = qf.tvar
-
-    def q_old_0_12_0(self, p, kind='lower'):
-        """
-        Old version from 0.12.0.
-
-        Set self._var_tvar_function to None to recompute these.
-
-        TODO: Will be removed soon.
-
-        return lowest quantile, appropriate for discrete bucketing.
-        quantile guaranteed to be in the index
-        nearest does not work because you always want to pick rounding up
-
-        Definition 2.1 (Quantiles)
-        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] ≥ α} is the lower α-quantile of X
-        x(α) = qα(X) = inf{x ∈ R : P[X ≤ x] > α} is the upper α-quantile of X.
-
-        We use the x-notation if the dependence on X is evident, otherwise the q-notion.
-        Acerbi and Tasche (2002)
-
-        :param p:
-        :param kind: allow upper or lower quantiles
-        :return:
-        """
-        if self._var_tvar_function is None:
-            # revised Dec 2019
-            self._var_tvar_function = {}
-            self.q_temp = self.density_df[['loss', 'F']].groupby('F').agg({'loss': np.min})
-            self.q_temp.loc[1, 'loss'] = self.q_temp.loss.iloc[-1]
-            self.q_temp.loc[0, 'loss'] = 0
-            # revised Jan 2020
-            # F           loss        loss_s
-            # 0.000000    0.0         0.0
-            # 0.667617    0.0         4500.0
-            # a value here is  V   and ^ which is the same: correct
-            # 0.815977    4500.0      5500.0
-            # 0.937361	  5500.0   	  9000.0
-            # upper and lower only differ at exact values of F where lower is loss and upper is loss_s
-            # in between must take the next value for lower and the previous value for next to get the same answer
-            self.q_temp = self.q_temp.sort_index()
-            # that q_temp left cts, want right continuous:
-            self.q_temp['loss_s'] = self.q_temp.loss.shift(-1)
-            self.q_temp.iloc[-1, 1] = self.q_temp.iloc[-1, 0]
-            # create interp functions
-            # old
-            # self._var_tvar_function['upper'] = \
-            #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
-            #                          fill_value='extrapolate')
-            # self._var_tvar_function['lower'] = \
-            #     interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='previous', bounds_error=False,
-            #                          fill_value='extrapolate')
-            # revised
-            self._var_tvar_function['upper'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='previous', bounds_error=False,
-                                     fill_value='extrapolate')
-            self._var_tvar_function['lower'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss, kind='next', bounds_error=False,
-                                     fill_value='extrapolate')
-            # change to using loss_s
-            self._var_tvar_function['middle'] = \
-                interpolate.interp1d(self.q_temp.index, self.q_temp.loss_s, kind='linear', bounds_error=False,
-                                     fill_value='extrapolate')
-        l = float(self._var_tvar_function[kind](p))
-        # because we are not interpolating the returned value must (should) be in the index...
-        assert kind == 'middle' or l in self.density_df.index
-        return l
 
     def cdf(self, x):
         """
@@ -1183,89 +1101,6 @@ class Portfolio(object):
             self._make_var_tvar(ser)
 
         return self._var_tvar_function['tvar'](p)
-
-    def tvar_old_0_12_0(self, p, kind='interp'):
-        """
-        Compute the tail value at risk at threshold p
-
-        Really this function returns ES
-
-        Definition 2.6 (Tail mean and Expected Shortfall)
-        Assume E[X−] < ∞. Then
-        x¯(α) = TM_α(X) = α^{−1}E[X 1{X≤x(α)}] + x(α) (α − P[X ≤ x(α)])
-        is α-tail mean at level α the of X.
-        Acerbi and Tasche (2002)
-
-        We are interested in the right hand exceedence [?? note > vs ≥]
-        α^{−1}E[X 1{X > x(α)}] + x(α) (P[X ≤ x(α)] − α)
-
-        McNeil etc. p66-70 - this follows from def of ES as an integral
-        of the quantile function
-
-
-        :param p:
-        :param kind:  'interp' = interpolate exgta_total;  'tail' tail integral, 'body' NYI - (ex - body integral)/(1-p)+v
-            'inverse' from capital to p using interp method
-        :return:
-        """
-        assert self.density_df is not None
-
-        if kind == 'tail':
-            # original
-            # _var = self.q(p)
-            # ex = self.density_df.loc[_var + self.bs:, ['p_total', 'loss']].product(axis=1).sum()
-            # pip = (self.density_df.loc[_var, 'F'] - p) * _var
-            # t_var = 1 / (1 - p) * (ex + pip)
-            # return t_var
-            # revised
-            if self._tail_var2 is None:
-                self._tail_var2 = self.density_df[['p_total', 'loss']].product(axis=1).iloc[::-1].cumsum().iloc[::-1]
-            _var = self.q(p)
-            if p >= 1.:
-                return _var
-            ex = self._tail_var2.loc[_var + self.bs]
-            pip = (self.density_df.loc[_var, 'F'] - p) * _var
-            t_var = 1 / (1 - p) * (ex + pip)
-            return t_var
-        elif kind == 'interp':
-            # original implementation interpolated
-            if self._tail_var is None:
-                # make tvar function
-                sup = (self.density_df.p_total[::-1] > 0).idxmax()
-                if sup == self.density_df.index[-1]:
-                    sup = np.inf
-                    _x = self.density_df.F
-                    _y = self.density_df.exgta_total
-                else:
-                    _x = self.density_df.F.values[:self.density_df.index.get_loc(sup)]
-                    _y = self.density_df.exgta_total.values[:self.density_df.index.get_loc(sup)]
-                p0 = self.density_df.at[0., 'F']
-                if p0 > 0:
-                    ps = np.linspace(0, p0, 200, endpoint=False)
-                    tempx = np.hstack((ps, _x))
-                    tempy = np.hstack((self.ex / (1-ps), _y))
-                    self._tail_var = interpolate.interp1d(tempx, tempy,
-                                  kind='linear', bounds_error=False,
-                                  fill_value=(self.ex, sup))
-                else:
-                    self._tail_var = interpolate.interp1d(_x, _y, kind='linear', bounds_error=False,
-                                                          fill_value=(self.ex, sup))
-            if isinstance(p, (float, np.float64)):
-                return float(self._tail_var(p))
-            else:
-                return self._tail_var(p)
-        elif kind == 'inverse':
-            if self._inverse_tail_var is None:
-                # make tvar function
-                self._inverse_tail_var = interpolate.interp1d(self.density_df.exgta_total, self.density_df.F,
-                                                      kind='linear', bounds_error=False,
-                                                      fill_value='extrapolate')
-            if isinstance(p, (int, np.int32, np.int64, float, np.float64)):
-                return float(self._inverse_tail_var(p))
-            else:
-                return self._inverse_tail_var(p)
-        else:
-            raise ValueError(f'Inadmissible kind passed to tvar; options are interp (default), inverse, or tail')
 
     def tvar_threshold(self, p, kind):
         """
@@ -1425,8 +1260,6 @@ class Portfolio(object):
         agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
         return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
-
-    fit = approximate
 
     def collapse(self, approx_type='slognorm'):
         """
@@ -1661,7 +1494,6 @@ class Portfolio(object):
             self.trim_df()
         # invalidate stored functions
         self._var_tvar_function = None
-        self.q_temp = None
         self._cdf = None
 
     def make_audit_df(self, columns, theoretical_stats=None):
@@ -1733,16 +1565,21 @@ class Portfolio(object):
 
         """
         if self.density_df is None:
-            return False
+            return "not updated"
 
         any_false = False
         for a in self.agg_list:
-            if not a.valid:
+            r = a.valid
+            # should be T/F/reinsurance, because we have checked updated.
+            if r == 'reinsurance':
+                logger.warning(f'Aggregate {a.name} has reinsurance,  validation n/a')
+                any_false = True
+            elif not r:
                 logger.warning(f'Aggregate {a.name} fails validation')
                 any_false = True
 
         if any_false:
-            logger.warning(f'Exiting: Portfolio validation steps skipped due to failed aggregate validation')
+            logger.warning(f'Exiting: Portfolio validation steps skipped due to failed or n/a aggregate validation')
             return False
         else:
             logger.info('All aggregate objects are not unreasonable')
@@ -2184,7 +2021,7 @@ class Portfolio(object):
         """
         bit = self.density_df.query('p_total > 0').filter(regex='exeqa_[a-zA-Z]')
         ax = scatter_matrix(bit, marker='.', s=5, alpha=1,
-                       figsize=(10, 10), diagonal='kde', **kwargs)
+                            figsize=(10, 10), diagonal='kde', **kwargs)
         return ax
 
     def plot_old(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
@@ -5407,13 +5244,6 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
 
         """
         a, p = self.set_a_p(a, p)
-
-        if getattr(self, '_raw_premium_capital', None) is not None and self.last_a == a:
-            # done already
-            return
-
-        # else recompute
-
         # story == run off
         # pricing report from adf
         dm = self.augmented_df.filter(regex=f'T.[MPQLROE]+.({self.line_name_pipe})').loc[[a]].T
@@ -5425,7 +5255,6 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         self._raw_premium_capital.index.name = 'Item'
         self.EX_premium_capital = self._raw_premium_capital. \
             rename(index=self.premium_capital_renamer, columns=self.line_renamer).sort_index()
-        self.last_a = a
 
     def multi_premium_capital(self, As, keys=None):
         """
@@ -6239,8 +6068,6 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             df = df.set_index('total', drop=not keep_total)
         df = df.reset_index(drop=True)
         return df
-
-    resample = sample
 
     @property
     def unit_names(self):

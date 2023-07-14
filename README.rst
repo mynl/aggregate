@@ -59,6 +59,19 @@ that usually require simulation, making it as easy to work with an aggregate (co
 as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
 and is implemented in Python under an open source BSD-license.
 
+Cheat Sheets (new July 2023)
+-----------------------------
+
+There are a series of one-page cheat sheets for the major classes describing
+all the methods and attributes. They provide a structured summary of
+the capabilities of each object. They are available in the ``cheat-sheets``
+directory. PDF versions are available here:
+
+* `Aggregate <cheat-sheets/aggregate.pdf>`_
+* `Portfolio <cheat-sheets/portfolio.pdf>`_
+* `Distributions <cheat-sheets/distributions.pdf>`_
+* `Underwriter <cheat-sheets/underwriter.pdf>`_
+* `Severity <cheat-sheets/severity.pdf>`_
 
 Documentation
 -------------
@@ -84,9 +97,14 @@ Installation
 Version History
 -----------------
 
-0.17.2
+0.18.0
 ~~~~~~~
 
+* Added ability to specify occ reinsurance after a built in agg; this
+  allows you to alter a gross aggregate more easily.
+* Added ability for unconditional dsev.
+* ``Underwriter.safe_lookup`` uses deepcopy rather than copy to avoid
+  problems array elements.
 * Cleanup of ``Aggregate`` class, concurrent with creating a cheat sheet
 
     - many documentation updates
@@ -96,6 +114,13 @@ Version History
     - deleted ``fit`` as alternative name for ``approximate``
     - deleted unused fields
 
+* Cleanup of ``Portfolio`` class, concurrent with creating a cheat sheet
+
+    - deleted ``fit`` as alternative name for ``approximate``
+    - deleted ``q_old_0_12_0`` (old quantile), ``q_temp``, ``tvar_old_0_12_0``
+    - deleted ``plot_old``, ``last_a``, ``_(inverse)_tail_var(_2)``
+    - deleted ``def get_stat(self, line='total', stat='EmpMean'): return self.audit_df.loc[line, stat]``
+    - deleted ``resample``, was an alias for sample
 
 * Frequency mfg renamed to freq_pgf to match other Frequency class methods and
   to accuractely describe the function as a probability generating function

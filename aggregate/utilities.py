@@ -2953,7 +2953,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     from .distributions import Aggregate
     from .portfolio import Portfolio
     # ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
-    ff = lambda x: f'{x:.5g}'
+    ff = kwargs.pop('ff', lambda x: f'{x:.5g}')
     # split output
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
@@ -2963,8 +2963,10 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
                 # object not updated
                 qd(x.describe.fillna(''), accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            if x.valid is None:
+            if x.valid == 'reinsurance':
                 vr = 'n/a (reinsurance)'
+            elif x.valid == 'not updated':
+                vr = 'n/a (not updated)'
             else:
                 vr = "not unreasonable" if x.valid else "fails"
             print(f'log2 = {x.log2}, bs = {bss}, validation: {vr}.')

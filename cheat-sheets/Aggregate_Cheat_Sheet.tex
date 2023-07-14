@@ -281,8 +281,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m plot},
-\texttt{figure} (return last figure),
 \texttt{\m reinsurance\_occ\_plot}
+\texttt{figure} (return last figure),
+\texttt{\m limits} (suggest axis limits for plotting),
 
     \end{minipage}
 };
@@ -294,7 +295,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-    
+
 \texttt{\m apply\_distortion},
 \texttt{\m price(p, dist)}
 \texttt{\m cramer\_lundberg aka pollaczeck\_khinchine} (probability of eventual ruin vs. initial capital and margin)
@@ -324,10 +325,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-    
+
 \texttt{aggregate\_keys} (internal),
 \texttt{\m more(regex)} (print all methods and fields matching \texttt{regex}),
-\texttt{\m limits} (suggest axis limits for plotting),
 \texttt{info} (text meta info),
 \texttt{\m html\_info\_blob} (internal),
 \texttt{\m json} (persist to json),

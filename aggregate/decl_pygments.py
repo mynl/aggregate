@@ -48,17 +48,27 @@ class AggLexer(RegexLexer):
             (r'\n', Text),
             (r'\\\n', Text),
             (r'\\', Text),
-            (r'note\{[^\}]*\}', Comment),
+            (r'note\{', Name.Type, 'note'),
+            (r'\}', Name.Type),
             (r'#.*$', Comment),
             ('!', Generic.Heading),
             # these are for documenation
-            (r'\<|\>', Generic.Heading),
+            # (r'\<|\>', Generic.Heading),
             # the regex for an ID from parser.py
             (r'mixed ', Operator, 'mixed_freq'),
+            (r'and', Name.Type),
+            include('numbers'),
             include('keywords'),
             include('expr'),
-            (r'[a-zA-Z][\._:~a-zA-Z0-9]*\b', Name),
+            # for the help
+            (r'<[A-Z_0-9*]+>', Generic.Heading),
+            # match ID in parser.py
+            (r'[a-zA-Z][\._:~a-zA-Z0-9\-]*\b', Name),
         ],
+
+        'note': [
+            (r'[^\}]*', Comment, '#pop'),
+            ],
 
         'mixed_freq': [
             (words(('gamma', 'delaporte', 'ig', 'sig', 'beta', 'sichel'),
@@ -69,7 +79,6 @@ class AggLexer(RegexLexer):
 
         'expr': [
             (r'[^\S\n]+', Text),
-            include('numbers'),
             (r'!=|==|<<|>>|:=|[-~+/*%=<>&^|.]', Operator),
             (r'[]{}:(),;[]', Punctuation),
             (r'(in|is|and|or|not)\b', Operator.Word),
@@ -141,7 +150,8 @@ class AggLexer(RegexLexer):
             (r'(\d(?:_?\d)*\.(?:\d(?:_?\d)*)?|(?:\d(?:_?\d)*)?\.\d(?:_?\d)*)'
                 r'([eE][+-]?\d(?:_?\d)*)?', Number),
             (r'\d(?:_?\d)*[eE][+-]?\d(?:_?\d)*j?', Number),
+            # current definition of number in parser.py
+            (r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?%?|\-?inf', Number),
             (r'\d(?:_?\d)*', Number.Integer),
         ],
-
     }

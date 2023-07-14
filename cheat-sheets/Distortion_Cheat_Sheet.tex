@@ -1,0 +1,266 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Distortion Cheat Sheet
+%
+% Created by Stephen J Mildenhall
+% (c) 2023
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+\usepackage[landscape]{geometry}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usetikzlibrary{decorations.pathmorphing}
+\usepackage{amsmath,amssymb}
+
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+
+\title{Aggregate Cheat Sheet}
+\usepackage[english]{babel}
+
+\advance\topmargin-.8in
+\advance\textheight3in
+\advance\textwidth3in
+\advance\oddsidemargin-1.5in
+\advance\evensidemargin-1.5in
+\parindent0pt
+\parskip2pt
+\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
+
+\definecolor{hred}{rgb}{1, 0.5, 0.5}
+\def\m{%
+\tikz[baseline=(char.base)]{
+    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
+}\;}
+
+\begin{document}
+
+\begin{center}{\huge{\textbf{\texttt{aggregate.Distortion} Cheat Sheet}}}\end{center}
+
+\raggedright The \texttt{Distortion} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples. \\
+ \texttt{\m Severity(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=0, exp\_limit=np.inf}, \\
+ \texttt{\phantom{\m}sev\_name='', sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0, sev\_xs=None, sev\_ps=None, sev\_wt=1, sev\_conditional=True, }\\
+% \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, }\\
+ \texttt{\phantom{\m}occ\_reins=None, occ\_kind='', freq\_name='', freq\_a=0, freq\_b=0, freq\_zm=False, freq\_p0=np.nan, agg\_reins=None, agg\_kind='', note='')}${}^{[0]}$
+
+The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
+
+
+\begin{multicols*}{3}
+
+\tikzstyle{mybox} = [draw=black, fill=white, very thick,
+    rectangle, inner sep=10pt, inner ysep=10pt]
+\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
+
+
+%------------1. SPECIFICATION & CREATION ---------------
+\begin{tikzpicture}
+\node [mybox, draw=blue] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+% {\it italics stuff} \\
+
+\texttt{assets},
+\texttt{\m average\_distortion},
+\texttt{col\_x},
+\texttt{col\_y},
+\texttt{df},
+\texttt{display\_name},
+\texttt{\m distortions\_from\_params},
+\texttt{has\_mass},
+\texttt{mass},
+\texttt{name},
+\texttt{premium\_target},
+\texttt{r0},
+\texttt{\m s\_gs\_distortion},
+\texttt{shape},
+
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt, fill=blue] at (box.north west) {1. Specification \& creation};
+\end{tikzpicture}
+
+
+%------------2. UPDATE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{\m bagged\_distortion},
+\texttt{error},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {2. Update};
+\end{tikzpicture}
+
+
+%------------ 3. MOMENTS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+{\it None }
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {3. Moments};
+\end{tikzpicture}
+
+
+%------------ 4. STATISTICAL FUNCTIONS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m g},
+\texttt{\m g\_dual},
+\texttt{\m g\_inv},
+\texttt{\m g\_prime},
+\texttt{\m wtd\_tvar},
+
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {4. Statistical functions};
+\end{tikzpicture}
+
+
+\columnbreak
+
+
+%------------ 5. VALIDATION ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m test},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {5. Validation};
+\end{tikzpicture}
+
+
+%------------ 6. OUTPUT ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+{\it None }
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {6. Output dataframes};
+\end{tikzpicture}
+
+
+%------------ 7. REINSURANCE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+{\it None }
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {7. Reinsurance};
+\end{tikzpicture}
+
+
+
+\columnbreak
+
+
+%------------ 8. VISUALIZTION ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m plot},
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {8. Visualization};
+\end{tikzpicture}
+
+
+%------------ 9. RISK ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{\m price},
+\texttt{\m price2},
+
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {9. Risk and pricing};
+\end{tikzpicture}
+
+
+%------------  10. APPROXIMATIONS ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+{\it None }
+
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {10. Approximations};
+\end{tikzpicture}
+
+
+%------------ 11. META ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+    
+\texttt{\m available\_distortions},
+\texttt{\m convex\_example},
+\texttt{renamer},
+
+        
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {11. Meta};
+\end{tikzpicture}
+
+\bigskip \raggedright
+{\bf Notes:} 
+
+[0]: Arguments \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, } omitted; see help. 
+
+[1]: matches \texttt{Portfolio} 
+
+Any vectorizable input accepts numeric or iterable datatypes.  
+
+Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
+
+
+\vskip .25truein
+
+\begin{flushright}
+\copyright\ Stephen J Mildenhall, July 2023 \\
+\phantom{\copyright\ }\texttt{aggregate} version 0.18.0 
+\end{flushright}
+
+
+\end{multicols*}
+
+\end{document}

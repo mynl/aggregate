@@ -783,7 +783,7 @@ class Aggregate(Frequency):
         How losses are layered by the occurrence reinsurance. Expected loss,
         CV layer loss, and expected counts to layers. 
         """
-        if self.reinsurance_audit_df is None:
+        if self.occ_reins is None:
             return None
         bit0 = self.reinsurance_audit_df.loc['occ'].xs('ex', axis=1, level=1)
         bit = self.reinsurance_audit_df.loc['occ'].xs('cv', axis=1, level=1)
@@ -1814,7 +1814,7 @@ class Aggregate(Frequency):
         """
         if self.reinsurance_kinds() != "None":
             # cannot validate when there is reinsurance
-            return None
+            return "reinsurance"
         df = self.describe.abs()
         try:
             df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
@@ -1824,7 +1824,7 @@ class Aggregate(Frequency):
             df['Err Skew(X)'] = np.nan
         except KeyError:
             # not updated
-            return False
+            return "not updated"
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
             logger.warning('FAIL: Sev mean error > eps')

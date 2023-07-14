@@ -973,7 +973,7 @@ The underlying portfolio is specified only as a 900 xs 100 layer on 25M premium 
 We use the function  ``make_ceder_netter`` to model the commission function. It takes a list of triples ``(s, y, a)`` as argument, interpreted as a share ``s`` of the layer ``y`` excess ``a``. It returns two functions, a netter and a ceder, that map a subject loss to net or ceded. Multiple non-overlapping layers can be provided. They are combined into a single function. We will model the slide as the maximum 40% commission minus a cession to two layers with different shares. The required layer descriptions, in loss ratio points, are
 
 * Layer 1 ``(0.25, 0.2, 0.35)`` for the slide between 35% and 55% and
-* Layer 1 ``(0.5,  0.1, 0.55)`` for the slide between 55% and 65%.
+* Layer 2 ``(0.5,  0.1, 0.55)`` for the slide between 55% and 65%.
 
 The function giving the slide payoff is easy to create, using a Python ``lambda`` function. The figure illustrates the ceder and netter functions and the function that computes the slide.
 

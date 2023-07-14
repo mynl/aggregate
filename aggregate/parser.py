@@ -389,14 +389,14 @@ class UnderwritingParser(Parser):
         # self.out_dict[('agg', p.name)] = dout
         return 'agg', p.name, dout
 
-    @_('AGG name builtin_agg agg_reins note')
+    @_('AGG name builtin_agg occ_reins agg_reins note')
     def agg_out(self, p):
         # for use when you change the agg and/or  want a new name
         self.logger(
             f'agg_out <-- AGG name builtin_aggregate note', p)
         # rename; NOTE!! the code below will overwrite the new name!
         del p.builtin_agg['name']
-        return 'agg', p.name, {'name': p.name, **p.builtin_agg, **p.agg_reins, 'note': p.note}
+        return 'agg', p.name, {'name': p.name, **p.builtin_agg, **p.occ_reins, **p.agg_reins, 'note': p.note}
 
     @_('builtin_agg agg_reins note')
     def agg_out(self, p):
@@ -590,6 +590,12 @@ class UnderwritingParser(Parser):
     def sev(self, p):
         self.logger(f'sev <-- sev picks', p)
         return {**p.sev, **p.picks}
+
+    @_('dsev "!"')
+    def dsev(self, p):
+        self.logger(f'dsev <-- unconditional (conditional=False) flag set', p)
+        p.dsev['sev_conditional'] = False
+        return p.dsev
 
     @_('sev "!"')
     def sev(self, p):

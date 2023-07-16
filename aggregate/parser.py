@@ -202,9 +202,10 @@ class UnderwritingParser(Parser):
 
     debugfile = None
     # uncomment to write detailed grammar rules
-    debugfile = Path.home() / 'aggregate/parser/parser.out'
+    # debugfile = Path.home() / 'aggregate/parser/parser.out'
+    if debugfile is not None:
+        debugfile.parent.mkdir(parents=True, exist_ok=True)
     # this won't have been created the first time this runs in a clean environment, hence:
-    # debugfile.parent.mkdir(parents=True, exist_ok=True)
     tokens = UnderwritingLexer.tokens
     precedence = (
         ('nonassoc', LOW), #  used to force shift in rules

@@ -116,7 +116,7 @@ Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Re
     :okwarning:
 
     a03 = build('agg Re:03 agg.Re:01 '
-                 'aggregate ceded to 6 x 24 and 6 x 30')
+                 'aggregate ceded to 6 xs 24 and 6 xs 30')
     a03.plot()
     @savefig DD_12x24a.png
     qd(a03)
@@ -128,8 +128,8 @@ Occurrence and aggregate programs can both be applied. The ``ceded to`` and ``ne
     :okwarning:
 
     a04 = build('agg Re:04 dfreq [1:6] dsev [1:6] '
-                 'occurrence net of 1 x 4 and 1 x 5 '
-                 'aggregate net of 4 xs 12 and 4 x 16')
+                 'occurrence net of 1 xs 4 and 1 xs 5 '
+                 'aggregate net of 4 xs 12 and 4 xs 16')
     @savefig DD_nn.png
     a04.plot()
     qd(a04)
@@ -151,8 +151,8 @@ These concepts are illustrated in the next example. Note the bucket size.
 
     a05 = build('agg Re:05 '
                 'dfreq [1:6] dsev [1:6] '
-                'occurrence net of 0.5 so 2 x 2 and 2 x 4 '
-                'aggregate net of 1 po 4 x 10 '
+                'occurrence net of 0.5 so 2 xs 2 and 2 xs 4 '
+                'aggregate net of 1 po 4 xs 10 '
                 , bs=1/512, log2=16)
     @savefig DD_nn2.png
     a05.plot()
@@ -165,8 +165,8 @@ A **tower** of limits can be specified by giving the attachment points of each l
 
 is equivalent to::
 
-    occurrence ceded to 1 x 0 and 1 x 1 and 3 x 2 \
-    and 5 x 5 and 10 x 10 and 16 x 20
+    occurrence ceded to 1 xs 0 and 1 xs 1 and 3 xs 2 \
+    and 5 xs 5 and 10 xs 10 and 16 xs 20
 
 Here is a summary of these examples. The audit dataframe gives a layering of aggregate losses. The plot is omitted; it is identical to gross since the tower covers all losses.
 
@@ -605,7 +605,7 @@ Setup the gross portfolio.
 
     a10 = build('agg Re:BN1 '
                 '[9000 3000] exposure at [0.04 0.03] rate '
-                '160 x 0 '
+                '160 xs 0 '
                 'sev 40 * pareto [0.9 0.95] - 40 '
                f'mixed gamma {mix_cv} ')
     qd(a10)
@@ -630,10 +630,10 @@ More in the spirit of ``aggregate``: create a new :class:`Aggregate` applying th
 
     a11 = build('agg Re:BN1a '
                 '[9000 3000] exposure at [0.04 0.03] rate '
-                '160 x 0 '
+                '160 xs 0 '
                 'sev 40 * pareto [0.9 0.95] - 40 '
                f'mixed gamma {mix_cv} '
-                'aggregate net of 360 x 0 ')
+                'aggregate net of 360 xs 0 ')
     qd(a11)
 
     gross = a11.agg_m; net = a11.est_m; ins_charge = net / gross
@@ -664,18 +664,18 @@ Bear and Nemlick report the Poisson approximation and a Heckman-Meyers convoluti
 
     a12 = build('agg Re:BN1p '
                 '[9000 3000] exposure at [0.04 0.03] rate '
-                '160 x 0 '
+                '160 xs 0 '
                 'sev 40 * pareto [0.9 0.95] - 40 '
                f'poisson '
-                'aggregate net of 360 x 0 ')
+                'aggregate net of 360 xs 0 ')
     qd(a12)
 
     a13 = build('agg Re:BN1c '
                 '[9000 3000] exposure at [0.04 0.03] rate '
-                '160 x 0 '
+                '160 xs 0 '
                 'sev 40 * pareto [0.9 0.95] - 40 '
                 'mixed gamma 0.05**.5 '
-                'aggregate net of 360 x 0 ')
+                'aggregate net of 360 xs 0 ')
     qd(a13)
 
 
@@ -810,7 +810,7 @@ The gross portfolio is the same as Treaty 1. Use Poisson frequency.
 
     a16 = build('agg Re:BN4 '
                 '[9000 3000] exposure at [0.04 0.03] rate '
-                '160 x 0 '
+                '160 xs 0 '
                 'sev 40 * pareto [0.9 0.95] - 40 '
                 'poisson ')
     qd(a16)

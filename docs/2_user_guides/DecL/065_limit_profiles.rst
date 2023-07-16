@@ -17,8 +17,8 @@ one-another.
    sev lognorm 500 cv 1.25                  \
    mixed gamma 0.6
 
-expresses a limit profile with 1000 of premium at 1000 x 0; 2000 at 2000
-x 0 4000 at 5000 x 0 and 1000 at 4000 x 1000. In this case all the loss
+expresses a limit profile with 1000 of premium at 1000 xs 0; 2000 at 2000
+xs 0, 4000 at 5000 xs 0, and 1000 at 4000 xs 1000. In this case all the loss
 ratios are the same, but they could vary too.
 
 A (mixed) compound Poisson aggregate with a mixed severity is a sum of aggregates,

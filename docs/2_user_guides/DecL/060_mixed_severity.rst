@@ -245,7 +245,7 @@ for each curve, rather than using weights, see :doc:`070_vectorization`.
     :okwarning:
 
     a06 = build('agg DecL:06 [100 200] claims '
-                '5000 x 0 '
+                '5000 xs 0 '
                 'sev [gamma lognorm] [100 150] cv [1 0.5] '
                 'mixed gamma 0.5',
                 log2=16, bs=2.5)
@@ -260,7 +260,7 @@ than a gamma, avoiding very good years.
     :okwarning:
 
     a07 = build('agg DecL:07 [100 200] claims '
-                 '5000 x 0 '
+                 '5000 xs 0 '
                  'sev [gamma lognorm] [100 150] cv [1 0.5] '
                  'mixed delaporte 0.5 0.6',
                 log2=18, bs=2.5)

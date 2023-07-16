@@ -14,12 +14,12 @@ The optional ``limits`` sub-clause specifies policy occurrence limits and deduct
     100 xs 0
     inf xs 100
     750 xs 250
-    1 x 1
+    1 xs 1
 
 * ``100 xs 0`` applies an occurrence limit of 100.
 * ``inf xs 100`` applies a deductible of 100 and no limit.
 * ``750 xs 250`` is an excess layer, with limit 750 and deductible 250.
-* ``1 x 1`` is also an excess layer of 1 xs 1.
+* ``1 xs 1`` is also an excess layer of 1 xs 1.
 
 ``inf`` denotes infinity, for an unlimited layer. Both ``xs`` and ``x`` are acceptable.
 

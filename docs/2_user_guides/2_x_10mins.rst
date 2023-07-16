@@ -643,7 +643,7 @@ An :class:`Aggregate` can have a mixed severity. The mixture can include differe
     a03 = build('agg TenM:03 '
                 '25 claims '
                 'sev [gamma lognorm invgamma] [5 10 10] cv [0.5 0.75 1.5] '
-                'wts [.5 .25 .25] + [0 10 20] '
+                '+ [0 10 20] wts [.5 .25 .25] '
                 'mixed gamma 0.5'
                , bs=1/16)
     qd(a03)
@@ -731,7 +731,7 @@ Apply 3 xs 7 occurrence reinsurance to cap individual losses at 7. ``a05no`` is 
     :okwarning:
 
     a05no = build('agg TenM:05no dfreq [2] dsev [1:10] '
-                'occurrence net of 3 x 7')
+                'occurrence net of 3 xs 7')
     qd(a05no)
 
 .. warning::
@@ -1556,7 +1556,7 @@ The second portfolio has been selected with two thick tailed units. A appears ri
                      'mixed delaporte 0.75 0.6 '
                  'agg B '
                      '5 claims '
-                     '20000 x 20 '
+                     '20000 xs 20 '
                      'sev lognorm 25 cv 3.0 '
                      'poisson'
                 , bs=1)

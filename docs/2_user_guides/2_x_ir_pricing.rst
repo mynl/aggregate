@@ -73,7 +73,7 @@ knowledge using :meth:`build`. The parameters are selected judgmentally.
     mean = wt * np.exp(mu + sigma**2 / 2) + (1 - wt) * scale / (shape - 1)
     build(f'sev IR:WC '
           f'[exp({mu}) {scale}] * [lognorm pareto] [{sigma} {shape}] '
-          f'wts [{wt} {1-wt}] + [0 {-scale}]');
+          f'+ [0 {-scale}] wts [{wt} {1-wt}]');
     print(f'Mean = {mean:.1f} in 000s')
 
 Second, we will build the model for a large account with 350 expected claims

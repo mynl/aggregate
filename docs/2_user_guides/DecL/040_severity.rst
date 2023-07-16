@@ -212,7 +212,7 @@ The default behavior uses severity conditional to the layer. In this example, th
     from aggregate import build, qd
     cond = build('agg DecL:Conditional '
                  '1 claim '
-                 '12 x 8 '
+                 '12 xs 8 '
                  'sev 20 * uniform '
                  'fixed')
     qd(cond)
@@ -227,7 +227,7 @@ uniform`` ground-up.
 
     uncd = build('agg DecL:Unconditional '
                  '1 claim '
-                 '12 x 8 '
+                 '12 xs 8 '
                  'sev 20 * uniform ! '
                  'fixed')
     qd(uncd)

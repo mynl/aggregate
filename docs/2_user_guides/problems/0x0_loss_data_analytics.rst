@@ -148,7 +148,7 @@ Create the :class:`Aggregate` object, display its ``describe`` dataframe and com
 
     a = build('agg lda.3.3.5 '
               '1 claim '
-              'sev [200 200] * [expon pareto] [1 3] wts [.25 .75] + [0 -200] '
+              'sev [200 200] * [expon pareto] [1 3] + [0 -200] wts [.25 .75] '
               'fixed',
               normalize=False)
     qd(a)
@@ -209,7 +209,7 @@ For an insurance:
 .. ipython:: python
     :okwarning:
 
-    a = build('agg lda.3.4.2 1 claim 6 x 4 sev 10 * beta 2 1 fixed')
+    a = build('agg lda.3.4.2 1 claim 6 xs 4 sev 10 * beta 2 1 fixed')
     qd(a)
     mv(a)
 
@@ -263,8 +263,8 @@ The ground up loss random variable for a health insurance policy in 2006 is mode
 
     import pandas as pd
 
-    a06 = build('agg X06 1 claim 500 x 100 sev 1000 * expon fixed', update=False)
-    a07 = build('agg X07 1 claim 500 x 100 sev 1050 * expon fixed', update=False)
+    a06 = build('agg X06 1 claim 500 xs 100 sev 1000 * expon fixed', update=False)
+    a07 = build('agg X07 1 claim 500 xs 100 sev 1050 * expon fixed', update=False)
     ans = pd.concat((a06.describe, a07.describe), keys=['2006', '2007'])
     qd(ans)
     ans.iloc[5, 0] / ans.iloc[2, 0] - 1
@@ -483,7 +483,7 @@ The number of projects and the number of overtime hours are independent. You wil
 
     a = build('agg Projects 2 claims '
               'dsev [5 10 20] [.2 .3 .5] geometric '
-              'aggregate net of 15 x 0')
+              'aggregate net of 15 xs 0')
     qd(a)
 
 Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that using an aggregate tower. The ``reinsurance_audit_df`` provides ceded and net statistics by layer. Here we extract just the ceded part to get the excess (overtime).

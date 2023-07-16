@@ -69,7 +69,7 @@ class Underwriter(object):
         self._lexer = None
         self._parser = None
         # make sure all database entries are stored; they are read on demand
-        self.databases = databases
+        self.databases = [] if databases is None else databases
         # stop pyCharm complaining
 
         # do not read in until needed for faster loading
@@ -77,7 +77,8 @@ class Underwriter(object):
         self._site_dir = None
         self._case_dir = None
         self._template_dir = None
-        self._knowledge = None
+        self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
+                ['kind', 'name'])
 
         # ensure description prints correctly. A bit cheaky.
         pd.set_option('display.max_colwidth', 100)
@@ -307,10 +308,8 @@ class Underwriter(object):
 
     @property
     def knowledge(self):
-        if self._knowledge is None:
-        # knowledge - accounts and line known to the underwriter
-            self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
-                ['kind', 'name'])
+        if len(self._knowledge) == 0 and len(self.databases) > 0:
+            # knowledge - accounts and line known to the underwriter
             self.read_databases()
         return self._knowledge.sort_index()[['program', 'spec']]
 
@@ -518,7 +517,7 @@ class Underwriter(object):
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=True, log2=0, bs=0, recommend_p=0.99999, logger_level=None, **kwargs):
+    def build(self, program, update=None, log2=0, bs=0, recommend_p=0.99999, logger_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -549,6 +548,9 @@ class Underwriter(object):
         if rv is None or len(rv) == 0:
             logger.log(WL, 'build produced no output')
             return None
+
+        if update is None:
+            update = self.update
 
         # in this loop bs_ and log2_ are the values actually used for each update;
         # they do not overwrite the input default values

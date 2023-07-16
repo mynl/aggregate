@@ -35,6 +35,7 @@
 #
 # July 2023 changes
 # make atom ** factor into factor ** factor so that (1 / 3) ** (3 /4) works
+# splice
 
 
 import logging
@@ -63,10 +64,10 @@ class UnderwritingLexer(Lexer):
               LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
               XS, PICKS,
               DISTORTION,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS, SPLICE,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
-              AND, # PERCENT,
+              AND,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
               }
@@ -108,6 +109,7 @@ class UnderwritingLexer(Lexer):
     ID['picks'] = PICKS
     ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
+    ID['splice'] = SPLICE
     ID['ceded'] = CEDED
     ID['claim'] = CLAIMS
     ID['dfreq'] = DFREQ
@@ -122,7 +124,6 @@ class UnderwritingLexer(Lexer):
     ID['wts'] = WEIGHTS
     ID['and'] = AND
     ID['exp'] = EXP
-    ID['wt'] = WEIGHTS
     ID['at'] = AT
     ID['cv'] = CV
     ID['lr'] = LR
@@ -133,7 +134,6 @@ class UnderwritingLexer(Lexer):
     ID['so'] = SHARE_OF
     ID['zm'] = ZM
     ID['zt'] = ZT
-    ID['x'] = XS
 
     @_(r'\n+')
     def newline(self, t):
@@ -202,7 +202,7 @@ class UnderwritingParser(Parser):
 
     debugfile = None
     # uncomment to write detailed grammar rules
-    # debugfile = Path.home() / 'aggregate/parser/parser.out'
+    debugfile = Path.home() / 'aggregate/parser/parser.out'
     # this won't have been created the first time this runs in a clean environment, hence:
     # debugfile.parent.mkdir(parents=True, exist_ok=True)
     tokens = UnderwritingLexer.tokens
@@ -211,8 +211,8 @@ class UnderwritingParser(Parser):
         ('nonassoc', INHOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
         ('left', TIMES),  # for scaling distributions
-        ('left', DIVIDE), # for internal math in expressions
-        # ('right', EXP),   # exponential function
+        ('nonassoc', DIVIDE), # for internal math in expressions; nonassoc means 1/2/3 causes an error, force parens
+        ('right', EXP),   # exponential function
         ('right', EXPONENT),
     )
 
@@ -228,17 +228,12 @@ class UnderwritingParser(Parser):
         nm = p._namemap
         sl = p._slice
         ans = []
-        for k, v in nm.items():
-            rhs = sl[v]
-            if type(rhs) == sly.yacc.YaccSymbol:
-                # ans.append(f'{k}={rhs.value} (type: {rhs.type})')
-                ans.append(f'{k}={rhs.value}')
-            else:
-                # ans.append(f'{k}={rhs!s}')
-                pass
+        for i, (k, v) in enumerate(nm.items()):
+            # breaks out the parts; sl is a tuple of parse states
+            rhs = v(sl, i)
+            ans.append(f'[{i}] {k}={rhs!s}')
         ans = "; ".join(ans)
         logger.info(f'{msg:20s}\t{ans}')
-        # logger.info(f'{msg:15s}\n\t{ans}\n')
 
     @staticmethod
     def enhance_debugfile(f_out=''):
@@ -569,7 +564,8 @@ class UnderwritingParser(Parser):
         return (p[0] / p[2], p[2], p[4])
 
     # severity term ============================================
-    @_('SEV sev %prec LOW')
+    #  %prec LOW removed
+    @_('SEV sev')
     def sev_clause(self, p):
         return p.sev
 
@@ -603,73 +599,92 @@ class UnderwritingParser(Parser):
         p.sev['sev_conditional'] = False
         return p.sev
 
-    @_('sev PLUS numbers', 'sev MINUS numbers')
+    @_('sev2 weights splice')
     def sev(self, p):
-        self.logger(f'sev <-- sev {p[1]} numbers', p)
-        p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
-            p.sev.get('sev_loc', 0))
+        self.logger(
+            f'sev <-- sev1 weights splice', p)
+        p.sev2['sev_wt'] = p.weights
+        p.sev2['sev_lb'] = p.splice['sev_lb']
+        p.sev2['sev_ub'] = p.splice['sev_ub']
+        return p.sev2
+
+    @_('sev1 PLUS numbers', 'sev1 MINUS numbers')
+    def sev2(self, p):
+        self.logger(f'sev2 <-- sev1 {p[1]} numbers', p)
+        p.sev1['sev_loc'] = UnderwritingParser._check_vectorizable(
+            p.sev1.get('sev_loc', 0))
         sign = 1 if p[1]=='+' else -1
         p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
-        p.sev['sev_loc'] += sign * p_numbers
-        return p.sev
+        p.sev1['sev_loc'] += sign * p_numbers
+        return p.sev1
 
-    @_('numbers TIMES sev')
-    def sev(self, p):
-        self.logger(f'sev <-- numbers TIMES sev', p)
+    @_('sev1')
+    def sev2(self, p):
+        self.logger(f'sev2 <-- sev1', p)
+        return p.sev1
+
+    @_('numbers TIMES sev0')
+    def sev1(self, p):
+        self.logger(f'sev1 <-- numbers TIMES sev0', p)
         p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
-        if 'sev_mean' in p.sev:
-            p.sev['sev_mean'] = UnderwritingParser._check_vectorizable(
-                p.sev.get('sev_mean', 0))
-            p.sev['sev_mean'] *= p_numbers
+        if 'sev_mean' in p.sev0:
+            p.sev0['sev_mean'] = UnderwritingParser._check_vectorizable(
+                p.sev0.get('sev_mean', 0))
+            p.sev0['sev_mean'] *= p_numbers
         # only scale if there is a scale (otherwise you double count)
-        if 'sev_scale' in p.sev:
-            p.sev['sev_scale'] = UnderwritingParser._check_vectorizable(
-                p.sev.get('sev_scale', 0))
-            p.sev['sev_scale'] *= p_numbers
-        if 'sev_mean' not in p.sev:
+        if 'sev_scale' in p.sev0:
+            p.sev0['sev_scale'] = UnderwritingParser._check_vectorizable(
+                p.sev0.get('sev_scale', 0))
+            p.sev0['sev_scale'] *= p_numbers
+        if 'sev_mean' not in p.sev0:
             # e.g. Pareto has no mean and it is important to set the scale
             # but if there is a mean it handles the scaling and setting scale will
             # confuse the distribution maker
-            p.sev['sev_scale'] = p_numbers
+            p.sev0['sev_scale'] = p_numbers
         # if there is a location it needs to scale too --- that's a curious choice!
-        if 'sev_loc' in p.sev:
-            p.sev['sev_loc'] = UnderwritingParser._check_vectorizable(
-                p.sev['sev_loc'])
-            p.sev['sev_loc'] *= p_numbers
-        # logger.error(str(p.sev))
-        return p.sev
+        if 'sev_loc' in p.sev0:
+            p.sev0['sev_loc'] = UnderwritingParser._check_vectorizable(
+                p.sev0['sev_loc'])
+            p.sev0['sev_loc'] *= p_numbers
+        # logger.error(str(p.sev0))
+        return p.sev0
 
-    @_('ids numbers CV numbers weights')
-    def sev(self, p):
-        self.logger(
-            f'sev <-- ids numbers CV numbers weights', p)
-        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_scale': 1.0, 'sev_wt': p.weights}
+    @_('sev0')
+    def sev1(self, p):
+        self.logger(f'sev1 <-- sev0', p)
+        return p.sev0
 
-    @_('ids numbers numbers weights')
-    def sev(self, p):
+    @_('ids numbers CV numbers')
+    def sev0(self, p):
         self.logger(
-            f'sev <-- ids numbers numbers weights', p)
+            f'sev0 <-- ids numbers CV numbers', p)
+        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_scale': 1.0}
+
+    @_('ids numbers numbers')
+    def sev0(self, p):
+        self.logger(
+            f'sev0 <-- ids numbers numbers', p)
         # two parameters for shape...must specify scale somehow. put in default scale as 1
-        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_b': p[2], 'sev_scale': 1.0, 'sev_wt': p.weights}
+        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_b': p[2], 'sev_scale': 1.0}
 
-    @_('ids numbers weights')
-    def sev(self, p):
+    @_('ids numbers')
+    def sev0(self, p):
         self.logger(
-            f'sev <-- ids numbers weights', p)
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_scale': 1.0,  'sev_wt': p.weights}
+            f'sev0 <-- ids numbers', p)
+        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_scale': 1.0}
 
     # no weights with xps terms
     @_('ids xps')
-    def sev(self, p):
-        self.logger(f'sev <-- ids xps (ids should be (c|d)histogram) or zero param (xps is none)', p)
+    def sev0(self, p):
+        self.logger(f'sev0 <-- ids xps (ids should be (c|d)histogram) or zero param (xps is none)', p)
         return {'sev_name': p.ids, **p.xps}
 
     @_('ids')
-    def sev(self, p):
+    def sev0(self, p):
         # for norm expon uniform levy, zero parameter severities
         # need to make sure there is a scale
         self.logger(
-            f'sev <-- ids, zero parameter severity {p.ids}', p)
+            f'sev0 <-- ids, zero parameter severity {p.ids}', p)
         return {'sev_name': p.ids, 'sev_scale': 1.0}
 
     @_('XPS doutcomes dprobs')
@@ -752,7 +767,20 @@ class UnderwritingParser(Parser):
     @_('')
     def weights(self, p):
         self.logger('weights <-- missing weights term', p)
-        return 1
+        return 1.
+
+    @_('SPLICE "[" numberl "]"')
+    def splice(self, p):
+        self.logger(f'splice <-- SPLICE [numberl]', p)
+
+        return {'sev_lb': p.numberl[:-1], 'sev_ub': p.numberl[1:]}
+
+    @_('')
+    def splice(self, p):
+        self.logger('splice <-- missing splice term', p)
+        # not sure best return value; weights returns 1
+        # return {'sev_lb': [0], 'sev_ub': [np.inf]}
+        return {'sev_lb': 0., 'sev_ub': np.inf}
 
     # layer terms, optional ====================================
     @_('numbers XS numbers')
@@ -958,43 +986,74 @@ class UnderwritingParser(Parser):
         self.logger('numbers <-- expr', p)
         return p.expr
 
-    @_('term')
-    def expr(self, p):
-        self.logger('expr <-- term', p)
-        return p.term
+    # @_('term')
+    # def expr(self, p):
+    #     self.logger('expr <-- term', p)
+    #     return p.term
+    #
+    # @_('term DIVIDE factor')
+    # def term(self, p):
+    #     self.logger('term <-- term / factor', p)
+    #     return p.term / p.factor
+    #
+    # @_('factor')
+    # def term(self, p):
+    #     self.logger('term <-- factor', p)
+    #     return p.factor
+    #
+    # @_('"(" term ")"')
+    # def factor(self, p):
+    #     return p.term
+    #
+    # @_('EXP "(" term ")"')
+    # def factor(self, p):
+    #     return exp(p.term)
+    #
+    # @_('power')
+    # def factor(self, p):
+    #     self.logger('factor <-- power', p)
+    #     return p.power
+    #
+    # @_('factor EXPONENT factor')
+    # def power(self, p):
+    #     self.logger('power <-- factor EXPONENT factor', p)
+    #     return p[0] ** p[2]
+    #
+    # @_('atom')
+    # def power(self, p):
+    #     self.logger('power <-- atom', p)
+    #     return p.atom
 
-    @_('term DIVIDE factor')
-    def term(self, p):
-        self.logger('term <-- term / factor', p)
-        return p.term / p.factor
 
-    @_('factor')
-    def term(self, p):
-        self.logger('term <-- factor', p)
-        return p.factor
-
-    @_('"(" term ")"')
-    def factor(self, p):
-        return p.term
-
-    @_('EXP "(" term ")"')
-    def factor(self, p):
-        return exp(p.term)
-
-    @_('power')
-    def factor(self, p):
-        self.logger('factor <-- power', p)
-        return p.power
-
-    @_('factor EXPONENT factor')
-    def power(self, p):
-        self.logger('power <-- factor EXPONENT factor', p)
-        return p[0] ** p[2]
 
     @_('atom')
-    def power(self, p):
-        self.logger('power <-- atom', p)
+    def expr(self, p):
+        self.logger('expr <-- atom', p)
         return p.atom
+
+    @_('atom DIVIDE atom')
+    def atom(self, p):
+        self.logger('atom <-- atom / atom', p)
+        return p[0] / p[2]
+
+    @_('"(" atom ")"')
+    def atom(self, p):
+        self.logger('atom <-- (atom)', p)
+        return p.atom
+
+    @_('EXP atom')
+    def atom(self, p):
+        self.logger('atom <-- EXP atom', p)
+        return exp(p.atom)
+
+    @_('atom EXPONENT atom')
+    def atom(self, p):
+        self.logger('atom <-- atom EXPONENT atom', p)
+        return p[0] ** p[2]
+
+
+
+
 
     @_('NUMBER')
     def atom(self, p):

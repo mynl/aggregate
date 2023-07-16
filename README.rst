@@ -102,9 +102,23 @@ Version History
 
 * Added ability to specify occ reinsurance after a built in agg; this
   allows you to alter a gross aggregate more easily.
-* Added ability for unconditional dsev.
 * ``Underwriter.safe_lookup`` uses deepcopy rather than copy to avoid
   problems array elements.
+* Clean up and improved Parser and grammar
+
+    - atom -> term is much cleaner (removed power, factor; now
+      managed with prcedence and assoicativity)
+    - EXP and EXPONENT are right
+      associative, division is not associative so 1/2/3 gives an error.
+    - Still SR conflict from dfreq [ ] [  ] because it could be the
+      probabilities clause or the start of a vectorized layer clause
+    - Remaining SR conflicts are from NUMBER, which is used in many
+      places. This is a problem with the grammar, not the parser.
+    - Added more tests to the parser test suite
+    - Severity weights clause must come after locations (more natural)
+    - Added ability for unconditional dsev.
+    - Support for splicing (see below)
+
 * Cleanup of ``Aggregate`` class, concurrent with creating a cheat sheet
 
     - many documentation updates
@@ -122,12 +136,23 @@ Version History
     - deleted ``def get_stat(self, line='total', stat='EmpMean'): return self.audit_df.loc[line, stat]``
     - deleted ``resample``, was an alias for sample
 
+* Management of knowledge in ``Underwriter`` changed to support loading
+  a database after creation. Databases not loaded until needed - alas
+  that includes printing the object. TODO: Consider a change?
 * Frequency mfg renamed to freq_pgf to match other Frequency class methods and
   to accuractely describe the function as a probability generating function
   rather than a moment generating function.
 * Added ``introspect`` function to Utilities. Used to create a cheat sheet
   for Aggregate.
 * Added cheat sheets, completed for Aggregate
+* Severity can now be conditional on being in a layer (see splice); managed
+  adjustments to underlying frozen rv using decorators. No overhead if not
+  used.
+* Added "splice" option for Severity (see Albrecher et. al ch XX) and Aggregate,
+  new arguments ``sev_lb`` and ``sev_ub``, each lists.
+* ``Underwriter.build`` defaults update argument to None, which uses the object default.
+* pretty printing: now returns a value, no tacit mode; added _html version to
+  run through pygments, that looks good in Jupyter Lab.     
 
 0.17.1
 ~~~~~~~~

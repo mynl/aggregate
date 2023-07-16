@@ -1,0 +1,279 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Aggregate Cheat Sheet
+%
+% Start only Aggregate lines with \texttt so you can count them
+%
+% Created by Stephen J Mildenhall
+% (c) 2023
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+\input{cheat_sheet_macros.tex}
+\title{DecL Cheat Sheet}
+
+% color scheme defeined here - just change the suffixes
+\colorlet{highlightcolor}{highlightcolora}
+\colorlet{washedcolor}{washedcolora}
+\colorlet{textcolor}{texta}
+
+
+
+\begin{document}
+
+{\huge{\bf DecL Cheat Sheet for Compound Distributions}}
+
+\raggedright The DecL specification of an \texttt{Aggregate} compound distribution object has eight clauses: \\
+\texttt{agg <NAME> <EXPOSURE> <LIMIT*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <NOTE*>} \\
+Key: \texttt{<INPUT>} denotes user input(s); clauses marked with an asterisk are optional; \texttt{lower\_case} is a DecL keyword; \texttt{CLAUSE\_TYPE} is a valid clause; options: \texttt{a|b|c}.
+
+\begin{multicols*}{3}
+
+%------------1. NAME CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+% {\it italics stuff} \\
+
+\texttt{agg NAME}
+
+\medskip\it Name of the compound \\
+Access from knowledge as \texttt{agg.NAME}. \\
+Names must match regex \\
+\rm \texttt{r'[a-zA-Z][\textbackslash.\_:~a-zA-Z0-9\textbackslash-]*'}.
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {1. Name Clause };
+\end{tikzpicture}
+
+
+%------------2. EXPOSURE CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{<EXP\_LOSS> loss} \\
+\texttt{<PREMIUM> premium at <LR> lr} \\
+\texttt{<EXPOSURE> exposure at <RATE> rate} \\
+\texttt{<CLAIMS> claims} \\
+\texttt{dfreq <OUTCOMES> <PROBABILITIES*>}
+
+\medskip\it Outcomes entered \texttt{[1 2 3 4]}  or \texttt{[2:10:2]} and
+probabilities \texttt{[.5 .25 1/8 1/9]} or omitted for equally likely.
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {2. Exposure Clause};
+\end{tikzpicture}
+
+
+%------------ 3. LIMIT CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{<LIMIT> xs <ATTACHMENT>}
+
+\medskip\it Occurrence limits applied to ground-up severity, unlimited reinstatements,
+losses conditional on attaching layer by default.
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {3. Limit Clause (optional)};
+\end{tikzpicture}
+
+
+%------------ 4. SEVERITY CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{sev <DIST\_NAME> <MEAN> cv <CV>} \\
+\texttt{sev <DIST\_NAME> <SHAPE1> <SHAPE2>} \\
+\texttt{dsev <OUTCOMES> <PROBABILITIES>}
+
+\medskip\texttt{<SCALE> * SEV + <LOC>}.
+
+\medskip\texttt{SEV splice [<LB> <UB>]} {\it conditional in layer} \\
+\medskip\texttt{SEV !} {\it unconditional, when {\rm\texttt{ATTACHMENT}} > 0}
+
+% \medskip\it Scale and translate \texttt{<SCALE> * SEV + <LOC>}.
+% Conditional in a layer $(\mathrm{LB}, \mathrm{UB}]$:  \texttt{SEV splice [<LB> <UB>]}.
+% Make unconditional:  \texttt{SEV !}
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {4. Severity Clause };
+\end{tikzpicture}
+
+
+\columnbreak
+
+
+%------------ 5. OCCURRENCE REINSURANCE CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{occurrence ceded to LAYERS} \\
+\texttt{occurrence net of LAYERS} \\
+\texttt{LAYER=SHARE so LAYER xs ATTACH | PARTICIPATION po LAYER xs ATTACH}
+\texttt{LAYERS=LAYER1 and LAYER2 and ...}
+
+\medskip\it Amount share of (\texttt{so}); participation (placed) $0\le po\le 1$ part of (\texttt{po})
+
+% For example \texttt{250 xs 250}, \texttt{3 so 5 xs 5}, or \texttt{30\% po 1 xs 1}.
+
+\medskip\rm \texttt{LAYERS=tower[250 500 1000]} \\
+\medskip\it Specify layer breaks, expands to \texttt{250 xs 0},
+\texttt{250 xs 250}, and \texttt{500 xs 500}; ground-up layer automatically added.
+    
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {5. Occurrence Reinsurance Clause};
+\end{tikzpicture}
+
+
+%------------ 6. FREQUENCY CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{poisson},
+\texttt{bernoulli},
+\texttt{fixed},
+\texttt{geometric},
+\texttt{logarithmic},
+\texttt{binomial XX},
+\texttt{negbin var\_mult},
+\texttt{pascal XX XX},
+\texttt{neymana XX} \\
+
+\texttt{mixed <MIXING DIST> <SHAPE1> <SHAPE2>} \\
+\texttt{MIXING DIST=gamma|delaporte|ig|sichel|beta}
+
+\texttt{FREQ zt}  \\
+\texttt{FREQ zm p0} \\
+\medskip\it zero truncated, zero modified with $\Pr(N=0)=p0$
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {6. Frequency Clause };
+\end{tikzpicture}
+
+
+%------------ 7. AGGREGATE REINSURANCE CLAUSE ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{aggregate ceded to LAYERS} \\
+\texttt{aggregate net of LAYERS} \\
+\texttt{aggregate (net of|ceded to) tower [<BREAKS>]}
+
+
+% \it See Occurrence Reinsurance Clause for \texttt{LAYERS} and outputs.
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {7. Aggregate Reinsurance Clause};
+\end{tikzpicture}
+
+
+
+\columnbreak
+
+
+%------------ 8. NOTE  ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{note\{prems op A curve, effective 1/1/2024;\}} \\
+\texttt{note\{bs=100; log2=17; normalize=False\}} \\
+
+\medskip\it Add hints for updating \\
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {8. Note};
+\end{tikzpicture}
+
+
+%------------ 9. VECTORIZATION ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\it Exposure clause\\
+\rm\texttt{[1 2 3] claims} \\
+\texttt{[100 200 300] loss} \\
+\texttt{[100 200 300] premium at [.8 .7 .65] lr} \\
+
+\it Layers clause \\
+\rm \texttt{[250 250 500] xs [0 250 500]} \it zip layers %  250 xs 0, 250 xs 250, and 500 xs 500.
+
+\it Severity clause \\
+\rm \texttt{[1 3] * expon 1 wts [.6 .4]} \\ %mixed exponential \\
+\texttt{[1 3] * [gamma lognorm] [4 1.25] wts [.6 .4]} \\ %  mixed severity types  \\
+
+\it Vectors are broadcast; layers, exposure etc. are zipped.
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {9. Vectorization};
+\end{tikzpicture}
+
+
+%------------  10. MATH EXPRESSIONS  ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\it Only division, exponentiation, and exponential allowed\\
+\rm \texttt{123}, \texttt{12.34e2}, \texttt{-12.4e-5}, \texttt{-12.0}, \texttt{12.4\%} \\
+\texttt{1/2}, \texttt{3**4}, \texttt{exp(2)}
+
+{\bf Warning:} \it there is no unary minus, minus binds to the number: $-4^2=(-4)^2=16$.
+
+Scale factor for lognormal $\mu,\sigma$ entered as \rm\texttt{exp(mu)/exp(sigma**2/2)}.
+
+% \texttt{agg Dice dfreq [1:6] dsev [1:6]} a dice-roll of dice rolls
+% Classic gross, net occurrence, net of occurrence and aggregate progression \\
+% \texttt{agg Gross 1000 loss 5000 xs 0 sev lognorm 50 cv 2.5 mixed gamma 0.4} \\
+% \texttt{agg NetOcc agg.Gross occurrence net of 50\% po 500 xs 500 and 4000 xs 1000} \\
+% \texttt{agg Net agg.NetOcc occurrence net of 50\% po 500 xs 500 and 4000 xs 1000} \\
+% Create and use mixed severity
+% \texttt{sev MED [100 300 1000] * expon 1 wts [0.8 0.17 0.03]} \\
+% \texttt{agg CommAuto 2000 premium at 70\% lr sev.MED mixed gamma 0.25}
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {10. Mathematical Expressions};
+\end{tikzpicture}
+
+
+%------------ 11. META build and Underwriter  ---------------
+% \begin{tikzpicture}
+% \node [mybox] (box){%
+%     \begin{minipage}{0.3\textwidth}\raggedright
+
+%     \end{minipage}
+% };
+% \node[fancytitle] at (box.north west) {11. Meta (build and Underwriter stuff)};
+% \end{tikzpicture}
+
+\bigskip \raggedright
+{\bf Notes:}
+
+
+% FOOTER
+\makefooter
+
+\end{multicols*}
+
+\end{document}

@@ -1,0 +1,107 @@
+% general includes
+\usepackage[landscape]{geometry}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usepackage{xcolor}
+% \usetikzlibrary{decorations.pathmorphing}
+\usetikzlibrary{calc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+
+\usepackage[english]{babel}
+
+% fontws
+\usepackage{stix}
+
+\advance\topmargin-.8in
+\advance\textheight3in
+\advance\textwidth3in
+\advance\oddsidemargin-1.5in
+\advance\evensidemargin-1.5in
+\parindent0pt
+\parskip2pt
+\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
+
+% colors from the logo
+% https://color.adobe.com/mythemes?viewTheme
+\definecolor{highlightcolora}{HTML}{73171F}
+\definecolor{highlightcolorb}{HTML}{CB7C13}
+\definecolor{highlightcolorc}{HTML}{168C6B}
+\definecolor{highlightcolord}{HTML}{355078}
+\definecolor{highlightcolore}{HTML}{263940}
+
+\colorlet{washedcolora}{highlightcolora!20!white}
+\colorlet{washedcolorb}{highlightcolorb!20!white}
+\colorlet{washedcolorc}{highlightcolorc!20!white}
+\colorlet{washedcolord}{highlightcolord!20!white}
+\colorlet{washedcolore}{highlightcolore!20!white}
+
+\colorlet{texta}{white}
+\colorlet{textb}{white}
+\colorlet{textc}{white}
+\colorlet{textd}{white}
+\colorlet{texte}{white}
+
+% circles for method and static method
+\definecolor{hred}{rgb}{1, 0.5, 0.5}
+\definecolor{hblue}{rgb}{0.5, 0.5, 1}
+\newcommand{\m}{% method
+\tikz[baseline=(char.base)]{
+    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
+}\;}
+\newcommand{\s}{% static method
+\tikz[baseline=(char.base)]{
+    \node[circle, fill=hblue, text=white, inner sep=1pt, minimum size=1em] (char) {s};
+}\;}
+
+
+%% TikZ MACROS
+
+% title box - adjust text color as appropriate here
+\tikzstyle{fancytitle} =[
+    fill=highlightcolor,
+    text=textcolor,
+    font=\bfseries,
+    right=10pt
+    ]
+
+% content box
+\tikzstyle{mybox} = [
+    draw=highlightcolor,
+    fill=washedcolor,
+    very thick,
+    rectangle,
+    inner sep=10pt,
+    inner ysep=10pt
+    ]
+
+
+\newcommand{\makefooter}{%
+% \vfil
+% \hfill
+\begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=south east, inner sep=0pt, outer sep=0pt] at ($(current page.south east) + (-0.125in,0.125in)$) {
+
+        \begin{tikzpicture}
+        \node [font=\small, text height=0.75in, align=right, minimum height=0.75in, inner xsep=5pt, inner ysep=0pt] (box){%
+            \copyright\ Stephen J Mildenhall \\
+            \texttt{aggregate 0.18.0} \\
+            2023-07-16
+        };
+        \node[inner sep=0pt, anchor=north west] at (box.north east) {
+            \includegraphics[width=0.75in,height=0.75in,keepaspectratio]{../docs/_static/agg_logo.png}
+        };
+        \end{tikzpicture}
+
+    };
+\end{tikzpicture}
+}

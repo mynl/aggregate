@@ -9,46 +9,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentclass{article}
-\usepackage[landscape]{geometry}
-\usepackage{url}
-\usepackage{multicol}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{tikz}
-\usetikzlibrary{decorations.pathmorphing}
+\input{cheat_sheet_macros.tex}
+\title{Portfolio Cheat Sheet}
 
-\usepackage{stmaryrd}
-\usepackage{colortbl}
-\usepackage{xcolor}
-\usepackage{mathtools}
-\usepackage{amsmath,amssymb}
-\usepackage{enumitem}
-
-\title{Aggregate Cheat Sheet}
-\usepackage[english]{babel}
-
-\advance\topmargin-.8in
-\advance\textheight3in
-\advance\textwidth3in
-\advance\oddsidemargin-1.5in
-\advance\evensidemargin-1.5in
-\parindent0pt
-\parskip2pt
-\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
-
-\definecolor{hred}{rgb}{1, 0.5, 0.5}
-\definecolor{hblue}{rgb}{0.5, 0.5, 1}
-\newcommand{\m}{% method
-\tikz[baseline=(char.base)]{
-    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
-}\;}
-\newcommand{\s}{% static method
-\tikz[baseline=(char.base)]{
-    \node[circle, fill=hblue, text=white, inner sep=1pt, minimum size=1em] (char) {s};
-}\;}
+% color scheme defeined here - just change the suffixes
+\colorlet{highlightcolor}{highlightcolore}
+\colorlet{washedcolor}{washedcolore}
+\colorlet{textcolor}{texte}
 
 \begin{document}
 
-\begin{center}{\huge{\textbf{\texttt{aggregate.Portfolio} Cheat Sheet}}}\end{center}
+{\huge{\textbf{\texttt{Portfolio} Class Cheat Sheet}}}
 
 \raggedright The \texttt{Portfolio} call signature is straightforward. \texttt{spec\_list} is a DecL program, list of
 \texttt{Aggregate} objects or kwargs, or names known to the Underwriter, or a pandas DataFrame sample.  \\
@@ -60,14 +31,9 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
 \begin{multicols*}{3}
 
-\tikzstyle{mybox} = [draw=black, fill=white, very thick,
-    rectangle, inner sep=10pt, inner ysep=10pt]
-\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
-
-
 %------------1. SPECIFICATION & CREATION ---------------
 \begin{tikzpicture}
-\node [mybox, draw=blue] (box){%
+\node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{name},
@@ -75,7 +41,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 \texttt{agg\_list} (list of \texttt{Aggregate} objects),
 \texttt{line\_names},
 \texttt{line\_names\_ex},
-\texttt{unit\_names} (unit $\mapsfrom$ line),
+\texttt{unit\_names} (unit $\leftarrow$ line),
 \texttt{unit\_names\_ex},
 \texttt{line\_name\_pipe},
 \texttt{program} (DecL program),
@@ -90,7 +56,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt, fill=blue] at (box.north west) {1. Specification \& creation};
+\node[fancytitle] at (box.north west) {1. Specification \& creation};
 \end{tikzpicture}
 
 
@@ -122,7 +88,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {2. Update};
+\node[fancytitle] at (box.north west) {2. Update};
 \end{tikzpicture}
 
 
@@ -147,7 +113,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {3. Moments\vphantom{p}};
+\node[fancytitle] at (box.north west) {3. Moments\vphantom{p}};
 \end{tikzpicture}
 
 
@@ -172,7 +138,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {4. Statistical functions\vphantom{p}};
+\node[fancytitle] at (box.north west) {4. Statistical functions\vphantom{p}};
 \end{tikzpicture}
 
 
@@ -194,7 +160,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {5. Validation\vphantom{p}};
+\node[fancytitle] at (box.north west) {5. Validation\vphantom{p}};
 \end{tikzpicture}
 
 
@@ -219,7 +185,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {6. Output dataframes};
+\node[fancytitle] at (box.north west) {6. Output dataframes};
 \end{tikzpicture}
 
 
@@ -232,7 +198,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {7. Reinsurance\vphantom{p}};
+\node[fancytitle] at (box.north west) {7. Reinsurance\vphantom{p}};
 \end{tikzpicture}
 
 
@@ -265,7 +231,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {8. Visualization \& exhibits\vphantom{p}};
+\node[fancytitle] at (box.north west) {8. Visualization \& exhibits\vphantom{p}};
 \end{tikzpicture}
 
 \columnbreak
@@ -312,7 +278,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {9. Risk and pricing};
+\node[fancytitle] at (box.north west) {9. Risk and pricing};
 \end{tikzpicture}
 
 
@@ -327,7 +293,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {10. Approximations};
+\node[fancytitle] at (box.north west) {10. Approximations};
 \end{tikzpicture}
 
 
@@ -348,7 +314,7 @@ interchangeably). Comments elucidate the meaning of more obscure entries. Intern
     
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {11. Meta\vphantom{p}};
+\node[fancytitle] at (box.north west) {11. Meta\vphantom{p}};
 \end{tikzpicture}
 
 \bigskip \raggedright
@@ -361,13 +327,8 @@ Any vectorizable input accepts numeric or iterable datatypes.
 Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
 
 
-\vskip .25truein
-
-\begin{flushright}
-\copyright\ Stephen J Mildenhall, July 2023 \\
-\phantom{\copyright\ }\texttt{aggregate} version 0.18.0 
-\end{flushright}
-
+% FOOTER
+\makefooter
 
 \end{multicols*}
 

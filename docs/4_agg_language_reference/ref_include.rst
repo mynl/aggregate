@@ -14,7 +14,7 @@ agg_list            	::= agg_list agg_out
 agg_out             	::= AGG name exposures layers sev_clause occ_reins freq agg_reins note
                     	 | AGG name dfreq layers sev_clause occ_reins agg_reins note
                     	 | AGG name TWEEDIE expr expr expr note
-                    	 | AGG name builtin_agg agg_reins note
+                    	 | AGG name builtin_agg occ_reins agg_reins note
                     	 | builtin_agg agg_reins note
 
 sev_out             	::= SEV name sev note
@@ -44,25 +44,32 @@ reins_clause        	::= expr XS expr
                     	 | expr SHARE_OF expr XS expr
                     	 | expr PART_OF expr XS expr
 
-sev_clause          	::= SEV sev %prec LOW
+sev_clause          	::= SEV sev
                     	 | dsev
                     	 | BUILTIN_SEV
 
 sev                 	::= sev picks
                     	 | sev "!"
-                    	 | sev PLUS numbers
-                    	 | sev MINUS numbers
-                    	 | numbers TIMES sev
-                    	 | ids numbers CV numbers weights
-                    	 | ids numbers numbers weights
-                    	 | ids numbers weights
-                    	 | ids xps
-                    	 | ids
+                    	 | sev2 weights splice
                     	 | BUILTIN_SEV
 
-xps                 	::= XPS doutcomes dprobs
+dsev                	::= dsev "!"
+                    	 | DSEV doutcomes dprobs
 
-dsev                	::= DSEV doutcomes dprobs
+sev2                	::= sev1 PLUS numbers
+                    	 | sev1 MINUS numbers
+                    	 | sev1
+
+sev1                	::= numbers TIMES sev0
+                    	 | sev0
+
+sev0                	::= ids numbers CV numbers
+                    	 | ids numbers numbers
+                    	 | ids numbers
+                    	 | ids xps
+                    	 | ids
+
+xps                 	::= XPS doutcomes dprobs
 
 dfreq               	::= DFREQ doutcomes dprobs
 
@@ -77,6 +84,9 @@ dprobs              	::= "[" numberl "]"
 
 weights             	::= WEIGHTS EQUAL_WEIGHT expr
                     	 | WEIGHTS "[" numberl "]"
+                    	 | 
+
+splice              	::= SPLICE "[" numberl "]"
                     	 | 
 
 layers              	::= numbers XS numbers
@@ -115,19 +125,13 @@ numbers             	::= "[" numberl "]"
 numberl             	::= numberl expr
                     	 | expr
 
-expr                	::= term
+expr                	::= atom
 
-term                	::= term DIVIDE factor
-                    	 | factor
-
-factor              	::= "(" term ")"
-                    	 | EXP "(" term ")"
-                    	 | power
-
-power               	::= factor EXPONENT factor
-                    	 | atom
-
-atom                	::= NUMBER
+atom                	::= atom DIVIDE atom
+                    	 | "(" atom ")"
+                    	 | EXP atom
+                    	 | atom EXPONENT atom
+                    	 | NUMBER
 
 FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed|logarithmic|negbin'
 

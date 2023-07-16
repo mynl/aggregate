@@ -7,63 +7,30 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentclass{article}
-\usepackage[landscape]{geometry}
-\usepackage{url}
-\usepackage{multicol}
-\usepackage{amsmath}
-\usepackage{amsfonts}
-\usepackage{tikz}
-\usepackage{xcolor}
-\usetikzlibrary{decorations.pathmorphing}
-\usepackage{amsmath,amssymb}
+\input{cheat_sheet_macros.tex}
+\title{Severity Cheat Sheet}
 
-\usepackage{colortbl}
-\usepackage{xcolor}
-\usepackage{mathtools}
-\usepackage{amsmath,amssymb}
-\usepackage{enumitem}
-
-\title{Aggregate Cheat Sheet}
-\usepackage[english]{babel}
-
-\advance\topmargin-.8in
-\advance\textheight3in
-\advance\textwidth3in
-\advance\oddsidemargin-1.5in
-\advance\evensidemargin-1.5in
-\parindent0pt
-\parskip2pt
-\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
-
-\definecolor{hred}{rgb}{1, 0.5, 0.5}
-\def\m{%
-\tikz[baseline=(char.base)]{
-    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
-}\;}
+% color scheme defeined here - just change the suffixes
+\colorlet{highlightcolor}{highlightcolorb}
+\colorlet{washedcolor}{washedcolorb}
+\colorlet{textcolor}{textb}
 
 \begin{document}
 
-\begin{center}{\huge{\textbf{\texttt{aggregate.Severity} Cheat Sheet}}}\end{center}
+{\huge{\textbf{\texttt{Severity} Class Cheat Sheet}}}
 
-\raggedright The \texttt{Severity} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples. \\
- \texttt{\m Severity(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=0, exp\_limit=np.inf}, \\
- \texttt{\phantom{\m}sev\_name='', sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0, sev\_xs=None, sev\_ps=None, sev\_wt=1, sev\_conditional=True, }\\
-% \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, }\\
- \texttt{\phantom{\m}occ\_reins=None, occ\_kind='', freq\_name='', freq\_a=0, freq\_b=0, freq\_zm=False, freq\_p0=np.nan, agg\_reins=None, agg\_kind='', note='')}${}^{[0]}$
-
+\raggedright The \texttt{Severity} call signature, \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities,  \\
+\texttt{\m Severity(name, sev\_name='', sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0, sev\_xs=None, sev\_ps=None,} \\
+\texttt{\phantom{\m Severity(}sev\_wt=1, sev\_lb, sev\_ub, sev\_conditional=True) }\\
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
 \begin{multicols*}{3}
 
-\tikzstyle{mybox} = [draw=black, fill=white, very thick,
-    rectangle, inner sep=10pt, inner ysep=10pt]
-\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
-
 
 %------------1. SPECIFICATION & CREATION ---------------
 \begin{tikzpicture}
-\node [mybox, draw=blue] (box){%
+\node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 % {\it italics stuff} \\
 
@@ -89,7 +56,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt, fill=blue] at (box.north west) {1. Specification \& creation};
+\node[fancytitle, right=10pt] at (box.north west) {1. Specification \& creation};
 \end{tikzpicture}
 
 
@@ -172,6 +139,8 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
+\it None
+
     \end{minipage}
 };
 \node[fancytitle, right=10pt] at (box.north west) {5. Validation};
@@ -183,6 +152,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
+\it None
 
     \end{minipage}
 };
@@ -195,12 +165,12 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
+\it None
 
     \end{minipage}
 };
 \node[fancytitle, right=10pt] at (box.north west) {7. Reinsurance};
 \end{tikzpicture}
-
 
 
 \columnbreak
@@ -275,13 +245,8 @@ Any vectorizable input accepts numeric or iterable datatypes.
 Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
 
 
-\vskip .25truein
-
-\begin{flushright}
-\copyright\ Stephen J Mildenhall, July 2023 \\
-\phantom{\copyright\ }\texttt{aggregate} version 0.18.0 
-\end{flushright}
-
+% FOOTER
+\makefooter
 
 \end{multicols*}
 

@@ -7,43 +7,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentclass{article}
-\usepackage[landscape]{geometry}
-\usepackage{url}
-\usepackage{multicol}
-\usepackage{amsmath}
-\usepackage{amsfonts}
-\usepackage{tikz}
-\usepackage{xcolor}
-\usetikzlibrary{decorations.pathmorphing}
-\usepackage{amsmath,amssymb}
+\input{cheat_sheet_macros.tex}
+\title{Distortion Cheat Sheet}
 
-\usepackage{colortbl}
-\usepackage{xcolor}
-\usepackage{mathtools}
-\usepackage{amsmath,amssymb}
-\usepackage{enumitem}
+% color scheme defeined here - just change the suffixes
+\colorlet{highlightcolor}{highlightcolord}
+\colorlet{washedcolor}{washedcolord}
+\colorlet{textcolor}{textd}
 
-\title{Aggregate Cheat Sheet}
-\usepackage[english]{babel}
-
-\advance\topmargin-.8in
-\advance\textheight3in
-\advance\textwidth3in
-\advance\oddsidemargin-1.5in
-\advance\evensidemargin-1.5in
-\parindent0pt
-\parskip2pt
-\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
-
-\definecolor{hred}{rgb}{1, 0.5, 0.5}
-\def\m{%
-\tikz[baseline=(char.base)]{
-    \node[circle, fill=hred, text=white, inner sep=1pt, minimum size=1em] (char) {m};
-}\;}
 
 \begin{document}
 
-\begin{center}{\huge{\textbf{\texttt{aggregate.Distortion} Cheat Sheet}}}\end{center}
+{\huge{\textbf{\texttt{Distortion} Class Cheat Sheet}}}
 
 \raggedright The \texttt{Distortion} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples. \\
  \texttt{\m Severity(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=0, exp\_limit=np.inf}, \\
@@ -56,14 +31,10 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \begin{multicols*}{3}
 
-\tikzstyle{mybox} = [draw=black, fill=white, very thick,
-    rectangle, inner sep=10pt, inner ysep=10pt]
-\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
-
 
 %------------1. SPECIFICATION & CREATION ---------------
 \begin{tikzpicture}
-\node [mybox, draw=blue] (box){%
+\node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 % {\it italics stuff} \\
 
@@ -86,7 +57,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt, fill=blue] at (box.north west) {1. Specification \& creation};
+\node[fancytitle] at (box.north west) {1. Specification \& creation};
 \end{tikzpicture}
 
 
@@ -101,7 +72,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {2. Update};
+\node[fancytitle] at (box.north west) {2. Update};
 \end{tikzpicture}
 
 
@@ -114,7 +85,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {3. Moments};
+\node[fancytitle] at (box.north west) {3. Moments};
 \end{tikzpicture}
 
 
@@ -133,7 +104,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {4. Statistical functions};
+\node[fancytitle] at (box.north west) {4. Statistical functions};
 \end{tikzpicture}
 
 
@@ -150,7 +121,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {5. Validation};
+\node[fancytitle] at (box.north west) {5. Validation};
 \end{tikzpicture}
 
 
@@ -164,7 +135,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {6. Output dataframes};
+\node[fancytitle] at (box.north west) {6. Output dataframes};
 \end{tikzpicture}
 
 
@@ -177,7 +148,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {7. Reinsurance};
+\node[fancytitle] at (box.north west) {7. Reinsurance};
 \end{tikzpicture}
 
 
@@ -194,7 +165,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {8. Visualization};
+\node[fancytitle] at (box.north west) {8. Visualization};
 \end{tikzpicture}
 
 
@@ -209,7 +180,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {9. Risk and pricing};
+\node[fancytitle] at (box.north west) {9. Risk and pricing};
 \end{tikzpicture}
 
 
@@ -222,7 +193,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {10. Approximations};
+\node[fancytitle] at (box.north west) {10. Approximations};
 \end{tikzpicture}
 
 
@@ -238,7 +209,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
         
     \end{minipage}
 };
-\node[fancytitle, right=10pt] at (box.north west) {11. Meta};
+\node[fancytitle] at (box.north west) {11. Meta};
 \end{tikzpicture}
 
 \bigskip \raggedright
@@ -253,12 +224,10 @@ Any vectorizable input accepts numeric or iterable datatypes.
 Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
 
 
-\vskip .25truein
+% \vskip .25truein
+% FOOTER
+\makefooter
 
-\begin{flushright}
-\copyright\ Stephen J Mildenhall, July 2023 \\
-\phantom{\copyright\ }\texttt{aggregate} version 0.18.0 
-\end{flushright}
 
 
 \end{multicols*}

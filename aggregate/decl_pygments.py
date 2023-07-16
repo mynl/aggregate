@@ -57,6 +57,8 @@ class AggLexer(RegexLexer):
             # the regex for an ID from parser.py
             (r'mixed ', Operator, 'mixed_freq'),
             (r'and', Name.Type),
+            (r'splice', Name.Type),
+            (r'wts', Name.Type),
             include('numbers'),
             include('keywords'),
             include('expr'),

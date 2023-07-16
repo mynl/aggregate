@@ -72,22 +72,23 @@ def get_fmts(df):
 
 def pprint(txt):
     """
-    Simple version of pprint
+    Simple text version of pprint with line breaking
     """
-    return pprint_ex(txt, split=60, html=True)
+    return pprint_ex(txt, split=60)
 
-def pprint_ex(txt, split=0, html=False, tacit=False):
+def pprint_ex(txt, split=0, html=False):
     """
-    Try to format an agg program. This is impractical now - dfreq and dsev, optional
+    Try to format an agg program. This is difficult because of dfreq and dsev, optional
     reinsurance, etc. Go for a simple approach of removing unnecessary spacing
     and removing notes. Notes can be accessed from the spec that is always to hand.
 
     For long programs use split=60 or so, they are split at appropriate points.
 
-    To do: split doesn't work for ports.
+    Best to use html = True to get colorization.
 
     :param txt: program text input
-    :param tacit: if True pp is silent, else it outputs.
+    :param split: if > 0 split lines at this length
+    :param html: if True return html (via pygments) , else return text
     """
     ans = []
     # programs come in as multiline
@@ -113,14 +114,9 @@ def pprint_ex(txt, split=0, html=False, tacit=False):
         #     ans += f'<p><small>Note {i+1}. {n}</small><p>'
         # use pygments to colorize
         agg_lex = get_lexer_by_name('agg')
-        ans = highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False))
-    if tacit is False and html is True:
-        display(HTML(ans))
-    elif tacit is False:
-        print(ans)
-        return
-    if tacit is True:
-        return ans
+        ans = HTML(highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False)))
+    return ans
+
 
 def ft(z, padding, tilt):
     """

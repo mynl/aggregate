@@ -1928,6 +1928,13 @@ class Portfolio(object):
         """
         pprint_ex(self.program, 20)
 
+    @property
+    def pprogram_html(self):
+        """
+        pretty print the program to html
+        """
+        return pprint_ex(self.program, 0, html=True)
+
     def limits(self, stat='range', kind='linear', zero_mass='include'):
         """
         Suggest sensible plotting limits for kind=range, density, .. (same as Aggregate).

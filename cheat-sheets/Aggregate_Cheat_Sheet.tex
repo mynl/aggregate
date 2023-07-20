@@ -8,7 +8,6 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass{article}
 \input{cheat_sheet_macros.tex}
 \title{Aggregate Cheat Sheet}
 
@@ -22,12 +21,13 @@
 
 {\huge{\bf \textbf{\texttt{Aggregate} Class Cheat Sheet}}}
 
-\raggedright The \texttt{Aggregate} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples. \\
+\raggedright
  \texttt{\m Aggregate(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=0, exp\_limit=np.inf}, \\
  \texttt{\phantom{\m}sev\_name='', sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0, sev\_xs=None, sev\_ps=None, sev\_wt=1, sev\_conditional=True, }\\
 % \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, }\\
  \texttt{\phantom{\m}occ\_reins=None, occ\_kind='', freq\_name='', freq\_a=0, freq\_b=0, freq\_zm=False, freq\_p0=np.nan, agg\_reins=None, agg\_kind='', note='')}${}^{[0]}$
 
+The \texttt{Aggregate} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 

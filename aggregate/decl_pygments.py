@@ -56,8 +56,8 @@ class AggLexer(RegexLexer):
             # (r'\<|\>', Generic.Heading),
             # the regex for an ID from parser.py
             (r'mixed ', Operator, 'mixed_freq'),
-            (r'and', Name.Type),
-            (r'splice', Name.Type),
+            (r'and',  Generic.Heading),
+            (r'splice',  Generic.Heading),
             (r'wts', Name.Type),
             include('numbers'),
             include('keywords'),
@@ -73,7 +73,8 @@ class AggLexer(RegexLexer):
             ],
 
         'mixed_freq': [
-            (words(('gamma', 'delaporte', 'ig', 'sig', 'beta', 'sichel'),
+            (words(('gamma', 'delaporte', 'ig', 'sig', 'beta', 'sichel', "<DISTRIBUTION>"),
+                   # last item is a hack for the AAS paper
                    suffix=' '
                    ), Name.Function, '#pop'),
             (r'sichel\.',  Name.Function)

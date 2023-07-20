@@ -97,8 +97,32 @@ Installation
 Version History
 -----------------
 
-0.18.0
+0.20.0 (release candidate for version 1.0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* ``sev_attachment``: changed default to ``None``; in that case gross losses equal
+  ground-up losses, with no adjustment. But if layer is 10 xs 0 then losses
+  become conditional on X > 0. That results in a different behaviour, e.g.,
+  when using ``dsev[0:3]``. Ripple through effect in Aggregate (change default),
+  Severity (change default, and change moment calculation; need to track the "attachment"
+  of zero and the fact that it came from None, to track Pr attaching)
+* dsev: check if any elements are < 0 and set to zero before computing moments
+  in dhistogram
+* same for dfreq; implemented in ``validate_discrete_distribution`` in distributions module
+* Default ``recommend_p=0.99999`` set in constsants module.
+* ``interpreter_test_suite`` renamed to ``run_test_suite`` and includes test
+  to count and report if there are errors.
+* Reason codes for failing validation; Aggregate.qt becomes Aggregte.explain_validation
+
+0.19.0
 ~~~~~~~
+
+* Fixed reinsurance description formatting
+* Improved splice parsing to allow explicit entry of lb and ub; needed to
+  model mixtures of mixtures (Albrecher et al. 2017)
+
+0.18.0 (major update)
+~~~~~~~~~~~~~~~~~~~~~~~
 
 * Added ability to specify occ reinsurance after a built in agg; this
   allows you to alter a gross aggregate more easily.
@@ -152,7 +176,7 @@ Version History
   new arguments ``sev_lb`` and ``sev_ub``, each lists.
 * ``Underwriter.build`` defaults update argument to None, which uses the object default.
 * pretty printing: now returns a value, no tacit mode; added _html version to
-  run through pygments, that looks good in Jupyter Lab.     
+  run through pygments, that looks good in Jupyter Lab.
 
 0.17.1
 ~~~~~~~~

@@ -63,7 +63,8 @@ class Underwriter(object):
         self.name = name
         self.update = update
         if log2 <= 0:
-            raise ValueError('log2 must be > 0. The number of buckets used equals 2**log2.')
+            raise ValueError(
+                'log2 must be > 0. The number of buckets used equals 2**log2.')
         self.log2 = log2
         self.debug = debug
         self._lexer = None
@@ -78,7 +79,7 @@ class Underwriter(object):
         self._case_dir = None
         self._template_dir = None
         self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
-                ['kind', 'name'])
+            ['kind', 'name'])
 
         # ensure description prints correctly. A bit cheaky.
         pd.set_option('display.max_colwidth', 100)
@@ -183,7 +184,8 @@ class Underwriter(object):
         try:
             program = db_path.read_text(encoding='utf-8')
         except Exception as e:
-            logger.error(f'Error reading requested database {db_path.name}. Ignoring.')
+            logger.error(
+                f'Error reading requested database {db_path.name}. Ignoring.')
         else:
             # read in, parse, save to sev/agg/port dictionaries
             # throw away answer...not creating anything
@@ -194,7 +196,8 @@ class Underwriter(object):
             n = len(self._knowledge)
             self.interpret_program(program)
             n = len(self._knowledge) - n
-            logger.info(f'Database {fn} read into knowledge, adding {n} entries.')
+            logger.info(
+                f'Database {fn} read into knowledge, adding {n} entries.')
 
     def __getitem__(self, item):
         """
@@ -211,14 +214,16 @@ class Underwriter(object):
         """
         # much less fancy version:
         if not isinstance(item, (str, tuple)):
-            raise ValueError(f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
+            raise ValueError(
+                f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
 
         assert self.knowledge is not None
 
         try:
             if type(item) == str:
                 # name == item, any type
-                rows = self._knowledge.xs(item, axis=0, level=1, drop_level=False)
+                rows = self._knowledge.xs(
+                    item, axis=0, level=1, drop_level=False)
             elif type(item) == tuple:
                 # return a dataframe row
                 rows = self._knowledge.loc[[item]]
@@ -232,7 +237,8 @@ class Underwriter(object):
                 kind, name, spec, program = rows.reset_index().iloc[0]
                 return Answer(kind=kind, name=name, spec=spec, program=program, object=None)
             else:
-                raise KeyError(f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
+                raise KeyError(
+                    f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
 
     def __repr__(self):
         import aggregate
@@ -254,11 +260,11 @@ class Underwriter(object):
             dd = str(dd)
         s.append(f'site dir           {sd}')
         s.append(f'default dir        {dd}')
-        s.append( '')
-        s.append( 'help')
-        s.append( 'build.knowledge    list of all programs')
-        s.append( 'build.qshow(pat)   show programs matching pattern')
-        s.append( 'build.show(pat)    build and display matching pattern')
+        s.append('')
+        s.append('help')
+        s.append('build.knowledge    list of all programs')
+        s.append('build.qshow(pat)   show programs matching pattern')
+        s.append('build.show(pat)    build and display matching pattern')
         return '\n'.join(s)
 
     def factory(self, answer):
@@ -273,7 +279,8 @@ class Underwriter(object):
         kind, name, spec, program, obj = answer.values()
 
         if obj is not None:
-            logger.error(f'Surprising: obj from Answer not None, type {type(obj)}. It will be overwritten.')
+            logger.error(
+                f'Surprising: obj from Answer not None, type {type(obj)}. It will be overwritten.')
 
         if kind == 'agg':
             obj = Aggregate(**spec)
@@ -289,7 +296,7 @@ class Underwriter(object):
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
                 logger.log(WL,
-                    f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
+                           f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
                 obj = None
             else:
                 obj = Severity(**spec)
@@ -380,7 +387,8 @@ class Underwriter(object):
             # calls __getitem__
             answer = self[portfolio_program]
         except (LookupError, TypeError):
-            logger.debug(f'underwriter.write | object not found, processing as a program.')
+            logger.debug(
+                f'underwriter.write | object not found, processing as a program.')
         else:
             logger.debug(f'underwriter.write | {answer.kind} object found.')
             answer = self.factory(answer)
@@ -458,7 +466,8 @@ class Underwriter(object):
             try:
                 # parser returns the type, name, and spec of the object
                 # this is where you can marry up with the program
-                kind, name, spec = self.parser.parse(self.lexer.tokenize(program_line))
+                kind, name, spec = self.parser.parse(
+                    self.lexer.tokenize(program_line))
             except ValueError as e:
                 if isinstance(e.args[0], str):
                     logger.error(e)
@@ -468,13 +477,16 @@ class Underwriter(object):
                     v = e.args[0].value
                     i = e.args[0].index
                     txt2 = program_line[0:i] + f'>>>' + program_line[i:]
-                    logger.error(f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    logger.error(
+                        f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
                     raise e
             else:
                 # store in uw dictionary and create if needed
-                logger.info(f'answer out: {kind} object {name} parsed successfully...adding to knowledge')
+                logger.info(
+                    f'answer out: {kind} object {name} parsed successfully...adding to knowledge')
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
-                rv.append(Answer(kind=kind, name=name, spec=spec, program=program_line, object=None))
+                rv.append(Answer(kind=kind, name=name, spec=spec,
+                          program=program_line, object=None))
 
         return rv
 
@@ -499,9 +511,11 @@ class Underwriter(object):
         except LookupError as e:
             logger.error(f'ERROR id {kind}.{name} not found in the knowledge.')
             raise e
-        logger.debug(f'UnderwritingParser.safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
+        logger.debug(
+            f'UnderwritingParser.safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
         if found_kind != kind:
-            raise ValueError(f'Error: type of {name} is  {found_kind}, not expected {kind}')
+            raise ValueError(
+                f'Error: type of {name} is  {found_kind}, not expected {kind}')
         # don't want to pass back the original otherwise changes can be reflected in the knowledge
         spec = deepcopy(spec)
         return spec
@@ -517,7 +531,7 @@ class Underwriter(object):
         # set logger_level for all aggregate loggers
         logger_level(level)
 
-    def build(self, program, update=None, log2=0, bs=0, recommend_p=0.99999, logger_level=None, **kwargs):
+    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, logger_level=None, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -563,7 +577,8 @@ class Underwriter(object):
                 # try to guess good defaults
                 d = answer.spec
                 # extract hints from note string
-                log2, bs, recommend_p, kwargs = parse_note_ex(d['note'], log2, bs, recommend_p, kwargs)
+                log2, bs, recommend_p, kwargs = parse_note_ex(
+                    d['note'], log2, bs, recommend_p, kwargs)
                 if d['sev_name'] == 'dhistogram' and log2 == 0:
                     bs_ = 1
                     # how big?
@@ -576,7 +591,8 @@ class Underwriter(object):
                         max_loss = np.max(d['sev_xs'])
                     else:
                         # normal approx on count
-                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
+                        max_loss = np.max(
+                            d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
                     # binaries are 0b111... len-2 * 2 is len - 1
                     log2_ = len(bin(int(max_loss))) - 1
                     logger.info(f'({answer.kind}, {answer.name}): Discrete mode, '
@@ -587,12 +603,15 @@ class Underwriter(object):
                     else:
                         log2_ = log2
                     if bs == 0:
-                        bs_ = round_bucket(answer.object.recommend_bucket(log2_, p=recommend_p))
+                        bs_ = round_bucket(
+                            answer.object.recommend_bucket(log2_, p=recommend_p))
                     else:
                         bs_ = bs
-                    logger.info(f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} (1/{1/bs_}) and log2={log2_}')
+                    logger.info(
+                        f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} (1/{1/bs_}) and log2={log2_}')
                 try:
-                    answer.object.update(log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
+                    answer.object.update(
+                        log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
                 except ZeroDivisionError as e:
                     logger.error(e)
                 except AttributeError as e:
@@ -603,7 +622,8 @@ class Underwriter(object):
             elif isinstance(answer.object, Portfolio) and update is True:
                 d = answer.spec
                 # extract hints from note string
-                log2, bs, recommend_p, kwargs = parse_note_ex(d['note'], log2, bs, recommend_p, kwargs)
+                log2, bs, recommend_p, kwargs = parse_note_ex(
+                    d['note'], log2, bs, recommend_p, kwargs)
                 # figure stuff
                 if log2 == -1:
                     log2_ = 13
@@ -616,7 +636,8 @@ class Underwriter(object):
                 else:
                     bs_ = bs
                 logger.info(f'updating with {log2_}, bs=1/{1 / bs_}')
-                logger.info(f'({answer.kind}, {answer.name}): bs={bs_} and log2={log2_}')
+                logger.info(
+                    f'({answer.kind}, {answer.name}): bs={bs_} and log2={log2_}')
                 answer.object.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
                                      debug=self.debug, **kwargs)
             elif isinstance(answer.object, Distortion):
@@ -624,7 +645,8 @@ class Underwriter(object):
             elif isinstance(answer.object, (Aggregate, Portfolio)) and update is False:
                 pass
             else:
-                logger.warning(f'Unexpected: output kind is {type(answer.object)}. (expr/number?)')
+                logger.warning(
+                    f'Unexpected: output kind is {type(answer.object)}. (expr/number?)')
                 pass
 
         if len(rv) == 1:
@@ -634,6 +656,13 @@ class Underwriter(object):
                 if answer.object is None:
                     return answer
                 else:
+                    # "automatic validation" here!
+                    # if isinstance(answer.object, (Portfolio, Aggregate)):
+                    #     rv = answer.object.valid
+                    #     if rv == Validation.NOT_UNREASONABLE:
+                    #         logger.warning(f'{answer.kind} {answer.name} is not unreasonable')
+                    #     else:
+                    #         logger.warning(f'WARNING: {answer.kind} {answer.name} FAIL VALIDATION')
                     return answer.object
         else:
             # multiple outputs, see if there is just one portfolio...this is not ideal?!
@@ -680,7 +709,8 @@ class Underwriter(object):
             stxt = [i for i in stxt if len(i) and i[0] != '#']
             df = pd.DataFrame(stxt, columns=['program'])
         else:
-            raise ValueError(f'File suffix must be .csv or .agg, not {filename.suffix}')
+            raise ValueError(
+                f'File suffix must be .csv or .agg, not {filename.suffix}')
         if where != '':
             df = df.loc[df.index.str.match(where)]
         # add One severity if not input
@@ -703,11 +733,15 @@ class Underwriter(object):
         """
         return self._interpreter_work(list(enumerate(program_list)), debug=True)
 
-    def interpreter_test_suite(self):
+    def run_test_suite(self):
         """
         Run interpreter on the test suite
         """
-        return self.interpreter_file(filename=self.test_suite_file)
+        df = self.interpreter_file(filename=self.test_suite_file)
+        num_errors = df.error.sum()
+        if num_errors != 0:
+            logger.error('{num_errors} errors in test suite')
+        return df
 
     def _interpreter_work(self, iterable, debug=False):
         """
@@ -726,7 +760,8 @@ class Underwriter(object):
         errs = 0
         no_errs = 0
         # detect non-trivial change
-        f = lambda x, y: 'same' if x.replace(' ', '') == y.replace(' ', '').replace('\t', '') else y
+        def f(x, y): return 'same' if x.replace(
+            ' ', '') == y.replace(' ', '').replace('\t', '') else y
         for test_name, program in iterable:
             if type(program) != str:
                 program_in = program[0]
@@ -750,7 +785,8 @@ class Underwriter(object):
                         # t = getattr(ea[0], 'type', ea[0])
                         # v = getattr(ea[0], 'value', ea[0])
                         i = getattr(ea[0], 'index', 0)
-                        if type(i) != int:  i = 0
+                        if type(i) != int:
+                            i = 0
                         # print(i, ea)
                         txt = program[0:i] + f'>>>' + program[i:]
                         name = 'parse error'
@@ -760,13 +796,17 @@ class Underwriter(object):
                     spec = txt
                 else:
                     no_errs += 1
-                ans[test_name] = [kind, err, name, spec, program, f(program, program_in)]
+                ans[test_name] = [kind, err, name, spec,
+                                  program, f(program, program_in)]
             elif len(program) > 1:
-                logger.info(f'{program_in} preprocesses to {len(program)} lines; not processing.')
+                logger.info(
+                    f'{program_in} preprocesses to {len(program)} lines; not processing.')
                 logger.info(program)
-                ans[test_name] = ['multiline', err, None, None, program, program_in]
+                ans[test_name] = ['multiline', err,
+                                  None, None, program, program_in]
             else:
-                logger.info(f'{program_in} preprocesses to a blank line; ignoring.')
+                logger.info(
+                    f'{program_in} preprocesses to a blank line; ignoring.')
                 ans[test_name] = ['blank', err, None, None, program, program_in]
 
         df_out = pd.DataFrame(ans,
@@ -797,8 +837,10 @@ class Underwriter(object):
         def ff(x):
             fs = '{x:120s}'
             return fs.format(x=x)
-        bit = self.show(regex, kind='', plot=False, describe=False)[['program']]
-        bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}', '').str.replace('  +', ' ') #, flags=re.MULTILINE)
+        bit = self.show(regex, kind='', plot=False,
+                        describe=False)[['program']]
+        bit['program'] = bit['program'].str.replace(
+            r' note\{[^}]+\}', '').str.replace('  +', ' ')  # , flags=re.MULTILINE)
         # bit['program'] = bit['program'].str.replace(' ( +)', ' ') #, flags=re.MULTILINE)
         # bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}$|  *', ' '   ) #, flags=re.MULTILINE)
         qd(bit,
@@ -842,7 +884,8 @@ class Underwriter(object):
         lm = LoggerManager(logger_level)
 
         if kind is None or kind == '':
-            df = self.knowledge.droplevel('kind').filter(regex=regex, axis=0).copy()
+            df = self.knowledge.droplevel('kind').filter(
+                regex=regex, axis=0).copy()
         else:
             df = self.knowledge.loc[kind].filter(regex=regex, axis=0).copy()
 
@@ -876,8 +919,9 @@ class Underwriter(object):
                 logger.error(f'skipping {n}...element not implemented')
             else:
                 if describe:
-                    # print('DecL Program:\n')
-                    getattr(a, 'pprogram', None)
+                    pp = getattr(a, 'pprogram', None)
+                    if pp is not None:
+                        print(pp)
                     qd(a)
                 if plot is True:
                     a.plot(figsize=(8, 2.4))
@@ -889,7 +933,7 @@ class Underwriter(object):
                 df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
                            'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']] = (
                     a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, a.agg_skew, a.est_m, a.est_cv, a.est_sd,
-                    a.est_skew, a.valid)
+                    a.est_skew, a.explain_validation())
         # if only one item, return it...much easier to use
         if len(ans) == 1:
             # noinspection PyUnboundLocalVariable
@@ -906,7 +950,7 @@ class Underwriter(object):
 
         """
 
-        if pattern=='':
+        if pattern == '':
             pattern = '*.agg'
         else:
             pattern += '.agg'
@@ -922,7 +966,8 @@ class Underwriter(object):
                     if rs[0] in ['agg', 'port', 'dist', 'distortion', 'sev']:
                         entries.append([dn, fn.name] + rs[:2])
 
-        ans = pd.DataFrame(entries, columns=['Directory', 'Database', 'kind', 'name'])
+        ans = pd.DataFrame(entries, columns=[
+                           'Directory', 'Database', 'kind', 'name'])
         return ans
 
 

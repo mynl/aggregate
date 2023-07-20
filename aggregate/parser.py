@@ -195,7 +195,7 @@ class UnderwritingParser(Parser):
 
     To test on the test_suite::
 
-        df = build.interpreter_test_suite()
+        df = build.run_test_suite()
         assert len(df.query('error != 0')) == 0
 
     """
@@ -770,10 +770,16 @@ class UnderwritingParser(Parser):
         self.logger('weights <-- missing weights term', p)
         return 1.
 
+    @_('SPLICE "[" numberl "]" "[" numberl "]"')
+    def splice(self, p):
+        self.logger(f'splice <-- SPLICE [numberl] [numberl]', p)
+        # explicitly enter lower and upper bounds for each splice
+        # neded for mixed EM / Pareto example in Albrecher
+        return {'sev_lb': p[2], 'sev_ub': p[5]}
+
     @_('SPLICE "[" numberl "]"')
     def splice(self, p):
         self.logger(f'splice <-- SPLICE [numberl]', p)
-
         return {'sev_lb': p.numberl[:-1], 'sev_ub': p.numberl[1:]}
 
     @_('')

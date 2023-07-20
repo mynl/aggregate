@@ -22,12 +22,12 @@ from textwrap import fill
 
 from .constants import *
 from .utilities import (sln_fit, sgamma_fit, ln_fit, gamma_fit, ft, ift,
-                        axiter_factory, estimate_agg_percentile, suptitle_and_tight,
-                        MomentAggregator, xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler,
+                        estimate_agg_percentile, MomentAggregator,
+                        xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler,
                         make_mosaic_figure, nice_multiple, xsden_to_meancvskew,
                         pprint_ex, approximate_work, moms_analytic, picks_work,
                         integral_by_doubling, logarithmic_theta, make_var_tvar,
-                        more, )
+                        more, explain_validation)
 import aggregate.random_agg as ar
 from .spectral import Distortion
 
@@ -45,6 +45,21 @@ def max_log2(x):
     return d
 
 
+def validate_discrete_distribution(xs, ps):
+    """
+    Make sure that outcomes are distinct, non-negative
+    and sorted in asending order, and that probabiliites are
+    summed across distinct outcomes. Used in
+    dsev and dfreq to validate user input.
+    """
+    if len(xs) != len(set(xs)) or len(xs[xs<0]) > 0:
+        logger.info('Duplicates in empirical distribution and/or negative values, summarizing.')
+        temp_df = pd.DataFrame({'x': xs, 'p': ps})
+        temp_df.loc[temp_df.x < 0, 'x'] = 0.
+        temp_df = temp_df.groupby('x').sum('p')
+        xs = np.array(temp_df.index)
+        ps = temp_df.p.values
+    return xs, ps
 
 
 class Frequency(object):
@@ -60,14 +75,18 @@ class Frequency(object):
 
     - ``fixed``: no parameters
     - ``bernoulli``: exp_en interpreted as a probability, must be < 1
-    - ``binomial``: Binomial(n, p) where p = freq_a, and n = exp_en
-    - ``poisson``: Poisson(freq_a)
-    - ``poisson``: geometric(freq_a)
-    - ``pascal``: pascal-poisson distribution, a poisson stopped sum of negative binomial; exp_en gives the overall
-      claim count. freq_a is the CV of the negative binomial distribution and freq_b is the
-      number of claimants per claim (or claims per occurrence). Hence the Poisson component
-      has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b and
-      cv freq_a
+    - ``binomial``: Binomial(n/p, p) where p = freq_a, and n = exp_en
+    - ``poisson``: Poisson(n)
+    - ``geometric``: geometric(1/(n + 1)), supported on 0, 1, 2, ...
+    - ``logarithmci``: logarithmic(theta), supported on 1, 2, ...; theta solved numerically
+    - ``negymana``: Po(n/freq_a) stopped sum of Po(freq_a) freq_a = "eggs per cluster"
+    - ``negbin``: freq_a is the variance multiplier, ratio of variance to mean
+    - ``pascal``:
+    - ``pascal``: (generalized) pascal-poisson distribution, a poisson stopped sum of negative binomial;
+      exp_en gives the overall claim count. freq_a is the CV of the frequency distribution
+      and freq_b is the number of claimants per claim (or claims per occurrence). Hence, the Poisson
+      component has mean exp_en / freq_b and the number of claims per occurrence has mean freq_b. This
+      parameterization may not be ideal(!).
 
     **Mixture** Frequency Types
 
@@ -96,6 +115,52 @@ class Frequency(object):
     - ``beta``: beta mixing with freq_a = Cv where beta is supported on the interval [0, freq_b]. This
       method should be used carefully. It has poor numerical stability and can produce bizzare
       aggregates when the alpha or beta parameters are < 1 (so there is a mode at 0 or freq_b).
+
+    Code proof for Neyman A::
+
+        from aggregate import build, qd
+        mean = 10
+        eggs_per_cluster = 4
+        neya = build(f'agg Neya {mean} claims dsev[1] neymana {eggs_per_cluster}')
+        qd(neya)
+
+        po = build(f'agg Po4 {eggs_per_cluster} claims dsev[1] poisson')
+        po_pmf = po.density_df.query('p_total > 1e-13').p_total
+
+        byhand = build(f'agg ByHand {mean / eggs_per_cluster} claims dsev {list(po_pmf.index)} {po_pmf.values} poisson')
+        qd(byhand)
+
+        df = pd.concat((neya.density_df.p_total, byhand.density_df.p_total), axis=1)
+        df.columns = ['neya', 'byhand']
+        df['err'] = df.neya - df.byhand
+        assert df.err.abs().max() < 1e-5
+        df.head(40)
+
+    Code proof for Pascal::
+
+        from aggregate import build, qd
+        mean = 10
+        claims_per_occ =1.24
+        overall_cv = 1.255
+        pascal = build(f'agg PascalEg {mean} claims dsev[1] pascal {overall_cv} {claims_per_occ}', log2=16)
+        qd(pascal)
+
+        c = (mean * overall_cv**2 - 1 - claims_per_occ) / claims_per_occ
+        th = claims_per_occ * c
+        a = 1 / c
+        # from form of nb pgf identify r = a and beta = theta, mean is rb, var is rb(1+b)
+        nb = build(f'agg NB {claims_per_occ} claims dsev[1] negbin {th + 1}', log2=16)
+        nb_pmf = nb.density_df.query('p_total > 1e-13').p_total
+        qd(nb)
+
+        byhand = build(f'agg ByHand {mean / claims_per_occ} claims dsev {list(nb_pmf.index)} {nb_pmf.values} poisson', log2=16)
+        qd(byhand)
+
+        df = pd.concat((pascal.density_df.p_total, byhand.density_df.p_total), axis=1)
+        df.columns = ['pascal', 'byhand']
+        df['err'] = df.pascal - df.byhand
+        assert df.err.abs().max() < 1e-5
+        df.head(40)
 
     :param freq_name: name of the frequency distribution, poisson, geometric, etc.
     :param freq_a:
@@ -255,7 +320,7 @@ class Frequency(object):
 
         elif self.freq_name == 'negbin':
             # freq_a parameter inputs the variance multiplier, variance as a multiple of mean
-            # go with the b, beta parameterization, mean rb and variance rb(1 + b). Thus
+            # go with the b, r parameterization, mean rb and variance rb(1 + b). Thus
             # b = v - 1 and r = n / b
             # Univariate Discrete Distributions, 3rd Edition (Norman L. Johnson, Adrienne W. Kemp etc.)
             # p. 208 uses P (our beta) and k (our r) for the parameters (see pgf)
@@ -400,7 +465,7 @@ class Frequency(object):
         elif self.freq_name == 'empirical':
             # stated en here...need to reach up to agg to set that?!
             # parameters are entered as nps, to a is n values and b is probability masses
-
+            self.freq_a, self.freq_b  = validate_discrete_distribution(self.freq_a, self.freq_b)
             def _freq_moms(n):
                 # independent of n, it will be -1
                 en = np.sum(self.freq_a * self.freq_b)
@@ -991,7 +1056,7 @@ class Aggregate(Frequency):
             raise ValueError(f'Inadmissible option {kind} passed to rescale, kind should be homog or inhomog.')
         return Aggregate(**spec)
 
-    def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=0, exp_limit=np.inf,
+    def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=None, exp_limit=np.inf,
                  sev_name='', sev_a=np.nan, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf, sev_conditional=True,
                  sev_pick_attachments=None, sev_pick_losses=None,
@@ -1011,7 +1076,8 @@ class Aggregate(Frequency):
         :param exp_premium:     premium volume or vector  (requires loss ratio)
         :param exp_lr:          loss ratio or vector  (requires premium)
         :param exp_en:          expected claim count per segment (self.n = total claim count)
-        :param exp_attachment:  occurrence attachment
+        :param exp_attachment:  occurrence attachment; None indicates no layer clause, which is treated different
+                                from an attachment of zero.
         :param exp_limit:       occurrence limit
         :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
         :param sev_a:           scipy stats shape parameter
@@ -1085,6 +1151,7 @@ class Aggregate(Frequency):
         self.est_sev_sd = 0
         self.est_sev_var = 0
         self.est_sev_skew = 0
+        self._valid = None
 
         self.note = note
         self.program = ''  # can be set externally
@@ -1254,7 +1321,8 @@ class Aggregate(Frequency):
             for _el, _pr, _lr, _en, _at, _y, in zip(*exp_arrays):
                 # adjust weights for excess coverage
                 sev_wt0 = sev_wt.copy()
-                if _at > 0:
+                # attachment can be None, and that needs to percolate through to Severity
+                if _at is not None and _at > 0:
                     w1 = sev_wt0 * np.array([s.sf(_at) for s in gup_sevs])
                     sev_wt0 = w1 / w1.sum()
 
@@ -1446,26 +1514,11 @@ class Aggregate(Frequency):
             s.append('')
         return '\n'.join(s)
 
-    def qt(self):
+    def explain_validation(self):
         """
-        String with diagnostic information.
-
+        Explain validation result. Validation computed if needed.
         """
-        if self.valid:
-            return "not unreasonable"
-
-        sev_err = self.est_sev_m / self.sev_m - 1
-        agg_err = self.agg_m / self.est_m - 1
-        n = 40
-        sev = 'sev mean: pass' if abs(sev_err) < self.validation_eps else f'sev mean: fails {sev_err: .4e}'
-        agg = 'agg mean: pass' if abs(agg_err) < self.validation_eps else f'agg mean: fails {agg_err: .4e}'
-        explanation = ''
-        if abs(sev_err) < self.validation_eps and abs(agg_err) < self.validation_eps:
-            bs = self.bs * 2
-            if bs != int(bs):
-                bs = '/'.join([str(i) for i in bs.as_integer_ratio()])
-            explanation = f'\nvalidation suggests possible aliasing\ntry increasing bucket size to {bs}'
-        return f"{'-' * n}\n{sev}\n{agg}{explanation}\n{'-' * n}"
+        return explain_validation(self.valid)
 
     def html_info_blob(self):
         """
@@ -1488,12 +1541,14 @@ class Aggregate(Frequency):
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
         if self.agg_density is not None:
-            if self.reinsurance_kinds() != 'None':
+            r = self.valid
+            if r & Validation.REINSURANCE:
                 s.append(f'<p>Validation: reinsurance, n/a.</p>')
-            elif self.valid:
+            elif r == Validation.NOT_UNREASONABLE:
                 s.append('<p>Validation: not unreasonable.</p>')
             else:
-                s.append(f'<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n{self.qt()}</pre></p>')
+                s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
+                         f'{self.explain_validation()}</pre></p>')
 
         return '\n'.join(s)
 
@@ -1597,7 +1652,7 @@ class Aggregate(Frequency):
         ix = self.density_df.index.get_indexer([x], 'nearest')[0]
         return self.density_df.iloc[ix, 0]
 
-    def update(self, log2=16, bs=0, recommend_p=0.99999, debug=False, **kwargs):
+    def update(self, log2=16, bs=0, recommend_p=RECOMMEND_P, debug=False, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -1653,6 +1708,7 @@ class Aggregate(Frequency):
         self._density_df = None  # invalidate
         self._var_tvar_function = None
         self._sev_var_tvar_function = None
+        self._valid = None
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
@@ -1825,9 +1881,15 @@ class Aggregate(Frequency):
         :return: True (interpreted as not unreasonable) if all tests are passed, else False.
 
         """
+        if self._valid is not None:
+            return self._valid
+
+        # logger.warning(f'{self.name} CALLING AGG VALID')
+        rv = Validation.NOT_UNREASONABLE
         if self.reinsurance_kinds() != "None":
             # cannot validate when there is reinsurance
-            return "reinsurance"
+            # could possibly add manually
+            return Validation.REINSURANCE
         df = self.describe.abs()
         try:
             df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
@@ -1837,15 +1899,16 @@ class Aggregate(Frequency):
             df['Err Skew(X)'] = np.nan
         except KeyError:
             # not updated
-            return "not updated"
+            self._valid = Validation.NOT_UPDATED
+            return Validation.NOT_UPDATED
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Sev mean error > eps')
-            return False
+            logger.info('FAIL: Sev mean error > eps')
+            rv |= Validation.SEV_MEAN
 
         if df.loc['Agg', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Agg mean error > eps')
-            return False
+            logger.info('FAIL: Agg mean error > eps')
+            rv |= Validation.AGG_MEAN
 
         # first line stops failing validation when the agg rel error is very very small
         # default eps is 1e-4, so this is 1e-12. there were examples in the documentation
@@ -1853,31 +1916,33 @@ class Aggregate(Frequency):
         if (abs(df.loc['Agg', 'Err E[X]']) > eps ** 3 and
                 abs(df.loc['Sev', 'Err E[X]']) > 0 and
                 abs(df.loc['Agg', 'Err E[X]']) > 10 * abs(df.loc['Sev', 'Err E[X]'])):
-            logger.warning('FAIL: Agg mean error > 10 * sev error')
-            return False
+            logger.info('FAIL: Agg mean error > 10 * sev error')
+            rv |= Validation.ALIASING
 
         try:
             if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Sev CV error > eps')
-                return False
+                logger.info('FAIL: Sev CV error > eps')
+                rv |= Validation.SEV_CV
 
             if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Agg CV error > eps')
-                return False
+                logger.info('FAIL: Agg CV error > eps')
+                rv |= Validation.AGG_CV
 
-            if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Sev skew error > eps')
-                return False
+            if np.inf > np.abs(df.loc['Sev', 'Skew(X)']) > 0 and np.abs(df.loc['Sev', 'Err Skew(X)']) > 100 * eps:
+                logger.info('FAIL: Sev skew error > eps')
+                rv |= Validation.SEV_SKEW
 
-            if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Agg skew error > eps')
-                return False
+            if np.inf > np.abs(df.loc['Agg', 'Skew(X)']) > 0 and np.abs(df.loc['Agg', 'Err Skew(X)']) > 100 * eps:
+                logger.info('FAIL: Agg skew error > eps')
+                rv |= Validation.AGG_SKEW
+
         except (TypeError, ZeroDivisionError):
             logger.info('Caution: not all validation tests applied')
             pass
-
-        logger.info(f'Aggregate {self.name} does not fail any validation: not unreasonable')
-        return True
+        if rv != Validation.NOT_UNREASONABLE:
+            logger.info(f'Aggregate {self.name} does not fail any validation: not unreasonable')
+        self._valid = rv
+        return rv
 
     def picks(self, attachments, layer_loss_picks, debug=False):
         """
@@ -2117,7 +2182,7 @@ class Aggregate(Frequency):
                     if s == y:
                         ra.append(f'{y:,.2f} xs {a:,.2f}')
                     else:
-                        ra.append(f'{s:,.2f} part of {y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{s:,.2%} share of {y:,.2f} xs {a:,.2f}')
             ans.append(' and '.join(ra))
             ans.append('per occurrence')
         if self.agg_reins is not None and kind in ['agg', 'both']:
@@ -2132,7 +2197,7 @@ class Aggregate(Frequency):
                     if s == y:
                         ra.append(f'{y:,.2f} xs {a:,.2f}')
                     else:
-                        ra.append(f'{s:,.2f} part of {y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{s:,.2%} share of {y:,.2f} xs {a:,.2f}')
             ans.append(' and '.join(ra))
             ans.append('in the aggregate.')
         if len(ans):
@@ -2508,7 +2573,7 @@ class Aggregate(Frequency):
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
 
-    def recommend_bucket(self, log2=10, p=0.999, verbose=False):
+    def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
         """
         Recommend a bucket size given 2**N buckets. Not rounded.
 
@@ -2518,7 +2583,8 @@ class Aggregate(Frequency):
         in that situation.
 
         :param log2: log2 of number of buckets. log2=10 is default.
-        :param p: percentile to use to determine needed range. Default is 0.999. if > 1 converted to 1-10**-n.
+        :param p: percentile to use to determine needed range. Default is RECOMMEND_P. if > 1 converted to 1-10**-n.
+        :param verbose: print out recommended bucket sizes for 2**n for n in {log2, 16, 13, 10}
         :return:
         """
         N = 1 << log2
@@ -2538,7 +2604,7 @@ class Aggregate(Frequency):
                 print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.3f}')
             if self.bs != 0:
                 print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
-            return rbr
+            return rbr # noqa
 
     def aggregate_error_analysis(self, log2, bs2_from=None, **kwargs):
         """
@@ -2622,8 +2688,10 @@ class Aggregate(Frequency):
                             ])
         # the total
         m = self.sev_m
+        # attachment is None if the limit clause is missing
+        min_attach = np.where(self.attachment==None, 0., self.attachment).min()
         sev_ans.append(['total',
-                        self.limit.max(), self.attachment.min(),
+                        self.limit.max(), min_attach,
                         truncation_point,
                         self.sf(truncation_point), self.density_df.p_sev.sum(),
                         1, self.n,
@@ -2900,8 +2968,11 @@ class Aggregate(Frequency):
 
         :param approx_type: norm, lognorn, slognorm (shifted lognormal), gamma, sgamma. If 'all'
             then returns a dictionary of each approx.
-        :param output: scipy - returns a frozen scipy.stats object; agg returns an Aggregate program;
-            any other value returns the program and created aggregate object with fixed frequency equal to 1.
+        :param output: scipy - frozen scipy.stats continuous rv object;
+          sev_decl - DecL program for severity (to substituate into an agg ; no name)
+          sev_kwargs - dictionary of parameters to create Severity
+          agg_decl - Decl program agg T 1 claim sev_decl fixed
+          any other string - created Aggregate object
         :return: as above.
         """
 
@@ -3072,729 +3143,6 @@ class Aggregate(Frequency):
         return df
 
 
-class SeverityOriginal(ss.rv_continuous):
-
-    def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
-                 sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_conditional=True, name='', note=''):
-        """
-        A continuous random variable, subclasses ``scipy.statistics_df.rv_continuous``,
-        adding layer and attachment functionality. It overrides
-
-        - ``cdf``
-        - ``pdf``
-        - ``isf``
-        - ``ppf``
-        - ``sf``
-        - ``stats``
-
-        See `scipy.stats continuous rvs <https://docs.scipy.org/doc/scipy/tutorial/stats/continuous.html>`_ for
-        more details about available distributions. The following distributions with two shape parameters
-        are supported:
-
-        - Burr (``burr``)
-        - Generalized Pareto (``genpareto``)
-        - Generalized gamma (``gengamma``)
-
-        It is easy to add others in the code below. With two shape parameters the mean cv input format
-        is not available.
-
-        See code in Problems and Solutions to extract distributions from scipy stats by introsepection.
-
-        :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
-        :param exp_attachment:
-        :param exp_limit:
-        :param sev_mean:
-        :param sev_cv:
-        :param sev_a: first shape parameter
-        :param sev_b: second shape parameter (e.g., beta)
-        :param sev_loc: scipy.stats location parameter
-        :param sev_scale: scipy.stats scale parameter
-        :param sev_xs: for fixed or histogram classes
-        :param sev_ps:
-        :param sev_wt: this is not used directly; but it is convenient to pass it in and ignore it because sevs are
-          implicitly created with sev_wt=1.
-        :param sev_conditional: conditional or unconditional; for severities use conditional
-        :param name: name of the severity object
-        :param note: optional note.
-        """
-
-        from .portfolio import Portfolio
-
-        super().__init__(self, name=sev_name)
-        # ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
-
-        self.program = ''  # may be set externally
-        self.limit = exp_limit
-        self.attachment = exp_attachment
-        self.detachment = exp_limit + exp_attachment
-        self.fz = None
-        self.pattach = 0
-        self.pdetach = 0
-        self.conditional = sev_conditional
-        self.sev_name = sev_name
-        # only used when created as sev ONE blah...
-        self.name = name
-        # distribution name
-        self.long_name = sev_name
-        self.note = note
-        self.sev1 = self.sev2 = self.sev3 = None
-        self.sev_wt = sev_wt
-        self.sev_loc = sev_loc
-        logger.debug(
-            f'Severity.__init__  | creating new Severity {self.sev_name} at {super().__repr__()}')
-        # there are two types: if sev_xs and sev_ps provided then fixed/histogram, else scpiy dist
-        # allows you to define fixed with just xs=1 (no log)
-        if sev_xs is not None:
-            if sev_name == 'fixed':
-                # fixed is a special case of dhistogram with just one point
-                sev_name = 'dhistogram'
-                sev_ps = np.array(1)
-            assert sev_name[1:] == 'histogram'
-            # TODO: make histogram work with exp_limit and exp_attachment; currently they are ignored
-            try:
-                xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
-            except ValueError:
-                # for empirical, with cts histogram xs and ps do not have the same size
-                if self.sev_name != 'chistogram':
-                    logger.warning(f'Severity.init | {sev_name} sev_xs and sev_ps cannot be broadcast.')
-                xs = np.array(sev_xs)
-                ps = np.array(sev_ps)
-            if not np.isclose(np.sum(ps), 1.0):
-                logger.error(f'Severity.init | {sev_name} histogram/fixed severity with probs do not sum to 1, '
-                             f'{np.sum(ps)}')
-            # need to exp_limit distribution
-            exp_limit = min(np.min(exp_limit), xs.max())
-            if sev_name == 'chistogram':
-                # continuous histogram: uniform between xs's
-                # if the inputs are not evenly spaced this messes up because it interprets p as the
-                #  height of the density over the range...hence have to rescale
-                #  it DOES NOT matter that the p's add up to 1...that is handled automatically
-                # changed 1 to -2 so the last bucket is bigger WHY SORTED???
-                if len(xs) == len(ps):
-                    xss = np.sort(np.hstack((xs, xs[-1] + xs[-2])))
-                else:
-                    # allows to pass in with the right hand end specified
-                    xss = xs
-                aps = ps / np.diff(xss)
-                # this is now slightly bigger
-                exp_limit = min(np.min(exp_limit), xss.max())
-                # midpoints
-                xsm = (xss[:-1] + xss[1:]) / 2
-                self.sev1 = np.sum(xsm * ps)
-                self.sev2 = np.sum(xsm ** 2 * ps)
-                self.sev3 = np.sum(xsm ** 3 * ps)
-                self.fz = ss.rv_histogram((aps, xss))
-            elif sev_name == 'dhistogram':
-                # discrete histogram: point masses at xs's
-                self.sev1 = np.sum(xs * ps)
-                self.sev2 = np.sum(xs ** 2 * ps)
-                self.sev3 = np.sum(xs ** 3 * ps)
-                # binary consistent
-                # need to be careful in case input has duplicates - these need removing
-                if len(xs) != len(set(xs)):
-                    logger.info('Duplicates in empirical distribution, summarizing.')
-                    _ = pd.DataFrame({'x': xs, 'p': ps}).groupby('x').sum('p')
-                    xs = np.array(_.index)
-                    ps = _.p.values
-                    del _
-                # was + but F(x) = Pr(X<=x) so shd be to left
-                # Jan 2023: want the increment to be smaller than any reasonable
-                # bucket size so buckets are not "split". This is fragile
-                # TODO: make 30 depend on the magnitude of xs to avoid underflow problems
-                # we won't likely ever have more than 1B = 2**30 buckets
-                # Feb 2023: for large x a fixed 2**30 results in underflow, hence:
-                d = max_log2(np.max(xs))
-                logger.info(f'Severity.init | {sev_name} d={d}')
-                xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
-                pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
-                self.fz = ss.rv_histogram((pss, xss))
-            else:
-                raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
-                                 f', you passed {sev_name}')
-
-        elif isinstance(sev_name, Severity):
-            self.fz = sev_name
-
-        elif not isinstance(sev_name, (str, np.str_)):
-            # must be a meta object - replaced in Underwriter.write
-            log2 = sev_a
-            bs = sev_b  # if zero it is happy to take whatever....
-            if isinstance(sev_name, Aggregate):
-                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs != 0)):
-                    # recompute
-                    sev_name.easy_update(log2, bs)
-                xs = sev_name.xs
-                ps = sev_name.agg_density
-            elif isinstance(sev_name, Portfolio):
-                if log2 and (log2 != sev_name.log2 or (bs != sev_name.bs and bs != 0)):
-                    # recompute
-                    sev_name.update(log2, bs, add_exa=False)
-                xs = sev_name.density_df.loss.values
-                ps = sev_name.density_df.p_total.values
-            else:
-                raise ValueError(f'Object {sev_name} passed as a proto-severity type but'
-                                 f' only Aggregate, Portfolio and Severity objects allowed')
-            # will make as a combo discrete/continuous histogram
-            # nail the bucket at zero and use a continuous approx +/- bs/2 around each other bucket
-            # leaves an ugly gap between 0 and bs/2...which is ignored
-            b1size = 1e-7  # size of the first "bucket"
-            xss = np.hstack((-bs * b1size, 0, xs[1:] - bs / 2, xs[-1] + bs / 2))
-            pss = np.hstack((ps[0] / b1size, 0, ps[1:]))
-            self.fz = ss.rv_histogram((pss, xss))
-            self.sev1 = np.sum(xs * ps)
-            self.sev2 = np.sum(xs ** 2 * ps)
-            self.sev3 = np.sum(xs ** 3 * ps)
-
-        elif sev_name in ['anglit', 'arcsine', 'cauchy', 'cosine', 'expon', 'gilbrat', 'gumbel_l',
-                          'gumbel_r', 'halfcauchy', 'halflogistic', 'halfnorm', 'hypsecant',
-                          'kstwobign', 'laplace', 'levy', 'levy_l', 'logistic', 'maxwell', 'moyal',
-                          'norm', 'rayleigh', 'semicircular', 'uniform', 'wald']:
-            # distributions with no shape parameters
-            #     Normal (and possibly others) does not have a shape parameter
-            if sev_loc == 0 and sev_mean > 0:
-                sev_loc = sev_mean
-            if sev_scale == 0 and sev_cv > 0:
-                sev_scale = sev_cv * sev_loc
-            gen = getattr(ss, sev_name)
-            self.fz = gen(loc=sev_loc, scale=sev_scale)
-
-        elif sev_name in ['beta', 'betaprime', 'burr', 'burr12', 'crystalball', 'exponweib', 'f', 'gengamma',
-                          'geninvgauss', 'johnsonsb', 'johnsonsu', 'kappa4', 'levy_stable', 'loguniform',
-                          'mielke', 'nct', 'ncx2', 'norminvgauss', 'powerlognorm', 'reciprocal',
-                          'studentized_range', 'trapezoid', 'trapz', 'truncnorm']:
-            # distributions with two shape parameters require specific inputs
-            # https://en.wikipedia.org/wiki/Beta_distribution#Two_unknown_parameters
-            if sev_name == 'beta' and sev_mean > 0 and sev_cv > 0:
-                m = sev_mean / sev_scale
-                v = m * m * sev_cv * sev_cv
-                sev_a = m * (m * (1 - m) / v - 1)
-                sev_b = (1 - m) * (m * (1 - m) / v - 1)
-                # logger.error(f'{sev_mean}, {sev_cv}, {sev_scale}, {m}, {v}, {sev_a}, {sev_b}')
-                self.fz = ss.beta(sev_a, sev_b, loc=0, scale=sev_scale)
-            else:
-                gen = getattr(ss, sev_name)
-                self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
-        else:
-            # distributions with one shape parameter, which either comes from sev_a or sev_cv
-            assert sev_name in ['alpha', 'argus', 'bradford', 'chi', 'chi2', 'dgamma', 'dweibull', 'erlang',
-                                'exponnorm', 'exponpow', 'fatiguelife', 'fisk', 'foldcauchy', 'foldnorm',
-                                'gamma', 'genextreme', 'genhalflogistic', 'genlogistic', 'gennorm', 'genpareto',
-                                'gompertz', 'halfgennorm', 'invgamma', 'invgauss', 'invweibull', 'kappa3', 'ksone',
-                                'kstwo', 'laplace_asymmetric', 'loggamma', 'loglaplace', 'lognorm', 'lomax',
-                                'nakagami', 'pareto', 'pearson3', 'powerlaw', 'powernorm', 'rdist', 'recipinvgauss',
-                                'rice', 'skewcauchy', 'skewnorm', 't', 'triang', 'truncexpon', 'tukeylambda',
-                                'vonmises', 'vonmises_line', 'weibull_max', 'weibull_min', 'wrapcauchy']
-            if np.isnan(sev_a) and sev_cv > 0:
-                sev_a, _ = self.cv_to_shape(sev_cv)
-                logger.info(f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')
-            elif np.isnan(sev_a):
-                raise ValueError('sev_a not set and sev_cv=0 is invalid, no way to determine shape.')
-            # have sev_a, now assemble distribution
-            if sev_mean > 0:
-                logger.info(f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
-                sev_scale, self.fz = self.mean_to_scale(sev_a, sev_mean, sev_loc)
-            elif sev_scale > 0 and sev_mean == 0:
-                logger.info(f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
-                gen = getattr(ss, sev_name)
-                self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
-            else:
-                raise ValueError('sev_scale and sev_mean both equal zero.')
-        if self.detachment == np.inf:
-            self.pdetach = 0
-        else:
-            self.pdetach = self.fz.sf(self.detachment)
-
-        if self.attachment == 0:
-            self.pattach = 1
-        else:
-            self.pattach = self.fz.sf(self.attachment)
-
-        if sev_mean > 0 or sev_cv > 0:
-            # if you input a sev_mean or sev_cv check we are close to target
-            st = self.fz.stats('mv')
-            m = st[0]
-            acv = st[1] ** .5 / m  # achieved sev_cv
-            # sev_loc added so you can write lognorm 5 cv .3 + 10 a shifted lognorm mean 5
-            if sev_mean > 0 and not np.isclose(sev_mean + sev_loc, m):
-                print(f'WARNING target mean {sev_mean} and achieved mean {m} not close')
-                # assert (np.isclose(sev_mean, m))
-            if sev_cv > 0 and not np.isclose(sev_cv * sev_mean / (sev_mean + sev_loc), acv):
-                print(f'WARNING target cv {sev_cv} and achieved cv {acv} not close')
-                # assert (np.isclose(sev_cv, acv))
-            # print('ACHIEVED', sev_mean, sev_cv, m, acv, self.fz.statistics_df(), self._stats())
-            logger.debug(
-                f'Severity.__init__ | parameters {sev_a}, {sev_scale}: target/actual {sev_mean} vs {m};  '
-                f'{sev_cv} vs {acv}')
-
-        assert self.fz is not None
-
-    def __repr__(self):
-        """
-        wrap default with name
-        :return:
-        """
-        return f'{super(Severity, self).__repr__()} of type {self.sev_name}'
-
-    def cv_to_shape(self, cv, hint=1):
-        """
-        Create a frozen object of type dist_name with given cv. The
-        lognormal, gamma, inverse gamma and inverse gaussian distributions
-        are solved analytically.
-        Other distributions solved numerically and may be unstable.
-
-        :param cv:
-        :param hint:
-        :return:
-        """
-        # some special cases we can handle:
-        if self.sev_name == 'lognorm':
-            shape = np.sqrt(np.log(cv * cv + 1))
-            fz = ss.lognorm(shape)
-            return shape, fz
-
-        if self.sev_name == 'gamma':
-            shape = 1 / (cv * cv)
-            fz = ss.gamma(shape)
-            return shape, fz
-
-        if self.sev_name == 'invgamma':
-            shape = 1 / cv ** 2 + 2
-            fz = ss.invgamma(shape)
-            return shape, fz
-
-        if self.sev_name == 'invgauss':
-            shape = cv ** 2
-            fz = ss.invgauss(shape)
-            return shape, fz
-
-        # pareto with loc=-1 alpha = 2 cv^2  / (cv^2 - 1)
-
-        gen = getattr(ss, self.sev_name)
-
-        def f(shape):
-            fz0 = gen(shape)
-            temp = fz0.stats('mv')
-            return cv - temp[1] ** .5 / temp[0]
-
-        try:
-            ans = newton(f, hint)
-        except RuntimeError:
-            logger.error(f'cv_to_shape | error for {self.sev_name}, {cv}')
-            ans = np.inf
-            return ans, None
-        fz = gen(ans)
-        return ans, fz
-
-    def mean_to_scale(self, shape, mean, loc=0):
-        """
-        Adjust the scale to achieved desired mean.
-        Return a frozen instance.
-
-        :param shape:
-        :param mean:
-        :param loc: location parameter (note: location is added to the mean...)
-        :return:
-        """
-        gen = getattr(ss, self.sev_name)
-        fz = gen(shape)
-        m = fz.stats('m')
-        scale = mean / m
-        fz = gen(shape, scale=scale, loc=loc)
-        return scale, fz
-
-    def __enter__(self):
-        """ Support with Severity as f: """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        del self
-
-    def _pdf(self, x, *args):
-        if self.conditional:
-            return np.where(x >= self.limit, 0,
-                            np.where(x == self.limit, np.inf if self.pdetach > 0 else 0,
-                                     self.fz.pdf(x + self.attachment) / self.pattach))
-        else:
-            if self.pattach < 1:
-                return np.where(x < 0, 0,
-                                np.where(x == 0, np.inf,
-                                         np.where(x == self.detachment, np.inf,
-                                                  np.where(x > self.detachment, 0,
-                                                           self.fz.pdf(x + self.attachment, *args)))))
-            else:
-                return np.where(x < 0, 0,
-                                np.where(x == self.detachment, np.inf,
-                                         np.where(x > self.detachment, 0,
-                                                  self.fz.pdf(x + self.attachment, *args))))
-
-    def _cdf(self, x, *args):
-        if self.conditional:
-            return np.where(x >= self.limit, 1,
-                            np.where(x < 0, 0,
-                                     (self.fz.cdf(x + self.attachment) - (1 - self.pattach)) / self.pattach))
-        else:
-            return np.where(x < 0, 0,
-                            np.where(x == 0, 1 - self.pattach,
-                                     np.where(x > self.limit, 1,
-                                              self.fz.cdf(x + self.attachment, *args))))
-
-    def _sf(self, x, *args):
-        if self.conditional:
-            return np.where(x >= self.limit, 0,
-                            np.where(x < 0, 1,
-                                     self.fz.sf(x + self.attachment, *args) / self.pattach))
-        else:
-            return np.where(x < 0, 1,
-                            np.where(x == 0, self.pattach,
-                                     np.where(x > self.limit, 0,
-                                              self.fz.sf(x + self.attachment, *args))))
-
-    def _isf(self, q, *args):
-        if self.conditional:
-            return np.where(q < self.pdetach / self.pattach, self.limit,
-                            self.fz.isf(q * self.pattach) - self.attachment)
-        else:
-            return np.where(q >= self.pattach, 0,
-                            np.where(q < self.pdetach, self.limit,
-                                     self.fz.isf(q, *args) - self.attachment))
-
-    def _ppf(self, q, *args):
-        if self.conditional:
-            return np.where(q > 1 - self.pdetach / self.pattach, self.limit,
-                            self.fz.ppf(1 - self.pattach * (1 - q)) - self.attachment)
-        else:
-            return np.where(q <= 1 - self.pattach, 0,
-                            np.where(q > 1 - self.pdetach, self.limit,
-                                     self.fz.ppf(q, *args) - self.attachment))
-
-    def _stats(self, *args, **kwds):
-        ex1, ex2, ex3 = self.moms()
-        var = ex2 - ex1 ** 2
-        skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / var ** 1.5
-        return np.array([ex1, var, skew, np.nan])
-
-    # expensive call, convenient to cache
-    @lru_cache
-    def moms(self):
-        """
-        Revised moments for Severity class. Trying to compute moments of
-
-            X(a,d) = min(d, (X-a)+)
-
-            ==> E[X(a,d)^n] = int_a^d (x-a)^n f(x) dx + (d-a)^n S(d).
-
-        Let x = q(p), F(x) = p, f(x)dx = dp. for 1,2,...n(<=3).
-
-        E[X(a,d)^n] = int_{F(a)}^{F(d)} (q(p)-a)^n dp + (d-a)^n S(d)
-
-        The base is to compute int_{F(a)}^{F(d)} q(p)^n dp. These are exi below. They are then adjusted to create
-        the moments needed.
-
-        Old moments tried to compute int S(x)dx, but that is over a large, non-compact domain and
-        did not work so well. With 0.9.3 old_moms was removed. Old_moms code did this: ::
-
-            ex1 = safe_integrate(lambda x: self.fz.sf(x), 1)
-            ex2 = safe_integrate(lambda x: 2 * (x - self.attachment) * self.fz.sf(x), 2)
-            ex3 = safe_integrate(lambda x: 3 * (x - self.attachment) ** 2 * self.fz.sf(x), 3)
-
-        **Test examples** ::
-
-            def test(mu, sigma, a, y):
-                global moms
-                import types
-                # analytic with no layer attachment
-                fz = ss.lognorm(sigma, scale=np.exp(mu))
-                tv = np.array([np.exp(k*mu + k * k * sigma**2/2) for k in range(1,4)])
-
-                # old method
-                s = agg.Severity('lognorm', sev_a=sigma, sev_scale=np.exp(mu),
-                                 exp_attachment=a, exp_limit=y)
-                est = np.array(s.old_moms())
-
-                # swap out moment routine
-                setattr(s, moms.__name__, types.MethodType(moms, s))
-                ans = np.array(s.moms())
-
-                # summarize and report
-                sg = f'Example: mu={mu}  sigma={sigma}  a={a}  y={y}'
-                print(f'{sg}\\n{"="*len(sg)}')
-                print(pd.DataFrame({'new_ans' : ans, 'old_ans': est,
-                                    'err': ans/est-1, 'no_la_analytic' : tv}))
-
-
-            test(8.7, .5, 0, np.inf)
-            test(8.7, 2.5, 0, np.inf)
-            test(8.7, 2.5, 10e6, 200e6)
-
-        **Example:**  ``mu=8.7``,  ``sigma=0.5``, ``a=0``,   ``y=inf`` ::
-
-                    new_ans       old_ans           err  no_la_analytic
-            0  6.802191e+03  6.802191e+03  3.918843e-11    6.802191e+03
-            1  5.941160e+07  5.941160e+07  3.161149e-09    5.941160e+07
-            2  6.662961e+11  6.662961e+11  2.377354e-08    6.662961e+11
-
-        **Example:** mu=8.7  sigma=2.5  a=0  y=inf (here the old method failed) ::
-
-                    new_ans       old_ans           err  no_la_analytic
-            0  1.366256e+05  1.366257e+05 -6.942541e-08    1.366257e+05
-            1  9.663487e+12  1.124575e+11  8.493016e+01    9.669522e+12
-            2  2.720128e+23  7.597127e+19  3.579469e+03    3.545017e+23
-
-        **Example:** mu=8.7  sigma=2.5  a=10000000.0  y=200000000.0 ::
-
-                    new_ans       old_ans           err  no_la_analytic
-            0  1.692484e+07  1.692484e+07  2.620126e-14    1.366257e+05
-            1  1.180294e+15  1.180294e+15  5.242473e-13    9.669522e+12
-            2  1.538310e+23  1.538310e+23  9.814372e-14    3.545017e+23
-
-
-        The numerical issues are very sensitive. Goign for a compromise between
-        speed and accuracy. Only an issue for very thick tailed distributions
-        with no upper limit - not a realistic situation.
-        Here is a tester program for two common cases:
-
-        ::
-
-            logger_level(30) # see what is going on
-            for sh, dist in zip([1,2,3,4, 3.5,2.5,1.5,.5], ['lognorm']*3 + ['pareto']*4):
-                s = Severity(dist, sev_a=sh, sev_scale=1, exp_attachment=0)
-                print(dist,sh, s.moms())
-                if dist == 'lognorm':
-                    print('actual', [(n, np.exp(n*n*sh*sh/2)) for n in range(1,4)])
-
-        :return: vector of moments. ``np.nan`` signals unreliable but finite value.
-            ``np.inf`` is correct, the moment does not exist.
-
-        """
-
-        # def safe_integrate(f, lower, upper, level, big):
-        #     """
-        #     Integrate the survival function, pay attention to error messages. Split integral if needed.
-        #     One shot pass.
-        #
-        #     """
-        #
-        #     argkw = dict(limit=100, epsrel=1e-8, full_output=1)
-        #     if upper < big:
-        #         split = 'no'
-        #         ex = quad(f, lower, upper, **argkw)
-        #         ans = ex[0]
-        #         err = ex[1]
-        #         steps = ex[2]['last']
-        #         if len(ex) == 4:
-        #             msg = ex[3][:33]
-        #         else:
-        #             msg = ''
-        #
-        #     else:
-        #         split = 'yes'
-        #         ex = quad(f, lower, big, **argkw)
-        #         ans1 = ex[0]
-        #         err1 = ex[1]
-        #         steps1 = ex[2]['last']
-        #         if len(ex) == 4:
-        #             msg1 = ex[3][:33]
-        #         else:
-        #             msg1 = ''
-        #
-        #         ex2 = quad(f, big, upper, **argkw)
-        #         ans2 = ex2[0]
-        #         err2 = ex2[1]
-        #         steps2 = ex2[2]['last']
-        #         if len(ex2) == 4:
-        #             msg2 = ex2[3][:33]
-        #         else:
-        #             msg2 = ''
-        #
-        #         ans = ans1 + ans2
-        #         err = err1 + err2
-        #         steps = steps1 + steps2
-        #         msg = msg1 + ' ' + msg2
-        #         logger.warning(f'integrals: lhs={ans:,.0f}, rhs={ans2:,.0f}')
-        #     logger.warning(f'E[X^{level}]: split={split}, ansr={ans}, error={err}, steps={steps}; message {msg}')
-        #     return ans
-
-        def safe_integrate(f, lower, upper, level):
-            """
-            Integrate the survival function, pay attention to error messages.
-
-            """
-
-            # argkw = dict(limit=100, epsabs=1e-6, epsrel=1e-6, full_output=1)
-            argkw = dict(limit=100, epsrel=1e-6 if level == 1 else 1e-4, full_output=1)
-            ex = quad(f, lower, upper, **argkw)
-            if len(ex) == 4 or ex[0] == np.inf:  # 'The integral is probably divergent, or slowly convergent.':
-                msg = ex[-1].replace("\n", " ") if ex[-1] == str else "no message"
-                logger.info(
-                    f'E[X^{level}]: ansr={ex[0]}, error={ex[1]}, steps={ex[2]["last"]}; message {msg} -> splitting integral')
-                # blow off other steps....
-                # use nan to mean "unreliable
-                # return np.nan   #  ex[0]
-                # this is too slow...and we don't really use it...
-                ϵ = 0.0001
-                if lower == 0 and upper > ϵ:
-                    logger.info(
-                        f'Severity.moms | splitting {self.sev_name} EX^{level} integral for convergence reasons')
-                    exa = quad(f, 1e-16, ϵ, **argkw)
-                    exb = quad(f, ϵ, upper, **argkw)
-                    logger.info(
-                        f'Severity.moms | [1e-16, {ϵ}] split EX^{level}: ansr={exa[0]}, error={exa[1]}, steps={exa[2]["last"]}')
-                    logger.info(
-                        f'Severity.moms | [{ϵ}, {upper}] split EX^{level}: ansr={exb[0]}, error={exb[1]}, steps={exb[2]["last"]}')
-                    ex = (exa[0] + exb[0], exa[1] + exb[1])
-                    # if exa[2]['last'] < argkw['limit'] and exb[2]['last'] < argkw['limit']:
-                    #     ex = (exa[0] + exb[0], exa[1] + exb[1])
-                    # else:
-                    #     # reached limit, unreliable
-                    #     ex = (np.nan, np.nan)
-            logger.info(f'E[X^{level}]={ex[0]}, error={ex[1]}, est rel error={ex[1] / ex[0] if ex[0] != 0 else np.inf}')
-            return ex[:2]
-
-        ex1a = None
-        # we integrate isf not q, so upper and lower are swapped
-        if self.attachment == 0:
-            upper = 1
-        else:
-            upper = self.fz.sf(self.attachment)
-        if self.detachment == np.inf:
-            lower = 0
-        else:
-            lower = self.fz.sf(self.detachment)
-
-        if self.detachment == np.inf and self.sev_name not in ['chistogram', 'dhistogram']:
-            # figure which moments actually exist
-            moments_finite = list(map(lambda x: not (np.isinf(x) or np.isnan(x)), self.fz.stats('mvs')))
-        else:
-            moments_finite = [True, True, True]
-        # logger.info(str(moments_finite))
-
-        # compute moments: histograms are tricky to integrate and we know the answer already...so
-        if self.attachment == 0 and self.detachment == np.inf and self.sev_name.endswith('histogram'):
-            ex1 = self.sev1
-            ex2 = self.sev2
-            ex3 = self.sev3
-
-        elif self.sev_name in ['lognorm', 'pareto', 'gamma', 'expon'] and self.sev_loc == 0:
-            # have exact and note this computes the answer directly
-            # no need for the subsequent adjustment
-            logger.info('Analytic moments')
-            ma = moms_analytic(self.fz, self.limit, self.attachment, 3)
-            ex1a, ex2a, ex3a = ma[1:]
-            if not moments_finite[0]:
-                ex1a = np.inf
-            if not moments_finite[1]:
-                ex2a = np.inf
-            if not moments_finite[2]:
-                ex3a = np.inf
-        else:
-            logger.info('Numerical moments')
-            continue_calc = True
-            max_rel_error = 1e-3
-            if moments_finite[0]:
-                ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
-                if ex1[0] != 0 and ex1[1] / ex1[0] < max_rel_error:
-                    ex1 = ex1[0]
-                else:
-                    ex1 = np.nan
-                    continue_calc = False
-            else:
-                logger.info('First moment does not exist.')
-                ex1 = np.inf
-
-            if continue_calc and moments_finite[1]:
-                ex2 = safe_integrate(lambda x: self.fz.isf(x) ** 2, lower, upper, 2)
-                # we know the mean; use that scale to determine if the absolute error is reasonable?
-                if ex2[1] / ex2[0] < max_rel_error:  # and ex2[1] < 0.01 * ex1**2:
-                    ex2 = ex2[0]
-                else:
-                    ex2 = np.nan
-                    continue_calc = False
-            elif not continue_calc:
-                ex2 = np.nan
-            else:
-                logger.info('Second moment does not exist.')
-                ex2 = np.inf
-
-            if continue_calc and moments_finite[2]:
-                ex3 = safe_integrate(lambda x: self.fz.isf(x) ** 3, lower, upper, 3)
-                if ex3[1] / ex3[0] < max_rel_error:
-                    ex3 = ex3[0]
-                else:
-                    ex3 = np.nan
-            elif not continue_calc:
-                ex3 = np.nan
-            else:
-                logger.info('Third moment does not exist.')
-                ex3 = np.inf
-
-        # adjust if not determined by exact formula
-        if ex1a is None:
-            dma = self.detachment - self.attachment
-            uml = upper - lower
-            a = self.attachment
-            if a > 0:
-                ex1a = ex1 - a * uml
-                ex2a = ex2 - 2 * a * ex1 + a ** 2 * uml
-                ex3a = ex3 - 3 * a * ex2 + 3 * a ** 2 * ex1 - a ** 3 * uml
-            else:
-                ex1a = ex1
-                ex2a = ex2
-                ex3a = ex3
-
-            if self.detachment < np.inf:
-                ex1a += dma * lower
-                ex2a += dma ** 2 * lower
-                ex3a += dma ** 3 * lower
-
-        if self.conditional:
-            ex1a /= self.pattach
-            ex2a /= self.pattach
-            ex3a /= self.pattach
-
-        return ex1a, ex2a, ex3a
-
-    def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD'):
-        """
-        Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
-        replaced with log density plot.
-
-        :param n: number of points to plot.
-        :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
-        :param figsize: (width, height) in inches.
-        :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
-        :return:
-        """
-        # TODO better coordination of figsize! Better axis formats and ranges.
-
-        xs = np.linspace(0, self._isf(1e-4), n)
-        xs2 = np.linspace(0, self._isf(1e-12), n)
-
-        if axd is None:
-            f = plt.figure(constrained_layout=True, figsize=figsize)
-            axd = f.subplot_mosaic(layout)
-
-        ds = 'steps-post' if self.sev_name == 'dhistogram' else 'default'
-
-        ax = axd['A']
-        ys = self._pdf(xs)
-        ax.plot(xs, ys, drawstyle=ds)
-        ax.set(title='Probability density', xlabel='Loss')
-        yl = ax.get_ylim()
-
-        ax = axd['B']
-        ys2 = self._pdf(xs2)
-        ax.plot(xs2, ys2, drawstyle=ds)
-        ax.set(title='Log density', xlabel='Loss', yscale='log', ylim=[1e-14, 2 * yl[1]])
-
-        ax = axd['C']
-        ys = self._cdf(xs)
-        ax.plot(xs, ys, drawstyle=ds)
-        ax.set(title='Probability distribution', xlabel='Loss', ylim=[-0.025, 1.025])
-
-        ax = axd['D']
-        ax.plot(ys, xs, drawstyle=ds)
-        ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$', xlim=[-0.025, 1.025])
-
 
 def make_conditional_cdf(lb, ub, plb, pub):
     """
@@ -3879,7 +3227,7 @@ def make_conditional_ppf(lb, ub, plb, pub):
 
 class Severity(ss.rv_continuous):
 
-    def __init__(self, sev_name, exp_attachment=0, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
+    def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
                  sev_conditional=True, name='', note=''):
         """
@@ -3907,7 +3255,8 @@ class Severity(ss.rv_continuous):
         See code in Problems and Solutions to extract distributions from scipy stats by introsepection.
 
         :param sev_name: scipy statistics_df continuous distribution | (c|d)histogram  cts or discerte | fixed
-        :param exp_attachment:
+        :param exp_attachment: None if layer is missing, distinct from 0; if a = 0 then losses are
+               conditional on  X>a, if a = None then losses are conditional on X>=0
         :param exp_limit:
         :param sev_mean:
         :param sev_cv:
@@ -3927,14 +3276,17 @@ class Severity(ss.rv_continuous):
         from .portfolio import Portfolio
 
         super().__init__(self, name=sev_name)
-        # ss.rv_continuous.__init__(self, name=f'{sev_name}[{exp_limit} xs {exp_attachment:,.0f}]')
 
         self.program = ''  # may be set externally
         self.limit = exp_limit
-        self.attachment = exp_attachment
-        self.detachment = exp_limit + exp_attachment
+        self.attachment = 0 if exp_attachment is None else exp_attachment
+        # need to keep this information, otherwise imposssible for this object
+        # to determine its treatment of zero
+        self.exp_attachment = exp_attachment
+        self.detachment = exp_limit + self.attachment
         self.fz = None
         self.pattach = 0
+        self.moment_pattach = 0
         self.pdetach = 0
         self.conditional = sev_conditional
         self.sev_name = sev_name
@@ -3973,6 +3325,7 @@ class Severity(ss.rv_continuous):
             # need to exp_limit distribution
             exp_limit = min(np.min(exp_limit), xs.max())
             if sev_name == 'chistogram':
+                # TODO: check this code still works!
                 # continuous histogram: uniform between xs's
                 # if the inputs are not evenly spaced this messes up because it interprets p as the
                 #  height of the density over the range...hence have to rescale
@@ -3993,24 +3346,19 @@ class Severity(ss.rv_continuous):
                 self.sev3 = np.sum(xsm ** 3 * ps)
                 self.fz = ss.rv_histogram((aps, xss))
             elif sev_name == 'dhistogram':
-                # discrete histogram: point masses at xs's
+                # need to be careful in case input has duplicates - these need removing
+                # it is also possible the user has included values < 0
+                # these must be replaced with zero. The next
+                # code hanndles both cases
+                xs, ps = validate_discrete_distribution(xs, ps)
+                # discrete histogram: point masses at xs's; moments must be computed after dealing
+                # with negative entries
                 self.sev1 = np.sum(xs * ps)
                 self.sev2 = np.sum(xs ** 2 * ps)
                 self.sev3 = np.sum(xs ** 3 * ps)
-                # binary consistent
-                # need to be careful in case input has duplicates - these need removing
-                if len(xs) != len(set(xs)):
-                    logger.info('Duplicates in empirical distribution, summarizing.')
-                    _ = pd.DataFrame({'x': xs, 'p': ps}).groupby('x').sum('p')
-                    xs = np.array(_.index)
-                    ps = _.p.values
-                    del _
-                # was + but F(x) = Pr(X<=x) so shd be to left
                 # Jan 2023: want the increment to be smaller than any reasonable
-                # bucket size so buckets are not "split". This is fragile
-                # TODO: make 30 depend on the magnitude of xs to avoid underflow problems
-                # we won't likely ever have more than 1B = 2**30 buckets
-                # Feb 2023: for large x a fixed 2**30 results in underflow, hence:
+                # bucket size so buckets are not "split". The function max_log2
+                # computes that d.
                 d = max_log2(np.max(xs))
                 logger.info(f'Severity.init | {sev_name} d={d}')
                 xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
@@ -4123,10 +3471,23 @@ class Severity(ss.rv_continuous):
         else:
             self.pdetach = self.fz.sf(self.detachment)
 
-        if self.attachment == 0:
-            self.pattach = 1
+        if exp_attachment is None:
+            # this behaviour makes layers consistent: if a = 0 then losses are
+            # conditional on  X>a, if a = None then losses are conditional on X>=0
+            # self.attachment needs to be a number because it is used in all
+            # the distribution functions
+            if sev_name.endswith('histogram'):
+                self.moment_pattach = self.pattach = 1
+            else:
+                # continuous distribution: need to condition on X >= 0
+                # which is the same as X > 0; however, here we need
+                # the correct p for the integral of isf to determine
+                # the moments. Thus, we need two values:
+                self.moment_pattach = self.fz.sf(self.attachment)
+                self.pattach = 1
         else:
-            self.pattach = self.fz.sf(self.attachment)
+            # None has already been mapped to 0
+            self.moment_pattach = self.pattach = self.fz.sf(self.attachment)
 
         if sev_mean > 0 or sev_cv > 0:
             # if you input a sev_mean or sev_cv check we are close to target
@@ -4472,7 +3833,8 @@ class Severity(ss.rv_continuous):
         ex1a = None
         # we integrate isf not q, so upper and lower are swapped
         if self.attachment == 0:
-            upper = 1
+            # continuous distributions with negative support may have mass at zero
+            upper = min(1, self.moment_pattach)
         else:
             upper = self.fz.sf(self.attachment)
         if self.detachment == np.inf:
@@ -4512,6 +3874,11 @@ class Severity(ss.rv_continuous):
             max_rel_error = 1e-3
             if moments_finite[0]:
                 ex1 = safe_integrate(self.fz.isf, lower, upper, 1)
+                # TODO: there is a potential issue here if the mean is very small
+                # a small abs error can appear as a large relative error
+                # however, that circumstance should not occur
+                # (saw with agg T 1 claim sev norm fixed; before we fixed the range
+                # of integration for moments to be [0.5, 1] instead of [0,1])
                 if ex1[0] != 0 and ex1[1] / ex1[0] < max_rel_error:
                     ex1 = ex1[0]
                 else:
@@ -4557,9 +3924,16 @@ class Severity(ss.rv_continuous):
                 ex2a = ex2 - 2 * a * ex1 + a ** 2 * uml
                 ex3a = ex3 - 3 * a * ex2 + 3 * a ** 2 * ex1 - a ** 3 * uml
             else:
-                ex1a = ex1
-                ex2a = ex2
-                ex3a = ex3
+                # a = 0: check if continous with mass at zero, and no limit clause (exp_attachment is None)
+                # in which case scale moments down by pattach
+                if self.exp_attachment is None and not self.sev_name.endswith('histogram'):
+                    ex1a = self.pattach * ex1
+                    ex2a = self.pattach * ex2
+                    ex3a = self.pattach * ex3
+                else:
+                    ex1a = ex1
+                    ex2a = ex2
+                    ex3a = ex3
 
             if self.detachment < np.inf:
                 ex1a += dma * lower

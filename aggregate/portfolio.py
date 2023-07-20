@@ -27,13 +27,11 @@ from IPython.core.display import HTML, display
 from .constants import *
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
-from .utilities import (ft,
-                        ift, sln_fit, sgamma_fit,
-                        axiter_factory, AxisManager, html_title,
+from .utilities import (ft, ift, axiter_factory, AxisManager, html_title,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, Answer, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
-                        make_var_tvar, more)
+                        make_var_tvar, more, explain_validation, )
 import aggregate.random_agg as ar
 
 
@@ -86,6 +84,7 @@ class Portfolio(object):
         self.name = name
         self.agg_list = []
         self.line_names = []
+        self._valid = None
         logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name}')
         # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
@@ -643,7 +642,7 @@ class Portfolio(object):
         _s = "" if _n <= 1 else "s"
         s.append(f'Portfolio contains {_n} aggregate component{_s}.')
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+            s.append(f'Updated with bucket size {self.bs:.6g}, log2 = {self.log2}, validation: {self.explain_validation()}')
         df = self.describe
         return '\n'.join(s) + df.fillna('').to_html()
 
@@ -1320,7 +1319,7 @@ class Portfolio(object):
         df.loc['total', :] = df.sum()
         return df
 
-    def best_bucket(self, log2=16, recommend_p=0.999):
+    def best_bucket(self, log2=16, recommend_p=RECOMMEND_P):
         """
         Recommend the best bucket. Rounded recommended bucket for log2 points.
 
@@ -1338,7 +1337,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0,
-               trim_df=False, add_exa=True, force_severity=True, recommend_p=0.999, approximation=None,
+               trim_df=False, add_exa=True, force_severity=True, recommend_p=RECOMMEND_P, approximation=None,
                debug=False):
         """
 
@@ -1379,7 +1378,7 @@ class Portfolio(object):
         :param debug: if True, print debug information
         :return:
         """
-
+        self._valid = None # reset valid flag
         if approximation is not None:
             if approximation == 'exact':
                 approx_freq_ge = 1e9
@@ -1564,26 +1563,30 @@ class Portfolio(object):
         :return: True if all tests are passed, else False.
 
         """
-        if self.density_df is None:
-            return "not updated"
+        if self._valid is not None:
+            return self._valid
 
-        any_false = False
+        rv = Validation.NOT_UNREASONABLE
+        if self.density_df is None:
+            self._valid = Validation.NOT_UPDATED
+            return Validation.NOT_UPDATED
+
         for a in self.agg_list:
             r = a.valid
-            # should be T/F/reinsurance, because we have checked updated.
-            if r == 'reinsurance':
-                logger.warning(f'Aggregate {a.name} has reinsurance,  validation n/a')
-                any_false = True
+            if r & Validation.REINSURANCE:
+                logger.info(f'Aggregate {a.name} has reinsurance, validation n/a')
             elif not r:
-                logger.warning(f'Aggregate {a.name} fails validation')
-                any_false = True
+                logger.info(f'Aggregate {a.name} fails validation')
+            rv |= r
 
-        if any_false:
-            logger.warning(f'Exiting: Portfolio validation steps skipped due to failed or n/a aggregate validation')
-            return False
+        if rv != Validation.NOT_UNREASONABLE:
+            logger.info(f'Exiting: Portfolio validation steps skipped due to failed or n/a Aggregate validation')
+            self._valid = rv
+            return rv
         else:
-            logger.info('All aggregate objects are not unreasonable')
+            logger.info('No Aggregate object fails validation')
 
+        # apply validation to the Portfolio total
         df = self.describe.xs('total', level=0, axis=0).abs()
         try:
             df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
@@ -1593,37 +1596,47 @@ class Portfolio(object):
             df['Err Skew(X)'] = np.nan
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Portfolio Sev mean error > eps')
-            return False
+            logger.info('FAIL: Portfolio Sev mean error > eps')
+            rv |= Validation.SEV_MEAN
 
         if df.loc['Agg', 'Err E[X]'] > eps:
-            logger.warning('FAIL: Portfolio Agg mean error > eps')
-            return False
+            logger.info('FAIL: Portfolio Agg mean error > eps')
+            rv |= Validation.AGG_MEAN
 
         if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
-            logger.warning('FAIL: Agg mean error > 10 * sev error')
-            return False
+            logger.info('FAIL: Agg mean error > 10 * sev error')
+            rv |= Validation.ALIASING
+
         try:
             if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Portfolio Sev CV error > eps')
-                return False
+                logger.info('FAIL: Portfolio Sev CV error > eps')
+                rv |= Validation.SEV_CV
 
             if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.warning('FAIL: Portfolio Agg CV error > eps')
-                return False
+                logger.info('FAIL: Portfolio Agg CV error > eps')
+                rv |= Validation.AGG_CV
 
             if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Portfolio Sev skew error > eps')
-                return False
+                logger.info('FAIL: Portfolio Sev skew error > eps')
+                rv |= Validation.SEV_SKEW
 
             if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
-                logger.warning('FAIL: Portfolio Agg skew error > eps')
-                return False
+                logger.info('FAIL: Portfolio Agg skew error > eps')
+                rv |= Validation.AGG_SKEW
+
         except (TypeError, ZeroDivisionError):
             pass
 
-        logger.info('Portfolio does not fail any validation: not unreasonable')
-        return True
+        if rv == Validation.NOT_UNREASONABLE:
+            logger.info('Portfolio does not fail any validation: not unreasonable')
+        self._valid = rv
+        return rv
+
+    def explain_validation(self):
+        """
+        Explain the validation result. Can pass in if already calculated.
+        """
+        return explain_validation(self.valid)
 
     @property
     def priority_capital_df(self):
@@ -1926,7 +1939,7 @@ class Portfolio(object):
         """
         pretty print the program to html
         """
-        pprint_ex(self.program, 20)
+        return pprint_ex(self.program, 20)
 
     @property
     def pprogram_html(self):
@@ -2030,235 +2043,6 @@ class Portfolio(object):
         ax = scatter_matrix(bit, marker='.', s=5, alpha=1,
                             figsize=(10, 10), diagonal='kde', **kwargs)
         return ax
-
-    def plot_old(self, kind='density', line='all', p=0.99, c=0, a=0, axiter=None, figsize=None, height=2,
-             aspect=1, **kwargs):
-        """
-        kind = density
-            simple plotting of line density or not line density;
-            input single line or list of lines;
-            log underscore appended as appropriate
-
-        kind = audit
-            Miscellaneous audit graphs
-
-        kind = priority
-            LEV EXA, E2Pri and combined plots by line
-
-        kind = quick
-            four bar charts of EL etc.
-
-        kind = collateral
-            plot to illustrate bivariate density of line vs not line with indicated asset a and capital c
-
-        :param kind: density | audit | priority | quick | collateral
-        :param line: lines to use, defaults to all
-        :param p:   for graphics audit, x-axis scale has maximum q(p)
-        :param c:   collateral amount
-        :param a:   asset amount
-        :param axiter: optional, pass in to use existing ``axiter``
-        :param figsize: arguments passed to axis_factory if no axiter
-        :param height:
-        :param aspect:
-        :param kwargs: passed to pandas plot routines
-        :return:
-        """
-        do_tight = (axiter is None)
-
-        if kind == 'quick':
-            if self.audit_df is not None:
-                axiter = axiter_factory(axiter, 4, figsize, height, aspect)
-            else:
-                axiter = axiter_factory(axiter, 3, figsize, height, aspect)
-
-            self.statistics_df.loc[('agg', 'mean')]. \
-                sort_index(ascending=True, axis=0). \
-                plot(kind='bar', rot=-45, title='Expected Loss', ax=next(axiter))
-
-            self.statistics_df.loc[('agg', 'cv')]. \
-                sort_index(ascending=True, axis=0). \
-                plot(kind='bar', rot=-45, title='Coeff of Variation', ax=next(axiter))
-
-            self.statistics_df.loc[('agg', 'skew')]. \
-                sort_index(ascending=True, axis=0). \
-                plot(kind='bar', rot=-45, title='Skewness', ax=next(axiter))
-
-            if self.audit_df is not None:
-                self.audit_df['P99.9']. \
-                    sort_index(ascending=True, axis=0). \
-                    plot(kind='bar', rot=-45, title='99.9th Percentile', ax=next(axiter))
-
-        elif kind == 'density':
-            if isinstance(line, str):
-                if line == 'all':
-                    line = [f'p_{i}' for i in self.line_names_ex]
-                else:
-                    line = ['p_' + line]
-            elif isinstance(line, list):
-                line = ['p_' + i if i[0:2] != 'ημ' else i for i in line]
-            else:
-                raise ValueError
-            line = sorted(line)
-            if 'subplots' in kwargs and len(line) > 1:
-                axiter = axiter_factory(axiter, len(line), figsize, height, aspect)
-                ax = axiter.grid(len(line))
-            else:
-                axiter = axiter_factory(axiter, 1, figsize, height, aspect)
-                # want to be able to pass an axis in rather than an axiter...
-                if isinstance(axiter, AxisManager):
-                    ax = axiter.grid(1)
-                else:
-                    ax = axiter
-            self.density_df[line].sort_index(axis=1). \
-                plot(sort_columns=True, ax=ax, **kwargs)
-            if 'logy' in kwargs:
-                _t = 'log Density'
-            else:
-                _t = 'Density'
-            if 'subplots' in kwargs and isinstance(ax, Iterable):
-                for a, l in zip(ax, line):
-                    a.set(title=f'{l} {_t}')
-                    a.legend().set_visible(False)
-            elif isinstance(ax, Iterable):
-                for a in ax:
-                    a.set(title=f'{_t}')
-            else:
-                ax.set(title=_t)
-
-        elif kind == 'audit':
-            D = self.density_df
-            # n_lines = len(self.line_names_ex)
-            n_plots = 12  # * n_lines + 8  # assumes that not lines have been taken out!
-            axiter = axiter_factory(axiter, n_plots, figsize, height, aspect)
-
-            # make appropriate scales
-            density_scale = D.filter(regex='^p_').iloc[1:, :].max().max()
-            expected_loss_scale = np.sum(D.loss * D.p_total) * 1.05
-            large_loss_scale = (D.p_total.cumsum() > p).idxmax()
-
-            # densities
-            temp = D.filter(regex='^p_', axis=1)
-            ax = axiter.grid(1)
-            temp.plot(ax=ax, ylim=(0, density_scale), xlim=(0, large_loss_scale), title='Densities')
-
-            ax = axiter.grid(1)
-            temp.plot(ax=ax, logx=True, ylim=(0, density_scale), title='Densities log/linear')
-
-            ax = axiter.grid(1)
-            temp.plot(ax=ax, logy=True, xlim=(0, large_loss_scale), title='Densities linear/log')
-
-            ax = axiter.grid(1)
-            temp.plot(ax=ax, logx=True, logy=True, title='Densities log/log')
-
-            # graph of cumulative loss cost and rate of change of cumulative loss cost
-            temp = D.filter(regex='^exa_[^η]')
-            # need to check exa actually computed
-            if temp.shape[1] == 0:
-                logger.error('Update exa before audit plot')
-                return
-
-            ax = axiter.grid(1)
-            temp.plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, expected_loss_scale),
-                      title='Loss Cost by Line: $E(X_i(a))$')
-
-            ax = axiter.grid(1)
-            temp.diff().plot(legend=True, ax=ax, xlim=(0, large_loss_scale), ylim=(0, D.index[1]),
-                             title='Change in Loss Cost by Line: $\\nabla E(X_i(a))$')
-
-            # E(X_i / X | X > a); exi_x_lea_ dropped
-            prefix_and_titles = dict(exi_xgta_=r'$E(X_i/X \mid X>a)$',
-                                     exeqa_=r'$E(X_i \mid X=a)$',
-                                     exlea_=r'$E(X_i \mid X \leq a)$',
-                                     exgta_=r'$E(X_i \mid X>a)$')
-            for prefix in prefix_and_titles.keys():
-                regex = f'^{prefix}[a-zA-Z]'
-                ax = axiter.grid(1)
-                D.filter(regex=regex).plot(ax=ax, xlim=(0, large_loss_scale))
-                if prefix == 'exgta_':
-                    ax.set_title(r'$E(X_i \mid X > a)$ by line and total')
-                if prefix.find('xi_x') > 0:
-                    # these are fractions between zero and 1; plot sum on same axis and adjust limit
-                    D.filter(regex=regex).sum(axis=1).plot(ax=ax, label='calced total')
-                    ax.set_ylim(-.05, 1.05)  # so you can see if anything weird is going on
-                elif prefix == 'exgta_' or prefix == 'exeqa_':
-                    # scale same as x axis - so you can see E(X | X=a) is the diagonal ds
-                    ax.set_ylim(0, large_loss_scale)
-                else:
-                    # scale like mean
-                    ax.set_ylim(0, expected_loss_scale)
-                ax.set_title(prefix_and_titles[prefix])
-                ax.legend(frameon=False)
-
-            # Lee diagrams by peril - will fit in the sixth small plot
-            ax = next(axiter)
-            # force total first
-            ax.plot(D.loc[:, 'p_total'].cumsum(), D.loss, label='total')
-            for c in D.filter(regex='^p_[^t]').columns:
-                ax.plot(D.loc[:, c].cumsum(), D.loss, label=c[2:])
-            ax.legend(frameon=False)
-            ax.set_title('Lee Diagram')
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, large_loss_scale)
-
-        elif kind == 'priority':
-            xmax = self.q(p)
-            n_lines = len(self.line_names_ex)
-            n_plots = 3 + 2 * n_lines
-            if axiter is None:
-                axiter = axiter_factory(axiter, n_plots, figsize, height, aspect)
-
-            for prefix, fmt in dict(lev_='LEV', exa_=r'$E(X_i\mid X=a)$', e2pri_=r'$E_2(X_i \mid X=a)$').items():
-                ax = axiter.grid(1)
-                self.density_df.filter(regex=f'{prefix}').plot(ax=ax, xlim=(0, xmax),
-                                                               title=fmt)
-                ax.set_xlabel('Capital assets')
-
-            for line in self.line_names:
-                ax = axiter.grid(1)
-                self.density_df.filter(regex=f'(lev|exa|e2pri)_{line}$').plot(ax=ax, xlim=(0, xmax),
-                                                                              title=f'{line.title()} by Priority')
-                ax.set_xlabel('Capital assets')
-            for col in self.line_names_ex:
-                ax = axiter.grid(1)
-                self.density_df.filter(regex=f'epd_[012]_{col}').plot(ax=ax, xlim=(0, xmax),
-                                                                      title=f'{col.title()} EPDs', logy=True)
-
-        elif kind == 'collateral':
-            assert line != '' and line != 'all'
-            if axiter is None:
-                axiter = axiter_factory(axiter, 2, figsize, height, aspect)
-
-            cmap = cm.BuGn
-            if a == 0:
-                a = self.q(p)
-            pline = self.density_df.loc[0:a, f'p_{line}'].values
-            notline = self.density_df.loc[0:a, f'ημ_{line}'].values
-            xs = self.density_df.loc[0:a, 'loss'].values
-            N = pline.shape[0]
-            biv = np.matmul(notline.reshape((N, 1)), pline.reshape((1, N)))
-            biv = biv  # / np.sum(np.sum(biv))
-            for rho in [1, 0.05]:
-                ax = next(axiter)
-                ax.imshow(biv ** rho, cmap=cmap, origin='lower', extent=[0, xs[-1], 0, xs[-1]],
-                          interpolation='nearest', **kwargs)
-                cy = a - c
-                ax.plot((c, c), (a - c, xs[-1]), 'k', linewidth=0.5)
-                ax.plot((0, a), (a, 0), 'k', linewidth=0.5)
-                if c > 0:
-                    ax.plot((c, xs[-1]), (cy, xs[-1] * (a / c - 1)), 'k', linewidth=0.5)
-                ax.plot((0, c, c), (a - c, a - c, 0), c='k', ls='--', linewidth=0.25)
-                ax.set_xlim(0, xs[-1])
-                ax.set_ylim(0, xs[-1])
-                ax.set_xlabel(f'Line {line}')
-                ax.set_ylabel(f'Not {line}')
-
-        else:
-            logger.error(f'Portfolio.plot | Unknown plot type {kind}')
-            raise ValueError(f'Portfolio.plot unknown plot type {kind}')
-
-        if do_tight:
-            axiter.tidy()
-            suptitle_and_tight(f'{kind.title()} Plots for {self.name.title()}')
 
     def uat_interpolation_functions(self, a0, e0):
         """

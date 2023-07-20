@@ -114,6 +114,8 @@ def pprint_ex(txt, split=0, html=False):
         #     ans += f'<p><small>Note {i+1}. {n}</small><p>'
         # use pygments to colorize
         agg_lex = get_lexer_by_name('agg')
+        # remove extra spaces
+        txt = re.sub(r'[ \t\n]+', ' ', txt.strip())
         ans = HTML(highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False)))
     return ans
 
@@ -293,22 +295,27 @@ def gamma_fit(m, cv):
 
 def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
     """
-    Does the work for Portfolio.approxomate and Aggregate.approximate. See their documentaiton.
+    Does the work for Portfolio.approximate and Aggregate.approximate. See their documentation.
 
+    :param output: scipy - frozen scipy.stats continuous rv object; agg_decl
+      sev_decl - DecL program for severity (to substituate into an agg ; no name)
+      sev_kwargs - dictionary of parameters to create Severity
+      agg_decl - Decl program agg T 1 claim sev_decl fixed
+      any other string - created Aggregate object
     """
     if approx_type == 'norm':
         sd = m*cv
         if output == 'scipy':
             return ss.norm(loc=m, scale=sd)
         sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-        agg_str += f'{sd} @ norm 1 # {m} '
+        decl = f'{sd} @ norm 1 # {m} '
 
     elif approx_type == 'lognorm':
         mu, sigma = mu_sigma_from_mean_cv(m, cv)
-        sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu)}
+        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu)}
         if output == 'scipy':
             return ss.lognorm(sigma, scale=np.exp(mu))
-        agg_str += f'{np.exp(mu)} * lognorm {sigma} '
+        decl = f'{np.exp(mu)} * lognorm {sigma} '
 
     elif approx_type == 'gamma':
         shape = cv ** -2
@@ -316,28 +323,33 @@ def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
         if output == 'scipy':
             return ss.gamma(shape, scale=scale)
         sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
-        agg_str += f'{scale} * gamma {shape} '
+        decl = f'{scale} * gamma {shape} '
 
     elif approx_type == 'slognorm':
         shift, mu, sigma = sln_fit(m, cv, skew)
         if output == 'scipy':
             return ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-        sev = {'sev_name': 'lognorm', 'sev_shape': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
-        agg_str += f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+        decl = f'{np.exp(mu)} * lognorm {sigma} + {shift} '
 
     elif approx_type == 'sgamma':
         shift, alpha, theta = sgamma_fit(m, cv, skew)
         if output == 'scipy':
             return ss.gamma(alpha, loc=shift, scale=theta)
         sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-        agg_str += f'{theta} * gamma {alpha} + {shift} '
+        decl = f'{theta} * gamma {alpha} + {shift} '
 
     else:
         raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
 
-    if output == 'agg':
+    if output == 'agg_decl':
+        agg_str += decl
         agg_str += ' fixed'
         return agg_str
+    elif output == 'sev_kwargs':
+        return sev
+    elif output == 'sev_decl':
+        return decl
     else:
         from . distributions import Aggregate
         return Aggregate(**{'name': name, 'note': note,
@@ -2959,15 +2971,8 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
                 # object not updated
                 qd(x.describe.fillna(''), accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            if x.valid == 'reinsurance':
-                vr = 'n/a (reinsurance)'
-            elif x.valid == 'not updated':
-                vr = 'n/a (not updated)'
-            else:
-                vr = "not unreasonable" if x.valid else "fails"
-            print(f'log2 = {x.log2}, bs = {bss}, validation: {vr}.')
-            if isinstance(x, Aggregate) and x.valid is False:
-                qt(x)
+            vr = x.explain_validation()
+            print(f'log2 = {x.log2}, bandwidth = {bss}, validation: {vr}.')
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,
@@ -3008,13 +3013,6 @@ def qdp(df):
     d.loc['std'] = df.std(ddof=0)
     d.loc['cv'] = d.loc['std'] / d.loc['mean']
     return d
-
-
-def qt(a):
-    """
-    Quick test diagnostics for an Aggregate object.
-    """
-    print(a.qt())
 
 
 def mv(x, y=None):
@@ -3736,3 +3734,37 @@ def introspect(ob):
     df[['callable', 'value', 'type', 'help', 'length']] = ans
     df = df.sort_values(['callable', 'length', 'name'])
     return df
+
+
+def explain_validation(rv):
+    """
+    Explain the validation result rv.
+    Don't over report: if you fail CV don't need to be told you fail Skew too.
+    """
+    if rv == Validation.NOT_UNREASONABLE:
+        return "not unreasonable"
+    elif rv & Validation.NOT_UPDATED:
+        return "n/a, not updated"
+    elif rv & Validation.REINSURANCE:
+        return "n/a, reinsurance"
+    else:
+        explanation = 'fails '
+        if rv & Validation.SEV_MEAN:
+            # explanation += f'sev mean: {ob.sev_m: .4e} vs {ob.est_sev_m: .4e}\n'
+            explanation += f'sev mean, '
+        if rv & Validation.AGG_MEAN:
+            explanation += f'agg mean, '
+        if rv & Validation.ALIASING:
+            explanation += "agg mean error >> sev, possible aliasing; try larger bs, "
+        if not(rv & Validation.SEV_MEAN) and (rv & Validation.SEV_CV):
+            # explanation += f'sev cv: {ob.sev_cv: .4e} vs {ob.est_sev_cv: .4e}, '
+            explanation += f'sev cv, '
+        if not(rv & Validation.AGG_MEAN) and (rv & Validation.AGG_CV):
+            explanation += f'agg cv, '
+        if not (rv & Validation.SEV_CV) and (rv & Validation.SEV_SKEW):
+            # explanation += f'sev skew: {ob.sev_skew: .4e} vs {ob.est_sev_skew: .4e}, '
+            explanation += f'sev skew, '
+        if not (rv & Validation.AGG_CV) and (rv & Validation.AGG_SKEW):
+            explanation += f'agg skew, '
+    return explanation[:-2]
+

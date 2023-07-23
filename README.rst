@@ -2,49 +2,6 @@
 |  |py-versions| |downloads|
 |  |license| |packages|  |twitter|
 
-.. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
-    :target: https://pepy.tech/project/aggregate
-    :alt: Downloads
-
-.. |stars| image:: https://img.shields.io/github/stars/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/stargazers
-    :alt: Github stars
-
-.. |forks| image:: https://img.shields.io/github/forks/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/network/members
-    :alt: Github forks
-
-.. |contributors| image:: https://img.shields.io/github/contributors/mynl/aggregate.svg
-    :target: https://github.com/mynl/aggregate/graphs/contributors
-    :alt: Contributors
-
-.. |version| image:: https://img.shields.io/pypi/v/aggregate.svg?label=pypi
-    :target: https://pypi.org/project/aggregate
-    :alt: Latest version
-
-.. |activity| image:: https://img.shields.io/github/commit-activity/m/mynl/aggregate
-   :target: https://github.com/mynl/aggregate
-   :alt: Latest Version
-
-.. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
-    :alt: Supported Python versions
-
-.. |license| image:: https://img.shields.io/pypi/l/aggregate.svg
-    :target: https://github.com/mynl/aggregate/blob/master/LICENSE
-    :alt: License
-
-.. |packages| image:: https://repology.org/badge/tiny-repos/python:aggregate.svg
-    :target: https://repology.org/metapackage/python:aggregate/versions
-    :alt: Binary packages
-
-.. |doc| image:: https://readthedocs.org/projects/aggregate/badge/?version=latest
-    :target: https://aggregate.readthedocs.io/en/latest/
-    :alt: Documentation Status
-
-.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
-    :target: https://twitter.com/SJ2Mi
-    :alt: Twitter Follow
-
 -----
 
 aggregate: a powerful Python actuarial modeling library
@@ -59,6 +16,14 @@ that usually require simulation, making it as easy to work with an aggregate (co
 as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
 and is implemented in Python under an open source BSD-license.
 
+White Paper (new July 2023)
+----------------------------
+
+The `White Paper <cheat-sheets/Aggregate_white_paper.pdf>`_ describes
+the purpose, implementation, and use of the :class:`Aggregate` class
+within the ``aggregate`` package. :class:`Aggregate` handles the
+creation and manipulation of compound frequency-severity distributions.
+
 Cheat Sheets (new July 2023)
 -----------------------------
 
@@ -67,11 +32,12 @@ all the methods and attributes. They provide a structured summary of
 the capabilities of each object. They are available in the ``cheat-sheets``
 directory. PDF versions are available here:
 
-* `Aggregate <cheat-sheets/aggregate.pdf>`_
-* `Portfolio <cheat-sheets/portfolio.pdf>`_
-* `Distributions <cheat-sheets/distributions.pdf>`_
-* `Underwriter <cheat-sheets/underwriter.pdf>`_
-* `Severity <cheat-sheets/severity.pdf>`_
+* `Aggregate <cheat-sheets/Aggregate_Cheat_Sheet.pdf>`_
+* `Portfolio <cheat-sheets/Portfolio_Cheat_Sheet.pdf>`_
+* `Distributions <cheat-sheets/DecL_Cheat_Sheet.pdf>`_
+* `Distributions <cheat-sheets/Distortion_Cheat_Sheet.pdf>`_
+* `Underwriter <cheat-sheets/Underwriter_Cheat_Sheet.pdf>`_
+* `Severity <cheat-sheets/Severity_Cheat_Sheet.pdf>`_
 
 Documentation
 -------------
@@ -97,8 +63,16 @@ Installation
 Version History
 -----------------
 
-0.20.0 (release candidate for version 1.0)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+0.20.1
+~~~~~~~~
+
+* Bug fix in parser interpretation of arrays with step size
+* Added figures for AAS paper to extensions.ft and extensions.figures
+* Validation "not unreasonable" flag set to 0
+* Added Aggregate_white_paper.pdf
+
+0.20.0
+~~~~~~~
 
 * ``sev_attachment``: changed default to ``None``; in that case gross losses equal
   ground-up losses, with no adjustment. But if layer is 10 xs 0 then losses
@@ -135,7 +109,7 @@ Version History
     - EXP and EXPONENT are right
       associative, division is not associative so 1/2/3 gives an error.
     - Still SR conflict from dfreq [ ] [  ] because it could be the
-      probabilities clause or the start of a vectorized layer clause
+      probabilities clause or the start of a vectorized limit clause
     - Remaining SR conflicts are from NUMBER, which is used in many
       places. This is a problem with the grammar, not the parser.
     - Added more tests to the parser test suite
@@ -301,6 +275,8 @@ Version History
 * Added ``spectral.approx_ccoc`` to create a ct approx to the CCoC distortion
 * ``qdp`` moved to ``utilities`` (describe plus some quantiles)
 * Added ``Pentagon`` class in ``extensions``
+* Added example use of the Pollaczeck-Khinchine formula, reproducing examples from
+  the `actuar`` risk vignette to Ch 5 of the documentation.
 
 Earlier versions
 ~~~~~~~~~~~~~~~~~~
@@ -312,6 +288,13 @@ Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
 * MAJOR version changes with incompatible API changes.
 * MINOR version changes with added functionality in a backwards compatible manner.
 * PATCH version changes with backwards compatible bug fixes.
+
+Issues and Todo
+-----------------
+
+* Treatment of zero lb is not consistent with attachment equals zero.
+* Flag attempts to use fixed frequency with non-integer expected value.
+* Flag attempts to use mixing with inconsistent frequency distribution.
 
 Getting started
 ---------------
@@ -408,3 +391,48 @@ email me.
 
 Social media: https://www.reddit.com/r/AggregateDistribution/.
 
+
+.. substitutions
+
+.. |downloads| image:: https://img.shields.io/pypi/dm/aggregate.svg
+    :target: https://pepy.tech/project/aggregate
+    :alt: Downloads
+
+.. |stars| image:: https://img.shields.io/github/stars/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/stargazers
+    :alt: Github stars
+
+.. |forks| image:: https://img.shields.io/github/forks/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/network/members
+    :alt: Github forks
+
+.. |contributors| image:: https://img.shields.io/github/contributors/mynl/aggregate.svg
+    :target: https://github.com/mynl/aggregate/graphs/contributors
+    :alt: Contributors
+
+.. |version| image:: https://img.shields.io/pypi/v/aggregate.svg?label=pypi
+    :target: https://pypi.org/project/aggregate
+    :alt: Latest version
+
+.. |activity| image:: https://img.shields.io/github/commit-activity/m/mynl/aggregate
+   :target: https://github.com/mynl/aggregate
+   :alt: Latest Version
+
+.. |py-versions| image:: https://img.shields.io/pypi/pyversions/aggregate.svg
+    :alt: Supported Python versions
+
+.. |license| image:: https://img.shields.io/pypi/l/aggregate.svg
+    :target: https://github.com/mynl/aggregate/blob/master/LICENSE
+    :alt: License
+
+.. |packages| image:: https://repology.org/badge/tiny-repos/python:aggregate.svg
+    :target: https://repology.org/metapackage/python:aggregate/versions
+    :alt: Binary packages
+
+.. |doc| image:: https://readthedocs.org/projects/aggregate/badge/?version=latest
+    :target: https://aggregate.readthedocs.io/en/latest/
+    :alt: Documentation Status
+
+.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
+    :target: https://twitter.com/SJ2Mi
+    :alt: Twitter Follow

@@ -1,12 +1,50 @@
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from scipy.fft import irfft, fft, ifft, rfft, fftshift
+from scipy.fft import irfft,  rfft
 from numpy import real, imag, roll
-from .. import build
+from .. import build, qd
 from .. constants import FIG_H, FIG_W
-import matplotlib as mpl
-from aggregate import build, qd
+# from aggregate import build, qd
+
+
+def poisson_example(en, small2):
+    """
+    Example to show how to compute Po(en) using 1 << small2 buckets.
+    For AAS paper. Sample call::
+
+        poisson_example(10**8, 17)
+
+    :param en: mean of Poisson, e.g., 10**8
+    :param small2: log2 number of buckets to use in FFT routine, 2**small2 should be
+      about 10 * en ** 0.5 to get +/-5 standard deviations around the mean
+
+    """
+    from scipy.stats import poisson
+
+    B = 1 << small2
+    z = np.zeros(B); z[1] = 1
+    wrap = irfft(np.exp(en * (rfft(z) - 1)))
+    k = en // B + 1
+    xs = k * B - (B >> 1) +  np.arange(B)
+    pmf = roll(wrap, B >> 1)
+    df = pd.DataFrame({'x': xs, 'FFT pmf': pmf})
+    po = poisson(en)
+    df['Exact pmf'] = po.pmf(df.x)
+    df = df.set_index('x', drop=True)
+    fig, [ax0, ax1] = plt.subplots(1, 2, figsize=(FIG_W * 2, FIG_H + 0.3), constrained_layout=True)
+    ax0.plot(wrap);
+    ax0.set(title=f'Raw FFT-based output, wrapped to [0, {B}]',
+            xlabel=f'Wrapped outcome, n mod {B}',
+            ylabel='Probability mass, Pr(N=n)');
+    df[['FFT pmf', 'Exact pmf']].plot(style=['-', ':'], ax=ax1, logy=True,
+        title='Shifted FFT vs exact Poisson probabilities\n(log scale)',
+        xlabel='Outcome, n', ylabel='Probability mass, Pr(N=n)');
+    ax1.set(ylim=[1e-17, 2 * df['FFT pmf'].max()])
+    ax1.yaxis.set_minor_locator(ticker.LogLocator(subs='all'))
+
 
 def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
     """
@@ -27,7 +65,7 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
     (moved from figures.py)
 
     """
-    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_H), constrained_layout=True)
+    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_H + 0.3), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
 
     if ez == 0 or sev_clause != '':

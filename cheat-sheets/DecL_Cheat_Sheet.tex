@@ -27,7 +27,7 @@
 
 \raggedright The DecL specification of an \texttt{Aggregate} compound distribution object has eight clauses: \\
 \texttt{agg <NAME> <EXPOSURE> <LIMIT*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <NOTE*>} \\
-Key: \texttt{<INPUT>} denotes user input(s); clauses marked with an asterisk are optional; \texttt{lower\_case} is a DecL keyword; \texttt{CLAUSE\_TYPE} is a valid clause; options: \texttt{a|b|c}.
+Key: \texttt{<INPUT>} user input(s); \texttt{lower\_case} is a DecL keyword; \texttt{CLAUSE\_TYPE} is a valid clause; options: \texttt{a|b|c}; \texttt{inf} for infinity; clauses marked with an asterisk are optional.
 
 \begin{multicols*}{3}
 
@@ -37,12 +37,18 @@ Key: \texttt{<INPUT>} denotes user input(s); clauses marked with an asterisk are
     \begin{minipage}{0.3\textwidth}\raggedright
 % {\it italics stuff} \\
 
-\texttt{agg NAME}
+\texttt{agg <NAME>}
+\texttt{agg <NAME>}
+\texttt{sev <NAME> <SEVERITY>}
 
-\medskip\it Name of the compound \\
-Access from knowledge as \texttt{agg.NAME}. \\
-Names must match regex \\
-\rm \texttt{r'[a-zA-Z][\textbackslash.\_:~a-zA-Z0-9\textbackslash-]*'}.
+\medskip\it Name of the compound or severity.\\
+Names match regex \rm \texttt{r'[a-zA-Z][\textbackslash.\_:~a-zA-Z0-9\textbackslash-]*'}.
+
+Created objects can be referenced \\
+\rm
+\texttt{agg.<NAME>}
+\texttt{agg <NEW\_NAME> agg.<OLD\_NAME>}
+
 
     \end{minipage}
 };
@@ -78,8 +84,8 @@ probabilities \texttt{[.5 .25 1/8 1/9]} or omitted for equally likely.
 
 \texttt{<LIMIT> xs <ATTACHMENT>}
 
-\medskip\it Occurrence limits applied to ground-up severity, unlimited reinstatements,
-losses conditional on attaching layer by default.
+
+\medskip\it Occurrence limits applied to ground-up severity, unlimited reinstatements, losses conditional on attaching layer by default.
 
 
     \end{minipage}
@@ -95,6 +101,7 @@ losses conditional on attaching layer by default.
 
 \texttt{sev <DIST\_NAME> <MEAN> cv <CV>} \\
 \texttt{sev <DIST\_NAME> <SHAPE1> <SHAPE2>} \\
+\texttt{sev sev.<NAME>>} \\
 \texttt{dsev <OUTCOMES> <PROBABILITIES>}
 
 \medskip\texttt{<SCALE> * SEV + <LOC>}.
@@ -122,10 +129,10 @@ losses conditional on attaching layer by default.
 
 \texttt{occurrence ceded to LAYERS} \\
 \texttt{occurrence net of LAYERS} \\
-\texttt{LAYER=SHARE so LAYER xs ATTACH | PARTICIPATION po LAYER xs ATTACH}
+\texttt{LAYER=<<SHARE> so> <LAYER> xs <ATTACH>}
 \texttt{LAYERS=LAYER1 and LAYER2 and ...}
 
-\medskip\it Amount share of (\texttt{so}); participation (placed) $0\le po\le 1$ part of (\texttt{po})
+\medskip\it $0\le \mathrm{SHARE} \le 1$  share of (\texttt{so})
 
 % For example \texttt{250 xs 250}, \texttt{3 so 5 xs 5}, or \texttt{30\% po 1 xs 1}.
 
@@ -149,16 +156,16 @@ losses conditional on attaching layer by default.
 \texttt{fixed},
 \texttt{geometric},
 \texttt{logarithmic},
-\texttt{binomial XX},
-\texttt{negbin var\_mult},
-\texttt{pascal XX XX},
-\texttt{neymana XX} \\
+\texttt{binomial <P>},
+\texttt{negbin <VAR\_MULT>},
+\texttt{neymana <CLAIMS-PER-OCC>},
+\texttt{pascal <CV> <CLAIMS-PER-OCC>} \\
 
 \texttt{mixed <MIXING DIST> <SHAPE1> <SHAPE2>} \\
-\texttt{MIXING DIST=gamma|delaporte|ig|sichel|beta}
+\texttt{MIXING DIST=gamma|delaporte|ig|sig|sichel|beta <CV> <VARIES>}
 
 \texttt{FREQ zt}  \\
-\texttt{FREQ zm p0} \\
+\texttt{FREQ zm <P0>} \\
 \medskip\it zero truncated, zero modified with $\Pr(N=0)=p0$
 
 
@@ -198,7 +205,7 @@ losses conditional on attaching layer by default.
 \texttt{note\{prems op A curve, effective 1/1/2024;\}} \\
 \texttt{note\{bs=100; log2=17; normalize=False\}} \\
 
-\medskip\it Add hints for updating \\
+\medskip\it Add hints for updating; split on semicolon then split on equals. \\
 
     \end{minipage}
 };
@@ -222,6 +229,8 @@ losses conditional on attaching layer by default.
 \it Severity clause \\
 \rm \texttt{[1 3] * expon 1 wts [.6 .4]} \\ %mixed exponential \\
 \texttt{[1 3] * [gamma lognorm] [4 1.25] wts [.6 .4]} \\ %  mixed severity types  \\
+\texttt{100 * lognorm [.75 1.5] wts [.6 .4] slice [0 200 inf]}
+\texttt{100 * lognorm [.5 .75 1.5] wts [.4 .4 .2] slice [0 0 200] [200 200 inf]}
 
 \it Vectors are broadcast; layers, exposure etc. are zipped.
 
@@ -240,9 +249,9 @@ losses conditional on attaching layer by default.
 \rm \texttt{123}, \texttt{12.34e2}, \texttt{-12.4e-5}, \texttt{-12.0}, \texttt{12.4\%} \\
 \texttt{1/2}, \texttt{3**4}, \texttt{exp(2)}
 
-{\bf Warning:} \it there is no unary minus, minus binds to the number: $-4^2=(-4)^2=16$.
-
 Scale factor for lognormal $\mu,\sigma$ entered as \rm\texttt{exp(mu)/exp(sigma**2/2)}.
+
+{\bf Warning:} \it minus binds to the number: $-4^2=(-4)^2=16$; there is no unary minus.
 
 % \texttt{agg Dice dfreq [1:6] dsev [1:6]} a dice-roll of dice rolls
 % Classic gross, net occurrence, net of occurrence and aggregate progression \\
@@ -269,8 +278,8 @@ Scale factor for lognormal $\mu,\sigma$ entered as \rm\texttt{exp(mu)/exp(sigma*
 % \node[fancytitle] at (box.north west) {11. Meta (build and Underwriter stuff)};
 % \end{tikzpicture}
 
-\bigskip \raggedright
-{\bf Notes:}
+% \bigskip \raggedright
+% {\bf Notes:}
 
 
 % FOOTER

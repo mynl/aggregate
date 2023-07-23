@@ -23,7 +23,7 @@ VALIDATION_EPS = 1e-4
 RECOMMEND_P = 0.99999
 
 class Validation(Flag):
-    NOT_UNREASONABLE = auto()
+    NOT_UNREASONABLE = 0
     SEV_MEAN = auto()
     SEV_CV = auto()
     SEV_SKEW = auto()

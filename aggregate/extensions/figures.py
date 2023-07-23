@@ -7,7 +7,7 @@ from scipy.fft import rfft, irfft # , fftshift, ifftshift, fft, ifft
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import matplotlib as mpl
-from .. import build
+from .. import build, qd
 from .. constants import FIG_H, FIG_W, PLOT_FACE_COLOR
 from .. spectral import Distortion
 
@@ -269,3 +269,101 @@ def dual_distortion(dist=None, s=0.3):
                ylabel='Price of layer $1_{U<s}$', aspect='equal')
     axs[1].set(title=None, xlabel='$s$, probability of loss to layer $1_{U<s}$',
                aspect='equal')
+
+
+def discretization_sev_example(outcomes):
+    """
+    For AAS paper. Convergence of sevs with smaller bucket size.
+
+    """
+    a01 = build(f'agg Num:01 1 claim dsev [{outcomes}] fixed', update=False)
+    aex = build(f'agg Num:01e 1 claim dsev [{outcomes}] fixed', update=False)
+    aex.update(log2=16, bs=1/2048)
+    xlim = aex.limits()
+    xlim = (xlim[0], np.round(xlim[1], 0))
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
+        constrained_layout=True)
+    for bs, ax in zip([1, 1/2, 1/4, 1/8], axs.flat):
+        for k in ['forward', 'round', 'backward']:
+            a01.update(log2=10, bs=bs, sev_calc=k)
+            a01.density_df.p_total.cumsum().\
+                plot(xlim=xlim, lw=2 if  k=='round' else 1,
+                drawstyle='steps-post', ls='--', label=k, ax=ax)
+        aex.density_df.p_total.cumsum().\
+            plot(xlim=xlim, lw=1, label='exact', ax=ax)
+        ax.legend(loc='lower right')
+        ax.set(title=f'Bandwidth bs={bs}')
+    axs[0,0].set(ylabel='distribution');
+    axs[1,0].set(ylabel='distribution');
+    # @savefig num_ex1a.png scale=20
+    fig.suptitle('Severity by discretization method for different bandwidths');
+
+
+def discretization_agg_example(outcomes):
+    """
+    For AAS paper. Convergence of sevs with smaller bucket size.
+
+    """
+    a02 = build(f'agg Num:02 4 claims dsev [{outcomes}] poisson', update=False)
+    aex = build(f'agg Num:02e 4 claims dsev [{outcomes}] poisson', update=False)
+    aex.update(log2=16, bs=1/2048)
+    xlim = aex.limits()
+    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
+        constrained_layout=True)
+    for bs, ax in zip([1, 1/2, 1/4, 1/8], axs.flat):
+        for k in ['forward', 'round', 'backward']:
+            a02.update(log2=10, bs=bs, sev_calc=k)
+            a02.density_df.p_total.cumsum().\
+                plot(xlim=xlim, lw=2 if  k=='round' else 1,
+               drawstyle='steps-post', label=k, ax=ax)
+        aex.density_df.p_total.cumsum().\
+            plot(xlim=xlim, lw=1, label='exact', ax=ax)
+        ax.legend(loc='lower right')
+        ax.set(title=f'Bandwidth bs={bs}')
+    # @savefig num_ex1b.png scale=20
+    fig.suptitle('Aggregates by discretization method');
+
+
+def gh_example(en):
+    '''
+    Code to reproduce GHGrübel and Hermesmeier 1999, Table 1.
+    The function ``exact_cdf`` calculates the compound probability
+    that :math:`x-1/2 < X \le x+1/2`.
+    For AAS paper with en=20.
+
+    '''
+    from scipy.stats import levy
+    a = build(f'agg L {en} claim sev levy poisson', update=False)
+    qd(a)
+    bs = 1
+    a.update(log2=16, bs=bs, padding=2, normalize=False, tilt_vector=None)
+    df = a.density_df.loc[[1, 10, 100, 1000], ['p_total']] / a.bs
+    df.columns = ['Agg pad=2']
+
+    def exact_cdf(x):
+        nonlocal en
+        n = 5 * en
+        # poisson freqs
+        p = np.zeros(n)
+        a = np.zeros(n)
+        p[0] = np.exp(-en)
+        fz = levy()
+        for i in range(1, n):
+            p[i] = p[i-1] * en / i
+            a[i] = fz.cdf((x+0.5)/i**2) - fz.cdf((x-0.5)/i**2)
+        return np.sum(p * a)
+
+    df['True'] = [exact_cdf(i) for i in df.index]
+
+    # other models
+    log2 = 10
+    for tilt in [None, 1/1024, 5/1024, 25/1024]:
+        a.update(log2=log2, bs=bs, padding=0,
+                 normalize=False, tilt_vector=tilt)
+        if tilt is None:
+            tilt = 0
+        df[f'Tilt {tilt:.2g}'] = a.density_df.loc[[1, 10, 100, 1000],
+                                  ['p_total']]/a.bs
+    df.index = [f'{x: 6.0f}' for x in df.index]
+    df.index.name = 'x'
+    qd(df.iloc[:, [1,0,2,3,4, 5]], ff=lambda x: f'{x:11.3e}')

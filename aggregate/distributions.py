@@ -1076,7 +1076,7 @@ class Aggregate(Frequency):
         :param exp_premium:     premium volume or vector  (requires loss ratio)
         :param exp_lr:          loss ratio or vector  (requires premium)
         :param exp_en:          expected claim count per segment (self.n = total claim count)
-        :param exp_attachment:  occurrence attachment; None indicates no layer clause, which is treated different
+        :param exp_attachment:  occurrence attachment; None indicates no limit clause, which is treated different
                                 from an attachment of zero.
         :param exp_limit:       occurrence limit
         :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
@@ -1506,11 +1506,7 @@ class Aggregate(Frequency):
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
             s.append(f'aggregate reinsurance    {self.reinsurance_description("agg").lower()}')
-            if self.valid is None:
-                vr = 'n/a (reinsurance)'
-            else:
-                vr = "not unreasonable" if self.valid else "fails"
-            s.append(f'validation               {vr}')
+            s.append(f'validation               {self.explain_validation()  }')
             s.append('')
         return '\n'.join(s)
 
@@ -2252,6 +2248,8 @@ class Aggregate(Frequency):
         Assumes frequency is Poisson.
 
         See Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
+
+        TODO: Should return a named tuple.
 
         :param rho: rho = prem / loss - 1 is the margin-to-loss ratio
         :param cap: cap = cap severity at cap, which replaces severity with X | X <= cap

@@ -446,7 +446,7 @@ def round_bucket(bs):
         elif rbs <= 10:
             return 10.0
         else:
-            rbs = np.round(bs, -int(np.log(bs) / np.log(10)))
+            rbs = np.round(bs, -int(np.log10(bs)))
             if rbs < bs:
                 rbs *= 2
             return rbs

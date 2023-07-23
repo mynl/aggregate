@@ -34,21 +34,24 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 % {\it italics stuff} \\
 
-\texttt{name} {\it expl} \\
-\texttt{sev\_name} {\it expl} \\
-\texttt{sev\_a} {\it expl} \\
-\texttt{sev\_b} {\it expl} \\
-\texttt{sev\_mean} {\it expl} \\
-\texttt{sev\_cv} {\it expl} \\
-\texttt{sev\_loc} {\it expl} \\
-\texttt{sev\_scale} {\it expl} \\
-\texttt{sev\_xs} {\it expl} \\
-\texttt{sev\_ps} {\it expl} \\
-\texttt{sev\_wt} {\it expl} \\
-\texttt{sev\_lb} {\it expl} \\
-\texttt{sev\_ub} {\it expl} \\
-\texttt{sev\_conditional} {\it expl} \\
+\texttt{name} {\it name for object } \\
+\texttt{sev\_name} {\it scipy distribution name, or  } \texttt{(c|d)histogram} \\
+\texttt{exp\_attachment} {\it gross loss attachment or} \texttt{None} \\
+\texttt{exp\_limit} {\it gross loss limit }
+\texttt{sev\_a} {\it shape parameter 1} \\
+\texttt{sev\_b} {\it shape parameter 2} \\
+\texttt{sev\_mean} {\it ground-up loss mean} \\
+\texttt{sev\_cv} {\it ground-up loss CV} \\
+\texttt{sev\_loc} {\it location (shift)} \\
+\texttt{sev\_scale} {\it scale factor } \\
+\texttt{sev\_xs} {\it vector of outcomes} \\
+\texttt{sev\_ps} {\it vector of probabilities; missing for equal likelihood} \\
+\texttt{sev\_wt} {\it ignored, mixing handled by } \texttt{Aggregate} \\
+\texttt{sev\_lb} {\it lower bound for conditional range} \\
+\texttt{sev\_ub} {\it upper bound} \\
+\texttt{sev\_conditional} {\it gross losses conditional on attaching layer (default) or unconditional} \\
 
+\it Specify the ground-up loss, optionally converted to gross loss by the limit clause.
 
 
     \end{minipage}

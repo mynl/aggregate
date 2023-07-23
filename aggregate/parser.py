@@ -739,7 +739,7 @@ class UnderwritingParser(Parser):
     @_('"[" expr RANGE expr RANGE expr "]"')
     def doutcomes(self, p):
         self.logger('doutcomes <-- [expr : expr : expr]', p)
-        return np.arange(p[1], p[3] + 1, p[5])
+        return np.arange(p[1], p[3] + 0.5 * p[5], p[5])
 
     # see note above doutcomes
     @_('"[" numberl "]"')

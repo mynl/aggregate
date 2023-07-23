@@ -15,6 +15,7 @@ The Pollaczeck-Khinchine Formula
 * :ref:`pz hr`
 * :ref:`pz intro`
 * :ref:`pz fft`
+* :ref:`pz actuar`
 * :ref:`pz using`
 * :ref:`pz scale`
 
@@ -170,10 +171,62 @@ margin is very small because the claim count is very large.
 integrated distribution :math:`F_I` and convolve it with a geometric
 frequency.
 
+.. _pz actuar:
+
+Using The Pollaczeck-Khinchine Formula I
+----------------------------------------
+
+This section reproduces two examples from the `risk vignette <https://cran.r-project.org/web/packages/actuar/vignettes/risk.pdf>`_ for the ``actuar`` package.
+
+The first is based on a mean 10 Poisson compound with shape 2 gamma severity. The vignette uses matched-moments discretization and so our numbers do not exactly match, but they are very close. We build the compound, compute some quantiles and tvars, display the density (compare p.\ 8-10). Then using a premium loading of 20% using the expected value premium (p.\ 12), we reproduce the probabilities in Figure 5. Our computation is exact vs. using an approximation.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build, qd
+    import matplotlib.pyplot as plt
+
+    a = build('agg Actuar 10 claims sev gamma 2 poisson'
+            , bs=0.5, log2=8)
+    qd(a)
+    ps = [0.25, .5, .75, .9, .95, .975, .99, .995, .999, 1-1e-14]
+    qd(pd.DataFrame({'p': ps, 'q': a.q(ps)}), float_format=lambda x: f'{x:10.3f}' if x < 1 else f'{x:10.1f}')
+    fig, axs = plt.subplots(1, 3, figsize=(3 * 3.5, 2.45), constrained_layout=True)
+    ax, ax0, ax1 = axs.flat
+    a.density_df.F.plot(ax=ax, xlim=[0, 60], title='Po-Gamma distribution function');
+    qd(a.density_df.p_total.head(20).reset_index(drop=False), float_format=lambda x: f'   {x:<12.5g}' if 0 < x < .1 else f'{x:10.1f}')
+    qd(a.tvar([.9, .95, .99]))
+    ruins, find_us, mean, dfi  = a.cramer_lundberg(.2)
+    ax0.plot(np.cumsum(dfi), label='integrated')
+    ax0.plot(a.density_df.p_sev.cumsum(), label='severity')
+    ax0.set(xlim=[0, 40], title='Severity and integrated severity distributions')
+    ax0.legend(loc='lower right')
+    @savefig pz-actuar.png scale=20
+    ruins.plot(ax=ax1, xlim=[0, 50],
+              title='Probability of eventual ruin against starting surplus',
+              ylabel='Probability', xlabel='Starting surplus');
+
+
+The second uses a Pareto severity, where the integrated distribution can be computed exactly. The following code produces the exact values for the probability of eventual default against starting surplus. All the values fall in the range between lower and upper shown on p.\ 19.
+
+.. ipython:: python
+    :okwarning:
+
+    a = build('agg Actuar2 1 claim sev 4 * pareto 5 - 4 fixed')
+    qd(a)
+    ruins, find_us, mean, dfi  = a.cramer_lundberg(.2)
+    ruins.name = 'Prob'
+    bit = ruins.loc[np.arange(0, 51, 5)].to_frame()
+    bit.index = bit.index.astype(int)
+    bit.index.name = 'Initial surplus'
+    qd(bit, ff=lambda x: f'{x:.5f}')
+
+The actual work, to get the answer as opposed to formatting the result, is only two lines of code in Aggregate (the first and third) vs. 8 in actuar R.
+
 .. _pz using:
 
-Using The Pollaczeck-Khinchine Formula
-----------------------------------------
+Using The Pollaczeck-Khinchine Formula II
+--------------------------------------------
 
 This section illustrates the theory using a lognormal severity with a mean of 50,000
 and a CV of 10 (:math:`\sigma=2.15`) corresponding to a moderately risky
@@ -189,7 +242,6 @@ Set up the portfolio.
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build, qd
     port = build('port PZTest '
                      'agg Limit1  '
                         '0.1 claims '

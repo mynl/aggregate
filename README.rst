@@ -19,25 +19,9 @@ and is implemented in Python under an open source BSD-license.
 White Paper (new July 2023)
 ----------------------------
 
-The `White Paper <cheat-sheets/Aggregate_white_paper.pdf>`_ describes
-the purpose, implementation, and use of the :class:`Aggregate` class
-within the ``aggregate`` package. :class:`Aggregate` handles the
-creation and manipulation of compound frequency-severity distributions.
-
-Cheat Sheets (new July 2023)
------------------------------
-
-There are a series of one-page cheat sheets for the major classes describing
-all the methods and attributes. They provide a structured summary of
-the capabilities of each object. They are available in the ``cheat-sheets``
-directory. PDF versions are available here:
-
-* `Aggregate <cheat-sheets/Aggregate_Cheat_Sheet.pdf>`_
-* `Portfolio <cheat-sheets/Portfolio_Cheat_Sheet.pdf>`_
-* `Distributions <cheat-sheets/DecL_Cheat_Sheet.pdf>`_
-* `Distributions <cheat-sheets/Distortion_Cheat_Sheet.pdf>`_
-* `Underwriter <cheat-sheets/Underwriter_Cheat_Sheet.pdf>`_
-* `Severity <cheat-sheets/Severity_Cheat_Sheet.pdf>`_
+The `White Paper <https://github.com/mynl/aggregate/blob/master/cheat-sheets/Aggregate_white_paper.pdf>`_ describes
+the purpose, implementation, and use of the class ``aggregate.Aggregate`` that
+handles the creation and manipulation of compound frequency-severity distributions.
 
 Documentation
 -------------

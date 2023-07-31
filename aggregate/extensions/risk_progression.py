@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from collections import namedtuple
 from aggregate import make_mosaic_figure
-
+from IPython.display import display
 
 def ff(n):
     s = f'{{x:.{n}f}}'
@@ -55,10 +55,11 @@ def plot_comparison(self, projections, axs, smooth):
     :param axs: list of axes
     :param smooth: smoothing factor for densities
     """
-    lw = 2
-    for unit, proj, axd, ax, axr, lc in \
+    lw = 1/2
+    marker = 'x'
+    for unit, proj, axd, ax, axr, lc, lc2 in \
         zip(self.unit_names, projections.values(), axs.flat[::3],
-            axs.flat[1::3], axs.flat[2::3], ['C1', 'C2']):
+            axs.flat[1::3], axs.flat[2::3], ['C1', 'C2'], ['C3', 'C4']):
 
         # figure the mean
         mn = np.sum(proj.p_total * proj.index)
@@ -73,7 +74,7 @@ def plot_comparison(self, projections, axs, smooth):
         p = p.groupby(level=0).sum()
         p.iloc[:-1] = p.iloc[:-1] / np.diff(p.index) * mn
         p.index = p.index / mn
-        p.plot(ax=axd, c=lc, ls='--', label='Projection of ' + unit)
+        p.plot(ax=axd, marker=marker, ms=2, ls='none', c=lc2, label='Projection of ' + unit)
 
         # original density
         p = self[unit].density_df.p_total.copy()
@@ -96,9 +97,9 @@ def plot_comparison(self, projections, axs, smooth):
 
         # plot normalized distributions on linear and return period scale
         ax.plot(self.density_df[f'p_{unit}'].cumsum(),
-                self.density_df.loss / self[unit].est_m, c=lc, lw=lw/2, label=unit)
+                self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, label=unit)
         ax.plot(proj.F, np.array(proj.index) / mn,
-                c=lc, ls='--', lw=lw, label='Projection')
+                c=lc2, lw=lw, label='Projection')
         ax.plot(self.density_df['F'], self.density_df.loss /
                 self.est_m, c='C0', lw=lw, label='total')
         ax.set(ylim=[0, 5], xlabel='probability', ylabel='normalized loss')
@@ -106,10 +107,10 @@ def plot_comparison(self, projections, axs, smooth):
         ax.legend(loc='upper left')
 
         axr.plot(1 / (1 - self.density_df[f'p_{unit}'].cumsum()),
-                 self.density_df.loss / self[unit].est_m, c=lc, lw=lw/2, label=unit)
+                 self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, label=unit)
         proj = proj.query('F > 1e-11 and S > 1e-11')
         axr.plot(1 / proj.S, np.array(proj.index) / mn,
-                 c=lc, ls='--', lw=lw, label='Projection')
+                 c=lc2, lw=lw, label='Projection')
         axr.plot(1 / self.density_df['S'], self.density_df.loss /
                  self.est_m, c='C0', lw=lw, label='total')
         axr.set(xlim=[1, 1e4], ylim=1e-1, xscale='log', yscale='log',
@@ -251,7 +252,10 @@ def price_compare(self, dn, projection_dists, ud_dists):
     na_price.columns = ['el', 'ask']
     # if this is nan it gets dropped from stack?!
     na_price['bid'] = lna_priceb.df['P']
-    na_price = na_price.stack(dropna=False).to_frame()
+    # display(na_price)
+    # ? change in output of price is adding a level, drop it
+    na_price = na_price.stack(dropna=False).to_frame().droplevel(0, axis=0)
+    # display(na_price)
     # beware : order matters here
     na_price.loc[('sum', 'el'), :] = 0.0
     na_price.loc[('sum', 'ask'), :] = 0.0

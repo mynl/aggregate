@@ -47,13 +47,14 @@ Installation
 Version History
 -----------------
 
-0.20.1
-~~~~~~~~
+0.20.1 (July-2023 branch)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Bug fix in parser interpretation of arrays with step size
 * Added figures for AAS paper to extensions.ft and extensions.figures
 * Validation "not unreasonable" flag set to 0
-* Added Aggregate_white_paper.pdf
+* Added aggregate_white_paper.pdf
+* Colors in risk_progression
 
 0.20.0
 ~~~~~~~

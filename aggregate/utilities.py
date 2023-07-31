@@ -1918,7 +1918,7 @@ def make_mosaic_figure(mosaic, figsize=None, w=FIG_W, h=FIG_H, xfmt='great', yfm
         return f, axd
 
 
-def knobble_fonts():
+def knobble_fonts(color=False):
     """
     Not sure we should get into this...
 
@@ -1936,6 +1936,9 @@ def knobble_fonts():
 
     """
 
+    # reset everything
+    plt.rcdefaults()
+
     # this sets a much smaller base fontsize
     # everything scales off font size
     plt.rcParams['font.size'] = FONT_SIZE
@@ -1943,13 +1946,28 @@ def knobble_fonts():
     # mpl default is medium
     plt.rcParams['legend.fontsize'] = LEGEND_FONT
 
-    # graphics set up
-    plt.rcParams["axes.facecolor"] = PLOT_FACE_COLOR
-    # note plt.rc lets you set multiple related properties at once:
-    plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
-    plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
-
-    plot_colormap_name = 'cividis'
+    # color set up
+    if color:
+        plt.rcParams["axes.facecolor"] = PLOT_FACE_COLOR
+        # note plt.rc lets you set multiple related properties at once:
+        plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
+        plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
+    else:
+        # graphics defaults - better res graphics
+        plt.rcParams['figure.dpi'] = 300
+        plt.rc('legend', fc="white", ec="white")
+        default_colors = [(0,0,0)]
+        default_ls = ['solid', 'dashed', 'dotted', 'dashdot']
+        props = []
+        cc = [i[1] for i in product(default_ls, default_colors)]
+        lsc = [i[0] for i in product(default_ls, default_colors)]
+        props.append(cycler('color', cc))
+        props.append(cycler('linestyle', lsc))
+        # combine all cyclers
+        cprops = props[0]
+        for c in props[1:]:
+            cprops += c
+        mpl.rcParams['axes.prop_cycle'] = cycler(cprops)
 
     # fonts: add some better fonts as earlier defaults
     mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif']

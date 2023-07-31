@@ -46,7 +46,7 @@ def poisson_example(en, small2):
     ax1.yaxis.set_minor_locator(ticker.LogLocator(subs='all'))
 
 
-def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
+def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0, cmap='plasma'):
     """
     Illustrate wrapping by convolving a uniform distribution with mean ez
     en times (if ``ez>0`` or ``sev_clause!=''``) or using the input ``sev_clause``.
@@ -115,7 +115,7 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0):
     ax0.set(ylim=lm)
 
     norm = mpl.colors.Normalize(0, 1, clip=True)
-    cmappable = mpl.cm.ScalarMappable(norm=norm, cmap='plasma')
+    cmappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     mapper = cmappable.to_rgba
     cc = list(map(mapper, np.linspace(0, 1, 1 << big2-small2)))
     ax1.plot(full, label='Full computation', c='w', alpha=1, lw=3, drawstyle=ds)

@@ -96,23 +96,24 @@ def plot_comparison(self, projections, axs, smooth):
         axd.legend(loc='upper right').set(title='NORMALIZED losses')
 
         # plot normalized distributions on linear and return period scale
+        ds = 'steps-pre'
         ax.plot(self.density_df[f'p_{unit}'].cumsum(),
-                self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, label=unit)
+                self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, drawstyle=ds, label=unit)
         ax.plot(proj.F, np.array(proj.index) / mn,
-                c=lc2, lw=lw, label='Projection')
+                c=lc2, lw=lw, drawstyle=ds, label='Projection')
         ax.plot(self.density_df['F'], self.density_df.loss /
-                self.est_m, c='C0', lw=lw, label='total')
+                self.est_m, c='C0', lw=lw, drawstyle=ds, label='total')
         ax.set(ylim=[0, 5], xlabel='probability', ylabel='normalized loss')
         ax.axhline(1, lw=.5, ls='--', c='C7')
         ax.legend(loc='upper left')
 
         axr.plot(1 / (1 - self.density_df[f'p_{unit}'].cumsum()),
-                 self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, label=unit)
+                 self.density_df.loss / self[unit].est_m, c=lc, lw=lw*2, drawstyle=ds, label=unit)
         proj = proj.query('F > 1e-11 and S > 1e-11')
         axr.plot(1 / proj.S, np.array(proj.index) / mn,
-                 c=lc2, lw=lw, label='Projection')
+                 c=lc2, lw=lw, drawstyle=ds, label='Projection')
         axr.plot(1 / self.density_df['S'], self.density_df.loss /
-                 self.est_m, c='C0', lw=lw, label='total')
+                 self.est_m, c='C0', lw=lw, drawstyle=ds, label='total')
         axr.set(xlim=[1, 1e4], ylim=1e-1, xscale='log', yscale='log',
                 xlabel='log return period', ylabel='log normalized loss')
         axr.axhline(1, lw=.5, ls='--', c='C7')
@@ -161,18 +162,22 @@ def up_down_distributions(self):
     down_functions = {}
     up_distributions = {}
     down_distributions = {}
+    # avoid extraneous up and down on impossible values
+    bit = self.density_df
+    bit0 = self.density_df.query('p_total > 0 or loss==0')
+    bit0 = bit0.reindex(bit.index, method='pad')
     for unit in self.unit_names:
-        u, d, c = make_up_down(self.density_df[f'exeqa_{unit}'])
+        u, d, c = make_up_down(bit0[f'exeqa_{unit}'])
         up_functions[unit] = u
         down_functions[unit] = d
 
         u = u.to_frame()
-        u['p_total'] = self.density_df.p_total
+        u['p_total'] = bit.p_total
         du, _ = make_distribution(u)
         up_distributions[unit] = du
 
         d = d.to_frame()
-        d['p_total'] = self.density_df.p_total
+        d['p_total'] = bit.p_total
         dd, _ = make_distribution(d)
         down_distributions[unit] = dd
 
@@ -190,21 +195,22 @@ def plot_up_down(self, udd, axs):
     udd = UDD named tuple (above)
     """
 
-    for unit, ax in zip(self.unit_names, axs.flat):
-        ax = self.density_df[f'exeqa_{unit}'].plot(ax=ax, lw=4, c='C7')
-        udd.up_functions[unit].plot(ax=ax)
-        udd.down_functions[unit].plot(ax=ax)
+    # left and middle plots
+    for unit, ax, recreated_c in zip(self.unit_names, axs.flat, ['C0', 'C1']):
+        ax = self.density_df[f'exeqa_{unit}'].plot(ax=ax, lw=.5, c='C7', drawstyle='steps-mid')
         (udd.up_functions[unit] - udd.down_functions[unit]
-         ).plot(ax=ax, lw=1.5, ls=':', c='C2', label='recreated')
+         ).plot(ax=ax, lw=1.5, ls='-', c=recreated_c, label='recreated', drawstyle='steps-post')
+        udd.up_functions[unit].plot(ax=ax,   c='C3', drawstyle='steps-post', lw=1, ls='--')
+        udd.down_functions[unit].plot(ax=ax, c='C5', drawstyle='steps-post', lw=1, ls='-.')
         ax.legend()
         ax.set(xlabel='loss', ylabel='up or down function')
 
-    # plot ud distributions
+    # plot ud distributions (right hand plot)
     ax = axs.flat[-1]
     for (k, v), c in zip(udd.up_distributions.items(), ['C0', 'C1']):
-        v.cumsum().plot(c=c, ax=ax, label=f'Up {k}')
+        v.cumsum().plot(c=c, ax=ax, label=f'Up {k}', drawstyle='steps-post')
     for (k, v), c in zip(udd.down_distributions.items(), ['C0', 'C1']):
-        v.cumsum().plot(c=c, ls=':', ax=ax, label=f'Down {k}')
+        v.cumsum().plot(c=c, ls=':', ax=ax, label=f'Down {k}', drawstyle='steps-post')
     ax.legend(loc='lower right')
     ax.set(xlabel='loss', ylabel='cumulative probability')
 
@@ -296,16 +302,12 @@ def price_compare(self, dn, projection_dists, ud_dists):
     return compare
 
 
-def full_monty(self, dn, truncate=True, smooth=16):
+def full_monty(self, dn, truncate=True, smooth=16, plot=True):
     """
     One-stop shop for a Portfolio self
     Unlimited assets
     Prints all on one giant figure
     """
-
-    # figure for all plots
-    fig, axs = plt.subplots(4, 3, figsize=(
-        3 * 3.5, 4 * 2.45), constrained_layout=True)
 
     # in the known bounded case we can truncate
     regex = ''.join([i[0] for i in self.line_names_ex])
@@ -313,27 +315,32 @@ def full_monty(self, dn, truncate=True, smooth=16):
         self.density_df = self.density_df.loc[:self.density_df.F.idxmax()]
         self._linear_quantile_function = None
 
-    # density and exa plots
-    axd = {'A': axs[0, 0], 'B': axs[0, 1], 'C': axs[0, 2]}
-    self.plot(axd=axd)
-    self.density_df.filter(regex=f'exeqa_[{regex}]').plot(ax=axd['C'])
-    axd['C'].set(xlabel='loss', ylabel='Conditional expectation')
-
     # projection distributions
     projection_dists, sum_probs = make_projection_distributions(self)
     if not np.allclose(list(sum_probs.values()), 1):
         print(sum_probs)
 
-    # impact of projections on distributions
-    axs1 = axs[1:3, :]
-    plot_comparison(self, projection_dists, axs1, smooth)
-
     # up and down decomp
     ud_dists = up_down_distributions(self)
 
-    # plot UD
-    axs1 = axs[3, :]
-    plot_up_down(self, ud_dists, axs1)
+    if plot:
+        # figure for all plots
+        fig, axs = plt.subplots(4, 3, figsize=(
+            3 * 3.5, 4 * 2.45), constrained_layout=True)
+
+        # density and exa plots
+        axd = {'A': axs[0, 0], 'B': axs[0, 1], 'C': axs[0, 2]}
+        self.plot(axd=axd)
+        self.density_df.filter(regex=f'exeqa_[{regex}]').plot(ax=axd['C'])
+        axd['C'].set(xlabel='loss', ylabel='Conditional expectation')
+
+        # impact of projections on distributions
+        axs1 = axs[1:3, :]
+        plot_comparison(self, projection_dists, axs1, smooth)
+
+        # plot UD
+        axs1 = axs[3, :]
+        plot_up_down(self, ud_dists, axs1)
 
     compare = price_compare(self, dn, projection_dists, ud_dists)
     compare['umd'] = compare['up'] - compare['down']
@@ -341,3 +348,4 @@ def full_monty(self, dn, truncate=True, smooth=16):
     RiskProgression = namedtuple('RiskProgression', ['compare_df', 'projection_dists', 'ud_dists'])
     ans = RiskProgression(compare, projection_dists, ud_dists)
     return ans
+

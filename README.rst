@@ -47,8 +47,14 @@ Installation
 Version History
 -----------------
 
-0.20.1 (July-2023 branch)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+0.20.2
+~~~~~~~~~
+
+* risk progression logic adjusted to exclude values with zero probability; graphs
+  updated to use step drawstyle.
+
+0.20.1
+~~~~~~~
 
 * Bug fix in parser interpretation of arrays with step size
 * Added figures for AAS paper to extensions.ft and extensions.figures

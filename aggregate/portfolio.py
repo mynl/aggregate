@@ -653,8 +653,8 @@ class Portfolio(object):
             empex = np.nan
             isupdated = False
         else:
-            ex = self.audit_df.loc['total' 'Mean']
-            empex = self.audit_df.loc['total' 'EmpMean']
+            ex = self.audit_df.loc['total', 'Mean']
+            empex = self.audit_df.loc['total', 'EmpMean']
             isupdated = True
 
         s = [f'Portfolio object         {self.name:s}',
@@ -3584,7 +3584,7 @@ class Portfolio(object):
         :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
 
-        warnings.warn('In 0.13.0 the default allocation will become linear not lifted.', DeprecationWarning)
+        # warnings.warn('In 0.13.0 the default allocation will become linear not lifted.', DeprecationWarning)
 
         assert allocation in ('lifted', 'linear'), "allocation must be 'lifted' or 'linear'"
         PricingResult = namedtuple('PricingResult', ['df', 'price', 'price_dict', 'a_reg', 'reg_p'])
@@ -3630,7 +3630,7 @@ class Portfolio(object):
                 df['a'] = df.P + df.Q
                 df['LR'] = df.L / df.P
                 df['PQ'] = df.P / df.Q
-                df['ROE'] = df.M / df.Q
+                df['COC'] = df.M / df.Q
                 price[k] = last_price = df.loc['total', 'P']
                 dfs[k] = df.sort_index()
 
@@ -3641,7 +3641,8 @@ class Portfolio(object):
         elif allocation == 'linear':
             # code mirrors pricing_bounds
             # slice for extracting
-            sle = slice(self.bs, a_reg)
+            # sle = slice(self.bs, a_reg)
+            sle = slice(0, a_reg)
             S = self.density_df.loc[sle, ['S']].copy()
             loss = self.density_df.loc[sle, ['loss']]
             # deal losses for allocations
@@ -3664,45 +3665,53 @@ class Portfolio(object):
                 gps = pd.DataFrame(-np.diff(gS, prepend=1, axis=0), index=S.index)
 
                 if self.sf(a_reg) > (1 - self.density_df.p_total.sum()):
+                    print('Adjusting tail losses, but skipping\n'
+                          f'Triggering sf(areg) > 1 - p_total: {self.sf(a_reg):.5g} code ')
+                    # logger.info(f'Triggering sf(areg) > 1 - p_total: {1-self.sf(a_reg):.5g} code ')
                     # NOTE: this adjustment requires the whole tail; it has been computed in
                     # density_df. However, when you come to risk adjusted version it hasn't
                     # been computed. That's why the code above falls back to apply distortion.
                     # see notes below in slow method
+                    if 1:
+                        # painful issue here with the naming leading to
+                        rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
+                        # this regex does not capture the sum column if present
+                        exeqa.loc[a_reg, :] = self.density_df.filter(regex='exi_xgta_.+$(?<!exi_xgta_sum)').\
+                                                rename(columns=rner).loc[a_reg - self.bs] * a_reg
+                        # there is no exi_xgta_total, so that comes out as missing
+                        # need to fill in value
+                        if np.isnan(exeqa.loc[a_reg, 'exeqa_total']):
+                            exeqa.loc[a_reg, 'exeqa_total'] = exeqa.loc[a_reg].fillna(0).sum()
+                        # the lifted/natural difference is that here scenarios in the tail are not re-
+                        # weighted using risk adjusted probabilities. They are collapsed with objective
+                        # probs.
 
-                    # print('Adjusting tail losses')
-                    # painful issue here with the naming leading to
-                    rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
-                    # this regex does not capture the sum column if present
-                    exeqa.loc[a_reg, :] = self.density_df.filter(regex='exi_xgta_.+$(?<!exi_xgta_sum)').\
-                    rename(columns=rner).loc[a_reg - self.bs] * a_reg
-                    # the lifted/natural difference is that here scenarios in the tail are not re-
-                    # weighted using risk adjusted probabilities. They are collapsed with objective
-                    # probs.
-
-                # these are at the layer level
+                # these are at the layer level, these compute Eq 14.20 p. 372
+                # note that by construction S(a) = 0 so there is no extra mass at the end
                 exp_loss =   ((ps.to_numpy() * self.bs) / loss.to_numpy() * exeqa )[::-1].cumsum()[::-1]
                 alloc_prem = ((gps.to_numpy() * self.bs) / loss.to_numpy() * exeqa)[::-1].cumsum()[::-1]
                 margin = alloc_prem - exp_loss
 
                 # deal with last row KLUDGE, s=0, coc = gs-s/(1-gs)=0
                 # think about what this should be... poss shift?
-
+                # reciprocal cost of capital = capital / margin = 1 - gS / (gS - S)
                 rcoc = (1 - gS) / (gS - S)
-                # this can have quirkiness on the left
-                left = self.q(1e-6)
-                if left > 0:
-                    rcoc.loc[:left, 'S'] = rcoc.loc[left, 'S']
-                    # left = self.bs # this is a kludge
+                # compute 1/roe at s=1
                 gprime = v.g_prime(1)
                 fv = gprime / (1 - gprime)
+                # print(f'computed s=1 capital factor={fv}')
                 # if gS-S=0 then gS=S=1 is possible (certain small losses); then fully loss funded, no equity, hence:
                 rcoc = rcoc.fillna(fv).shift(1, fill_value=fv)
                 # at S=0 also have gS-S=0, could have infinite
                 capital = margin * rcoc.values
+                # from IPython.display import display as d2
+                # d2(pd.concat((S, gS, rcoc, self.density_df.filter(regex='exi_xgta_').loc[sle], margin, capital), axis=1,
+                #              keys=['S', 'gS', 'rcoc', 'alpha', 'margin', 'capital']))
 
-                exp_loss_sum = exp_loss.sum()
-                alloc_prem_sum = alloc_prem.sum()
-                capital_sum = capital.sum()
+                # these are integrals of alpha S and beta gS
+                exp_loss_sum = exp_loss.replace([np.inf, -np.inf, np.nan], 0).sum()
+                alloc_prem_sum = alloc_prem.replace([np.inf, -np.inf, np.nan], 0).sum()
+                capital_sum = capital.replace([np.inf, -np.inf, np.nan], 0).sum()
 
                 df = pd.concat((exp_loss_sum, alloc_prem_sum, capital_sum), axis=1, keys=['L', 'P', 'Q']) . \
                         rename(index=lambda x: x.replace('exeqa_', '')). \

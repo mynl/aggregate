@@ -43,8 +43,7 @@ import numpy as np
 from numpy import exp
 from pathlib import Path
 import re
-from sly import Lexer, Parser
-import sly
+from . sly import Lexer, Parser
 
 logger = logging.getLogger(__name__)
 

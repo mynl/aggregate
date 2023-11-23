@@ -47,6 +47,27 @@ Installation
 Version History
 -----------------
 
+0.21.2
+~~~~~~~~
+
+* Misc documentation updates.
+* Experimental magic functions, allowing, eg. %agg [spec] to create an aggregate object (one-liner).
+* 0.21.1 yanked from pypi due to error in pyproject.toml.
+
+0.21.0
+~~~~~~~~~
+
+* Moved ``sly`` into the project for better control.  ``sly`` is a Python implementation of lex and yacc parsing tools.
+  It is written by Dave Beazley. Per the sly repo on github:
+
+  The SLY project is no longer making package-installable releases. It's fully functional, but if choose to use it,
+  you should vendor the code into your application. SLY has zero-dependencies. Although I am semi-retiring the project,
+  I will respond to bug reports and still may decide to make future changes to it depending on my mood.
+  I'd like to thank everyone who has contributed to it over the years. --Dave
+
+* Experimenting with a line/cell DecL magic interpreter in Jupyter Lab to obviate the
+  need for ``build``.
+
 0.20.2
 ~~~~~~~~~
 

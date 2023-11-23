@@ -28,6 +28,8 @@ from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *
 from .decl_pygments import *
+from .sly import *
+from .agg_magics import *
 
 import sys
 
@@ -47,7 +49,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
-__version__ = "0.20.2"
+__version__ = "0.21.2"
 
 
 

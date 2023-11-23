@@ -476,13 +476,16 @@ the answer.
         pricer[f'{nm}_gS'] = dist.g(pricer.S)
         pricer[f'{nm}_exag'] = pricer[f'{nm}_gS'].shift(1, fill_value=0).cumsum() * abcd.bs
         pricer = pricer.sort_index()
-    pricer = pricer.loc[[a_stoploss]]; \
-    pricer.columns = pricer.columns.str.split('_', expand=True); \
-    comp = pricer.stack(0).droplevel(0,0); \
-    comp.loc['Technical'] = [net_el_stoploss, tech_prem - 1.98, np.nan]; \
-    comp['stoploss_value'] = tech_prem - comp.exag; \
-    comp = comp.sort_values('stoploss_value', ascending=False); \
-    qd(comp)
+    try:
+        pricer = pricer.loc[[a_stoploss]]; \
+        pricer.columns = pricer.columns.str.split('_', expand=True); \
+        comp = pricer.stack(0).droplevel(0,0); \
+        comp.loc['Technical'] = [net_el_stoploss, tech_prem - 1.98, np.nan]; \
+        comp['stoploss_value'] = tech_prem - comp.exag; \
+        comp = comp.sort_values('stoploss_value', ascending=False); \
+        qd(comp)
+    except:
+        print('Unspecfied error: TODO investigate.')
 
 The output table reveals that the stop loss value is greater than its market
 price for the CCoC, PH, and Wang distortions, but less for the dual and TVaR.

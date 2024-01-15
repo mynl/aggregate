@@ -9,7 +9,7 @@ from matplotlib import ticker
 import matplotlib as mpl
 from .. import build, qd
 from .. constants import FIG_H, FIG_W, PLOT_FACE_COLOR
-from .. spectral import Distortion
+from .. spectral import Distortion, tvar_weights
 
 
 def adjusting_layer_losses():
@@ -367,3 +367,151 @@ def gh_example(en):
     df.index = [f'{x: 6.0f}' for x in df.index]
     df.index.name = 'x'
     qd(df.iloc[:, [1,0,2,3,4, 5]], ff=lambda x: f'{x:11.3e}')
+
+
+def g_insurance_statistics(axi, dist, c='C0', ls='-', lw=1, diag=False, grid=False):
+    """
+    Six part plot with EL, premium, loss ratio, profit, layer ROE and P:S for g
+    axi = axis iterator with 6 axes
+    dist = distortion
+    Used to create PIR Figs 11.6 and 11.7
+    """
+    g = dist.g
+    N = 1000
+    ps = np.linspace(1 / (2 * N), 1, N, endpoint=False)
+    gs = g(ps)
+
+    dn = dist.name
+
+    # FIG: six panel display
+    for i, ys, key in zip(range(1, 7),
+                          [gs, ps / gs, gs / ps, gs - ps, (gs - ps) / (1 - ps), gs / (1 - gs)],
+                          ['Premium', 'Loss Ratio', 'Markup',
+                           'Margin', 'Discount Rate', 'Premium Leverage']):
+        a = next(axi)
+        if i == 1:
+            a.plot(ps, ys, ls=ls, c=c, lw=lw, label=dn)
+        else:
+            a.plot(ps, ys, ls=ls, lw=lw, c=c)
+        if i in [1] and diag:
+            a.plot(ps, ps, color='k', linewidth=0.25)
+        a.set(title=key)
+        if i == 3 or i == 6:
+            a.axis([0, 1, 0, 5])
+            a.set(aspect=1 / 5)
+        elif i == 5:
+            # discount
+            a.axis([0, 1, 0, .5])
+            a.set(aspect=1 / .5)
+        else:
+            a.axis([0, 1, 0, 1])
+            a.set(aspect=1)
+        if i == 1:
+            a.legend(loc='lower right')
+        if grid:
+            a.grid(lw=0.25)
+
+
+def g_risk_appetite(axi, dist, c='C0', ls='-', N=1000, lw=1, grid=False, xlabel=True, title=True, add_tvar=False):
+    """
+    Plot to illustrate the risk appetite associated with a distortion g.
+    Derived from ``g_insurance_statistics``.
+    Plots premium, loss ratio, margin, return (easier to understand than discount),
+    VaR wts and optionally TVaR wts
+    axi = axis iterator with 6 axes
+    dist = distortion
+    Used to create PIR Figs 11.6 and 11.7
+    """
+    g = dist.g
+    ps = np.linspace(1 / (2 * N), 1, N, endpoint=False)
+    gs = g(ps)
+
+    # var weight
+    gp = dist.g_prime(ps)
+
+    # tvar weight
+    wt_fun = tvar_weights(dist)
+    ps01 = np.linspace(0, 1, N+1)
+    tvar = wt_fun(ps01)
+
+    # labels etc.
+    dn = dist.name.replace(' ', '\n').replace('aCC', 'CC')
+    isccoc = dist.name.lower().find('ccoc') >= 0
+    istvar = dist.name.lower().find('tvar') >= 0
+
+    for i, ys, key in zip(range(6),
+                          [gs,
+                           ps / gs,
+                           gs - ps,
+                           (gs - ps) / (1 - gs),
+                           gp,
+                           tvar],
+                          ['Premium',
+                           'Loss ratio',
+                           'Margin',
+                           'Return on capital',
+                           'VaR weight',
+                           'TVaR p weight']):
+        if i == 5 and not add_tvar:
+            # skip tvar weights
+            continue
+        a = next(axi)
+        if key == 'VaR weight' and istvar:
+            ds = 'steps-post'
+        elif key == 'TVaR p weight' and (istvar or isccoc):
+            ds = 'steps-mid'
+        else:
+            ds = 'default'
+        kwargs = {'ls': ls, 'c': c, 'lw': lw, 'ds': ds}
+        if i == 0:
+            a.plot(ps, ys, label=dn, **kwargs)
+            a.legend(loc='lower right', fontsize=10)
+        elif i < 5:
+            a.plot(ps, ys, **kwargs)
+        else:
+            a.plot(ps01, ys, **kwargs)
+        if title:
+            a.set(title=key)
+        if i in (1, 3, 4):
+            mn, mx = a.get_ylim()
+            mx = max(1.025, min(5, mx * 1.1))
+            # a.set_ylim(0)
+            a.axis([-0.025, 1.025, -0.025, mx])
+            a.set(aspect=1 / mx)
+        elif i == 2:
+            a.axis([-0.025, 1.025, -0.025, .525])
+            a.set(aspect=2)
+        elif i in (0,1):
+            a.axis([-0.025, 1.025, -0.025, 1.025])
+            a.set(aspect='equal')
+        elif i == 5:
+            pass
+        else:
+            a.axis([-0.025, 1.025, -0.025, 1.025])
+            a.set(aspect=1)
+        if isccoc:
+            if key == 'Premium':
+                # add zero point
+                a.plot(0, 0, 'o', c=c)
+            if key == 'VaR weight':
+                # add var mass
+                mx = 2.2
+                line, = a.plot(0, mx, '*', c=c)  # Point above the plot area
+                # Allow plotting outside of the plot area
+                line.set_clip_on(False)
+            if key == 'Return on capital':
+                # add var mass
+                mx = a.get_ylim()[1] * 1.1
+                line, = a.plot(0, mx, '*', c=c)  # Point above the plot area
+                # Allow plotting outside of the plot area
+                line.set_clip_on(False)
+        if grid:
+            a.grid(lw=0.25)
+        if xlabel:
+            if i == 0:
+                a.set(xlabel='Exceedance probability\n(large losses on left)')
+            elif i == 5:
+                a.set(xlabel='p value\n(mean on left, max on right)')
+            else:
+                a.set(xlabel='Exceedance probability')
+    # print(np.sum(gp))

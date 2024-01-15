@@ -60,8 +60,8 @@ class Bounds(object):
         # hack for beta distribution, you want to force 1 to be in tvar ps, but Fp = 1
         # TODO figure out why p_star grinds to a halt if you input b < inf
         self.add_one = True
-        logger.warning('Deprecatation warning. The kind argument is now ignored. Functionality '
-                       'is equivalent to kind="tail", which was the most accurate method.')
+        # logger.warning('Deprecatation warning. The kind argument is now ignored. Functionality '
+        #                'is equivalent to kind="tail", which was the most accurate method.')
 
     def __repr__(self):
         """

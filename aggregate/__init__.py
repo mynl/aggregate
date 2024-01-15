@@ -20,7 +20,7 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
                         make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
                         more, parse_note, parse_note_ex, introspect, explain_validation)
-from .spectral import Distortion, approx_ccoc
+from .spectral import Distortion, approx_ccoc, tvar_weights
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
 from .underwriter import Underwriter, build
@@ -49,7 +49,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
-__version__ = "0.21.2"
+__version__ = "0.21.3"
 
 
 

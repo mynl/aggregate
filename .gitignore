@@ -120,3 +120,4 @@ venv.bak/
 
 doc/index - Copy.xrst
 cheat-sheets/preamble.fmt
+*.png

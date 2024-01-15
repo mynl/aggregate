@@ -119,7 +119,7 @@ class Distortion(object):
                 return x ** rhoinv
 
             def g_prime(x):
-                return rho * x ** (rho - 1.0) if x > 0 else np.inf
+                return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
 
         elif self._name == 'wang':
             lam = self.shape
@@ -133,7 +133,7 @@ class Distortion(object):
                 return n.cdf(n.ppf(x) - lam)
 
             def g_prime(x):
-                return n.pdf(n.ppf(x) - lam) / n.pdf(n.ppf(x) + lam)
+                return n.pdf(n.ppf(x) + lam) / n.pdf(n.ppf(x))
 
         elif self._name == 'tt':
             lam = self.shape
@@ -760,6 +760,7 @@ class Distortion(object):
             # no longer guaranteed that a is in ser.index
             return ans.iloc[ans.index.get_indexer([a], method='nearest')]
 
+
 def approx_ccoc(roe, eps=1e-14, display_name=None):
     """
     Create a continuous approximation to the CCoC distortion with return roe.
@@ -774,3 +775,53 @@ def approx_ccoc(roe, eps=1e-14, display_name=None):
                       else display_name
                       )
 
+
+def tvar_weights(d):
+    """
+    Return tvar weight function for a distortion d. Use np.gradient to differentiate g' but
+    adjust for certain distortions. The returned function expects a numpy array of p
+    values.
+
+    :param: d distortion
+    """
+
+    shape = d.shape
+    r0 = d.r0
+    nm = d.name
+
+    if nm.lower().find('ccoc') >= 0:
+        nm = 'ccoc'
+        v = shape
+        def wf(p):
+            return np.where(p==0, 1 - v,
+                            # use nan to try and distinguish mass from density
+                            np.where(p == 1, v, np.nan))
+    elif nm == 'ph':
+        # this is easy, do by hand
+        def wf(p):
+            return np.where(
+                p==1, shape,  # really a mass!
+                -shape * (shape - 1) * (1 - p) ** (shape - 1)
+            )
+    elif nm == 'tvar':
+        def wf(p):
+            # something that will plot reasonably
+            dp = p[1] - p[0]
+            return np.where(np.abs(p - shape) < dp, 1, 0)
+
+    else:
+        # numerical approximation
+        def wf(p):
+            gprime = d.g_prime(1 - p)
+            wt = (1 - p) * np.gradient(gprime, p)
+            return wt
+
+        # adjust for endpoints in certain situations (where is a mass at 0 or a kink
+        # s=1 (slope approaching s=1 is > 0)
+
+        if nm == 'wang':
+            pass
+        elif nm == 'dual':
+            pass
+
+    return wf  #noqa

@@ -146,9 +146,9 @@ def make_up_down(ser):
     u = np.maximum(0, dy).cumsum()
     d = -np.minimum(0, dy).cumsum()
     c = u - d
-    u.name = 'up'
-    d.name = 'down'
-    c.name = 'recreated'
+    u.name = 'Ins'
+    d.name = 'Fin'
+    c.name = 'Ins - Fin'
     return u, d, c
 
 
@@ -197,13 +197,14 @@ def plot_up_down(self, udd, axs):
 
     # left and middle plots
     for unit, ax, recreated_c in zip(self.unit_names, axs.flat, ['C0', 'C1']):
-        ax = self.density_df[f'exeqa_{unit}'].plot(ax=ax, lw=.5, c='C7', drawstyle='steps-mid')
+        ax = self.density_df[f'exeqa_{unit}'].plot(ax=ax, lw=.5, c='C7', drawstyle='steps-mid',
+                                                   label=f'E[{unit} | X]')
         (udd.up_functions[unit] - udd.down_functions[unit]
-         ).plot(ax=ax, lw=1.5, ls='-', c=recreated_c, label='recreated', drawstyle='steps-post')
+         ).plot(ax=ax, lw=1.5, ls='-', c=recreated_c, label='Ins - Fin', drawstyle='steps-post')
         udd.up_functions[unit].plot(ax=ax,   c='C3', drawstyle='steps-post', lw=1, ls='--')
         udd.down_functions[unit].plot(ax=ax, c='C5', drawstyle='steps-post', lw=1, ls='-.')
         ax.legend()
-        ax.set(xlabel='loss', ylabel='up or down function')
+        ax.set(xlabel='X, total', ylabel='Unit or conditional loss')
 
     # plot ud distributions (right hand plot)
     ax = axs.flat[-1]
@@ -241,7 +242,7 @@ def price_work(dn, series, names_ex):
     return bit
 
 
-def price_compare(self, dn, projection_dists, ud_dists):
+def price_compare(self, dn, projection_dists, ud_dists, allocation='linear'):
     """
     Build out pricing comparison waterfall
 
@@ -251,9 +252,9 @@ def price_compare(self, dn, projection_dists, ud_dists):
 
     # linear natural allocation pricing
     # KLUDGE
-    lna_pricea = self.price(self.q(1), dn, view='ask')
+    lna_pricea = self.price(self.q(1), dn, allocation=allocation, view='ask')
     # display(lna_pricea.df)
-    lna_priceb = self.price(self.q(1), dn, view='bid')
+    lna_priceb = self.price(self.q(1), dn, allocation=allocation, view='bid')
     na_price = lna_pricea.df[['L', 'P']]
     na_price.columns = ['el', 'ask']
     # if this is nan it gets dropped from stack?!
@@ -302,7 +303,7 @@ def price_compare(self, dn, projection_dists, ud_dists):
     return compare
 
 
-def full_monty(self, dn, truncate=True, smooth=16, plot=True):
+def full_monty(self, dn, truncate=True, smooth=16, plot=True, allocation='linear'):
     """
     One-stop shop for a Portfolio self
     Unlimited assets
@@ -342,10 +343,26 @@ def full_monty(self, dn, truncate=True, smooth=16, plot=True):
         axs1 = axs[3, :]
         plot_up_down(self, ud_dists, axs1)
 
-    compare = price_compare(self, dn, projection_dists, ud_dists)
+    compare = price_compare(self, dn, projection_dists, ud_dists, allocation=allocation)
     compare['umd'] = compare['up'] - compare['down']
+    compare2 = compare.copy()
+    for l in compare2.index.levels[0]:
+        m = compare2.loc[(l, 'ask')] - compare2.loc[(l, 'el')]
+        compare2.loc[(l, 'margin'), :] = m
+    compare2 = compare2.sort_index()
+    compare2 = compare2.rename(columns={'lna': 'Linear NA' ,
+                      'sa': 'Standalone',
+                      'proj_sa': 'Projection SA',
+                      'up': 'Ins',
+                      'down': 'Fin',
+                      'umd': 'Ins - Fin'})
+    # or
+    # {'Linear NA': 'NA(Xi)', 'Standalone': 'ρ(Xi)',
+    #                  'Projection SA': 'ρ(E[Xi | X])',
+    #                  'Ins': 'ρ(Ins)', 'Fin': 'ρ(Fin)', 'Ins - Fin': 'ρ(Ins) - ρ(Fin)'
 
-    RiskProgression = namedtuple('RiskProgression', ['compare_df', 'projection_dists', 'ud_dists'])
-    ans = RiskProgression(compare, projection_dists, ud_dists)
+    RiskProgression = namedtuple('RiskProgression',
+                                 ['compare_df', 'compare_df2', 'projection_dists', 'ud_dists'])
+    ans = RiskProgression(compare, compare2, projection_dists, ud_dists)
     return ans
 

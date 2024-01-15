@@ -4,13 +4,14 @@
 
 -----
 
-aggregate: a powerful Python actuarial modeling library
-========================================================
+aggregate: a powerful actuarial modeling library
+==================================================
 
 Purpose
 -----------
 
-``aggregate`` solves insurance, risk management, and actuarial problems using realistic models that reflect
+``aggregate`` builds approximations to compound (aggregate) probability distributions quickly and accurately.
+It can be used to solve insurance, risk management, and actuarial problems using realistic models that reflect
 underlying frequency and severity. It delivers the speed and accuracy of parametric distributions to situations
 that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution
 as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
@@ -46,6 +47,19 @@ Installation
 
 Version History
 -----------------
+
+
+0.21.3
+~~~~~~~~
+
+* Risk progression, defaults to linear allocation.
+* Added ``g_insurance_statistics`` to ``extensions`` to plot insurance statistics from a distortion ``g``.
+* Added ``g_risk_appetite`` to ``extensions`` to plot risk appetite from a distortion ``g`` (value, loss ratio,
+  return on capital, VaR and TVaR weights).
+* Corrected Wang distortion derivative.
+* Vectorized ``Distortion.g_prime`` calculation for proportional hazard
+* Added ``tvar_weights`` function to ``spectral`` to compute the TVaR weights of a distortion. (Work in progress)
+* Updated dependencies in pyproject.toml file.
 
 0.21.2
 ~~~~~~~~

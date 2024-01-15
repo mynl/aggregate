@@ -2769,6 +2769,9 @@ class Aggregate(Frequency):
 
         return self._var_tvar_function[kind](p)
 
+    # for consistency with scipy
+    ppf = q
+
     def _make_var_tvar(self, ser):
         dict_ans = {}
         qf = make_var_tvar(ser)

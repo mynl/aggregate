@@ -24,7 +24,7 @@ aggregate Documentation
 Introduction
 ****************
 
-:mod:``aggregate`` builds approximations to compound (aggregate) probability distributions quickly and accurately.
+:mod:`aggregate` builds approximations to compound (aggregate) probability distributions quickly and accurately.
 It can be used to solve insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
 :mod:`aggregate` includes an expressive language called DecL to describe aggregate distributions and is implemented in Python under an open source BSD-license.
@@ -40,7 +40,7 @@ This help document is in six parts plus a bibliography.
    ---
    :img-top: _static/gs.png
 
-   Get up and running: installation, ``aggregate`` "hello world", and a glimpse into the functionality.
+   Get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
 
    +++
 
@@ -52,7 +52,7 @@ This help document is in six parts plus a bibliography.
    ---
    :img-top: _static/ug.png
 
-   How to solve real-world actuarial problems using ``aggregate``.
+   How to solve real-world actuarial problems using :mod:`aggregate`.
 
    +++
 
@@ -91,7 +91,7 @@ This help document is in six parts plus a bibliography.
    :img-top: _static/tg.png
 
 
-   Probability theory background and the numerical implementation methods employed by ``aggregate``.
+   Probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
 
    +++
 

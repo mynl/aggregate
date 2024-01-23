@@ -62,6 +62,10 @@ All the code examples have been tested in such a virtual environment and the doc
 Version History
 -----------------
 
+0.22.0
+~~~~~~~~~~
+
+* Created version 0.22.0, convolation
 
 0.21.4
 ~~~~~~~~

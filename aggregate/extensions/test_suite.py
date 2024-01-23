@@ -1,101 +1,95 @@
 # code for running test cases, producing HTML, etc.
 
 from .. import pprint_ex
-
-# from ..aggregate.utilities  import iman_conover, mu_sigma_from_mean_cv
-# # from aggregate.utils import rearrangement_algorithm_max_VaR
-# from .. aggregate.utilities import random_corr_matrix
+from .. import build as build_uw
 import logging
 import matplotlib.pyplot as plt
 from pathlib import Path
 import re
-
 
 logger = logging.getLogger(__name__)
 
 
 class TestSuite(object):
 
-    p = None
-    build = None
-    tests = ''
-
-    @classmethod
-    def __init__(cls, build=None, out_dir_name=''):
+    def __init__(self, build_in=None, fn='test_suite.agg', out_dir_name=''):
         """
         Run test suite fn. Create specified objects. Save graphics and info to HTML. Wrap
         HTML with template.
 
         TODO: convert wrapping to Jinja!
 
-        To run whole test_suite
-        ::
+        To run whole test_suite::
 
             python -m aggregate.extensions.test_suite
 
+        :param build_in: build object, allows input custom build object
+        :param fn: test suite file name, default test_suite.agg
+        :param out_dir_name: output directory name, default site_dir/generated
         """
 
-        if build is None:
-            from .. import build
-
-        cls.build = build
+        self.build = build_in if build_in else build_uw
 
         if out_dir_name != '':
-            cls.p = Path(out_dir_name)
-            if cls.p.exists() is False:
+            self.out_dir = Path(out_dir_name)
+            if self.out_dir.exists() is False:
                 raise FileExistsError(f'Directory {out_dir_name} does not exist.')
         else:
-            cls.p = cls.build.site_dir.parent / 'generated'
-            cls.p.mkdir(exist_ok=True)
-            (cls.p / "img").mkdir(exist_ok=True)
+            self.out_dir = self.build.site_dir.parent / 'generated'
+            self.out_dir.mkdir(exist_ok=True)
+            (self.out_dir / "img").mkdir(exist_ok=True)
 
-        logger.info(f'Output directory {cls.p.resolve()}')
+        logger.info(f'Output directory {self.out_dir.resolve()}')
 
-        # extract from comments; this is just FYI
-        fn = 'test_suite.agg'
-        suite = build.default_dir / fn
+        suite = self.build.default_dir / fn
+        assert suite.exists(), f'Requested test suite file {suite} does not exist.'
         txt = suite.read_text(encoding='utf-8')
         tests = [i for i in txt.split('\n') if re.match(r'# [A-Z]\.', i)]
-        cls.tests = [i.replace("# ", "").split('. ') for i in tests]
+        self.tests = [i.replace("# ", "").split('. ') for i in tests]
 
-    @classmethod
-    def run(cls, regex, title, fig_prefix, fig_format='svg', fig_size=(8,2.4), **kwargs):
+    def run(self, regex, title, filename, browse=False, fig_format='svg', fig_size=(8,2.4), **kwargs):
         """
+        Run all tests matching regex. Save graphics and info to HTML.
+        Wrap HTML with template. To run whole test_suite use::
+
+            python -m aggregate.extensions.test_suite
 
         :param regex: regex of tests to run, e.g., 'agg [ABC]\. '
         :param title: title for blob
-        :param fig_prefix: file name prefix for saved immage files (convenience)
+        :param filename: file name prefix for saved immage files (convenience)
+        :param browse: open browser to output file
         :param fig_format:  html or markdown (md); html uses svg output, markdown uses pdf
         :param fig_size:
         :param kwargs: passed to savefig
         """
-        logger.warning(f'figure prefix = {fig_prefix}')
-
         ans = []
-        for n in cls.build.qshow(regex).index:
-            a = cls.build(n)
+        for n in self.build.qshow(regex, tacit=False).index:
+            a = self.build(n)
             ans.append(a.html_info_blob().replace('h3>', 'h2>'))
-            ans.append(pprint_ex(a.program, 50, True, True))
-            ans.append(cls.style_df(a.describe).to_html())
+            ans.append(pprint_ex(a.program, 50, True))
+            ans.append(self.style_df(a.describe).to_html())
             ans.append('<br>')
-            fn = cls.p / f'img/{fig_prefix}_tmp_{hash(a):0x}.{fig_format}'
+            fn = self.out_dir / f'img/{filename}_tmp_{hash(a):0x}.{fig_format}'
             a.plot(figsize=fig_size)
             a.figure.savefig(fn, **kwargs)
             ans.append(f'<img src="{fn.resolve()}" />')
             plt.close(a.figure)
             logger.warning(f'Created {n}, mean {a.agg_m:.2f}')
-
-        blob = '\n'.join(ans)
-        fn = cls.p / f'{fig_prefix}.html'
+        blob = '\n'.join([i if type(i)==str else i.data for i in ans])
+        fn = self.out_dir / f'{filename}.html'
         fn.write_text(blob, encoding='utf-8')
 
-        fn2 = cls.p / f'{fn.stem}_wrapped.html'
-        fn3 = cls.build.template_dir / 'test_suite_template.html'
+        fn2 = self.out_dir / f'{fn.stem}_wrapped.html'
+        fn3 = self.build.template_dir / 'test_suite_template.html'
         # TODO JINJA!
         template = fn3.read_text()
         template = template.replace('HEADING GOES HERE', title).replace(
             'CONTENTHERE', blob)
         fn2.write_text(template, encoding='utf-8')
+        logger.info(f'Output written to {fn2.resolve()}')
+        if browse:
+            import webbrowser
+            webbrowser.open(fn2.resolve().as_uri())
 
     @staticmethod
     def style_df(df):
@@ -166,7 +160,8 @@ def run_test_suite():
     # run all the aggs
     # TODO FIX for Portfolios
     # t.run(regex=r'^C\.', title='C only', fig_prefix="auto", fig_format='png', dpi=300)
-    t.run(regex=r'^[A-KNO]\.', title='Full Test Suite', fig_prefix="auto", fig_format='png', dpi=300)
+    t.run(regex=r'^[A-KNO]', title='Full Test Suite', filename='A_tests', browse=True,
+          fig_format='png', dpi=300)
 
 
 if __name__ == '__main__':

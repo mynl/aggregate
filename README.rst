@@ -39,14 +39,39 @@ https://github.com/mynl/aggregate
 Installation
 ------------
 
-::
+To install into a new ``Python>=3.10`` virtual environment::
 
-  pip install aggregate
+    python -m venv path/to/your/venv``
+    cd path/to/your/venv
 
+followed by::
+
+    \path\to\env\Scripts\activate
+
+on Windows, or::
+
+    source /path/to/env/bin/activate
+
+on Linux/Unix or MacOS. Finally, install the package::
+
+    pip install aggregate[dev]
+
+All the code examples have been tested in such a virtual environment and the documentation will build.
 
 
 Version History
 -----------------
+
+
+0.21.4
+~~~~~~~~
+
+* Updated requirement using ``pipreqs`` recommendations
+* Color graphics in documentation
+* Added ``expected_shift_reduce = 16  # Set this to the number of expected shift/reduce conflicts`` to ``parser.py``
+  to avoid warnings. The conflicts are resolved in the correct way for the grammar to work.
+* Issues: there is a difference between ``dfreq[1]`` and ``1 claim ... fixed``, e.g.,
+  when using spliced severities. These should not  occur.
 
 
 0.21.3

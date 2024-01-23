@@ -136,7 +136,6 @@ agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify 
 agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims}
 agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}
 
-
 # Mixed and Spliced severities
 # ============================
 agg G.Mixed00  1  claim  50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wts [.2 .3 .3 .15 .05]             poisson            note{no shared mixing}
@@ -150,7 +149,6 @@ agg G.Mixed08  1  claim          sev [100 200 250 300] *  beta [1 200 500 100] [
 agg G.Mixed09  8  claim          sev      100 * [lognorm expon] [.5 1] wts [0.6 .4]                         mixed gamma 0.3    note{different severities}
 agg G.Mixed10  1  claim          sev [50 100] * [lognorm expon]  [2 1]  + 10 wts=2                          mixed gamma 0.3
 agg G.Mixed11  1  claim          sev [50 100] * [lognorm expon]  [2 1]  + 10                                mixed gamma 0.3
-# agg G.Spliced01 1 claim 50 xs 0 sev lognorm 10 cv [0.2 0.4 0.6 0.8 1.0] wts [.2 .3 .3 .15 .05]             spliced gamma 0.3  note{shared mixing, compare audit and report dfs}
 
 # Limit profiles
 # ==============
@@ -173,7 +171,6 @@ agg I.Blend09  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 c
 agg I.Blend10  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
 agg I.Blend11  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5  note{log2=17;}
 agg I.Blend12  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
-
 
 # Reinsurance
 # ===========

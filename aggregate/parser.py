@@ -199,6 +199,8 @@ class UnderwritingParser(Parser):
 
     """
 
+    expected_shift_reduce = 16  # Set this to the number of expected shift/reduce conflicts
+
     debugfile = None
     # uncomment to write detailed grammar rules
     # debugfile = Path.home() / 'aggregate/parser/parser.out'

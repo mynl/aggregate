@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
 import aggregate as agg
 
+# color graphs
+agg.knobble_fonts(True)
+
 # graphics defaults - better res graphics
 plt.rcParams['figure.dpi'] = 300
 

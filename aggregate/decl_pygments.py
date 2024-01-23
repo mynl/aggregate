@@ -13,21 +13,6 @@ from pygments.token import (Text, Comment, Operator, Keyword, Number,
 __all__ = ['AggLexer']
 
 
-# def colorize(code):
-#     # step 2: apply custom style
-#     # embed Style inside HTML (self-contained, no external CSS-file
-#     # formatter.noclasses = True  # inline style to each element directly
-#     formatter = HtmlFormatter(style='monokai', full=True)
-#     return highlight(code, AggLexer(), formatter)
-
-
-# def rawhtml(code):
-#     formatter = HtmlFormatter(style='monokai', full=False)
-#     return highlight(code, AggLexer(), formatter)
-
-
-# define custom style -> see older version; don't want to do this
-
 class AggLexer(RegexLexer):
     """
     Aggregate program language lexer. (Based on Python lexer. )

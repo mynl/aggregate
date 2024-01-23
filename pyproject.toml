@@ -33,10 +33,9 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.1",
     "psutil",
+    "Pygments",
     "scipy>=1.11",
-#    "sly",
     "titlecase",
-    "pygments"
 ]
 license = {text = "BSD-3-Clause"}
 requires-python = ">=3.10"
@@ -47,7 +46,7 @@ Documentation = "https://aggregate.readthedocs.io/en/latest/"
 
 [project.optional-dependencies]
 dev = [
-    "docutils==0.16",
+    "docutils<0.17",
     "jupyter-sphinx",
     "nbsphinx",
     "pickleshare",

@@ -2160,12 +2160,12 @@ class Aggregate(Frequency):
         logger.info(f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
                     f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
 
-    def reinsurance_description(self, kind='both', width=70):
+    def reinsurance_description(self, kind='both', width=0):
         """
         Text description of the reinsurance.
 
         :param kind: both, occ, or agg
-        :param width: width of text for textwrap.fill
+        :param width: width of text for textwrap.fill; omitted if width==0
         """
         ans = []
         if self.occ_reins is not None and kind in ['occ', 'both']:
@@ -2173,12 +2173,12 @@ class Aggregate(Frequency):
             ra = []
             for (s, y, a) in self.occ_reins:
                 if np.isinf(y):
-                    ra.append(f'{s:,.2%} share of unlimited xs {a:,.2f}')
+                    ra.append(f'{s:,.0%} share of unlimited xs {a:,.0f}')
                 else:
                     if s == y:
-                        ra.append(f'{y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{y:,.0f} xs {a:,.0f}')
                     else:
-                        ra.append(f'{s:,.2%} share of {y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{s:,.0%} share of {y:,.0f} xs {a:,.0f}')
             ans.append(' and '.join(ra))
             ans.append('per occurrence')
         if self.agg_reins is not None and kind in ['agg', 'both']:
@@ -2188,12 +2188,12 @@ class Aggregate(Frequency):
             ra = []
             for (s, y, a) in self.agg_reins:
                 if np.isinf(y):
-                    ra.append(f'{s:,.2%} share of unlimited xs {a:,.2f}')
+                    ra.append(f'{s:,.0%} share of unlimited xs {a:,.0f}')
                 else:
                     if s == y:
-                        ra.append(f'{y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{y:,.0f} xs {a:,.0f}')
                     else:
-                        ra.append(f'{s:,.2%} share of {y:,.2f} xs {a:,.2f}')
+                        ra.append(f'{s:,.0%} share of {y:,.0f} xs {a:,.0f}')
             ans.append(' and '.join(ra))
             ans.append('in the aggregate.')
         if len(ans):
@@ -2204,7 +2204,8 @@ class Aggregate(Frequency):
             reins = ' '.join(ans)
         else:
             reins = 'No reinsurance'
-        reins = fill(reins, width)
+        if width:
+            reins = fill(reins, width)
         return reins
 
     def reinsurance_kinds(self):

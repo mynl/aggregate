@@ -2962,7 +2962,7 @@ def moms_analytic(fz, limit, attachment, n, analytic=True):
     return ans
 
 
-def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
+def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     """
     Endless quest for a robust display format!
 
@@ -2973,13 +2973,24 @@ def qd(*argv, accuracy=3, align=True, trim=True, **kwargs):
     :param: argv: list of objects to print
     :param: accuracy: number of decimal places to display
     :param: align: if True, align columns at decimal point (sEngFormatter)
+    :param: trim: if True, trim trailing zeros (sEngFormatter)
+    :param: ff: if not None, use this function to format floats, or 'basic', or 'binary'
     :kwargs: passed to pd.DataFrame.to_string for dataframes only. e.g., pass dict of formatters by column.
 
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
     # ff = sEngFormatter(accuracy=accuracy - (2 if align else 0), min_prefix=0, max_prefix=12, align=align, trim=trim)
-    ff = kwargs.pop('ff', lambda x: f'{x:.5g}')
+    if ff is None:
+        ff = lambda x: f'{x:.5g}'
+    elif ff == 'basic':
+        ff = lambda x: f'{x:.1%}' if x < 1 else f'{x:12,.0f}'
+    elif ff == 'int_ratio':
+        def format_function(x):
+            ir = np.round(x, 13).as_integer_ratio()
+            return f'{int(x)}' if x in [0, 1] else f'  {ir[0]}/{ir[1]}'
+
+        ff = format_function
     # split output
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):

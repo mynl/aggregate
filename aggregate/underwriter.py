@@ -829,10 +829,11 @@ class Underwriter(object):
         """
         return self.show(regex, kind='', plot=False, describe=False, verbose=True)
 
-    def qshow(self, regex):
+    def qshow(self, regex, tacit=True):
         """
         Wrapper for show to just show (display) elements in knowledge that match ``regex``.
-        No reutrn value.
+        No reutrn value if tacit, else returns a dataframe.
+
         """
         def ff(x):
             fs = '{x:120s}'
@@ -843,9 +844,12 @@ class Underwriter(object):
             r' note\{[^}]+\}', '').str.replace('  +', ' ')  # , flags=re.MULTILINE)
         # bit['program'] = bit['program'].str.replace(' ( +)', ' ') #, flags=re.MULTILINE)
         # bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}$|  *', ' '   ) #, flags=re.MULTILINE)
-        qd(bit,
-           line_width=160, max_colwidth=130, col_space=15, justify='left',
-           max_rows=200, formatters={'program': ff})
+        if tacit:
+            qd(bit,
+               line_width=160, max_colwidth=130, col_space=15, justify='left',
+               max_rows=200, formatters={'program': ff})
+        else:
+            return bit
 
     def show(self, regex, kind='', plot=True, describe=True, logger_level=30, verbose=False, **kwargs):
         """

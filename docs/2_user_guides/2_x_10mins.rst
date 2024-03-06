@@ -72,7 +72,7 @@ A Ten Minute Guide to ``aggregate``
 
 .. _10 min princ cl:
 
-Principal Classes
+Principle Classes
 ------------------
 
 The ``aggregate`` package makes working with aggregate probability distributions as straightforward as working with parametric distributions even though their densities rarely have closed-form expressions. It is built around five principal classes.

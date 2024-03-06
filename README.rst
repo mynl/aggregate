@@ -1,6 +1,6 @@
 |  |activity| |doc| |version|
 |  |py-versions| |downloads|
-|  |license| |packages|  |twitter|
+|  |license| |packages| |zenodo|
 
 -----
 
@@ -62,10 +62,16 @@ All the code examples have been tested in such a virtual environment and the doc
 Version History
 -----------------
 
+0.23.0
+~~~~~~~~~~
+
+* Added ``sample_df`` dataframe to ``Portfolio`` when created from a sample
+  to store the sample. Original sample is needed in various applications.
+
 0.22.0
 ~~~~~~~~~~
 
-* Created version 0.22.0, convolation
+* Created version 0.22.0, convolation for AAS submission
 
 0.21.4
 ~~~~~~~~
@@ -488,6 +494,6 @@ Social media: https://www.reddit.com/r/AggregateDistribution/.
     :target: https://aggregate.readthedocs.io/en/latest/
     :alt: Documentation Status
 
-.. |twitter| image:: https://img.shields.io/twitter/follow/mynl.svg?label=follow&style=flat&logo=twitter&logoColor=4FADFF
-    :target: https://twitter.com/SJ2Mi
-    :alt: Twitter Follow
+.. |zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.10557199.svg
+    :target: https://zenodo.org/records/10557199
+    :alt: Zenodo DOI

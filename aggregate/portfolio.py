@@ -85,6 +85,7 @@ class Portfolio(object):
         self.agg_list = []
         self.line_names = []
         self._valid = None
+        self.sample_df = None
         logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name}')
         # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
         ma = MomentAggregator()
@@ -98,6 +99,8 @@ class Portfolio(object):
             if 'p_total' not in spec_list:
                 logger.info('Adding p_total column to DataFrame with equal probs')
                 spec_list['p_total'] = np.repeat(1 / len(spec_list), len(spec_list))
+            # it is helpful to know what sample the object is created
+            self.sample_df = spec_list
 
         for spec in spec_list:
             if isinstance(spec, Aggregate):

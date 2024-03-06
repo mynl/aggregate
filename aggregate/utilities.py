@@ -1971,7 +1971,8 @@ def knobble_fonts(color=False):
 
     # fonts: add some better fonts as earlier defaults
     mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif']
-    mpl.rcParams['font.sans-serif'] = ['Nirmala UI', 'Myriad Pro', 'Segoe UI', 'DejaVu Sans']
+    # 'Nirmala UI' has poor glyph coverage, removed as an option
+    mpl.rcParams['font.sans-serif'] = ['Myriad Pro', 'Segoe UI', 'DejaVu Sans']
     mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono']
     # this matches html output better
     mpl.rcParams['font.family'] = 'sans-serif'

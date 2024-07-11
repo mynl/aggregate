@@ -286,11 +286,22 @@ def sgamma_fit(m, cv, skew):
 
 def gamma_fit(m, cv):
     """
-
+    gamma parameters from mean and cv.
     """
     alpha = cv**-2
     beta = m / alpha
     return alpha, beta
+
+
+def beta_fit(m, cv):
+    """
+    alpha and beta parameters from mean and cv.
+
+    """
+    v = m * m * cv * cv
+    sev_a = m * (m * (1 - m) / v - 1)
+    sev_b = (1 - m) * (m * (1 - m) / v - 1)
+    return sev_a, sev_b
 
 
 def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):

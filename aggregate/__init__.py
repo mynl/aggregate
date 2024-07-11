@@ -19,7 +19,8 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         sEngFormatter, mv, picks_work, GCN, lognorm_approx,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
                         make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
-                        more, parse_note, parse_note_ex, introspect, explain_validation)
+                        more, parse_note, parse_note_ex, introspect, explain_validation,
+                        beta_fit)
 from .spectral import Distortion, approx_ccoc, tvar_weights
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward

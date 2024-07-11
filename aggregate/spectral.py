@@ -267,10 +267,10 @@ class Distortion(object):
                 self.has_mass = (p1 == 1)
                 self.mass = w if p1 == 1 else 0
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
-                s = np.array([0.,  1-p1, 1-p0, 1.])
-                gs = np.array([0.,   pt,   1., 1.])
-                g = interp1d(s, gs, kind='linear')
-                g_inv = interp1d(gs, s, kind='linear')
+                s = np.array([0.,  1 - p1, 1-p0, 1.])
+                gs = np.array([0.,     pt, 1.,   1.])
+                g = interp1d(s, gs, kind='linear', bounds_error=False, fill_value=(0,1))
+                g_inv = interp1d(gs, s, kind='linear', bounds_error=False, fill_value=(0,1))
 
                 if p1 < 1:
                     def g_prime(x):
@@ -289,10 +289,14 @@ class Distortion(object):
 
         elif self._name == 'convex':
             # convex envelope and general interpolation
-            # NOT ALLOWED to have a mass...
-            self.has_mass = False
+            # NOT ALLOWED to have a mass...why not???
+            # evil - use shape to indicate if mass at zero
+            if self.shape > 0:
+                self.has_mass = True
+                self.mass = self.shape
+
             # use shape for number of points in calibrating data set
-            self.shape = f'on {len(df):d} points'
+            self.display_name = f'Convex on {len(df):d} points'
             if not (0 in df[col_x].values and 1 in df[col_x].values):
                 # painful...always want 0 and 1 there...but don't know what other columns in df
                 # logger.debug('df does not contain s=0/1...adding')
@@ -400,14 +404,16 @@ class Distortion(object):
             sz = FIG_H if size=='small' else FIG_W
             fig, ax = plt.subplots(1,1, figsize=(sz, sz), constrained_layout=True)
 
+        if c is None:
+            c = 'C1'
         if scale == 'linear':
-            ax.plot(xs, y1, c='C1', label='$g$', **kwargs)
+            ax.plot(xs, y1, c=c, label='$g$ ' + self.display_name, **kwargs)
             if both:
                 ax.plot(xs, y2, c='C2', label='$g\check$', **kwargs)
             ax.plot(xs, xs, color='C0')
             # ax.plot(xs, xs, lw=0.5, color='C0', alpha=0.5)
         elif scale == 'return':
-            ax.plot(xs, y1, c='C1', label='$g$', **kwargs)
+            ax.plot(xs, y1, c=c, label='$g$', **kwargs)
             if both:
                 ax.plot(xs, y2, c='C2', label='$g\check$', **kwargs)
             ax.set(xscale='log', yscale='log', xlim=[1/5000, 1], ylim=[1/5000, 1])

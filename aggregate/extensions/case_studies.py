@@ -10,6 +10,7 @@ import argparse
 from collections import OrderedDict
 from datetime import datetime
 from inspect import signature
+from io import StringIO
 from itertools import product
 from jinja2 import Environment, FileSystemLoader
 import json
@@ -24,6 +25,7 @@ import os
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
 from pathlib import Path
+from PIL import Image
 from platform import platform
 import psutil
 import re
@@ -148,7 +150,33 @@ class CaseStudy(object):
     _dist_ = ['EL', 'Dist ccoc', 'Dist ph', 'Dist wang', 'Dist dual', 'Dist tvar', 'Dist blend', ]
     _classical_ = ['EL', 'ScaledEPD', 'ScaledTVaR', 'ScaledVaR', 'EqRiskEPD', 'EqRiskTVaR', 'EqRiskVaR',
                    'coTVaR', 'covar']
-
+    _gloss_ = {
+        'A': 'PIR Chapter  2, Tables  2.3, 2.5, 2.6, 2.7,     Estimated mean, CV, skewness and kurtosis by line and in  total, gross and net. ',
+        'B': 'PIR Chapter  2, Figures 2.2, 2.4, 2.6,          Gross and net densities on a linear and log scale.                              ',
+        'C': 'PIR Chapter  2, Figures 2.3, 2.5, 2.7,          Bivariate densities: gross and net with gross sample.                           ',
+        'D': 'PIR Chapter  4, Figures 4.9, 4.10, 4.11, 4.12,  TVaR, and VaR for unlimited and limited variables, gross and net.               ',
+        'E': 'PIR Chapter  4, Tables  4.6, 4.7, 4.8,          Estimated VaR, TVaR, and EPD by line and in total, gross, and net.              ',
+        'F': 'PIR Chapter  7, Table  7.2,                     Pricing summary.                                                                ',
+        'G': 'PIR Chapter  7, Table  7.3,                     Details of reinsurance.                                                         ',
+        'H': 'PIR Chapter  9, Tables  9.2, 9.5, 9.8,          Classical pricing by method.                                                    ',
+        'I': 'PIR Chapter  9, Tables  9.3, 9.6, 9.9,          Sum of parts (SoP) stand-alone vs. diversified classical pricing by method.',
+        'J': 'PIR Chapter  9, Tables  9.4, 9.7, 9.10,         Implied loss ratios from classical pricing by method.                           ',
+        'K': 'PIR Chapter  9, Table  9.11,                    Comparison of stand-alone and sum of parts premium.',
+        'L': 'PIR Chapter  9, Tables  9.12, 9.13, 9.14,       Constant CoC pricing by unit for Case Study.                                    ',
+        'M': 'PIR Chapter 11, Figures 11.2, 11.3, 11.4,11.5,  Distortion envelope for Case Study, gross.                                      ',
+        'N': 'PIR Chapter 11, Table  11.5,                    Parameters for the six SRMs and associated distortions.                         ',
+        'O': 'PIR Chapter 11, Figures 11.6, 11.7, 11.8,       Variation in insurance statistics for six distortions  as $s$ varies.           ',
+        'P': 'PIR Chapter 11, Figures 11.9, 11.10, 11.11,     Variation in insurance statistics as the asset limit is varied.                 ',
+        'Q': 'PIR Chapter 11, Tables  11.7, 11.8, 11.9,       Pricing by unit and distortion for Case Study.                                  ',
+        'R': 'PIR Chapter 13, Table  13.1,                    Comparison of gross expected losses by Case, catastrophe-prone lines.           ',
+        'S': 'PIR Chapter 13, Tables  13.2, 13.3, 13.4,       Constant 0.10 ROE pricing for Case Study, classical PCP methods.                ',
+        'T': 'PIR Chapter 15, Figures 15.2 - 15.7 (G/N),      Twelve plot.                                                                    ',
+        'U': 'PIR Chapter 15, Figures 15.8, 15.9, 15.10,      Capital density by layer.                                                       ',
+        'V': 'PIR Chapter 15, Tables  15.35, 15.36, 15.37,    Constant 0.10 ROE pricing for Cat/Non-Cat Case Study, distortion, SRM methods.  ',
+        'W': 'PIR Chapter 15, Figure 15.11,                   Loss and loss spectrums.                                                        ',
+        'X': 'PIR Chapter 15, Figures 15.12, 15.13, 15.14,    Percentile layer of capital  allocations by asset level.                        ',
+        'Y': 'PIR Chapter 15, Tables  15.38, 15.39, 15.40,    Percentile layer of capital  allocations compared to distortion allocations.    ',
+    }
     def __init__(self):
         """
         Create an empty CaseStudy.
@@ -156,6 +184,8 @@ class CaseStudy(object):
         Use ``factory`` to populate.
 
         """
+        # mode: html (default) or markdown
+        self.mode = 'html'
 
         # variables set in other functions
         self.gs_values = None
@@ -398,13 +428,14 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
         # extended exhibits
         webbrowser.open(Path.home() / f'aggregate/cases/{self.case_id}_extended.html')
 
-    def full_monty(self):
+    def full_monty(self, render=True):
         """
         All updating and exhibit generation. No output. For use with command line.
 
         :param self:
         :return:
         """
+        assert self.mode in ('html', 'markdown'), f'ERROR: mode must be html or markdown, not {self.mode}'
 
         logger.info('Start Full Monty Update')
         self.make_all()
@@ -424,11 +455,31 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
         process_memory()
         logger.info(f'{self.case_id} computed')
 
-        # save the results
-        mrr = ManualRenderResults(self)
+        if render:
+            # save the results
+            if self.mode == 'html':
+                mrr = ManualRenderResults(self)
+            elif self.mode == 'markdown':
+                mrr = ManualRenderResultsMarkdown(self)
+            mrr.render_custom('[A-Y]', suffix='book')
+            mrr.render_custom('Z.*', suffix='extended')
+            logger.info(f'{self.case_id} saved to {"HTML" if self.mode=="html" else "markdown"}...complete!')
+
+    def render_custom(self, outdir):
+        """
+        For markdown only, often don't want to render to ~/aggregate/cases
+        This method renders to user specified directory, outdir.
+        """
+        if self.mode != 'markdown':
+            raise ValueError('This method is only for markdown mode')
+        outdir = Path(outdir)
+        outdir.mkdir(exist_ok=True)
         mrr.render_custom('[A-Y]', suffix='book')
-        mrr.render_custom('Z*', suffix='extended')
-        logger.info(f'{self.case_id} saved to HTML...complete!')
+        mrr.render_custom('Z.*', suffix='extended')
+        logger.info(f'{self.case_id} saved to {"HTML" if self.mode=="html" else "markdown"}...complete!')
+
+
+
 
     def approx_roe(self, e=1e-15):
         """
@@ -503,7 +554,8 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
         # return audit_all, bit, pricing_summary
 
     @classmethod
-    def _display_work(cls, exhibit_id, df, caption, ff=None, save=True, cache_dir=None, show=False, align='right'):
+    def _display_work(cls, exhibit_id, df, caption, ff=None, save=True,
+                      cache_dir=None, show=False, align='right'):
         """
         Allow calling without creating an object, e.g. to consistently format the _cases_ database
 
@@ -563,6 +615,61 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
         # process_memory()
         return styled_df
 
+    @classmethod
+    def _display_work_md(cls, exhibit_id, df, caption, ff=None, save=True,
+                         cache_dir=None, show=False):
+        """
+        Allow calling without creating an object, e.g. to consistently format the _cases_ database
+
+        additional_properties is a list of selector, property pairs
+        E.g. [(col-list, dict-of-properties)]
+
+        :param exhibit_id:
+        :param df:
+        :param caption:
+        :param ff:
+        :param save:
+        :return:
+        """
+
+        if exhibit_id != '':
+            caption = f'({exhibit_id}) {caption}'
+
+        styled_df = df.style.format(ff).set_caption(caption)
+
+        if show is True: # ? and save is True:
+            display(styled_df)
+        if save is True:
+            dfc = df.copy()
+            if isinstance(ff, dict):
+                for c in dfc.columns:
+                    if c in ff.keys():
+                        dfc[c] = dfc[c].apply(ff[c])
+            elif callable(ff):
+                dfc = dfc.applymap(ff)
+            else:
+                print(f'Unhandled type ff = {type(ff)}')
+            if isinstance(dfc.columns, pd.MultiIndex):
+                dfc.columns = [': '.join(col).strip() for col in dfc.columns.values]
+            if isinstance(dfc.index, pd.MultiIndex):
+                dfc.index = [': '.join(col).strip() for col in dfc.index.values]
+            txt = dfc.to_markdown(headers='keys',
+                                  tablefmt='pipe',
+                                  stralign='default'
+            )
+            if caption != '':
+                caption = caption.replace('\n', ' ')
+            with Path(cache_dir / f'{exhibit_id}.md').open('wt', encoding='utf-8') as f:
+                f.write(f'## Table {exhibit_id}\n\n')
+                if exhibit_id in cls._gloss_:
+                    f.write(f'{cls._gloss_[exhibit_id]}\n\n')
+                f.write(txt)
+                f.write(f'\n: {caption}\n')
+        # TODO: what is done with the return item?
+        # placeholder: make it the same as  html... really only interested in the
+        # saving side-effects.
+        return styled_df
+
     def _display(self, exhibit_id, df, caption, ff=None, save=True):
         """
 
@@ -579,20 +686,24 @@ Lines: {", ".join(self.gross.line_names)} (ELs={", ".join([f"{a.agg_m:.2f}" for 
         if ff is None:
             fmts = {}
             for n, r in df.agg([np.mean, np.min, np.max, np.std]).T.iterrows():
-                if r.amax < 1 and r.amin < 1e-4 and r.amin > 0:
+                if r['max'] < 1 and r['min'] < 1e-4 and r['min'] > 0:
                     fmts[n] = f5g
-                elif r.amax < 1 and r.amin > 1e-4:
+                elif r['max'] < 1 and r['min'] > 1e-4:
                     fmts[n] = f3
-                elif r.amax < 10 and r.amin >= 0:
+                elif r['max'] < 10 and r['min'] >= 0:
                     fmts[n] = f3
                 else:
                     # was fc, but none of these numbers is that large
                     fmts[n] = f3
             ff = fmts
-        return self._display_work(exhibit_id, df, f'<div id="{exhibit_id}" /> ' + caption, ff, save,
+        logger.info(f'Exhibit {exhibit_id} processed')
+        if self.mode == 'html':
+            return self._display_work(exhibit_id, df, f'<div id="{exhibit_id}" /> ' + caption, ff, save,
+                                  self.cache_dir, self.show)
+        elif self.mode == 'markdown':
+            return self._display_work_md(exhibit_id, df, caption, ff, save,
                                   self.cache_dir, self.show)
         # return self._display_work(exhibit_id, df, caption, ff, save, self.cache_dir, self.show)
-        logger.info(f'Exhibit {exhibit_id} processed')
 
     def show_exhibits(self, *chapters):
         if chapters[0] == 'all':
@@ -667,7 +778,7 @@ columns show the difference."""
             if self.show: display(HTML('<hr>'))
             # table_no = 9.11
             # caption = f'Table {table_no}: '
-            caption = f"""Comparison of stand-alone and sum of parts (SoP) premium for {self.case_name}."""
+            caption = f"""Comparison of stand-alone and sum of parts (SoP) premium for {self.case_name}. Reductions shown as percentage change."""
             tab911 = self.modern_monoline_sa.loc[
                          [('No Default', 'Loss'), ('No Default', 'Premium'), ('No Default', 'Capital'),
                           ('With Default', 'Loss'), ('With Default', 'Premium'), ('With Default', 'Capital')]].iloc[:,
@@ -676,7 +787,7 @@ columns show the difference."""
             tab911['Gross Redn'] = tab911['Gross Total'] / tab911['Gross SoP'] - 1
             tab911['Net Redn'] = tab911['Net Total'] / tab911['Net SoP'] - 1
             tab911 = tab911.iloc[:, [0, 1, 4, 2, 3, 5]]
-            self._display("K", tab911, caption, lambda x: f'{x:,.1f}' if x > 10 else f'{x:.1%}')
+            self._display("K", tab911, caption, lambda x: f'{x:,.1f}' if x > 10 else f'{x:.1%}'.replace('%', ''))
 
             if self.show: display(HTML('<hr>'))
             # table_no = [9.12, 9.13, 9.14][self.case_number]
@@ -930,6 +1041,11 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         h = nr * self.fh
         return self.smfig(nr, nc, (w, h))
 
+    @staticmethod
+    def get_image_dimensions(image_path):
+        with Image.open(image_path) as img:
+            return img.size  # returns (width, height)
+
     def apply_distortions(self, dnet_='', dgross_=''):
         """
         make the 12 up plot
@@ -980,13 +1096,28 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         # make the container html snippet
         pth = str(p.relative_to(self.cache_base).as_posix())
-        blob = f"""
+        if self.mode == 'html':
+            blob = f"""
 <figure id="{plot_id}">
 <img src="/{pth}" width="100%" alt="Figure {f}" style="width:{100}%">
 <figcaption class="caption">{caption}</figcaption>
 </figure>
 """
-        (self.cache_dir / f'{plot_id}.html').write_text(blob, encoding='utf-8')
+            (self.cache_dir / f'{plot_id}.html').write_text(blob, encoding='utf-8')
+        elif self.mode == 'markdown':
+            if plot_id in self._gloss_:
+                gloss = f'{self._gloss_[plot_id]}\n\n'
+            else:
+                gloss = ''
+            w, h = self.get_image_dimensions(p)
+            scale = int(w / 7200 * 75)
+            blob = f"""## Figure {plot_id}
+
+{gloss}
+            
+![{caption}](/{pth}){{width="{scale}%"}}
+"""
+            (self.cache_dir / f'{plot_id}.md').write_text(blob, encoding='utf-8')
         process_memory()
 
     def case_twelve_plot(self):
@@ -2647,3 +2778,162 @@ class ManualRenderResults():
         p.write_text(h, encoding='utf-8')
         logger.info(f'Rendered {len(blobs)} exhibits and plots.')
 
+
+class ManualRenderResultsMarkdown():
+    def __init__(self, case_object):
+        """
+        Create local markdown page for the results datasets.
+
+        """
+        self.case_object = case_object
+
+    @staticmethod
+    def now():
+        return 'Created {date:%Y-%m-%d %H:%M:%S.%f}'.format(date=datetime.now()).rstrip('0')
+
+    def render(self):
+        """
+        Render all the exhibits. To render the book exhibits only (without the
+        extended exhibits) run .render_custom('[A-Y]')
+
+        :return:
+        """
+        self.render_custom('[A-Y]', suffix='book')
+        self.render_custom('Z.*', suffix='extended')
+
+    def render_custom(self, *argv, suffix, outdir=None, yaml_header=None):
+        """
+        Render a custom list of exhibits using standard glob file expansion.
+
+        The book exhibits are A-Y with Tn and Tg net and gross.
+
+        All extended exhibits are Z...
+
+        :param argv:
+        :return:
+        """
+        base_dir0 = Path.home() / 'aggregate/cases'
+        base_dir = base_dir0 / self.case_object.case_id
+        if base_dir.exists() is False:
+            raise ValueError('{self.case_id} directory not found')
+
+        # this is the actual content
+        blobs = []
+        ids = []
+        for pattern in argv:
+            for p in sorted(base_dir.glob('*.md')):
+                if re.match(pattern, p.stem):
+                    ids.append(p.stem)
+                    blobs.append(p.read_text(encoding='utf-8'))
+
+        desc = [f'{self.case_object.case_description}\n']
+        spec = self.case_object.to_dict()
+        desc.append('### Distributions\n\n```aggregate')
+        desc.append(f'# Line A (usually thinner tailed)')
+        desc.append(f'{spec["a_distribution"]}\n')
+        desc.append(f'# Line B Gross (usually thicker tailed)')
+        desc.append(f'{spec["b_distribution_gross"]}\n')
+        desc.append(f'# Line B Net')
+        desc.append(f'{spec["b_distribution_net"]}\n```\n')
+        desc.append(f'### Other Parameters\n')
+        # desc.append('<ul>')
+        desc.append(f'* `reg_p = {spec["reg_p"]}`')
+        desc.append(f'* `roe = {spec["roe"]}`')
+        desc.append(f'* `d2tc = {spec["d2tc"]}`')
+        desc.append(f'* `s_values = {spec["s_values"]}`')
+        desc.append(f'* `gs_values = {spec["gs_values"]}`')
+        desc.append(f'* `f_discrete = {spec["f_discrete"]}`')
+        desc.append(f'* `log2 = {spec["log2"]}`')
+        desc.append(f'* `bs = {spec["bs"]}`')
+        desc.append(f'* `padding = {spec["padding"]}`\n')
+        if suffix == 'book':
+            desc.append('## Description of Tables and Figures {#sec-desc}\n\n')
+        desc = '\n'.join(desc)
+
+        # hand create the markdown
+        sio = StringIO()
+        if yaml_header is not None:
+            sio.write(yaml_header)
+        sio.write(f'# {self.case_object.case_name} {suffix.title()} Case Study Results\n\n')
+        if suffix == 'book':
+            sio.write('## Exhibits by Chapter\n')
+            sio.write('* Chapter 2: Basic loss statistics (A-C)\n')
+            sio.write('* Chapter 4: VaR, TVaR and EPD statistics (D, E)\n')
+            sio.write('* Chapter 7: Portfolio pricing, used for calibration (F, G)\n')
+            sio.write('* Chapter 9: Classical portfolio and stand-alone pricing (H-L)\n')
+            sio.write('* Chapter 11: Modern portfolio and stand-alone pricing (M-Q)\n')
+            sio.write('* Chapter 13: Classical allocations (R, S)\n')
+            sio.write('* Chapter 15: Modern allocations (T-Y)\n\n')
+            sio.write('See @sec-desc for more details.\n\n')
+        elif suffix == 'extended':
+            sio.write('Supplemental tables and graphs.\n')
+        for blob in blobs:
+            sio.write('\n')
+            sio.write(blob)
+            sio.write('\n\n')
+        sio.write(f'## {self.case_object.case_name} Case Description\n\n')
+        sio.write(desc)
+        if suffix == 'book':
+            self.add_description(sio)
+
+        # rebase images, entered in snippets as /{case_id}/...
+        # other rebasing issues removed because we use the custom installed template
+        h = sio.getvalue()
+        if outdir is None:
+            p = Path.home() / f'aggregate/cases'
+            h = h.replace(f'/{self.case_object.case_id}', f'{self.case_object.case_id}')
+        else:
+            p = Path(outdir)
+            h = h.replace(f'/{self.case_object.case_id}', self.case_object.case_id)
+            # also copy the image files to img
+            img = p / self.case_object.case_id
+            img.mkdir(exist_ok=True, parents=True)
+            for i in sorted(base_dir.glob('*.png')):
+                if re.match(pattern, i.stem):
+                    l = img / i.name
+                    if l.exists():
+                        l.unlink()
+                    l.hardlink_to(i)
+        p = p / f'{self.case_object.case_id}_{suffix}.md'
+        p.write_text(h, encoding='utf-8')
+        logger.info(f'Rendered {len(blobs)} exhibits and plots.')
+
+    @staticmethod
+    def add_description(sio):
+        """
+        Add description of exhibits to sio
+
+        """
+
+        txt = """
+    
+| Ref. |  Kind  | Chapter | Number(s)             | Description                                                                      |
+|:----:|:------:|:-------:|:----------------------|:---------------------------------------------------------------------------------|
+|  A   | Table  |    2    | 2.3, 2.5, 2.6, 2.7    | Estimated mean, CV, skewness  and kurtosis by line and in  total, gross and net. |
+|  B   | Figure |    2    | 2.2, 2.4, 2.6         | Gross and net densities on a linear and log scale.                               |
+|  C   | Figure |    2    | 2.3, 2.5, 2.7         | Bivariate densities: gross and net with gross sample.                            |
+|  D   | Figure |    4    | 4.9, 4.10, 4.11, 4.12 | TVaR, and VaR for unlimited and limited variables, gross and net.                |
+|  E   | Table  |    4    | 4.6, 4.7, 4.8         | Estimated VaR, TVaR, and EPD by line and in total, gross, and net.               |
+|  F   | Table  |    7    | 7.2                   | Pricing summary.                                                                 |
+|  G   | Table  |    7    | 7.3                   | Details of reinsurance.                                                          |
+|  H   | Table  |    9    | 9.2, 9.5, 9.8         | Classical pricing by method.                                                     |
+|  I   | Table  |    9    | 9.3, 9.6, 9.9         | Sum of parts (SoP) stand-alone vs. diversified classical pricing by method.      |
+|  J   | Table  |    9    | 9.4, 9.7, 9.10        | Implied loss ratios from classical pricing by method.                            |
+|  K   | Table  |    9    | 9.11                  | Comparison of stand-alone and sum of parts premium.                              |
+|  L   | Table  |    9    | 9.12, 9.13, 9.14      | Constant CoC pricing by unit for Case Study.                                     |
+|  M   | Figure |   11    | 11.2, 11.3, 11.4,11.5 | Distortion envelope for Case Study, gross.                                       |
+|  N   | Table  |   11    | 11.5                  | Parameters for the six SRMs and associated distortions.                          |
+|  O   | Figure |   11    | 11.6, 11.7, 11.8      | Variation in insurance statistics for six distortions  as $s$ varies.            |
+|  P   | Figure |   11    | 11.9, 11.10, 11.11    | Variation in insurance statistics as the asset limit is varied.                  |
+|  Q   | Table  |   11    | 11.7, 11.8, 11.9      | Pricing by unit and distortion for Case Study.                                   |
+|  R   | Table  |   13    | 13.1 missing          | Comparison of gross expected losses by Case, catastrophe-prone lines.            |
+|  S   | Table  |   13    | 13.2, 13.3, 13.4      | Constant 0.10 ROE pricing for Case Study, classical PCP methods.                 |
+|  T   | Figure |   15    | 15.2 - 15.7 (G/N)     | Twelve plot.                                                                     |
+|  U   | Figure |   15    | 15.8, 15.9, 15.10     | Capital density by layer.                                                        |
+|  V   | Table  |   15    | 15.35, 15.36, 15.37   | Constant 0.10 ROE pricing for Cat/Non-Cat Case Study, distortion, SRM methods.   |
+|  W   | Figure |   15    | 15.11                 | Loss and loss spectrums.                                                         |
+|  X   | Figure |   15    | 15.12, 15.13, 15.14   | Percentile layer of capital  allocations by asset level.                         |
+|  Y   | Table  |   15    | 15.38, 15.39, 15.40   | Percentile layer of capital  allocations compared to distortion allocations.     |
+
+"""
+        sio.write(txt)

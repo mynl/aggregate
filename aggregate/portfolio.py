@@ -985,7 +985,7 @@ class Portfolio(object):
         """
 
         if kind == 'middle':
-            logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
+            # logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
             kind = 'lower'
 
         assert kind in ['lower', 'upper'], 'kind must be lower or upper'
@@ -2069,7 +2069,7 @@ class Portfolio(object):
         display(temp.style)
 
     def add_exa(self, df, ft_nots=None):
-        """
+        r"""
         Use fft to add exeqa_XXX = E(X_i | X=a) to each dist
 
         also add exlea = E(X_i | X <= a) = sum_{x<=a} exa(x)*f(x) where f is for the total
@@ -4138,6 +4138,8 @@ class Portfolio(object):
                 exhibit.loc[(m, 'a'), :] = exhibit.loc[(m, 'P'), :] + exhibit.loc[(m, 'Q'), :]
         except Exception as e:
             logger.error(f'Exception {e} creating LR, P, Q, ROE, or PQ')
+            print('Printing from portfolio line 4141.')
+            display(exhibit.head())
         # print(ans.distortion.name)
         # display(exhibit)
         ans.audit_df.loc['TVaR@'] = p_t
@@ -5885,6 +5887,64 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     @property
     def n_units(self):
         return len(self.line_names)
+
+    def swap_density_df(self, new_df, padding=1):
+        """
+        EXPERIMENTAL FUNCTION
+        TODO: Deal with stats? Create as a stand alone function and create the container portfolio too?
+        TODO: is this actually worth doing; are empirical distributions really that slow?
+        Swap out density_df for a new density_df created from direct input of line densities.
+        This sidesteps all Aggregate object creation. The resulting object has invalid stats.
+        USE WITH CAUTION. ``self`` must have the right line names.
+
+        Intended use case: you know the marginal densities as numerical distributions and
+        want to compute the sums, exas etc. Generally best to create the object ``port0`` as
+        a trivial object with the correct line names and then swap out. Example::
+
+            port0 = build('port Test agg A dfreq [1] dsev[1] agg B dfreq [1] dsev [1]')
+            port1 = build('port T2 agg A 1 claim sev lognorm 100 cv .3 fixed agg B 1 claim sev gamma 100 cv .3 fixed')
+            new_df = port1.density_df.filter(regex=port1.line_name_pipe + '|loss').drop(columns='p_total')
+            port0.swap_density_df(new_df)
+
+        port0 now has the same ``density_df`` as ``port1``.
+        """
+
+        from aggregate.utilities import ft, ift
+
+        # swap out marginals
+        self.density_df = new_df
+        self.log2 = int(np.log2(len(new_df)))
+        self.padding = padding
+
+        # recompute sums
+        ft_all = None
+        ft_line_density = {}
+        for agg in self.agg_list:
+            raw_nm = agg.name
+            nm = f'p_{agg.name}'
+            ft_line_density[raw_nm] = ft(self.density_df[nm], padding, None)
+            if ft_all is None:
+                ft_all = np.copy(ft_line_density[raw_nm])
+            else:
+                ft_all *= ft_line_density[raw_nm]
+        self.density_df['p_total'] = np.real(ift(ft_all, padding, None))
+        ft_nots = {}
+        for line in self.line_names:
+            ft_not = np.ones_like(ft_all)
+            if np.any(ft_line_density[line] == 0):
+                # have to build up
+                for not_line in self.line_names:
+                    if not_line != line:
+                        ft_not *= ft_line_density[not_line]
+            else:
+                if len(self.line_names) > 1:
+                    ft_not = ft_all / ft_line_density[line]
+            ft_nots[line] = ft_not
+
+        # do add_exa calculation
+        self.add_exa(self.density_df, ft_nots)
+
+        # done!
 
 def check01(s):
     """ add 0 1 at start end """

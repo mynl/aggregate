@@ -2755,7 +2755,7 @@ class Aggregate(Frequency):
         """
 
         if kind == 'middle' and getattr(self, 'middle_warning', 0) == 0:
-            logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
+            # logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
             self.middle_warning = 1
 
         if kind == 'middle':

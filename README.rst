@@ -67,11 +67,14 @@ Version History
 
 * Added ``sample_df`` dataframe to ``Portfolio`` when created from a sample
   to store the sample. Original sample is needed in various applications.
+* Added ``swap_density_df(self, new_df, padding=1)`` to ``Portfolio``.
+* Fixed errors in Case Studies caused by changes in Pandas.
+* Added ability to create Markdown case output, rather than HTML.
 
 0.22.0
 ~~~~~~~~~~
 
-* Created version 0.22.0, convolation for AAS submission
+* Created version 0.22.0, "convolation" for AAS submission
 
 0.21.4
 ~~~~~~~~

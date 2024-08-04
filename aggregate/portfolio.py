@@ -2753,8 +2753,8 @@ class Portfolio(object):
             # print(f'{name}\t{i: 3d}\t{fx+premium_target: 8.3f}\t{shape:8.3f}\t{fxp:8.3f}\n\n')
             if abs(fx) > 1e-5:
                 logger.warning(
-                    f'Portfolio.calibrate_distortion | Questionable convergenge! {name}, target '
-                    f'{premium_target} error {fx}, {i} iterations')
+                    f'Portfolio.calibrate_distortion | Questionable convergence for {name} distortion, target '
+                    f'{premium_target} error {fx} after {i} iterations')
 
         # build answer
         dist = Distortion(name=name, shape=shape, r0=r0, df=df)

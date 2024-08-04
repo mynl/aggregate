@@ -649,7 +649,8 @@ class Distortion(object):
     def s_gs_distortion(s, gs, display_name=''):
         """
         Make a convex envelope distortion from {s, g(s)} points.
-
+        TODO: allow mass at zero; currently shape=0 passes to no mass at zero
+        even if s,gs implies one. LAZY
         :param s: iterable (can be converted into numpy.array
         :param gs:
         :param display_name:
@@ -657,7 +658,7 @@ class Distortion(object):
         """
         s = np.array(s)
         gs = np.array(gs)
-        return Distortion('convex', None, df=pd.DataFrame({'s': s.flat, 'gs': gs.flat}),
+        return Distortion('convex', 0, df=pd.DataFrame({'s': s.flat, 'gs': gs.flat}),
                           col_x='s', col_y='gs', display_name=display_name)
 
     def price(self, ser, a=np.inf, kind='ask', S_calculation='forwards'):

@@ -25,13 +25,13 @@ class Distortion(object):
 
     # make these (mostly) immutable...avoid changing by mistake
     _available_distortions_ = ('ph', 'wang', 'cll', 'lep', 'ly', 'clin', 'dual', 'ccoc', 'tvar',
-                               'bitvar', 'convex', 'tt')
+                               'bitvar', 'convex', 'tt', 'beta')
     _has_mass_ = ('ly', 'clin', 'lep', 'roe')
     _med_names_ = ("Prop Hzrd", "Wang", 'Capd Loglin', "Lev Equiv", "Lin Yield", "Capped Linear", "Dual Mom",
-                   'Const CoC', "Tail VaR", 'BiTVaR', "Convex Env", 'Wang-tt')
+                   'Const CoC', "Tail VaR", 'BiTVaR', "Convex Env", 'Wang-tt', 'Beta')
     _long_names_ = ("Proportional Hazard", "Wang-normal", 'Capped Loglinear', "Leverage Equivalent Pricing",
                     "Linear Yield", "Capped Linear", "Dual Moment", "Constant CoC", "Tail VaR",
-                    'BiTVaR', "Convex Envelope", 'Wang-tt')
+                    'BiTVaR', "Convex Envelope", 'Wang-tt', 'Beta')
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'ccoc', 'tvar', 'wtdtvar,  'convex')
     _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,   .1,     0.15,     .15)
@@ -52,15 +52,24 @@ class Distortion(object):
         """
 
         if pricing and strict:
-            return tuple((i for i in cls._available_distortions_[:-4] if i not in cls._has_mass_))
+            return tuple((i for i in cls._available_distortions_[:-5] if i not in cls._has_mass_))
         elif pricing:
-            return cls._available_distortions_[:-2]
+            return cls._available_distortions_[:-3]
         else:
             return cls._available_distortions_
 
     def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y='', display_name=''):
         """
         Create a new distortion.
+
+        For the beta distribution:
+
+        * A synthesis of risk measures for capital adequacy
+        * Wirch and Hardy, IME 1999
+        * 0<a<=1, b>= 1
+        * b=1 is a PH with rho = 1/a
+        * a=1 is a dual with rho = b
+
 
         Tester: ::
 
@@ -82,7 +91,7 @@ class Distortion(object):
                 display(df.query(' abs(gg_inv - g_invg) > 1e-5'))
 
         :param name: name of an available distortion, call ``Distortion.available_distortions()`` for a list
-        :param shape: float or [float, float]
+        :param shape: float or [float, float] for beta
         :param shape: shape parameter
         :param r0: risk free or rental rate of interest
         :param df:  for convex envelope, dataframe with col_x and col_y used to parameterize or df for t
@@ -120,6 +129,23 @@ class Distortion(object):
 
             def g_prime(x):
                 return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
+
+        elif self._name == 'beta':
+            a, b = self.shape
+            assert 0 < a <= 1, f'a parameter must be in (0,1], not {a}'
+            assert b >= 1, f'b parameter must be >= 1, not {b}'
+            fz = ss.beta(a, b)
+            self.has_mass = False
+
+            def g(x):
+                return fz.cdf(x)
+
+            def g_inv(x):
+                return fz.ppf(x)
+
+            def g_prime(x):
+                return fz.pdf(x)
+
 
         elif self._name == 'wang':
             lam = self.shape
@@ -340,7 +366,7 @@ class Distortion(object):
         if self.display_name != '':
             s = self.display_name
             return s
-        elif isinstance(self.shape, str):
+        elif isinstance(self.shape, (list, tuple, str)):
             s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape}'
         else:
             s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape:.3f}'

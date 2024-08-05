@@ -70,6 +70,7 @@ Version History
 * Added ``swap_density_df(self, new_df, padding=1)`` to ``Portfolio``.
 * Fixed errors in Case Studies caused by changes in Pandas.
 * Added ability to create Markdown case output, rather than HTML.
+* Added beta distortion (generalizes the PH and dual)
 
 0.22.0
 ~~~~~~~~~~

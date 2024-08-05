@@ -23,7 +23,7 @@ import scipy.fft as sft
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import broyden2, newton_krylov, brentq
-from scipy.optimize.nonlin import NoConvergence
+from scipy.optimize import NoConvergence
 from scipy.special import kv, binom, loggamma
 from scipy.stats import multivariate_t
 from IPython.core.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG

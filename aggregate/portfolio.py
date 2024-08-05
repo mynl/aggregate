@@ -3026,7 +3026,7 @@ class Portfolio(object):
             # print(f'augmented_df not truncated (no exeqa error\nS==0 on len(S==0) = {np.sum(gSeq0)} elements')
 
         # S better be decreasing
-        if not np.alltrue(df.S.iloc[1:] <= df.S.iloc[:-1].values):
+        if not np.all(df.S.iloc[1:] <= df.S.iloc[:-1].values):
             logger.error('S = density_df.S is not non-increasing...carrying on but you should investigate...')
 
         for line in self.line_names:

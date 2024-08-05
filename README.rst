@@ -71,6 +71,7 @@ Version History
 * Fixed errors in Case Studies caused by changes in Pandas.
 * Added ability to create Markdown case output, rather than HTML.
 * Added beta distortion (generalizes the PH and dual)
+* Updated np.alltrue to np.all; updated NoConverge in scipy.optimize. 
 
 0.22.0
 ~~~~~~~~~~

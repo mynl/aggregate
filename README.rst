@@ -17,12 +17,14 @@ that usually require simulation, making it as easy to work with an aggregate (co
 as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
 and is implemented in Python under an open source BSD-license.
 
-White Paper (new July 2023)
-----------------------------
+White Paper (updated September 2024)
+-------------------------------------
 
-The `White Paper <https://github.com/mynl/aggregate/blob/master/cheat-sheets/Aggregate_white_paper.pdf>`_ describes
+The `White Paper <https://github.com/mynl/aggregate/blob/master/cheat-sheets/aggregate_accepted_2024-05-30.pdf>`_ describes
 the purpose, implementation, and use of the class ``aggregate.Aggregate`` that
-handles the creation and manipulation of compound frequency-severity distributions.
+handles the creation and manipulation of compound frequency-severity distributions. This paper has now
+been accepted by the `Annals of Actuarial Science <https://www.cambridge.org/core/journals/annals-of-actuarial-science>`_
+in the Actuarial Software series and is under copyediting.
 
 Documentation
 -------------
@@ -71,7 +73,18 @@ Version History
 * Fixed errors in Case Studies caused by changes in Pandas.
 * Added ability to create Markdown case output, rather than HTML.
 * Added beta distortion (generalizes the PH and dual)
-* Updated np.alltrue to np.all; updated NoConverge in scipy.optimize. 
+* Updated ``np.alltrue`` to ``np.all``; updated ``NoConverge`` in ``scipy.optimize``.
+* Added ``Distortion.calibrate`` to calibrate to a pricing target from input ``density_df`` (TODO: needs testing).
+* Added `wtdtvar`` to ``Distortion`` to compute the weighted TVaR from p values and weights,
+  masses and mean components.
+* Added ``minimum`` to ``Distortion`` to create a new ``Distortion`` as the minimum of a list of input Distortions. The list is passed as shape.
+* Added ``random_distortion`` to ``Distortions`` to compute a random distortion, useful
+  for testing!
+* Fixed ``tvar`` distortion to allow p=1 (max)
+* Simplified ``Distortion.__repr__`` and ``Distortion.__str__``.
+* Added `Distortion.ph``, ``.wang``, ...,  methods for common distortions, with better
+  hints for parameters. All are static methods that delegate to the constructor.
+* Fixed documentation build errors.
 
 0.22.0
 ~~~~~~~~~~
@@ -424,6 +437,11 @@ Install from source
 ::
 
     git clone --no-single-branch --depth 50 https://github.com/mynl/aggregate.git .
+
+    # to test from local machine
+    # mkdir /temp/dm
+    # cd /temp/dm
+    # git clone c:/s/telos/python/aggregate_project
 
     git checkout --force origin/master
 

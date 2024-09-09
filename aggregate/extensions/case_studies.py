@@ -29,7 +29,7 @@ from PIL import Image
 from platform import platform
 import psutil
 import re
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid as cumtrapz
 import shlex
 from subprocess import Popen
 from titlecase import titlecase as title

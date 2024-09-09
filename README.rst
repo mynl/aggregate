@@ -60,6 +60,7 @@ on Linux/Unix or MacOS. Finally, install the package::
 
 All the code examples have been tested in such a virtual environment and the documentation will build.
 
+To build the documentation run
 
 Version History
 -----------------
@@ -442,20 +443,36 @@ Install from source
     # mkdir /temp/dm
     # cd /temp/dm
     # git clone c:/s/telos/python/aggregate_project
+    # cd aggregate_project
 
     git checkout --force origin/master
 
     git clean -d -f -f
 
     python -mvirtualenv ./venv
+    # activate the virtual environment
+
+    pip install aggregate[dev]
 
     # ./venv/Scripts on Windows
-    ./venv/bin/python -m pip install --exists-action=w --no-cache-dir -r requirements.txt
+    #./venv/bin/python -m pip install --exists-action=w --no-cache-dir -r requirements.txt
 
     # to create help files
-    ./venv/bin/python -m pip install --upgrade --no-cache-dir pip setuptools<58.3.0
+    #./venv/bin/python -m pip install --upgrade --no-cache-dir pip setuptools<58.3.0
 
-    ./venv/bin/python -m pip install --upgrade --no-cache-dir pillow mock==1.0.1 alabaster>=0.7,<0.8,!=0.7.5 commonmark==0.9.1 recommonmark==0.5.0 sphinx<2 sphinx-rtd-theme<0.5 readthedocs-sphinx-ext<2.3 jinja2<3.1.0
+    #./venv/bin/python -m pip install --upgrade --no-cache-dir pillow mock==1.0.1 alabaster>=0.7,<0.8,!=0.7.5 commonmark==0.9.1 recommonmark==0.5.0 sphinx<2 sphinx-rtd-theme<0.5 readthedocs-sphinx-ext<2.3 jinja2<3.1.0
+
+    # make the docs script
+    python -m pip install --upgrade --no-cache-dir pip setuptools
+    python -m pip install --upgrade --no-cache-dir sphinx readthedocs-sphinx-ext
+    python -m pip install --upgrade --upgrade-strategy only-if-needed --no-cache-dir .[pyproject.toml,dev]
+    cat docs/conf.py
+
+    python -m sphinx -T -b html -d _build/doctrees -D language=en . $READTHEDOCS_OUTPUT/html
+    python -m sphinx -T -b latex -d _build/doctrees -D language=en . $READTHEDOCS_OUTPUT/pdf
+
+    cat latexmkrc
+    latexmk -r latexmkrc -pdf -f -dvi- -ps- -jobname=aggregate -interaction=nonstopmode
 
 Note: options from readthedocs.org script.
 

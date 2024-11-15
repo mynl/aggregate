@@ -16,7 +16,7 @@ from scipy import interpolate
 from scipy.optimize import newton
 from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov, brentq
-from scipy.optimize import NoConvergence
+from scipy.optimize import NoConvergence  # noqa
 from scipy.interpolate import interp1d
 from textwrap import fill
 

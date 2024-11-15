@@ -65,6 +65,35 @@ To build the documentation run
 Version History
 -----------------
 
+Conda Forge: https://github.com/conda-forge/aggregate-feedstock
+https://anaconda.org/conda-forge/aggregate/files
+
+0.24.0
+~~~~~~~~~~
+* Added state to Distortions so they can be pickled. Involved separating part of ``Distortion.__init__``
+  into a new method, ``Distortion._complete_init``. This is called from ``__init__`` and ``__setstate__``.
+  Ensured _complete_init refers to arguments as self.argname, not argname and set self
+  variables in class ``__init__`` method.
+* Fixed mixture g functions to handle input multidimensional arrays.
+* Simplified ``Distortion.__repr__`` and ``Distortion.__str__``.
+* Added ``Distortion.id`` to generate a unique ID depending on ``__dict__`` argument elements.
+* Corrected ``g_prime`` for minimum distortion.
+* Fixed biTVaR distortion to handle p1==1 by including the mass explicitly.
+* Added ``Distortion.price_ex`` to combine best of price and price2 methods and improve flexibility. It sorts and summarizes if needed. Optional return formats.
+* Added four numba compiled functions to Distortion for fast computation of
+  g.g(1-ps.cumsum()) and g.price( kind='ask'). These are tvar_gS, bitvar_gS,
+  tvar_ra (for risk adjusted expected value) and bitvar_ra. In each case the
+  values are computed without any copies of the original data, making them
+  far more memory efficient for very large input arrays. At the extreme,
+  bitvar_ra results in a speed up of the order of 2000x in realistic
+  situations, even with small (100s) input vectors. The functions are static
+  members of Distortion (numba requirement). They are not parallelized
+  because of the cumulative computation of S. See the file
+  PyWork/Distortion-price-tester.ipynb for tests (TODO: integraete into the
+  documentation.)  This addition results in numba being a required package.
+* Removed dependency on ``titlecase`` package.
+* Removed ``Distortion.calibrate`` method, which was not used and never tested. It lives with ``Portfolio``.
+
 0.23.0
 ~~~~~~~~~~
 

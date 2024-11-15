@@ -35,7 +35,8 @@ dependencies = [
     "psutil",
     "Pygments",
     "scipy>=1.11",
-    "titlecase",
+#    "titlecase",
+    "numba",
 ]
 license = {text = "BSD-3-Clause"}
 requires-python = ">=3.10"

@@ -1535,10 +1535,16 @@ class Portfolio(object):
             self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
         try:
             self.audit_df['MeanErr'] = self.audit_df['EmpMean'] / self.audit_df['Mean'] - 1
+        except ZeroDivisionError as e:
+            pass
+        try:
             self.audit_df['CVErr'] = self.audit_df['EmpCV'] / self.audit_df['CV'] - 1
+        except ZeroDivisionError as e:
+            pass
+        try:
             self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
         except ZeroDivisionError as e:
-            raise e
+            pass
 
     @property
     def valid(self):
@@ -2316,6 +2322,10 @@ class Portfolio(object):
         """
         return ift(x, self.padding, tilt)
 
+    def add_eta_mu(self):
+        """ convenience function to just add the eta-mus. """
+        self.add_exa_details(self.density_df, eta_mu='only')
+
     def add_exa_details(self, df, eta_mu=False):
         """
         From add_exa, details for epd functions and eta_mu flavors.
@@ -2380,7 +2390,10 @@ class Portfolio(object):
                 ft_line_density[line] = ft(self.density_df[f'p_{line}'], self.padding, None)
             for line in self.line_names:
                 ft_not = np.ones_like(ft_all)
-                if np.any(ft_line_density[line] == 0):
+                # this fails because the ft can contain very small quantites
+                # if np.any(ft_line_density[line] == 0):
+                # more robust test (tried 2 * np.finfo(float).eps but that failed)
+                if np.abs(ft_line_density[line]).min() < 1e-10:
                     # have to build up
                     for not_line in self.line_names:
                         if not_line != line:
@@ -2389,6 +2402,9 @@ class Portfolio(object):
                     if len(self.line_names) > 1:
                         ft_not = ft_all / ft_line_density[line]
                 self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, None))
+
+        if eta_mu == 'only':
+            return
 
         for col in self.line_names:
             # fill in ημ
@@ -2467,7 +2483,9 @@ class Portfolio(object):
             # capital and epd functions: for i = 0 and 1 we want line and not line
             loss_values = df.loss.values
             # only have type 2 when eta_mu is True
-            options = [0, 1, 2] if eta_mu else [0, 1]
+            # this lets add_exa_details be called with eta_mu=True stand-alone
+            options = [] if self._epd_2_assets is None else (
+                [0, 1, 2] if eta_mu else [0, 1])
             for i in options:
                 epd_values = -df['epd_{:}_{:}'.format(i, col)].values
                 # if np.any(epd_values[1:] <= epd_values[:-1]):
@@ -2481,7 +2499,7 @@ class Portfolio(object):
                 self._assets_2_epd[(col, i)] = minus_ans_wrapper(
                     interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
                                          fill_value='extrapolate'))
-            if eta_mu:
+            if eta_mu and self._epd_2_assets is not None:
                 for i in [0, 1]:
                     epd_values = -df['epd_{:}_ημ_{:}'.format(i, col)].values
                     self._epd_2_assets[('not ' + col, i)] = minus_arg_wrapper(
@@ -2490,18 +2508,19 @@ class Portfolio(object):
                     self._assets_2_epd[('not ' + col, i)] = minus_ans_wrapper(
                         interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
                                              fill_value='extrapolate'))
-        epd_values = -df['epd_0_total'].values
-        # if np.any(epd_values[1:] <= epd_values[:-1]):
-        #     print('total')
-        #     print(epd_values[1:][epd_values[1:] <= epd_values[:-1]])
-        # raise ValueError('Need to be sorted ascending')
-        loss_values = df.loss.values
-        self._epd_2_assets[('total', 0)] = minus_arg_wrapper(
-            interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True,
-                                 fill_value='extrapolate'))
-        self._assets_2_epd[('total', 0)] = minus_ans_wrapper(
-            interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
-                                 fill_value='extrapolate'))
+        if self._epd_2_assets is not None:
+            epd_values = -df['epd_0_total'].values
+            # if np.any(epd_values[1:] <= epd_values[:-1]):
+            #     print('total')
+            #     print(epd_values[1:][epd_values[1:] <= epd_values[:-1]])
+            # raise ValueError('Need to be sorted ascending')
+            loss_values = df.loss.values
+            self._epd_2_assets[('total', 0)] = minus_arg_wrapper(
+                interpolate.interp1d(epd_values, loss_values, kind='linear', assume_sorted=True,
+                                     fill_value='extrapolate'))
+            self._assets_2_epd[('total', 0)] = minus_ans_wrapper(
+                interpolate.interp1d(loss_values, epd_values, kind='linear', assume_sorted=True,
+                                     fill_value='extrapolate'))
 
     @property
     def epd_2_assets(self):
@@ -3559,31 +3578,25 @@ class Portfolio(object):
 
     def price(self, p, distortion=None, *, allocation='lifted', view='ask', efficient=True):
         """
-        Price using regulatory capital and pricing distortion functions.
+        Price total using regulatory capital and pricing distortion functions and allocate to units.
 
-        Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
-        the regulatory distortion derived from p. p can be input as a probability level converted
-        to assets using `kind`, a level of assets directly (snapped to index).
+        Compute rho(X wedge q(p)) where rho corresponds to the pricing distortion and q is the
+        quantile function for the total. p is input as a probability level and is converted
+        to assets using VaR (and hence snapped to the index). If p > 1, it is interpreted as
+        an asset level.
 
-        Regulatory capital distortion is applied on unlimited basis.
+        For the linear allocation all states >= a must be collapsed using objective probabilities to
+        a single state.
 
         Do not attempt to use with a weight_df dataframe from Bounds. For that, use the bounds
         object logic directly which is much more efficient.
-
-        The argument ``kind`` has been dropped, it is always ``'var'``. If that is not the case, convert your
-        asset level to a VaR threshold.
-
-        Updated: May 2023
-        Turns out, really awkward to return the dictionary. In most calls there is just one
-        distortion passed in. The result of the last distortion are reported in ans.price, and there
-        is a new price_dict for the price of each distortion. T
 
         :param p: float; if >1 assets if <1 a prob converted to quantile
         :param distortion: a distortion, list or dictionary (name: dist) of distortions. If None then
           ``self.dists`` dictionary is used.
         :param allocation: 'lifted' (default for legacy reasons) or 'linear': treatment in default scenarios. See PIR.
         :param view: bid or ask
-        :param efficient: for apply_distortion, lifted only
+        :param efficient: for apply_distortion, lifted only.
         :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
         """
 
@@ -3667,29 +3680,34 @@ class Portfolio(object):
                 gS = pd.DataFrame(gS, index=S.index, columns=['S'])
                 gps = pd.DataFrame(-np.diff(gS, prepend=1, axis=0), index=S.index)
 
-                if self.sf(a_reg) > (1 - self.density_df.p_total.sum()):
-                    print('Adjusting tail losses, but skipping\n'
-                          f'Triggering sf(areg) > 1 - p_total: {self.sf(a_reg):.5g} code ')
-                    # logger.info(f'Triggering sf(areg) > 1 - p_total: {1-self.sf(a_reg):.5g} code ')
+                if self.sf(a_reg) > (1 - self.density_df.p_total.sum()) and p != 1:
+                    # if p==1 is input then by definition sf(a) = 0 even if there are numerical
+                    # rounding issues, so this code can be skipped
+                    logger.info('Collapsing tail events by replacing exeqa with a * exi_xgta')
+                    logger.info(f'\tsf(areg) > 1 - p_total: {self.sf(a_reg):.5g} > '
+                          f'{1 - self.density_df.p_total.sum():.5g} code ')
                     # NOTE: this adjustment requires the whole tail; it has been computed in
                     # density_df. However, when you come to risk adjusted version it hasn't
                     # been computed. That's why the code above falls back to apply distortion.
-                    # see notes below in slow method
-                    if 1:
-                        # painful issue here with the naming leading to
-                        rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
-                        # this regex does not capture the sum column if present
-                        exeqa.loc[a_reg, :] = self.density_df.filter(regex='exi_xgta_.+$(?<!exi_xgta_sum)').\
-                                                rename(columns=rner).loc[a_reg - self.bs] * a_reg
-                        # there is no exi_xgta_total, so that comes out as missing
-                        # need to fill in value
-                        if np.isnan(exeqa.loc[a_reg, 'exeqa_total']):
-                            exeqa.loc[a_reg, 'exeqa_total'] = exeqa.loc[a_reg].fillna(0).sum()
-                        # the lifted/natural difference is that here scenarios in the tail are not re-
-                        # weighted using risk adjusted probabilities. They are collapsed with objective
-                        # probs.
+                    # However, for the linear allocation we use the objective weights.
+                    # Here is the adjustment.
+                    # painful issue here with the naming leading to
+                    rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
+                    # this regex does not capture the sum column if present
+                    exeqa.loc[a_reg, :] = self.density_df.filter(regex='exi_xgta_.+$(?<!exi_xgta_sum)').\
+                                            rename(columns=rner).loc[a_reg - self.bs] * a_reg
+                    # there is no exi_xgta_total, so that comes out as missing
+                    # need to fill in value
+                    if np.isnan(exeqa.loc[a_reg, 'exeqa_total']):
+                        exeqa.loc[a_reg, 'exeqa_total'] = exeqa.loc[a_reg].fillna(0).sum()
+                    # The lifted/natural difference is that here scenarios in the tail are not re-
+                    # weighted using risk adjusted probabilities. They are collapsed with objective
+                    # probs.
 
-                # these are at the layer level, these compute Eq 14.20 p. 372
+                # these are at the layer level, these compute αS Eq 14.20 p. 372 inside the
+                # parenthsis and then the cumsum computes the integral, bottom p. 372 for
+                # bar S, and similarly p. 373 for premium and β (Eq 14.23 and integral at
+                # bottom of page.
                 # note that by construction S(a) = 0 so there is no extra mass at the end
                 exp_loss =   ((ps.to_numpy() * self.bs) / loss.to_numpy() * exeqa )[::-1].cumsum()[::-1]
                 alloc_prem = ((gps.to_numpy() * self.bs) / loss.to_numpy() * exeqa)[::-1].cumsum()[::-1]

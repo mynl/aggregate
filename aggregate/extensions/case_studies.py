@@ -32,7 +32,7 @@ import re
 from scipy.integrate import cumulative_trapezoid as cumtrapz
 import shlex
 from subprocess import Popen
-from titlecase import titlecase as title
+# from titlecase import titlecase as title
 import webbrowser
 
 from IPython.display import HTML, display
@@ -130,7 +130,7 @@ def universal_renamer(x):
     x = re.sub(r'^([TMV])\.', lambda m: {
         'M': 'Marginal ', 'T': 'Primary ', 'V': 'Excess '}.get(m[1]), x)
     # sensible title case
-    x = title(x)
+    x = x.title()
     # deal with embedded abbreviations (e.g. plan lr -> Plan Lr or Plan ROE -> Plan Roe)
     x = re.sub(r'\b(Roe|Cv|Lr|Rol|Uw|Epd|Ph|Hs)\b', lambda x: x[1].upper(), x)
     x = x.replace('Scaled', 'Scaled ')

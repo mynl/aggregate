@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+from collections import namedtuple
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
@@ -5,13 +7,334 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from io import StringIO
 import pandas as pd
-from textwrap import fill
+# from textwrap import fill
 import logging
+import numba
 
 from .constants import *
 from .random_agg import RANDOM
+from .utilities import short_hash
 
 logger = logging.getLogger(__name__)
+
+
+# number super-fast functions for TVaR and BiTVaR computations
+@numba.njit(parallel=False)
+def tvar_gS(probs, p):
+    """
+    Compute gS given individual probs. Equivlaent to computing
+    ``tvar.g(1 - probs.cumsum())`` for a tvar distortion.
+
+    Runs about 4x speed of g.g(1-probs.cumsum()) for TVaR. Cannot
+    parallelize because of shared S variable.
+
+    :param probs: numpy array of probabilities.
+    :param p: float, distortion parameter.
+    """
+    # shared S variable mean you cannot parallelize
+    S = 1.
+    ans = np.zeros_like(probs)
+
+    if p == 0:
+        # mean
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S <= 0:
+                ans[i] = 0
+            elif S >= 1:
+                ans[i] = 1
+            else:
+                ans[i] = S
+
+    elif p == 1:
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S > 0:
+                ans[i] = 1
+            else:
+                ans[i] = 0
+
+    else:
+        # proper tvar
+        s = 1 - p
+        m = 1 / s
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S < s:
+                ans[i] = m * S
+            else:
+                ans[i] = 1
+    return ans
+
+
+@numba.njit(parallel=False)
+def bitvar_gS(probs, p0, p1, w):
+    """
+    Compute gS given individual probs. Equivlaent to computing
+    ``bitvar.g(1 - probs.cumsum())`` for a bitvar distortion.
+
+    As usual, p0 < p1, w in (0,1) input parameters.
+    See OneNote 2024/November Numba TVaR and BiTVaR.
+
+    :param probs: numpy array of probabilities.
+    :param p0: float, distortion parameter.
+    :param p1: float, distortion parameter.
+    :param w: float, weighting to p1.
+    """
+
+    if p0 == p1:
+        # actually a tvar
+        return tvar_gS(probs, p0)
+
+    if w == 0:
+        return tvar_gS(probs, p0)
+
+    if w == 1:
+        return tvar_gS(probs, p1)
+
+    # now weight is 0 < w < 1
+    # now there are four cases (0,1), (>0, 1), (0, <1), (>0, <1)
+    s0 = 1 - p0
+    s1 = 1 - p1
+    S = 1.
+    ans = np.zeros_like(probs)
+    # height at kink
+    pt = w + (1 - w) * s1 / s0
+    if p0 == 0 and p1 == 1:
+        slope = (1 - w)
+        for i in range(len(probs)):
+            S -= probs[i]
+            # here and below say <= 0 to allow for
+            # numerical cumulation error which can result
+            # in S very small < 0
+            if S <= 0:
+                ans[i] = 0
+            else:
+                ans[i] = w + slope * S
+
+    elif p0 > 0 and p1 == 1:
+        slope = (1 - w) / s0
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S <= 0:
+                ans[i] = 0
+            elif S < s0:
+                ans[i] = w + slope * S
+            else:
+                ans[i] = 1.
+
+    elif p0 == 0 and p1 < 1:
+        # two kinks
+        slope0 = pt / s1
+        slope1 = (1 - pt) / p1
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S <= 0:
+                ans[i] = 0
+            elif S < s1:
+                ans[i] = slope0 * S
+            else:
+                ans[i] = pt + slope1 * (S - s1)
+
+    else:
+        # p0 > 0 and p1 < 1
+        # three kinks
+        slope0 = pt / s1
+        slope1 = (1 - pt) / (s0 - s1)
+        for i in range(len(probs)):
+            S -= probs[i]
+            if S <= 0:
+                ans[i] = 0
+            elif S < s1:
+                ans[i] = slope0 * S
+            elif S < s0:
+                ans[i] = pt + slope1 * (S - s1)
+            else:
+                ans[i] = 1.
+
+    return ans
+
+
+@numba.njit(parallel=False)
+def tvar_ra(probs, x, p):
+    """
+    Computes risk adjusted value in one step with no intermediate
+    arrays or copies.
+
+    Equivalent to::
+
+        dx = np.diff(x)
+        (g.g(1 - probs.cumsum())[:-1] * dx).sum() + x[0]
+
+    or to::
+
+        den = pd.Series(probs, index=x)
+        tvar.price_ex(den, kind='both', calculation='dx', as_frame=True)
+
+
+    Detects if it is computing the  mean (p==0) or the maximum (p==1)
+    and shortcuts accordingly.
+
+    :param probs: numpy array of probabilities.
+    :param x: numpy array loss outcomes, must be in ascending order.
+    :param p: float, distortion parameter.
+    """
+    # shared S variable mean you cannot parallelize
+    S = 1.
+    lastx = x[0]
+    ans = lastx    # !! remember the shift!
+
+    if p == 0:
+        # mean
+        ans = np.sum(probs * x)
+        # for i in range(len(probs) - 1):
+        #     S -= probs[i]
+        #     dx = x[i + 1] - lastx
+        #     lastx = x[i + 1]
+        #     if S <= 0:
+        #         pass
+        #     elif S >= 1:
+        #         ans += dx
+        #     else:
+        #         ans += S * dx
+
+    elif p == 1:
+        # max
+        ans = x[-1]
+        # for i in range(len(probs) - 1):
+        #     S -= probs[i]
+        #     dx = x[i + 1] - lastx
+        #     lastx = x[i + 1]
+        #     if S > 0:
+        #         ans += dx
+
+    else:
+        # proper tvar
+        s = 1 - p
+        m = 1 / s
+        for i in range(len(probs) - 1):
+            S -= probs[i]
+            dx = x[i + 1] - lastx
+            lastx = x[i + 1]
+            if S < s:
+                ans += m * S * dx
+            else:
+                ans += dx
+    return ans
+
+
+@numba.njit(parallel=False)
+def bitvar_ra(probs, x, p0, p1, w):
+    """
+    Computes risk adjusted value in one step with no intermediate
+    arrays or copies.
+
+    Equivalent to::
+
+        dx = np.diff(x)
+        (g.g(1 - probs.cumsum())[:-1] * dx).sum() + x[0]
+
+    or to::
+
+        den = pd.Series(probs, index=x)
+        tvar.price_ex(den, kind='both', calculation='dx', as_frame=True)
+
+    :param probs: numpy array of probabilities.
+    :param x: numpy array of loss outcomes, must be in ascending order.
+    :param p0: float, distortion parameter.
+    :param p1: float, distortion parameter.
+    :param w: float, weighting to p1.
+    """
+
+    if p0 == p1:
+        # actually a tvar
+        return tvar_ra(probs, x, p0)
+
+    if w == 0:
+        return tvar_ra(probs, x, p0)
+
+    if w == 1:
+        return tvar_ra(probs, x, p1)
+
+    # now weight is 0 < w < 1
+    # now there are four cases (0,1), (>0, 1), (0, <1), (>0, <1)
+    s0 = 1 - p0
+    s1 = 1 - p1
+    S = 1.
+    lastx = x[0]
+    ans = lastx
+    # height at kink
+    pt = w + (1 - w) * s1 / s0
+
+    if p0 == 0 and p1 == 1:
+        # weights mean and max
+        m = np.sum(probs * x)
+        x = x[-1]
+        ans = w * x + (1 - w) * m
+        # slope = (1 - w)
+        # for i in range(len(probs) - 1):
+        #     S -= probs[i]
+        #     dx = x[i + 1] - lastx
+        #     lastx = x[i + 1]
+        #     # here and below say <= 0 to allow for
+        #     # numerical cumulation error which can result
+        #     # in S very small < 0
+        #     if S <= 0:
+        #         pass
+        #     else:
+        #         ans += (w + slope * S) * dx
+
+    elif p0 > 0 and p1 == 1:
+        m0 = tvar_ra(probs, x, p0)
+        ans = w * x[-1] + (1 - w) * m0
+        # slope = (1 - w) / s0
+        # for i in range(len(probs) - 1):
+        #     S -= probs[i]
+        #     dx = x[i + 1] - lastx
+        #     lastx = x[i + 1]
+        #     if S <= 0:
+        #         pass
+        #     elif S < s0:
+        #         ans += (w + slope * S) * dx
+        #     else:
+        #         ans += dx
+
+    elif p0 == 0 and p1 < 1:
+        m1 = tvar_ra(probs, x, p1)
+        ans = w * m1 + (1 - w) * np.sum(probs * x)
+        # two kinks
+        # slope0 = pt / s1
+        # slope1 = (1 - pt) / p1
+        # for i in range(len(probs) - 1):
+        #     S -= probs[i]
+        #     dx = x[i + 1] - lastx
+        #     lastx = x[i + 1]
+        #     if S <= 0:
+        #         pass
+        #     elif S < s1:
+        #         ans += (slope0 * S) * dx
+        #     else:
+        #         ans += (pt + slope1 * (S - s1)) * dx
+
+    else:
+        # p0 > 0 and p1 < 1
+        # three kinks
+        slope0 = pt / s1
+        slope1 = (1 - pt) / (s0 - s1)
+        for i in range(len(probs) - 1):
+            S -= probs[i]
+            dx = x[i + 1] - lastx
+            lastx = x[i + 1]
+            if S <= 0:
+                pass
+            elif S < s1:
+                ans += (slope0 * S) * dx
+            elif S < s0:
+                ans += (pt + slope1 * (S - s1)) * dx
+            else:
+                ans += dx
+
+    return ans
 
 
 class Distortion(object):
@@ -43,8 +366,8 @@ class Distortion(object):
                     'BiTVaR', 'Weighted TVaR', "Convex Envelope", 'Wang-tt', 'Beta')
     # TODO fix examples!
     # _available_distortions_ = ('ph', 'wang', 'cll', 'lep',  'ly', 'clin', 'dual', 'ccoc', 'tvar', 'wtdtvar,  'convex')
-    _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,   .1,     0.15,     .15)
-    _eg_param_2_ =              (.5,     .75,     .5,    0.5,   1.5,   1.8,     3,   .25,    0.50,      .5)
+    _eg_param_1_ =              (.9,     .1,      .9,    0.25,  0.8,   1.1,   1.5,   .1,     0.15,     .15)  # noqa
+    _eg_param_2_ =              (.5,     .75,     .5,    0.5,   1.5,   1.8,     3,   .25,    0.50,      .5)  # noqa
     # _distortion_names_ = dict(zip(_available_distortions_, _med_names_))
     _distortion_names_ = dict(zip(_available_distortions_, _long_names_))
     renamer = _distortion_names_
@@ -83,6 +406,56 @@ class Distortion(object):
             return cls._available_distortions_[:-3]
         else:
             return cls._available_distortions_
+
+    # Custom __getstate__ to save named constructor arguments
+    def __getstate__(self):
+        # Save the constructor arguments in a state dictionary with names
+        # run through shape
+        if isinstance(self.shape, Iterable):
+            loc_shape = []
+            for x in self.shape:
+                if isinstance(x, Distortion):
+                    loc_shape.append(x.__getstate__())
+                else:
+                    loc_shape.append(x)
+        else:
+            loc_shape = self.shape
+
+        state = {
+            'name': self._name,
+            'shape': loc_shape,
+            'r0': self.r0,
+            'df': self.df,
+            'col_x': self.col_x,
+            'col_y': self.col_y,
+            'display_name': self.display_name
+        }
+        return state
+
+    def __setstate__(self, state):
+        # Unpack the state dictionary and pass it to the constructor
+        # Use __dict__.update() to restore the state...usual but doesn't work
+        # because of possible iteration in shape
+        # self.__dict__.update(state)
+        self._name = state['name']
+        self.r0 = state['r0']
+        self.df = state['df']
+        self.col_x = state['col_x']
+        self.col_y = state['col_y']
+        self.display_name = state['display_name']
+        # deal with complex shape
+        if isinstance(state['shape'], Iterable):
+            loc_shape = []
+            for x in state['shape']:
+                if isinstance(x, dict):
+                    loc_shape.append(Distortion(**x))
+                else:
+                    loc_shape.append(x)
+            self.shape = np.array(loc_shape)
+        else:
+            self.shape = state['shape']
+        # now complete the init
+        self._complete_init()
 
     def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y='', display_name=''):
         """
@@ -125,25 +498,32 @@ class Distortion(object):
         :param col_y:
         :param display_name: over-ride name, useful for parameterized convex fix distributions
         """
-
+        # constructor arguments (e.g., needed for pickling)
         self._name = name
-        self.shape = shape
         self.r0 = r0
+        self.df = df
+        self.col_x = col_x
+        self.col_y = col_y
+        self.display_name = display_name
+        self.shape = shape
+        self.min_index = None  # used for minimum distortion, returns "active" distortion index
+        self._complete_init()
+
+    def _complete_init(self):
+        """
+
+        """
         # when created by calibrate distortions extra info put here
         self.error = 0.0
         self.premium_target = 0.0
         self.assets = 0.0
         self.mass = 0.0
-        self.df = df
-        self.col_x = col_x
-        self.col_y = col_y
-        self.display_name = display_name
         g_prime = None
 
         # now make g and g_inv
         if self._name == 'ph':
             rho = self.shape
-            rhoinv = 1.0 / rho
+            rhoinv = 1.0 / rho   # noqa
             self.has_mass = False
 
             # @numba.vectorize(["float64(float64)"], nopython=True, target='parallel')
@@ -171,7 +551,6 @@ class Distortion(object):
 
             def g_prime(x):
                 return fz.pdf(x)
-
 
         elif self._name == 'wang':
             lam = self.shape
@@ -215,12 +594,14 @@ class Distortion(object):
         elif self._name == 'tvar':
             p = self.shape
             if p == 1:
+                # aka max
                 alpha = np.nan
                 self.has_mass = True
                 self.mass = 1
 
                 def g(x):
-                    return np.where(x==0, 0, 1)
+                    # <= 0 handles rounding issues gracefully
+                    return np.where(x<=0, 0, 1)
 
                 def g_inv(x):
                     return np.where(x < 1, x * (1 - p), 1)
@@ -229,6 +610,7 @@ class Distortion(object):
                     return np.where(x < 1 - p, alpha, 0)
 
             else:
+                # proper tvar or mean
                 alpha = 1 / (1 - p)
                 self.has_mass = False
 
@@ -239,15 +621,15 @@ class Distortion(object):
                     return np.where(x < 1, x * (1 - p), 1)
 
                 def g_prime(x):
-                    return np.where(x < 1 - p, alpha, 0)
+                    return np.where(x <= 1 - p, alpha, 0)
 
 
         elif self._name == 'ly':
             # linear yield
             # r0 = occupancy; rk = consumption specified in list shape parameter
             rk = self.shape
-            self.has_mass = (r0 > 0)
-            self.mass = r0 / (1 + r0)
+            self.has_mass = (self.r0 > 0)
+            self.mass = self.r0 / (1 + self.r0)
 
             def g(x):
                 return np.where(x == 0, 0, (self.r0 + x * (1 + rk)) / (1 + self.r0 + rk * x))
@@ -259,8 +641,8 @@ class Distortion(object):
             # capped linear, needs shape > 1 to make sense...needs shape >= 1-r0 else
             # problems at 1
             sl = self.shape
-            self.has_mass = (r0 > 0)
-            self.mass = r0
+            self.has_mass = (self.r0 > 0)
+            self.mass = self.r0
 
             def g(x):
                 return np.where(x == 0, 0, np.minimum(1, self.r0 + sl * x))
@@ -333,7 +715,7 @@ class Distortion(object):
             # compare Bernegger approach
             # allows to create distortions with controlled slopes at 0 and 1.
             alpha = float(self.shape)  # numpy complains about powers of integers
-            x0, x1 = df
+            x0, x1 = self.df
             assert x0 < x1, 'Error: x0 must be less than x1'
             self.has_mass = False
             self.mass = 0
@@ -381,16 +763,30 @@ class Distortion(object):
         elif self._name == 'bitvar':
             # bitvar tvar, df = p0 <p1, shape = weight on p1
             try:
-                p0, p1 = df
+                p0, p1 = self.df
                 assert p0 < p1, 'Error: p0 must be less than p1'
-                w = shape
+                w = self.shape
                 self.has_mass = (p1 == 1)
                 self.mass = w if p1 == 1 else 0
                 pt = (1 - p1) / (1 - p0) * (1 - w) + w
-                s = np.array([0.,  1 - p1, 1-p0, 1.])
-                gs = np.array([0.,     pt, 1.,   1.])
-                g = interp1d(s, gs, kind='linear', bounds_error=False, fill_value=(0,1))
-                g_inv = interp1d(gs, s, kind='linear', bounds_error=False, fill_value=(0,1))
+                # if p1==1 there is a mass, so have to be careful to put that in
+                if p1 == 1:
+                    # if p1 = 1 the result is a TVaR + max
+                    alpha = 1 / (1 - p0)
+                    def g(x):
+                        # <= 0 handles rounding issues gracefully
+                        return w * np.where(x<=0, 0, 1) + (1 - w) * np.minimum(alpha * x, 1)
+
+                    # this stupid code with fixed number wasted two days of my life.
+                    # but we don't really use g_inv so...
+                    s = np.array([0.,   1e-50, 1-p0, 1.])
+                    gs = np.array([0.,     pt, 1.,   1.])
+                    g_inv = interp1d(gs, s, kind='linear', bounds_error=False, fill_value=(0,1))
+                else:
+                    s = np.array([0.,  1 - p1, 1-p0, 1.])
+                    gs = np.array([0.,     pt, 1.,   1.])
+                    g = interp1d(s, gs, kind='linear', bounds_error=False, fill_value=(0,1))
+                    g_inv = interp1d(gs, s, kind='linear', bounds_error=False, fill_value=(0,1))
 
                 if p1 < 1:
                     def g_prime(x):
@@ -413,8 +809,8 @@ class Distortion(object):
             # wts = weights, must sum to 1, passed as df
 
             # extract inputs
-            ps = np.array(shape)
-            wts = np.array(df)
+            ps = np.array(self.shape)
+            wts = np.array(self.df)
             if 1 in ps and wts[-1] > 0:
                 self.has_mass = True
                 self.mass = wts[-1]
@@ -422,9 +818,7 @@ class Distortion(object):
                 self.has_mass = False
                 self.mass = 0
 
-            if display_name != '':
-                self.display_name = display_name
-            else:
+            if self.display_name == '':
                 self.display_name = f'wtdTVaR on {len(ps):d} points'
 
             # data checks
@@ -462,28 +856,43 @@ class Distortion(object):
 
         elif self._name  == 'minimum':
             # min of several distortion; shape is list of Distortions
-            self.has_mass = np.all([d.has_mass for d in shape])
+            self.has_mass = np.all([d.has_mass for d in self.shape])
             if self.has_mass:
-                self.mass = np.min([d.mass for d in shape])
+                self.mass = np.min([d.mass for d in self.shape])
             else:
                 self.mass = 0
 
-            if display_name != '':
-                self.display_name = display_name
-            else:
-                self.display_name = f'Minimum of {len(shape):d} distortions'
+            if self.display_name == '':
+                self.display_name = f'Minimum of {len(self.shape):d} distortions'
 
-            loc_shape = shape.copy() ## ? insulates from shape?
+            loc_shape = self.shape  # #.copy() ## ? insulates from shape?
+            def min_index(x):
+                g_values = np.array([gi.g(x) for gi in loc_shape])
+                return np.argmin(g_values, axis=0)
+            self.min_index = min_index
+
             def g(x):
                 g_values = np.array([gi.g(x) for gi in loc_shape])
                 return np.min(g_values, axis=0)
 
             def g_prime(x):
+                """
+                Note: you really need to check whether the point x is a
+                knot point for the minimum function.
+                """
+                # need to see what happens just before 1.
+                # This is a hack.
+                x = np.where(x==1, 1 - 1e-15, x)
                 g_values = np.array([gi.g(x) for gi in loc_shape])
                 # Find the index of the minimum value
                 min_index = np.argmin(g_values, axis=0)
                 # Return the derivative (g_prime) of the object that achieved the minimum
-                return np.array([loc_shape[i].g_prime(x) for i in min_index])
+                if np.isscalar(min_index):
+                    return loc_shape[min_index].g_prime(x)
+                elif np.isscalar(x):
+                    return np.array([loc_shape[i].g_prime(x) for i in min_index])
+                else:
+                    return np.array([loc_shape[i].g_prime(xi) for i, xi in zip(min_index, x)])
 
             def g_inv(y):
                 """
@@ -496,29 +905,32 @@ class Distortion(object):
         elif self._name == 'mixture':
             # mixture of several distortion; shape is list of Distortions
             # and weights are passed in df
-
-            self.has_mass = np.any([d.has_mass for d in shape])
+            # reconstuct if needed (pickle)
+            loc_shape = []
+            for x in self.shape:
+                if isinstance(x, Distortion):
+                    loc_shape.append(x)
+                else:
+                    loc_shape.append(Distortion(**x))
+            self.has_mass = np.any([d.has_mass for d in loc_shape])
             if self.has_mass:
-                self.mass = np.sum([d.mass * w for (d, w) in zip(shape, df)])
+                self.mass = np.sum([d.mass * w for (d, w) in zip(loc_shape, self.df)])
             else:
                 self.mass = 0
 
-            if display_name != '':
-                self.display_name = display_name
-            else:
-                self.display_name = f'Mixture of {len(shape):d} distortions'
+            if self.display_name == '':
+                self.display_name = f'Mixture of {len(loc_shape):d} distortions'
 
-            loc_shape = shape.copy() ## ? insulates from shape?
-            if df is None:
+            if self.df is None:
                 loc_wts = self.df = np.array([1 / len(loc_shape)] * len(loc_shape))
             else:
-                loc_wts = np.array(df.copy())
+                loc_wts = np.array(self.df.copy())
             def g(x):
                 g_values = np.array([gi.g(x) for gi in loc_shape])
                 # at this point, have to be a bit careful about the shape of the arrays
                 if g_values.ndim > 2:
                     # Flatten the higher dimensions (n1, n2) into a single dimension
-                    vals_flat = g_values.reshape(2, -1)  # shape (2, n1 * n2)
+                    vals_flat = g_values.reshape(len(loc_shape), -1)  # shape (2, n1 * n2)
 
                     # Perform the matrix multiplication
                     result_flat = loc_wts @ vals_flat  # shape (n1 * n2)
@@ -536,7 +948,7 @@ class Distortion(object):
                 # at this point, have to be a bit careful about the shape of the arrays
                 if g_values.ndim > 2:
                     # Flatten the higher dimensions (n1, n2) into a single dimension
-                    vals_flat = g_values.reshape(2, -1)
+                    vals_flat = g_values.reshape(len(loc_shape), -1)
                     result_flat = loc_wts @ vals_flat  # shape (n1 * n2)
                     result = result_flat.reshape(g_values.shape[1], g_values.shape[2])
                 else:
@@ -560,33 +972,34 @@ class Distortion(object):
                 self.mass = self.shape
 
             # use shape for number of points in calibrating data set
-            self.display_name = f'Convex on {len(df):d} points'
-            if not (0 in df[col_x].values and 1 in df[col_x].values):
+            if self.display_name == '':
+                self.display_name = f'Convex on {len(self.df):d} points'
+            if not (0 in self.df[self.col_x].values and 1 in self.df[self.col_x].values):
                 # painful...always want 0 and 1 there...but don't know what other columns in df
                 # logger.debug('df does not contain s=0/1...adding')
-                df = df[[col_x, col_y]].copy().reset_index(drop=True)
-                df.loc[len(df)] = (0,0)
-                df.loc[len(df)] = (1,1)
-                df = df.sort_values(col_x)
-            if len(df) > 2:
-                hull = ConvexHull(df[[col_x, col_y]])
+                self.df = self.df[[self.col_x, self.col_y]].copy().reset_index(drop=True)
+                self.df.loc[len(self.df)] = (0,0)
+                self.df.loc[len(self.df)] = (1,1)
+                self.df = self.df.sort_values(self.col_x)
+            if len(self.df) > 2:
+                hull = ConvexHull(self.df[[self.col_x, self.col_y]])
                 knots = list(set(hull.simplices.flatten()))
-                g = interp1d(df.iloc[knots, df.columns.get_loc(col_x)],
-                             df.iloc[knots, df.columns.get_loc(col_y)], kind='linear',
+                g = interp1d(self.df.iloc[knots, self.df.columns.get_loc(self.col_x)],
+                             self.df.iloc[knots, self.df.columns.get_loc(self.col_y)], kind='linear',
                              bounds_error=False, fill_value=(0,1))
-                g_inv = interp1d(df.iloc[knots, df.columns.get_loc(col_y)],
-                             df.iloc[knots, df.columns.get_loc(col_x)], kind='linear',
+                g_inv = interp1d(self.df.iloc[knots, self.df.columns.get_loc(self.col_y)],
+                             self.df.iloc[knots, self.df.columns.get_loc(self.col_x)], kind='linear',
                              bounds_error=False, fill_value=(0,1))
             else:
-                df = df.sort_values(col_x)
-                g = interp1d(df[col_x], df[col_y], kind='linear',
+                self.df = self.df.sort_values(self.col_x)
+                g = interp1d(self.df[self.col_x], self.df[self.col_y], kind='linear',
                              bounds_error=False, fill_value=(0,1))
-                g_inv = interp1d(df[col_y], df[col_x], kind='linear',
+                g_inv = interp1d(self.df[self.col_y], self.df[self.col_x], kind='linear',
                              bounds_error=False, fill_value=(0,1))
         else:
+            print(self._name, self.shape, self.df)
             raise ValueError(
-                "Incorrect spec passed to Distortion; implemented g types are ph, wang, tvar, "
-                "ly (linear yield), lep (layer equivalent pricing) and clin (clipped linear)")
+                f"Incorrect spec passed to Distortion; name={self._name}, shape={self.shape}, r0={self.r0}, df={self.df}")
 
         self.g = g
         self.g_inv = g_inv
@@ -642,9 +1055,19 @@ class Distortion(object):
     @staticmethod
     def bitvar(p0, p1, w=0.5):
         """
-        Utility method to create bitvar.
+        Utility method to create bitvar with :math:`p_0 < p_1`. The
+        weight w is the weight on p1. Remember p=0 corresponds to
+        the mean and p=1 to the max.
         """
-        return Distortion('bitvar', w, df=[p0, p1], display_name=f'bitvar({p0:.3g}, {p1:.3g}; {w:.3g})')
+        # first check if it is really a TVaR
+        if p0 == p1:
+            return Distortion.tvar(p0)
+        elif w == 0:
+            return Distortion.tvar(p0)
+        elif w == 1:
+            return Distortion.tvar(p1)
+        else:
+            return Distortion('bitvar', w, df=[p0, p1], display_name=f'bitvar({p0:.3g}, {p1:.3g}; {w:.3g})')
 
     @staticmethod
     def ccoc(d):
@@ -657,7 +1080,7 @@ class Distortion(object):
         return Distortion('ccoc', r, display_name=f'ccoc({r:.3g})')
 
     @staticmethod
-    def minimum(distortion_list, weights=None):
+    def minimum(distortion_list):
         """
         Utility method to create minimum of a list of distortions.
         """
@@ -693,12 +1116,21 @@ class Distortion(object):
         """
         return 1 - self.g(1 - x)
 
+    def id(self):
+        """
+        Unique ID as a short string
+        """
+        # operational end of the hose
+        bit = {k: v for k, v in self.__dict__.items() if k in ('_name', 'r0', 'df', 'shape', 'col_x', 'col_y')}
+        return short_hash(str(bit))
+
     def __str__(self):
-        if self.display_name != '':
-            s = self.display_name
-            return s
-        else:
-            return self.__repr__()
+        return self.name
+        # if self.display_name != '':
+        #     s = self.display_name
+        #     return s
+        # else:
+        #     return self.__repr__()
         # was
         # elif isinstance(self.shape, (list, tuple, str)):
         #     s = f'{self._distortion_names_.get(self._name, self._name)}, {self.shape}'
@@ -711,13 +1143,14 @@ class Distortion(object):
         # elif self.has_mass:
         #     # don't show the mass for wtdtvar
         #     s += f', mass {self.mass:.3f}'
-
-        return s
+        # return s
 
     def __repr__(self):
+        return self.name
         # Get the default __repr__ output
-        default_repr = super().__repr__()
-        return f'{self.name}: {default_repr}'
+        # this messes up plot etc. that uses repr as default title
+        # default_repr = super().__repr__()
+        # return f'{self.name}: {default_repr}'
         # # originally
         # if self.has_mass:
         #     s += f', {self.r0})'
@@ -761,11 +1194,17 @@ class Distortion(object):
             xs = np.hstack((0, np.linspace(1e-10, 1, n)))
 
         y1 = self.g(xs)
+        y2 = None   # keep linter happy
         if both:
             y2 = self.g_dual(xs)
 
         if ax is None:
-            sz = FIG_H if size=='small' else FIG_W
+            if size == 'small':
+                sz = FIG_H
+            elif isinstance(size, (float, int)):
+                sz = size
+            else:
+                sz = FIG_W
             fig, ax = plt.subplots(1,1, figsize=(sz, sz), constrained_layout=True)
 
         if c is None:
@@ -806,7 +1245,7 @@ class Distortion(object):
         return ax
 
     @classmethod
-    def test(cls, r0=0.035, df=[0.0, .9]):
+    def test(cls, r0=0.035, df=[0.0, .9]):  # noqa default class is mutable
         """
         Tester: make some nice plots of available distortions.
 
@@ -1048,7 +1487,7 @@ class Distortion(object):
         if mass:
             ps = np.append(ps, 1)
             wts = np.append(wts, mass)
-            ma = f', ms={mass:.3f}'
+            ma = f', mx={mass:.3f}'
         if mean:
             ps = np.insert(ps, 0, 0)
             wts = np.insert(wts, 0, mean)
@@ -1059,7 +1498,10 @@ class Distortion(object):
         r"""
         Compute the bid and ask prices for the distribution determined by ``ser`` with
         an asset limit ``a``. Index of ``ser`` need not be equally spaced, so it can
-        be applied to :math:`\kappa`. To do this for unit A in portfolio port::
+        be applied to :math:`\kappa`. However, the index values must be distinct.
+        Index is sorted if needed.
+
+        To apply to do kappa for unit A in portfolio port::
 
             ser = port.density_df[['exeqa_A', 'p_total']].\
                 set_index('exeqa_A').groupby('exeqa_A').\
@@ -1068,6 +1510,12 @@ class Distortion(object):
 
         Always use ``S_calculation='forwards`` method to compute S = 1 - cumsum(probs).
         Computes the price as the integral of gS.
+
+        Returns a tuple of (premium, loss) for the ask or bid price. When 'both' requested
+        returns (bid_premium, loss, ask_premium).
+
+        Generally prefer to use newer price_ex.
+        Requires ser starts at x=0.
 
         :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes need not
           be spaced evenly. ``ser`` is usually a probability column from ``density_df``.
@@ -1086,15 +1534,17 @@ class Distortion(object):
         else:
             raise ValueError(f'kind must be bid, ask, or both, not {kind}')
 
+        # unlikely to be an issue
+        if not ser.index.is_monotonic_increasing:
+            ser = ser.sort_index(ascending=True)
+
         # apply limit
         if a < np.inf:
             # ser = ser.copy()
             # tail = ser[a:].sum()
-            ser = ser[:a]
+            # fixed bug: need loc to include a
+            ser = ser.loc[:a]
             # ser[a] = tail
-
-        # unlikely to be an issue
-        ser = ser.sort_index(ascending=True)
 
         if S_calculation == 'forwards':
             S = 1 - ser.cumsum()
@@ -1120,22 +1570,20 @@ class Distortion(object):
 
     def price2(self, ser, a=None, S_calculation='forwards'):
         r"""
-        Compute the bid and ask prices for the distribution determined by ``ser`` with
-        an asset limits given by values of ``ser``. Index of ``ser`` need not be equally
-        spaced, so it can be applied to :math:`\kappa`. To do this for unit A in portfolio
-        ``port``::
+        Similar to price, and uses the exact same calculation. Returns bid and ask by
+        default in a DataFrame. Returns all cumulative sums if a is None (likely, not
+        what you want).
 
-            ser = port.density_df[['exeqa_A', 'p_total']].\
-                set_index('exeqa_A').groupby('exeqa_A').\
-                sum()['p_total']
-            dist.price(ser, port.q(0.99))
-
-        :param ser: pd.Series of is probabilities, indexed by outcomes. Outcomes must
-          be spaced evenly. ``ser`` is usually a probability column from ``density_df``.
+        Generally prefer to use newer price_ex.
+        Requires ser starts at x=0.
         """
 
         if not isinstance(ser, pd.Series):
             raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
+
+        # unlikely to be an issue
+        if not ser.index.is_monotonic_increasing:
+            ser = ser.sort_index(ascending=True)
 
         if S_calculation == 'forwards':
             S = 1 - ser.cumsum()
@@ -1161,210 +1609,180 @@ class Distortion(object):
             # no longer guaranteed that a is in ser.index
             return ans.iloc[ans.index.get_indexer([a], method='nearest')]
 
-    @staticmethod
-    def calibrate(self, name, premium_target, density_df, assets=np.inf, df=None):
+    def price_ex(self, ser, a=np.inf, kind='ask', method='dx', S_calculation='backwards',
+                 as_frame=False):
         """
-        TODO: TEST THIS!! 
-        Find transform to hit a premium target.
-        Based off Portfolio.calibrate_distortion, without many of the options.
-        Assumes cumsum S_calc method. No funky adjustments. Assumes S is passed in as
-        argument.
+        Updated version of price and price2 that should be used in the future.
 
-        :param name: type of distortion
-        :param premium_target: target premium
-        :param density_df: from Portfolio, Aggregate, or similar. Needs xs index and S column
-        :param assets: optional asset level, default unlimited (ccoc not available)
-        :param df: [p0, p1] for BiTVaR distortion
-        :return: newly created Distortion object achieving desired pricing.
+        Always uses S_calculation='forwards' method to compute S = 1 - cumsum(probs).
+        Sorts ser if needed.
+
+        if calculation 'dx' computes the price as the integral of gS dx. (This method
+        has fewer diffs).
+        if calculation 'ds' computes the prices as the integralk of x d(gS).
+
+        Both methods require the index to be sorted, so that is checked and handled
+
+        Neither method requires the index to be unique.
+
+        kind = ask, bid or both.
+
+        Asset level a is required to be in the index of ser, there is no interpolation.
+
+        There is an ambiguity here about a. If you want the unlimited price of an
+        unbounded variable then you integrate to infinity. In the numerical approximation
+        you integrate over all ser values. In that canse there is no a P(X>a) term
+        added in the dgS method, because Pr(X>inf)=0. However, if X is actually bounded
+        and as a mass at its max value then you do need to add xPr(X>
+
+        Returns a namedtuple.
+
+        summarize=True automatically summarizes the index if it is not unique.
+
+        if as_frame is True, returns a DataFrame with bid, el, and ask columns,
+        otherwise returns a namedtuple with bid, el, and ask fields.
+
+        If S_calculation is 'forwards', S is computed as 1 - ser.cumsum(). If 'backwards',
+        it is computed as p_total[::-1].cumsum()[::-1].shift(-1, fill_value=0). This is computed
+        before p is truncated for a.
+
+        Because of potential underflow issues, the backwards method for computing the ask
+        is more reliable. Therefore it has become the default.
+
+        When there are thin tails, neither method is reliable for the bid
+        because g_dual(s) = 1 - g(1 - s).
         """
+        # input audits
+        assert kind in ['bid', 'ask', 'both'], "kind must be 'bid', 'ask', or 'both'"
+        assert method in ['dx', 'ds'], "method must be 'dx' or 'ds'"
+        assert S_calculation in ['forwards', 'backwards'], "S_calculation must be 'forwards' or 'backwards'"
+        if not isinstance(ser, pd.Series):
+            raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
+        assert ser.index.is_monotonic_increasing, 'ser index must be sorted ascending'
+        # need
+        if not ser.index.is_monotonic_increasing:
+            ser = ser.sort_index(ascending=True)
 
-        Splus = (1 - density_df.loc[0:assets, 'p_total'].cumsum()).values
-        bs = density_df.index[1] - density_df.index[0]
+        if S_calculation == 'forwards':
+            # truncate: note here you need ser a Series and you need to use
+            # .loc to truncate at a and include a. Otherwise, it may not be included.
+            if a < np.inf:
+                assert a in ser.index, f'a={a} must be in the index of ser'
+                # notice this includes a at the end, which is not needed
+                # to compute the integral Sdx integral (but is for the xdS)
+                ser = ser.loc[:a]
+            # calculation using forwards method
+            S = np.maximum(0, 1 - ser.cumsum())
+            if a == np.inf:
+                # if a = inf then you want the last prob to be zero come what may
+                S.iloc[-1] = 0
+        elif S_calculation == 'backwards':
+            # there is an implicit assumption here that ser.sum() == 1.
+            if not np.allclose((ser.sum()), (1)):
+                print(f'WARNING: ser.sum() = {ser.sum()} is not 1.')
+            S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]
+            S = np.minimum(1, S)
+            if a < np.inf:
+                assert a in ser.index, f'a={a} must be in the index of ser'
+                S = S.loc[:a]
+            # note that by construction the last element here is automatically zero
 
-        last_non_zero = np.argwhere(Splus)
-        ess_sup = 0
-        if len(last_non_zero) == 0:
-            # no nonzero element
-            last_non_zero = len(Splus) + 1
+        gS = dual_gS = None
+        el = bid = ask = np.nan   # keep the linter happy
+
+        if kind == 'ask':
+            gS = np.array(self.g(S))
+        elif kind == 'both':
+            gS = np.array(self.g(S))
+            dual_gS = np.array(self.g_dual(S))
+        elif kind == 'bid':
+            dual_gS = np.array(self.g_dual(S))
+
+        # at this point S is a Series, and gS and dual_gS are numpy arrays
+        if method == 'dx':
+            # note: the last value of S is for prob > a, so it is not used.
+            dx = np.diff(S.index)
+            x0 = S.index[0]
+            el = (S.iloc[:-1].values * dx).sum() + x0
+            if gS is not None:
+                ask = (gS[:-1] * dx).sum() + x0
+            if dual_gS is not None:
+                bid = (dual_gS[:-1] * dx).sum() + x0
+
+        elif method == 'ds':
+            # the last adjustment to the xdgS integral is to add
+            # a P(X>a) provided a is finite. To simplify math:
+            if a == np.inf:
+                a = 0
+            dS = np.diff(S, prepend=1.)
+            x = np.array(S.index)
+            # S is a Series
+            # int gS dx = - x S + a S - 0 S0
+            el = -((x * dS).sum()) + a * S.iloc[-1]
+            if gS is not None:
+                dgS = np.diff(gS, prepend=1.)
+                ask = -((x * dgS).sum()) +a * gS[-1]
+            if dual_gS is not None:
+                ddual_gS = np.diff(dual_gS, prepend=1.)
+                bid = -((x * ddual_gS).sum()) + a * dual_gS[-1]
+
+        if as_frame:
+            return pd.DataFrame([[bid, el, ask, self.name, a]],
+                                index=[0],  # convenient to know it is 0
+                                # index=pd.MultiIndex.from_arrays([[self.name], [a]],
+                                #                                 names=['distortion', 'assets']),
+                                columns=pd.Index(
+                                    ['bid', 'el', 'ask', 'distortion', 'assets']))
         else:
-            last_non_zero = last_non_zero.max()
-        # remember length = max index + 1 because zero based
-        if last_non_zero + 1 < len(Splus):
-            # now you have issues...
-            # truncate at first zero; numpy indexing because values
-            S = Splus[:last_non_zero + 1]
-            ess_sup = density_df.index[last_non_zero + 1]
-            logger.info(
-                'Portfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
-                f'{name} at {last_non_zero}, loss = {ess_sup}')
-            print('Triggering WEIRD CODE in calibrate.')
+            # Define a namedtuple called 'Point' with fields 'x' and 'y'
+            Price = namedtuple('Price', 'bid,el,ask')
+            return Price(bid, el, ask)
+
+    # add the numba functions to the class for easy access
+    def quick_gS(self, den):
+        """
+        Calls numba version to compute ``self.g(1-den.sumsum())``
+        for tvar or bitvar distortions.
+        """
+        if self._name == 'tvar':
+            p = self.shape
+            if isinstance(den, pd.Series):
+                return tvar_gS(den.values, p)
+            else:
+                return tvar_gS(den, p)
+        elif self._name == 'bitvar':
+            p0, p1 = self.df
+            w = self.shape
+            if isinstance(den, pd.Series):
+                return bitvar_gS(den.values, p0, p1, w)
+            else:
+                return bitvar_gS(den, p0, p1, w)
         else:
-            S = (1 - density_df.loc[0:assets - bs, 'p_total'].cumsum()).values
+            raise ValueError(f'quick_gS only implemented for TVaR and BiTVaR, not {self._name}')
 
-        # now all S values should be greater than zero  and it is decreasing
-        assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
-
-        if name == 'ph':
-            lS = np.log(S)
-            shape = 0.95  # starting param
-
-            def f(rho):
-                trho = S ** rho
-                ex = np.sum(trho) * bs
-                ex_prime = np.sum(trho * lS) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'wang':
-            n = ss.norm()
-            shape = 0.95  # starting param
-
-            def f(lam):
-                temp = n.ppf(S) + lam
-                tlam = n.cdf(temp)
-                ex = np.sum(tlam) * bs
-                ex_prime = np.sum(n.pdf(temp)) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'ly':
-            # linear yield model; min rol is ro/(1+ro)
-            shape = 1.25  # starting param
-            mass = ess_sup * r0 / (1 + r0)
-
-            def f(rk):
-                num = r0 + S * (1 + rk)
-                den = 1 + r0 + rk * S
-                tlam = num / den
-                ex = np.sum(tlam) * bs + mass
-                ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'clin':
-            # capped linear, input rf as min rol
-            shape = 1
-            mass = ess_sup * r0
-
-            def f(r):
-                r0_rS = r0 + r * S
-                ex = np.sum(np.minimum(1, r0_rS)) * bs + mass
-                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * bs
-                return ex - premium_target, ex_prime
-        elif name in ['roe', 'ccoc']:
-            # constant roe
-            # TODO Note if you input the roe this is easy!
-            shape = 0.25
-            def f(r):
-                v = 1 / (1 + r)
-                d = 1 - v
-                mass = ess_sup * d
-                r0_rS = d + v * S
-                ex = np.sum(np.minimum(1, r0_rS)) * bs + mass
-                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'lep':
-            # layer equivalent pricing
-            # params are d=r0/(1+r0) and delta* = r/(1+r)
-            d = r0 / (1 + r0)
-            shape = 0.25  # starting param
-            # these hard to compute variables do not change with the parameters
-            rSF = np.sqrt(S * (1 - S))
-            mass = ess_sup * d
-
-            def f(r):
-                spread = r / (1 + r) - d
-                temp = d + (1 - d) * S + spread * rSF
-                ex = np.sum(np.minimum(1, temp)) * bs + mass
-                ex_prime = (1 + r) ** -2 * np.sum(np.where(temp < 1, rSF, 0)) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'tt':
-            assert name != 'tt', 'Not implemented for tt distortion because it is not a distortion.'
-            # wang-t-t ... issue with df, will set equal to 5.5 per Shaun's paper
-            # finding that is a reasonable level; user can input alternative
-            # param is shape like normal
-            t = ss.t(df)
-            shape = 0.95  # starting param
-
-            def f(lam):
-                temp = t.ppf(S) + lam
-                tlam = t.cdf(temp)
-                ex = np.sum(tlam) * bs
-                ex_prime = np.sum(t.pdf(temp)) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'cll':
-            # capped loglinear
-            shape = 0.95  # starting parameter
-            lS = np.log(S)
-            lS[0] = 0
-            ea = np.exp(r0)
-
-            def f(b):
-                uncapped = ea * S ** b
-                ex = np.sum(np.minimum(1, uncapped)) * bs
-                ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'dual':
-            # dual moment
-            # be careful about partial at s=1
-            shape = 2.0  # starting parameter
-            lS = -np.log(1 - S)  # prob a bunch of zeros...
-            lS[S == 1] = 0
-
-            def f(rho):
-                temp = (1 - S) ** rho
-                trho = 1 - temp
-                ex = np.sum(trho) * bs
-                ex_prime = np.sum(temp * lS) * bs
-                return ex - premium_target, ex_prime
-        elif name == 'tvar':
-            # tvar
-            shape = 0.9   # starting parameter
-            def f(rho):
-                temp = np.where(S <= 1-rho, S / (1 - rho), 1)
-                temp2 = np.where(S <= 1-rho, S / (1 - rho)**2, 1)
-                ex = np.sum(temp) * bs
-                ex_prime = np.sum(temp2) * bs
-                return ex - premium_target, ex_prime
-
-        elif name == 'wtdtvar':
-            # weighted tvar with fixed p parameters
-            shape = 0.5  # starting parameter
-            p0, p1 = df
-            s = np.array([0., 1-p1, 1-p0, 1.])
-
-            def f(w):
-                pt = (1 - p1) / (1 - p0) * (1 - w) + w
-                gs = np.array([0.,  pt,   1., 1.])
-                g = interp1d(s, gs, kind='linear')
-                trho = g(S)
-                ex = np.sum(trho) * bs
-                ex_prime = (np.sum(np.minimum(S / (1 - p1), 1) - np.minimum(S / (1 - p0), 1))) * bs
-                return ex - premium_target, ex_prime
+    def quick_ra(self, den, x=None):
+        """
+        Computes the risk adjusted expected value of ``den`` and ``x`` using the distortion.
+        Calls numba version of ra for tvar or bitvar distortion. If ``x is None``,
+        requires ``den`` to be a ``Series`` and uses the index. ``x`` values must be in
+        ascending order.
+        """
+        if self._name == 'tvar':
+            p = self.shape
+            if isinstance(den, pd.Series):
+                return tvar_ra(den.values, np.array(den.index), p)
+            else:
+                assert x is not None
+                return tvar_ra(den, x, p)
+        elif self._name == 'bitvar':
+            p0, p1 = self.df
+            w = self.shape
+            if isinstance(den, pd.Series):
+                return bitvar_ra(den.values, np.array(den.index), p0, p1, w)
+            else:
+                return bitvar_ra(den, x, p0, p1, w)
         else:
-            raise ValueError(f'calibrate_distortion not implemented for {name}')
-
-        # numerical solve except for tvar, and roe when premium is known
-        if name in ('roe', 'ccoc'):
-            assert assets < np.inf, f'Must input finite assets for ccoc.'
-            el = np.sum(density_df.index * density_df.p_total)
-            r = (premium_target - el) / (assets - premium_target)
-            shape = r
-            r0 = 0
-            fx = 0
-        else:
-            i = 0
-            fx, fxp = f(shape)
-            max_iter = 200 if name == 'tvar' else 50
-            while abs(fx) > 1e-5 and i < max_iter:
-                shape = shape - fx / fxp
-                fx, fxp = f(shape)
-                i += 1
-            if abs(fx) > 1e-5:
-                logger.warning(
-                    f'Distortion.calibrate | Questionable convergence for {name} distortion, target '
-                    f'{premium_target} error {fx} after {i} iterations')
-
-        # build answer
-        dist = Distortion(name=name, shape=shape, r0=r0, df=df)
-        dist.error = fx
-        dist.assets = assets
-        dist.premium_target = premium_target
-        return dist
+            raise ValueError(f'quick_ra only implemented for TVaR and BiTVaR, not {self._name}')
 
 
 def approx_ccoc(roe, eps=1e-14, display_name=None):

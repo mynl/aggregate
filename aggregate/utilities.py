@@ -2,6 +2,7 @@ from collections import namedtuple
 from cycler import cycler
 import decimal
 from functools import lru_cache
+import hashlib
 from io import BytesIO
 import itertools
 from itertools import product
@@ -39,6 +40,16 @@ GCN = namedtuple('GCN', ['gross', 'net', 'ceded'])
 # TODO take out timer stuff
 last_time = first_time = 0
 timer_active = False
+
+
+def short_hash(s):
+    """
+    machine independent hash of a string s
+    """
+    ho = hashlib.md5()
+    ho.update(s.encode('utf-8'))
+    hv = ho.hexdigest()[:8].upper()
+    return hv
 
 
 def get_fmts(df):
@@ -484,8 +495,11 @@ def make_ceder_netter(reins_list, debug=False):
     Build the netter and ceder functions. It is applied to occ_reins and agg_reins,
     so should be stand-alone.
 
-    The reinsurance functions are piecewise linear functions from 0 to inf which
+    The reinsurance functions are piecewise linear functions from 0 to inf with
     kinks as needed to express the ceded loss as a function of subject (gross) loss.
+
+    The entries in ``reins_list`` are tuples (share of, limit, attach) where share of is the
+    percentage share, between 0 and 1.
 
     For example, if ``reins_list = [(1, 10, 0), (0.5, 30, 20)]`` the program is 10 x 10 and
     15 part of 30 x 20 (share=0.5). This requires nodes at 0, 10, 20, 50, and inf.

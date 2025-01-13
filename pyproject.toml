@@ -35,7 +35,6 @@ dependencies = [
     "psutil",
     "Pygments",
     "scipy>=1.11",
-#    "titlecase",
     "numba",
 ]
 license = {text = "BSD-3-Clause"}

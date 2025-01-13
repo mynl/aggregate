@@ -403,8 +403,9 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
     if np.isinf(cv):
         raise ValueError('Infinite variance passed to estimate_agg_percentile')
 
-    if p > 1:
-        p = 1 - 10 ** -p
+    # make vectorizable
+    p = np.array(p)
+    p = np.where(p > 1, 1 - 10 ** -p, p)
 
     pn = pl = pg = 0
     if skew <= 0:
@@ -427,7 +428,7 @@ def estimate_agg_percentile(m, cv, skew, p=0.999):
         pl = fzl.isf(1 - p)
         pg = fzg.isf(1 - p)
     # throw in a mean + 3 sd approx too...
-    return max(pn, pl, pg, m * (1 + ss.norm.isf(1 - p) * cv))
+    return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
 
 
 def round_bucket(bs):

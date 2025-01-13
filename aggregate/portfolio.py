@@ -3661,8 +3661,8 @@ class Portfolio(object):
             sle = slice(0, a_reg)
             S = self.density_df.loc[sle, ['S']].copy()
             loss = self.density_df.loc[sle, ['loss']]
-            # deal losses for allocations
-            exeqa = self.density_df.filter(regex='exeqa_').loc[sle]
+            # deal losses for allocations; do not want to pick up eta mu versions here
+            exeqa = self.density_df.filter(regex='exeqa_[^η]').loc[sle]
 
             # last entry needs to include all remaining losses from a-bs onwards, hence:
             S.loc[a_reg, 'S'] = 0.

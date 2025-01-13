@@ -68,6 +68,14 @@ Version History
 Conda Forge: https://github.com/conda-forge/aggregate-feedstock
 https://anaconda.org/conda-forge/aggregate/files
 
+0.24.1
+~~~~~~~~~~
+* Added script to build the documentation from a local clone of the repository.
+* Added ``Aggregate.unwrap`` to adjust aggregates computed with too few buckets
+  but enough space. It unwraps the computed aggregate by adjusting the index. This
+  reverses the "wagon-wheel" effect, whereby FFTs wrap-around the end of the array.
+* Vectorized ``ultilities.estimate_agg_percentile`` for use in ``Aggregate.unwrap``
+
 0.24.0
 ~~~~~~~~~~
 * Added state to Distortions so they can be pickled. Involved separating part of ``Distortion.__init__``
@@ -468,42 +476,13 @@ Install from source
 
     git clone --no-single-branch --depth 50 https://github.com/mynl/aggregate.git .
 
-    # to test from local machine
-    # mkdir /temp/dm
-    # cd /temp/dm
-    # git clone c:/s/telos/python/aggregate_project
-    # cd aggregate_project
-
-    git checkout --force origin/master
-
-    git clean -d -f -f
-
     python -mvirtualenv ./venv
-    # activate the virtual environment
+    # activate the virtual environment (Windows, YRMV)
+    venv\Scripts\activate.bat
 
+    # install the package
     pip install aggregate[dev]
 
-    # ./venv/Scripts on Windows
-    #./venv/bin/python -m pip install --exists-action=w --no-cache-dir -r requirements.txt
-
-    # to create help files
-    #./venv/bin/python -m pip install --upgrade --no-cache-dir pip setuptools<58.3.0
-
-    #./venv/bin/python -m pip install --upgrade --no-cache-dir pillow mock==1.0.1 alabaster>=0.7,<0.8,!=0.7.5 commonmark==0.9.1 recommonmark==0.5.0 sphinx<2 sphinx-rtd-theme<0.5 readthedocs-sphinx-ext<2.3 jinja2<3.1.0
-
-    # make the docs script
-    python -m pip install --upgrade --no-cache-dir pip setuptools
-    python -m pip install --upgrade --no-cache-dir sphinx readthedocs-sphinx-ext
-    python -m pip install --upgrade --upgrade-strategy only-if-needed --no-cache-dir .[pyproject.toml,dev]
-    cat docs/conf.py
-
-    python -m sphinx -T -b html -d _build/doctrees -D language=en . $READTHEDOCS_OUTPUT/html
-    python -m sphinx -T -b latex -d _build/doctrees -D language=en . $READTHEDOCS_OUTPUT/pdf
-
-    cat latexmkrc
-    latexmk -r latexmkrc -pdf -f -dvi- -ps- -jobname=aggregate -interaction=nonstopmode
-
-Note: options from readthedocs.org script.
 
 License
 -------

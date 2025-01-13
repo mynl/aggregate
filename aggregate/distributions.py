@@ -1940,6 +1940,88 @@ class Aggregate(Frequency):
         self._valid = rv
         return rv
 
+    def unwrap(self, p=1e-7, audit=True):
+        """
+        Unwrap self created with log2 "too small".
+
+        a: an Aggregate object.
+        Estimated p and 1-p quantiles are used to determine [L, R]
+        range of effective support.
+        If audit, return comparison of empirical moments of shifted
+        answer with a.agg_m etc. analytic moments.
+        """
+        # figure bounds from method of moments estimates
+        m, cv, skew = self.agg_m, self.agg_cv, self.agg_skew
+        sc = self.bs
+        L, R = estimate_agg_percentile(m, cv, skew, p=(p, 1 - p))
+        # snap to grid in both cases (can't use self.snap because outside index!)
+        L = int(np.round(L / sc, 0))
+        R = int(np.round(R / sc, 0))
+
+        # number of buckets
+        N = 1 << self.log2
+
+        # is the request reasonable?
+        # enough space condition: R - L <= N
+        assert R - L <= N, f'{R=} - {L=} = {R-L=} > {N=}, not enough space'
+
+        # how many "blocks" to the right are we?
+        l = L // N
+        r = R // N
+
+        # extract aliased density
+        y = self.density_df.p_total.values
+
+        # there are now two cases: dist fits within one block or wraps over two
+        # if it falls over more than two that is an error
+        if l == r:
+            # no unwrapping, range lies in one block
+            # just shift index to right by correct number of chunks
+            # locate correct left hand edge, index created below
+            L = (L // N) * N
+            # method reporting
+            mode = f'Shift only'  # \n{L=}'
+        elif l == r - 1:
+            # must wrap answer into one block and shift
+            # figure location of extreme points as remainders
+            rem_r = R % N       # right hand end in fft-wrapped coords
+            rem_l = L % N
+            # by math this will always be true (see blog post)
+            assert rem_l >= rem_r
+            # unwrap amount
+            roll_forward = N - (rem_l + rem_r) // 2
+            y = np.roll(y, roll_forward)
+            # shifted index, factoring in unwrap
+            L = (L // N + 1) * N - roll_forward
+            # method reporting
+            mode = f'Shift and wrap'  # \n{roll_forward=}, {L=}'
+        else:
+            # see blog post
+            print(f'Should not occur: {l=}, {r=}')
+
+        # align with index and create answer
+        i = np.arange(L, L + N, dtype=float) * sc
+        ans = pd.Series(y, index=i)
+        # apply scale to L and R now to match ans
+        L *= sc
+        R *= sc
+        # document proportion of probability in selected range
+        prob_captured = ans[L:R].sum()
+        # package results
+        Unwrap = namedtuple('Unwrap', 'y, mode, prob_captured, L, R, audit_df')
+        if audit:
+            em, ecv, eskew = xsden_to_meancvskew(ans.index, ans)
+            audit_df = pd.DataFrame(
+                {'m': [m, em],
+                 'cv': [cv, ecv],
+                 'skew': [skew, eskew]},
+                index=['actual', 'rewrapped'])
+
+        else:
+            audit_df = None
+        ans = Unwrap(ans, mode, prob_captured, L, R, audit_df)
+        return ans
+
     def picks(self, attachments, layer_loss_picks, debug=False):
         """
         Adjust the computed severity to hit picks targets in layers defined by a.

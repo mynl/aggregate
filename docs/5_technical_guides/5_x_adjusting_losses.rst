@@ -88,7 +88,9 @@ layer, adjust to :math:`\tilde S(x) = S(a_n) + w_n(S(x) - S(a_n))`, so
 where :math:`\omega_n=S(a_n)`. Set
 :math:`\omega_i = \omega_{i+1} + w_{i+1} p_{i+1}` and
 :math:`\tilde S(x) = \omega_i + w_n(S(x) - S(a_n))` in the :math:`i`\ th
-layer. We can compute all the weights by proceeding down the tower:
+layer. (Be careful to distinguish omega offsets :math:`\omega` from
+weights :math:`w`!)
+We can compute all the weights by proceeding down the tower:
 
 .. math::
    t_i
@@ -98,7 +100,7 @@ layer. We can compute all the weights by proceeding down the tower:
 
 :math:`\tilde S` is continuous is :math:`S` is because of the definition
 of :math:`\omega` at the layer boundaries. When :math:`x=a_{i-1}`,
-:math:`\tilde S(a_{i-1}) = \omega_i + w_i(S(a_{i-1}) - S(a_i)) = \omega_i + w_ip_i = \omega_{i=1}`.
+:math:`\tilde S(a_{i-1}) = \omega_i + w_i(S(a_{i-1}) - S(a_i)) = \omega_i + w_ip_i = \omega_{i-1}`.
 
 The function ``utilities.picks_work`` computes the adjusted severity. In
 debug mode, it returns useful layer information. A severity can be

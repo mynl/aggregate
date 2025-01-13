@@ -1614,14 +1614,14 @@ class Distortion(object):
         """
         Updated version of price and price2 that should be used in the future.
 
-        Always uses S_calculation='forwards' method to compute S = 1 - cumsum(probs).
+        Always uses S_calculation='backwards' method to compute S as
+        ``ser[::-1].cumsum().shift(1, fill_value=0)[::-1]``.
+
         Sorts ser if needed.
 
-        if calculation 'dx' computes the price as the integral of gS dx. (This method
+        If calculation 'dx' computes the price as the integral of gS dx. (This method
         has fewer diffs).
         if calculation 'ds' computes the prices as the integralk of x d(gS).
-
-        Both methods require the index to be sorted, so that is checked and handled
 
         Neither method requires the index to be unique.
 
@@ -1658,7 +1658,7 @@ class Distortion(object):
         assert S_calculation in ['forwards', 'backwards'], "S_calculation must be 'forwards' or 'backwards'"
         if not isinstance(ser, pd.Series):
             raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
-        assert ser.index.is_monotonic_increasing, 'ser index must be sorted ascending'
+        # assert ser.index.is_monotonic_increasing, 'ser index must be sorted ascending'
         # need
         if not ser.index.is_monotonic_increasing:
             ser = ser.sort_index(ascending=True)

@@ -1942,13 +1942,17 @@ class Aggregate(Frequency):
 
     def unwrap(self, p=1e-7, audit=True):
         """
-        Unwrap self created with log2 "too small".
+        Unwrap self created with log2 that is too small to contain the answer.
 
-        a: an Aggregate object.
-        Estimated p and 1-p quantiles are used to determine [L, R]
-        range of effective support.
-        If audit, return comparison of empirical moments of shifted
-        answer with a.agg_m etc. analytic moments.
+        :param p: Percentile threshold. The estimated p and 1-p quantiles are
+            used to determine the effective support [L, R]. R-L must fit in the
+            space available, i.e., R-L <= N * self.bs.
+        :param audit: If audit, return comparison of empirical moments of shifted
+            answer with a.agg_m etc. analytic moments.
+        :return: Unwrap named tuple containing fields y the density as a Series,
+            mode of shifting/unwrapping, prob_captured the probability in the
+            effective support (which should be close to 1), L, R the boundary of the
+            effective support.
         """
         # figure bounds from method of moments estimates
         m, cv, skew = self.agg_m, self.agg_cv, self.agg_skew

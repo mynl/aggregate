@@ -5,9 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy.fft import irfft,  rfft
 from numpy import real, imag, roll
-from .. import build, qd
+from .. import build, qd, Aggregate
 from .. constants import FIG_H, FIG_W
-# from aggregate import build, qd
 
 
 def poisson_example(en, small2):
@@ -151,7 +150,6 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     Illustrate "manual" inversion of a characteristic function using irfft, including
     optional scaling and location shift.
 
-
     :param params: a list of shape parameters. loc and scale are handled separately.
     :param chf: the characteristic function of the distribution, takes args params, loc, scale, t;
       routine handles conversion to Fourier Transform
@@ -163,7 +161,7 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     :param scale: scale parameter
     :param xmax: if not zero, used to fix xmax. Otherwise, selected as frz.isf(1e-17) to capture the
       full range of theunderlying distribution. For thick tailed distributions, you usually input
-      xmax manually. Note bs / xmax / n. If None set equal to n = 1 << log2, for use in
+      xmax manually. Note bs = xmax / n. If None set equal to n = 1 << log2, for use in
       discrete distributions (forced bucket size of 1).
     :param xshift: if not zero, used to shift the x-axis. The minimum x value equals xshift.
       To center the x-axis, set xshift = -xmax/2. Should be a multiple of bs = xmax / n.
@@ -264,7 +262,7 @@ def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0
     else:
         ax3.plot(ts, np.cumsum(np.angle(fx)) / (2 * np.pi), c='C2')
     ax3.set(title='Cumulative phase',
-            ylabel='cumsum(arg(ft)) / $2\pi$', xlabel='frequency')
+            ylabel='cumsum(arg(ft)) / $2\\pi$', xlabel='frequency')
 
     if suptitle != '':
         fig.suptitle(suptitle)
@@ -454,3 +452,537 @@ def stats(df):
     df.loc['skew'] = (df.loc[3] - 3 * df.loc[2] * df.loc[1] +
                       2 * df.loc[1]**3) / df.loc['sd'] ** 3
     return df
+
+
+class FourierTools(object):
+    """Manual inversion of a ch. f. using FFTs."""
+
+    def __init__(self, chf, fz):
+        """
+        Class version of manual inversion of characteristic function.
+
+        Splits functionality of aggregate.extensions.ft_invert into:
+
+        1. Numerical inversion, ``ft_invert``
+        2. Computation of actual density
+        2. Graph to compare densities
+        3. Graph to compute effect of wrapping
+
+        Compared to ``ft_invert`` function, the meaning of x_max and
+        xshift are changed.
+
+        For discrete rvs, x_max is always n - 1 and the bucketr size 1.
+        For continuous rvs, it is either input or estimated as a quantile.
+
+        The arguments completely define the distribution of interest. Other class
+        functions vary the numerical variables, defining the window and number of
+        points used in the FFT routine.
+
+        See BLOG POST.
+
+        :param chf: the characteristic function of the distribution, takes args t;
+          routine handles conversion to Fourier Transform and adds loc and scale effects.
+          Must use same shape parameters as fz.
+        :param fz: the scipy.stats frozen distribution object. Used to compute the exact answer.
+          (Note: ft_invert allowed the class, pre-creation or an array. That option no
+          longer allowed.) If fz is 'discrete' or 'continuous' or 'mixed' it is a
+          generic distribution with no closed form cdf/pdf, e.g. Tweeedie. Then you
+          can't compute exact, obviously.
+        """
+        self.chf = chf
+        self.fz = fz
+        if isinstance(fz, str):
+            # extremely limited functionality
+            self.params = (0,)  # allows passing as param 1 to the chf
+            self.loc = 0.
+            self.scale = 1.
+            self.discrete = True if fz == 'discrete' else False
+            self.distribution_name = 'User defined'
+        elif isinstance(fz, Aggregate):
+            self.params = (0,)
+            self.loc = 0.
+            self.scale = 1.
+            self.discrete = fz.bs == 1
+            self.distribution_name = f'Aggregate({fz.name})'
+        else:
+            # extract shape params from fz; no longer used
+            self.params = fz.args
+            # location and scale with default 0, 1
+            kwds = fz.kwds
+            self.loc = kwds.get('loc', 0.)
+            self.scale = kwds.get('scale', 1)
+            # is this a discrete or continuous variable?
+            self.discrete = True if str(type(fz)).find('discrete') > 0 else False
+            self.distribution_name = fz.dist.name
+        # slightly ugly state, but this encodes n=2**log2, xmin, xmax, etc.
+        self._df = self._df_exact = None
+        self._ts = None      # phases (angles) at which ft evaluated , for plotting
+        self._fourier = None  # store the sample of ft at self._ts for plotting
+        self.last_fig = None
+        self.bs = self.x_range = self.x_min = self.x_max = self.decimate = 0
+
+    def __repr__(self):
+        """Repr of the object."""
+        return f'FT_Invert({self.distribution_name}{self.params}, loc={self.loc}, scale={self.scale})'
+
+    def describe(self):
+        """More information."""
+        return f'{self.x_min=}, {self.x_max=}, {self.bs=}, {self.df.shape=}'
+
+    @property
+    def df(self):
+        """Return current state dataframe output."""
+        if self._df is not None:
+            return self._df
+        else:
+            raise ValueError('Must run invert first!')
+
+    @property
+    def df_exact(self):
+        """Return current state dataframe output."""
+        if self._df is not None:
+            return self._df_exact
+        else:
+            raise ValueError('Must run compute_exact first!')
+
+    def fourier_transform(self, t):
+        """
+        Create ft function  by converting ch f to Fourier transform and including scale and loc.
+
+        Recall:
+        ft(t)= int f(x)exp(-2πi t x)dx
+        chf(t) = int f(x)exp(i t x)dx.
+        """
+        TWOPI = 6.283185307179586
+        t1 = -t * TWOPI
+        ans = self.chf(t1 * self.scale)
+        if self.loc != 0:
+            # for some reason ans *= np.exp(-t1 * loc) does not work
+            ans = ans * np.exp(t1 * self.loc * 1j)
+        return ans
+
+    def invert(self, log2, x_min=0, x_max=0, s=1e-17):
+        """
+        Invert a characteristic function using irfft.
+
+        If self.fz is None then you must input x_max.
+
+        :param x_min: minimum value of range.
+        :param x_max: maximum value of range. If None then x_max = 1<<log2.
+        :param s: survival probability to determine tails
+        """
+        # number of buckets
+        n = 1 << log2
+        if x_max == 0:
+            if self.discrete:
+                # force bs = 1
+                x_max = x_min + n
+            else:
+                x_max = self.fz.isf(s)
+        if x_min is None:
+            x_min = self.fz.ppf(s)
+        if x_min == 0 and x_max == 0:
+            raise ValueError('Must provide x_min < 0 or x_max > 0. Current range is 0 to 0!')
+
+        # spatial range is [x_min, x_max]
+        # translate to [0, x_max - x_min]
+        x_range = x_max - x_min
+        # sampling interval (wavelength) = bs = x_range / n
+        # sampling domain, for exact and to "label" the Fourier Transform output
+        # sampling interval is bs (small bs means high sampling rate)
+        # highest sampling freq for inverting the FT is 1 / bs = n / x_range
+        bs = x_range / n
+        if self.discrete:
+            assert bs == 1, f'{bs=}, not the expected 1 for a discrete rv'
+        # note x_max = n * bs, so n / x_max = 1 / bs.
+
+        # f(x) = int_R fhat(t) exp(2πi tx)dt ≈ int_-f_max_f^max_f ...
+        # note that f_max is 1 / bs
+        f_max = n / x_range
+        # sample the FT; using real fft, only need half the range
+        self._ts = np.arange(n // 2 + 1) * f_max / n
+        self._fourier = self.fourier_transform(self._ts)
+        # for debugging
+        # ft_invert.fx = fx
+        # ft_invert.self._ts = self._ts
+        probs = irfft(self._fourier)
+        if x_min != 0:
+            probs = np.roll(probs, -int(x_min / bs))
+
+        # for df index
+        self._df = pd.DataFrame({
+            'x': np.linspace(x_min, x_max, n, endpoint=False),
+            'p': probs}).set_index('x')
+
+        # store for future use
+        self.bs, self.x_range, self.x_min, self.x_max = bs, x_range, x_min, x_max
+        return self._df
+
+    def compute_exact(self, calc='survival', decimate=1, min_points=256):
+        """
+        Compute exact density using frozen scipy.stats object.
+
+        :param calc: 'density' re-scales pdf, 'survival' uses backward
+          differences of sf.
+        :param decimate: decimate (take ``::decimate``) input xs to reduce
+          number of calls to fz (which may be slow)
+        :param min_points: opposite of decimate, ensure exact computed
+          with min_points. Useful for example when log2 is "too small"
+          to ensure exact distribution is rendered correctly.
+        """
+        assert self._df is not None, 'Must recompute first. Run ft_invert().'
+        xs = np.array(self._df.index)
+        if decimate > 1:
+            xs = xs[::decimate]
+        # if too few points beef up, non-discrete distributions only
+        if len(xs) < min_points and not self.discrete:
+            xs = np.linspace(xs[0], xs[-1] + self.bs, min_points)
+        bs = xs[1] - xs[0]
+
+        # discrete dists have pmf not pdf
+        if getattr(self.fz, 'pdf', None) is None:
+            pdf = self.fz.pmf
+        else:
+            pdf = self.fz.pdf
+
+        if calc == 'density':
+            print('Best to use survival calc.')
+            exact = pdf(xs)
+            # total may not be the whole amount if the range does not include all prob
+            exact = exact / exact.sum() * (self.fz.cdf(xs[-1]) - self.fz.cdf(xs[0]))
+        else:
+            xs1 = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
+            exact = -np.diff(self.fz.sf(xs1))
+        # add column, want to avoid introducing missing values
+        self._df_exact = pd.DataFrame({'x': xs, 'p': exact}).set_index('x')
+        self.decimate = decimate
+        return self._df_exact
+
+    def plot(self, suptitle='', xlim=None):
+        """
+        Compare density, log density, and plot amplitude and argument of Fourier transform.
+
+        :param suptitle: super title for the plot.
+        """
+        assert self._df is not None, 'Must recompute first. Run ft_invert() and compute_exact().'
+        assert self._df_exact is not None, 'Must recompute first. Run compute_exact().'
+
+        # plot four graphs per ft_invert
+        self.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
+        ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
+        x = np.array(self._df.index)
+        p = self._df.p.values
+        xe = np.array(self._df_exact.index)
+        pe = self._df_exact.p.values
+        # bucket sizes to create densities
+        b = x[1] - x[0]
+        be = xe[1] - xe[0]
+        if xlim is None:
+            xlim = [x[0], x[-1]]
+
+        for ax in [ax0, ax1]:
+            ax.plot(x, p / b, label='Fourier', lw=1)
+            ax.plot(xe, pe / be, ls='--', c='C3', label='exact', lw=1)
+            ax.legend(fontsize='x-small')
+        ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
+        # mn = min(np.log10(exact).min(), np.log10(x).min())
+        mn0 = np.log10(p / b).min() * 1.25
+        mn = 10 ** np.floor(mn0)
+        mx = max(np.log10(pe / be).max(), np.log10(x).max())
+        mx = 10 ** np.ceil(mx)
+        if np.isnan(mn):
+            mn = 1e-17
+        if np.isnan(mx):
+            mx = 1
+        ax1.set(yscale='log', ylim=[mn, mx], xlim=xlim, title='Log density', xlabel='Outcome, x')
+
+        if self.discrete and len(self._df) <= 64:
+            drawstyle = 'steps-post'
+        else:
+            drawstyle = 'default'
+        for ax in [ax2, ax5]:
+            ax.plot(x, np.cumsum(p), label='cdf Fourier', lw=1,
+                    c='C0', drawstyle=drawstyle)
+            ax.plot(xe, np.cumsum(pe), label='cdf exact', ls='--', lw=.5,
+                    c='C3', drawstyle=drawstyle)
+            ax.plot(x, np.cumsum(p[::-1])[::-1], label='sf Fourier', lw=1,
+                    c='C2', drawstyle=drawstyle)
+            ax.plot(xe, np.cumsum(pe[::-1])[::-1], label='sf exact', ls='--', lw=.5,
+                    c='C4', drawstyle=drawstyle)
+
+        ax2.set(title='Cumulative sf and cdf', xlabel='Outcome, x', xlim=xlim)
+        ax2.legend()
+        ax5.set(yscale='log', title='Cumulative log sf and cdf', ylim=[mn, 10],
+                xlim=xlim, xlabel='Outcome, x')
+
+        # ft on ax3, probably should inline this
+        self._plot_fourier1d(ax3)
+
+        # amplitude and phase both on ax4
+        ax4r = ax4.twinx()
+        ax4.plot(self._ts, np.abs(self._fourier), '-', lw=1.5, c='C4', label='Amplidude')
+        # for amplitude, only look at nonzero fts, find index of non-zero (inz) items
+        inz = np.abs(self._fourier) > 0
+        tnz = self._ts[inz]
+        fnz = self._fourier[inz]
+        anz = np.angle(fnz)
+        uw = np.unwrap(anz)
+        if len(self._df) <= 256:
+            kw = {'ls': '-', 'marker': '.', 'ms': 3, 'lw': 1}
+        else:
+            kw = {'lw': 1}
+        ax4r.plot(tnz, uw, c='C2', **kw, label='phase, unwrapped')
+        kw['lw'] = 0.5
+        kw['marker'] = None
+        kw['ls'] = ':'
+        ax4r.plot(tnz, anz, c='C2', **kw, label='phase, wrapped')
+        ax4r.legend(loc='upper right')
+        ax4.legend(loc='center right')
+        ax4.set(ylabel='Amplitude |ft|', yscale='log', xlabel='frequency', xlim=[-.05, 0.5 / self.bs + 0.05])
+        if self.bs == 1:
+            ax4.set(xticks=[0, .25, .5])
+        ax4r.set(title='Amplitude and phase',
+                 ylabel='Phase / 2π', xlabel='frequency / 2π')
+        if suptitle != '':
+            self.last_fig.suptitle(suptitle)
+
+    def plot_wraps(self, wraps=None, suptitle='', add_tail=False):
+        """
+        Illustrate wrapping. Only run when fz.pdf is easy to calc, otherwise too slow.
+
+        :param wraps: optional list of wrap values.
+        """
+        assert self._df is not None, 'Must recompute first. Run ft_invert() and ft_compare().'
+        # extract values
+        x = np.array(self._df.index)
+        b = x[1] - x[0]
+        p = self._df['p'].values / b    # here and below divide by b to convert to a density
+        xe = np.array(self._df_exact.index)
+        be = xe[1] - xe[0]
+        pe = self._df_exact.p.values / be
+        xe_range = xe[-1] - xe[0]
+        rt = pe.copy()
+
+        # duplicated...
+        mn0 = np.log10(x).min() * 1.25
+        mn = 10 ** np.floor(mn0)
+        mx = max(np.log10(p).max(), np.log10(x).max())
+        mx = 10 ** np.ceil(mx)
+        if np.isnan(mn):
+            mn = 1e-17
+        if np.isnan(mx):
+            mx = 1
+        # if getattr(self.fz, 'pdf', None) is None:
+        #     pdf = self.fz.pmf
+        # else:
+        #     pdf = self.fz.pdf
+
+        # report answer
+        ans = []
+        self.last_fig, axs = plt.subplots(2, 2, figsize=(2 * 2.5, 2 * 2.), constrained_layout=True)
+        ax0, ax1, ax2, ax3 = axs.flat
+        for ax in axs.flat:
+            ax.plot(x, p, label='Fourier', lw=2)
+        lw = .5
+        for i, b_wrap in enumerate(wraps):
+            if type(b_wrap) == int:
+                bl = f'{b_wrap:d}'
+            else:
+                bl = f'{b_wrap:.3f}'
+            xs2 = b_wrap * xe_range + xe
+            # for computing probs using survial method
+            xs2d = np.hstack((xs2 - be / 2, xs2[-1] + be / 2))
+            adj = -np.diff(self.fz.sf(xs2d)) / be
+            rt += adj
+            c = f'C{i+1}'
+            ax0.plot(xe, rt, label=bl, lw=lw, c=c)
+            ax1.plot(xe, adj, label=bl, lw=lw, c=c)
+            if add_tail:
+                ax1.plot(xs2, adj, label=bl, lw=lw, c=c, ls=':')
+                ax3.plot(xs2, adj, label=bl, lw=lw, c=c, ls=':')
+            ax2.plot(xe, rt, label=bl, lw=lw, c=c)
+            ax3.plot(xe, adj, label=bl, lw=lw, c=c)
+            ans.append([b_wrap, xs2[0], xs2[-1], self.fz.cdf(xs2[-1]), self.fz.cdf(xs2[0]),
+                        self.fz.cdf(xs2[-1]) - self.fz.cdf(xs2[0])])
+        for ax in axs.flat:
+            ax.plot(xe, pe, label='exact', ls='--', lw=1, c='C3')
+        ax0.set(yscale='linear',
+                # ylim=[mn, mx],
+                title='Cumulative aliasing',
+                xlabel='Outcome, x',
+                ylabel='Density')
+        ax2.set(yscale='log',
+                # ylim=[mn, mx],
+                title='Cumulative - log scale',
+                xlabel='Outcome, x',
+                ylabel='Log density')
+        ax1.set(yscale='linear',
+                # ylim=[mn, mx],
+                title='Incremental aliasing',
+                xlabel='Outcome, x',
+                ylabel='Density')
+        ax3.set(yscale='log',
+                # ylim=[mn, mx],
+                title='Incremental - log scale',
+                xlabel='Outcome, x',
+                ylabel='Log density')
+        ax2.legend(fontsize='x-small', ncol=2)
+        if add_tail:
+            ax1.legend(fontsize='x-small', ncol=2)
+        if suptitle != '':
+            self.last_fig.suptitle(suptitle)
+        if add_tail:
+            if 0 not in wraps:
+                wraps.append(0)
+            wraps.append(max(wraps) + 1)
+            for b_wrap in wraps:
+                ax1.axvline(xe[0] + b_wrap * xe_range, lw=.25, c='k', ls=':')
+                ax3.axvline(xe[0] + b_wrap * xe_range, lw=.25, c='k', ls=':')
+        df = pd.DataFrame(ans, columns=['wrap', 'x0', 'x1', 'below x1', 'below x0', 'pr in wrap'])
+        df = df.set_index('wrap')
+        return df
+
+    def _plot_fourier1d(self, ax, min_abs=1e-20):
+        """Create simple plot of Fourier transform on one axis."""
+        fhat = self._fourier.copy()
+        c = np.abs(fhat)
+        num_large = np.sum(c > min_abs)
+        fhat = fhat[:num_large]
+        c = c[:num_large]
+
+        ax.plot(np.real(fhat), np.imag(fhat), '-o', ms=2, lw=.5, label='ft')
+        fhat = fhat[c > 0] / c[c > 0]
+        ax.plot(np.real(fhat), np.imag(fhat), '-o', ms=1, lw=.5, label='ft / |ft|')
+        lim = [-1.05, 1.05]
+        ax.set(xlim=lim, ylim=lim, aspect='equal', xlabel='real(ft)',
+               ylabel='imag(ft)', title='Fourier transform')
+        ax.legend(loc='upper left')
+        ax.axhline(0, c='k', alpha=.5, lw=.5)
+        ax.axvline(0, c='k', alpha=.5, lw=.5)
+
+    def plot_fourier3d(self, scale=True):
+        """Three dimensional line plot of the Fourier transform using mayavi."""
+        # dont want to make mayavi a required package
+        print('REMEMBER: Pops a separate window!')
+        try:
+            from mayavi import mlab
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('mayavi required, pip install mayavi')
+
+        # Generate data
+        t = self._ts
+        f_t = self._fourier
+        c = np.abs(f_t)  # Use |f(t)| for coloring
+
+        if scale:
+            f_t = f_t / c
+        f_t[np.isinf(f_t)] = np.nan
+
+        x = np.real(f_t)
+        y = np.imag(f_t)
+        # scale to 0, 1
+        z = t / np.max(t)
+
+        # Create the 3D line plot
+        mlab.figure(size=(1000, 800))  # Set figure size
+        mlab.plot3d(x, y, z, c, tube_radius=0.005, colormap='viridis')
+
+        # Add axes and labels
+        mlab.xlabel('Re(f)')
+        mlab.ylabel('Im(f)')
+        mlab.zlabel('scaled t')
+        mlab.title('Scaled FT' if scale else "FT")
+        # Show the plot
+        mlab.show()
+
+    def plot_fourier3da(self):
+        """Three dimensional line plot of the Fourier transform using plotly."""
+        # dont want to make plotly a required package
+        try:
+            import plotly.graph_objects as go
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('plotly required, pip install plotly')
+        t = self._ts
+        f_t = self._fourier
+        x = np.real(f_t)
+        y = np.imag(f_t)
+        c = np.abs(f_t)
+
+        # normalized plot data
+        f_t_rhs = f_t / np.abs(f_t)
+        x_rhs = np.real(f_t_rhs)
+        y_rhs = np.imag(f_t_rhs)
+
+        # Create the subplot figure
+        fig = go.Figure()
+
+        # LHS plot
+        fig.add_trace(
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=t,
+                mode="lines",
+                line=dict(
+                    color=.5,
+                    width=4,
+                ),
+                name="blue: f(t)",
+            )
+        )
+
+        # RHS plot
+        fig.add_trace(
+            go.Scatter3d(
+                x=x_rhs,
+                y=y_rhs,
+                z=t,
+                mode="lines",
+                line=dict(
+                    color=c,
+                    colorscale="Plasma",
+                    width=4,
+                    colorbar=dict(
+                        title="|f(t)|",
+                        len=0.5,
+                        lenmode="fraction",
+                    ),
+                ),
+                name="colored: f(t) / |f(t)|",
+            )
+        )
+
+        # Update layout for side-by-side 3D plots
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(title="Re(f)", range=[-1, 1]),
+                yaxis=dict(title="Im(f)", range=[-1, 1]),
+                zaxis=dict(title="t", range=[0, .55]),
+                aspectmode="manual",
+                aspectratio=dict(x=1, y=1, z=1)
+            ),
+            width=900,  # Wider figure for two plots
+            height=800,
+            title='Fourier transform and normalized transform.'
+        )
+        return fig
+
+
+def make_levy_chf(alpha, beta):
+    """Make the ch of stable(alpha, beta) per Nolan book page 5 Def 1.3."""
+    assert 0 < alpha < 2, f'alpha must be in (0, 2]'
+    if alpha == 1:
+        def chf(t):
+            return np.where(t==0, 1.,
+                            np.exp(- np.abs(t) * (1 + 1j * beta * 2 / np.pi *
+                                         np.sign(t) * np.log(np.abs(t)))))
+    elif alpha < 2:
+        # alpha not = 1
+        tan = np.tan(np.pi / 2 * alpha)
+        def chf(t):
+            return np.exp(- np.abs(t) ** alpha * (1 - 1j * beta * np.sign(t) * tan))
+    else:
+        # actually normal
+        def chf(t):
+            return np.exp(-t**2 / 2)
+    return chf

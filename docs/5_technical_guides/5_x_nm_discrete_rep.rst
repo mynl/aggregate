@@ -188,7 +188,7 @@ This decision is based in part on the following observations about the moment me
 
 Approximating the Density
 """""""""""""""""""""""""""
-The pdf at $kb$ can be approximated as $p_k / b$. This suggests another approach to discretization. Using the rounding method
+The pdf at :math:`kb` can be approximated as :math:`p_k / b`. This suggests another approach to discretization. Using the rounding method
 
 .. math::
 

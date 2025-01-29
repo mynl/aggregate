@@ -455,7 +455,7 @@ class Portfolio(object):
         logger.info('Creating exa_sample and executing switcheroo')
         port.density_df = port.add_exa_sample(sample_df)
         # update total stats
-        logger.info('Updating total statistics (WARNING: these are now emprical)')
+        logger.info('Updating total statistics (WARNING: these are now empirical)')
         port.independent_audit_df = port.audit_df.copy()
         # just update the total stats
         port.make_audit_df(['total'], None)

@@ -1738,6 +1738,48 @@ class Distortion(object):
             Price = namedtuple('Price', 'bid,el,ask')
             return Price(bid, el, ask)
 
+    def make_q(self, ser, a=np.inf):
+        """
+        Use logic from ``price_ex`` to return the vector of risk adjusted probabilities
+        for use in pricing. See ``price_ex`` for more.
+
+        Always uses backwards calculation, ask pricing and method='ds'.
+
+        The resulting series is used as::
+
+            q = a.make_q(x, a)
+            ask = -((x * q).sum()) + a * gS[-1]
+
+        In use, the last adjustment to the xdgS integral is to add a P(X>a) provided a is finite.
+        To simplify the math, just add::
+
+            if a == np.inf:
+                a = 0
+        """
+        if not isinstance(ser, pd.Series):
+            raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
+        # assert ser.index.is_monotonic_increasing, 'ser index must be sorted ascending'
+        # need
+        if not ser.index.is_monotonic_increasing:
+            ser = ser.sort_index(ascending=True)
+
+        # there is an implicit assumption here that ser.sum() == 1.
+        if ser.sum() < 1:
+            raise ValueError('Sum of input probabilities must be 1. Try remove_fuzz=True if using a Portfolio')
+        # backwards calc of S
+        S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]
+        S = np.minimum(1, S)
+        if a < np.inf:
+            assert a in ser.index, f'a={a} must be in the index of ser'
+            S = S.loc[:a]
+
+        gS = np.array(self.g(S))
+        # at this point S is a Series, and gS is a numpy array
+        dS = -np.diff(S, prepend=1.)
+        dgS = -np.diff(gS, prepend=1.)
+        ans = pd.DataFrame({'p': dS, 'q': dgS, 'S': S, 'gS': gS}, index=S.index)
+        return ans
+
     # add the numba functions to the class for easy access
     def quick_gS(self, den):
         """

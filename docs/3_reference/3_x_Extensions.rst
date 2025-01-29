@@ -13,6 +13,11 @@ Basic
 .. automodule:: aggregate.extensions.basic
    :members:
 
+Fourier Transform Support
+----------------------------
+
+.. automodule:: aggregate.extensions.ft
+   :members:
 
 Case Study Support
 ---------------------

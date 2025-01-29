@@ -17,56 +17,27 @@ that usually require simulation, making it as easy to work with an aggregate (co
 as the lognormal. ``aggregate`` includes an expressive language called DecL to describe aggregate distributions
 and is implemented in Python under an open source BSD-license.
 
-White Paper (updated September 2024)
--------------------------------------
+Aggregate White Paper
+----------------------
 
-The `White Paper <https://github.com/mynl/aggregate/blob/master/cheat-sheets/aggregate_accepted_2024-05-30.pdf>`_ describes
-the purpose, implementation, and use of the class ``aggregate.Aggregate`` that
-handles the creation and manipulation of compound frequency-severity distributions. This paper has now
-been accepted by the `Annals of Actuarial Science <https://www.cambridge.org/core/journals/annals-of-actuarial-science>`_
-in the Actuarial Software series and is under copyediting.
-
-Documentation
--------------
-
-https://aggregate.readthedocs.io/
-
-
-Where to get it
----------------
-
-https://github.com/mynl/aggregate
-
-
-Installation
-------------
-
-To install into a new ``Python>=3.10`` virtual environment::
-
-    python -m venv path/to/your/venv``
-    cd path/to/your/venv
-
-followed by::
-
-    \path\to\env\Scripts\activate
-
-on Windows, or::
-
-    source /path/to/env/bin/activate
-
-on Linux/Unix or MacOS. Finally, install the package::
-
-    pip install aggregate[dev]
-
-All the code examples have been tested in such a virtual environment and the documentation will build.
-
-To build the documentation run
+`Aggregate: fast, accurate, and flexible approximation of compound probability distributions <https://www.cambridge.org/core/journals/annals-of-actuarial-science/article/aggregate-fast-accurate-and-flexible-approximation-of-compound-probability-distributions/1BF9A534D944D983B1D780C60885F065>`_ describes the ``Aggregate`` class within ``aggregate``. This paper has been published in the peer reviewed journal `Annals of Actuarial Science <https://www.cambridge.org/core/journals/annals-of-actuarial-science>`_ in the Actuarial Software series.
+The paper describes the purpose, implementation, and use ``Aggregate``, showing how it can be used to create and manipulate compound frequency-severity distributions.
 
 Version History
 -----------------
 
-Conda Forge: https://github.com/conda-forge/aggregate-feedstock
-https://anaconda.org/conda-forge/aggregate/files
+.. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
+
+
+0.24.2
+~~~~~~~~~~
+
+* Added ``Distortion.make_q`` to return the risk adjusted probabilities used
+  in pricing. Same logic as ``price_ex``. Makes it easy to compute the natural
+  allocation from a distortion.
+* Added ``extensions.ft.FourierTools`` class, which performs direct inversion of a (continuous) Fourier transform (characteristic function)
+  using FFTs. This is particularly useful for stable distributions, where the Fourier transform is known but the density is not. See examples in :ref:`num ft tools`
+* Added ``make_levy_chf`` to ``extensions`` to compute the characteristic function of a Levy stable distribution.
 
 0.24.1
 ~~~~~~~~~~
@@ -405,6 +376,44 @@ Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
 * MAJOR version changes with incompatible API changes.
 * MINOR version changes with added functionality in a backwards compatible manner.
 * PATCH version changes with backwards compatible bug fixes.
+
+
+Documentation
+-------------
+
+https://aggregate.readthedocs.io/
+
+
+Where to get it
+---------------
+
+https://github.com/mynl/aggregate
+
+
+Installation
+------------
+
+To install into a new ``Python>=3.10`` virtual environment::
+
+    python -m venv path/to/your/venv``
+    cd path/to/your/venv
+
+followed by::
+
+    \path\to\env\Scripts\activate
+
+on Windows, or::
+
+    source /path/to/env/bin/activate
+
+on Linux/Unix or MacOS. Finally, install the package::
+
+    pip install aggregate[dev]
+
+All the code examples have been tested in such a virtual environment and the documentation will build.
+
+To build the documentation run
+
 
 Issues and Todo
 -----------------

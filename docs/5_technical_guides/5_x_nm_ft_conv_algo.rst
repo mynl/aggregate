@@ -38,7 +38,7 @@ Algorithm Inputs
 #. Number of buckets, expressed as log base 2, :math:`n=2^\mathit{log2}`.
 #. Bucket size, :math:`b`.
 #. Severity calculation method: ``round``, ``forwards``, or ``backwards``
-#. Discretization calculation method: ``survial``, ``distribution``, or ``both``.
+#. Discretization calculation method: ``survival``, ``distribution``, or ``both``.
 #. Normalization parameter, ``True`` or ``False``.
 #. Padding parameter, an integer :math:`d \ge 0`.
 #. Tilt parameter, a real number :math:`\theta \ge 0`.
@@ -86,13 +86,13 @@ Theory: Why the Algorithm Works
 
 This section explains why the output output :math:`\mathsf a=(a_0,\dots,a_{m-1})` has :math:`a_k` very close to :math:`\Pr(A=kb)`.
 
-**Fourier transforms** provide an alternative way to represent a distribution function. The [Wikipedia](https://en.wikipedia.org/wiki/Fourier_transform) article says:
+**Fourier transforms** provide an alternative way to represent a distribution function. The `Wikipedia <https://en.wikipedia.org/wiki/Fourier_transform>`_ article says:
 
     The Fourier transform of a function is a complex-valued function representing the complex sinusoids that comprise the original function. For each frequency, the magnitude (absolute value) of the complex value represents the amplitude of a constituent complex sinusoid with that frequency, and the argument of the complex value represents that complex sinusoid's phase offset. If a frequency is not present, the transform has a value of 0 for that frequency. The Fourier inversion theorem provides a synthesis process that recreates the original function from its frequency domain representation.
 
     Functions that are localized in the time domain have Fourier transforms that are spread out across the frequency domain and vice versa, a phenomenon known as the uncertainty principle. The critical case for this principle is the Gaussian function: the Fourier transform of a Gaussian function is another Gaussian function.
 
-    Generalizations include the discrete-time Fourier transform (DTFT, group $Z$), the discrete Fourier transform (DFT, group :math:`Z\pmod N`) and the Fourier series or circular Fourier transform (group = :math:`S^1`, the unit circle being a closed finite interval with endpoints identified). The latter is routinely employed to handle periodic functions. The fast Fourier transform (FFT) is an algorithm for computing the DFT.
+    Generalizations include the discrete-time Fourier transform (DTFT, group :math:`Z`), the discrete Fourier transform (DFT, group :math:`Z\pmod N`) and the Fourier series or circular Fourier transform (group = :math:`S^1`, the unit circle being a closed finite interval with endpoints identified). The latter is routinely employed to handle periodic functions. The fast Fourier transform (FFT) is an algorithm for computing the DFT.
 
 The Fourier transform (FT) of a distribution function :math:`F` is usually written :math:`\hat F`. The FT contains the same information as the distribution and there is a dictionary back and forth between the two, using the inverse FT.
 Some computations with distributions are easier to perform using their FT, which is what makes them useful.
@@ -201,7 +201,7 @@ Here is the rationale for each step.
      \begin{align}
      g(kb)
      &= \sum_l \hat g(\tfrac{l}{P}) e^{2 \pi i kb \tfrac{l}{P}} \\
-     &= \sum_l \hat gf(\tfrac{l}{P}) e^{\tfrac{2 \pi i}{n} kl}.
+     &= \sum_l \hat g(\tfrac{l}{P}) e^{\tfrac{2 \pi i}{n} kl}.
      \end{align}
 
   However, this is an infinite sum (step 3), and we are working with computers, so it needs to be truncated (step 4). What is
@@ -281,10 +281,86 @@ To summarize:
    large :math:`P=nb`, arguing for large :math:`n` or large :math:`b`
    (in conflict to managing discretization error).
 
+.. _num ft tools:
+
 Using FFT to Invert Characteristic Functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The use of FFTs to recover the aggregate at the end of Step 4 is entirely generic. It can be used to invert any characteristic function. In this section we provide some of examples.
+The use of FFTs to recover the aggregate at the end of Step 4 is entirely generic. It can be used to invert any characteristic function. In this section we provide some of examples. Many more examples are available in a `blog post <https://blog.mynl.com/posts/notes/2025-01-23-Fourier-inversion-with-FFTs/>`_ I wrote on the topic.
+
+The first example shows how to compute a Poisson distribution with mean of 10280 using only 1028 buckets.
+
+.. ipython:: python
+    :okwarning:
+
+    import scipy.stats as ss
+    import matplotlib.pyplot  as plt
+    from aggregate.extensions import FourierTools
+    en = 10280
+    ft_obj = FourierTools(
+           chf=lambda t: np.exp(en * (np.exp(1j * t) - 1)),
+           fz=ss.poisson(en)
+    )
+    print(ft_obj)
+    df = ft_obj.invert(log2=10, x_min=9750)
+    ft_obj.compute_exact(calc='survival');
+    print(ft_obj.describe())
+    @savefig numfftnew01.png scale=20
+    ft_obj.plot()
+
+The six plots show the density, log density, and cdf and sf along the top row. The bottom row shows the Fourier transform and normalized transform, illustrating how it wraps around and tends to the origin, the amplitude and phase of the transform, illustrating how the amplitude falls of quickly (because of the Riemann-Lebesgue theorem), and the log cdf and sf.
+
+The second example tries to compute a Poisson with mean 25600 using only 512 buckets, which is not enough. As a result the answer is polluted by serious aliasing, where the tails wrap around and are included in the body of the distribution.
+
+.. ipython:: python
+    :okwarning:
+
+    en = 25600
+    ft_obj = FourierTools(
+           chf=lambda t: np.exp(en * (np.exp(1j * t) - 1)),
+           fz=ss.poisson(en)
+    )
+    x_min = ft_obj.fz.ppf(0.05)
+    print(ft_obj)
+    df = ft_obj.invert(log2=9, x_min=x_min)
+    ft_obj.compute_exact(calc='survival');
+    print(f'{ft_obj.x_min=}, {ft_obj.x_max=}, {ft_obj.bs=}, {df.shape=}')
+    @savefig numfftnew02.png scale=20
+    ft_obj.plot()
+
+The details of the aliasing are shown in the next plot. The top row on a linear scale, bottom log scale, left column shows cumulative output and right the components. The top right shows how the tails wrap around and are included in the body of the distribution.
+
+.. ipython:: python
+    :okwarning:
+
+    @savefig numfftnew03.png scale=20
+    ft_obj.plot_wraps([-1, 1], add_tail=True)
+
+The final example shows how to compute a stable distribution with exponent 1.75 and skewness 0.3. Because the distribution is very thick tailed, some aliasing is inevitable. The plot shows the aliasing error is not too bad, but the tails are not as accurate as the body of the distribution..
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate.extensions.ft import make_levy_chf
+    a = 1.75
+    b = 0.3
+    fz = ss.levy_stable(a, b)
+    ft_obj = FourierTools(
+           chf=make_levy_chf(a, b),
+           fz=fz
+    )
+    df = ft_obj.invert(log2=12, x_min=-50, x_max=100)
+    print(ft_obj)
+    print(f'{ft_obj.x_min=}, {ft_obj.x_max=}, {ft_obj.bs=}, {df.shape=}')
+    ft_obj.compute_exact(calc='surv', decimate=8);
+    @savefig numfftnew04.png scale=20
+    ft_obj.plot()
+
+
+Older Examples
+"""""""""""""""""
+
+The rest of this section shows some older examples, using ``aggregate.extensions.ft_invert``, but the new ``FourierTools`` class should be used instead.
 
 Invert a gamma distribution from a sample of its characteristic function and compare with the true density. These plots show the inversion is extremely accurate over a very wide range. The top right plot compares the log density, highlighting differences only in the extreme tails.
 

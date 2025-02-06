@@ -286,7 +286,7 @@ To summarize:
 Using FFT to Invert Characteristic Functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The use of FFTs to recover the aggregate at the end of Step 4 is entirely generic. It can be used to invert any characteristic function. In this section we provide some of examples. Many more examples are available in a `blog post <https://blog.mynl.com/posts/notes/2025-01-23-Fourier-inversion-with-FFTs/>`_ I wrote on the topic.
+The use of FFTs to recover the aggregate at the end of Step 4 is entirely generic. It can be used to invert any characteristic function. In this section we provide some of examples. Many more examples are available in my `blog post <https://blog.mynl.com/posts/notes/2025-01-23-Fourier-inversion-with-FFTs/>`_.
 
 The first example shows how to compute a Poisson distribution with mean of 10280 using only 1028 buckets.
 
@@ -301,8 +301,7 @@ The first example shows how to compute a Poisson distribution with mean of 10280
            chf=lambda t: np.exp(en * (np.exp(1j * t) - 1)),
            fz=ss.poisson(en)
     )
-    print(ft_obj)
-    df = ft_obj.invert(log2=10, x_min=9750)
+    ft_obj.invert(log2=10, x_min=9750)
     ft_obj.compute_exact(calc='survival');
     print(ft_obj.describe())
     @savefig numfftnew01.png scale=20
@@ -321,10 +320,9 @@ The second example tries to compute a Poisson with mean 25600 using only 512 buc
            fz=ss.poisson(en)
     )
     x_min = ft_obj.fz.ppf(0.05)
-    print(ft_obj)
-    df = ft_obj.invert(log2=9, x_min=x_min)
+    ft_obj.invert(log2=9, x_min=x_min)
     ft_obj.compute_exact(calc='survival');
-    print(f'{ft_obj.x_min=}, {ft_obj.x_max=}, {ft_obj.bs=}, {df.shape=}')
+    print(ft_obj.describe())
     @savefig numfftnew02.png scale=20
     ft_obj.plot()
 
@@ -349,10 +347,9 @@ The final example shows how to compute a stable distribution with exponent 1.75 
            chf=make_levy_chf(a, b),
            fz=fz
     )
-    df = ft_obj.invert(log2=12, x_min=-50, x_max=100)
-    print(ft_obj)
-    print(f'{ft_obj.x_min=}, {ft_obj.x_max=}, {ft_obj.bs=}, {df.shape=}')
-    ft_obj.compute_exact(calc='surv', decimate=8);
+    ft_obj.invert(log2=12, x_min=-50, x_max=100)
+    ft_obj.compute_exact(calc='survival');
+    print(ft_obj.describe())
     @savefig numfftnew04.png scale=20
     ft_obj.plot()
 

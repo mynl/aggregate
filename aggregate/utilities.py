@@ -1978,6 +1978,8 @@ def knobble_fonts(color=False):
         # note plt.rc lets you set multiple related properties at once:
         plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
         plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
+        # smaller figures
+        plt.rcParams['figure.dpi'] = 100
     else:
         # graphics defaults - better res graphics
         plt.rcParams['figure.dpi'] = 300
@@ -2000,8 +2002,10 @@ def knobble_fonts(color=False):
     # 'Nirmala UI' has poor glyph coverage, removed as an option
     mpl.rcParams['font.sans-serif'] = ['Myriad Pro', 'Segoe UI', 'DejaVu Sans']
     mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono']
+    mpl.rcParams['font.family'] = 'serif'
     # this matches html output better
-    mpl.rcParams['font.family'] = 'sans-serif'
+    # mpl.rcParams['font.family'] = 'sans-serif'
+    # much nicer math font, default is dejavusans
     mpl.rcParams['mathtext.fontset'] = 'stixsans'
     pd.options.display.width = 120
 

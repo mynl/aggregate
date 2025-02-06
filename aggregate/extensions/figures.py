@@ -1,4 +1,5 @@
 # figures other than from PIR book
+# see case_studies.py and pir_figures.py for PIR book figures
 
 import numpy as np
 # from numpy import roll

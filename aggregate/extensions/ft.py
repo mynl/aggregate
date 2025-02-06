@@ -3,7 +3,7 @@ import matplotlib as mpl
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from scipy.fft import irfft,  rfft
+from scipy.fft import irfft,  rfft, ifft as ift
 from numpy import real, imag, roll
 from .. import build, qd, Aggregate
 from .. constants import FIG_H, FIG_W
@@ -504,6 +504,13 @@ class FourierTools(object):
             self.scale = 1.
             self.discrete = fz.bs == 1
             self.distribution_name = f'Aggregate({fz.name})'
+        elif fz is None:
+            # flying blind...do the best we can
+            self.params = (0,)
+            self.loc = 0.
+            self.scale = 1.
+            self.discrete = False
+            self.distribution_name = 'Unknown'
         else:
             # extract shape params from fz; no longer used
             self.params = fz.args
@@ -519,15 +526,17 @@ class FourierTools(object):
         self._ts = None      # phases (angles) at which ft evaluated , for plotting
         self._fourier = None  # store the sample of ft at self._ts for plotting
         self.last_fig = None
-        self.bs = self.x_range = self.x_min = self.x_max = self.decimate = 0
+        # from the last run, note: x_range = P
+        self.bs = self.x_range = self.x_min = self.x_max = self.log2 = 0
+        self.exact_calc = ""
 
     def __repr__(self):
         """Repr of the object."""
-        return f'FT_Invert({self.distribution_name}{self.params}, loc={self.loc}, scale={self.scale})'
+        return f'FourierTools({self.distribution_name}{self.params}, loc={self.loc}, scale={self.scale})'
 
     def describe(self):
         """More information."""
-        return f'{self.x_min=}, {self.x_max=}, {self.bs=}, {self.df.shape=}'
+        return f'{repr(self)}\nn={2**self.log2}, x_min={self.x_min}, x_max={self.x_max:.3g}, bs={self.bs:.3g}'
 
     @property
     def df(self):
@@ -561,26 +570,32 @@ class FourierTools(object):
             ans = ans * np.exp(t1 * self.loc * 1j)
         return ans
 
-    def invert(self, log2, x_min=0, x_max=0, s=1e-17):
+    def invert(self, log2, x_min=0, bs=0, x_max=None, s=1e-17):
         """
         Invert a characteristic function using irfft.
 
-        If self.fz is None then you must input x_max.
+        Call with just log2 for positive support, to determine x_max and
+        bs from quantiles. Call with bs fixed to a reasonable value to
+        deduce x_max = x_min + n bs. Call with x_max to fix the range
+        and deduce bs.
 
         :param x_min: minimum value of range.
-        :param x_max: maximum value of range. If None then x_max = 1<<log2.
+        :param bs: bucket size to use, determines x_max
+        :param x_max: minimum value of range.
         :param s: survival probability to determine tails
         """
         # number of buckets
+        self.log2 = log2
         n = 1 << log2
-        if x_max == 0:
-            if self.discrete:
-                # force bs = 1
-                x_max = x_min + n
-            else:
-                x_max = self.fz.isf(s)
         if x_min is None:
             x_min = self.fz.ppf(s)
+        if bs == 0:
+            if self.discrete:
+                x_max = x_min + n
+            else:
+                x_max = self.fz.isf(s) if x_max is None else x_max
+        else:
+            x_max = x_min + bs * n
         if x_min == 0 and x_max == 0:
             raise ValueError('Must provide x_min < 0 or x_max > 0. Current range is 0 to 0!')
 
@@ -590,17 +605,17 @@ class FourierTools(object):
         # sampling interval (wavelength) = bs = x_range / n
         # sampling domain, for exact and to "label" the Fourier Transform output
         # sampling interval is bs (small bs means high sampling rate)
-        # highest sampling freq for inverting the FT is 1 / bs = n / x_range
+        # the highest sampling freq for inverting the FT is 1 / bs = n / x_range
         bs = x_range / n
         if self.discrete:
             assert bs == 1, f'{bs=}, not the expected 1 for a discrete rv'
-        # note x_max = n * bs, so n / x_max = 1 / bs.
 
+        # f_max is 1 / bs
+        f_max = 1 / bs
         # f(x) = int_R fhat(t) exp(2πi tx)dt ≈ int_-f_max_f^max_f ...
-        # note that f_max is 1 / bs
-        f_max = n / x_range
         # sample the FT; using real fft, only need half the range
-        self._ts = np.arange(n // 2 + 1) * f_max / n
+        # self._ts = np.arange(n // 2 + 1) * f_max / n
+        self._ts = np.linspace(0, 1/2, n // 2 + 1) * f_max
         self._fourier = self.fourier_transform(self._ts)
         # for debugging
         # ft_invert.fx = fx
@@ -616,29 +631,95 @@ class FourierTools(object):
 
         # store for future use
         self.bs, self.x_range, self.x_min, self.x_max = bs, x_range, x_min, x_max
-        return self._df
 
-    def compute_exact(self, calc='survival', decimate=1, min_points=256):
+    def invert_simpson(self, *, log2=0, bs=0, x_min=None):
+        """
+        Add Simpson's method approximation.
+
+        Adds ``simpson`` column to
+        ``self.df``. Uses method of Wang and Zhang, "Simpson's rule based FFT
+        method to compute densities of stable distribution" (2008). Can no
+        longer use the real fft and ifft methods because the input vector is
+        not conjugate symmetric about its midpoint.
+
+        Run after self.invert to set parameters or input directly. Defaults
+        are None because 0 is a legitimate value for x_min. Convenient to
+        state x_min and bs directly. Best to input all parameters if adjusting
+        to avoid mismatches. Note x_max gets trumped by n, bs, and x_min.
+        """
+        # parameters to use for the calculation
+        log2 = log2 if log2 > 0 else self.log2
+        n = 1 << log2
+        x_min = x_min if x_min is not None else self.x_min
+        bs = bs if bs > 0 else self.bs
+        f_max = 1 / bs
+        ks = np.arange(0, n)
+        P = n * bs   # period
+
+        t_left = np.linspace(-f_max / 2, f_max / 2, n, endpoint=False)
+        t_left = np.roll(t_left, n >> 1)
+
+        if x_min != 0:
+            # pre-FFT adjustment
+            x_min_adj = np.exp(2 * np.pi * 1j * x_min * t_left)
+            # post-FFT adjustment
+            post_2 = np.exp(2 * np.pi * 1j * x_min / (2 * P))
+            post_3 = np.exp(2 * np.pi * 1j * x_min / P)
+        else:
+            # no adjustments needed
+            x_min_adj = post_2 = post_3 = 1.
+
+        phi_left = self.fourier_transform(t_left)
+        # three terms left, middle, right of simpson's rule
+        term1 = ift(x_min_adj * phi_left)
+        term2 = post_2 * np.exp(np.pi * 1j * ks / n) * ift(
+            x_min_adj * self.fourier_transform(t_left + 0.5 / n * f_max))
+        term3 = post_3 * np.exp(2 * np.pi * 1j * ks / n) * ift(
+            x_min_adj * self.fourier_transform(t_left + 1 / n * f_max))
+        # weighted sum
+        simpson = (term1 + 4. * term2 + term3) / 6.
+        # check imaginary part small
+        max_abs = np.abs(np.imag(simpson)).max()
+        if max_abs > 1e-10:
+            print(f'WARNING: Answer has suspiciously large imaginary component {max_abs}')
+        # create / update answer dataframe
+        if self._df is None or self.bs != bs or self.x_min != x_min:
+            # changed scale or location, recreate dataframe from scratch
+            print('recreating df')
+            self._df = pd.DataFrame({
+                'x': np.linspace(x_min, x_min + n * bs, n, endpoint=False),
+                'simpson': np.real(simpson)}).set_index('x')
+        else:
+            # append to existing dataframe
+            self.df['simpson'] = np.real(simpson)
+
+    def compute_exact(self, calc='survival', max_points=257):
         """
         Compute exact density using frozen scipy.stats object.
 
         :param calc: 'density' re-scales pdf, 'survival' uses backward
           differences of sf.
+        :param max_points: maximum number of points to use; if more just
+          interpolate this many points.
         :param decimate: decimate (take ``::decimate``) input xs to reduce
           number of calls to fz (which may be slow)
         :param min_points: opposite of decimate, ensure exact computed
           with min_points. Useful for example when log2 is "too small"
           to ensure exact distribution is rendered correctly.
         """
+        assert calc in ('survival', 'density'), 'calc must be "survival" or "density"'
+        self.exact_calc = calc
         assert self._df is not None, 'Must recompute first. Run ft_invert().'
         xs = np.array(self._df.index)
-        if decimate > 1:
-            xs = xs[::decimate]
-        # if too few points beef up, non-discrete distributions only
-        if len(xs) < min_points and not self.discrete:
-            xs = np.linspace(xs[0], xs[-1] + self.bs, min_points)
-        bs = xs[1] - xs[0]
-
+        if len(xs) > max_points and not self.discrete:
+            # mostly this is an issue for non-discrete distributions
+            xs = np.linspace(xs[0], xs[-1] + self.bs, max_points)
+        # if decimate > 1:
+        #     xs = xs[::decimate]
+        # # if too few points beef up, non-discrete distributions only
+        # if len(xs) < min_points and not self.discrete:
+        #     xs = np.linspace(xs[0], xs[-1] + self.bs, min_points)
+        self.bs_exact = bs = xs[1] - xs[0]
         # discrete dists have pmf not pdf
         if getattr(self.fz, 'pdf', None) is None:
             pdf = self.fz.pmf
@@ -648,14 +729,11 @@ class FourierTools(object):
         if calc == 'density':
             print('Best to use survival calc.')
             exact = pdf(xs)
-            # total may not be the whole amount if the range does not include all prob
-            exact = exact / exact.sum() * (self.fz.cdf(xs[-1]) - self.fz.cdf(xs[0]))
-        else:
+        elif calc == 'survival':
             xs1 = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
-            exact = -np.diff(self.fz.sf(xs1))
-        # add column, want to avoid introducing missing values
-        self._df_exact = pd.DataFrame({'x': xs, 'p': exact}).set_index('x')
-        self.decimate = decimate
+            exact = -np.diff(self.fz.sf(xs1)) /  bs
+            self._df_exact = pd.DataFrame({'x': xs, 'p': exact}).set_index('x')
+        # self.decimate = decimate
         return self._df_exact
 
     def plot(self, suptitle='', xlim=None):
@@ -676,19 +754,20 @@ class FourierTools(object):
         pe = self._df_exact.p.values
         # bucket sizes to create densities
         b = x[1] - x[0]
+        # no longer needed, exact estimates the density
         be = xe[1] - xe[0]
         if xlim is None:
             xlim = [x[0], x[-1]]
 
         for ax in [ax0, ax1]:
             ax.plot(x, p / b, label='Fourier', lw=1)
-            ax.plot(xe, pe / be, ls='--', c='C3', label='exact', lw=1)
+            ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
             ax.legend(fontsize='x-small')
         ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
         # mn = min(np.log10(exact).min(), np.log10(x).min())
         mn0 = np.log10(p / b).min() * 1.25
         mn = 10 ** np.floor(mn0)
-        mx = max(np.log10(pe / be).max(), np.log10(x).max())
+        mx = max(np.log10(pe).max(), np.log10(x).max())
         mx = 10 ** np.ceil(mx)
         if np.isnan(mn):
             mn = 1e-17
@@ -703,16 +782,16 @@ class FourierTools(object):
         for ax in [ax2, ax5]:
             ax.plot(x, np.cumsum(p), label='cdf Fourier', lw=1,
                     c='C0', drawstyle=drawstyle)
-            ax.plot(xe, np.cumsum(pe), label='cdf exact', ls='--', lw=.5,
+            ax.plot(xe, np.cumsum(pe * be), label='cdf exact', ls='--', lw=.5,
                     c='C3', drawstyle=drawstyle)
             ax.plot(x, np.cumsum(p[::-1])[::-1], label='sf Fourier', lw=1,
                     c='C2', drawstyle=drawstyle)
-            ax.plot(xe, np.cumsum(pe[::-1])[::-1], label='sf exact', ls='--', lw=.5,
+            ax.plot(xe, np.cumsum(pe[::-1] * be)[::-1], label='sf exact', ls='--', lw=.5,
                     c='C4', drawstyle=drawstyle)
 
-        ax2.set(title='Cumulative sf and cdf', xlabel='Outcome, x', xlim=xlim)
+        ax2.set(title='sf and cdf', xlabel='Outcome, x', xlim=xlim)
         ax2.legend()
-        ax5.set(yscale='log', title='Cumulative log sf and cdf', ylim=[mn, 10],
+        ax5.set(yscale='log', title='log sf and cdf', ylim=[mn, 10],
                 xlim=xlim, xlabel='Outcome, x')
 
         # ft on ax3, probably should inline this
@@ -746,21 +825,25 @@ class FourierTools(object):
         if suptitle != '':
             self.last_fig.suptitle(suptitle)
 
-    def plot_wraps(self, wraps=None, suptitle='', add_tail=False):
+    def plot_wraps(self, wraps=None, calc='survival', add_tail=False):
         """
         Illustrate wrapping. Only run when fz.pdf is easy to calc, otherwise too slow.
 
-        :param wraps: optional list of wrap values.
+        :param wraps: optional list of wrap values. Eg [-1,1] plots one greater and one
+            less than [0, P)
+        :param calc: how to estimate the density outside the base range, same ``compute_exact``.
+        :param add_tail: plot the shifted exact densities in plots 2 and 4.
         """
-        assert self._df is not None, 'Must recompute first. Run ft_invert() and ft_compare().'
+        assert self._df is not None, 'Must recompute first. Run invert().'
+        assert self._df_exact is not None, "Must run compute_exact() first."
         # extract values
         x = np.array(self._df.index)
         b = x[1] - x[0]
         p = self._df['p'].values / b    # here and below divide by b to convert to a density
         xe = np.array(self._df_exact.index)
         be = xe[1] - xe[0]
-        pe = self._df_exact.p.values / be
-        xe_range = xe[-1] - xe[0]
+        pe = self._df_exact.p.values
+        x_range = self.x_max - self.x_min
         rt = pe.copy()
 
         # duplicated...
@@ -772,10 +855,6 @@ class FourierTools(object):
             mn = 1e-17
         if np.isnan(mx):
             mx = 1
-        # if getattr(self.fz, 'pdf', None) is None:
-        #     pdf = self.fz.pmf
-        # else:
-        #     pdf = self.fz.pdf
 
         # report answer
         ans = []
@@ -784,16 +863,29 @@ class FourierTools(object):
         for ax in axs.flat:
             ax.plot(x, p, label='Fourier', lw=2)
         lw = .5
+        if calc == 'density':
+            if hasattr(self.fz, 'pdf'):
+                pdf = self.fz.pdf
+            elif hasattr(self.fz, 'pmf'):
+                pdf = self.fz.pmf
+            else:
+                raise ValueError('fz must have pdf or pmf method for density method')
         for i, b_wrap in enumerate(wraps):
             if type(b_wrap) == int:
                 bl = f'{b_wrap:d}'
             else:
                 bl = f'{b_wrap:.3f}'
-            xs2 = b_wrap * xe_range + xe
-            # for computing probs using survial method
-            xs2d = np.hstack((xs2 - be / 2, xs2[-1] + be / 2))
-            adj = -np.diff(self.fz.sf(xs2d)) / be
-            rt += adj
+            xs2 = b_wrap * x_range + xe
+            if calc == 'survival':
+                # for computing probs using survival method
+                xs2d = np.hstack((xs2 - be / 2, xs2[-1] + be / 2))
+                adj = -np.diff(self.fz.sf(xs2d)) / be
+                rt += adj
+            elif calc == 'density':
+                adj = pdf(xs2)
+                rt += adj
+            else:
+                raise ValueError('calc must be "survival" or "density"')
             c = f'C{i+1}'
             ax0.plot(xe, rt, label=bl, lw=lw, c=c)
             ax1.plot(xe, adj, label=bl, lw=lw, c=c)
@@ -807,40 +899,52 @@ class FourierTools(object):
         for ax in axs.flat:
             ax.plot(xe, pe, label='exact', ls='--', lw=1, c='C3')
         ax0.set(yscale='linear',
-                # ylim=[mn, mx],
                 title='Cumulative aliasing',
                 xlabel='Outcome, x',
                 ylabel='Density')
         ax2.set(yscale='log',
-                # ylim=[mn, mx],
                 title='Cumulative - log scale',
                 xlabel='Outcome, x',
                 ylabel='Log density')
         ax1.set(yscale='linear',
-                # ylim=[mn, mx],
                 title='Incremental aliasing',
                 xlabel='Outcome, x',
                 ylabel='Density')
         ax3.set(yscale='log',
-                # ylim=[mn, mx],
                 title='Incremental - log scale',
                 xlabel='Outcome, x',
                 ylabel='Log density')
         ax2.legend(fontsize='x-small', ncol=2)
         if add_tail:
             ax1.legend(fontsize='x-small', ncol=2)
-        if suptitle != '':
-            self.last_fig.suptitle(suptitle)
         if add_tail:
             if 0 not in wraps:
                 wraps.append(0)
+            if 1 not in wraps:
+                wraps.append(1)
             wraps.append(max(wraps) + 1)
+            wraps = sorted(wraps)
             for b_wrap in wraps:
-                ax1.axvline(xe[0] + b_wrap * xe_range, lw=.25, c='k', ls=':')
-                ax3.axvline(xe[0] + b_wrap * xe_range, lw=.25, c='k', ls=':')
-        df = pd.DataFrame(ans, columns=['wrap', 'x0', 'x1', 'below x1', 'below x0', 'pr in wrap'])
-        df = df.set_index('wrap')
+                ax1.axvline(x[0] + b_wrap * x_range, lw=.25, c='k', ls=':')
+                ax3.axvline(x[0] + b_wrap * x_range, lw=.25, c='k', ls=':')
+            for ax in [ax1, ax3]:
+              ax.set(xticks=self.x_min + np.arange(0, max(wraps), 2) * self.x_max)
+              ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(n=2))
+        df = pd.DataFrame(ans, columns=['Wrap', 'x0', 'x1', 'Pr(X≤x1)', 'Pr(X≤x0)', 'Pr(X in Wrap)'])
+        df = df.set_index('Wrap')
         return df
+
+    def plot_simpson(self, ylim=1e-16):
+        """Plot Simpson's approximation."""
+        fig, ax = plt.subplots(1, 1, figsize=(5, 3.25), constrained_layout=True)
+        if self._df_exact is not None:
+            self.df_exact.p.plot(ax=ax, lw=1, c='C1')
+        xs = np.array(self.df.index)
+        if 'p' in self.df:
+            ax.plot(xs, self.df.p / self.bs, label='basic', c='C0', lw=1)
+        ax.plot(xs, self.df.simpson / self.bs, label='simpson', c='C3', ls=':')
+        ax.set(yscale='log', ylim=ylim)
+        ax.legend()
 
     def _plot_fourier1d(self, ax, min_abs=1e-20):
         """Create simple plot of Fourier transform on one axis."""

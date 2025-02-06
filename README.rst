@@ -29,6 +29,14 @@ Version History
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
 
+0.25.0
+~~~~~~~~~~~~
+* Tweak ``extensions.ft.FourierTools``: added ``invert_simpson`` method using Simpson's rule, better for stable distributions. This is the method used by ``scipy.stats``.
+* Bumped to 0.25 which should have done in 0.24.2 because it added new functionality
+* Tidied docs
+* `knobble_fonts` uses serif font by default in matplotlib, and sets up
+  in color mode by default. 
+
 0.24.2
 ~~~~~~~~~~
 
@@ -36,7 +44,7 @@ Version History
   in pricing. Same logic as ``price_ex``. Makes it easy to compute the natural
   allocation from a distortion.
 * Added ``extensions.ft.FourierTools`` class, which performs direct inversion of a (continuous) Fourier transform (characteristic function)
-  using FFTs. This is particularly useful for stable distributions, where the Fourier transform is known but the density is not. See examples in :ref:`num ft tools`
+  using FFTs. This is particularly useful for stable distributions, where the Fourier transform is known but the density is not. See examples in Section 5 of the documentation.
 * Added ``make_levy_chf`` to ``extensions`` to compute the characteristic function of a Levy stable distribution.
 
 0.24.1

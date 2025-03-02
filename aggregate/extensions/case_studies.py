@@ -39,10 +39,6 @@ from IPython.display import HTML, display
 
 from .. constants import *
 
-# general set up
-pd.set_option("display.float_format", EngFormatter(3, True))
-pd.set_option('display.max_rows', 500)
-
 # get the logger
 logger = logging.getLogger('aggregate.case_studies')
 
@@ -268,6 +264,9 @@ class CaseStudy(object):
         self.cache_base = Path.home() / 'aggregate/cases'
         self.cache_base.mkdir(exist_ok=True)
         self.cache_dir = None
+        # general set up
+        pd.set_option("display.float_format", EngFormatter(3, True))
+        pd.set_option('display.max_rows', 500)
 
     def to_json(self):
         """

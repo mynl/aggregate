@@ -12,12 +12,21 @@ Basic
 
 .. automodule:: aggregate.extensions.basic
    :members:
+   :undoc-members:
 
 Fourier Transform Support
 ----------------------------
 
 .. automodule:: aggregate.extensions.ft
    :members:
+   :undoc-members:
+
+Tweedie Support
+--------------------
+
+.. automodule:: aggregate.extensions.tweedie
+   :members:
+   :undoc-members:
 
 Case Study Support
 ---------------------

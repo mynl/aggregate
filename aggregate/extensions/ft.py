@@ -1,3 +1,4 @@
+import logging
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.ticker as ticker
@@ -7,6 +8,10 @@ from scipy.fft import irfft,  rfft, ifft as ift
 from numpy import real, imag, roll
 from .. import build, qd, Aggregate
 from .. constants import FIG_H, FIG_W
+
+
+# get the logger
+logger = logging.getLogger(__name__)
 
 
 def poisson_example(en, small2):
@@ -457,7 +462,7 @@ def stats(df):
 class FourierTools(object):
     """Manual inversion of a ch. f. using FFTs."""
 
-    def __init__(self, chf, fz):
+    def __init__(self, chf, fz, scale_mode=True):
         """
         Class version of manual inversion of characteristic function.
 
@@ -488,9 +493,12 @@ class FourierTools(object):
           longer allowed.) If fz is 'discrete' or 'continuous' or 'mixed' it is a
           generic distribution with no closed form cdf/pdf, e.g. Tweeedie. Then you
           can't compute exact, obviously.
+        :param scale_mode: if True, the scale parameter from fz is used in the Fourier
+          Transform, otherwise it is unadjusted.
         """
         self.chf = chf
         self.fz = fz
+        self.scale_mode = scale_mode
         if isinstance(fz, str):
             # extremely limited functionality
             self.params = (0,)  # allows passing as param 1 to the chf
@@ -564,10 +572,13 @@ class FourierTools(object):
         """
         TWOPI = 6.283185307179586
         t1 = -t * TWOPI
-        ans = self.chf(t1 * self.scale)
-        if self.loc != 0:
-            # for some reason ans *= np.exp(-t1 * loc) does not work
-            ans = ans * np.exp(t1 * self.loc * 1j)
+        if self.scale_mode:
+            ans = self.chf(t1 * self.scale)
+            if self.loc != 0:
+                # for some reason ans *= np.exp(-t1 * loc) does not work
+                ans = ans * np.exp(t1 * self.loc * 1j)
+        else:
+            ans = self.chf(t1)
         return ans
 
     def invert(self, log2, x_min=0, bs=0, x_max=None, s=1e-17):
@@ -607,8 +618,8 @@ class FourierTools(object):
         # sampling interval is bs (small bs means high sampling rate)
         # the highest sampling freq for inverting the FT is 1 / bs = n / x_range
         bs = x_range / n
-        if self.discrete:
-            assert bs == 1, f'{bs=}, not the expected 1 for a discrete rv'
+        if self.discrete and bs != 1:
+            logger.warning(f'{bs=}, not the expected 1 for a discrete rv')
 
         # f_max is 1 / bs
         f_max = 1 / bs
@@ -681,11 +692,11 @@ class FourierTools(object):
         # check imaginary part small
         max_abs = np.abs(np.imag(simpson)).max()
         if max_abs > 1e-10:
-            print(f'WARNING: Answer has suspiciously large imaginary component {max_abs}')
+            logger.warning(f'Answer has suspiciously large imaginary component {max_abs}')
         # create / update answer dataframe
         if self._df is None or self.bs != bs or self.x_min != x_min:
             # changed scale or location, recreate dataframe from scratch
-            print('recreating df')
+            logger.info('recreating df')
             self._df = pd.DataFrame({
                 'x': np.linspace(x_min, x_min + n * bs, n, endpoint=False),
                 'simpson': np.real(simpson)}).set_index('x')
@@ -727,8 +738,9 @@ class FourierTools(object):
             pdf = self.fz.pdf
 
         if calc == 'density':
-            print('Best to use survival calc.')
+            logger.warning('Best to use survival calc rather than density method.')
             exact = pdf(xs)
+            self._df_exact = pd.DataFrame({'x': xs, 'p': exact}).set_index('x')
         elif calc == 'survival':
             xs1 = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
             exact = -np.diff(self.fz.sf(xs1)) /  bs
@@ -736,32 +748,46 @@ class FourierTools(object):
         # self.decimate = decimate
         return self._df_exact
 
-    def plot(self, suptitle='', xlim=None):
+    def plot(self, suptitle='', xlim=None, verbose=True):
         """
         Compare density, log density, and plot amplitude and argument of Fourier transform.
 
         :param suptitle: super title for the plot.
         """
         assert self._df is not None, 'Must recompute first. Run ft_invert() and compute_exact().'
-        assert self._df_exact is not None, 'Must recompute first. Run compute_exact().'
+        has_exact = self._df_exact is not None
+        if not has_exact:
+            logger.warning('No exact! Maybe run compute_exact().')
 
         # plot four graphs per ft_invert
-        self.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
-        ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
+        if verbose:
+            self.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
+            ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
+        else:
+            self.last_fig, axs = plt.subplots(1, 2, figsize=(2 * 2.5, 1 * 2.5), constrained_layout=True)
+            ax0, ax1 = axs.flat
+
         x = np.array(self._df.index)
         p = self._df.p.values
-        xe = np.array(self._df_exact.index)
-        pe = self._df_exact.p.values
-        # bucket sizes to create densities
         b = x[1] - x[0]
-        # no longer needed, exact estimates the density
-        be = xe[1] - xe[0]
+        if has_exact:
+            xe = np.array(self._df_exact.index)
+            pe = self._df_exact.p.values
+            be = xe[1] - xe[0]
+        else:
+            # avoid an error below when no exact
+            pe = self.df.p.values
         if xlim is None:
-            xlim = [x[0], x[-1]]
+            if x[0] == 0:
+                lower = -x[-1] / 25
+            else:
+                lower = x[0]
+            xlim = [lower, x[-1]]
 
         for ax in [ax0, ax1]:
             ax.plot(x, p / b, label='Fourier', lw=1)
-            ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
+            if has_exact:
+                ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
             ax.legend(fontsize='x-small')
         ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
         # mn = min(np.log10(exact).min(), np.log10(x).min())
@@ -774,7 +800,12 @@ class FourierTools(object):
         if np.isnan(mx):
             mx = 1
         ax1.set(yscale='log', ylim=[mn, mx], xlim=xlim, title='Log density', xlabel='Outcome, x')
+        if not verbose:
+            if suptitle != '':
+                self.last_fig.suptitle(suptitle)
+            return
 
+        # else: verbose mode: full monty with six plots
         if self.discrete and len(self._df) <= 64:
             drawstyle = 'steps-post'
         else:
@@ -782,11 +813,13 @@ class FourierTools(object):
         for ax in [ax2, ax5]:
             ax.plot(x, np.cumsum(p), label='cdf Fourier', lw=1,
                     c='C0', drawstyle=drawstyle)
-            ax.plot(xe, np.cumsum(pe * be), label='cdf exact', ls='--', lw=.5,
+            if has_exact:
+                ax.plot(xe, np.cumsum(pe * be), label='cdf exact', ls='--', lw=.5,
                     c='C3', drawstyle=drawstyle)
             ax.plot(x, np.cumsum(p[::-1])[::-1], label='sf Fourier', lw=1,
                     c='C2', drawstyle=drawstyle)
-            ax.plot(xe, np.cumsum(pe[::-1] * be)[::-1], label='sf exact', ls='--', lw=.5,
+            if has_exact:
+                ax.plot(xe, np.cumsum(pe[::-1] * be)[::-1], label='sf exact', ls='--', lw=.5,
                     c='C4', drawstyle=drawstyle)
 
         ax2.set(title='sf and cdf', xlabel='Outcome, x', xlim=xlim)
@@ -967,7 +1000,7 @@ class FourierTools(object):
     def plot_fourier3d(self, scale=True):
         """Three dimensional line plot of the Fourier transform using mayavi."""
         # dont want to make mayavi a required package
-        print('REMEMBER: Pops a separate window!')
+        logger.warning('REMEMBER: this routine pops a separate window!')
         try:
             from mayavi import mlab
         except ModuleNotFoundError:

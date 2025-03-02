@@ -221,7 +221,7 @@ def fig_10_3(dist=None, s=0.3):
 
     def setbg(t):
         """ make text boxes opaque and same color as plot background """
-        t.set_bbox(dict(facecolor=PLOT_FACE_COLOR, alpha=0.85, edgecolor='none', boxstyle='square,pad=.1'))
+        t.set_bbox(dict(facecolor=plt.rcParams['axes.facecolor'], alpha=0.85, edgecolor='none', boxstyle='square,pad=.1'))
 
     for a in axs.flat:
         a.plot(ps, gs, c='C1', lw=1.5, label='Premium, $g(s)$')
@@ -273,7 +273,7 @@ def fig_10_3(dist=None, s=0.3):
                ylabel='Price of layer $1_{U<s}$', aspect='equal')
 
 
-def fig_10_5(port=None, dist=None, s=0.3):
+def fig_10_5(port=None, dist=None, s=0.3, x=None):
     """
     three plot version of previous with more explanation of first picture
 
@@ -294,7 +294,6 @@ def fig_10_5(port=None, dist=None, s=0.3):
     """
 
     return_period_max = 100
-    return_period_x = 1 / s
 
     fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_H, FIG_W), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
@@ -304,6 +303,11 @@ def fig_10_5(port=None, dist=None, s=0.3):
     if dist is None:
         dist = build('distortion myph ph 0.4')
 
+    if x is None:
+        x = port.q(1 - s)
+    else:
+        s = port.sf(x)
+
     g = dist.g
     K = port.q(1 - 1 / return_period_max)  # 200 year capital
     xs = port.density_df.loss
@@ -311,7 +315,6 @@ def fig_10_5(port=None, dist=None, s=0.3):
     gS = g(S)
     gS[0] = 1.0
 
-    x = port.q(1 - 1 / return_period_x)
     Fx = port.cdf(x)
     gFx = 1 - g(1-Fx)
 
@@ -321,8 +324,8 @@ def fig_10_5(port=None, dist=None, s=0.3):
 
     dist_name = str(dist).replace('\n', ' ')
 
-    ax0.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$')
-    ax0.plot(1-gS, xs, lw=1.5, c='C1',
+    ax0.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-post')
+    ax0.plot(1-gS, xs, lw=1.5, c='C1', drawstyle='steps-post',
            label=f'Premium $g(S(x))$\nDistortion {dist_name}')
 
     ax0.plot([Fx, Fx], [0, x], linewidth=0.25, c='C7')
@@ -347,19 +350,19 @@ def fig_10_5(port=None, dist=None, s=0.3):
                  va='baseline', ha='center', arrowprops={'arrowstyle': '->'})
 
     # middle plot =======================================================================
-    ax1.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$')
-    ax1.plot(1-gS, xs, lw=1.5, c='C1',
+    ax1.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-post')
+    ax1.plot(1-gS, xs, lw=1.5, c='C1',  drawstyle='steps-post',
            label=f'Premium $g(S(x))$\ndistortion {dist_name}')
 
     loss_line = [(port.cdf(i), i) for i in np.linspace(K, .01, 200)]
     prem_line = [(1-g(1 - port.cdf(i)), i) for i in np.linspace(K, .01, 200)]
 
     # top patch
-    patches = [Polygon([(0, 0), (0, K), (1 - g(1-port.cdf(K)), K)] + prem_line, True)]
+    patches = [Polygon([(0, 0), (0, K), (1 - g(1-port.cdf(K)), K)] + prem_line, closed=True)]
     # bottom
-    patches.append(Polygon([(1, 0), (1, K), (port.cdf(K), K)] + loss_line, True))
+    patches.append(Polygon([(1, 0), (1, K), (port.cdf(K), K)] + loss_line, closed=True))
     # middle
-    patches.append(Polygon([(1, 0)] + loss_line[::-1] + prem_line, True))
+    patches.append(Polygon([(1, 0)] + loss_line[::-1] + prem_line, closed=True))
 
     # under loss, eq, margin
     p = PatchCollection(patches, alpha=.25, facecolors=['lightsteelblue', 'C0', 'C1' ])

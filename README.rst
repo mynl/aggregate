@@ -1,11 +1,11 @@
 |  |activity| |doc| |version|
-|  |py-versions| |downloads|
+|  |py-versions| |downloads| |stars| |forks| 
 |  |license| |packages| |zenodo|
 
 -----
 
-aggregate: a powerful actuarial modeling library
-==================================================
+aggregate: working with actuarial compound distributions
+===========================================================
 
 Purpose
 -----------
@@ -20,7 +20,7 @@ and is implemented in Python under an open source BSD-license.
 Aggregate White Paper
 ----------------------
 
-`Aggregate: fast, accurate, and flexible approximation of compound probability distributions <https://www.cambridge.org/core/journals/annals-of-actuarial-science/article/aggregate-fast-accurate-and-flexible-approximation-of-compound-probability-distributions/1BF9A534D944D983B1D780C60885F065>`_ describes the ``Aggregate`` class within ``aggregate``. This paper has been published in the peer reviewed journal `Annals of Actuarial Science <https://www.cambridge.org/core/journals/annals-of-actuarial-science>`_ in the Actuarial Software series.
+`Aggregate: fast, accurate, and flexible approximation of compound probability distributions <https://www.cambridge.org/core/journals/annals-of-actuarial-science/article/aggregate-fast-accurate-and-flexible-approximation-of-compound-probability-distributions/1BF9A534D944D983B1D780C60885F065>`_ describes the ``Aggregate`` class within ``aggregate``. This paper has been published in the peer reviewed journal `Annals of Actuarial Science <https://www.cambridge.org/core/journals/annals-of-actuarial-science>`_'s Actuarial Software series.
 The paper describes the purpose, implementation, and use ``Aggregate``, showing how it can be used to create and manipulate compound frequency-severity distributions.
 
 Version History
@@ -29,12 +29,19 @@ Version History
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
 
+0.26.0
+~~~~~~~~~~
+* ``extensions`` no longer sets ``pd.float_format`` to Engineering.
+* Added ``tweedie.Tweedie`` class to ``extensions`` to compute the Tweedie class distributions for
+  all valid :math:`p`.
+
 0.25.0
 ~~~~~~~~~~~~
-* Tweak ``extensions.ft.FourierTools``: added ``invert_simpson`` method using Simpson's rule, better for stable distributions. This is the method used by ``scipy.stats``.
+* Tweak ``extensions.ft.FourierTools``: added ``invert_simpson`` method using Simpson's rule,
+  better for stable distributions. This is the method used by ``scipy.stats``.
 * Bumped to 0.25 which should have done in 0.24.2 because it added new functionality
 * Tidied docs
-* `knobble_fonts` uses serif font by default in matplotlib, and sets up
+* ``knobble_fonts`` uses serif font by default in matplotlib, and sets up
   in color mode by default. 
 
 0.24.2

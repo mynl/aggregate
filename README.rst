@@ -33,7 +33,7 @@ Version History
 ~~~~~~~~~~
 * ``extensions`` no longer sets ``pd.float_format`` to Engineering.
 * Added ``tweedie.Tweedie`` class to ``extensions`` to compute the Tweedie class distributions for
-  all valid :math:`p`.
+  all valid :math:`p`. (Dangling jax dependence.)
 
 0.25.0
 ~~~~~~~~~~~~

@@ -1,6 +1,9 @@
 from enum import Enum
-from jax import grad     # EXTREMELY idle...
-import jax.numpy as jnp
+try:
+    from jax import grad     # EXTREMELY idle...
+    import jax.numpy as jnp
+except:
+    pass
 import logging
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker

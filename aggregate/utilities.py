@@ -87,7 +87,7 @@ def pprint(txt):
     """
     return pprint_ex(txt, split=60)
 
-def pprint_ex(txt, split=0, html=False):
+def pprint_ex(txt, split=0, html=False, show=True):
     """
     Try to format an agg program. This is difficult because of dfreq and dsev, optional
     reinsurance, etc. Go for a simple approach of removing unnecessary spacing
@@ -128,6 +128,8 @@ def pprint_ex(txt, split=0, html=False):
         # remove extra spaces
         txt = re.sub(r'[ \t\n]+', ' ', txt.strip())
         ans = HTML(highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False)))
+    if show:
+        print(ans)
     return ans
 
 

@@ -164,24 +164,24 @@ class Tweedie(object):
         prefix = ('' if theta == 0 else 'tilted ')
         match p:
             case 0:
-                self.name = "normal"
+                self.name = "Gaussian"
             case 1:
-                self.name = "poisson"
+                self.name = "Poisson"
             case 2:
                 self.name = "gamma"
             case 3:
                 if theta == 0:
-                    self.name = "levy"
+                    self.name = "Lévy"
                 else:
-                    self.name = "inverse gaussian"
+                    self.name = "inverse Gaussian"
             case p if 1 < p < 2:
-                self.name = "tweedie"
+                self.name = "Tweedie"
             case p if p < 0:
                 self.name = prefix + "extreme stable"
             case p if p > 2:
                 self.name = prefix + "positive extreme stable"
             case p if np.isinf(p):
-                self.name = prefix + "extreme cauchy"
+                self.name = prefix + "Landau"
             case _:
                 raise ValueError(f'Invalid p: {p}')
 
@@ -910,9 +910,9 @@ def tweedie_illustration():
         if dot:
             ax.plot(x,y, 'ko', ms=5)
 
-    ql(2,    0, 'Normal', ha='center')
-    ql(1,   10, 'Cauchy\nas $p\\to\\infty$', ha='left', va='top')
-    ql(.5,   3, 'Levy stable 3/2\ninv Gaussian', ha='right')
+    ql(2,    0, 'Gaussian', ha='center')
+    ql(1,   10, 'Landau\nas $p\\to\\infty$', ha='left', va='top')
+    ql(.5,   3, 'Lévy stable 3/2\ninv Gaussian', ha='right')
     ql(0,    2, 'Gamma')
     ql(-4.5, 1, 'Poisson\n$\\alpha\\to-\\infty$', va='top', ha='center')
 

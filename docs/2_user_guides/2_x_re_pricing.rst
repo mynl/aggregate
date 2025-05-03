@@ -323,7 +323,7 @@ Property Risk Exposure Rating
 
 Property risk exposure rating differs from casualty in part because the severity distribution varies with each risk (location). Rather than a single ground-up severity curve per class, there is a size of loss distribution normalized by property total insured value (TIV).
 
-We start by introducing the Swiss Re severity curves, :cite:t:`Bernegger1997` using a moments-matched beta distribution. The function ``G`` defines the MBBEFD distribution, parameterized by ``c``.
+We start by introducing the Swiss Re severity curves, :cite:t:`Bernegger1997` using a moments-matched beta distribution. The function ``F`` defines the MBBEFD distribution, parameterized by ``c``.
 
 .. ipython:: python
     :okwarning:
@@ -339,10 +339,10 @@ We start by introducing the Swiss Re severity curves, :cite:t:`Bernegger1997` us
     def bg(c):
         return np.exp((0.78 + 0.12*c)*c)
 
-    def G(x, c):
+    def F(x, c):
         b = bb(c)
         g = bg(c)
-        return np.log(((g - 1) * b + (1 - g * b) * b**x) / (1 - b)) / np.log(g * b)
+        return np.where(x == 1 , 1 , 1-(1-b)/((g-1)*b**(1-x)+(1-g*b)))
 
 
 Here are the base curves, compare Figure 4.2 in :cite:t:`Bernegger1997`. The curve ``c=5`` is close to the Lloyd's curve (scale).
@@ -355,13 +355,13 @@ Here are the base curves, compare Figure 4.2 in :cite:t:`Bernegger1997`. The cur
     ans = []
     ps = np.linspace(0,1,101)
     for c in [0, 1, 2, 3, 4, 5]:
-        gs = G(ps, c)
-        ax.plot(ps, gs, label=f'c={c}')
-        ans.append([c, *xsden_to_meancv(ps[1:], np.diff(gs))])
+        fs = F(ps, c)
+        ax.plot(ps, fs, label=f'c={c}')
+        ans.append([c, *xsden_to_meancv(ps[1:], np.diff(fs))])
     ax.legend(loc='lower right');
     @savefig prop_ch1.png scale=20
-    ax.set(xlabel='Proportion of limit', ylabel='Proportion of expected loss',
-           title='Swiss Re property scales');
+    ax.set(xlabel='Loss degree x', ylabel='Probablity of X <= x',
+           title='MBBDF Distribution');
 
 Next, approximate these curves with a beta distribution to make them easier for us to use in ``aggregate``. Here are the parameters and fit graphs for each curve.
 

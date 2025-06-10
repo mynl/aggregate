@@ -1127,7 +1127,7 @@ class Aggregate(Frequency):
         #                   agg_reins=agg_reins, agg_kind=agg_kind, note=note)
         # using inspect, more robust...must call before you create other variables
         frame = inspect.currentframe()
-        self._spec = inspect.getargvalues(frame).locals
+        self._spec = dict(inspect.getargvalues(frame).locals)
         for n in ['frame', 'get_value', 'self']:
             if n in self._spec: self._spec.pop(n)
 

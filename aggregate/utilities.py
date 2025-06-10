@@ -27,7 +27,7 @@ from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence
 from scipy.special import kv, binom, loggamma
 from scipy.stats import multivariate_t
-from IPython.core.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG
+from IPython.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG
 
 from .constants import *
 import aggregate.random_agg as ar

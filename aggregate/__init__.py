@@ -55,7 +55,7 @@ __version__ = "0.26.0"
 
 # as a default turn off all logging
 logger_level(30)
-knobble_fonts(True)
+# knobble_fonts(True)
 
 # module level doc-string
 __doc__ = """

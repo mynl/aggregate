@@ -1,3 +1,37 @@
+"""
+Aggregate Lexer and Parser.
+===========================
+
+To debug in a repl use the following code:
+
+    from aggregate.parser import UnderwritingLexer, UnderwritingParser
+
+    lexer = UnderwritingLexer()
+    parser = UnderwritingParser(lambda x: x, debug=True)
+
+    while True:
+        try:
+            text = input(">> ")
+            if not text:
+                continue
+        except (EOFError, KeyboardInterrupt):
+            break
+
+        try:
+            if text == 'x':
+                break
+            tokens = list(lexer.tokenize(text))
+            print("Tokens:")
+            for tok in tokens:
+                print(f"  {tok.type:<10} {tok.value!r}")
+
+            result = parser.parse(iter(tokens))
+            print("Parsed:")
+            print(result)
+        except Exception as e:
+            print("Error:", e)
+
+"""
 # For historical interest, the journey to sorting out the parser ran as follows:
 #
 # 0. Base: 12 SR conflicts
@@ -56,9 +90,9 @@ class UnderwritingLexer(Lexer):
 
     """
 
-    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
+    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV, NOTE,
               SEV, AGG, PORT,
-              NUMBER, # INFINITY,
+              NUMBER,  # INFINITY,
               PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
               LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
               XS, PICKS,
@@ -209,11 +243,11 @@ class UnderwritingParser(Parser):
     # this won't have been created the first time this runs in a clean environment, hence:
     tokens = UnderwritingLexer.tokens
     precedence = (
-        ('nonassoc', LOW), #  used to force shift in rules
+        ('nonassoc', LOW),  # used to force shift in rules
         ('nonassoc', INHOMOG_MULTIPLY),
         ('left', PLUS, MINUS),
         ('left', TIMES),  # for scaling distributions
-        ('nonassoc', DIVIDE), # for internal math in expressions; nonassoc means 1/2/3 causes an error, force parens
+        ('nonassoc', DIVIDE),  # for internal math in expressions; nonassoc means 1/2/3 causes an error, force parens
         ('right', EXP),   # exponential function
         ('right', EXPONENT),
     )
@@ -309,14 +343,14 @@ class UnderwritingParser(Parser):
     def distortion_out(self, p):
         self.logger('distortion_out <-- DISTORTION ID name', p)
         # self.out_dict[("distortion", p.name)] =
-        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr }
+        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr}
 
     @_('DISTORTION name ID expr "[" numberl "]"')
     def distortion_out(self, p):
         self.logger('distortion_out <-- DISTORTION name ID [ numberl ]', p)
         # for bitvars etc. TODO apply edit to ID to check it is bitvar?
         # self.out_dict[('distortion', p.name)] =
-        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr, 'df': p.numberl }
+        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr, 'df': p.numberl}
 
     # building portfolios ======================================
     @_('PORT name note agg_list')
@@ -345,7 +379,7 @@ class UnderwritingParser(Parser):
             f'agg_out <-- AGG name exposures layers SEV sev occ_reins freq agg_reins note', p)
         # self.out_dict[("agg", p.name)] =
         return 'agg', p.name, {'name': p.name, **p.exposures, **p.layers, **p.sev_clause,
-                                         **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
+                               **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
 
     @_('AGG name dfreq layers sev_clause occ_reins agg_reins note')
     def agg_out(self, p):
@@ -353,7 +387,7 @@ class UnderwritingParser(Parser):
             f'agg_out <-- AGG name dfreq layers sev_clause occ_reins agg_reins note', p)
         # self.out_dict[("agg", p.name)] =
         return 'agg', p.name, {'name': p.name, **p.dfreq, **p.layers, **p.sev_clause,
-                                         **p.occ_reins, **p.agg_reins, 'note': p.note}
+                               **p.occ_reins, **p.agg_reins, 'note': p.note}
 
     @_('AGG name TWEEDIE expr expr expr note')
     def agg_out(self, p):
@@ -402,7 +436,7 @@ class UnderwritingParser(Parser):
             f'agg_out <-- builtin_agg agg_reins note', p)
         # print(p.builtin_agg)
         # self.out_dict[("agg", p.builtin_agg['name'])] =
-        return 'agg', p.builtin_agg['name'],  {**p.builtin_agg, **p.agg_reins, 'note': p.note}
+        return 'agg', p.builtin_agg['name'], {**p.builtin_agg, **p.agg_reins, 'note': p.note}
 
     # building severities ======================================
     # difference from sev_clause (below) is sev_out has a name
@@ -562,7 +596,7 @@ class UnderwritingParser(Parser):
         if p[0] / p[2] < 0.05:
             logger.warning(
                 f'Part of clause with proportion {p[0] / p[2]} is suspiciously small. '
-                 'Did you mean share of?')
+                'Did you mean share of?')
         return (p[0] / p[2], p[2], p[4])
 
     # severity term ============================================
@@ -615,7 +649,7 @@ class UnderwritingParser(Parser):
         self.logger(f'sev2 <-- sev1 {p[1]} numbers', p)
         p.sev1['sev_loc'] = UnderwritingParser._check_vectorizable(
             p.sev1.get('sev_loc', 0))
-        sign = 1 if p[1]=='+' else -1
+        sign = 1 if p[1] == '+' else -1
         p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
         p.sev1['sev_loc'] += sign * p_numbers
         return p.sev1
@@ -660,7 +694,7 @@ class UnderwritingParser(Parser):
     def sev0(self, p):
         self.logger(
             f'sev0 <-- ids numbers CV numbers', p)
-        return {'sev_name':  p.ids, 'sev_mean':  p[1], 'sev_cv':  p[3], 'sev_scale': 1.0}
+        return {'sev_name': p.ids, 'sev_mean': p[1], 'sev_cv': p[3], 'sev_scale': 1.0}
 
     @_('ids numbers numbers')
     def sev0(self, p):
@@ -673,7 +707,7 @@ class UnderwritingParser(Parser):
     def sev0(self, p):
         self.logger(
             f'sev0 <-- ids numbers', p)
-        return {'sev_name': p.ids, 'sev_a':  p[1], 'sev_scale': 1.0}
+        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_scale': 1.0}
 
     # no weights with xps terms
     @_('ids xps')
@@ -696,7 +730,7 @@ class UnderwritingParser(Parser):
             ps = np.ones_like(p.doutcomes) / len(p.doutcomes)
         else:
             ps = p.dprobs
-        return {'sev_xs':  p.doutcomes, 'sev_ps':  ps}
+        return {'sev_xs': p.doutcomes, 'sev_ps': ps}
 
     @_('DSEV doutcomes dprobs')
     def dsev(self, p):
@@ -925,7 +959,7 @@ class UnderwritingParser(Parser):
         # bid = built_in_dict, want to be careful not to add scale too much
         bid = p.builtin_agg
         bid['name'] += '_shifted'
-        sign = 1 if p[1]=="+" else -1
+        sign = 1 if p[1] == "+" else -1
         # TODO make vector addable
         if 'sev_loc' in bid:
             bid['sev_loc'] += sign * p.expr
@@ -1032,8 +1066,6 @@ class UnderwritingParser(Parser):
     #     self.logger('power <-- atom', p)
     #     return p.atom
 
-
-
     @_('atom')
     def expr(self, p):
         self.logger('expr <-- atom', p)
@@ -1058,10 +1090,6 @@ class UnderwritingParser(Parser):
     def atom(self, p):
         self.logger('atom <-- atom EXPONENT atom', p)
         return p[0] ** p[2]
-
-
-
-
 
     @_('NUMBER')
     def atom(self, p):
@@ -1214,6 +1242,7 @@ XS                      ::= "xs|x"
     Path(save_to_fn).write_text(s, encoding='utf-8')
 
     return s
+
 
 if __name__ == '__main__':
     # print the grammar and add to this file as part of docstring in 41_language_reference.rst

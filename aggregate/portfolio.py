@@ -22,7 +22,7 @@ from scipy.optimize import bisect
 from scipy.spatial import ConvexHull
 from textwrap import fill
 import warnings
-from IPython.core.display import HTML, display
+from IPython.display import HTML, display
 
 from .constants import *
 from .distributions import Aggregate, Severity

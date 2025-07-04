@@ -1784,87 +1784,87 @@ class Answer(dict):
                 else:
                     display(v.head(10))
 
-
-def log_test():
-    """"
-    Issue logs at each level
-    """
-    print('Issuing five messages...')
-    for l, n in zip([logger], ['logger']):
-        print(n)
-        l.debug('A debug message')
-        l.info('A info message')
-        l.warning('A warning message')
-        l.error('A error message')
-        l.critical('A critical message')
-        print(f'...done with {n}')
-    print('...done')
-
-
-class LoggerManager():
-    def __init__(self, level, name='aggregate'):
-        """
-        Manage all the aggregate loggers: toggle levels
-        Put lm = LoggerManager(10) at the start of a function.
-        When it goes out of scope it puts the level back
-        where it was.
-
-        TODO: make work on a per logger basis!
-
-        """
-        self.level = level
-        self.loggers = [v for k, v in logging.root.manager.loggerDict.items()
-                        if isinstance(v, logging.Logger) and k.find(name) >= 0 and v.getEffectiveLevel() != level]
-
-        if len(self.loggers) > 0:
-            self.base_level = self.loggers[0].getEffectiveLevel()
-            for l in self.loggers:
-                l.setLevel(level)
-
-    def __del__(self):
-        for l in self.loggers:
-            logger.info(f'Putting logger level back to {self.base_level} from {self.level}')
-            l.setLevel(self.base_level)
-
-
-def logger_level(level=30, name='aggregate', verbose=False):
-    """
-    Code from common.py
-
-    Change logger level all loggers containing name
-    Changing for EVERY logger is a really bad idea,
-    you get the endless debug info out of matplotlib
-    find_font, for exapmle.
-
-    FWIW, to list all loggers:
-    ::
-
-        loggers = [logging.getLogger()]  # get the root logger
-        loggers = loggers + [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-        loggers
-
-    :param level:
-    :return:
-    """
-
-    try:
-        # logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
-        logging.basicConfig(format='line %(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
-                            datefmt='%M:%S')
-        loggers = [logging.getLogger()]  # get the root logger
-        loggers = loggers + \
-            [logging.getLogger(name)
-             for name in logging.root.manager.loggerDict]
-
-        # set the level selectively
-        for logger in loggers:
-            if logger.name.find(name) >= 0:
-                logger.setLevel(level)
-        if verbose:
-            for logger in loggers:
-                print(logger.name, logger.getEffectiveLevel())
-    except ValueError as e:
-        raise e
+# all logging controlled by the USER of the package not the package itself
+# def log_test():
+#     """"
+#     Issue logs at each level
+#     """
+#     print('Issuing five messages...')
+#     for l, n in zip([logger], ['logger']):
+#         print(n)
+#         l.debug('A debug message')
+#         l.info('A info message')
+#         l.warning('A warning message')
+#         l.error('A error message')
+#         l.critical('A critical message')
+#         print(f'...done with {n}')
+#     print('...done')
+#
+#
+# class LoggerManager():
+#     def __init__(self, level, name='aggregate'):
+#         """
+#         Manage all the aggregate loggers: toggle levels
+#         Put lm = LoggerManager(10) at the start of a function.
+#         When it goes out of scope it puts the level back
+#         where it was.
+#
+#         TODO: make work on a per logger basis!
+#
+#         """
+#         self.level = level
+#         self.loggers = [v for k, v in logging.root.manager.loggerDict.items()
+#                         if isinstance(v, logging.Logger) and k.find(name) >= 0 and v.getEffectiveLevel() != level]
+#
+#         if len(self.loggers) > 0:
+#             self.base_level = self.loggers[0].getEffectiveLevel()
+#             for l in self.loggers:
+#                 l.setLevel(level)
+#
+#     def __del__(self):
+#         for l in self.loggers:
+#             logger.info(f'Putting logger level back to {self.base_level} from {self.level}')
+#             l.setLevel(self.base_level)
+#
+#
+# def logger_level(level=30, name='aggregate', verbose=False):
+#     """
+#     Code from common.py
+#
+#     Change logger level all loggers containing name
+#     Changing for EVERY logger is a really bad idea,
+#     you get the endless debug info out of matplotlib
+#     find_font, for exapmle.
+#
+#     FWIW, to list all loggers:
+#     ::
+#
+#         loggers = [logging.getLogger()]  # get the root logger
+#         loggers = loggers + [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+#         loggers
+#
+#     :param level:
+#     :return:
+#     """
+#
+#     try:
+#         # logging.basicConfig(format='%(asctime)s.%(msecs)03d|%(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
+#         logging.basicConfig(format='line %(lineno)4d|%(levelname)-10s| %(name)s.%(funcName)s|  %(message)-s',
+#                             datefmt='%M:%S')
+#         loggers = [logging.getLogger()]  # get the root logger
+#         loggers = loggers + \
+#             [logging.getLogger(name)
+#              for name in logging.root.manager.loggerDict]
+#
+#         # set the level selectively
+#         for logger in loggers:
+#             if logger.name.find(name) >= 0:
+#                 logger.setLevel(level)
+#         if verbose:
+#             for logger in loggers:
+#                 print(logger.name, logger.getEffectiveLevel())
+#     except ValueError as e:
+#         raise e
 
 
 def subsets(x):

@@ -3823,7 +3823,6 @@ class Severity(ss.rv_continuous):
 
         ::
 
-            logger_level(30) # see what is going on
             for sh, dist in zip([1,2,3,4, 3.5,2.5,1.5,.5], ['lognorm']*3 + ['pareto']*4):
                 s = Severity(dist, sev_a=sh, sev_scale=1, exp_attachment=0)
                 print(dist,sh, s.moms())

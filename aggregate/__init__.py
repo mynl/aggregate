@@ -6,15 +6,15 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         axiter_factory, AxisManager, lognorm_lev, html_title,
                         sensible_jump, suptitle_and_tight,
                         MomentAggregator, MomentWrangler, xsden_to_meancv, xsden_to_meancvskew,
-                        frequency_examples, Answer, log_test, subsets,
+                        frequency_examples, Answer, subsets,
                         round_bucket,
                         make_ceder_netter, make_mosaic_figure, nice_multiple,
-                        style_df, logger_level, friendly,
+                        style_df, friendly,
                         FigureManager, tweedie_convert, tweedie_density,
                         iman_conover, rearrangement_algorithm_max_VaR,
                         mu_sigma_from_mean_cv,
                         make_corr_matrix, random_corr_matrix,
-                        LoggerManager, knobble_fonts, approximate_work,
+                        knobble_fonts, approximate_work,
                         partial_e, partial_e_numeric, moms_analytic, qd,
                         sEngFormatter, mv, picks_work, GCN, lognorm_approx,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
@@ -50,11 +50,9 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
-__version__ = "0.26.0"
+__version__ = "0.27.0"
 
 
-# as a default turn off all logging
-logger_level(30)
 # knobble_fonts(True)
 
 # module level doc-string

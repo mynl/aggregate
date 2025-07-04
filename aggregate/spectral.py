@@ -1,15 +1,26 @@
 from collections.abc import Iterable
 from collections import namedtuple
-import numpy as np
+from io import StringIO
+# from textwrap import fill
+import logging
+import warnings
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import scipy.stats as ss
 from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
-from io import StringIO
-import pandas as pd
-# from textwrap import fill
-import logging
-import numba
+
+try:
+    import numba
+    njit = numba.njit
+except ImportError:
+    warnings.warn("Numba not found. Falling back to pure Python.")
+    def njit(func=None, **kwargs):
+        if func is None:
+            return lambda f: f
+        return func
 
 from .constants import *
 from .random_agg import RANDOM
@@ -19,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # number super-fast functions for TVaR and BiTVaR computations
-@numba.njit(parallel=False)
+@njit(parallel=False)
 def tvar_gS(probs, p):
     """
     Compute gS given individual probs. Equivlaent to computing
@@ -67,7 +78,7 @@ def tvar_gS(probs, p):
     return ans
 
 
-@numba.njit(parallel=False)
+@njit(parallel=False)
 def bitvar_gS(probs, p0, p1, w):
     """
     Compute gS given individual probs. Equivlaent to computing
@@ -155,7 +166,7 @@ def bitvar_gS(probs, p0, p1, w):
     return ans
 
 
-@numba.njit(parallel=False)
+@njit(parallel=False)
 def tvar_ra(probs, x, p):
     """
     Computes risk adjusted value in one step with no intermediate
@@ -223,7 +234,7 @@ def tvar_ra(probs, x, p):
     return ans
 
 
-@numba.njit(parallel=False)
+@njit(parallel=False)
 def bitvar_ra(probs, x, p0, p1, w):
     """
     Computes risk adjusted value in one step with no intermediate

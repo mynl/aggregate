@@ -29,6 +29,12 @@ Version History
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
 
+0.27.0
+~~~~~~~~~~
+* Removed control over logging and just use ``logger = logging.getLogger(__name__)`` in all modules. Removed ``log_test`` function and ``LoggerManager`` class. 
+* Removed ``numba`` as a requirement - huge library, hardly used. Only occurs in spectral module.
+* Replaced build_docs batch file with doc-test which mirrors readthedocs process more closely.
+
 0.26.0
 ~~~~~~~~~~
 * ``extensions`` no longer sets ``pd.float_format`` to Engineering.

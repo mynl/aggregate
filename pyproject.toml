@@ -20,6 +20,9 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Education",
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Mathematics",
@@ -35,7 +38,8 @@ dependencies = [
     "psutil",
     "Pygments",
     "scipy>=1.11",
-    "numba",
+    # made optional in 0.27
+    # "numba",
 ]
 license = {text = "BSD-3-Clause"}
 requires-python = ">=3.10"

@@ -154,8 +154,6 @@ class TestSuite(object):
 
 def run_test_suite():
     t = TestSuite()
-    # show progress
-    t.build.logger_level(30)
     print(t.tests)
     # run all the aggs
     # TODO FIX for Portfolios

@@ -13,8 +13,8 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import (logger_level, round_bucket, Answer,
-                        LoggerManager, qd, show_fig, more,
+from .utilities import (round_bucket, Answer,
+                        qd, show_fig, more,
                         parse_note_ex)
 
 logger = logging.getLogger(__name__)
@@ -520,18 +520,7 @@ class Underwriter(object):
         spec = deepcopy(spec)
         return spec
 
-    @staticmethod
-    def logger_level(level):
-        """
-        Convenience function.
-
-        :param level:
-        :return:
-        """
-        # set logger_level for all aggregate loggers
-        logger_level(level)
-
-    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, logger_level=None, **kwargs):
+    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
         """
         Convenience function to make work easy for the user. Intelligent auto updating.
         Detects discrete distributions and sets ``bs = 1``.
@@ -545,15 +534,10 @@ class Underwriter(object):
         :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
             and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
         :param bs:
-        :param logger_level: temporary log(ger) level for this build
         :param recommend_p: passed to recommend bucket functions. Increase (closer to 1) for thick tailed distributions.
         :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
         :return: created object(s)
         """
-
-        # automatically puts level back at the end
-        if logger_level is not None:
-            lm = LoggerManager(logger_level)
 
         # make stuff
         # write will return a dict with keys (kind, name) and value a WriteAnswer namedtuple
@@ -851,7 +835,7 @@ class Underwriter(object):
         else:
             return bit
 
-    def show(self, regex, kind='', plot=True, describe=True, logger_level=30, verbose=False, **kwargs):
+    def show(self, regex, kind='', plot=True, describe=True, verbose=False, **kwargs):
         """
         Create from knowledge by name or match to name.
         Optionally plot. Returns the created object plus dataframe with more detailed information.
@@ -876,16 +860,12 @@ class Underwriter(object):
         :param kind: the kind of object, port, agg, etc.
         :param plot:    if True, plot   (default True)
         :param describe: if True, print the describe dataframe
-        :param logger_level: work silently!
         :param verbose: if True, return the dataframe and objects; else no return value
         :param kwargs: passed to build for calculation instructions
         :return: dictionary of created objects and DataFrame with info about each.
         """
         # too painful getting the one thing out!
         ans = []
-
-        # temp logger level
-        lm = LoggerManager(logger_level)
 
         if kind is None or kind == '':
             df = self.knowledge.droplevel('kind').filter(
@@ -977,7 +957,6 @@ class Underwriter(object):
 
 # exported instance
 # self = dbuild = None
-logger_level(30)
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

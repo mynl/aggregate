@@ -2680,7 +2680,7 @@ class Aggregate(Frequency):
                 p = max(p, 1 - 10 ** -8)
             moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
             logger.debug(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
-            return max(moment_est, limit_est)
+            recommended = max(moment_est, limit_est)
         else:
             for n in sorted({log2, 16, 13, 10}):
                 rb = self.recommend_bucket(n)
@@ -2689,7 +2689,9 @@ class Aggregate(Frequency):
                 print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.3f}')
             if self.bs != 0:
                 print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
-            return rbr # noqa
+            recommended = rbr # noqa
+        # can fail when distribution is constant
+        return 1 if np.isnan(recommended) else recommended
 
     def aggregate_error_analysis(self, log2, bs2_from=None, **kwargs):
         """

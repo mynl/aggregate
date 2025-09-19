@@ -50,7 +50,7 @@ __license__ = "BSD 3-Clause New License"
 __email__ = "steve@convexrisk.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
-__version__ = "0.27.0"
+__version__ = "0.27.1"
 
 
 # knobble_fonts(True)

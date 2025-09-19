@@ -28,6 +28,10 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+0.27.1
+-------
+
+* Fixed a bug with recommend unit in a portfolio with all fixed components. 
 
 0.27.0
 ~~~~~~~~~~

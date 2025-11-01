@@ -3433,7 +3433,7 @@ class Portfolio(object):
         "Main Result for Conditional Layer Effectiveness; Piano Diagram" in OneNote
 
         In total gamma_a(x) = E[ (a ^ X) / X | X > x] is the average rate of reimbursement for losses above x
-        given capital a. It satisfies int_0^\infty gamma_a(x) S(x) dx = E[a ^ X]. Notice the integral is to
+        given capital a. It satisfies int_0^\\infty gamma_a(x) S(x) dx = E[a ^ X]. Notice the integral is to
         infinity, regardless of the amount of capital a.
 
         By line gamma_{a,i}(x) = E[ E[X_i | X] / X  {(X ^ a) / X} 1_{X>x} ] / E[ {E[X_i | X] / X} 1_{X>x} ].
@@ -3968,12 +3968,12 @@ class Portfolio(object):
         # in non-efficient the renamer and existing columns collide and you get duplicates
         # transpose turns into rows...
         pricing = augmented_df.rename(columns=self.tm_renamer).loc[[a_cal]].T. \
-                    filter(regex='^(T)\.(L|P|M|Q)_', axis=0).copy()
+                    filter(regex=r'^(T)\.(L|P|M|Q)_', axis=0).copy()
         pricing = pricing.loc[~pricing.index.duplicated()]
         # put in exact Q rather than add up the parts...more accurate
         pricing.at['T.Q_total', a_cal] = a_cal - exag
         # TODO EVIL! this reorders the lines and so messes up when port has lines not in alpha order
-        pricing.index = pricing.index.str.split('_|\.', expand=True)
+        pricing.index = pricing.index.str.split(r'_|\.', expand=True)
         pricing = pricing.sort_index()
         pricing = pd.concat((pricing,
                              pricing.xs(('T','P'), drop_level=False).rename(index={'P': 'PQ'}) / pricing.xs(('T', 'Q')).to_numpy(),
@@ -4261,7 +4261,7 @@ class Portfolio(object):
         # TWO
         ax = next(axi)
         # df[['Layer Capital', 'Layer Margin']].plot(xlim=xlim, ax=ax)
-        augmented_df.filter(regex='^M\.[QM]_total').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r'^M\.[QM]_total').rename(columns=self.renamer). \
             plot(xlim=[0, a_max], ylim=[-0.05, 1.05], logy=False, title='Marginal Capital and Margin', ax=ax)
         tidy(ax)
         ax.legend(frameon=True, loc='center right')
@@ -4269,7 +4269,7 @@ class Portfolio(object):
         # THREE
         ax = next(axi)
         # df[['Premium↓', 'Loss↓', 'Capital↓', 'Assets↓', 'Risk Margin↓']].plot(xlim=xlim, ax=ax)
-        augmented_df.filter(regex='^V\.(L|P|Q|M)_total').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r'^V\.(L|P|Q|M)_total').rename(columns=self.renamer). \
             plot(xlim=[0, a_max], ylim=[0, a_max], logy=False, title=f'Decreasing LPMQ from {a_cal:.0f}',
                  ax=ax)
         (a_cal - augmented_df.loc[:a_cal, 'loss']).plot(ax=ax, label='Assets')
@@ -4278,14 +4278,14 @@ class Portfolio(object):
 
         # FOUR
         ax = next(axi)
-        augmented_df.filter(regex='^(T|V|M)\.LR_total').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r^(T|V|M)\.LR_total').rename(columns=self.renamer). \
             plot(xlim=[0, a_cal * 1.1], ylim=[-0.05, 1.05], ax=ax, title='Increasing, Decreasing and Marginal LRs')
         tidy(ax)
         ax.legend(frameon=True, loc='lower left')
 
         # FIVE
         ax = next(axi)
-        augmented_df.filter(regex='^T\.(L|P|Q|M)_total|loss').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r'^T\.(L|P|Q|M)_total|loss').rename(columns=self.renamer). \
             plot(xlim=[0, a_max], ylim=[0, a_max], logy=False, title=f'Increasing LPMQ to {a_cal:.0f}',
                  ax=ax)
         tidy(ax)
@@ -4294,7 +4294,7 @@ class Portfolio(object):
         # SIX
         # could include leverage?
         ax = next(axi)
-        augmented_df.filter(regex='^(M|T|V)\.ROE_(total)?$').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r'^(M|T|V)\.ROE_(total)?$').rename(columns=self.renamer). \
             plot(xlim=[0, a_max],  # ylim=[-0.05, 1.05],
                  logy=False, title=f'Increasing, Decreasing and Marginal ROE to {a_cal:.0f}',
                  ax=ax)
@@ -4390,7 +4390,7 @@ class Portfolio(object):
         #
         # from original example_factory_sublines
         try:
-            temp = augmented_df.filter(regex='exi_xgtag?_(?!sum)|^S|^gS|^(M|T)\.').copy()
+            temp = augmented_df.filter(regex=r'exi_xgtag?_(?!sum)|^S|^gS|^(M|T)\.').copy()
             renamer = self.renamer
             augmented_df.index.name = 'Assets a'
             temp.index.name = 'Assets a'
@@ -4435,7 +4435,7 @@ class Portfolio(object):
             a.grid('b')
 
             # SEVEN improve scale selection
-            a = augmented_df.filter(regex='M\.LR').rename(columns=renamer).sort_index(1). \
+            a = augmented_df.filter(regex=r'M\.LR').rename(columns=renamer).sort_index(1). \
                 plot(ylim=[-.05, 1.5], xlim=[0, a_max], title='Marginal LR',
                      ax=next(ax))
             a.grid('b')
@@ -4836,7 +4836,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
             for l in self.density_df.columns:
                 if re.search('^ημ_', l):
                     # nu_line -> not line density
-                    self._renamer[l] = re.sub('^ημ_([0-9A-Za-z\-_.,]+)', r'not \1 density', l)
+                    self._renamer[l] = re.sub(r'^ημ_([0-9A-Za-z\-_.,]+)', r'not \1 density', l)
                 else:
                     l0 = l.replace('ημ_', 'not ')
                     for k, v in meta_namer.items():

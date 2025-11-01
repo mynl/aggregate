@@ -1564,12 +1564,12 @@ class Aggregate(Frequency):
 
         ``sev_calc='continuous'`` (same as forward, kept for backwards compatibility) is used when
         you think of the resulting distribution as continuous across the buckets
-        (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X \le b_i)`.
+        (which we generally don't). The buckets are not shifted and so :math:`Pr(X=b_i) = Pr( b_{i-1} < X \\le b_i)`.
         Note that :math:`b_{i-1}=-bs/2` is prepended.
 
         We use the discretized distribution as though it is fully discrete and only takes values at the bucket
         points. Hence, we should use `sev_calc='discrete'`. The buckets are shifted left by half a bucket,
-        so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X \le b_i + b/2)`.
+        so :math:`Pr(X=b_i) = Pr( b_i - b/2 < X \\le b_i + b/2)`.
 
         The other wrinkle is the righthand end of the range. If we extend to np.inf then we ensure we have
         probabilities that sum to 1. But that method introduces a probability mass in the last bucket that

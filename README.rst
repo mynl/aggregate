@@ -32,6 +32,7 @@ Version History
 -------
 
 * Added ``standard_shape`` to Distortion and added to distortion_df created by Portfolio.calibrate_distortions.
+* Updated dependencies and imports for doc build.
 
 0.27.1
 -------

@@ -675,8 +675,8 @@ class Underwriter(object):
         split on new lines and converted to a dataframe.
         Other file formats are rejected.
 
-        These methods are called interpreter\_... rather than
-        interpret\_... because they are for testing and debugging
+        These methods are called interpreter\\_... rather than
+        interpret\\_... because they are for testing and debugging
         the interpreter, not for actually interpreting anything!
 
         """

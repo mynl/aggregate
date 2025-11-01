@@ -2664,7 +2664,7 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
           :math:`j=1,\\dots,d`
 
           -  Create a temporary matrix :math:`V_j` by deleting the
-             :math:`j`\ th column of :math:`X`
+             :math:`j` th column of :math:`X`
           -  Create a column vector :math:`v` whose :math:`i` th element
              equals the sum of the elements in the :math:`i` th row of
              :math:`V_j`
@@ -2944,7 +2944,7 @@ def partial_e_numeric(fz, a, n):
 
 def moms_analytic(fz, limit, attachment, n, analytic=True):
     """
-    Return moments of :math:`E[(X-attachment)^+ \wedge limit]^m`
+    Return moments of :math:`E[(X-attachment)^+ \\wedge limit]^m`
     for m = 1,2,...,n.
 
     To check:
@@ -3288,8 +3288,8 @@ def picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, deb
 
     :param attachments: array of layer attachment points, in ascending order (bottom to top). a[0]>0
     :param layer_loss_picks: Target means. If ``len(layer_loss_picks)==len(attachments)`` then the bottom layer, 0 to a[0],
-      is added. Can be input as unconditional layer severity (i.e., :math:`\\mathbb{E}[(X-a)^+\wedge y]`) or as the
-      layer loss pick (i.e., :math:`\\mathbb{E}[(X-a)^+\wedge y]'times n` where *n* is the number of ground-up (to the
+      is added. Can be input as unconditional layer severity (i.e., :math:`\\mathbb{E}[(X-a)^+\\wedge y]`) or as the
+      layer loss pick (i.e., :math:`\\mathbb{E}[(X-a)^+\\wedge y]'times n` where *n* is the number of ground-up (to the
       insurer) claims. Multiplying and dividing by :math:`S(a)` shows this equals conditional severity in the layer
       times the number of claims in the layer.) Actuaries usually estimate the loss pick to the layer in pricing. When
       called from :class:`Aggregate` the number of ground up claims is known.

@@ -748,7 +748,7 @@ class Distortion(object):
                     f(x) = x^-alpha, F(x)=int_{x_0}^x f
                     g(s) = F(x0 + s(x1-x0)) / F(x1)
 
-                    alpha \ge 0 required
+                    alpha \\ge 0 required
                     x0, x1 are other parameters to determine slopes at 0, 1
 
                     """

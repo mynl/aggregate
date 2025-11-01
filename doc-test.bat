@@ -119,7 +119,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo HTML documentation built successfully in "%HTML_OUTPUT_DIR%"
-echo run cd "%HTML_OUTPUT_DIR%" && python -m http.server %PORT%
+echo run cd "%HTML_OUTPUT_DIR%" ^&^& python -m http.server %PORT%
 echo to serve the documentation. 
 
 :: --- Launch Web Server and Open Docs ---

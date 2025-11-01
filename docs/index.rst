@@ -31,85 +31,53 @@ It delivers the speed and accuracy of parametric distributions to situations tha
 
 This help document is in six parts plus a bibliography.
 
-.. Panels at https://sphinx-panels.readthedocs.io/en/latest/
-   img-top-cls: pl-5 pr-5
+.. grid:: 2 2 3 3
+   :gutter: 2
 
-.. panels::
-   :img-top-cls: height=50px bg-success
+   .. grid-item-card::
+      :img-top: _static/gs.png
+      :link: 1_Getting_Started
+      :link-type: ref
+      :text-align: left
 
-   ---
-   :img-top: _static/gs.png
+      Get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
 
-   Get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
+   .. grid-item-card::
+      :img-top: _static/ug.png
+      :link: 2_User_Guides
+      :link-type: ref
+      :text-align: left
 
-   +++
+      How to solve real-world actuarial problems using :mod:`aggregate`.
 
-   .. link-button:: 1_Getting_Started
-      :type: ref
-      :text: Getting Started
-      :classes: btn-block btn-secondary stretched-link
+   .. grid-item-card::
+      :img-top: _static/api.png
+      :link: 3_Reference
+      :link-type: ref
+      :text-align: left
 
-   ---
-   :img-top: _static/ug.png
+      Documentation for every class and function, for developers and more advanced users.
 
-   How to solve real-world actuarial problems using :mod:`aggregate`.
+   .. grid-item-card::
+      :img-top: _static/decl.png
+      :link: 4_dec_Language_Reference
+      :link-type: ref
+      :text-align: left
 
-   +++
+      The Dec Language (DecL) for specifying aggregate distributions.
 
-   .. link-button:: 2_User_Guides
-      :type: ref
-      :text: User Guides
-      :classes: btn-block btn-secondary stretched-link
+   .. grid-item-card::
+      :img-top: _static/tg.png
+      :link: 5_Technical_Guides
+      :link-type: ref
+      :text-align: left
 
-   ---
-   :img-top: _static/api.png
+      Probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
 
+   .. grid-item-card::
+      :img-top: _static/dev.png
+      :link: 6_Development
+      :link-type: ref
+      :text-align: left
 
-   Documentation for every class and function, for developers and more advanced users.
-
-   +++
-
-   .. link-button:: 3_Reference
-      :type: ref
-      :text: API Reference
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/decl.png
-
-
-   The Dec Language (DecL)  for specifying aggregate distributions.
-
-   +++
-
-   .. link-button:: 4_dec_Language_Reference
-      :type: ref
-      :text: DecL Reference
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/tg.png
-
-
-   Probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
-
-   +++
-
-   .. link-button:: 5_Technical_Guides
-      :type: ref
-      :text: Technical Guides
-      :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :img-top: _static/dev.png
-
-   Design philosophy, competing products, future development ideas, and historical perspective.
-
-   +++
-
-   .. link-button:: 6_Development
-      :type: ref
-      :text: Development
-      :classes: btn-block btn-secondary stretched-link
-
-
+      Design philosophy, competing products, future development ideas, and historical perspective.

@@ -106,8 +106,9 @@ bibtex_reference_style = 'author_year'
 default_dark_mode = False
 
 # https://www.spinics.net/lists/linux-doc/msg77015.html
-# autosectionlabel_prefix_document = True
-# autosectionlabel_maxdepth = 1
+# GPT recommneded putthing these back
+autosectionlabel_prefix_document = True
+autosectionlabel_maxdepth = 2
 
 
 # -- Options for HTML output ----------------------------------------------

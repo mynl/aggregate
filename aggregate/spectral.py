@@ -1208,11 +1208,11 @@ class Distortion(object):
 
         assert scale in ['linear', 'return']
 
-        if scale == 'return' and n == 101:
+        if scale == 'return':
             # default not enough for return
-            n = 10001
+            xs = 10 ** np.linspace(-10, 0, n)
 
-        if xs is None:
+        elif xs is None:
             xs = np.hstack((0, np.linspace(1e-10, 1, n)))
 
         y1 = self.g(xs)
@@ -1236,14 +1236,14 @@ class Distortion(object):
         if scale == 'linear':
             ax.plot(xs, y1, c=c, label=self.name, **kwargs)
             if both:
-                ax.plot(xs, y2, c=c_dual, label='$g\check$', **kwargs)
+                ax.plot(xs, y2, c=c_dual, label='$g\\check$', **kwargs)
             ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
             # ax.plot(xs, xs, lw=0.5, color='C0', alpha=0.5)
         elif scale == 'return':
-            ax.plot(xs, y1, c=c, label='$g$', **kwargs)
+            ax.plot(xs, y1, c=c, label=self.name, **kwargs)
             if both:
-                ax.plot(xs, y2, c=c_dual, label='$g\check$', **kwargs)
-            ax.set(xscale='log', yscale='log', xlim=[1/5000, 1], ylim=[1/5000, 1])
+                ax.plot(xs, y2, c=c_dual, label=f'Dual {self.name}', **kwargs)
+            ax.set(xscale='log', yscale='log', xlim=[1/5_000, 1], ylim=[1/5_000, 1])
             ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
 
         if self._name == 'convex' and plot_points:
@@ -1260,8 +1260,9 @@ class Distortion(object):
             elif scale == 'return':
                 ax.scatter(x=1/self.df[self.col_x], y=1/self.df[self.col_y], marker='.', s=15, color=c, alpha=alpha)
 
-        ax.set(title=self.name, aspect='equal',
-               xticks=np.linspace(0, 1, 6), yticks=np.linspace(0, 1, 6))
+        ax.set(title=self.name, aspect='equal')
+        if scale == 'linear':
+               ax.set(xticks=np.linspace(0, 1, 6), yticks=np.linspace(0, 1, 6))
         if both:
             ax.legend(loc='upper left', fontsize='x-small')
         return ax
@@ -1786,7 +1787,7 @@ class Distortion(object):
             ser = ser.sort_index(ascending=True)
 
         # there is an implicit assumption here that ser.sum() == 1.
-        if ser.sum() < 1:
+        if ser.sum() < np.nextafter(1.0, 0.0):  # float before 1, rounding...
             raise ValueError('Sum of input probabilities must be 1. Try remove_fuzz=True if using a Portfolio')
         # backwards calc of S
         S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]

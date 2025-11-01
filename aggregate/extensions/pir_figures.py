@@ -273,7 +273,7 @@ def fig_10_3(dist=None, s=0.3):
                ylabel='Price of layer $1_{U<s}$', aspect='equal')
 
 
-def fig_10_5(port=None, dist=None, s=0.3, x=None):
+def fig_10_5(port=None, dist=None, s=0.3, x=None, return_period_max=100):
     """
     three plot version of previous with more explanation of first picture
 
@@ -292,8 +292,6 @@ def fig_10_5(port=None, dist=None, s=0.3, x=None):
             b = f.add_axes([0, 0, 1, 1/3], label='b')
 
     """
-
-    return_period_max = 100
 
     fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_H, FIG_W), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat

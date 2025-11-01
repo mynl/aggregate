@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=70", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -48,18 +48,21 @@ Documentation = "https://aggregate.readthedocs.io/en/latest/"
 
 [project.optional-dependencies]
 dev = [
-    "docutils<0.17",
-    "jupyter-sphinx",
-    "nbsphinx",
+    "myst-parser>=2.0",
+    "sphinx>=8.1,<9",
+    "docutils>=0.20,<0.22",
+    "nbsphinx>=0.9.4",
+    "jupyter-sphinx>=0.5.3",
+    "sphinx-design>=0.6",
+    "sphinx-copybutton>=0.5",
+    "sphinx-toggleprompt>=0.6",
     "pickleshare",
-    "recommonmark>=0.7.1",
-    "setuptools>=62.3.2",
-    "sphinx>=5.0",
-    "sphinx-panels",
-    "sphinx-rtd-dark-mode",
+    # "recommonmark>=0.7.1",
+    # "setuptools>=62.3.2",
+    # "sphinx-panels",
+    # "sphinx-rtd-dark-mode",
+    "spinx_rtd_theme>=2.0",
     "sphinxcontrib-bibtex",
-    "sphinx-copybutton",
-    "sphinx-toggleprompt",
     "sphinx-multitoc-numbering"
 ]
 

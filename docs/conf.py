@@ -43,7 +43,8 @@ version = release[: len(release) -
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx_rtd_theme',
+    'myst_parser',
+    # 'sphinx_rtd_theme',
     'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
@@ -55,12 +56,14 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
-    'sphinx_panels',
+    # 'sphinx_panels',
     'sphinxcontrib.bibtex',
     'sphinx_multitoc_numbering',
-    'sphinx_rtd_dark_mode'
+    # 'sphinx_rtd_dark_mode'
 ]
 
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+myst_enable_extensions = ["dollarmath", "amsmath", "deflist", "colon_fence"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

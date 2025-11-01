@@ -2665,19 +2665,19 @@ def rearrangement_algorithm_max_VaR(df, p=0, tau=1e-3, max_n_iter=100):
 
           -  Create a temporary matrix :math:`V_j` by deleting the
              :math:`j`\ th column of :math:`X`
-          -  Create a column vector :math:`v` whose :math:`i`\ th element
-             equals the sum of the elements in the :math:`i`\ th row of
+          -  Create a column vector :math:`v` whose :math:`i` th element
+             equals the sum of the elements in the :math:`i` th row of
              :math:`V_j`
-          -  Set the :math:`j`\ th column of :math:`Y` equal to the
-             :math:`j`\ th column of :math:`X` arranged to have the opposite
+          -  Set the :math:`j` th column of :math:`Y` equal to the
+             :math:`j` th column of :math:`X` arranged to have the opposite
              order to :math:`v`, i.e. the largest element in the
-             :math:`j`\ th column of :math:`X` is placed in the row of
+             :math:`j` th column of :math:`X` is placed in the row of
              :math:`Y` corresponding to the smallest element in :math:`v`,
              the second largest with second smallest, etc.
 
        -  Compute :math:`y`, the :math:`N\\times 1` vector with
-          :math:`i`\ th element equal to the sum of the elements in the
-          :math:`i`\ th row of :math:`Y` and let :math:`y^*=\min(y)` be the
+          :math:`i` th element equal to the sum of the elements in the
+          :math:`i` th row of :math:`Y` and let :math:`y^*=\\min(y)` be the
           smallest element of :math:`y` and compute :math:`x^*` from
           :math:`X` similarly
        -  If :math:`y^*-x^* \\ge \\epsilon` then set :math:`X=Y` and repeat
@@ -2853,7 +2853,7 @@ def partial_e(sev_name, fz, a, n):
 
     .. math:
 
-        \int_0^a x^k fz.pdf(x)dx
+        \\int_0^a x^k fz.pdf(x)dx
 
     for k=0,...,n as a np.array
 

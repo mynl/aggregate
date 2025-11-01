@@ -4278,7 +4278,7 @@ class Portfolio(object):
 
         # FOUR
         ax = next(axi)
-        augmented_df.filter(regex=r^(T|V|M)\.LR_total').rename(columns=self.renamer). \
+        augmented_df.filter(regex=r^'(T|V|M)\.LR_total').rename(columns=self.renamer). \
             plot(xlim=[0, a_cal * 1.1], ylim=[-0.05, 1.05], ax=ax, title='Increasing, Decreasing and Marginal LRs')
         tidy(ax)
         ax.legend(frameon=True, loc='lower left')

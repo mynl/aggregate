@@ -61,7 +61,7 @@ dev = [
     # "setuptools>=62.3.2",
     # "sphinx-panels",
     # "sphinx-rtd-dark-mode",
-    "spinx_rtd_theme>=2.0",
+    "sphinx_rtd_theme>=2.0",
     "sphinxcontrib-bibtex",
     "sphinx-multitoc-numbering"
 ]

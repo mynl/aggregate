@@ -324,8 +324,8 @@ def fig_10_5(port=None, dist=None, s=0.3, x=None):
 
     dist_name = str(dist).replace('\n', ' ')
 
-    ax0.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-post')
-    ax0.plot(1-gS, xs, lw=1.5, c='C1', drawstyle='steps-post',
+    ax0.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-pre')
+    ax0.plot(1-gS, xs, lw=1.5, c='C1', drawstyle='steps-pre',
            label=f'Premium $g(S(x))$\nDistortion {dist_name}')
 
     ax0.plot([Fx, Fx], [0, x], linewidth=0.25, c='C7')
@@ -350,8 +350,8 @@ def fig_10_5(port=None, dist=None, s=0.3, x=None):
                  va='baseline', ha='center', arrowprops={'arrowstyle': '->'})
 
     # middle plot =======================================================================
-    ax1.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-post')
-    ax1.plot(1-gS, xs, lw=1.5, c='C1',  drawstyle='steps-post',
+    ax1.plot(1-S, xs, lw=1.5, c='C0', label='Loss, $S(x)$', drawstyle='steps-pre')
+    ax1.plot(1-gS, xs, lw=1.5, c='C1',  drawstyle='steps-pre',
            label=f'Premium $g(S(x))$\ndistortion {dist_name}')
 
     loss_line = [(port.cdf(i), i) for i in np.linspace(K, .01, 200)]

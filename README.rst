@@ -28,10 +28,17 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+0.28.0
+-------
+
+* Added ``standard_shape`` to Distortion and added to distortion_df created by Portfolio.calibrate_distortions.
+
 0.27.1
 -------
 
 * Fixed a bug with recommend unit in a portfolio with all fixed components. 
+* Adjusted line styles in twelve plot and clarified use in doc string.
+* Corrected ROE calculation of natural allocation premium when g(s) = 1.
 
 0.27.0
 ~~~~~~~~~~

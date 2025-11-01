@@ -2808,7 +2808,7 @@ class Portfolio(object):
 
         ans = pd.DataFrame(
             columns=['$a$', 'LR', '$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$', 'Levg', '$K$',
-                     'ROE', 'param', 'error', 'method'], dtype=float)
+                     'ROE', 'param', 'std_param', 'error', 'method'], dtype=float)
         ans = ans.set_index(['$a$', 'LR', 'method'], drop=True)
         dists = {}
         if As is None:
@@ -2843,7 +2843,7 @@ class Portfolio(object):
                     dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a, S_calc=S_calc)
                     dists[dname] = dist
                     ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
-                                                  dist.shape, dist.error]
+                                                  dist.shape, dist.standard_shape, dist.error]
         # very helpful to keep these...
         self.dist_ans = ans
         self.dists = dists
@@ -2859,9 +2859,9 @@ class Portfolio(object):
         if self.dist_ans is None:
             return None
 
-        df = self.dist_ans.iloc[:, [0,4,5,6,7,8,9,10]].copy()
+        df = self.dist_ans.iloc[:, [0,4,5,6,7,8,9,10,11]].copy()
         df.index.names = ['a', 'LR', 'method']
-        df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'error']
+        df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'std_param', 'error']
         return df
 
     def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', efficient=True):
@@ -3211,8 +3211,10 @@ class Portfolio(object):
         # df['T.L_total'] = df['exa_total']
         # df['T.P_total'] = df['exag_total']
         # critical insight is the layer ROEs are the same for all lines by law invariance
-        # lhopital's rule estimate of g'(1) = ROE(1)
-        gprime1 = g_prime(1) # (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
+        # lhopital's rule estimate of ROE(1) estimates (gs-s)/(1-gs) = g's - 1)/(-g's) =
+        # 1 / g's - 1
+        # this can be infinite...
+        gprime1 = 1 / g_prime(1) - 1 # (g(1 - ϵ) - (1 - ϵ)) / (1 - g(1 - ϵ))
         df['M.ROE_total'] = np.where(df['M.Q_total']!=0,
                                             df['M.M_total'] / df['M.Q_total'],
                                             gprime1)
@@ -5339,7 +5341,13 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     def twelve_plot(self, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0, biv_log=True, legend_font=0,
                     contour_scale=10, sort_order=None, kind='two', cmap='viridis'):
         """
-        Twelve-up plot for ASTIN paper and book, by rc index:
+        Twelve-up plot for ASTIN paper and book.
+
+        Must set up self by running, for example::
+
+            self.apply_distortion(port.dists['ph'], efficient=False)
+
+        Plots, by rc index:
 
         Greys for grey color map
 
@@ -5388,8 +5396,9 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
         temp = self.density_df.filter(regex='p_').rename(columns=self.short_renamer('p')).sort_index(axis=1).loc[:xmax]
         temp = temp.iloc[:, sort_order]
         temp.index.name = 'Loss'
-        l1 = temp.plot(ax=a11, lw=1)
-        l2 = temp.plot(ax=a12, lw=1, logy=True)
+        kwargs = {'drawstyle': 'steps-mid'}
+        l1 = temp.plot(ax=a11, lw=1, **kwargs)
+        l2 = temp.plot(ax=a12, lw=1, logy=True, **kwargs)
         l1.lines[-1].set(linewidth=1.5)
         l2.lines[-1].set(linewidth=1.5)
         a11.set(title='Density')

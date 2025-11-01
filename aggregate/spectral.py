@@ -11,6 +11,7 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
+from scipy.stats import norm
 
 try:
     import numba
@@ -531,11 +532,15 @@ class Distortion(object):
         self.mass = 0.0
         g_prime = None
 
+        # for the usual suspects only
+        standard_shape = np.nan
+
         # now make g and g_inv
         if self._name == 'ph':
             rho = self.shape
             rhoinv = 1.0 / rho   # noqa
             self.has_mass = False
+            standard_shape = (1 - self.shape) / (1 + self.shape)
 
             # @numba.vectorize(["float64(float64)"], nopython=True, target='parallel')
             def g(x):
@@ -567,6 +572,7 @@ class Distortion(object):
             lam = self.shape
             n = ss.norm()
             self.has_mass = False
+            standard_shape = 2 * n.cdf(self.shape / 2 ** 0.5) - 1
 
             def g(x):
                 return n.cdf(n.ppf(x) + lam)
@@ -604,6 +610,8 @@ class Distortion(object):
 
         elif self._name == 'tvar':
             p = self.shape
+            standard_shape = self.shape
+
             if p == 1:
                 # aka max
                 alpha = np.nan
@@ -670,6 +678,7 @@ class Distortion(object):
             d = 1 - v
             self.has_mass = (d > 0)
             self.mass = d
+            standard_shape =  self.shape / (1 + self.shape)
 
             def g(x):
                 return np.where(x == 0, 0, np.minimum(1, d + v * x))
@@ -709,6 +718,7 @@ class Distortion(object):
             p = self.shape
             q = 1 / p
             self.has_mass = False
+            standard_shape = (self.shape - 1) / (self.shape + 1)
 
             def g(x):
                 return 1 - (1 - x)**p
@@ -1012,6 +1022,7 @@ class Distortion(object):
             raise ValueError(
                 f"Incorrect spec passed to Distortion; name={self._name}, shape={self.shape}, r0={self.r0}, df={self.df}")
 
+        self.standard_shape = standard_shape
         self.g = g
         self.g_inv = g_inv
         if g_prime is None:

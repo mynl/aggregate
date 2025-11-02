@@ -63,7 +63,8 @@ dev = [
     # "sphinx-rtd-dark-mode",
     "sphinx_rtd_theme>=2.0",
     "sphinxcontrib-bibtex",
-    "sphinx-multitoc-numbering"
+    "sphinx-multitoc-numbering",
+    "sphinx-design"
 ]
 
 [tool.setuptools.dynamic]

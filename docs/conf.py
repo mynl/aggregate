@@ -56,6 +56,7 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
+    'sphinx_design',
     # 'sphinx_panels',
     'sphinxcontrib.bibtex',
     'sphinx_multitoc_numbering',

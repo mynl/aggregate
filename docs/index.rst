@@ -37,7 +37,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/gs.png
       :link: 1_Getting_Started
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       Get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
@@ -45,7 +45,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/ug.png
       :link: 2_User_Guides
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       How to solve real-world actuarial problems using :mod:`aggregate`.
@@ -53,7 +53,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/api.png
       :link: 3_Reference
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       Documentation for every class and function, for developers and more advanced users.
@@ -61,7 +61,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/decl.png
       :link: 4_dec_Language_Reference
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       The Dec Language (DecL) for specifying aggregate distributions.
@@ -69,7 +69,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/tg.png
       :link: 5_Technical_Guides
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       Probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
@@ -77,7 +77,7 @@ This help document is in six parts plus a bibliography.
    .. grid-item-card::
       :img-top: _static/dev.png
       :link: 6_Development
-      :link-type: ref
+      :link-type: doc
       :text-align: left
 
       Design philosophy, competing products, future development ideas, and historical perspective.

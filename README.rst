@@ -28,11 +28,25 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+0.29.0
+-------
+* Portfolio analyze_distortions2 to iron out annoyances with current function but retain it for backwards compatibility.
+* Portfolio calibrate_distortions2 for same reasons, args coc and reg_p.
+* Spectral tvar_info_df and plot_affine for working with weighted TVaR distortions.
+* Changed behavior of Distortion.random_distortion so that input number of knots *includes* mass and mean if present.
+* Added random_distortion_ex(n=1, random_state=None) in Distortion class to simulate across types, extending random_distortion which is only a wtdtvar. 
+
+0.28.1
+-------
+
+* `applymap` to `map` per Pandas update.
+
 0.28.0
 -------
 
 * Added ``standard_shape`` to Distortion and added to distortion_df created by Portfolio.calibrate_distortions.
 * Updated dependencies and imports for doc build.
+* Added `spectral.consistent_distortions` to create consistent family of representative distortions.
 
 0.27.1
 -------

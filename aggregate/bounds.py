@@ -778,7 +778,8 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     tvar_d = Distortion('tvar', bounds.p_star('total', prem))
     idx = df.index.get_locs(df.idxmax()['t1'])[0]
     pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
-    max_d = Distortion('wtdtvar', w, df=[pl, pu])
+    # max_d = Distortion('wtdtvar', w, df=[pl, pu])
+    max_d = Distortion('wtdtvar', [pl, pu], df=[1-w, w])
 
     tmax = float(df.iloc[idx]['t1'])
     n_ = len(df.query('t1 == @tmax'))
@@ -788,7 +789,8 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
 
     idn = df.index.get_locs(df.idxmin()['t1'])[0]
     pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
-    min_d = Distortion('wtdtvar', wn, df=[pln, pun])
+    # min_d = Distortion('wtdtvar', wn, df=[pln, pun])
+    min_d = Distortion('wtdtvar', [pln, pun], df=[1-wn, wn])
 
     ax = axd['A']
     plot_max_min(bounds, ax)
@@ -882,7 +884,7 @@ def similar_risks_example():
     axi = iter(axs.flat)
     # all with base portfolio
 
-    bounds.cloud_view(axs.flatten(), 0, alpha=1, pricing=True,
+    bounds.cloud_view(axs=axs.flatten(), n_resamples=0, alpha=1, pricing=True,
                       title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={p_star:.3f}',
                       distortions=[{k: p_base.dists[k] for k in ['ccoc', 'tvar']},
                                    {k: p_base.dists[k] for k in ['ph', 'wang', 'dual']}])

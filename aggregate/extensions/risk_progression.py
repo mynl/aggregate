@@ -261,7 +261,9 @@ def price_compare(self, dn, projection_dists, ud_dists, allocation='linear'):
     na_price['bid'] = lna_priceb.df['P']
     # display(na_price)
     # ? change in output of price is adding a level, drop it
-    na_price = na_price.stack(dropna=False).to_frame().droplevel(0, axis=0)
+    # pandas change
+    # na_price = na_price.stack(dropna=False).to_frame().droplevel(0, axis=0)
+    na_price = na_price.stack().to_frame().droplevel(0, axis=0)
     # display(na_price)
     # beware : order matters here
     na_price.loc[('sum', 'el'), :] = 0.0

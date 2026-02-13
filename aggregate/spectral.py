@@ -6,6 +6,7 @@ import logging
 import warnings
 
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -13,11 +14,15 @@ from scipy.interpolate import interp1d
 from scipy.spatial import ConvexHull
 from scipy.stats import norm
 
+logger = logging.getLogger(__name__)
+phi = norm.cdf
+phi_inv = norm.ppf
+
 try:
     import numba
     njit = numba.njit
 except ImportError:
-    warnings.warn("Numba not found. Falling back to pure Python.")
+    logger.info("Numba not found. Falling back to pure Python.")
     def njit(func=None, **kwargs):
         if func is None:
             return lambda f: f
@@ -26,8 +31,6 @@ except ImportError:
 from .constants import *
 from .random_agg import RANDOM
 from .utilities import short_hash
-
-logger = logging.getLogger(__name__)
 
 
 # number super-fast functions for TVaR and BiTVaR computations
@@ -512,6 +515,7 @@ class Distortion(object):
         """
         # constructor arguments (e.g., needed for pickling)
         self._name = name
+        self._kind_immutable = name
         self.r0 = r0
         self.df = df
         self.col_x = col_x
@@ -840,7 +844,11 @@ class Distortion(object):
                 self.mass = 0
 
             if self.display_name == '':
-                self.display_name = f'wtdTVaR on {len(ps):d} points'
+                try:
+                    self.display_name = f'wtdTVaR on {len(ps):d} points'
+                except:
+                    print(f'ERROR: {ps = }, {ps = }')
+                    self.display_name = f'wtdTVaR on UNKNOWN points'
 
             # data checks
             # check sorted
@@ -874,6 +882,29 @@ class Distortion(object):
             gs = wts @ Distortion.tvar_terms(ps)
             g = interp1d(s, gs, kind='linear', bounds_error=False, fill_value=(0,1))
             g_inv = interp1d(gs, s, kind='linear', bounds_error=False, fill_value=(0,1))
+
+            # want to compute derivatives exactly
+            def g_prime(s):
+                # gemini 3 pro
+                s = 1 - np.atleast_1d(s)
+                # Calculate slopes for each TVaR component: w_i / (1 - p_i)
+                # Handle division by zero if p=1 (results in inf, handled by logic below)
+                component_slopes = np.divide(wts, 1.0 - ps, where=(ps < 1.0), out=np.full_like(ps, np.inf))
+
+                # Broadcast s against ps
+                # s_col shape: (..., 1), ps shape: (N,)
+                s_col = s[..., np.newaxis]
+
+                # TVaR_p(s) derivative is 1/(1-p) if s > p, else 0
+                # Sum contributions where s > p_i
+                active_mask = s_col > ps
+                grad = np.sum(np.where(active_mask, component_slopes, 0.0), axis=-1)
+
+                # Check for cusps (s == p_i)  ??
+                is_cusp = np.any(np.isclose(s_col, ps, rtol=1e-14, atol=1e-14), axis=-1)
+                grad[is_cusp] = np.nan
+
+                return grad
 
         elif self._name  == 'minimum':
             # min of several distortion; shape is list of Distortions
@@ -1028,6 +1059,90 @@ class Distortion(object):
         if g_prime is None:
             g_prime = lambda x: (g(x + 1e-6) - g(x - 1e-6)) / 2e-6
         self.g_prime = g_prime
+
+    def tvar_info_df(self):
+        """
+        Return dataframe of information for wtdtvar, convex type distortions.
+
+        p, wts
+        knots = 1 - p (where g has kinks)
+        slopes, intercepts = for each affine part, starting at the knot point
+
+        TODO: implement for other types?
+        """
+        # if self._kind_immutable not in {'tvar', 'wtdtvar', 'bitvar', 'ccoc'}:
+        if self._kind_immutable != 'wtdtvar':
+            return None
+        p = np.array(self.shape)
+        wts = np.array(self.df)
+        # knots = knots[::-1]
+        if 0 not in p:
+            p = np.hstack((0, p))
+            wts = np.hstack((0, wts))
+        if 1 not in p:
+            p = np.hstack((p, 1))
+            wts = np.hstack((wts, 0))
+        knots = 1 - p
+        gs = self.g(knots)
+        df = pd.DataFrame({
+            's': knots,
+            'gs': gs,
+            'p': p,
+            'wts': wts,
+        })
+        df = df.sort_values('s').reset_index(drop=True)
+        # slope and intercept
+        df['slope'] = (df.gs.shift(-1) - df.gs) / (df.s.shift(-1) - df.s)
+        df['intercept'] = df.gs - df.slope * df.s
+        # need to adjust if there is a mass
+        if p[-1] == 1 and wts[-1] > 0:
+            df.loc[0, 'slope'] = (df.gs[1] - df.wts[0]) / df.s[1]
+            df.loc[0, 'intercept'] = df.wts[0]
+        # add elasticities either side of cusps
+        def eta(s):
+            s = np.asarray(s)
+            return np.where(s == 0, 1,
+                np.where(s == 1, 0, s * self.g_prime(s) / self.g(s)))
+        # use mid points of regions to avoid an arb epsilon that may not
+        # be small enough
+        df['gprime-'] = self.g_prime((df.s + df.s.shift(1)) / 2)
+        df['gprime+'] = self.g_prime((df.s + df.s.shift(-1)) / 2)
+        df['eta-'] = eta((df.s + df.s.shift(1)) / 2)
+        df['eta+'] = eta((df.s + df.s.shift(-1)) / 2)
+        # if df.loc[0, 'wts'] == 0:
+        #     df = df.drop(index=0)
+        return df
+
+    def plot_affine(self, ax=None, n_pts=101,
+                    cmap_name='viridis', alpha=1.,
+                    marker='o', marker_size=4):
+        """Render the upper affine envelope of g for wtdtvars."""
+        if self._kind_immutable != 'wtdtvar':
+            return None
+        ax = self.plot(both=False)
+        # if ax is None:
+        #     fig, ax = plt.subplots(1, 1, figsize=(FIG_H, FIG_H))
+        ps = np.linspace(0, 1, n_pts)
+        gs = self.g(ps)
+        df = self.tvar_info_df()
+
+        # Generate colors from the colormap
+        # n / max(1, len - 1) handles the edge case of a single line
+        n_lines = len(df)
+        cmap = colormaps.get_cmap(cmap_name)
+        colors = [cmap(i / max(1, n_lines - 1)) for i in range(n_lines)]
+        for c, (n, r) in zip(colors, df.iterrows()):
+            if np.isnan(r.slope): continue
+            line = r.intercept + r.slope * ps
+            line = np.where((line>=0) & (line<=1), line, np.nan)
+            ax.plot(ps, line, lw=0.5, color=c, alpha=alpha)
+        if len(df) < 20:
+            ax.scatter(df.s, df.gs,
+                        color=colors,
+                        marker=marker,
+                        s=marker_size,
+                        zorder=3)
+        return ax
 
     # utility methods to create usual suspects and other common distortions
     @staticmethod
@@ -1227,12 +1342,12 @@ class Distortion(object):
                 sz = size
             else:
                 sz = FIG_W
-            fig, ax = plt.subplots(1,1, figsize=(sz, sz), constrained_layout=True)
+            fig, ax = plt.subplots(1,1, figsize=(sz, sz), layout="constrained")
 
         if c is None:
-            c = 'C1'
+            c = 'C0'
         if c_dual is None:
-            c_dual = 'C2'
+            c_dual = 'C1'
         if scale == 'linear':
             ax.plot(xs, y1, c=c, label=self.name, **kwargs)
             if both:
@@ -1492,16 +1607,61 @@ class Distortion(object):
                           col_x='s', col_y='gs', display_name=display_name)
 
     @staticmethod
-    def random_distortion(n_knots, mass=0, mean=0, wt_rng=None, random_state=None):
+    def random_distortion_ex(n=1, random_state=None):
+        """
+        Random distortion over types.
+
+        Example usage and test::
+            ans = Distortion.random_distortion_ex(24)
+            f, axs = plt.subplots(6, 4, figsize=(4*1.5, 6*1.5), layout='constrained')
+            for (n, g), ax in zip(ans.items(), axs.flat):
+                g.plot(ax=ax, both=False)
+
+        Generalizes random_distortion which only returns a wtdtvar type.
+        """
+        rng = np.random.default_rng(random_state)
+
+        def _one_distortion(rng):
+            method = rng.choice(['ph', 'wang', 'dual', 'wtdtvar', 'tvar', 'ccoc'])
+            match method:
+                case 'ph':
+                    return Distortion.ph(rng.uniform(0.1 if rng.uniform() < 0.1 else 0.4, 1.0))
+                case 'wang':
+                    return Distortion.wang(rng.uniform(0.5, 1.5))
+                case 'dual':
+                    return Distortion.dual(rng.uniform(1.1, 2.5))
+                case 'tvar':
+                    return Distortion.tvar(rng.uniform(0.01, 0.99))
+                case 'ccoc':
+                    return Distortion.ccoc(rng.uniform(0.02, 0.35))
+                case 'wtdtvar':
+                    knots = rng.choice([2, 2, 3, 3, 3, 4, 4, 5, 8, 12])
+                    mean = 0 if (t:=rng.uniform() < 0.5) else t / 2
+                    mass = 0 if (t:=rng.uniform() < 0.75) else t / 4
+                    return Distortion.random_distortion(knots, mass, mean, random_state=rng)
+        if n == 1:
+            return _one_distortion(rng)
+        else:
+            return {i: _one_distortion(rng) for i in range(n)}
+
+    @staticmethod
+    def random_distortion(n_knots, mass=0, mean=0, wt_rng=None, name="", random_state=None):
         """
         Create a random distortion. if mass (mean)
         add a mass (mean) term.
+        Knots include possible mean and mass (max) knots.
         wt_rng to generate (spiky) weights, eg. wt_rng=ss.pareto(1.5).rvs.
         """
-        ps = np.random.rand(n_knots)
+        random_state = random_state or np.random.default_rng()
+        if mass: n_knots -= 1
+        if mean: n_knots -= 1
+        ps = random_state.random(n_knots)
         ps.sort()
+        assert n_knots >= 0
+        if n_knots == 0:
+            assert mass + mean == 1, 'BiTVaR weighting mean and max, weights must sum to 1.'
         if wt_rng is None:
-            wts = np.random.rand(n_knots)
+            wts = random_state.random(n_knots)
         else:
             wts = wt_rng(size=n_knots, random_state=random_state)
         wts = wts / wts.sum(dtype=np.float64) * (1 - mass - mean)
@@ -1515,7 +1675,8 @@ class Distortion(object):
             ps = np.insert(ps, 0, 0)
             wts = np.insert(wts, 0, mean)
             mn = f', mn={mean:.3f}'
-        return Distortion('wtdtvar', ps, df=wts, display_name=f'Rnd {n_knots} knots{mn}{ma}')
+        return Distortion('wtdtvar', ps, df=wts,
+                display_name=name or f'Rnd {n_knots} knots{mn}{ma}')
 
     def price(self, ser, a=np.inf, kind='ask', S_calculation='forwards'):
         r"""
@@ -1914,3 +2075,31 @@ def tvar_weights(d):
             pass
 
     return wf  #noqa
+
+
+def p_to_parameters(p):
+    """Return standard parameters equivalent to TVaR p."""
+    ans = {}
+    # in terms of p = d, discount parameterization
+    ans['ccoc'] = p
+    # g(s) = s^a, a = 1 - p / 1 + p; a = 0 is p = 1, a = 1 is p = 0
+    ans['ph'] = (1 - p) / (1 + p)
+    ans['wang'] = 2 ** 0.5 * phi_inv((1 + p) / 2)
+    # p = 0 lambda = 0, p = 1 lambda = infty
+    # b param = 1 + p / 1 - p, p = 0 is b=1 and p = 1 is b = infty
+    ans['dual'] = (1 + p) / (1 - p)
+    ans['tvar'] = p
+    return ans
+
+
+def consistent_distortions(p: int):
+    """Create five representative distortions using the TVaR-p parameterization."""
+    params = p_to_parameters(p)
+    ans = {}
+    for k, sh in params.items():
+        # Distortion.ccoc takes discount but, alas,
+        # Distortion('ccoc', shape) takes return
+        if k == 'ccoc':
+            sh = sh / (1 - sh)
+        ans[k] = Distortion(k, sh)
+    return ans

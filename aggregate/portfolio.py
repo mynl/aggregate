@@ -491,13 +491,15 @@ class Portfolio(object):
         bit[('', 'difference')] = bit[('independent', 'p_total')] - bit[('sample', 'p_total')]
         return bit
 
-    def pricing_bounds(self, premium, a=0, p=0, n_tps=64, kind='tail', slow=False, verbose=250):
+    def pricing_bounds(self, premium, a=0, p=0, n_tps=512, s=512, kind='interp', slow=False, verbose=250):
         """
         Compute the natural allocation premium ranges by unit consistent with
         total premium at asset level a or p (one of which must be provided).
 
         Unlike typical case with even s values, this is run at the actual S
         values of the Portfolio.
+
+        Use s<=0 to use S values.
 
         Visualize::
 
@@ -517,7 +519,11 @@ class Portfolio(object):
         S.iloc[-1] = 0.
         bounds = Bounds(self)
         bounds.add_one = True
-        bounds.tvar_cloud('total', premium, a, n_tps, S.values, kind=kind)
+        # bounds.tvar_cloud('total', premium, a, n_tps, S.values, kind=kind)
+        if s <= 0:
+            bounds.tvar_cloud('total', premium, a,  n_tps, S.values, kind=kind)
+        else:
+            bounds.tvar_cloud('total', premium, a,  n_tps, s, kind=kind)
 
         # TODO: (hack) pl=1 and s=1 is driving an error NAN - need to replace with 0. But WHY?
         gS = bounds.cloud_df.fillna(0).values.T
@@ -623,7 +629,7 @@ class Portfolio(object):
         if self._remove_fuzz or force:
             logger.debug(f'Portfolio.remove_fuzz | Removing fuzz from {self.name} dataframe, caller {log}')
             df[df.select_dtypes(include=['float64']).columns] = \
-                df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+                df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
 
     def __repr__(self):
         """
@@ -2715,7 +2721,8 @@ class Portfolio(object):
             # dual moment
             # be careful about partial at s=1
             shape = 2.0  # starting parameter
-            lS = -np.log(1 - S)  # prob a bunch of zeros...
+            with np.errstate(divide='ignore', invalid='ignore'):
+                lS = -np.log(1 - S)  # prob a bunch of zeros...
             lS[S == 1] = 0
 
             def f(rho):
@@ -2781,6 +2788,10 @@ class Portfolio(object):
         dist.assets = assets
         dist.premium_target = premium_target
         return dist
+
+    def calibrate_distortions2(self, coc, reg_p):
+        """Simplified calibrate_distortions reflecting how it is used."""
+        ans = self.calibrate_distortions(COCs=[coc], Ps=[reg_p])
 
     def calibrate_distortions(self, LRs=None, COCs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
                               strict='ordered', S_calc='cumsum'):
@@ -3814,9 +3825,48 @@ class Portfolio(object):
         ans['comp_df'] = pd.concat(dfs).sort_index()
         return ans
 
+    def analyze_distortions2(self, p, dists=None):
+        """
+        Updated version of analyze_distortions reflecting how it is really used!
+
+        Use dists or self.dists
+
+        Returns only comp_df.
+        """
+        dfs = {}
+        dists = dists or self.dists
+        if dists is None:
+            raise ValueError('Must pass dists or self must have dists. '
+                             'Did you forget to calibrate_distortions?')
+
+        # defaults that we always select
+        use_self = add_comps = False
+        kind = 'lower'
+        efficient = True
+        for k, d in dists.items():
+            # first distortion...add the comps...these are same for all dists
+            ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=add_comps,
+                                             efficient=efficient, use_self=use_self,
+                                             rename_dists=False)
+            dfs[d] = ad_ans.exhibit
+        ans = pd.concat(dfs.values(), keys=[str(i) for i in dfs.keys()])   #.sort_index()
+        ans = ans.droplevel(1, axis=0)
+
+        # force the same order as input dist
+        # ans.index.name = 'distortion'
+        # new_index_df = ans.index.to_frame()
+        # new_index_df['distortion'] = (
+        #     new_index_df['distortion']
+        #     .astype(pd.CategoricalDtype(categories=dists.keys(), ordered=True))
+        # )
+        # # Reassign and sort
+        # ans.index = new_index_df.distortion
+        # ans = ans.sort_index()
+        return ans
+
     def analyze_distortion(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
                            p=None, kind='lower', A=None, use_self=False, plot=False,
-                           a_max_p=1-1e-8, add_comps=True, efficient=True):
+                           a_max_p=1-1e-8, add_comps=True, efficient=True, rename_dists=True):
         """
 
         Graphic and summary DataFrame for one distortion showing results that vary by asset level.
@@ -3995,7 +4045,8 @@ class Portfolio(object):
             ans = self.analyze_distortion_plots(ans, dist, a_cal, p, self.q(a_max_p), ROE, LR)
 
         # ans['exhibit'] = ans.exhibit.swaplevel(0,1).sort_index()
-        ans['exhibit'] = ans.exhibit.rename(index={'T': f'Dist {dist.name}'}).sort_index()
+        if rename_dists:
+            ans['exhibit'] = ans.exhibit.rename(index={'T': f'Dist {dist.name}'}).sort_index()
         return ans
 
     def analyze_distortion_add_comps(self, ans, a_cal, p, kind, ROE):

@@ -750,7 +750,7 @@ class Aggregate(Frequency):
             eps = np.finfo(float).eps
             # may not have a severity, remember...
             self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
-                self._density_df.select_dtypes(include=['float64']).applymap(lambda x: 0 if abs(x) < eps else x)
+                self._density_df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
 
             # we spend a lot of time computing sev exactly, so don't want to flush that away
             # with remove fuzz...hence add here
@@ -3453,7 +3453,8 @@ class Severity(ss.rv_continuous):
                 logger.info(f'Severity.init | {sev_name} d={d}')
                 xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
                 pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
-                self.fz = ss.rv_histogram((pss, xss))
+                # new warning; these are NOT densities
+                self.fz = ss.rv_histogram((pss, xss), density=False)
             else:
                 raise ValueError('Histogram must be chistogram (continuous) or dhistogram (discrete)'
                                  f', you passed {sev_name}')

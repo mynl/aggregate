@@ -913,8 +913,9 @@ class Aggregate(Frequency):
         for c in ['gross', 'ceded', 'net']:
             s = self.reinsurance_df[f'p_agg_{c}_occ']
             s[np.abs(s) < 1e-15] = 0
-            s = s[::-1].cumsum()[::-1].values
-            s[s == 0] = np.nan
+            s_values = s[::-1].cumsum()[::-1].values
+            s = np.where(np.abs(s_values) < 1e-15, 0, s_values)
+            s = np.where(s == 0, np.nan, s)
             ax1.plot(1 - s, y, label=c)
         ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
         ax1.legend()

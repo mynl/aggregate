@@ -56,7 +56,7 @@ def validate_discrete_distribution(xs, ps):
         logger.info('Duplicates in empirical distribution and/or negative values, summarizing.')
         temp_df = pd.DataFrame({'x': xs, 'p': ps})
         temp_df.loc[temp_df.x < 0, 'x'] = 0.
-        temp_df = temp_df.groupby('x').sum('p')
+        temp_df = temp_df.groupby('x')[['p']].sum()
         xs = np.array(temp_df.index)
         ps = temp_df.p.values
     return xs, ps

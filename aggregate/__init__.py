@@ -45,9 +45,9 @@ if not sys.warnoptions:
 __docformat__ = 'restructuredtext'
 __project__ = 'aggregate'
 __author__ = "Stephen J. Mildenhall"
-__copyright__ = "2018-2024, Convex Risk LLC"
+__copyright__ = "2018-2026, Stephen J Mildenhall"
 __license__ = "BSD 3-Clause New License"
-__email__ = "steve@convexrisk.com"
+__email__ = "stephen.j.mildenhall@gmail.com"
 __status__ = "beta"
 # only need to change here, feeds conf.py (docs) and pyproject.toml (build)
 __version__ = "0.28.1"

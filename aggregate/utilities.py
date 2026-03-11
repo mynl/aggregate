@@ -29,6 +29,14 @@ from scipy.special import kv, binom, loggamma
 from scipy.stats import multivariate_t
 from IPython.display import HTML, Markdown, display, Image as ipImage, SVG as ipSVG
 
+# for comonotonic allocations
+try:
+    from numba import njit
+except ImportError:
+    # Fallback if numba is not installed
+    def njit(func):
+        return func
+
 from .constants import *
 import aggregate.random_agg as ar
 
@@ -3830,3 +3838,89 @@ def explain_validation(rv):
             explanation += f'agg skew, '
     return explanation[:-2]
 
+
+@njit
+def make_comonotonic_allocations(s_grid: np.ndarray, pdf_s: np.ndarray, kappa: np.ndarray) -> np.ndarray:
+    """
+    Computes a comonotonic convex-order improvement for an allocation matrix.
+
+    Implements the algorithmic convex-order improvement from Theorem 3.1 in
+    Denuit et. al.
+    Uses a majorization approach based on Lorentz and Shimogaki (1968)
+    to flatten monotonicity violations and redistribute mass .
+
+    Reference
+    ---------
+
+    Denuit, Michel, et al. "Comonotonicity and Pareto optimality, with application
+    to collaborative insurance." Insurance: Mathematics and Economics 120 (2025): 1-16.
+
+    Parameters
+    ----------
+    s_grid : np.ndarray
+        1D array of length M representing the discretized aggregate sum $S$.
+    pdf_s : np.ndarray
+        1D array of length M containing the probability mass function of $S$.
+    kappa : np.ndarray
+        2D array of shape (N, M) where N is the number of individual risks and M
+        is the length of s_grid. Represents the initial Conditional Mean
+        Risk-Sharing (CMRS) allocations $X_i^0 = \\mathsf{E}[X_i | S]$.
+
+    Returns
+    -------
+    np.ndarray
+        2D array of shape (N, M) containing the comonotonic allocations $\\tilde{f}_i(S)$.
+    """
+    n, m = kappa.shape
+    kappa_tilde = np.copy(kappa)
+
+    # Sweep forward through the aggregate states S
+    for k in range(1, m):
+        # Calculate local slopes to check for monotonicity
+        diffs = kappa_tilde[:, k] - kappa_tilde[:, k-1]
+
+        # Identify components where the allocation decreases as S increases
+        violators = np.where(diffs < 0)[0]
+
+        if len(violators) > 0:
+            non_violators = np.where(diffs >= 0)[0]
+
+            for i in violators:
+                p = k - 1
+                mass = pdf_s[k]
+                weighted_sum = kappa_tilde[i, k] * mass
+
+                # Scan backward to find the pooling index p that restores monotonicity
+                # by creating an integral average (lambda_val) that bounds the previous steps
+                while p >= 0 and kappa_tilde[i, p] > (weighted_sum / mass if mass > 0 else kappa_tilde[i, k]):
+                    weighted_sum += kappa_tilde[i, p] * pdf_s[p]
+                    mass += pdf_s[p]
+                    p -= 1
+
+                p += 1
+
+                if mass > 0:
+                    lambda_val = weighted_sum / mass
+                else:
+                    lambda_val = kappa_tilde[i, k]
+
+                # delta represents the mass removed from the violator to flatten it
+                delta = kappa_tilde[i, p:k + 1] - lambda_val
+                kappa_tilde[i, p:k + 1] = lambda_val
+
+                if len(non_violators) > 0:
+                    slopes = diffs[non_violators]
+                    sum_slopes = np.sum(slopes)
+
+                    # Compute redistribution weights proportional to positive slopes
+                    # to prevent non-violators from breaking monotonicity
+                    if sum_slopes > 0:
+                        alpha = slopes / sum_slopes
+                    else:
+                        alpha = np.ones(len(non_violators)) / len(non_violators)
+
+                    # Redistribute the removed mass to the non-violating components
+                    for idx, j in enumerate(non_violators):
+                        kappa_tilde[j, p:k + 1] += delta * alpha[idx]
+
+    return kappa_tilde

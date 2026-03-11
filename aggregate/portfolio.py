@@ -31,7 +31,8 @@ from .utilities import (ft, ift, axiter_factory, AxisManager, html_title,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, Answer, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
-                        make_var_tvar, more, explain_validation, )
+                        make_var_tvar, more, explain_validation,
+                        make_comonotonic_allocations as make_comonotonic_allocations_work)
 import aggregate.random_agg as ar
 
 
@@ -5966,6 +5967,27 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
     def n_units(self):
         return len(self.line_names)
 
+    def make_comonotonic_allocations(self, max_loss=-1):
+        """
+        Make comonotonic version of kappas using Denuit's alogorithm.
+
+        Pass in upper bound max_loss, or use self.q(1) by default.
+        """
+        if max_loss <= 0: max_loss = self.q(1)
+        df = self.density_df.filter(regex='loss|p_total|exeqa_[^t]').loc[:max_loss]
+        assert df is not None, 'Object must be updated to compute allocations.'
+        s_grid = df.loss.to_numpy()
+        pdf_s = df.p_total.to_numpy()
+        bit = df.iloc[:, 2:]
+        kappa = bit.T.to_numpy()
+        # do the work
+        kappa_tilde = make_comonotonic_allocations_work(s_grid, pdf_s, kappa)
+        # add to extract and return
+        dfnew = df.copy()
+        for c, k in zip(bit, kappa_tilde):
+            dfnew[f'{c}_t'] = k
+        return dfnew
+
     def swap_density_df(self, new_df, padding=1):
         """
         EXPERIMENTAL FUNCTION
@@ -6104,3 +6126,5 @@ def make_awkward(log2, scale=False):
     awk = Portfolio('awkward', [A, B])
     awk.update(log2, 1/sc if scale else 1, remove_fuzz=True, padding=0)
     return awk
+
+

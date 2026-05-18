@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-dynamic = ["version"]
+version = "1.0.0a1"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.rst"
 authors = [
@@ -68,9 +68,6 @@ dev = [
     "sphinx-multitoc-numbering",
     "sphinx-design"
 ]
-
-[tool.setuptools.dynamic]
-version  = { attr = "aggregate.__version__" }
 
 [tool.setuptools]
 include-package-data = true

@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "Bash(uv run *)",
+      "Bash(echo \"exit $?\")"
     ]
   }
 }

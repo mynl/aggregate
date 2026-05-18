@@ -1,22 +1,7 @@
-# Byte-compiled / optimized / DLL files
+# Python bytecode
 __pycache__/
 *.py[cod]
 *$py.class
-
-*.sublime-*
-
-.idea/
-venv-agg/
-
-# Sphinx documentation
-docs/_build
-docs/dm/temp
-docs/savefig
-# doc/_templates
-# doc/_theme
-
-cheat-sheets/*.aux
-cheat-sheets/*.log
 
 # C extensions
 *.so
@@ -24,102 +9,51 @@ cheat-sheets/*.log
 # Distribution / packaging
 .Python
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
+.installed.cfg
 MANIFEST
-node_modules/*
-frozen_0.9.2/*
-dm*.*
 
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# celery beat schedule file
-celerybeat-schedule
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
+# Virtual environments
 .env
 .venv
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
+venv-agg/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Jupyter
+.ipynb_checkpoints
 
-# Rope project settings
-.ropeproject
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+.cache
 
-# mkdocs documentation
-/site
+# Sphinx documentation
+docs/_build/
+docs/savefig/
 
-# mypy
-.mypy_cache/
-
-
-doc/index - Copy.xrst
+# LaTeX build artifacts (cheat-sheets/)
+cheat-sheets/*.aux
+cheat-sheets/*.log
 cheat-sheets/preamble.fmt
-*.png
+
+# Editors / IDEs
+.idea/
+*.sublime-*
+
+# pyenv
+.python-version
+
+# Local scratch (ad-hoc throwaway files)
+scratch_*

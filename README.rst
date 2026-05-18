@@ -28,6 +28,10 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+0.30.1
+-------
+* Confirmed support for Python 3.13 and 3.14
+
 0.30.0
 -------
 * Added `comonotonic_allocations` to `Portfolio` to implement the method of Denuit, Michel, et al. "Comonotonicity and Pareto optimality, with application to collaborative insurance." Insurance: Mathematics and Economics 120 (2025): 1-16. This uses numba if available. Warning: it can be very slow without numba!
@@ -39,7 +43,6 @@ Version History
 * Spectral tvar_info_df and plot_affine for working with weighted TVaR distortions.
 * Changed behavior of Distortion.random_distortion so that input number of knots *includes* mass and mean if present.
 * Added random_distortion_ex(n=1, random_state=None) in Distortion class to simulate across types, extending random_distortion which is only a wtdtvar.
-
 
 0.28.1
 -------

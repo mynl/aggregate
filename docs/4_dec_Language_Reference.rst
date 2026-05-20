@@ -24,10 +24,9 @@ Programs are processed one line at a time. Before passing to the lexer, the foll
 
 1. Remove Python and C++ style  ``#`` or ``//`` comments, through end of line
 2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
-3. Map semicolons to newline
-4. Map backslash newline (Python line continuations) to space
-5. Replace \\n\\t  with space, to support the tabbed indented Portfolio layout
-6. Split on remaining newlines
+3. Map backslash newline (Python line continuations) to space
+4. Replace \\n\\t  with space, to support the tabbed indented Portfolio layout
+5. Split on remaining newlines
 
 Lexer Term Definitions
 ======================
@@ -38,52 +37,54 @@ Aggregate names must not include underscore. Portfolio names may include undersc
 
 ::
 
-    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV,NOTE,
+    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV, NOTE,
               SEV, AGG, PORT,
-              NUMBER, INFINITY,
+              NUMBER,
               PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
               LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
               XS, PICKS,
               DISTORTION,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS,
+              CV, WEIGHTS, EQUAL_WEIGHT, XPS, SPLICE,
               MIXED, FREQ, TWEEDIE, ZM, ZT,
               NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
-              AND,  PERCENT,
+              AND,
               EXPONENT, EXP,
               DFREQ, DSEV, RANGE
               }
 
     ignore = ' \t,\\|'
     literals = {'[', ']', '!', '(', ')'}
-    NOTE = r'note\{[^\}]*\}'  # r'[^\}]+'
-    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic'
+    NOTE = r'note\{[^\}]*\}'
+    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
+    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
+    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic|negbin'
     DISTORTION = 'dist(ortion)?'
-    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?'
-    ID = r'[a-zA-Z][\.:~_a-zA-Z0-9]*'
+    # NUMBER absorbs an optional leading minus, an optional ``%`` suffix
+    # (percent), and the special values ``inf`` / ``-inf``.
+    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?%?|\-?inf'
+    # ID excludes any reserved keyword in standalone form and anything
+    # starting with ``agg.`` or ``sev.`` (which are BUILTIN_AGG / BUILTIN_SEV).
+    ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
     EXPONENT = r'\^|\*\*'
     PLUS = r'\+'
     MINUS = r'\-'
     TIMES = r'\*'
     DIVIDE = '/'
-    PERCENT = '%'
     INHOMOG_MULTIPLY = '@'
     EQUAL_WEIGHT = '='
     RANGE = ':'
 
     ID['occurrence'] = OCCURRENCE
-    ID['unlimited'] = INFINITY
     ID['aggregate'] = AGGREGATE
     ID['exposure'] = EXPOSURE
     ID['tweedie'] = TWEEDIE
     ID['premium'] = PREMIUM
     ID['tower'] = TOWER
     ID['mixed'] = MIXED
-    ID['unlim'] = INFINITY
     ID['picks'] = PICKS
     ID['prem'] = PREMIUM
     ID['claims'] = CLAIMS
+    ID['splice'] = SPLICE
     ID['ceded'] = CEDED
     ID['claim'] = CLAIMS
     ID['dfreq'] = DFREQ
@@ -96,10 +97,8 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ID['agg'] = AGG
     ID['xps'] = XPS
     ID['wts'] = WEIGHTS
-    ID['inf'] = INFINITY
     ID['and'] = AND
     ID['exp'] = EXP
-    ID['wt'] = WEIGHTS
     ID['at'] = AT
     ID['cv'] = CV
     ID['lr'] = LR
@@ -110,7 +109,6 @@ Aggregate names must not include underscore. Portfolio names may include undersc
     ID['so'] = SHARE_OF
     ID['zm'] = ZM
     ID['zt'] = ZT
-    ID['x'] = XS
 
 Dec Language Grammar Specification
 ===================================
@@ -150,9 +148,9 @@ To only parse::
     df.query('error != 0')
 
 
-``sly`` Parser
-==================
+Parser Implementation
+=======================
 
-The parser is built using the ``sly`` package, https://sly.readthedocs.io/en/latest/sly.html.
+The parser is built using `Lark <https://lark-parser.readthedocs.io/>`_ with an Earley backend and a dynamic, context-sensitive lexer. The grammar lives in ``aggregate/decl.lark`` and is the single source of truth — the listing in :ref:`Dec Language Grammar Specification` is regenerated from it. Earley dissolves the shift/reduce conflicts the previous SLY (LALR) implementation needed to hand-tune; the dynamic lexer plus tightened ``ID`` rule keep the grammar unambiguous.
 
 

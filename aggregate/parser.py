@@ -2,7 +2,19 @@
 Aggregate Lexer and Parser.
 ===========================
 
-To debug in a repl use the following code:
+Implements the DecL (Declarative Language) DSL used to describe aggregate
+distributions. The grammar lives in ``aggregate/decl.lark``; this module
+provides the ``UnderwritingLexer`` and ``UnderwritingParser`` wrappers that
+``aggregate.underwriter`` consumes.
+
+The parser uses `Lark <https://lark-parser.readthedocs.io/>`_ with an Earley
+backend and a dynamic, context-sensitive lexer. Earley dissolves the
+shift/reduce conflicts that the previous SLY (LALR) implementation needed to
+hand-tune with ``%prec`` hacks, and the dynamic lexer disambiguates keywords
+from identifiers based on grammar context rather than the SLY
+``ID['keyword'] = TOKEN`` remapping trick.
+
+REPL debugging session::
 
     from aggregate.parser import UnderwritingLexer, UnderwritingParser
 
@@ -16,1236 +28,825 @@ To debug in a repl use the following code:
                 continue
         except (EOFError, KeyboardInterrupt):
             break
-
         try:
-            if text == 'x':
-                break
             tokens = list(lexer.tokenize(text))
             print("Tokens:")
             for tok in tokens:
                 print(f"  {tok.type:<10} {tok.value!r}")
-
-            result = parser.parse(iter(tokens))
-            print("Parsed:")
-            print(result)
+            print("Parsed:", parser.parse(text))
         except Exception as e:
             print("Error:", e)
-
 """
-# For historical interest, the journey to sorting out the parser ran as follows:
-#
-# 0. Base: 12 SR conflicts
-# 1. Reinstated UMINUS: 25SR/15RR! Rejected rule
-# 2. Removed percent: 25/14
-# 3. MINUS "(" expr ")" %prec UMINUS --> MINUS expr %prec UMINUS: 25/14
-# 4. protoexpr introduced as the first level of decoding a NUMBER, UMINUS, percent reinstated: 25/14
-# 5. UMINUS at expression level: 25/14
-# 6. Use same symbol but different precenence for scale and loc: 33/14?!!
-# 7. UMINUS at proto_expression level: 25/14
-# 8. Python style math (atom, power, factor, term, sum) (retains same symbol for LOC/SCALE): 29SR/NONE!
-# 9. Removed percent made no difference....reinstated but made highest priority
-# 10. Removed EXP and () 23 SR XXXX (26 with (),)
-# 11. Removed SPECIFIED (23)
-# 12. Removed name exposures layers builtin_sev; builtin_sev->sev and then use the sev rule (23)
-# 13. builtin_sevs are defined by a dictionary...once looked up they are no different from regular sevs, so all special code removed... 23SR
-# 14. EXP and () reinstated, 26 SR
-# 15. Intrdouced sev_clause (includes sev and dsev) 29SR [if you try dfreq sev_clause you get 39SR] ...going with 39
-# 16. Put LOW prec in reduced to 36...
-# 17. Issue was driven by cases with optional arguments. Need to give the optional (reduce) case lower weight.
-# 18. parameters to severity...
-#
-# Issue with scalar x RV + const and pulling out the parameters. If you allow 2 + 3 * lognorm it will never
-# work with the same character. Hence need @. Similarly for #.
-# zero param sevs are a problem too.
-#
-# Zero parameter severities did not work. YOu must enter at least one parameter, but it is ignored.
-#
-# Calculator is more bother than it is worth... keep exp, ** and /, but drop everything else (use f strings!)
-# Result has SR conflicts but it parses all the test programs
-#
-# June 2023 have 21 shift/reduce conflicts.
-# 20 of them are five groups of four: EXP, (, NUMBER, INFINITY
-# The remaining one is [ around dfreq
-#
-# July 2023 changes
-# make atom ** factor into factor ** factor so that (1 / 3) ** (3 /4) works
-# splice
 
+from __future__ import annotations
 
 import logging
-import numpy as np
-from numpy import exp
-from pathlib import Path
 import re
-from . sly import Lexer, Parser
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Iterable, Iterator
+
+import numpy as np
+from lark import Lark, Transformer
+from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 logger = logging.getLogger(__name__)
 
-DEBUGFILE = Path.home() / 'aggregate/parser/parser.out'
+GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 
 
-class UnderwritingLexer(Lexer):
+# ======================================================================
+# Lexer
+# ======================================================================
+
+
+class _TokenizedText:
+    """An iterable of Lark tokens that also remembers the original source text.
+
+    ``UnderwritingParser.parse`` accepts either a raw string or one of these
+    objects, preserving the historic ``parser.parse(lexer.tokenize(line))``
+    call shape from ``aggregate.underwriter``.
     """
-    Implements the Lexer for the agg language.
 
-    """
+    __slots__ = ("text",)
 
-    tokens = {ID, BUILTIN_AGG, BUILTIN_SEV, NOTE,
-              SEV, AGG, PORT,
-              NUMBER,  # INFINITY,
-              PLUS, MINUS, TIMES, DIVIDE, INHOMOG_MULTIPLY,
-              LOSS, PREMIUM, AT, LR, CLAIMS, EXPOSURE, RATE,
-              XS, PICKS,
-              DISTORTION,
-              CV, WEIGHTS, EQUAL_WEIGHT, XPS, SPLICE,
-              MIXED, FREQ, TWEEDIE, ZM, ZT,
-              NET, OF, CEDED, TO, OCCURRENCE, AGGREGATE, PART_OF, SHARE_OF, TOWER,
-              AND,
-              EXPONENT, EXP,
-              DFREQ, DSEV, RANGE
-              }
+    def __init__(self, text: str) -> None:
+        self.text = text
 
-    ignore = ' \t,\\|'
-    literals = {'[', ']', '!', '(', ')'}
+    def __iter__(self) -> Iterator[SimpleNamespace]:
+        for tok in _PARSER.lex(self.text):
+            yield SimpleNamespace(
+                type=tok.type, value=str(tok), index=tok.start_pos or 0
+            )
 
-    # per manual, need to list longer tokens before shorter ones
-    # simple but effective notes
-    NOTE = r'note\{[^\}]*\}'
-    BUILTIN_AGG = r'agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
-    BUILTIN_SEV = r'sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*'
-    FREQ = 'binomial|pascal|poisson|bernoulli|geometric|fixed|neyman(a|A)?|logarithmic|negbin'
-    DISTORTION = 'dist(ortion)?'
-    # number regex including unary minus; need before MINUS else that grabs the minus sign in -3 etc.
-    # includes inf, -inf and percents
-    NUMBER = r'\-?(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?%?|\-?inf'
 
-    # do use _ in unit names as part of portfolios. Can use ~ or . or : instead:
-    # why? because p_ is used and _ is special
-    # on honor system...really need two types of ID, it is OK in a portfolio name
-    ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
-    EXPONENT = r'\^|\*\*'
-    PLUS = r'\+'
-    MINUS = r'\-'
-    TIMES = r'\*'
-    DIVIDE = '/'
-    INHOMOG_MULTIPLY = '@'
-    EQUAL_WEIGHT = '='
-    RANGE = ':'
-
-    ID['occurrence'] = OCCURRENCE
-    ID['aggregate'] = AGGREGATE
-    ID['exposure'] = EXPOSURE
-    ID['tweedie'] = TWEEDIE
-    ID['premium'] = PREMIUM
-    ID['tower'] = TOWER
-    ID['mixed'] = MIXED
-    ID['picks'] = PICKS
-    ID['prem'] = PREMIUM
-    ID['claims'] = CLAIMS
-    ID['splice'] = SPLICE
-    ID['ceded'] = CEDED
-    ID['claim'] = CLAIMS
-    ID['dfreq'] = DFREQ
-    ID['dsev'] = DSEV
-    ID['loss'] = LOSS
-    ID['port'] = PORT
-    ID['rate'] = RATE
-    ID['net'] = NET
-    ID['sev'] = SEV
-    ID['agg'] = AGG
-    ID['xps'] = XPS
-    ID['wts'] = WEIGHTS
-    ID['and'] = AND
-    ID['exp'] = EXP
-    ID['at'] = AT
-    ID['cv'] = CV
-    ID['lr'] = LR
-    ID['xs'] = XS
-    ID['of'] = OF
-    ID['to'] = TO
-    ID['po'] = PART_OF
-    ID['so'] = SHARE_OF
-    ID['zm'] = ZM
-    ID['zt'] = ZT
-
-    @_(r'\n+')
-    def newline(self, t):
-        self.lineno += t.value.count('\n')
-
-    def error(self, t):
-        logger.error(f"Illegal character '{t.value[0]:s}'")
-        self.index += 1
+class UnderwritingLexer:
+    """DecL lexer. Thin wrapper around Lark's tokenizer plus a regex
+    preprocessor that splits multi-line programs and strips comments."""
 
     @staticmethod
-    def preprocess(program):
+    def preprocess(program: str) -> list[str]:
+        """Split a multi-line DecL program into clean single-line statements.
+
+        The preprocessor performs six steps:
+
+        1. Newlines inside ``[ ]`` (e.g., from formatted numpy arrays) are
+           collapsed to spaces.
+        2. ``//`` and ``#`` comments are removed through end of line.
+        3. ``\\\\n`` line continuation is mapped to a space.
+        4. ``\\n\\t`` and four-space indented ``\\n    `` (the tabbed Portfolio
+           layout) are collapsed to a space.
+        5. The result is split on newlines.
+        6. Empty lines are dropped.
+
+        Parameters
+        ----------
+        program : str
+            Raw multi-line DecL source.
+
+        Returns
+        -------
+        list[str]
+            Non-empty, stripped DecL statements ready for parsing.
         """
-        Separate preprocessor step, allowing it to be called separately.
-        Preprocessing involves six steps:
-
-        1. Remove // comments, through end of line
-        2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
-        3. Backslash (line continuation) mapped to space
-        4. \\n\\t is replaced with space, supporting the tabbed indented Portfolio layout
-        5. Split on newlines
-
-        :param program:
-        :return:
-        """
-
-        # handle \n in vectors; first item is outside, then inside... (multidimensional??)
-        out_in = re.split(r'\[|\]', program)
+        # Collapse newlines inside [...] (which can appear when a vector is
+        # formatted with f'{np.linspace(...)}').
+        out_in = re.split(r"\[|\]", program)
         assert len(out_in) % 2  # must be odd
-        odd = [t.replace('\n', ' ') for t in out_in[1::2]]  # replace inside []
-        even = out_in[0::2]  # otherwise, pass through
-        # reassemble
-        program = ' '.join([even[0]] + [f'[{o}] {e}' for o, e in zip(odd, even[1:])])
+        odd = [t.replace("\n", " ") for t in out_in[1::2]]
+        even = out_in[0::2]
+        program = " ".join([even[0]] + [f"[{o}] {e}" for o, e in zip(odd, even[1:])])
 
-        # remove comments C++-style // or # comments
-        # must replace comments before changing other \ns
-        program = re.sub(r'(//|#)[^\n]*$', r'\n', program, flags=re.MULTILINE)
+        # Strip // and # comments through end of line.
+        program = re.sub(r"(//|#)[^\n]*$", r"\n", program, flags=re.MULTILINE)
 
-        #  preprocessing: line continuation; \n\t or \n____ to space (for port agg element indents),
-        # ; to new line, split on new line
-        program = program.replace('\\\n', ' '). replace('\n\t', ' ').replace('\n    ', ' ')
+        # Line continuation and Portfolio-indent collapse.
+        program = (
+            program.replace("\\\n", " ").replace("\n\t", " ").replace("\n    ", " ")
+        )
 
-        # split program into lines, only accept len > 0
-        program = [i.strip() for i in program.split('\n') if len(i.strip()) > 0]
-        return program
+        return [i.strip() for i in program.split("\n") if len(i.strip()) > 0]
+
+    def tokenize(self, text: str) -> _TokenizedText:
+        """Tokenize a single DecL line.
+
+        Returns an iterable of token objects with ``.type``, ``.value``, and
+        ``.index`` attributes (the index is the character offset in the source
+        line), compatible with the legacy SLY token shape that
+        ``aggregate.underwriter`` inspects on parse errors.
+        """
+        return _TokenizedText(text)
 
 
-class UnderwritingParser(Parser):
-    """
-    Implements the Parser for the agg language.
+# ======================================================================
+# Transformer (parse tree -> (kind, name, spec) tuple)
+# ======================================================================
 
-    Here are testers for the math expressions::
 
-        from aggregate import build
-        for t in ['-123', '-2%', '45%', '1e-3%', 'inf', '-inf', 'exp(1)', 'exp(1/2)', 'exp(-1)', '-1/8',
-                  'exp(10)/exp(3**2/2)', '2**10', '50/exp(.3**2/2)', '1/exp(1.9**2 / 2)']:
-            a = build(t)
-            print(a.name)
-            assert float(a.name) == eval(t.replace('%', '/100').replace('exp', 'np.exp').replace('inf', 'np.inf'))
+def _check_vectorizable(value):
+    """Coerce a value into something numpy can broadcast over."""
+    if isinstance(value, (float, int, np.ndarray)):
+        return value
+    return np.array(value)
 
-    To test on the test_suite::
 
-        df = build.run_test_suite()
-        assert len(df.query('error != 0')) == 0
+def _number_to_float(s: str):
+    if s.endswith("%"):
+        return float(s[:-1]) / 100
+    if s == "inf":
+        return np.inf
+    if s == "-inf":
+        return -np.inf
+    return float(s)
 
-    """
 
-    expected_shift_reduce = 16  # Set this to the number of expected shift/reduce conflicts
+class UnderwritingTransformer(Transformer):
+    """Transform a Lark parse tree into the SLY-compatible
+    ``(kind, name, spec)`` tuple consumed by ``aggregate.underwriter``."""
 
-    debugfile = None
-    # uncomment to write detailed grammar rules
-    # debugfile = Path.home() / 'aggregate/parser/parser.out'
-    if debugfile is not None:
-        debugfile.parent.mkdir(parents=True, exist_ok=True)
-    # this won't have been created the first time this runs in a clean environment, hence:
-    tokens = UnderwritingLexer.tokens
-    precedence = (
-        ('nonassoc', LOW),  # used to force shift in rules
-        ('nonassoc', INHOMOG_MULTIPLY),
-        ('left', PLUS, MINUS),
-        ('left', TIMES),  # for scaling distributions
-        ('nonassoc', DIVIDE),  # for internal math in expressions; nonassoc means 1/2/3 causes an error, force parens
-        ('right', EXP),   # exponential function
-        ('right', EXPONENT),
-    )
-
-    def __init__(self, safe_lookup_function, debug=False):
-        self.debug = debug
-        # self.reset()
-        # instance of uw class to look up severities
+    def __init__(self, safe_lookup_function, debug: bool = False) -> None:
+        super().__init__()
         self.safe_lookup = safe_lookup_function
+        self.debug = debug
 
-    def logger(self, msg, p):
-        if self.debug is False:
-            return
-        nm = p._namemap
-        sl = p._slice
-        ans = []
-        for i, (k, v) in enumerate(nm.items()):
-            # breaks out the parts; sl is a tuple of parse states
-            rhs = v(sl, i)
-            ans.append(f'[{i}] {k}={rhs!s}')
-        ans = "; ".join(ans)
-        logger.info(f'{msg:20s}\t{ans}')
+    # ----- terminals -------------------------------------------------
+    def NUMBER(self, tok):
+        return _number_to_float(str(tok))
 
-    @staticmethod
-    def enhance_debugfile(f_out=''):
-        """
-        Put links in the parser.out debug file, if DEBUGFILE != ''.
+    def NOTE(self, tok):
+        return str(tok)[5:-1]
 
-        :param f_out: Path or filename of output. If "" then DEBUGFILE.html used.
-        :return:
-        """
+    def ID(self, tok):
+        return str(tok)
 
-        if DEBUGFILE == '':
-            return
+    def BUILTIN_AGG(self, tok):
+        return str(tok)
 
-        if f_out == '':
-            f_out = DEBUGFILE.with_suffix('.html')
-        else:
-            f_out = Path(f_out)
+    def BUILTIN_SEV(self, tok):
+        return str(tok)
 
-        txt = Path(DEBUGFILE).read_text(encoding='utf-8')
-        txt = txt.replace('Grammar:\n', '<h1>Grammar:</h1>\n\n<pre>\n').replace('->', '<-')
-        txt = re.sub(r'^Rule ([0-9]+)', r'<div id="rule_\1" />Rule \1', txt, flags=re.MULTILINE)
-        txt = re.sub(r'^state ([0-9]+)$', r'<div id="state_\1" /><b>state \1</b>', txt, flags=re.MULTILINE)
-        txt = re.sub(r'^    \(([0-9]+)\) ', r'    <a href="#rule_\1">Rule (\1)</a> ', txt, flags=re.MULTILINE)
-        txt = re.sub(r'go to state ([0-9]+)', r'go to <a href="#state_\1">state (\1)</a>', txt, flags=re.MULTILINE)
-        txt = re.sub(r'using rule ([0-9]+)', r'using <a href="#rule_\1">rule (\1)</a>', txt, flags=re.MULTILINE)
-        txt = re.sub(r'in state ([0-9]+)', r'in <a href="#state_\1">state (\1)</a>', txt, flags=re.MULTILINE)
+    def FREQ(self, tok):
+        return str(tok)
 
-        f_out.write_text(txt + '\n</pre>', encoding='utf-8')
+    # ----- answer dispatch ------------------------------------------
+    def answer_sev(self, c):
+        return c[0]
 
-    @staticmethod
-    def _check_vectorizable(value):
-        """
-        Check the value can be vectorized.
+    def answer_agg(self, c):
+        return c[0]
 
-        """
-        if isinstance(value, (float, int, np.ndarray)):
-            return value
-        else:
-            return np.array(value)
+    def answer_port(self, c):
+        return c[0]
 
-    # final answer exit points =================================
-    @_('sev_out')
-    def answer(self, p):
-        self.logger(
-            f'answer <-- sev_out, created severity {p.sev_out[1]}', p)
-        return p.sev_out
+    def answer_distortion(self, c):
+        return c[0]
 
-    @_('agg_out')
-    def answer(self, p):
-        self.logger(
-            f'answer <-- agg_out, created aggregate {p.agg_out[1]}', p)
-        return p.agg_out
+    def answer_expr(self, c):
+        e = c[0]
+        return ("expr", f"{e}", e)
 
-    @_('port_out')
-    def answer(self, p):
-        self.logger(f'answer <-- port_out, created portfolio {p.port_out[1]}', p)
-        return p.port_out
+    # ----- distortion ------------------------------------------------
+    def distortion_out_short(self, c):
+        _, name, kind_id, shape = c
+        return ("distortion", name, {"name": kind_id, "shape": shape})
 
-    @_('distortion_out')
-    def answer(self, p):
-        self.logger(f'answer <-- distortion_out, created distortion {p.distortion_out[1]} ', p)
-        return p.distortion_out
+    def distortion_out_long(self, c):
+        _, name, kind_id, shape, df = c
+        return ("distortion", name, {"name": kind_id, "shape": shape, "df": df})
 
-    @_('expr')
-    def answer(self, p):
-        self.logger(f'expr_out <-- expr {p.expr} ', p)
-        return 'expr', f'{p.expr}', p.expr
+    # ----- portfolio -------------------------------------------------
+    def port_out(self, c):
+        _, name, note, agg_list = c
+        return ("port", name, {"spec": agg_list, "note": note})
 
-    # making distortions ======================================
-    @_('DISTORTION name ID expr')
-    def distortion_out(self, p):
-        self.logger('distortion_out <-- DISTORTION ID name', p)
-        # self.out_dict[("distortion", p.name)] =
-        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr}
+    def agg_list_cons(self, c):
+        lst, ag = c
+        lst.append(ag)
+        return lst
 
-    @_('DISTORTION name ID expr "[" numberl "]"')
-    def distortion_out(self, p):
-        self.logger('distortion_out <-- DISTORTION name ID [ numberl ]', p)
-        # for bitvars etc. TODO apply edit to ID to check it is bitvar?
-        # self.out_dict[('distortion', p.name)] =
-        return 'distortion', p.name, {'name': p.ID, 'shape': p.expr, 'df': p.numberl}
+    def agg_list_one(self, c):
+        return [c[0]]
 
-    # building portfolios ======================================
-    @_('PORT name note agg_list')
-    def port_out(self, p):
-        self.logger(
-            f'port_out <-- PORT name note agg_list', p)
-        # self.out_dict[("port", p.name)] =
-        return 'port', p.name, {'spec': p.agg_list, 'note': p.note}
+    # ----- aggregate -------------------------------------------------
+    def agg_out_full(self, c):
+        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, note = c
+        spec = {
+            "name": name,
+            **exposures,
+            **layers,
+            **sev_clause,
+            **occ_reins,
+            **freq,
+            **agg_reins,
+            "note": note,
+        }
+        return ("agg", name, spec)
 
-    @_('agg_list agg_out')
-    def agg_list(self, p):
-        self.logger(f'agg_list <-- agg_list, agg_out', p)
-        p.agg_list.append(p.agg_out)
-        return p.agg_list
+    def agg_out_dfreq(self, c):
+        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, note = c
+        spec = {
+            "name": name,
+            **dfreq,
+            **layers,
+            **sev_clause,
+            **occ_reins,
+            **agg_reins,
+            "note": note,
+        }
+        return ("agg", name, spec)
 
-    # building aggregates ======================================
-    @_('agg_out')
-    def agg_list(self, p):
-        self.logger(f'agg_list <-- agg_out', p)
-        return [p.agg_out]
-
-    # simplify agg out with sev_clause
-    @_('AGG name exposures layers sev_clause occ_reins freq agg_reins note')
-    def agg_out(self, p):
-        self.logger(
-            f'agg_out <-- AGG name exposures layers SEV sev occ_reins freq agg_reins note', p)
-        # self.out_dict[("agg", p.name)] =
-        return 'agg', p.name, {'name': p.name, **p.exposures, **p.layers, **p.sev_clause,
-                               **p.occ_reins, **p.freq, **p.agg_reins, 'note': p.note}
-
-    @_('AGG name dfreq layers sev_clause occ_reins agg_reins note')
-    def agg_out(self, p):
-        self.logger(
-            f'agg_out <-- AGG name dfreq layers sev_clause occ_reins agg_reins note', p)
-        # self.out_dict[("agg", p.name)] =
-        return 'agg', p.name, {'name': p.name, **p.dfreq, **p.layers, **p.sev_clause,
-                               **p.occ_reins, **p.agg_reins, 'note': p.note}
-
-    @_('AGG name TWEEDIE expr expr expr note')
-    def agg_out(self, p):
-        self.logger('agg_out <-- AGG name TWEEDIE expr expr expr note', p)
-        # Tweedie distribution in mean, p, sigma^2 (dispersion) format (MUST be mean first!!)
-        # variance function is sigma^2 mean^p
-        # phi = sigma^2 in Jorgenson p. 127 notation
-        # p = (2 + a)/(a + 1) to a = (2 - p)/(p - 1)
-        # lambda = mu^(2-p) / ((2-p) sigma^2)
-        # beta = lambda alpha / mu
-
-        # if not here then relative import fails when you run the program to pring the grammar
+    def agg_out_tweedie(self, c):
+        # Tweedie distribution in (mean, p, sigma^2) form. The variance
+        # function is sigma^2 * mean^p; phi = sigma^2 in Jorgenson p. 127
+        # notation. The Tweedie -> compound-Poisson(gamma) reparameterization
+        # is delegated to ``tweedie_convert`` (imported lazily because this
+        # module is also runnable as ``python -m`` for grammar printing).
         from .utilities import tweedie_convert
-        mu = p[3]
-        pp = p[4]
-        sig2 = p[5]
+
+        _, name, _tw, mu, pp, sig2, note = c
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
-        alpha = ans['α']
-        lam = ans['λ']
-        beta = ans['β']
-        # originally
-        # alpha = (2 - pp) / (pp - 1)
-        # lam = mu ** (2 - pp) / ((2 - pp) * sig2)
-        # beta = lam * alpha / mu
+        alpha = ans["α"]
+        lam = ans["λ"]
+        beta = ans["β"]
+        spec = {
+            "name": name,
+            "exp_en": lam,
+            "freq_name": "poisson",
+            "sev_name": "gamma",
+            "sev_a": alpha,
+            "sev_scale": beta,
+            "note": (
+                f"Tw(p={pp}, μ={mu}, σ^2={sig2}) --> "
+                f"CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), scale={beta:.8g}"
+            ),
+        }
+        return ("agg", name, spec)
 
-        dout = {'name': p.name, 'exp_en': lam, 'freq_name': 'poisson',
-                'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': beta,
-                'note': f'Tw(p={pp}, μ={mu}, σ^2={sig2}) --> CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), '
-                        f'scale={beta:.8g}'}
-        # self.out_dict[('agg', p.name)] = dout
-        return 'agg', p.name, dout
+    def agg_out_rename(self, c):
+        _, name, bagg, occ_reins, agg_reins, note = c
+        if "name" in bagg:
+            del bagg["name"]
+        spec = {"name": name, **bagg, **occ_reins, **agg_reins, "note": note}
+        return ("agg", name, spec)
 
-    @_('AGG name builtin_agg occ_reins agg_reins note')
-    def agg_out(self, p):
-        # for use when you change the agg and/or  want a new name
-        self.logger(
-            f'agg_out <-- AGG name builtin_aggregate note', p)
-        # rename; NOTE!! the code below will overwrite the new name!
-        del p.builtin_agg['name']
-        return 'agg', p.name, {'name': p.name, **p.builtin_agg, **p.occ_reins, **p.agg_reins, 'note': p.note}
+    def agg_out_builtin(self, c):
+        bagg, agg_reins, note = c
+        return ("agg", bagg["name"], {**bagg, **agg_reins, "note": note})
 
-    @_('builtin_agg agg_reins note')
-    def agg_out(self, p):
-        # no change to the builtin agg, allows agg.A as a legitimate agg (called A)
-        self.logger(
-            f'agg_out <-- builtin_agg agg_reins note', p)
-        # print(p.builtin_agg)
-        # self.out_dict[("agg", p.builtin_agg['name'])] =
-        return 'agg', p.builtin_agg['name'], {**p.builtin_agg, **p.agg_reins, 'note': p.note}
+    # ----- severity output ------------------------------------------
+    def sev_out_sev(self, c):
+        _, name, sev, note = c
+        sev["name"] = name
+        sev["note"] = note
+        return ("sev", name, sev)
 
-    # building severities ======================================
-    # difference from sev_clause (below) is sev_out has a name
-    @_('SEV name sev note')
-    def sev_out(self, p):
-        self.logger(
-            f'sev_out <-- sev name sev note ', p)
-        p.sev['name'] = p.name
-        p.sev['note'] = p.note
-        # self.out_dict[("sev", p.name)] = p.sev
-        return 'sev', p.name, p.sev
+    def sev_out_dsev(self, c):
+        _, name, dsev, note = c
+        dsev["name"] = name
+        dsev["note"] = note
+        return ("sev", name, dsev)
 
-    @_('SEV name dsev note')
-    def sev_out(self, p):
-        self.logger(
-            f'sev_out <-- sev name dsev note ', p)
-        p.dsev['name'] = p.name
-        p.dsev['note'] = p.note
-        # self.out_dict[("sev", p.name)] = p.dsev
-        return 'sev', p.name, p.dsev
+    # ----- frequency -------------------------------------------------
+    def freq_zm(self, c):
+        freq, _zm, expr = c
+        freq["freq_zm"] = True
+        freq["freq_p0"] = expr
+        return freq
 
-    # frequency term ===========================================
-    # for all frequency distributions claim count is determined by exposure / severity
-    # EXCEPT for dfreq (and old EMPIRICAL) where it is entered
-    # only freq shape parameters need be entered at the end
-    # one and two parameter mixing distributions
+    def freq_zt(self, c):
+        freq, _zt = c
+        freq["freq_zm"] = True
+        freq["freq_p0"] = 0.0
+        return freq
 
-    @_('freq ZM expr')
-    def freq(self, p):
-        self.logger('freq <-- freq ZM expr', p)
-        f = p.freq
-        f['freq_zm'] = True
-        f['freq_p0'] = p.expr
-        return f
+    def freq_mixed_two(self, c):
+        _mixed, id_, a, b = c
+        return {"freq_name": id_, "freq_a": a, "freq_b": b}
 
-    @_('freq ZT')
-    def freq(self, p):
-        self.logger('freq <-- freq ZT', p)
-        f = p.freq
-        f['freq_zm'] = True
-        f['freq_p0'] = 0.0
-        return f
+    def freq_mixed_one(self, c):
+        _mixed, id_, a = c
+        return {"freq_name": id_, "freq_a": a}
 
-    @_('MIXED ID expr expr')
-    def freq(self, p):
-        self.logger(
-            f'freq <-- MIXED ID {p.ID} expr expr', p)
-        return {'freq_name': p.ID, 'freq_a': p[2], 'freq_b': p[3]}
+    def freq_two(self, c):
+        freq, a, b = c
+        if freq != "pascal":
+            logger.warning(f"Illogical choice of frequency {freq}, expected pascal")
+        return {"freq_name": freq, "freq_a": a, "freq_b": b}
 
-    @_('MIXED ID expr')
-    def freq(self, p):
-        self.logger(
-            f'freq <-- MIXED ID {p.ID} expr', p)
-        return {'freq_name': p.ID, 'freq_a': p.expr}
-
-    @_('FREQ expr expr')
-    def freq(self, p):
-        self.logger(
-            f'freq <-- FREQ {p.FREQ} expr expr', p)
-        if p.FREQ != 'pascal':
+    def freq_one(self, c):
+        freq, a = c
+        if freq not in ["binomial", "neyman", "neymana", "neymanA", "negbin"]:
             logger.warning(
-                f'Illogical choice of frequency {p.FREQ}, expected pascal')
-        return {'freq_name': p.FREQ, 'freq_a': p[1], 'freq_b': p[2]}
+                f"Illogical choice of frequency {freq}, expected binomial or neyman A"
+            )
+        return {"freq_name": freq, "freq_a": a}
 
-    # binomial p
-    @_('FREQ expr')
-    def freq(self, p):
-        self.logger(
-            f'freq <-- FREQ expr {p.FREQ}', p)
-        # one parameter distributions
-        if p.FREQ not in ['binomial', 'neyman', 'neymana', 'neymanA', 'negbin']:
-            logger.warning(
-                f'Illogical choice of frequency {p.FREQ}, expected binomial or neyman A')
-        return {'freq_name': p.FREQ, 'freq_a': p.expr}
-
-    @_('FREQ')
-    def freq(self, p):
-        self.logger(
-            f'freq <-- FREQ {p.FREQ} (zero param distributions)', p)
-        # zero parameter distributions
-        if p.FREQ not in ('poisson', 'bernoulli', 'fixed', 'geometric', 'logarithmic'):
+    def freq_zero(self, c):
+        freq = c[0]
+        if freq not in ("poisson", "bernoulli", "fixed", "geometric", "logarithmic"):
             logger.error(
-                f'Illogical choice for FREQ {p.FREQ}, should be poisson, bernoulli, geometric, logarithmic or fixed.')
-        return {'freq_name': p.FREQ}
+                f"Illogical choice for FREQ {freq}, should be poisson, bernoulli, "
+                "geometric, logarithmic or fixed."
+            )
+        return {"freq_name": freq}
 
-    # agg reins clause ========================================
-    @_('AGGREGATE NET OF reins_list')
-    def agg_reins(self, p):
-        self.logger(f'agg_reins <-- AGGREGATE NET OF reins_list', p)
-        return {'agg_reins': p.reins_list, 'agg_kind': 'net of'}
+    # ----- reinsurance ----------------------------------------------
+    def agg_reins_net(self, c):
+        return {"agg_reins": c[3], "agg_kind": "net of"}
 
-    @_('AGGREGATE CEDED TO reins_list')
-    def agg_reins(self, p):
-        self.logger(f'agg_reins <--  AGGREGATE CEDED TO reins_list', p)
-        return {'agg_reins': p.reins_list, 'agg_kind': 'ceded to'}
+    def agg_reins_ceded(self, c):
+        return {"agg_reins": c[3], "agg_kind": "ceded to"}
 
-    @_(" %prec LOW")
-    def agg_reins(self, p):
-        self.logger('agg_reins <-- missing agg reins', p)
+    def agg_reins_none(self, c):
         return {}
 
-    # occ reins clause ========================================
-    @_('OCCURRENCE NET OF reins_list')
-    def occ_reins(self, p):
-        self.logger(f'occ_reins <-- OCCURRENCE NET OF reins_list', p)
-        return {'occ_reins': p.reins_list, 'occ_kind': 'net of'}
+    def occ_reins_net(self, c):
+        return {"occ_reins": c[3], "occ_kind": "net of"}
 
-    @_('OCCURRENCE CEDED TO reins_list')
-    def occ_reins(self, p):
-        self.logger(f'occ_reins <-- OCCURRENCE CEDED TO reins_list', p)
-        return {'occ_reins': p.reins_list, 'occ_kind': 'ceded to'}
+    def occ_reins_ceded(self, c):
+        return {"occ_reins": c[3], "occ_kind": "ceded to"}
 
-    @_("")
-    def occ_reins(self, p):
-        self.logger('occ_reins <-- missing occ reins', p)
+    def occ_reins_none(self, c):
         return {}
 
-    # reinsurance clauses  ====================================
-    @_('reins_list AND reins_clause')
-    def reins_list(self, p):
-        self.logger(f'reins_list <-- reins_list AND reins_clause', p)
-        p.reins_list.append(p.reins_clause)
-        return p.reins_list
+    def reins_list_cons(self, c):
+        lst, _and, clause = c
+        lst.append(clause)
+        return lst
 
-    @_('reins_clause')
-    def reins_list(self, p):
-        self.logger(f'reins_list <-- reins_clause becomes reins_list', p)
-        return [p.reins_clause]
+    def reins_list_one(self, c):
+        return [c[0]]
 
-    @_('tower')
-    def reins_list(self, p):
-        # would be dumb if it only contained one layer
-        self.logger(
-            f'reins_clause <-- tower', p)
-        limit = p.tower[0]
-        attach = p.tower[1]
+    def reins_list_tower(self, c):
+        tower = c[0]
+        limit, attach = tower[0], tower[1]
         return [(1.0, l, a) for l, a in zip(limit, attach)]
 
-    @_('expr XS expr')
-    def reins_clause(self, p):
-        self.logger(
-            f'reins_clause <-- expr XS expr {p[0]} xs {p[2]}', p)
-        return (1.0, p[0], p[2])
+    def reins_clause_xs(self, c):
+        limit, _xs, attach = c
+        return (1.0, limit, attach)
 
-    @_('expr SHARE_OF expr XS expr')
-    def reins_clause(self, p):
-        self.logger(
-            f'reins_clause <-- expr SHARE_OF expr XS expr {p[0]} s/o {p[2]} xs {p[4]}', p)
-        # here expr is the proportion...always store as a proportion
-        return (p[0], p[2], p[4])
+    def reins_clause_share(self, c):
+        share, _so, limit, _xs, attach = c
+        return (share, limit, attach)
 
-    @_('expr PART_OF expr XS expr')
-    def reins_clause(self, p):
-        self.logger(
-            f'reins_clause <-- expr PART_OF expr XS expr {p[0]} p/o {p[2]} xs {p[4]}', p)
-        # here expr is the currency amount of cover
-        if p[0] / p[2] < 0.05:
+    def reins_clause_part(self, c):
+        amount, _po, limit, _xs, attach = c
+        if amount / limit < 0.05:
             logger.warning(
-                f'Part of clause with proportion {p[0] / p[2]} is suspiciously small. '
-                'Did you mean share of?')
-        return (p[0] / p[2], p[2], p[4])
+                f"Part of clause with proportion {amount / limit} is "
+                "suspiciously small. Did you mean share of?"
+            )
+        return (amount / limit, limit, attach)
 
-    # severity term ============================================
-    #  %prec LOW removed
-    @_('SEV sev')
-    def sev_clause(self, p):
-        return p.sev
+    # ----- severity (continuous) ------------------------------------
+    def sev_clause_sev(self, c):
+        _sev, sev = c
+        return sev
 
-    @_('dsev')
-    def sev_clause(self, p):
-        return p.dsev
+    def sev_clause_dsev(self, c):
+        return c[0]
 
-    @_('BUILTIN_SEV')
-    def sev_clause(self, p):
-        # when the builtin does not need adjusting
-        self.logger(f'sev_clause <-- BUILTIN_SEV ({p.BUILTIN_SEV})', p)
-        built_in_dict = self.safe_lookup(p.BUILTIN_SEV)
-        if 'name' in built_in_dict:
-            del built_in_dict['name']
-        return built_in_dict
+    def sev_clause_builtin(self, c):
+        b = self.safe_lookup(c[0])
+        if "name" in b:
+            del b["name"]
+        return b
 
-    @_('sev picks')
-    def sev(self, p):
-        self.logger(f'sev <-- sev picks', p)
-        return {**p.sev, **p.picks}
+    def sev_unconditional(self, c):
+        sev = c[0]
+        sev["sev_conditional"] = False
+        return sev
 
-    @_('dsev "!"')
-    def dsev(self, p):
-        self.logger(f'dsev <-- unconditional (conditional=False) flag set', p)
-        p.dsev['sev_conditional'] = False
-        return p.dsev
+    def sev_picks(self, c):
+        sev, picks = c
+        return {**sev, **picks}
 
-    @_('sev "!"')
-    def sev(self, p):
-        self.logger(f'sev <-- unconditional (conditional=False) flag set', p)
-        p.sev['sev_conditional'] = False
-        return p.sev
+    def sev_weighted(self, c):
+        sev2, weights, splice = c
+        sev2["sev_wt"] = weights
+        sev2["sev_lb"] = splice["sev_lb"]
+        sev2["sev_ub"] = splice["sev_ub"]
+        return sev2
 
-    @_('sev2 weights splice')
-    def sev(self, p):
-        self.logger(
-            f'sev <-- sev1 weights splice', p)
-        p.sev2['sev_wt'] = p.weights
-        p.sev2['sev_lb'] = p.splice['sev_lb']
-        p.sev2['sev_ub'] = p.splice['sev_ub']
-        return p.sev2
+    def sev_builtin(self, c):
+        b = self.safe_lookup(c[0])
+        if "name" in b:
+            del b["name"]
+        return b
 
-    @_('sev1 PLUS numbers', 'sev1 MINUS numbers')
-    def sev2(self, p):
-        self.logger(f'sev2 <-- sev1 {p[1]} numbers', p)
-        p.sev1['sev_loc'] = UnderwritingParser._check_vectorizable(
-            p.sev1.get('sev_loc', 0))
-        sign = 1 if p[1] == '+' else -1
-        p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
-        p.sev1['sev_loc'] += sign * p_numbers
-        return p.sev1
+    def sev2_add(self, c):
+        sev1, _plus, numbers = c
+        sev1["sev_loc"] = _check_vectorizable(sev1.get("sev_loc", 0))
+        sev1["sev_loc"] += _check_vectorizable(numbers)
+        return sev1
 
-    @_('sev1')
-    def sev2(self, p):
-        self.logger(f'sev2 <-- sev1', p)
-        return p.sev1
+    def sev2_sub(self, c):
+        sev1, _minus, numbers = c
+        sev1["sev_loc"] = _check_vectorizable(sev1.get("sev_loc", 0))
+        sev1["sev_loc"] -= _check_vectorizable(numbers)
+        return sev1
 
-    @_('numbers TIMES sev0')
-    def sev1(self, p):
-        self.logger(f'sev1 <-- numbers TIMES sev0', p)
-        p_numbers = UnderwritingParser._check_vectorizable(p.numbers)
-        if 'sev_mean' in p.sev0:
-            p.sev0['sev_mean'] = UnderwritingParser._check_vectorizable(
-                p.sev0.get('sev_mean', 0))
-            p.sev0['sev_mean'] *= p_numbers
-        # only scale if there is a scale (otherwise you double count)
-        if 'sev_scale' in p.sev0:
-            p.sev0['sev_scale'] = UnderwritingParser._check_vectorizable(
-                p.sev0.get('sev_scale', 0))
-            p.sev0['sev_scale'] *= p_numbers
-        if 'sev_mean' not in p.sev0:
-            # e.g. Pareto has no mean and it is important to set the scale
-            # but if there is a mean it handles the scaling and setting scale will
-            # confuse the distribution maker
-            p.sev0['sev_scale'] = p_numbers
-        # if there is a location it needs to scale too --- that's a curious choice!
-        if 'sev_loc' in p.sev0:
-            p.sev0['sev_loc'] = UnderwritingParser._check_vectorizable(
-                p.sev0['sev_loc'])
-            p.sev0['sev_loc'] *= p_numbers
-        # logger.error(str(p.sev0))
-        return p.sev0
+    def sev2_passthrough(self, c):
+        return c[0]
 
-    @_('sev0')
-    def sev1(self, p):
-        self.logger(f'sev1 <-- sev0', p)
-        return p.sev0
+    def sev1_scaled(self, c):
+        numbers, _times, sev0 = c
+        p_numbers = _check_vectorizable(numbers)
+        if "sev_mean" in sev0:
+            sev0["sev_mean"] = _check_vectorizable(sev0.get("sev_mean", 0)) * p_numbers
+        if "sev_scale" in sev0:
+            sev0["sev_scale"] = (
+                _check_vectorizable(sev0.get("sev_scale", 0)) * p_numbers
+            )
+        if "sev_mean" not in sev0:
+            # Distributions without an analytic mean (e.g. Pareto) get a scale
+            # rather than a scaled mean; setting both would double-count.
+            sev0["sev_scale"] = p_numbers
+        if "sev_loc" in sev0:
+            sev0["sev_loc"] = _check_vectorizable(sev0["sev_loc"]) * p_numbers
+        return sev0
 
-    @_('ids numbers CV numbers')
-    def sev0(self, p):
-        self.logger(
-            f'sev0 <-- ids numbers CV numbers', p)
-        return {'sev_name': p.ids, 'sev_mean': p[1], 'sev_cv': p[3], 'sev_scale': 1.0}
+    def sev1_passthrough(self, c):
+        return c[0]
 
-    @_('ids numbers numbers')
-    def sev0(self, p):
-        self.logger(
-            f'sev0 <-- ids numbers numbers', p)
-        # two parameters for shape...must specify scale somehow. put in default scale as 1
-        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_b': p[2], 'sev_scale': 1.0}
+    def sev0_mean_cv(self, c):
+        ids, mean, _cv, cv = c
+        return {"sev_name": ids, "sev_mean": mean, "sev_cv": cv, "sev_scale": 1.0}
 
-    @_('ids numbers')
-    def sev0(self, p):
-        self.logger(
-            f'sev0 <-- ids numbers', p)
-        return {'sev_name': p.ids, 'sev_a': p[1], 'sev_scale': 1.0}
+    def sev0_two_params(self, c):
+        ids, a, b = c
+        return {"sev_name": ids, "sev_a": a, "sev_b": b, "sev_scale": 1.0}
 
-    # no weights with xps terms
-    @_('ids xps')
-    def sev0(self, p):
-        self.logger(f'sev0 <-- ids xps (ids should be (c|d)histogram) or zero param (xps is none)', p)
-        return {'sev_name': p.ids, **p.xps}
+    def sev0_one_param(self, c):
+        ids, a = c
+        return {"sev_name": ids, "sev_a": a, "sev_scale": 1.0}
 
-    @_('ids')
-    def sev0(self, p):
-        # for norm expon uniform levy, zero parameter severities
-        # need to make sure there is a scale
-        self.logger(
-            f'sev0 <-- ids, zero parameter severity {p.ids}', p)
-        return {'sev_name': p.ids, 'sev_scale': 1.0}
+    def sev0_xps(self, c):
+        ids, xps = c
+        return {"sev_name": ids, **xps}
 
-    @_('XPS doutcomes dprobs')
-    def xps(self, p):
-        self.logger('xps <-- XPS doutcomes dprobs', p)
-        if len(p.dprobs) == 0:
-            ps = np.ones_like(p.doutcomes) / len(p.doutcomes)
-        else:
-            ps = p.dprobs
-        return {'sev_xs': p.doutcomes, 'sev_ps': ps}
+    def sev0_zero_params(self, c):
+        ids = c[0]
+        return {"sev_name": ids, "sev_scale": 1.0}
 
-    @_('DSEV doutcomes dprobs')
-    def dsev(self, p):
-        self.logger('dsev <-- DSEV doutcomes dprobs', p)
-        # need to check probs has been populated
-        if len(p.dprobs) == 0:
-            ps = np.ones_like(p.doutcomes) / len(p.doutcomes)
-        else:
-            ps = p.dprobs
-        return {'sev_name': 'dhistogram', 'sev_xs': p.doutcomes, 'sev_ps': ps}
+    def xps(self, c):
+        _xps, doutcomes, dprobs = c
+        ps = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        return {"sev_xs": doutcomes, "sev_ps": ps}
 
-    @_('DFREQ doutcomes dprobs')
-    def dfreq(self, p):
-        self.logger('dfreq <-- DFREQ doutcomes dprobs', p)
-        # need to check probs has been populated
-        if len(p.dprobs) == 0:
-            b = np.ones_like(p.doutcomes) / len(p.doutcomes)
-        else:
-            b = p.dprobs
-        return {'freq_name': 'empirical', 'freq_a': p.doutcomes, 'freq_b': b, 'exp_en': -1}
+    def dsev_main(self, c):
+        _dsev, doutcomes, dprobs = c
+        ps = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        return {"sev_name": "dhistogram", "sev_xs": doutcomes, "sev_ps": ps}
 
-    @_('PICKS "[" numberl "]" "[" numberl "]"')
-    def picks(self, p):
-        self.logger('picks <-- PICKS "[" numberl "]" "[" numberl "]"', p)
+    def dsev_unconditional(self, c):
+        dsev = c[0]
+        dsev["sev_conditional"] = False
+        return dsev
 
-        return {'sev_pick_attachments': p[2], 'sev_pick_losses': p[5]}
+    def dfreq(self, c):
+        _dfreq, doutcomes, dprobs = c
+        b = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        return {
+            "freq_name": "empirical",
+            "freq_a": doutcomes,
+            "freq_b": b,
+            "exp_en": -1,
+        }
 
-    # never valid for this to be a single number not in [], using this
-    # format rather than numbers enforces an actual list
-    @_('"[" numberl "]"')
-    def doutcomes(self, p):
-        self.logger('doutcomes <-- [numberl] (must be a list)', p)
-        a = self._check_vectorizable(p.numberl)
-        return a
+    def picks(self, c):
+        _picks, attachments, losses = c
+        return {"sev_pick_attachments": attachments, "sev_pick_losses": losses}
 
-    @_('"[" expr RANGE expr "]"')
-    def doutcomes(self, p):
-        self.logger('doutcomes <-- [expr : expr]', p)
-        return np.arange(p[1], p[3] + 1)
+    def doutcomes_list(self, c):
+        return _check_vectorizable(c[0])
 
-    @_('"[" expr RANGE expr RANGE expr "]"')
-    def doutcomes(self, p):
-        self.logger('doutcomes <-- [expr : expr : expr]', p)
-        return np.arange(p[1], p[3] + 0.5 * p[5], p[5])
+    def doutcomes_range(self, c):
+        start, _, end = c
+        return np.arange(start, end + 1)
 
-    # see note above doutcomes
-    @_('"[" numberl "]"')
-    def dprobs(self, p):
-        self.logger('dprobs <-- [numberl] (must be a list)', p)
-        a = self._check_vectorizable(p.numberl)
-        return a
+    def doutcomes_range_step(self, c):
+        start, _, end, _2, step = c
+        return np.arange(start, end + 0.5 * step, step)
 
-    @_('')
-    def dprobs(self, p):
-        self.logger('dprobs <-- missing dprobs term', p)
+    def dprobs_list(self, c):
+        return _check_vectorizable(c[0])
+
+    def dprobs_none(self, c):
         return []
 
-    @_('WEIGHTS EQUAL_WEIGHT expr')
-    def weights(self, p):
-        self.logger(
-            f'weights <-- WEIGHTS EQUAL_WEIGHTS expr ', p)
-        return np.ones(int(p.expr)) / p.expr
+    def weights_equal(self, c):
+        _wts, _eq, expr = c
+        return np.ones(int(expr)) / expr
 
-    # force weights to be a vector
-    @_('WEIGHTS "[" numberl "]"')
-    def weights(self, p):
-        self.logger(f'weights <-- WEIGHTS [numberl]', p)
-        return p.numberl
+    def weights_list(self, c):
+        _wts, numberl = c
+        return numberl
 
-    @_('')
-    def weights(self, p):
-        self.logger('weights <-- missing weights term', p)
-        return 1.
+    def weights_none(self, c):
+        return 1.0
 
-    @_('SPLICE "[" numberl "]" "[" numberl "]"')
-    def splice(self, p):
-        self.logger(f'splice <-- SPLICE [numberl] [numberl]', p)
-        # explicitly enter lower and upper bounds for each splice
-        # neded for mixed EM / Pareto example in Albrecher
-        return {'sev_lb': p[2], 'sev_ub': p[5]}
+    def splice_two(self, c):
+        _, lb, ub = c
+        return {"sev_lb": lb, "sev_ub": ub}
 
-    @_('SPLICE "[" numberl "]"')
-    def splice(self, p):
-        self.logger(f'splice <-- SPLICE [numberl]', p)
-        return {'sev_lb': p.numberl[:-1], 'sev_ub': p.numberl[1:]}
+    def splice_one(self, c):
+        _, numberl = c
+        return {"sev_lb": numberl[:-1], "sev_ub": numberl[1:]}
 
-    @_('')
-    def splice(self, p):
-        self.logger('splice <-- missing splice term', p)
-        # not sure best return value; weights returns 1
-        # return {'sev_lb': [0], 'sev_ub': [np.inf]}
-        return {'sev_lb': 0., 'sev_ub': np.inf}
+    def splice_none(self, c):
+        return {"sev_lb": 0.0, "sev_ub": np.inf}
 
-    # layer terms, optional ====================================
-    @_('numbers XS numbers')
-    def layers(self, p):
-        self.logger(
-            f'layers <-- numbers XS numbers', p)
-        return {'exp_attachment': p[2], 'exp_limit': p[0]}
+    # ----- layers ----------------------------------------------------
+    def layers_xs(self, c):
+        limit, _xs, attach = c
+        return {"exp_attachment": attach, "exp_limit": limit}
 
-    @_('tower')
-    def layers(self, p):
-        self.logger(
-            f'layers <-- tower', p)
-        return {'exp_attachment': p.tower[1], 'exp_limit': p.tower[0]}
+    def layers_tower(self, c):
+        tower = c[0]
+        return {"exp_attachment": tower[1], "exp_limit": tower[0]}
 
-    @_('')
-    def layers(self, p):
-        self.logger('layers <-- missing layer term', p)
+    def layers_none(self, c):
         return {}
 
-    @_('TOWER doutcomes')
-    def tower(self, p):
-        # doutcomes allows a list, range, or range with step
-        self.logger(f'tower <-- tower doutcomes', p)
-        breaks = p.doutcomes
-        # do not want this. it means net == 0 and ceded== gross in total which
-        # is rarely what you want. User can put in themselves.
-        # if breaks[0] != 0:
-        #     breaks = np.hstack((0., breaks))
-        # if not np.isinf(breaks[-1]):
-        #     breaks = np.hstack((breaks, np.inf))
+    def tower(self, c):
+        _tower, doutcomes = c
+        breaks = doutcomes
         limits = np.diff(breaks)
         attach = breaks[:-1]
-        # logger.info('\n'.join([f'{x} xs {y}' for x, y in zip(limits, attach)]))
         return [limits, attach]
 
-    # optional note  ===========================================
-    @_('NOTE')
-    def note(self, p):
-        self.logger(f'note <-- NOTE', p)
-        return p.NOTE[5:-1]
+    # ----- note ------------------------------------------------------
+    def note_some(self, c):
+        return c[0]
 
-    @_(" %prec LOW")
-    def note(self, p):
-        self.logger("note <-- missing note term", p)
-        return ''
+    def note_none(self, c):
+        return ""
 
-    # exposures ================================================
-    @_('numbers CLAIMS')
-    def exposures(self, p):
-        self.logger(f'exposures <-- numbers CLAIMS', p)
-        return {'exp_en': p.numbers}
+    # ----- exposures -------------------------------------------------
+    def exposures_claims(self, c):
+        numbers, _claims = c
+        return {"exp_en": numbers}
 
-    @_('numbers LOSS')
-    def exposures(self, p):
-        self.logger(f'exposures <-- numbers LOSS', p)
-        return {'exp_el': p.numbers}
+    def exposures_loss(self, c):
+        numbers, _loss = c
+        return {"exp_el": numbers}
 
-    @_('numbers PREMIUM AT numbers LR')
-    def exposures(self, p):
-        self.logger(
-            f'exposures <-- numbers PREMIUM AT numbers LR', p)
-        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
+    def exposures_premium_lr(self, c):
+        prem, _premium, _at, lr, _lr = c
+        return {
+            "exp_premium": prem,
+            "exp_lr": lr,
+            "exp_el": np.array(prem) * np.array(lr),
+        }
 
-    @_('numbers EXPOSURE AT numbers RATE')
-    def exposures(self, p):
-        self.logger(f'exposures <-- numbers EXPOSURE AT numbers RATE', p)
-        return {'exp_premium': p[0], 'exp_lr': p[3], 'exp_el': np.array(p[0]) * np.array(p[3])}
+    def exposures_exposure_rate(self, c):
+        exp_, _exposure, _at, rate, _rate = c
+        return {
+            "exp_premium": exp_,
+            "exp_lr": rate,
+            "exp_el": np.array(exp_) * np.array(rate),
+        }
 
-    # ID =======================================================
-    @_('"[" idl "]"')
-    def ids(self, p):
-        self.logger(f'ids <-- [idl]', p)
-        return p.idl
+    # ----- ids -------------------------------------------------------
+    def ids_list(self, c):
+        return c[0]
 
-    @_('idl ID')
-    def idl(self, p):
-        self.logger(f'idl <-- idl ID ({p.ID})', p)
-        p.idl.append(p.ID)
-        return p.idl
+    def ids_single(self, c):
+        return c[0]
 
-    @_('ID')
-    def idl(self, p):
-        self.logger(f'idl <-- ID ({p.ID})', p)
-        ans = [p.ID]
-        self.logger(f'idl <-- ID', p)
-        return ans
+    def idl_cons(self, c):
+        lst, id_ = c
+        lst.append(id_)
+        return lst
 
-    @_('ID')
-    def ids(self, p):
-        self.logger(f'ids <-- ID ({p.ID})', p)
-        return p.ID
+    def idl_one(self, c):
+        return [c[0]]
 
-    # elements made from named portfolios ========================
-    @_('expr INHOMOG_MULTIPLY builtin_agg')
-    def builtin_agg(self, p):
-        """  inhomogeneous change of scale """
-        self.logger(
-            f'builtin_agg <-- expr INHOMOG_MULTIPLY builtin_agg', p)
-        bid = p.builtin_agg.copy()
-        bid['name'] += '_i_scaled'
-
-        bid['exp_en'] = self._check_vectorizable(bid.get('exp_en', 0)) * p.expr
-        bid['exp_el'] = self._check_vectorizable(bid.get('exp_el', 0)) * p.expr
-        bid['exp_premium'] = self._check_vectorizable(bid.get('exp_premium', 0)) * p.expr
+    # ----- builtin aggregate scaling --------------------------------
+    def builtin_agg_inhomog(self, c):
+        expr, _at, bagg = c
+        bid = bagg.copy()
+        bid["name"] += "_i_scaled"
+        bid["exp_en"] = _check_vectorizable(bid.get("exp_en", 0)) * expr
+        bid["exp_el"] = _check_vectorizable(bid.get("exp_el", 0)) * expr
+        bid["exp_premium"] = _check_vectorizable(bid.get("exp_premium", 0)) * expr
         return bid
 
-    @_('expr TIMES builtin_agg')
-    def builtin_agg(self, p):
-        """homogeneous change of scale """
-        self.logger('builtin_agg <-- expr TIMES builtin_agg', p)
-        # bid = built_in_dict, want to be careful not to add scale too much
-        bid = p.builtin_agg
-        bid['name'] += '_homog_scaled'
-        if 'sev_mean' in bid:
-            bid['sev_mean'] = self._check_vectorizable(bid['sev_mean']) * p.expr
-        if 'sev_scale' in bid:
-            bid['sev_scale'] = self._check_vectorizable(bid['sev_scale']) * p.expr
-        if 'sev_loc' in bid:
-            bid['sev_loc'] = self._check_vectorizable(bid['sev_loc']) * p.expr
-        bid['exp_attachment'] = self._check_vectorizable(bid.get('exp_attachment', 0)) * p.expr
-        bid['exp_limit'] = self._check_vectorizable(bid.get('exp_limit', np.inf)) * p.expr
-        bid['exp_el'] = self._check_vectorizable(bid.get('exp_el', 0)) * p.expr
-        bid['exp_premium'] = self._check_vectorizable(bid.get('exp_premium', 0)) * p.expr
+    def builtin_agg_homog(self, c):
+        expr, _times, bagg = c
+        bid = bagg
+        bid["name"] += "_homog_scaled"
+        if "sev_mean" in bid:
+            bid["sev_mean"] = _check_vectorizable(bid["sev_mean"]) * expr
+        if "sev_scale" in bid:
+            bid["sev_scale"] = _check_vectorizable(bid["sev_scale"]) * expr
+        if "sev_loc" in bid:
+            bid["sev_loc"] = _check_vectorizable(bid["sev_loc"]) * expr
+        bid["exp_attachment"] = _check_vectorizable(bid.get("exp_attachment", 0)) * expr
+        bid["exp_limit"] = _check_vectorizable(bid.get("exp_limit", np.inf)) * expr
+        bid["exp_el"] = _check_vectorizable(bid.get("exp_el", 0)) * expr
+        bid["exp_premium"] = _check_vectorizable(bid.get("exp_premium", 0)) * expr
         return bid
 
-    @_('builtin_agg PLUS expr', 'builtin_agg MINUS expr')
-    def builtin_agg(self, p):
+    def builtin_agg_plus(self, c):
+        bagg, _plus, expr = c
+        bid = bagg
+        bid["name"] += "_shifted"
+        if "sev_loc" in bid:
+            bid["sev_loc"] += expr
+        else:
+            bid["sev_loc"] = expr
+        return bid
+
+    def builtin_agg_minus(self, c):
+        bagg, _minus, expr = c
+        bid = bagg
+        bid["name"] += "_shifted"
+        if "sev_loc" in bid:
+            bid["sev_loc"] -= expr
+        else:
+            bid["sev_loc"] = -expr
+        return bid
+
+    def builtin_agg_lookup(self, c):
+        return self.safe_lookup(c[0])
+
+    # ----- name ------------------------------------------------------
+    def name(self, c):
+        return c[0]
+
+    # ----- numbers (vectors and scalars) -----------------------------
+    def numbers_list(self, c):
+        return c[0]
+
+    def numbers_range(self, c):
+        start, _, end = c
+        return np.arange(start, end + 1)
+
+    def numbers_range_step(self, c):
+        start, _, end, _2, step = c
+        return np.arange(start, end + 1, step)
+
+    def numbers_scalar(self, c):
+        return c[0]
+
+    def numberl_cons(self, c):
+        lst, expr = c
+        lst.append(expr)
+        return lst
+
+    def numberl_one(self, c):
+        return [c[0]]
+
+    # ----- expressions (DecL math sub-language) ----------------------
+    # ?expr / ?term / ?factor are inlined in the grammar — the
+    # transformer only sees the aliased nodes below.
+
+    def atom_divide(self, c):
+        a, _, b = c
+        return a / b
+
+    def atom_parens(self, c):
+        return c[0]
+
+    def atom_exp(self, c):
+        _, x = c
+        return np.exp(x)
+
+    def atom_exponent(self, c):
+        a, _, b = c
+        return a ** b
+
+    def atom_number(self, c):
+        return c[0]
+
+
+# ======================================================================
+# Module-level Lark instance (loaded once)
+# ======================================================================
+
+_PARSER = Lark.open(
+    str(GRAMMAR_FILE),
+    start="answer",
+    parser="earley",
+    lexer="dynamic",
+    maybe_placeholders=True,
+)
+
+
+# ======================================================================
+# Parser wrapper
+# ======================================================================
+
+
+class UnderwritingParser:
+    """DecL parser. Accepts either a raw line of source or the iterable
+    returned by ``UnderwritingLexer.tokenize`` (which carries the original
+    text), returning a ``(kind, name, spec)`` tuple where ``kind`` is one of
+    ``'agg'``, ``'sev'``, ``'port'``, ``'distortion'``, or ``'expr'``."""
+
+    def __init__(self, safe_lookup_function, debug: bool = False) -> None:
+        self.safe_lookup = safe_lookup_function
+        self.debug = debug
+
+    def parse(self, source) -> tuple[str, str, object]:
+        """Parse a single DecL statement.
+
+        Parameters
+        ----------
+        source : str or iterable
+            Either the source string directly, or a ``_TokenizedText``
+            instance (the return value of ``UnderwritingLexer.tokenize``).
+
+        Returns
+        -------
+        (kind, name, spec) : tuple
+            ``kind`` is one of ``'agg'``, ``'sev'``, ``'port'``,
+            ``'distortion'``, ``'expr'``; ``name`` is the object identifier;
+            ``spec`` is the dictionary specification used downstream to
+            construct the object.
+
+        Raises
+        ------
+        ValueError
+            On parse error. ``args[0]`` is a ``SimpleNamespace`` with
+            ``.type``, ``.value``, and ``.index`` attributes (matching the
+            historic SLY token shape) so callers can highlight the position
+            of the bad token.
         """
-        translation (shift, change location) by expr
-        :param p:
-        :return:
-        """
-        self.logger('builtin_agg <-- builtin_agg PLUS expr', p)
-        # bid = built_in_dict, want to be careful not to add scale too much
-        bid = p.builtin_agg
-        bid['name'] += '_shifted'
-        sign = 1 if p[1] == "+" else -1
-        # TODO make vector addable
-        if 'sev_loc' in bid:
-            bid['sev_loc'] += sign * p.expr
+        if isinstance(source, str):
+            text = source
         else:
-            bid['sev_loc'] = sign * p.expr
-        return bid
-
-    @_('BUILTIN_AGG')
-    def builtin_agg(self, p):
-        # ensure lookup only happens here
-        self.logger(f'builtin_agg <-- BUILTIN_AGG ({p.BUILTIN_AGG})', p)
-        built_in_dict = self.safe_lookup(p.BUILTIN_AGG)
-        return built_in_dict
-
-    @_('BUILTIN_SEV')
-    def sev(self, p):
-        # ensure lookup only happens here
-        # unlike aggs, will never just say sev.A
-        # usage: agg A 1 claim sev sev.B fixed; a little awkward but not used much
-        # leaving it here allos for subsequent scaling and translation
-        # if it is directly a sev_clause it cannot be adjusted
-        self.logger(f'sev <-- BUILTIN_SEV ({p.BUILTIN_SEV})', p)
-        built_in_dict = self.safe_lookup(p.BUILTIN_SEV)
-        if 'name' in built_in_dict:
-            del built_in_dict['name']
-        return built_in_dict
-
-    # ids =========================================================
-    @_('ID')
-    def name(self, p):
-        self.logger(f'name <-- ID = {p.ID}', p)
-        return p.ID
-
-    # vectors of numbers ==========================================
-    @_('"[" numberl "]"')
-    def numbers(self, p):
-        self.logger(f'numbers <-- [numberl]', p)
-        return p.numberl
-
-    # allow range notation in numbers
-    @_('"[" expr RANGE expr "]"')
-    def numbers(self, p):
-        self.logger('numbers <-- [expr : expr]', p)
-        return np.arange(p[1], p[3] + 1)
-
-    @_('"[" expr RANGE expr RANGE expr "]"')
-    def numbers(self, p):
-        self.logger('numbers <-- [expr : expr : expr]', p)
-        return np.arange(p[1], p[3] + 1, p[5])
-
-    @_('numberl expr')
-    def numberl(self, p):
-        self.logger(
-            f'numberl <-- numberl expr (adding {p.expr} to list {p.numberl})', p)
-        p.numberl.append(p.expr)
-        return p.numberl
-
-    @_('expr')
-    def numberl(self, p):
-        self.logger(f'numberl <-- expr', p)
-        ans = [p.expr]
-        return ans
-
-    @_('expr')
-    def numbers(self, p):
-        self.logger('numbers <-- expr', p)
-        return p.expr
-
-    # @_('term')
-    # def expr(self, p):
-    #     self.logger('expr <-- term', p)
-    #     return p.term
-    #
-    # @_('term DIVIDE factor')
-    # def term(self, p):
-    #     self.logger('term <-- term / factor', p)
-    #     return p.term / p.factor
-    #
-    # @_('factor')
-    # def term(self, p):
-    #     self.logger('term <-- factor', p)
-    #     return p.factor
-    #
-    # @_('"(" term ")"')
-    # def factor(self, p):
-    #     return p.term
-    #
-    # @_('EXP "(" term ")"')
-    # def factor(self, p):
-    #     return exp(p.term)
-    #
-    # @_('power')
-    # def factor(self, p):
-    #     self.logger('factor <-- power', p)
-    #     return p.power
-    #
-    # @_('factor EXPONENT factor')
-    # def power(self, p):
-    #     self.logger('power <-- factor EXPONENT factor', p)
-    #     return p[0] ** p[2]
-    #
-    # @_('atom')
-    # def power(self, p):
-    #     self.logger('power <-- atom', p)
-    #     return p.atom
-
-    @_('atom')
-    def expr(self, p):
-        self.logger('expr <-- atom', p)
-        return p.atom
-
-    @_('atom DIVIDE atom')
-    def atom(self, p):
-        self.logger('atom <-- atom / atom', p)
-        return p[0] / p[2]
-
-    @_('"(" atom ")"')
-    def atom(self, p):
-        self.logger('atom <-- (atom)', p)
-        return p.atom
-
-    @_('EXP atom')
-    def atom(self, p):
-        self.logger('atom <-- EXP atom', p)
-        return exp(p.atom)
-
-    @_('atom EXPONENT atom')
-    def atom(self, p):
-        self.logger('atom <-- atom EXPONENT atom', p)
-        return p[0] ** p[2]
-
-    @_('NUMBER')
-    def atom(self, p):
-        self.logger(f'atom <-- NUMBER, {p.NUMBER}', p)
-        if p.NUMBER.endswith('%'):
-            t = float(p.NUMBER[:-1]) / 100
-        elif p.NUMBER == "inf":
-            t = np.inf
-        elif p.NUMBER == "-inf":
-            t = -np.inf
-        else:
-            t = float(p.NUMBER)
-        return t
-
-    def error(self, p):
-        if p:
-            raise ValueError(p)
-        else:
-            raise ValueError('Unexpected end of file')
+            text = getattr(source, "text", None) or "".join(
+                str(t.value) for t in source
+            )
+        try:
+            tree = _PARSER.parse(text)
+        except UnexpectedToken as e:
+            tok = e.token
+            raise ValueError(
+                SimpleNamespace(
+                    type=getattr(tok, "type", "?"),
+                    value=str(tok),
+                    index=getattr(tok, "start_pos", 0) or 0,
+                )
+            ) from e
+        except UnexpectedCharacters as e:
+            pos = getattr(e, "pos_in_stream", None)
+            if pos is None:
+                pos = max(0, getattr(e, "column", 1) - 1)
+            raise ValueError(
+                SimpleNamespace(type="?", value=text[pos : pos + 1], index=pos)
+            ) from e
+        except UnexpectedInput as e:
+            raise ValueError(SimpleNamespace(type="?", value=str(e), index=0)) from e
+        return UnderwritingTransformer(self.safe_lookup, self.debug).transform(tree)
 
 
-def grammar(add_to_doc=False, save_to_fn=''):
+# ======================================================================
+# Documentation helper
+# ======================================================================
+
+
+def grammar(add_to_doc: bool = False, save_to_fn: str | Path = "") -> str:
+    """Return the DecL grammar (the contents of ``decl.lark``) as a string.
+
+    Parameters
+    ----------
+    add_to_doc : bool
+        If True, write the grammar to ``docs/4_agg_language_reference/
+        ref_include.rst`` wrapped in a Sphinx ``code-block:: lark`` directive
+        so it can be ``include``-d by the language reference.
+    save_to_fn : str or Path
+        Optional additional output path. If empty, defaults to
+        ``~/aggregate/parser/grammar.lark``.
+
+    Returns
+    -------
+    str
+        The full grammar source.
     """
-    Write the grammar at the top of the file as a docstring
+    text = GRAMMAR_FILE.read_text(encoding="utf-8")
 
-    To work with multi-rules enter them on one line, like so::
+    if add_to_doc:
+        out = (
+            Path(__file__).parent.parent
+            / "docs"
+            / "4_agg_language_reference"
+            / "ref_include.rst"
+        )
+        body = "\n".join("    " + ln for ln in text.splitlines())
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(f".. code-block:: lark\n\n{body}\n", encoding="utf-8")
 
-        @_('builtin_agg PLUS expr', 'builtin_agg MINUS expr')
+    target = Path(save_to_fn) if save_to_fn else Path.home() / "aggregate/parser/grammar.lark"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
 
-    :param add_to_doc: add the grammar to the docstring
-    :param save_to_fn: save the grammar to a file
-    """
-
-    pout = Path(__file__).parent / '../docs/4_agg_language_reference/ref_include.rst'
-
-    # get the grammar from the top of the file
-    txt = Path(__file__).read_text(encoding='utf-8')
-    stxt = txt.split('@_')
-    ans = {}
-    # 3:-3 get rid of junk at top and bottom (could change if file changes)
-    for it in stxt[3:-3]:
-        if it.find('# def') >= 0:
-            # skip rows with a comment between @_ and def
-            pass
-        else:
-            b = it.split('def')
-            b0 = b[0].strip()[2:-2]
-            # check if multirule
-            if ', ' in b0:
-                b0 = [i.replace("'", '') for i in b0.split(', ')]
-            else:
-                b0 = [b0]
-            try:
-                b1 = b[1].split("(self, p):")[0].strip()
-            except:
-                logger.error(f'Unexpected multirule behavior {it}')
-                exit()
-            if b1 in ans:
-                ans[b1] += b0
-            else:
-                ans[b1] = b0
-    s = ''
-    for k, v in ans.items():
-        s += f'{k:<20s}\t::= {v[0]:<s}\n'
-        for rhs in v[1:]:
-            s += f'{" "*20}\t | {rhs:<s}\n'
-        s += '\n'
-
-    # finally add the language words
-    # this is a bit manual, but these shouldnt change much...
-    # lang_words = '\n\nlanguage words go here\n\n'
-    lang_words = '''FREQ                    ::= 'binomial|poisson|bernoulli|pascal|geometric|neymana?|fixed|logarithmic|negbin'
-
-BUILTINID               ::= 'sev|agg|port|meta.ID'
-
-NOTE                    ::= 'note{TEXT}'
-
-EQUAL_WEIGHT            ::= "="
-
-AGG                     ::= 'agg'
-
-AGGREGATE               ::= 'aggregate'
-
-AND                     ::= 'and'
-
-AT                      ::= 'at'
-
-CEDED                   ::= 'ceded'
-
-CLAIMS                  ::= 'claims|claim'
-
-CONSTANT                ::= 'constant'
-
-CV                      ::= 'cv'
-
-DFREQ                   ::= 'dfreq'
-
-DSEV                    ::= 'dsev'
-
-EXP                     ::= 'exp'
-
-EXPONENT                ::= '^|**'
-
-INHOMOG_MULTIPLY        ::= "@"
-
-INFINITY                ::= 'inf|unlim|unlimited'
-
-LOSS                    ::= 'loss'
-
-LR                      ::= 'lr'
-
-MIXED                   ::= 'mixed'
-
-NET                     ::= 'net'
-
-OCCURRENCE              ::= 'occurrence'
-
-OF                      ::= 'of'
-
-PART_OF                 ::= 'po'
-
-PERCENT                 ::= '%'
-
-PORT                    ::= 'port'
-
-PREMIUM                 ::= 'premium|prem'
-
-SEV                     ::= 'sev'
-
-SHARE_OF                ::= 'so'
-
-TO                      ::= 'to'
-
-WEIGHTS                 ::= 'wts|wt'
-
-XPS                     ::= 'xps'
-
-XS                      ::= "xs|x"
-
-'''
-
-    s += lang_words
-    # create for docs in one file (that gets included by rst)
-    if add_to_doc is True:
-        pout.write_text(s, encoding='utf-8')
-
-    # save to user folder grammar
-    if save_to_fn == '':
-        save_to_fn = Path.home() / 'aggregate/parser/grammar.md'
-    Path(save_to_fn).write_text(s, encoding='utf-8')
-
-    return s
+    return text
 
 
-if __name__ == '__main__':
-    # print the grammar and add to this file as part of docstring in 41_language_reference.rst
-
+if __name__ == "__main__":
     grammar(add_to_doc=True)
-    UnderwritingParser.enhance_debugfile()

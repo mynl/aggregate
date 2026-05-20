@@ -1,0 +1,5198 @@
+{
+  "sev One dsev  [1]": {
+    "kind": "sev",
+    "name": "One",
+    "spec": {
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "name": "One",
+      "note": ""
+    }
+  },
+  "agg A.Dice00 dfreq  [1:6]  dsev  [1]                    note{The roll of a single dice.}": {
+    "kind": "agg",
+    "name": "A.Dice00",
+    "spec": {
+      "name": "A.Dice00",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "freq_b": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "The roll of a single dice."
+    }
+  },
+  "agg A.Dice01 dfreq  [1]    dsev  [1:6]                  note{Same as previous example.}": {
+    "kind": "agg",
+    "name": "A.Dice01",
+    "spec": {
+      "name": "A.Dice01",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "sev_ps": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "note": "Same as previous example."
+    }
+  },
+  "agg A.Dice02 dfreq  [2]    dsev  [1:6]                  note{Sum of the rolls of two dice.}": {
+    "kind": "agg",
+    "name": "A.Dice02",
+    "spec": {
+      "name": "A.Dice02",
+      "freq_name": "empirical",
+      "freq_a": [
+        2.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "sev_ps": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "note": "Sum of the rolls of two dice."
+    }
+  },
+  "agg A.Dice03 dfreq  [5]    dsev  [1:6]                  note{Sum of the rolls of five dice.}": {
+    "kind": "agg",
+    "name": "A.Dice03",
+    "spec": {
+      "name": "A.Dice03",
+      "freq_name": "empirical",
+      "freq_a": [
+        5.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "sev_ps": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "note": "Sum of the rolls of five dice."
+    }
+  },
+  "agg A.Dice04 dfreq  [1:6]  dsev  [1:6]                  note{Sum of a dice roll of dice rolls}": {
+    "kind": "agg",
+    "name": "A.Dice04",
+    "spec": {
+      "name": "A.Dice04",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "freq_b": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+      ],
+      "sev_ps": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "note": "Sum of a dice roll of dice rolls"
+    }
+  },
+  "agg A.Dice05 dfreq  [1:4]  dsev  [1:16]                 note{Something you can't do easily by hand}": {
+    "kind": "agg",
+    "name": "A.Dice05",
+    "spec": {
+      "name": "A.Dice05",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0,
+        4.0
+      ],
+      "freq_b": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0
+      ],
+      "sev_ps": [
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625,
+        0.0625
+      ],
+      "note": "Something you can't do easily by hand"
+    }
+  },
+  "agg B.Basic01 dfreq  [1]  dsev  [0 1]                                   note{toss of a single coin}": {
+    "kind": "agg",
+    "name": "B.Basic01",
+    "spec": {
+      "name": "B.Basic01",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        0.0,
+        1.0
+      ],
+      "sev_ps": [
+        0.5,
+        0.5
+      ],
+      "note": "toss of a single coin"
+    }
+  },
+  "agg B.Basic02 dfreq  [12]  dsev  [0 1]                                  note{toss of 12 single coins}": {
+    "kind": "agg",
+    "name": "B.Basic02",
+    "spec": {
+      "name": "B.Basic02",
+      "freq_name": "empirical",
+      "freq_a": [
+        12.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        0.0,
+        1.0
+      ],
+      "sev_ps": [
+        0.5,
+        0.5
+      ],
+      "note": "toss of 12 single coins"
+    }
+  },
+  "agg B.Basic03 dfreq  [1:3]  dsev  [1 2 10]                              note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely}": {
+    "kind": "agg",
+    "name": "B.Basic03",
+    "spec": {
+      "name": "B.Basic03",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "freq_b": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        10.0
+      ],
+      "sev_ps": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "note": "1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely"
+    }
+  },
+  "agg B.Basic03 dfreq  [1:11:2]  dsev  [1 2 10]                           note{1 3...11 claims range and step, sev 1, 2, 10 all equally likely}": {
+    "kind": "agg",
+    "name": "B.Basic03",
+    "spec": {
+      "name": "B.Basic03",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        3.0,
+        5.0,
+        7.0,
+        9.0,
+        11.0
+      ],
+      "freq_b": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        10.0
+      ],
+      "sev_ps": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "note": "1 3...11 claims range and step, sev 1, 2, 10 all equally likely"
+    }
+  },
+  "agg B.Basic04 dfreq  [1 2 3]   [.5 1/4 1/4]  dsev  [1 2 10]               note{specify probabilities of claims}": {
+    "kind": "agg",
+    "name": "B.Basic04",
+    "spec": {
+      "name": "B.Basic04",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "freq_b": [
+        0.5,
+        0.25,
+        0.25
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        10.0
+      ],
+      "sev_ps": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "note": "specify probabilities of claims"
+    }
+  },
+  "agg B.Basic05 dfreq  [1:3]    dsev  [1 2 10]   [.4 .4 .2]                 note{specify probabilities of sev}": {
+    "kind": "agg",
+    "name": "B.Basic05",
+    "spec": {
+      "name": "B.Basic05",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "freq_b": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        10.0
+      ],
+      "sev_ps": [
+        0.4,
+        0.4,
+        0.2
+      ],
+      "note": "specify probabilities of sev"
+    }
+  },
+  "agg B.Basic06 dfreq  [1:3]   [.5 1/4 1/4]  dsev  [1 2 10]   [.4 .4 .2]      note{specify both probabilities }": {
+    "kind": "agg",
+    "name": "B.Basic06",
+    "spec": {
+      "name": "B.Basic06",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "freq_b": [
+        0.5,
+        0.25,
+        0.25
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        10.0
+      ],
+      "sev_ps": [
+        0.4,
+        0.4,
+        0.2
+      ],
+      "note": "specify both probabilities "
+    }
+  },
+  "agg B.Basic07 dfreq  [0 1 2]   [.5 .3 .2]  sev sev.One": {
+    "kind": "agg",
+    "name": "B.Basic07",
+    "spec": {
+      "name": "B.Basic07",
+      "freq_name": "empirical",
+      "freq_a": [
+        0.0,
+        1.0,
+        2.0
+      ],
+      "freq_b": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": ""
+    }
+  },
+  "agg B.Basic08 dfreq  [0 1 2]   [.5 .3 .2]  sev.One": {
+    "kind": "agg",
+    "name": "B.Basic08",
+    "spec": {
+      "name": "B.Basic08",
+      "freq_name": "empirical",
+      "freq_a": [
+        0.0,
+        1.0,
+        2.0
+      ],
+      "freq_b": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": ""
+    }
+  },
+  "agg B.Basic09 dfreq  [0 1 2]   [.5 .3 .2]  sev lognorm 10 cv .3": {
+    "kind": "agg",
+    "name": "B.Basic09",
+    "spec": {
+      "name": "B.Basic09",
+      "freq_name": "empirical",
+      "freq_a": [
+        0.0,
+        1.0,
+        2.0
+      ],
+      "freq_b": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "exp_en": -1,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "note": ""
+    }
+  },
+  "agg Ca.Freq01.Fixed        10 claims sev.One fixed": {
+    "kind": "agg",
+    "name": "Ca.Freq01.Fixed",
+    "spec": {
+      "name": "Ca.Freq01.Fixed",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "fixed"
+    }
+  },
+  "agg Ca.Freq02.Poisson      10 claims sev.One poisson": {
+    "kind": "agg",
+    "name": "Ca.Freq02.Poisson",
+    "spec": {
+      "name": "Ca.Freq02.Poisson",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "poisson"
+    }
+  },
+  "agg Ca.Freq03.Bernoulli    .8 claims sev.One bernoulli": {
+    "kind": "agg",
+    "name": "Ca.Freq03.Bernoulli",
+    "spec": {
+      "name": "Ca.Freq03.Bernoulli",
+      "exp_en": 0.8,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "bernoulli"
+    }
+  },
+  "agg Ca.Freq04.Binomial     10 claims sev.One binomial 0.5": {
+    "kind": "agg",
+    "name": "Ca.Freq04.Binomial",
+    "spec": {
+      "name": "Ca.Freq04.Binomial",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "binomial",
+      "freq_a": 0.5
+    }
+  },
+  "agg Ca.Freq05.Geometric    10 claims sev.One geometric": {
+    "kind": "agg",
+    "name": "Ca.Freq05.Geometric",
+    "spec": {
+      "name": "Ca.Freq05.Geometric",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "geometric"
+    }
+  },
+  "agg Ca.Freq06.Pascal       10 claims sev.One pascal .8 3": {
+    "kind": "agg",
+    "name": "Ca.Freq06.Pascal",
+    "spec": {
+      "name": "Ca.Freq06.Pascal",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "pascal",
+      "freq_a": 0.8,
+      "freq_b": 3.0
+    }
+  },
+  "agg Ca.Freq07.NegBin       10 claims sev.One negbin 3               note{shape paramter equals variance multiplier}": {
+    "kind": "agg",
+    "name": "Ca.Freq07.NegBin",
+    "spec": {
+      "name": "Ca.Freq07.NegBin",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "shape paramter equals variance multiplier",
+      "freq_name": "negbin",
+      "freq_a": 3.0
+    }
+  },
+  "agg Ca.Freq08.Logarithmic  10 claims sev.One logarithmic": {
+    "kind": "agg",
+    "name": "Ca.Freq08.Logarithmic",
+    "spec": {
+      "name": "Ca.Freq08.Logarithmic",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "logarithmic"
+    }
+  },
+  "agg Ca.Freq09.NeymanA      10 claims sev.One neymana 3              note{shape paramter number of eggs per cluster}": {
+    "kind": "agg",
+    "name": "Ca.Freq09.NeymanA",
+    "spec": {
+      "name": "Ca.Freq09.NeymanA",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "shape paramter number of eggs per cluster",
+      "freq_name": "neymana",
+      "freq_a": 3.0
+    }
+  },
+  "agg Cb.Freq10.NegBin       10 claims sev.One mixed gamma 0.65       note{shape paramter equals variance of mixing distribution}": {
+    "kind": "agg",
+    "name": "Cb.Freq10.NegBin",
+    "spec": {
+      "name": "Cb.Freq10.NegBin",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "shape paramter equals variance of mixing distribution",
+      "freq_name": "gamma",
+      "freq_a": 0.65
+    }
+  },
+  "agg Cb.Freq11.Delaporte    10 claims sev.One mixed delaporte .65 .25": {
+    "kind": "agg",
+    "name": "Cb.Freq11.Delaporte",
+    "spec": {
+      "name": "Cb.Freq11.Delaporte",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "delaporte",
+      "freq_a": 0.65,
+      "freq_b": 0.25
+    }
+  },
+  "agg Cb.Freq12.IG           10 claims sev.One mixed ig .65": {
+    "kind": "agg",
+    "name": "Cb.Freq12.IG",
+    "spec": {
+      "name": "Cb.Freq12.IG",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "ig",
+      "freq_a": 0.65
+    }
+  },
+  "agg Cb.Freq13.SIG          10 claims sev.One mixed sig 0.5 0.4": {
+    "kind": "agg",
+    "name": "Cb.Freq13.SIG",
+    "spec": {
+      "name": "Cb.Freq13.SIG",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "sig",
+      "freq_a": 0.5,
+      "freq_b": 0.4
+    }
+  },
+  "agg Cb.Freq14.Sichel       10 claims sev.One mixed delaporte .65 -0.25": {
+    "kind": "agg",
+    "name": "Cb.Freq14.Sichel",
+    "spec": {
+      "name": "Cb.Freq14.Sichel",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "delaporte",
+      "freq_a": 0.65,
+      "freq_b": -0.25
+    }
+  },
+  "agg Cb.Freq15.Sichel.gamma 10 claims sev.One mixed sichel.gamma .65 .25": {
+    "kind": "agg",
+    "name": "Cb.Freq15.Sichel.gamma",
+    "spec": {
+      "name": "Cb.Freq15.Sichel.gamma",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "sichel.gamma",
+      "freq_a": 0.65,
+      "freq_b": 0.25
+    }
+  },
+  "agg Cb.Freq16.Sichel.ig    10 claims sev.One mixed sichel.ig .65 .25": {
+    "kind": "agg",
+    "name": "Cb.Freq16.Sichel.ig",
+    "spec": {
+      "name": "Cb.Freq16.Sichel.ig",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "sichel.ig",
+      "freq_a": 0.65,
+      "freq_b": 0.25
+    }
+  },
+  "agg Cb.Freq17.Beta         10 claims sev.One mixed beta .5 4": {
+    "kind": "agg",
+    "name": "Cb.Freq17.Beta",
+    "spec": {
+      "name": "Cb.Freq17.Beta",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "",
+      "freq_name": "beta",
+      "freq_a": 0.5,
+      "freq_b": 4.0
+    }
+  },
+  "agg Cc.Freq20.Poisson     4 claims dsev  [1]  poisson zt": {
+    "kind": "agg",
+    "name": "Cc.Freq20.Poisson",
+    "spec": {
+      "name": "Cc.Freq20.Poisson",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "poisson",
+      "freq_zm": true,
+      "freq_p0": 0.0,
+      "note": ""
+    }
+  },
+  "agg Cc.Freq21.Poisson     4 claims dsev  [1]  poisson zm .5": {
+    "kind": "agg",
+    "name": "Cc.Freq21.Poisson",
+    "spec": {
+      "name": "Cc.Freq21.Poisson",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "poisson",
+      "freq_zm": true,
+      "freq_p0": 0.5,
+      "note": ""
+    }
+  },
+  "agg Cc.Freq22.Geometric   4 claims dsev  [1]  geometric zm .5        note{pr(N=0)=1, there is no zt version}": {
+    "kind": "agg",
+    "name": "Cc.Freq22.Geometric",
+    "spec": {
+      "name": "Cc.Freq22.Geometric",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "geometric",
+      "freq_zm": true,
+      "freq_p0": 0.5,
+      "note": "pr(N=0)=1, there is no zt version"
+    }
+  },
+  "agg Cc.Freq23.Logarithmic 4 claims dsev  [1]  logarithmic zm .5      note{pr(N=0)=1, there is no zt version}": {
+    "kind": "agg",
+    "name": "Cc.Freq23.Logarithmic",
+    "spec": {
+      "name": "Cc.Freq23.Logarithmic",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "logarithmic",
+      "freq_zm": true,
+      "freq_p0": 0.5,
+      "note": "pr(N=0)=1, there is no zt version"
+    }
+  },
+  "agg Cc.Freq24.Binomial    4 claims dsev  [1]  binomial 0.6 zm .5     note{Cannot make p0 smaller than the natural p}": {
+    "kind": "agg",
+    "name": "Cc.Freq24.Binomial",
+    "spec": {
+      "name": "Cc.Freq24.Binomial",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "binomial",
+      "freq_a": 0.6,
+      "freq_zm": true,
+      "freq_p0": 0.5,
+      "note": "Cannot make p0 smaller than the natural p"
+    }
+  },
+  "agg Cc.Freq25.Negbin      4 claims dsev  [1]  negbin 3 zm .5         note{Limits on p0}": {
+    "kind": "agg",
+    "name": "Cc.Freq25.Negbin",
+    "spec": {
+      "name": "Cc.Freq25.Negbin",
+      "exp_en": 4.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "freq_name": "negbin",
+      "freq_a": 3.0,
+      "freq_zm": true,
+      "freq_p0": 0.5,
+      "note": "Limits on p0"
+    }
+  },
+  "agg D.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}": {
+    "kind": "agg",
+    "name": "D.Sev01",
+    "spec": {
+      "name": "D.Sev01",
+      "exp_en": 1.0,
+      "sev_name": "expon",
+      "sev_scale": 100.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "zero param severity can look odd, but it works"
+    }
+  },
+  "agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed": {
+    "kind": "agg",
+    "name": "D.Sev02",
+    "spec": {
+      "name": "D.Sev02",
+      "exp_en": 1.0,
+      "sev_name": "expon",
+      "sev_a": 1.0,
+      "sev_scale": 100.0,
+      "sev_loc": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will this work?}": {
+    "kind": "agg",
+    "name": "D.Sev03",
+    "spec": {
+      "name": "D.Sev03",
+      "exp_en": 1.0,
+      "sev_name": "expon",
+      "sev_scale": 100.0,
+      "sev_loc": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "will this work?"
+    }
+  },
+  "agg D.Sev04 1 claim sev 100 * norm    +500 fixed": {
+    "kind": "agg",
+    "name": "D.Sev04",
+    "spec": {
+      "name": "D.Sev04",
+      "exp_en": 1.0,
+      "sev_name": "norm",
+      "sev_scale": 100.0,
+      "sev_loc": 500.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev05 1 claim sev 100 * uniform + 50 fixed": {
+    "kind": "agg",
+    "name": "D.Sev05",
+    "spec": {
+      "name": "D.Sev05",
+      "exp_en": 1.0,
+      "sev_name": "uniform",
+      "sev_scale": 100.0,
+      "sev_loc": 50.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev05b 2 claims sev 100*uniform + 50 fixed": {
+    "kind": "agg",
+    "name": "D.Sev05b",
+    "spec": {
+      "name": "D.Sev05b",
+      "exp_en": 2.0,
+      "sev_name": "uniform",
+      "sev_scale": 100.0,
+      "sev_loc": 50.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev06 1 claim sev 10 * gamma 0.3      fixed": {
+    "kind": "agg",
+    "name": "D.Sev06",
+    "spec": {
+      "name": "D.Sev06",
+      "exp_en": 1.0,
+      "sev_name": "gamma",
+      "sev_a": 0.3,
+      "sev_scale": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev07 1 claim sev      gamma 12 cv .3 fixed": {
+    "kind": "agg",
+    "name": "D.Sev07",
+    "spec": {
+      "name": "D.Sev07",
+      "exp_en": 1.0,
+      "sev_name": "gamma",
+      "sev_mean": 12.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev08 1 claim sev      lognorm 50 cv .3 fixed": {
+    "kind": "agg",
+    "name": "D.Sev08",
+    "spec": {
+      "name": "D.Sev08",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev09 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed          note{mean equals 50 and cv is slightly higher than .3}": {
+    "kind": "agg",
+    "name": "D.Sev09",
+    "spec": {
+      "name": "D.Sev09",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_a": 0.3,
+      "sev_scale": 47.79987409165499,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "mean equals 50 and cv is slightly higher than .3"
+    }
+  },
+  "agg D.Sev10 1 claim sev 100 * invgamma 4.07 fixed                   note{remember must set scale or mean}": {
+    "kind": "agg",
+    "name": "D.Sev10",
+    "spec": {
+      "name": "D.Sev10",
+      "exp_en": 1.0,
+      "sev_name": "invgamma",
+      "sev_a": 4.07,
+      "sev_scale": 100.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "remember must set scale or mean"
+    }
+  },
+  "agg D.Sev11 1 claim sev 100 * weibull_min 1.5 fixed": {
+    "kind": "agg",
+    "name": "D.Sev11",
+    "spec": {
+      "name": "D.Sev11",
+      "exp_en": 1.0,
+      "sev_name": "weibull_min",
+      "sev_a": 1.5,
+      "sev_scale": 100.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev12 1 claim sev invgauss 10 cv .5 fixed": {
+    "kind": "agg",
+    "name": "D.Sev12",
+    "spec": {
+      "name": "D.Sev12",
+      "exp_en": 1.0,
+      "sev_name": "invgauss",
+      "sev_mean": 10.0,
+      "sev_cv": 0.5,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev13 1 claim sev 10 * pareto 2.6  + -10 fixed                note{entering Pareto is awkward}": {
+    "kind": "agg",
+    "name": "D.Sev13",
+    "spec": {
+      "name": "D.Sev13",
+      "exp_en": 1.0,
+      "sev_name": "pareto",
+      "sev_a": 2.6,
+      "sev_scale": 10.0,
+      "sev_loc": -10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "entering Pareto is awkward"
+    }
+  },
+  "agg D.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed": {
+    "kind": "agg",
+    "name": "D.Sev14",
+    "spec": {
+      "name": "D.Sev14",
+      "exp_en": 1.0,
+      "sev_name": "beta",
+      "sev_a": 3.0,
+      "sev_b": 2.0,
+      "sev_scale": 50.0,
+      "sev_loc": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg D.Sev15 1   claim  sev  dhistogram xps  [1 10 40]   [.5 .3 .2]  fixed  note{old notation}": {
+    "kind": "agg",
+    "name": "D.Sev15",
+    "spec": {
+      "name": "D.Sev15",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        10.0,
+        40.0
+      ],
+      "sev_ps": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "old notation"
+    }
+  },
+  "agg D.Sev16 dfreq  [1]  dsev  [1 10 40]   [.5 .3 .2]                         note{preferred new notation}": {
+    "kind": "agg",
+    "name": "D.Sev16",
+    "spec": {
+      "name": "D.Sev16",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        10.0,
+        40.0
+      ],
+      "sev_ps": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "note": "preferred new notation"
+    }
+  },
+  "agg D.Sev17 1   claim  sev chistogram xps  [1 10 40]   [.5 .3 .2]  fixed   note{continuous version}": {
+    "kind": "agg",
+    "name": "D.Sev17",
+    "spec": {
+      "name": "D.Sev17",
+      "exp_en": 1.0,
+      "sev_name": "chistogram",
+      "sev_xs": [
+        1.0,
+        10.0,
+        40.0
+      ],
+      "sev_ps": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "continuous version"
+    }
+  },
+  "agg E.TSev00  1 claim sev      lognorm 10 cv .09 fixed": {
+    "kind": "agg",
+    "name": "E.TSev00",
+    "spec": {
+      "name": "E.TSev00",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.09,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev01  1 claim sev 10 * lognorm 10 cv .09 fixed": {
+    "kind": "agg",
+    "name": "E.TSev01",
+    "spec": {
+      "name": "E.TSev01",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 0.09,
+      "sev_scale": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev02  1 claim sev      lognorm 10 cv .09 + 20 fixed": {
+    "kind": "agg",
+    "name": "E.TSev02",
+    "spec": {
+      "name": "E.TSev02",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.09,
+      "sev_scale": 1.0,
+      "sev_loc": 20.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev03  1 claim sev 10 * lognorm 10 cv .09 + 20 fixed": {
+    "kind": "agg",
+    "name": "E.TSev03",
+    "spec": {
+      "name": "E.TSev03",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 0.09,
+      "sev_scale": 10.0,
+      "sev_loc": 20.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev04  1 claim sev 9.559974818331 * lognorm .3 fixed": {
+    "kind": "agg",
+    "name": "E.TSev04",
+    "spec": {
+      "name": "E.TSev04",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_a": 0.3,
+      "sev_scale": 9.559974818331,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev05  1 claim sev 9.559974818331 * lognorm .3 + 5 fixed": {
+    "kind": "agg",
+    "name": "E.TSev05",
+    "spec": {
+      "name": "E.TSev05",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_a": 0.3,
+      "sev_scale": 9.559974818331,
+      "sev_loc": 5.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev06  1 claim 130 xs 20 sev      lognorm 20 cv 0.75     fixed": {
+    "kind": "agg",
+    "name": "E.TSev06",
+    "spec": {
+      "name": "E.TSev06",
+      "exp_en": 1.0,
+      "exp_attachment": 20.0,
+      "exp_limit": 130.0,
+      "sev_name": "lognorm",
+      "sev_mean": 20.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev07  1 claim 130 xs 20 sev 20 * lognorm 0.75           fixed": {
+    "kind": "agg",
+    "name": "E.TSev07",
+    "spec": {
+      "name": "E.TSev07",
+      "exp_en": 1.0,
+      "exp_attachment": 20.0,
+      "exp_limit": 130.0,
+      "sev_name": "lognorm",
+      "sev_a": 0.75,
+      "sev_scale": 20.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev08  1 claim 130 xs 20 sev 20 * lognorm 1 cv 0.75      fixed": {
+    "kind": "agg",
+    "name": "E.TSev08",
+    "spec": {
+      "name": "E.TSev08",
+      "exp_en": 1.0,
+      "exp_attachment": 20.0,
+      "exp_limit": 130.0,
+      "sev_name": "lognorm",
+      "sev_mean": 20.0,
+      "sev_cv": 0.75,
+      "sev_scale": 20.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev09  1 claim 130 xs 20 sev 20 * lognorm 1 cv 0.75 + 20 fixed": {
+    "kind": "agg",
+    "name": "E.TSev09",
+    "spec": {
+      "name": "E.TSev09",
+      "exp_en": 1.0,
+      "exp_attachment": 20.0,
+      "exp_limit": 130.0,
+      "sev_name": "lognorm",
+      "sev_mean": 20.0,
+      "sev_cv": 0.75,
+      "sev_scale": 20.0,
+      "sev_loc": 20.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg E.TSev10 10 claims           sev lognorm 10 cv 0.8 poisson": {
+    "kind": "agg",
+    "name": "E.TSev10",
+    "spec": {
+      "name": "E.TSev10",
+      "exp_en": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg E.TSev11 10 claims  30 xs  0 sev lognorm 10 cv 0.8 poisson": {
+    "kind": "agg",
+    "name": "E.TSev11",
+    "spec": {
+      "name": "E.TSev11",
+      "exp_en": 10.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 30.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg E.TSev12 10 claims 100 xs 10 sev lognorm 10 cv 0.8 poisson": {
+    "kind": "agg",
+    "name": "E.TSev12",
+    "spec": {
+      "name": "E.TSev12",
+      "exp_en": 10.0,
+      "exp_attachment": 10.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg E.TSev13 10 claims inf xs  0 sev lognorm 10 cv 0.8 poisson": {
+    "kind": "agg",
+    "name": "E.TSev13",
+    "spec": {
+      "name": "E.TSev13",
+      "exp_en": 10.0,
+      "exp_attachment": 0.0,
+      "exp_limit": "__inf__",
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg E.TSev14 10 claims inf xs 10 sev lognorm 10 cv 0.8 poisson": {
+    "kind": "agg",
+    "name": "E.TSev14",
+    "spec": {
+      "name": "E.TSev14",
+      "exp_en": 10.0,
+      "exp_attachment": 10.0,
+      "exp_limit": "__inf__",
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg E.TSev15 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}": {
+    "kind": "agg",
+    "name": "E.TSev15",
+    "spec": {
+      "name": "E.TSev15",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 200.0,
+      "sev_name": "lognorm",
+      "sev_a": 2.0,
+      "sev_scale": 123.43,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "conditional severity"
+    }
+  },
+  "agg E.TSev16 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}": {
+    "kind": "agg",
+    "name": "E.TSev16",
+    "spec": {
+      "name": "E.TSev16",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 200.0,
+      "sev_name": "lognorm",
+      "sev_a": 2.0,
+      "sev_scale": 123.43,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "sev_conditional": false,
+      "freq_name": "poisson",
+      "note": "unconditional severity"
+    }
+  },
+  "agg E.TSev17 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}": {
+    "kind": "agg",
+    "name": "E.TSev17",
+    "spec": {
+      "name": "E.TSev17",
+      "exp_en": 5.0,
+      "exp_attachment": 10.0,
+      "exp_limit": 200.0,
+      "sev_name": "lognorm",
+      "sev_a": 2.0,
+      "sev_scale": 123.43,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "conditional severity"
+    }
+  },
+  "agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}": {
+    "kind": "agg",
+    "name": "E.TSev18",
+    "spec": {
+      "name": "E.TSev18",
+      "exp_en": 5.0,
+      "exp_attachment": 10.0,
+      "exp_limit": 200.0,
+      "sev_name": "lognorm",
+      "sev_a": 2.0,
+      "sev_scale": 123.43,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "sev_conditional": false,
+      "freq_name": "poisson",
+      "note": "unconditional severity"
+    }
+  },
+  "agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}": {
+    "kind": "agg",
+    "name": "F.Expos01",
+    "spec": {
+      "name": "F.Expos01",
+      "exp_en": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "specify number of claims"
+    }
+  },
+  "agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims}": {
+    "kind": "agg",
+    "name": "F.Expos02",
+    "spec": {
+      "name": "F.Expos02",
+      "exp_el": 500.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "specify expected loss, derive number of claims"
+    }
+  },
+  "agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}": {
+    "kind": "agg",
+    "name": "F.Expos03",
+    "spec": {
+      "name": "F.Expos03",
+      "exp_premium": 1000.0,
+      "exp_lr": 0.5,
+      "exp_el": 500.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "specify premium and loss ratio, derive number of claims"
+    }
+  },
+  "agg G.Mixed00  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts  [.2 .3 .3 .15 .05]              poisson            note{no shared mixing}": {
+    "kind": "agg",
+    "name": "G.Mixed00",
+    "spec": {
+      "name": "G.Mixed00",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 50.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.2,
+        0.3,
+        0.3,
+        0.15,
+        0.05
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "no shared mixing"
+    }
+  },
+  "agg G.Mixed01  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts  [.2 .3 .3 .15 .05]              mixed gamma 0.3    note{shared mixing, compare audit and report dfs}": {
+    "kind": "agg",
+    "name": "G.Mixed01",
+    "spec": {
+      "name": "G.Mixed01",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 50.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.2,
+        0.3,
+        0.3,
+        0.15,
+        0.05
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": "shared mixing, compare audit and report dfs"
+    }
+  },
+  "agg G.Mixed02  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts=5                              mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed02",
+    "spec": {
+      "name": "G.Mixed02",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 50.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed03  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]                                     mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed03",
+    "spec": {
+      "name": "G.Mixed03",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 50.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed04  1  claim  50 xs 0 sev lognorm  [2 4 6 8 10]  cv 1           wts  [.2 .3 .3 .15 .05]              mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed04",
+    "spec": {
+      "name": "G.Mixed04",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 50.0,
+      "sev_name": "lognorm",
+      "sev_mean": [
+        2.0,
+        4.0,
+        6.0,
+        8.0,
+        10.0
+      ],
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.2,
+        0.3,
+        0.3,
+        0.15,
+        0.05
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed05  1  claim 250 xs 0 sev lognorm  [10 15 20 25 50 100]  cv  [0.1 0.2 0.4 0.6 0.8 1.0]  wts=6        mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed05",
+    "spec": {
+      "name": "G.Mixed05",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 250.0,
+      "sev_name": "lognorm",
+      "sev_mean": [
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        50.0,
+        100.0
+      ],
+      "sev_cv": [
+        0.1,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed07  1  claim          sev 100               *  beta  [1 200 500 100]   [100 800 500 1]  + 10  wts=4  mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed07",
+    "spec": {
+      "name": "G.Mixed07",
+      "exp_en": 1.0,
+      "sev_name": "beta",
+      "sev_a": [
+        1.0,
+        200.0,
+        500.0,
+        100.0
+      ],
+      "sev_b": [
+        100.0,
+        800.0,
+        500.0,
+        1.0
+      ],
+      "sev_scale": 100.0,
+      "sev_loc": 10.0,
+      "sev_wt": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed08  1  claim          sev  [100 200 250 300]  *  beta  [1 200 500 100]   [100 800 500 1]  + 10  wts=4  mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed08",
+    "spec": {
+      "name": "G.Mixed08",
+      "exp_en": 1.0,
+      "sev_name": "beta",
+      "sev_a": [
+        1.0,
+        200.0,
+        500.0,
+        100.0
+      ],
+      "sev_b": [
+        100.0,
+        800.0,
+        500.0,
+        1.0
+      ],
+      "sev_scale": [
+        100.0,
+        200.0,
+        250.0,
+        300.0
+      ],
+      "sev_loc": 10.0,
+      "sev_wt": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed09  8  claim          sev      100 *  [lognorm expon]   [.5 1]  wts  [0.6 .4]                          mixed gamma 0.3    note{different severities}": {
+    "kind": "agg",
+    "name": "G.Mixed09",
+    "spec": {
+      "name": "G.Mixed09",
+      "exp_en": 8.0,
+      "sev_name": [
+        "lognorm",
+        "expon"
+      ],
+      "sev_a": [
+        0.5,
+        1.0
+      ],
+      "sev_scale": 100.0,
+      "sev_wt": [
+        0.6,
+        0.4
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": "different severities"
+    }
+  },
+  "agg G.Mixed10  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10 wts=2                          mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed10",
+    "spec": {
+      "name": "G.Mixed10",
+      "exp_en": 1.0,
+      "sev_name": [
+        "lognorm",
+        "expon"
+      ],
+      "sev_a": [
+        2.0,
+        1.0
+      ],
+      "sev_scale": [
+        50.0,
+        100.0
+      ],
+      "sev_loc": 10.0,
+      "sev_wt": [
+        0.5,
+        0.5
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg G.Mixed11  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10                                mixed gamma 0.3": {
+    "kind": "agg",
+    "name": "G.Mixed11",
+    "spec": {
+      "name": "G.Mixed11",
+      "exp_en": 1.0,
+      "sev_name": [
+        "lognorm",
+        "expon"
+      ],
+      "sev_a": [
+        2.0,
+        1.0
+      ],
+      "sev_scale": [
+        50.0,
+        100.0
+      ],
+      "sev_loc": 10.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.3,
+      "note": ""
+    }
+  },
+  "agg H.Limits01               1 claim  [1 5 10 20]  xs  0              sev lognorm 10 cv 1.2  fixed": {
+    "kind": "agg",
+    "name": "H.Limits01",
+    "spec": {
+      "name": "H.Limits01",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        1.0,
+        5.0,
+        10.0,
+        20.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.2,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg H.Limits02               5 claim            100 xs  [0 10 50]     sev lognorm 10 cv 1.2  fixed": {
+    "kind": "agg",
+    "name": "H.Limits02",
+    "spec": {
+      "name": "H.Limits02",
+      "exp_en": 5.0,
+      "exp_attachment": [
+        0.0,
+        10.0,
+        50.0
+      ],
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.2,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg H.Limits02               5 claim  [10 20 50 100]  xs  [0 0 50 100]  sev lognorm 10 cv 2.0  fixed": {
+    "kind": "agg",
+    "name": "H.Limits02",
+    "spec": {
+      "name": "H.Limits02",
+      "exp_en": 5.0,
+      "exp_attachment": [
+        0.0,
+        0.0,
+        50.0,
+        100.0
+      ],
+      "exp_limit": [
+        10.0,
+        20.0,
+        50.0,
+        100.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 2.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg H.Limits03    [10 10 10 10]  claims  [inf 10 inf 10]  xs  [0 0 5 5]   sev lognorm 10 cv 1.25 fixed": {
+    "kind": "agg",
+    "name": "H.Limits03",
+    "spec": {
+      "name": "H.Limits03",
+      "exp_en": [
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "exp_attachment": [
+        0.0,
+        0.0,
+        5.0,
+        5.0
+      ],
+      "exp_limit": [
+        "__inf__",
+        10.0,
+        "__inf__",
+        10.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.25,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg I.Blend01  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]                  poisson": {
+    "kind": "agg",
+    "name": "I.Blend01",
+    "spec": {
+      "name": "I.Blend01",
+      "exp_en": 10.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        5.0,
+        10.0,
+        15.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 12.0,
+      "sev_cv": [
+        1.0,
+        1.5,
+        3.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg I.Blend02  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]                  mixed gamma 0.25": {
+    "kind": "agg",
+    "name": "I.Blend02",
+    "spec": {
+      "name": "I.Blend02",
+      "exp_en": 10.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        5.0,
+        10.0,
+        15.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 12.0,
+      "sev_cv": [
+        1.0,
+        1.5,
+        3.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.25,
+      "note": ""
+    }
+  },
+  "agg I.Blend03  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]  wts=3           mixed gamma 0.25": {
+    "kind": "agg",
+    "name": "I.Blend03",
+    "spec": {
+      "name": "I.Blend03",
+      "exp_en": 10.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        5.0,
+        10.0,
+        15.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 12.0,
+      "sev_cv": [
+        1.0,
+        1.5,
+        3.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.25,
+      "note": ""
+    }
+  },
+  "agg I.Blend04   1 claims  [1 5 10 20]  xs  0          sev lognorm 10 cv 1.2 wts  [.50 .20 .20 .1]      mixed gamma 0.25": {
+    "kind": "agg",
+    "name": "I.Blend04",
+    "spec": {
+      "name": "I.Blend04",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        1.0,
+        5.0,
+        10.0,
+        20.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.2,
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.5,
+        0.2,
+        0.2,
+        0.1
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.25,
+      "note": ""
+    }
+  },
+  "agg I.Blend05   5 claims  [10 20 50 100]  xs 10          sev lognorm 10 cv 1.2 wts  [.50 .20 .20 .1]   mixed gamma 0.25": {
+    "kind": "agg",
+    "name": "I.Blend05",
+    "spec": {
+      "name": "I.Blend05",
+      "exp_en": 5.0,
+      "exp_attachment": 10.0,
+      "exp_limit": [
+        10.0,
+        20.0,
+        50.0,
+        100.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.2,
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.5,
+        0.2,
+        0.2,
+        0.1
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.25,
+      "note": ""
+    }
+  },
+  "agg I.Blend06  [10 30 15 5]   claims  [inf 10 inf 10]  xs  [0 0 5 5]  sev lognorm  10 cv  [1.0 1.25 1.5]  wts=3         mixed gamma 0.25": {
+    "kind": "agg",
+    "name": "I.Blend06",
+    "spec": {
+      "name": "I.Blend06",
+      "exp_en": [
+        10.0,
+        30.0,
+        15.0,
+        5.0
+      ],
+      "exp_attachment": [
+        0.0,
+        0.0,
+        5.0,
+        5.0
+      ],
+      "exp_limit": [
+        "__inf__",
+        10.0,
+        "__inf__",
+        10.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        1.0,
+        1.25,
+        1.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.25,
+      "note": ""
+    }
+  },
+  "agg I.Blend07    [10 20 30]   claims  [100 200 75]  xs  [0 50 75]     sev lognorm 100 cv  [1 2]  wts  [.6 .4]             mixed gamma 0.4": {
+    "kind": "agg",
+    "name": "I.Blend07",
+    "spec": {
+      "name": "I.Blend07",
+      "exp_en": [
+        10.0,
+        20.0,
+        30.0
+      ],
+      "exp_attachment": [
+        0.0,
+        50.0,
+        75.0
+      ],
+      "exp_limit": [
+        100.0,
+        200.0,
+        75.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": [
+        1.0,
+        2.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.6,
+        0.4
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.4,
+      "note": ""
+    }
+  },
+  "agg I.Blend08       [10 30]   claims                              sev lognorm 100 cv  [1 2]                         mixed gamma 0.4": {
+    "kind": "agg",
+    "name": "I.Blend08",
+    "spec": {
+      "name": "I.Blend08",
+      "exp_en": [
+        10.0,
+        30.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": [
+        1.0,
+        2.0
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.4,
+      "note": ""
+    }
+  },
+  "agg I.Blend09   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  note{log2=17;}": {
+    "kind": "agg",
+    "name": "I.Blend09",
+    "spec": {
+      "name": "I.Blend09",
+      "exp_premium": [
+        1000.0,
+        2000.0,
+        500.0
+      ],
+      "exp_lr": [
+        0.8,
+        0.7,
+        0.5
+      ],
+      "exp_el": [
+        800.0,
+        1400.0,
+        250.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.35,
+        0.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.5,
+        0.375,
+        0.125
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.5,
+      "note": "log2=17;"
+    }
+  },
+  "agg I.Blend10   [500 800 200]    loss                             sev lognorm 10 cv  [.2 .35 .5]  wts=3             mixed gamma 0.5": {
+    "kind": "agg",
+    "name": "I.Blend10",
+    "spec": {
+      "name": "I.Blend10",
+      "exp_el": [
+        500.0,
+        800.0,
+        200.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.35,
+        0.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.5,
+      "note": ""
+    }
+  },
+  "agg I.Blend11   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  note{log2=17;}": {
+    "kind": "agg",
+    "name": "I.Blend11",
+    "spec": {
+      "name": "I.Blend11",
+      "exp_premium": [
+        1000.0,
+        2000.0,
+        500.0
+      ],
+      "exp_lr": [
+        0.8,
+        0.7,
+        0.5
+      ],
+      "exp_el": [
+        800.0,
+        1400.0,
+        250.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.35,
+        0.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.5,
+        0.375,
+        0.125
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.5,
+      "note": "log2=17;"
+    }
+  },
+  "agg I.Blend12   [500 800 200]    loss                             sev lognorm 10 cv  [.2 .35 .5]  wts=3             mixed gamma 0.5": {
+    "kind": "agg",
+    "name": "I.Blend12",
+    "spec": {
+      "name": "I.Blend12",
+      "exp_el": [
+        500.0,
+        800.0,
+        200.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.35,
+        0.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.5,
+      "note": ""
+    }
+  },
+  "agg J.Re01  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson": {
+    "kind": "agg",
+    "name": "J.Re01",
+    "spec": {
+      "name": "J.Re01",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg J.Re02  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate net of 50% so 25 xs 0 and 75 xs 25": {
+    "kind": "agg",
+    "name": "J.Re02",
+    "spec": {
+      "name": "J.Re02",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          75.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re03  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
+    "kind": "agg",
+    "name": "J.Re03",
+    "spec": {
+      "name": "J.Re03",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          100.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re04  5 claims 100 xs 0 dsev  [1:100]           occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
+    "kind": "agg",
+    "name": "J.Re04",
+    "spec": {
+      "name": "J.Re04",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          100.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re05  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson": {
+    "kind": "agg",
+    "name": "J.Re05",
+    "spec": {
+      "name": "J.Re05",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg J.Re06  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate ceded to 50% so 25 xs 0 and 75 xs 25": {
+    "kind": "agg",
+    "name": "J.Re06",
+    "spec": {
+      "name": "J.Re06",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          75.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg J.Re07  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
+    "kind": "agg",
+    "name": "J.Re07",
+    "spec": {
+      "name": "J.Re07",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          100.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg J.Re08  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
+    "kind": "agg",
+    "name": "J.Re08",
+    "spec": {
+      "name": "J.Re08",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          5.0,
+          0.0
+        ],
+        [
+          0.3333333333333333,
+          15.0,
+          5.0
+        ],
+        [
+          1.0,
+          30.0,
+          20.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          0.5,
+          25.0,
+          0.0
+        ],
+        [
+          1.0,
+          100.0,
+          25.0
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg J.Re09  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 15 xs 5 poisson": {
+    "kind": "agg",
+    "name": "J.Re09",
+    "spec": {
+      "name": "J.Re09",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          1.0,
+          15.0,
+          5.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg J.Re10  5 claims 100 xs 0 sev lognorm 10 cv .75                            poisson aggregate net of   20 xs 0": {
+    "kind": "agg",
+    "name": "J.Re10",
+    "spec": {
+      "name": "J.Re10",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          20.0,
+          0.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re11  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 15 xs 5 poisson aggregate net of   20 xs 0": {
+    "kind": "agg",
+    "name": "J.Re11",
+    "spec": {
+      "name": "J.Re11",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.75,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          1.0,
+          15.0,
+          5.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          20.0,
+          0.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re12  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 15 xs 5 poisson aggregate net of   20 xs 0": {
+    "kind": "agg",
+    "name": "J.Re12",
+    "spec": {
+      "name": "J.Re12",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "occ_reins": [
+        [
+          1.0,
+          15.0,
+          5.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          20.0,
+          0.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re13  5 claims 100 xs 0 dsev  [1:100]           occurrence net of   15 xs 5 poisson aggregate ceded to 20 xs 0": {
+    "kind": "agg",
+    "name": "J.Re13",
+    "spec": {
+      "name": "J.Re13",
+      "exp_en": 5.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "occ_reins": [
+        [
+          1.0,
+          15.0,
+          5.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          20.0,
+          0.0
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv  [.2 .35 .5]  wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 xs 2.0       mixed gamma 0.5  aggregate ceded to 1.5 xs 1.5 and 5.0 po 10.0 xs 12.5": {
+    "kind": "agg",
+    "name": "J.Re14",
+    "spec": {
+      "name": "J.Re14",
+      "exp_premium": 1000.0,
+      "exp_lr": 0.5,
+      "exp_el": 500.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": [
+        0.2,
+        0.35,
+        0.5
+      ],
+      "sev_scale": 1.0,
+      "sev_wt": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          1.0,
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          1.0,
+          1.0
+        ],
+        [
+          0.25,
+          3.0,
+          2.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "gamma",
+      "freq_a": 0.5,
+      "agg_reins": [
+        [
+          1.0,
+          1.5,
+          1.5
+        ],
+        [
+          0.5,
+          10.0,
+          12.5
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 xs 1 and 2.5 po 5 xs 5 and 25% so 30 xs 20 and inf xs 100 poisson          aggregate net of 10 xs 15": {
+    "kind": "agg",
+    "name": "J.Re15",
+    "spec": {
+      "name": "J.Re15",
+      "exp_en": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 3.0,
+      "sev_cv": 0.35,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "occ_reins": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.5,
+          5.0,
+          5.0
+        ],
+        [
+          0.25,
+          30.0,
+          20.0
+        ],
+        [
+          1.0,
+          "__inf__",
+          100.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          10.0,
+          15.0
+        ]
+      ],
+      "agg_kind": "net of",
+      "note": ""
+    }
+  },
+  "agg J.Re16 5 claims dsev  [0:100]  occurrence ceded to tower  [10:50:10]  poisson": {
+    "kind": "agg",
+    "name": "J.Re16",
+    "spec": {
+      "name": "J.Re16",
+      "exp_en": 5.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901
+      ],
+      "occ_reins": [
+        [
+          1.0,
+          10.0,
+          10.0
+        ],
+        [
+          1.0,
+          10.0,
+          20.0
+        ],
+        [
+          1.0,
+          10.0,
+          30.0
+        ],
+        [
+          1.0,
+          10.0,
+          40.0
+        ]
+      ],
+      "occ_kind": "ceded to",
+      "freq_name": "poisson",
+      "note": ""
+    }
+  },
+  "agg J.Re17 5 claims dsev  [0:100]  poisson aggregate ceded to tower  [200:500:100]": {
+    "kind": "agg",
+    "name": "J.Re17",
+    "spec": {
+      "name": "J.Re17",
+      "exp_en": 5.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0,
+        40.0,
+        41.0,
+        42.0,
+        43.0,
+        44.0,
+        45.0,
+        46.0,
+        47.0,
+        48.0,
+        49.0,
+        50.0,
+        51.0,
+        52.0,
+        53.0,
+        54.0,
+        55.0,
+        56.0,
+        57.0,
+        58.0,
+        59.0,
+        60.0,
+        61.0,
+        62.0,
+        63.0,
+        64.0,
+        65.0,
+        66.0,
+        67.0,
+        68.0,
+        69.0,
+        70.0,
+        71.0,
+        72.0,
+        73.0,
+        74.0,
+        75.0,
+        76.0,
+        77.0,
+        78.0,
+        79.0,
+        80.0,
+        81.0,
+        82.0,
+        83.0,
+        84.0,
+        85.0,
+        86.0,
+        87.0,
+        88.0,
+        89.0,
+        90.0,
+        91.0,
+        92.0,
+        93.0,
+        94.0,
+        95.0,
+        96.0,
+        97.0,
+        98.0,
+        99.0,
+        100.0
+      ],
+      "sev_ps": [
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901,
+        0.009900990099009901
+      ],
+      "freq_name": "poisson",
+      "agg_reins": [
+        [
+          1.0,
+          100.0,
+          200.0
+        ],
+        [
+          1.0,
+          100.0,
+          300.0
+        ],
+        [
+          1.0,
+          100.0,
+          400.0
+        ]
+      ],
+      "agg_kind": "ceded to",
+      "note": ""
+    }
+  },
+  "agg K.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv}": {
+    "kind": "agg",
+    "name": "K.Tweedie0",
+    "spec": {
+      "name": "K.Tweedie0",
+      "exp_en": 10.050251256281404,
+      "sev_name": "gamma",
+      "sev_mean": 0.0995,
+      "sev_cv": 0.07088812050083283,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "Tweedie defined by claim count, gamma mean and cv"
+    }
+  },
+  "agg K.Tweedie1 10.050251256281404 claims sev 0.0005 * gamma 199 poisson                  note{Tweedie defined by claim count, gamma scale and shape}": {
+    "kind": "agg",
+    "name": "K.Tweedie1",
+    "spec": {
+      "name": "K.Tweedie1",
+      "exp_en": 10.050251256281404,
+      "sev_name": "gamma",
+      "sev_a": 199.0,
+      "sev_scale": 0.0005,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "Tweedie defined by claim count, gamma scale and shape"
+    }
+  },
+  "agg K.Tweedie2 tweedie 1 1.005 0.1                                                       note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p}": {
+    "kind": "agg",
+    "name": "K.Tweedie2",
+    "spec": {
+      "name": "K.Tweedie2",
+      "exp_en": 10.050251256281404,
+      "freq_name": "poisson",
+      "sev_name": "gamma",
+      "sev_a": 199.00000000000426,
+      "sev_scale": 0.0004999999999999894,
+      "note": "Tw(p=1.005, \u03bc=1.0, \u03c3^2=0.1) --> CP(\u03bb= 10.0503, ga(\u03b1=199, \u03b2=0.0005), scale=0.0005"
+    }
+  },
+  "port L.Bodoff1 note{Bodoff Thought Experiment No. 1} agg wind1  1 claim sev dhistogram xps  [0,  99]   [0.80, 0.20]  fixed agg quake1 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
+    "kind": "port",
+    "name": "L.Bodoff1",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "wind1",
+          {
+            "name": "wind1",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              99.0
+            ],
+            "sev_ps": [
+              0.8,
+              0.2
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "quake1",
+          {
+            "name": "quake1",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              100.0
+            ],
+            "sev_ps": [
+              0.95,
+              0.05
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ]
+      ],
+      "note": "Bodoff Thought Experiment No. 1"
+    }
+  },
+  "port L.Bodoff2 note{Bodoff Thought Experiment No. 2} agg wind2  1 claim sev dhistogram xps  [0,  50]   [0.80, 0.20]  fixed agg quake2 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
+    "kind": "port",
+    "name": "L.Bodoff2",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "wind2",
+          {
+            "name": "wind2",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              50.0
+            ],
+            "sev_ps": [
+              0.8,
+              0.2
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "quake2",
+          {
+            "name": "quake2",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              100.0
+            ],
+            "sev_ps": [
+              0.95,
+              0.05
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ]
+      ],
+      "note": "Bodoff Thought Experiment No. 2"
+    }
+  },
+  "port L.Bodoff3 note{Bodoff Thought Experiment No. 3} agg wind3  1 claim sev dhistogram xps  [0,   5]   [0.80, 0.20]  fixed agg quake3 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
+    "kind": "port",
+    "name": "L.Bodoff3",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "wind3",
+          {
+            "name": "wind3",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              5.0
+            ],
+            "sev_ps": [
+              0.8,
+              0.2
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "quake3",
+          {
+            "name": "quake3",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              100.0
+            ],
+            "sev_ps": [
+              0.95,
+              0.05
+            ],
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ]
+      ],
+      "note": "Bodoff Thought Experiment No. 3"
+    }
+  },
+  "port L.Bodoff4 note{Bodoff Thought Experiment No. 4 (check!)} agg a 0.25 claims sev   4 * expon poisson agg b 0.05 claims sev  20 * expon poisson agg c 0.05 claims sev 100 * expon poisson": {
+    "kind": "port",
+    "name": "L.Bodoff4",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "a",
+          {
+            "name": "a",
+            "exp_en": 0.25,
+            "sev_name": "expon",
+            "sev_scale": 4.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "b",
+          {
+            "name": "b",
+            "exp_en": 0.05,
+            "sev_name": "expon",
+            "sev_scale": 20.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "c",
+          {
+            "name": "c",
+            "exp_en": 0.05,
+            "sev_name": "expon",
+            "sev_scale": 100.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": ""
+          }
+        ]
+      ],
+      "note": "Bodoff Thought Experiment No. 4 (check!)"
+    }
+  },
+  "port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev  [0 8 10]   [1/2 1/4 1/4]  fixed agg Discrete.X2 1 claim dsev  [0 1 90]   [1/2 1/4 1/4]  fixed note{bs=1; log2=8; padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.1.Discrete",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Discrete.X1",
+          {
+            "name": "Discrete.X1",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              8.0,
+              10.0
+            ],
+            "sev_ps": [
+              0.5,
+              0.25,
+              0.25
+            ],
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "Discrete.X2",
+          {
+            "name": "Discrete.X2",
+            "exp_en": 1.0,
+            "sev_name": "dhistogram",
+            "sev_xs": [
+              0.0,
+              1.0,
+              90.0
+            ],
+            "sev_ps": [
+              0.5,
+              0.25,
+              0.25
+            ],
+            "freq_name": "fixed",
+            "note": "bs=1; log2=8; padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Discrete case study. Change 8 to 9 for the equal points example."
+    }
+  },
+  "port M.PIR.2.Tame note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed note{bs=1/64, log2=16, padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.2.Tame",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Tame.A",
+          {
+            "name": "Tame.A",
+            "exp_en": 1.0,
+            "sev_name": "gamma",
+            "sev_mean": 50.0,
+            "sev_cv": 0.1,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "Tame.B",
+          {
+            "name": "Tame.B",
+            "exp_en": 1.0,
+            "sev_name": "gamma",
+            "sev_mean": 50.0,
+            "sev_cv": 0.15,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": "bs=1/64, log2=16, padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Tame case study. For reinsurance see text."
+    }
+  },
+  "port M.PIR.3.CNC.Gross note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed note{bs=1/64, log2=16, padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.3.CNC.Gross",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "CNC.NonCat",
+          {
+            "name": "CNC.NonCat",
+            "exp_en": 1.0,
+            "sev_name": "gamma",
+            "sev_mean": 80.0,
+            "sev_cv": 0.15,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "CNC.Cat",
+          {
+            "name": "CNC.Cat",
+            "exp_en": 1.0,
+            "sev_name": "lognorm",
+            "sev_mean": 20.0,
+            "sev_cv": 1.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": "bs=1/64, log2=16, padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Cat-Noncat gross case study."
+    }
+  },
+  "port M.PIR.4.CNC.Net note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 note{bs=1/64, log2=16, padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.4.CNC.Net",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "CNC.Net.NonCat",
+          {
+            "name": "CNC.Net.NonCat",
+            "exp_en": 1.0,
+            "sev_name": "gamma",
+            "sev_mean": 80.0,
+            "sev_cv": 0.15,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "CNC.Net.Cat",
+          {
+            "name": "CNC.Net.Cat",
+            "exp_en": 1.0,
+            "sev_name": "lognorm",
+            "sev_mean": 20.0,
+            "sev_cv": 1.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "agg_reins": [
+              [
+                1.0,
+                79.64,
+                41.11
+              ]
+            ],
+            "agg_kind": "net of",
+            "note": "bs=1/64, log2=16, padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Cat-Noncat net case study."
+    }
+  },
+  "port M.PIR.5.HuSCS.Gross note{PIR Hurricane SCS gross case study.} agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson note{bs=1/4, log2=19, padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.5.HuSCS.Gross",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "SCS",
+          {
+            "name": "SCS",
+            "exp_en": 70.0,
+            "sev_name": "lognorm",
+            "sev_a": 1.9,
+            "sev_scale": 6.079971448520339,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "Hu",
+          {
+            "name": "Hu",
+            "exp_en": 2.0,
+            "sev_name": "lognorm",
+            "sev_a": 2.5,
+            "sev_scale": 341.39842640290095,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": "bs=1/4, log2=19, padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Hurricane SCS gross case study."
+    }
+  },
+  "port M.PIR.6.HuSCS.Net note{PIR Hurricane SCS net case study.} agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson note{bs=1/4, log2=19, padding=1}": {
+    "kind": "port",
+    "name": "M.PIR.6.HuSCS.Net",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Net.SCS",
+          {
+            "name": "Net.SCS",
+            "exp_en": 70.0,
+            "sev_name": "lognorm",
+            "sev_a": 1.9,
+            "sev_scale": 6.079971448520339,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": ""
+          }
+        ],
+        [
+          "agg",
+          "Net.Hu",
+          {
+            "name": "Net.Hu",
+            "exp_en": 2.0,
+            "sev_name": "lognorm",
+            "sev_a": 2.5,
+            "sev_scale": 341.39842640290095,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "occ_reins": [
+              [
+                1.0,
+                372.4,
+                40.25
+              ]
+            ],
+            "occ_kind": "net of",
+            "freq_name": "poisson",
+            "note": "bs=1/4, log2=19, padding=1"
+          }
+        ]
+      ],
+      "note": "PIR Hurricane SCS net case study."
+    }
+  },
+  "agg N.US.Hurricane 1.79 claims 1e12 xs 0 sev exp(19.595) * lognorm 2.581 poisson  note{Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.}": {
+    "kind": "agg",
+    "name": "N.US.Hurricane",
+    "spec": {
+      "name": "N.US.Hurricane",
+      "exp_en": 1.79,
+      "exp_attachment": 0.0,
+      "exp_limit": 1000000000000.0,
+      "sev_name": "lognorm",
+      "sev_a": 2.581,
+      "sev_scale": 323593934.7739501,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course."
+    }
+  },
+  "agg N.US.SCS      37.50 claims 50e9 xs 0 sev exp(18.785550228504665) * lognorm 1.75 poisson note{Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B}": {
+    "kind": "agg",
+    "name": "N.US.SCS",
+    "spec": {
+      "name": "N.US.SCS",
+      "exp_en": 37.5,
+      "exp_attachment": 0.0,
+      "exp_limit": 50000000000.0,
+      "sev_name": "lognorm",
+      "sev_a": 1.75,
+      "sev_scale": 144032601.10870516,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B"
+    }
+  },
+  "agg N.Comm.Liability     10e6 loss 1e6 xs 0   sev lognorm 100e3 cv 3.77 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Comm.Liability",
+    "spec": {
+      "name": "N.Comm.Liability",
+      "exp_el": 10000000.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 1000000.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100000.0,
+      "sev_cv": 3.77,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.26,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "agg N.Comm.Professional  10e6 loss 5e6 xs 0   sev lognorm 850e3 cv 8.48 mixed gamma 0.27 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Comm.Professional",
+    "spec": {
+      "name": "N.Comm.Professional",
+      "exp_el": 10000000.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 5000000.0,
+      "sev_name": "lognorm",
+      "sev_mean": 850000.0,
+      "sev_cv": 8.48,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.27,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "agg N.Personal.Auto            10e6 loss 300e3 xs 0 sev lognorm  45e3 cv 20.4 mixed gamma 0.13 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Personal.Auto",
+    "spec": {
+      "name": "N.Personal.Auto",
+      "exp_el": 10000000.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 300000.0,
+      "sev_name": "lognorm",
+      "sev_mean": 45000.0,
+      "sev_cv": 20.4,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.13,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "agg N.Comm.Umbrella  [6e6 3e6 1e6]  loss  [1e6 4e6 5e6]  xs  [1e6 1e6 5e6]  sev lognorm 250e3 cv 5.00 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Comm.Umbrella",
+    "spec": {
+      "name": "N.Comm.Umbrella",
+      "exp_el": [
+        6000000.0,
+        3000000.0,
+        1000000.0
+      ],
+      "exp_attachment": [
+        1000000.0,
+        1000000.0,
+        5000000.0
+      ],
+      "exp_limit": [
+        1000000.0,
+        4000000.0,
+        5000000.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 250000.0,
+      "sev_cv": 5.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.26,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "agg N.Comm.Property  [7e6 3e6]  loss 100e6 xs 0 sev 100e6 * beta 0.1 cv  [1.25 2.5]  mixed gamma 0.28 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Comm.Property",
+    "spec": {
+      "name": "N.Comm.Property",
+      "exp_el": [
+        7000000.0,
+        3000000.0
+      ],
+      "exp_attachment": 0.0,
+      "exp_limit": 100000000.0,
+      "sev_name": "beta",
+      "sev_mean": 10000000.0,
+      "sev_cv": [
+        1.25,
+        2.5
+      ],
+      "sev_scale": 100000000.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.28,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "agg N.Homeowners           [8e6 2e6]  loss 650e3 xs 0 sev 650e3 * beta 0.1 cv  [0.75 2.75]  mixed gamma 0.37 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
+    "kind": "agg",
+    "name": "N.Homeowners",
+    "spec": {
+      "name": "N.Homeowners",
+      "exp_el": [
+        8000000.0,
+        2000000.0
+      ],
+      "exp_attachment": 0.0,
+      "exp_limit": 650000.0,
+      "sev_name": "beta",
+      "sev_mean": 65000.0,
+      "sev_cv": [
+        0.75,
+        2.75
+      ],
+      "sev_scale": 650000.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "gamma",
+      "freq_a": 0.37,
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+    }
+  },
+  "sev N.Comm.Auto.MED  [2.764e3 24.548e3 275.654e3 1.917469e6 10e6]  * expon 1 wts  [0.824796 0.159065 0.014444 0.001624 0.000071]  note{Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)}": {
+    "kind": "sev",
+    "name": "N.Comm.Auto.MED",
+    "spec": {
+      "sev_name": "expon",
+      "sev_a": 1.0,
+      "sev_scale": [
+        2764.0,
+        24548.0,
+        275654.0,
+        1917469.0,
+        10000000.0
+      ],
+      "sev_wt": [
+        0.824796,
+        0.159065,
+        0.014444,
+        0.001624,
+        7.1e-05
+      ],
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "name": "N.Comm.Auto.MED",
+      "note": "Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)"
+    }
+  },
+  "agg O.Logo 1 claim  [10:250:10]  xs 0 sev lognorm 100 cv 1 fixed": {
+    "kind": "agg",
+    "name": "O.Logo",
+    "spec": {
+      "name": "O.Logo",
+      "exp_en": 1.0,
+      "exp_attachment": 0.0,
+      "exp_limit": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0,
+        110.0,
+        120.0,
+        130.0,
+        140.0,
+        150.0,
+        160.0,
+        170.0,
+        180.0,
+        190.0,
+        200.0,
+        210.0,
+        220.0,
+        230.0,
+        240.0,
+        250.0
+      ],
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  }
+}

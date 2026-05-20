@@ -1,0 +1,309 @@
+// Grammar for the DecL (Declarative Language) DSL used by aggregate/parser.py.
+//
+// Loaded with:
+//   Lark.open('decl.lark', start='answer', parser='earley',
+//             lexer='dynamic', maybe_placeholders=True)
+//
+// Migrated from SLY (LALR + hand-tuned %prec hacks) in 2026. Earley dissolves
+// the 16 prior shift/reduce conflicts and the dynamic lexer makes keyword/ID
+// disambiguation contextual, so the SLY `ID['keyword'] = TOKEN` remapping
+// trick is replaced by terminal priorities (keywords priority 2, ID priority
+// 1, builtin-dotted names priority 3).
+//
+// Each alternative carries a `-> alias` so the UnderwritingTransformer in
+// parser.py can dispatch on it.
+
+// ======================================================================
+// Top-level
+// ======================================================================
+
+answer: sev_out          -> answer_sev
+      | agg_out          -> answer_agg
+      | port_out         -> answer_port
+      | distortion_out   -> answer_distortion
+      | expr             -> answer_expr
+
+// ======================================================================
+// Distortion
+// ======================================================================
+
+distortion_out: DISTORTION name ID expr                       -> distortion_out_short
+              | DISTORTION name ID expr "[" numberl "]"       -> distortion_out_long
+
+// ======================================================================
+// Portfolio
+// ======================================================================
+
+port_out: PORT name note agg_list
+
+agg_list: agg_list agg_out   -> agg_list_cons
+        | agg_out            -> agg_list_one
+
+// ======================================================================
+// Aggregate
+// ======================================================================
+
+agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins note  -> agg_out_full
+       | AGG name dfreq      layers sev_clause occ_reins         agg_reins note  -> agg_out_dfreq
+       | AGG name TWEEDIE expr expr expr note                                    -> agg_out_tweedie
+       | AGG name builtin_agg occ_reins agg_reins note                           -> agg_out_rename
+       | builtin_agg agg_reins note                                              -> agg_out_builtin
+
+// ======================================================================
+// Severity output (standalone `sev X ...` definitions)
+// ======================================================================
+
+sev_out: SEV name sev note    -> sev_out_sev
+       | SEV name dsev note   -> sev_out_dsev
+
+// ======================================================================
+// Frequency
+// ======================================================================
+
+freq: freq ZM expr             -> freq_zm
+    | freq ZT                  -> freq_zt
+    | MIXED ID expr expr       -> freq_mixed_two
+    | MIXED ID expr            -> freq_mixed_one
+    | FREQ expr expr           -> freq_two
+    | FREQ expr                -> freq_one
+    | FREQ                     -> freq_zero
+
+// ======================================================================
+// Reinsurance
+// ======================================================================
+
+agg_reins: AGGREGATE NET OF reins_list    -> agg_reins_net
+         | AGGREGATE CEDED TO reins_list  -> agg_reins_ceded
+         |                                -> agg_reins_none
+
+occ_reins: OCCURRENCE NET OF reins_list   -> occ_reins_net
+         | OCCURRENCE CEDED TO reins_list -> occ_reins_ceded
+         |                                -> occ_reins_none
+
+reins_list: reins_list AND reins_clause   -> reins_list_cons
+          | reins_clause                  -> reins_list_one
+          | tower                         -> reins_list_tower
+
+reins_clause: expr XS expr                   -> reins_clause_xs
+            | expr SHARE_OF expr XS expr     -> reins_clause_share
+            | expr PART_OF expr XS expr      -> reins_clause_part
+
+// ======================================================================
+// Severity (continuous: scipy.stats wrappers)
+// ======================================================================
+
+sev_clause: SEV sev          -> sev_clause_sev
+          | dsev             -> sev_clause_dsev
+          | BUILTIN_SEV      -> sev_clause_builtin
+
+sev: sev "!"                 -> sev_unconditional
+   | sev picks               -> sev_picks
+   | sev2 weights splice     -> sev_weighted
+   | BUILTIN_SEV             -> sev_builtin
+
+sev2: sev1 PLUS numbers      -> sev2_add
+    | sev1 MINUS numbers     -> sev2_sub
+    | sev1                   -> sev2_passthrough
+
+sev1: numbers TIMES sev0     -> sev1_scaled
+    | sev0                   -> sev1_passthrough
+
+sev0: ids numbers CV numbers   -> sev0_mean_cv
+    | ids numbers numbers      -> sev0_two_params
+    | ids numbers              -> sev0_one_param
+    | ids xps                  -> sev0_xps
+    | ids                      -> sev0_zero_params
+
+xps: XPS doutcomes dprobs
+
+dsev: DSEV doutcomes dprobs   -> dsev_main
+    | dsev "!"                -> dsev_unconditional
+
+dfreq: DFREQ doutcomes dprobs
+
+picks: PICKS "[" numberl "]" "[" numberl "]"
+
+doutcomes: "[" numberl "]"                          -> doutcomes_list
+         | "[" expr RANGE expr "]"                  -> doutcomes_range
+         | "[" expr RANGE expr RANGE expr "]"       -> doutcomes_range_step
+
+dprobs: "[" numberl "]"   -> dprobs_list
+      |                   -> dprobs_none
+
+weights: WEIGHTS EQUAL_WEIGHT expr     -> weights_equal
+       | WEIGHTS "[" numberl "]"        -> weights_list
+       |                                 -> weights_none
+
+splice: SPLICE "[" numberl "]" "[" numberl "]"   -> splice_two
+      | SPLICE "[" numberl "]"                   -> splice_one
+      |                                           -> splice_none
+
+// ======================================================================
+// Layers
+// ======================================================================
+
+layers: numbers XS numbers   -> layers_xs
+      | tower                -> layers_tower
+      |                      -> layers_none
+
+tower: TOWER doutcomes
+
+// ======================================================================
+// Note (optional trailing `note{...}` clause)
+// ======================================================================
+
+note: NOTE   -> note_some
+    |        -> note_none
+
+// ======================================================================
+// Exposures
+// ======================================================================
+
+exposures: numbers CLAIMS                       -> exposures_claims
+         | numbers LOSS                         -> exposures_loss
+         | numbers PREMIUM AT numbers LR        -> exposures_premium_lr
+         | numbers EXPOSURE AT numbers RATE     -> exposures_exposure_rate
+
+// ======================================================================
+// IDs (severity-name lists or singletons)
+// ======================================================================
+
+ids: "[" idl "]"   -> ids_list
+   | ID            -> ids_single
+
+idl: idl ID        -> idl_cons
+   | ID            -> idl_one
+
+// ======================================================================
+// Builtin aggregate operations (scale, translate, lookup)
+// ======================================================================
+
+builtin_agg: expr INHOMOG_MULTIPLY builtin_agg   -> builtin_agg_inhomog
+           | expr TIMES builtin_agg              -> builtin_agg_homog
+           | builtin_agg PLUS expr               -> builtin_agg_plus
+           | builtin_agg MINUS expr              -> builtin_agg_minus
+           | BUILTIN_AGG                         -> builtin_agg_lookup
+
+// ======================================================================
+// Name (single identifier wrapper)
+// ======================================================================
+
+name: ID
+
+// ======================================================================
+// Numbers (vectors and scalars)
+// ======================================================================
+
+numbers: "[" numberl "]"                            -> numbers_list
+       | "[" expr RANGE expr "]"                    -> numbers_range
+       | "[" expr RANGE expr RANGE expr "]"         -> numbers_range_step
+       | expr                                       -> numbers_scalar
+
+numberl: numberl expr   -> numberl_cons
+       | expr           -> numberl_one
+
+// ======================================================================
+// Expression atoms (the DecL math sub-language)
+// ----------------------------------------------------------------------
+// Precedence (tightest first):  ()  >  EXP  >  EXPONENT (** / ^)  >  /
+// EXPONENT is right-associative (2**3**4 == 2**(3**4));
+// DIVIDE is left-associative (1/2/3 == (1/2)/3).
+// `?term` and `?factor` are inlined when they have a single child, so
+// the transformer only sees the aliased nodes (atom_divide, atom_exp,
+// atom_exponent, atom_parens, atom_number).
+// ======================================================================
+
+?expr: term
+
+?term: term DIVIDE factor       -> atom_divide
+     | factor
+
+?factor: EXP factor             -> atom_exp
+       | atom EXPONENT factor   -> atom_exponent
+       | atom
+
+atom: NUMBER                    -> atom_number
+    | "(" expr ")"              -> atom_parens
+
+// ======================================================================
+// Terminals
+// ======================================================================
+
+// Keywords — priority 2 so they outrank the catch-all ID terminal.
+OCCURRENCE.2: "occurrence"
+AGGREGATE.2:  "aggregate"
+EXPOSURE.2:   "exposure"
+TWEEDIE.2:    "tweedie"
+PREMIUM.2:    "premium" | "prem"
+TOWER.2:      "tower"
+MIXED.2:      "mixed"
+PICKS.2:      "picks"
+CLAIMS.2:     "claims" | "claim"
+SPLICE.2:     "splice"
+CEDED.2:      "ceded"
+DFREQ.2:      "dfreq"
+DSEV.2:       "dsev"
+LOSS.2:       "loss"
+PORT.2:       "port"
+RATE.2:       "rate"
+NET.2:        "net"
+SEV.2:        "sev"
+AGG.2:        "agg"
+XPS.2:        "xps"
+WEIGHTS.2:    "wts"
+AND.2:        "and"
+EXP.2:        "exp"
+AT.2:         "at"
+CV.2:         "cv"
+LR.2:         "lr"
+XS.2:         "xs"
+OF.2:         "of"
+TO.2:         "to"
+PART_OF.2:    "po"
+SHARE_OF.2:   "so"
+ZM.2:         "zm"
+ZT.2:         "zt"
+DISTORTION.2: "distortion" | "dist"
+
+FREQ.2: "binomial" | "pascal" | "poisson" | "bernoulli" | "geometric"
+      | "fixed" | "neymanA" | "neymana" | "neyman" | "logarithmic" | "negbin"
+
+// agg.X / sev.X / note{...} — priority 3 outranks the AGG / SEV / ID
+// alternatives that share their prefix.
+BUILTIN_AGG.3: /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_SEV.3: /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+NOTE.3:        /note\{[^}]*\}/
+
+// NUMBER absorbs an optional leading minus so `-3` is one token rather than
+// MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
+NUMBER.2: /-?(\d+\.?\d*|\d*\.\d+)([eE][+\-]?\d+)?%?|-?inf/
+
+// ID is the catch-all identifier — priority 1 (default).
+// Two negative lookaheads at the start of the match make the grammar
+// unambiguous:
+//   1. (?!agg\.|sev\.)         — anything starting with agg. or sev. is
+//                                BUILTIN_AGG / BUILTIN_SEV territory.
+//   2. (?!keyword(?![namechar])) — reject a keyword standing alone (i.e.,
+//                                followed by a non-name character or end
+//                                of input). Names containing a keyword as
+//                                a prefix (e.g., `premium_account`,
+//                                `aggressive`) still lex as ID because
+//                                the inner lookahead fails when the next
+//                                character is itself a name character.
+// Without these lookaheads, Earley + the dynamic lexer would explore
+// both the keyword and ID interpretations for inputs like `dsev` or
+// `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
+// heuristics to land on the intended parse.
+ID: /(?!agg\.|sev\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|po|poisson|port|prem|premium|rate|sev|so|splice|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+
+EXPONENT:         "**" | "^"
+PLUS:             "+"
+MINUS:            "-"
+TIMES:            "*"
+DIVIDE:           "/"
+INHOMOG_MULTIPLY: "@"
+EQUAL_WEIGHT:     "="
+RANGE:            ":"
+
+// Whitespace + noise. Mirrors SLY's `ignore = ' \t,\\|'`.
+%ignore /[ \t,\\|]+/

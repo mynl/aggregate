@@ -29,7 +29,6 @@ from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *
 from .decl_pygments import *
-from .sly import *
 from .agg_magics import *
 
 import sys

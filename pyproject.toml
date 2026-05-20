@@ -32,6 +32,7 @@ dependencies = [
     "cycler",
     "ipykernel",
     "jinja2",
+    "lark>=1.1",
     "matplotlib>=3.5",
     "numpy>=1.26",
     "pandas>=2.1",
@@ -66,12 +67,25 @@ dev = [
     "sphinx_rtd_theme>=2.0",
     "sphinxcontrib-bibtex",
     "sphinx-multitoc-numbering",
-    "sphinx-design"
+    "sphinx-design",
+    "pytest>=7",
+]
+notebook = [
+    "jupyterlab",
+    "ipywidgets",
+    "jupytext",
 ]
 
 [tool.setuptools]
 include-package-data = true
-packages = ["aggregate", "aggregate.extensions", "aggregate.sly"]
+packages = ["aggregate", "aggregate.extensions"]
+
+[tool.setuptools.package-data]
+aggregate = ["*.lark", "agg/*.agg", "templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
 
 #[tool.setuptools.packages.find]
 #where = ["."]

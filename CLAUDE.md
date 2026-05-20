@@ -12,14 +12,22 @@ Published at https://aggregate.readthedocs.io/ and https://github.com/mynl/aggre
 
 Use `uv` for all environment and dependency management.
 
+**Set `UV_LINK_MODE=copy` whenever invoking `uv`.** The repo lives on a path where uv's default hardlink mode falls back with a warning; copy mode is the supported choice here. The repo's `.claude/settings.local.json` sets this automatically for the Claude harness; in a regular shell run `export UV_LINK_MODE=copy` (POSIX) or `$env:UV_LINK_MODE = "copy"` (PowerShell).
+
 **Sync environment:**
 ```
 uv sync
 ```
 
-**Install with dev extras:**
+**Install with dev extras** (docs build, pytest):
 ```
 uv sync --extra dev
+```
+
+**Install with notebook extras** (JupyterLab, widgets, jupytext — for interactive testing/hacking):
+```
+uv sync --extra notebook
+uv run jupyter lab
 ```
 
 **Run anything in the managed environment:**
@@ -28,11 +36,17 @@ uv run python ...
 uv run jupyter notebook
 ```
 
-**Run the interpreter test suite** (primary test mechanism — no pytest):
+**Run the pytest suite** (primary test mechanism):
+```
+uv run pytest
+```
+Tests live in `tests/`. Every line of `aggregate/agg/test_suite.agg` is exercised as its own parametrized test case (one assert-parses test and one shape-regression test against a captured SLY snapshot).
+
+**Generate the visual report** (HTML with plots, optional):
 ```
 uv run python -m aggregate.extensions.test_suite
 ```
-This reads `aggregate/agg/test_suite.agg` (500+ DecL examples), builds all objects, and generates an HTML report.
+This builds every object in `test_suite.agg`, plots it, and writes an HTML page. Useful for spot-checking the full DecL → build → statistics pipeline.
 
 **Build documentation:**
 ```
@@ -67,14 +81,13 @@ Frequency          ← base class for frequency distributions
 | `portfolio.py` | `Portfolio` — multi-unit analysis, diversification, capital allocation |
 | `spectral.py` | `Distortion` — risk measures (TVaR, Wang, PH, biTVaR, etc.) |
 | `underwriter.py` | `Underwriter` — knowledge base, persistence, top-level `build()` entry point |
-| `parser.py` | `UnderwritingLexer` / `UnderwritingParser` — DecL lexer/parser using bundled SLY |
+| `parser.py` | `UnderwritingLexer` / `UnderwritingParser` — DecL lexer/parser using Lark (Earley + dynamic lexer); grammar in `decl.lark` |
+| `decl.lark` | The DecL grammar — single source of truth for the language |
 | `utilities.py` | FFT helpers, quantile/TVaR functions, plotting, moment utilities |
 | `bounds.py` | `Bounds` — pricing bounds (IME 2022 methodology) |
 | `constants.py` | Global constants and validation flag definitions |
 
-`aggregate/sly/` is a vendored copy of Dave Beazley's SLY lexer/parser library (vendored because SLY no longer publishes installable releases).
-
-`aggregate/extensions/` contains optional modules (case studies, figures, the test suite runner, Fourier tools, Tweedie distributions). These are not imported by the core package.
+`aggregate/extensions/` contains optional modules (case studies, figures, the visual test-suite reporter, Fourier tools, Tweedie distributions). These are not imported by the core package and are slated for removal at 1.0; anything important moves into the core then.
 
 ### DecL — the domain-specific language
 
@@ -86,7 +99,7 @@ agg MyBook
     occurrence net of 50 xs 0      # per-occurrence reinsurance
 ```
 
-`build('...')` is the primary public API — it parses DecL and returns an `Aggregate` or `Portfolio`. The full grammar is in `parser.py`; reference examples are in `aggregate/agg/test_suite.agg`.
+`build('...')` is the primary public API — it parses DecL and returns an `Aggregate` or `Portfolio`. The full grammar is in `aggregate/decl.lark`; reference examples are in `aggregate/agg/test_suite.agg`.
 
 ### Computation pattern
 
@@ -107,6 +120,17 @@ All new functions and any modified existing functions must include a docstring. 
 
 ## Testing
 
-There is no pytest suite. Integration testing is done through the interpreter test suite (`aggregate/extensions/test_suite.py`) which exercises the full DecL → build → statistics pipeline. The `.agg` file categories A–O cover frequencies, severities, reinsurance, distortions, case studies, and papers.
+The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. Each line of `aggregate/agg/test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:
+
+- `test_line_parses` — the line parses to a valid `(kind, name, spec)` shape.
+- `test_spec_matches_snapshot` — the spec matches `tests/data/expected_specs.json`, a snapshot captured from the legacy SLY parser before the Lark migration. This catches semantic drift in the grammar/transformer.
+
+The snapshot can be regenerated with `uv run python tests/capture_sly_snapshot.py` IF the SLY parser is restored from git history; otherwise treat it as a frozen reference.
+
+`aggregate/extensions/test_suite.py` is a visual reporter — it builds each object, plots it, writes HTML. It complements pytest but is not an assertion suite.
 
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
+
+## TODO
+
+- **Docs reference SLY-era grammar.** `docs/4_agg_language_reference/` describes the grammar in SLY's `@_` form and may mention shift/reduce conflicts. After the Lark migration both descriptions are stale; the grammar reference should `include` `aggregate/decl.lark` (or call `aggregate.parser.grammar(add_to_doc=True)` which writes `docs/4_agg_language_reference/ref_include.rst`).

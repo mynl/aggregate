@@ -1,46 +1,60 @@
-# from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass
 import logging
-import numpy as np
-import pandas as pd
 from pathlib import Path
 import re
-# from IPython.display import HTML, display
-# from inspect import signature
+from typing import Any
 
-from .constants import *
+import numpy as np
+import pandas as pd
+
+from .constants import WL, VALIDATION_EPS, RECOMMEND_P
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import (round_bucket, Answer,
-                        qd, show_fig, more,
-                        parse_note_ex)
+from .utilities import (round_bucket, qd, show_fig, more, parse_note_ex)
 
 logger = logging.getLogger(__name__)
 
 
-# rejected: immutable
-# WriteAnswer = namedtuple('WriteAnswer', ['kind', 'name', 'spec', 'program', 'object'])
+@dataclass
+class ParsedProgram:
+    """One DecL declaration after parsing, with optional constructed object.
+
+    Returned by :meth:`Underwriter.interpret_program` and used internally by
+    :meth:`Underwriter.factory` / :meth:`Underwriter.build`. The ``object``
+    field is ``None`` after parsing and is populated by :meth:`Underwriter.factory`
+    once the corresponding Aggregate / Severity / Portfolio / Distortion is built.
+    """
+    kind: str           # 'agg' | 'sev' | 'port' | 'distortion' | 'expr'
+    name: str           # the user-given name (e.g. 'Dice', 'MyBook')
+    spec: Any           # dict of kwargs for the constructor
+    program: str        # the original DecL source line
+    object: Any = None  # the constructed object once factory has run
 
 
 class Underwriter(object):
     """
-    The ``Underwriter`` class manages the creation of Aggregate and Portfolio objects, and
-    maintains a database of standard Severity (curves) and Aggregate (unit or line level) objects
-    called the knowledge base.
+    Manage the creation of Aggregate, Severity, Portfolio, and Distortion objects.
 
-    - Handles persistence to and from agg files
-    - Is interface into program parser
-    - Handles safe lookup from the knowledge for parser
+    Maintains a database of named DecL declarations (the "knowledge base") and
+    exposes the user-facing :meth:`build` entry point that parses a DecL program
+    and constructs the corresponding object(s).
 
-    Objects have a kind and a name. The kind is one of 'sev', 'agg' or 'port'. The name is a string.
-    They have a representation as a program. When the program is interpreted it produces a dictionary spec
-    that can be used to create the object. The static method factory can create any object from the
-    (kind, name, spec, program) quartet, though, strictly, program is not needed.
+    Responsibilities:
 
-    The underwriter knowledge is stored in a dataframe indexed by kind and name with columns
-    spec and program.
+    - Persist DecL programs to and from ``.agg`` files.
+    - Bridge to the parser (`UnderwritingLexer` / `UnderwritingParser`).
+    - Safe lookup of named programs from the knowledge base for the parser.
+
+    Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``, ``'port'``,
+    ``'distortion'``) and a *name*. Parsing produces a :class:`ParsedProgram`
+    holding the kind, name, dict spec, source program, and (once :meth:`factory`
+    runs) the constructed object.
+
+    The knowledge base is stored in ``self._knowledge`` — a DataFrame indexed
+    by ``(kind, name)`` with columns ``spec`` and ``program``.
     """
 
     def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False):
@@ -71,7 +85,6 @@ class Underwriter(object):
         self._parser = None
         # make sure all database entries are stored; they are read on demand
         self.databases = [] if databases is None else databases
-        # stop pyCharm complaining
 
         # do not read in until needed for faster loading
         self._default_dir = None
@@ -81,8 +94,8 @@ class Underwriter(object):
         self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
             ['kind', 'name'])
 
-        # ensure description prints correctly. A bit cheaky.
-        pd.set_option('display.max_colwidth', 100)
+        # (removed: was `pd.set_option('display.max_colwidth', 100)`; set in
+        # your own session if you want wider DataFrame column display)
 
     @property
     def lexer(self):
@@ -96,9 +109,12 @@ class Underwriter(object):
             self._parser = UnderwritingParser(self.safe_lookup, self.debug)
         return self._parser
 
+    # The four *_dir properties below are lazily resolved and mkdir on first
+    # access — downstream code in extensions/case_studies and the visual
+    # test_suite reporter relies on these directories existing.
     @property
     def default_dir(self):
-        # default_dir is installed by pip and contain installation files
+        """Installation directory holding the bundled ``.agg`` databases."""
         if self._default_dir is None:
             self._default_dir = Path(__file__).parent / 'agg'
             self._default_dir.mkdir(parents=True, exist_ok=True)
@@ -106,7 +122,7 @@ class Underwriter(object):
 
     @property
     def site_dir(self):
-        # site dir is in Users's home directory and stores their files
+        """User-local directory under ``~/aggregate/databases`` for custom ``.agg`` files."""
         if self._site_dir is None:
             self._site_dir = Path.home() / 'aggregate/databases'
             self._site_dir.mkdir(parents=True, exist_ok=True)
@@ -114,42 +130,44 @@ class Underwriter(object):
 
     @property
     def case_dir(self):
-        # case dir is in Users's home directory and stores their files
+        """User-local directory under ``~/aggregate/cases`` (used by case studies)."""
         if self._case_dir is None:
             self._case_dir = Path.home() / 'aggregate/cases'
-            # check case dir exists
             self._case_dir.mkdir(parents=True, exist_ok=True)
         return self._case_dir
 
     @property
     def template_dir(self):
-        # template dir is in Users's home directory and stores their files
+        """Packaged Jinja/HTML template directory."""
         if self._template_dir is None:
             self._template_dir = self.default_dir.parent / 'templates'
             self._template_dir.mkdir(parents=True, exist_ok=True)
         return self._template_dir
 
     def read_databases(self):
-        if self.databases is None:
-            # nothing to do
-            self.databases = []
-        elif self.databases == 'all':
-            self.databases = ['default', 'site']
-        elif type(self.databases) == str:
-            self.databases = [self.databases]
+        """
+        Resolve ``self.databases`` (the constructor argument) into a list of
+        files and read each one into the knowledge base. Does not mutate
+        ``self.databases`` — calling this twice is idempotent.
+        """
+        requested = self.databases
+        if not requested:
+            return
+        if requested == 'all':
+            requested = ['default', 'site']
+        elif isinstance(requested, str):
+            requested = [requested]
 
-        if 'default' in self.databases:
-            # add all databases in default_dir
-            self.databases.remove('default')
-            self.databases.extend(self.default_dir.glob('*.agg'))
+        files = []
+        for entry in requested:
+            if entry == 'default':
+                files.extend(self.default_dir.glob('*.agg'))
+            elif entry == 'site':
+                files.extend(self.site_dir.glob('*.agg'))
+            else:
+                files.append(entry)
 
-        if 'site' in self.databases:
-            # add all user databases
-            self.databases.remove('site')
-            self.databases.extend(self.site_dir.glob('*.agg'))
-
-        # actually read databases
-        for fn in self.databases:
+        for fn in files:
             self.read_database(fn)
 
     def read_database(self, fn):
@@ -178,26 +196,24 @@ class Underwriter(object):
         elif (self.default_dir / p).exists():
             db_path = self.default_dir / p
         else:
-            logger.error(f'Database {fn} not found. Ignoring.')
+            logger.error('Database %s not found. Ignoring.', fn)
             return
 
         try:
             program = db_path.read_text(encoding='utf-8')
-        except Exception as e:
-            logger.error(
-                f'Error reading requested database {db_path.name}. Ignoring.')
+        except OSError:
+            logger.exception('Error reading requested database %s. Ignoring.', db_path.name)
         else:
             # read in, parse, save to sev/agg/port dictionaries
             # throw away answer...not creating anything
             # get rid of cosmetic spaces, but keep newline tabs (2 or more spaces)
             program = re.sub('^  +', '\t', program, flags=re.MULTILINE)
             program = re.sub(' +', ' ', program)
-            logger.info(f'Reading database {fn}...')
+            logger.info('Reading database %s...', fn)
             n = len(self._knowledge)
             self.interpret_program(program)
             n = len(self._knowledge) - n
-            logger.info(
-                f'Database {fn} read into knowledge, adding {n} entries.')
+            logger.info('Database %s read into knowledge, adding %d entries.', fn, n)
 
     def __getitem__(self, item):
         """
@@ -231,87 +247,81 @@ class Underwriter(object):
             raise KeyError(f'Item {item} not found.')
         except TypeError as e:
             # TODO fix this "TypeError: unhashable type: 'slice'"
-            raise KeyError(f'getitem TypeError looking for {item}, {e}')
+            raise KeyError(f'getitem TypeError looking for {item}, {e}') from e
         else:
             if len(rows) == 1:
                 kind, name, spec, program = rows.reset_index().iloc[0]
-                return Answer(kind=kind, name=name, spec=spec, program=program, object=None)
+                return ParsedProgram(kind=kind, name=name, spec=spec, program=program)
             else:
                 raise KeyError(
                     f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
 
-    def __repr__(self):
-        import aggregate
-        s = []
-        s.append(f'underwriter        {self.name}')
-        s.append(f'version            {aggregate.__version__}')
-        s.append(f'knowledge          {len(self.knowledge)} programs')
-        s.append(f'update             {self.update}')
-        for k in ['log2', 'debug']:
-            s.append(f'{k:<19s}{getattr(self, k)}')
-        s.append(f'validation_eps     {VALIDATION_EPS}')
-        sd = self.site_dir.resolve().relative_to(Path.home())
-        sd = f'~/{sd}'
-        dd = self.default_dir.resolve()
+    @staticmethod
+    def _format_dir(path: Path) -> str:
+        """Render an absolute path as ``~/...`` if it lives under the user's home."""
         try:
-            dd = dd.relative_to(Path.home())
-            dd = f'~/{dd}'
+            return f'~/{path.resolve().relative_to(Path.home())}'
         except ValueError:
-            dd = str(dd)
-        s.append(f'site dir           {sd}')
-        s.append(f'default dir        {dd}')
-        s.append('')
-        s.append('help')
-        s.append('build.knowledge    list of all programs')
-        s.append('build.qshow(pat)   show programs matching pattern')
-        s.append('build.show(pat)    build and display matching pattern')
-        return '\n'.join(s)
+            return str(path.resolve())
 
-    def factory(self, answer):
+    def __repr__(self):
+        # Count knowledge entries from the cached frame directly — avoid
+        # self.knowledge here, which would trigger a database read.
+        return (
+            f'Underwriter        {self.name}\n'
+            f'version            {self.version}\n'
+            f'knowledge          {len(self._knowledge)} programs\n'
+            f'update             {self.update}\n'
+            f'log2               {self.log2}\n'
+            f'debug              {self.debug}\n'
+            f'validation_eps     {VALIDATION_EPS}\n'
+            f'site dir           {self._format_dir(self.site_dir)}\n'
+            f'default dir        {self._format_dir(self.default_dir)}'
+        )
+
+    def factory(self, parsed):
         """
-        Create object of kind from spec, a dictionary.
-        Creating from uw obviously needs the uw, so this is NOT a staticmethod!
+        Construct the object described by a :class:`ParsedProgram` and attach it.
 
-        :param answer: an Answer class with members kind, name, spec, and program
-        :return: creates answer.object
+        Portfolio construction needs ``self`` (it is passed as the ``uw``
+        argument), which is why this is not a staticmethod.
+
+        :param parsed: a :class:`ParsedProgram` with ``kind``, ``name``, ``spec``,
+            and ``program`` populated; ``object`` is None on input.
+        :return: the same ``parsed`` with ``parsed.object`` set to the
+            constructed object (or left ``None`` for the named-mixed-severity
+            case, which can only be created in the context of an Aggregate).
         """
 
-        kind, name, spec, program, obj = answer.values()
-
-        if obj is not None:
-            logger.error(
-                f'Surprising: obj from Answer not None, type {type(obj)}. It will be overwritten.')
+        kind, name, spec, program = parsed.kind, parsed.name, parsed.spec, parsed.program
 
         if kind == 'agg':
             obj = Aggregate(**spec)
             obj.program = program
         elif kind == 'port':
-            # Portfolio expects name, agg_list, uw
-            # agg list is a list of spects that can be passed to Aggregate
-            # need to drop the 'agg', name before the spec that gets returned
-            # by the parser. Hence:
+            # Portfolio expects name, agg_list, uw. agg_list is a list of specs
+            # that can be passed to Aggregate. Drop the leading ('agg', name)
+            # from each spec entry returned by the parser.
             agg_list = [k for i, j, k in spec['spec']]
             obj = Portfolio(name, agg_list, uw=self)
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
                 logger.log(WL,
-                           f'Mixed severity cannot be created, returning spec. You had {spec["sev_wt"]}, expected 1')
+                           'Mixed severity cannot be created, returning spec. You had %s, expected 1',
+                           spec["sev_wt"])
                 obj = None
             else:
                 obj = Severity(**spec)
-                # ? set outside...
                 obj.program = program
         elif kind == 'distortion':
             obj = Distortion(**spec)
-            # ? set outside
             obj.program = program
         else:
-            ValueError(f'Cannot build {kind} objects')
+            raise ValueError(f'Cannot build {kind} objects')
 
-        # update the object
-        answer['object'] = obj
-        return answer
+        parsed.object = obj
+        return parsed
 
     @property
     def knowledge(self):
@@ -343,34 +353,40 @@ class Underwriter(object):
 
     def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
-        Write a natural language program. Write carries out the following steps.
+        Interpret a DecL program and create the corresponding objects.
 
-        1. Read in the program and cleans it (e.g. punctuation, parens etc. are
-           removed and ignored, replace ; with new line etc.)
+        Steps:
 
-        2. Parse line by line to create a dictionary definition of sev, agg or port objects.
-
-        3. Replace sev.name, agg.name and port.name references with their objects.
-
-        4. If update set, update all created objects.
+        1. Preprocess the program (strip comments, normalize whitespace,
+           handle line continuations).
+        2. Parse line by line to create a dictionary spec for each sev, agg,
+           port, or distortion declaration.
+        3. Resolve ``sev.name`` / ``agg.name`` builtin references via the
+           knowledge base.
+        4. If ``update`` is set, update all created objects.
 
         Sample input::
 
             port MY_PORTFOLIO
-                agg Line1 20  loss 3 x 2 sev gamma 5 cv 0.30 mixed gamma 0.4
-                agg Line2 10  claims 3 x 2 sevgamma 12 cv 0.30 mixed gamma 1.2
-                agg Line 3100  premium at 0.4 3 x 2 sev 4 @ lognormal 3 cv 0.8 fixed 1
+                agg Line1 20  loss xs 3 xs 2 sev gamma 5 cv 0.30 mixed gamma 0.4
+                agg Line2 10  claims xs 3 xs 2 sev gamma 12 cv 0.30 mixed gamma 1.2
+                agg Line3 100 premium at 0.4 lr 3 xs 2 sev 4 @ lognormal 3 cv 0.8 fixed 1
 
-        The indents are required if each agg item appears on a new line.
+        Each ``agg`` clause inside a portfolio must be tab-indented on its own
+        line; the preprocessor folds ``\\n\\t agg`` back into a single line for
+        the parser.
 
-        See parser for full language spec! See Aggregate class for many examples.
+        See ``aggregate/decl.lark`` for the full grammar and ``Aggregate``
+        for many examples.
 
-        :param log2:
-        :param bs:
-        :param portfolio_program:
-        :param update: override class default
-        :param kwargs: passed to object's update method if ``update==True``
-        :return: single created object or dictionary name: object
+        :param portfolio_program: a DecL program (str), or the name of a
+            previously-built object in the knowledge base.
+        :param log2: log2 of the number of buckets for the discrete
+            representation; 0 uses ``self.log2``.
+        :param bs: bucket size; 0 lets the object recommend one.
+        :param update: override the class-level ``self.update`` default.
+        :param kwargs: passed to each created object's ``update`` method.
+        :return: list of :class:`ParsedProgram` (one per top-level declaration).
         """
 
         # prepare for update
@@ -387,15 +403,13 @@ class Underwriter(object):
             # calls __getitem__
             answer = self[portfolio_program]
         except (LookupError, TypeError):
-            logger.debug(
-                f'underwriter.write | object not found, processing as a program.')
+            logger.debug('underwriter.write | object not found, processing as a program.')
         else:
-            logger.debug(f'underwriter.write | {answer.kind} object found.')
+            logger.debug('underwriter.write | %s object found.', answer.kind)
             answer = self.factory(answer)
             if update:
                 answer.object.update(log2, bs, **kwargs)
             # rationalize return to be the same as parsed programs
-            # TODO test this code
             return [answer]
 
         # if you fall through to here then the portfolio_program did not refer to a built-in object
@@ -405,8 +419,6 @@ class Underwriter(object):
         for answer in irv:
             # create objects and update if needed
             answer = self.factory(answer)
-            if answer not in irv:
-                logger.error('OK THAT FAILED' * 20)
             if answer.object is not None:
                 # this can fail for named mixed severities, which can only
                 # be created in context of an agg... that behaviour is
@@ -418,11 +430,10 @@ class Underwriter(object):
             rv.append(answer)
 
         # report on what has been done
-        if rv is None:
-            logger.log(WL, f'Program did not contain any output')
+        if not rv:
+            logger.log(WL, 'Program did not contain any output')
         else:
-            if len(rv):
-                logger.info(f'Program created {len(rv)} objects.')
+            logger.info('Program created %d objects.', len(rv))
 
         # return created objects
         return rv
@@ -476,17 +487,16 @@ class Underwriter(object):
                     t = e.args[0].type
                     v = e.args[0].value
                     i = e.args[0].index
-                    txt2 = program_line[0:i] + f'>>>' + program_line[i:]
-                    logger.error(
-                        f'Parse error in input "{txt2}"\nValue {v} of type {t} not expected')
+                    txt2 = program_line[0:i] + '>>>' + program_line[i:]
+                    logger.error('Parse error in input "%s"\nValue %s of type %s not expected',
+                                 txt2, v, t)
                     raise e
             else:
                 # store in uw dictionary and create if needed
-                logger.info(
-                    f'answer out: {kind} object {name} parsed successfully...adding to knowledge')
+                logger.info('answer out: %s object %s parsed successfully...adding to knowledge',
+                            kind, name)
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
-                rv.append(Answer(kind=kind, name=name, spec=spec,
-                          program=program_line, object=None))
+                rv.append(ParsedProgram(kind=kind, name=name, spec=spec, program=program_line))
 
         return rv
 
@@ -506,61 +516,43 @@ class Underwriter(object):
         name = '.'.join(name)
         try:
             # lookup in Underwriter
-            answer = self[(kind, name)]
-            found_kind, found_name, spec, program, _ = answer.values()
-        except LookupError as e:
-            logger.error(f'ERROR id {kind}.{name} not found in the knowledge.')
-            raise e
-        logger.debug(
-            f'UnderwritingParser.safe_lookup | retrieved {kind}.{name} as type {found_kind}.{found_name}')
-        if found_kind != kind:
-            raise ValueError(
-                f'Error: type of {name} is  {found_kind}, not expected {kind}')
+            parsed = self[(kind, name)]
+        except LookupError:
+            logger.error('ERROR id %s.%s not found in the knowledge.', kind, name)
+            raise
+        logger.debug('UnderwritingParser.safe_lookup | retrieved %s.%s as type %s.%s',
+                     kind, name, parsed.kind, parsed.name)
+        if parsed.kind != kind:
+            raise ValueError(f'Error: type of {name} is  {parsed.kind}, not expected {kind}')
         # don't want to pass back the original otherwise changes can be reflected in the knowledge
-        spec = deepcopy(spec)
-        return spec
+        return deepcopy(parsed.spec)
 
-    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
+    def _build_all(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
         """
-        Convenience function to make work easy for the user. Intelligent auto updating.
-        Detects discrete distributions and sets ``bs = 1``.
+        Parse, build, and smart-update — the heavy lifting shared by
+        :meth:`build` and :meth:`build_many`.
 
-        ``build`` method sets loger level to 30 by default.
-
-        ``__call__`` is set equal to ``build``.
-
-        :param program:
-        :param update: build's update
-        :param log2: 0 is default: Estimate log2 for discrete and self.log2 for all others. Inupt value over-rides
-            and cancels discrete computation (good for large discrete outcomes where bucket happens to be 1.)
-        :param bs:
-        :param recommend_p: passed to recommend bucket functions. Increase (closer to 1) for thick tailed distributions.
-        :param kwargs: passed to update, e.g., padding. Note force_severity=True is applied automatically
-        :return: created object(s)
+        Returns the full list of :class:`ParsedProgram` regardless of count.
+        Callers enforce their own count contract.
         """
-
-        # make stuff
-        # write will return a dict with keys (kind, name) and value a WriteAnswer namedtuple
         rv = self.write(program, update=False, force_severity=True)
 
-        if rv is None or len(rv) == 0:
+        if not rv:
             logger.log(WL, 'build produced no output')
-            return None
+            return rv
 
         if update is None:
             update = self.update
 
-        # in this loop bs_ and log2_ are the values actually used for each update;
-        # they do not overwrite the input default values
+        # in this loop bs_ and log2_ are the values actually used for each
+        # update; they do not overwrite the input default values
         for answer in rv:
             if answer.object is None:
-                # object not created
-                logger.info(f'Object {answer.name} of kind {answer.kind} returned as '
-                            'a spec; no further processing.')
+                # object not created (named-mixed-severity case)
+                logger.info('Object %s of kind %s returned as a spec; no further processing.',
+                            answer.name, answer.kind)
             elif isinstance(answer.object, Aggregate) and update is True:
-                # try to guess good defaults
                 d = answer.spec
-                # extract hints from note string
                 log2, bs, recommend_p, kwargs = parse_note_ex(
                     d['note'], log2, bs, recommend_p, kwargs)
                 if d['sev_name'] == 'dhistogram' and log2 == 0:
@@ -571,44 +563,34 @@ class Underwriter(object):
                     elif d['freq_name'] == 'empirical':
                         max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
                     elif d['freq_name'] == 'bernoulli':
-                        # allow for max loss to occur
                         max_loss = np.max(d['sev_xs'])
                     else:
                         # normal approx on count
-                        max_loss = np.max(
-                            d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
+                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
                     # binaries are 0b111... len-2 * 2 is len - 1
                     log2_ = len(bin(int(max_loss))) - 1
-                    logger.info(f'({answer.kind}, {answer.name}): Discrete mode, '
-                                'using bs=1 and log2={log2_}')
+                    logger.info('(%s, %s): Discrete mode, using bs=1 and log2=%s',
+                                answer.kind, answer.name, log2_)
                 else:
-                    if log2 == 0:
-                        log2_ = self.log2
-                    else:
-                        log2_ = log2
+                    log2_ = self.log2 if log2 == 0 else log2
                     if bs == 0:
-                        bs_ = round_bucket(
-                            answer.object.recommend_bucket(log2_, p=recommend_p))
+                        bs_ = round_bucket(answer.object.recommend_bucket(log2_, p=recommend_p))
                     else:
                         bs_ = bs
-                    logger.info(
-                        f'({answer.kind}, {answer.name}): Normal mode, using bs={bs_} (1/{1/bs_}) and log2={log2_}')
+                    logger.info('(%s, %s): Normal mode, using bs=%s (1/%s) and log2=%s',
+                                answer.kind, answer.name, bs_, 1 / bs_, log2_)
                 try:
                     answer.object.update(
                         log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
-                except ZeroDivisionError as e:
-                    logger.error(e)
-                except AttributeError as e:
+                except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
             elif isinstance(answer.object, Severity):
-                # there is no updating for severities
+                # severities have no update
                 pass
             elif isinstance(answer.object, Portfolio) and update is True:
                 d = answer.spec
-                # extract hints from note string
                 log2, bs, recommend_p, kwargs = parse_note_ex(
                     d['note'], log2, bs, recommend_p, kwargs)
-                # figure stuff
                 if log2 == -1:
                     log2_ = 13
                 elif log2 == 0:
@@ -619,9 +601,7 @@ class Underwriter(object):
                     bs_ = answer.object.best_bucket(log2_, recommend_p)
                 else:
                     bs_ = bs
-                logger.info(f'updating with {log2_}, bs=1/{1 / bs_}')
-                logger.info(
-                    f'({answer.kind}, {answer.name}): bs={bs_} and log2={log2_}')
+                logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs_, log2_)
                 answer.object.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
                                      debug=self.debug, **kwargs)
             elif isinstance(answer.object, Distortion):
@@ -629,175 +609,147 @@ class Underwriter(object):
             elif isinstance(answer.object, (Aggregate, Portfolio)) and update is False:
                 pass
             else:
-                logger.warning(
-                    f'Unexpected: output kind is {type(answer.object)}. (expr/number?)')
-                pass
+                logger.warning('Unexpected: output kind is %s. (expr/number?)', type(answer.object))
 
-        if len(rv) == 1:
-            # only one output...just return that
-            # retun object if it exists, otherwise the ans namedtuple
-            for answer in rv:
-                if answer.object is None:
-                    return answer
-                else:
-                    # "automatic validation" here!
-                    # if isinstance(answer.object, (Portfolio, Aggregate)):
-                    #     rv = answer.object.valid
-                    #     if rv == Validation.NOT_UNREASONABLE:
-                    #         logger.warning(f'{answer.kind} {answer.name} is not unreasonable')
-                    #     else:
-                    #         logger.warning(f'WARNING: {answer.kind} {answer.name} FAIL VALIDATION')
-                    return answer.object
-        else:
-            # multiple outputs, see if there is just one portfolio...this is not ideal?!
-            ports_found = 0
-            for answer in rv:
-                if answer.kind == 'port':
-                    ports_found += 1
-            if ports_found == 1:
-                # if only one, it must be answer
-                if answer.object is None:
-                    return answer
-                else:
-                    return answer.object
-        # in all other cases, return the full list
         return rv
 
-    __call__ = build
-
-    def interpreter_file(self, *, filename='', where=''):
+    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
         """
-        Run a suite of test programs. For detailed analysis, run_one.
-        filename is a string or Path. If a csv it is read into
-        a dataframe, with the first column used as index. If it
-        is an agg file (e.g. an agg database), it is preprocessed
-        to remove comments and replace \\n\\t agg with a space, then
-        split on new lines and converted to a dataframe.
-        Other file formats are rejected.
+        Parse a single DecL program and return the constructed object.
 
-        These methods are called interpreter\\_... rather than
-        interpret\\_... because they are for testing and debugging
-        the interpreter, not for actually interpreting anything!
+        ``build`` is the primary user-facing entry point. It parses the
+        program, constructs the corresponding object, and smart-updates the
+        discrete distribution (detecting discrete severities to pick ``bs=1``,
+        otherwise calling :meth:`recommend_bucket`).
 
+        ``__call__`` delegates to ``build``.
+
+        :param program: a DecL program producing exactly one top-level output.
+        :param update: override the class-level ``self.update`` default.
+        :param log2: 0 (default) estimates log2 for discrete severities and
+            uses ``self.log2`` for everything else. A nonzero value overrides
+            the discrete-mode estimation.
+        :param bs: bucket size; 0 lets the object recommend one.
+        :param recommend_p: passed to :meth:`recommend_bucket`; raise (closer
+            to 1) for thick-tailed distributions.
+        :param kwargs: passed to ``update`` (e.g. ``padding``). ``force_severity=True``
+            is always applied.
+        :return: the constructed Aggregate / Severity / Portfolio / Distortion.
+            For the named-mixed-severity case where the spec cannot be built
+            standalone, returns the :class:`ParsedProgram` with ``object=None``.
+        :raises ValueError: if the program produces zero or more than one
+            top-level output. Use :meth:`build_many` for batched programs.
+        """
+        rv = self._build_all(program, update=update, log2=log2, bs=bs,
+                             recommend_p=recommend_p, **kwargs)
+        if len(rv) != 1:
+            raise ValueError(
+                f'build() expects a single output, got {len(rv)}; '
+                f'use build_many() for batched programs.'
+            )
+        answer = rv[0]
+        return answer if answer.object is None else answer.object
+
+    def build_many(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
+        """
+        Parse a (possibly multi-output) DecL program and return all results.
+
+        Same smart-update logic as :meth:`build`, but returns the full
+        ``list[ParsedProgram]`` regardless of count. Use this when a program
+        deliberately produces multiple top-level outputs.
+
+        :return: list of :class:`ParsedProgram`, one per top-level output.
+        """
+        return self._build_all(program, update=update, log2=log2, bs=bs,
+                               recommend_p=recommend_p, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self.build(*args, **kwargs)
+
+    def interpret_test_file(self, *, filename='', where=''):
+        """
+        Run every DecL program in a ``.agg`` or ``.csv`` file through the parser
+        without creating output, returning a DataFrame with per-line parse-error info.
+
+        This is for *testing* the interpreter — that is, exercising the lex/parse
+        path and reporting which lines fail — not for actually interpreting
+        anything into objects. Use :meth:`build` or :meth:`build_many` for that.
+
+        For ``.csv`` files, the first column is used as index. For ``.agg`` files,
+        the text is preprocessed (``\\n\\tagg`` folded back into one line, comments
+        stripped) and then split on newlines.
+
+        :param filename: a string or Path. Defaults to
+            ``~/aggregate/tests/test_suite.csv`` if empty.
+        :param where: regex filter on the DataFrame index; '' means all rows.
+        :return: DataFrame with columns ``kind, error, name, output,
+            preprocessed program, program``.
         """
         if filename == '':
             filename = Path.home() / 'aggregate/tests/test_suite.csv'
-        elif type(filename) == str:
+        elif isinstance(filename, str):
             filename = Path(filename)
         if filename.suffix == '.csv':
             df = pd.read_csv(filename, index_col=0)
         elif filename.suffix == '.agg':
             txt = filename.read_text(encoding='utf-8')
             stxt = re.sub('\n\tagg', ' agg', txt, flags=re.MULTILINE)
-            stxt = stxt.split('\n')
-            stxt = [i for i in stxt if len(i) and i[0] != '#']
+            stxt = [i for i in stxt.split('\n') if len(i) and i[0] != '#']
             df = pd.DataFrame(stxt, columns=['program'])
         else:
-            raise ValueError(
-                f'File suffix must be .csv or .agg, not {filename.suffix}')
+            raise ValueError(f'File suffix must be .csv or .agg, not {filename.suffix}')
         if where != '':
             df = df.loc[df.index.str.match(where)]
-        # add One severity if not input
-        # if txt.find('sev One dsev [1]') < 0:
-        #     logger.info('Adding One to knowledge.')
+        # ensure the canonical One severity is present for any sev.One references
         self.write('sev One dsev [1]')
-        return self._interpreter_work(df.iterrows())
 
-    def interpreter_line(self, program, name='one off', debug=True):
-        """
-        Interpret single line of code  in debug mode.
-        name is index of output
-        """
-
-        return self._interpreter_work(iter([(name, program)]), debug=debug)
-
-    def interpreter_list(self, program_list):
-        """
-        Interpret elements in a list in debug mode.
-        """
-        return self._interpreter_work(list(enumerate(program_list)), debug=True)
-
-    def run_test_suite(self):
-        """
-        Run interpreter on the test suite
-        """
-        df = self.interpreter_file(filename=self.test_suite_file)
-        num_errors = df.error.sum()
-        if num_errors != 0:
-            logger.error('{num_errors} errors in test suite')
-        return df
-
-    def _interpreter_work(self, iterable, debug=False):
-        """
-        Do all the work for the test, allows input to be marshalled into the tester
-        in different ways. Unlike production interpret_program, runs one line at a time.
-        Each line is preprocessed and then run through a clean parser, and the output
-        analyzed.
-
-        Last column, program as input is only changed if the preprocessor changes the program
-
-        :return: DataFrame
-        """
-        lexer = UnderwritingLexer()
-        parser = UnderwritingParser(self.safe_lookup, debug)
         ans = {}
-        errs = 0
-        no_errs = 0
-        # detect non-trivial change
-        def f(x, y): return 'same' if x.replace(
-            ' ', '') == y.replace(' ', '').replace('\t', '') else y
-        for test_name, program in iterable:
-            if type(program) != str:
-                program_in = program[0]
-                program = lexer.preprocess(program_in)
-            else:
-                program_in = program
-                program = lexer.preprocess(program_in)
+        # detect a non-trivial change between preprocessed and input program
+        def _changed(preprocessed, original):
+            return 'same' if preprocessed.replace(' ', '') == original.replace(' ', '').replace('\t', '') else original
+
+        for test_name, program in df.iterrows():
+            program_in = program[0] if not isinstance(program, str) else program
+            preprocessed = self.lexer.preprocess(program_in)
             err = 0
-            if len(program) == 1:
-                program = program[0]
+            if len(preprocessed) == 1:
+                line = preprocessed[0]
                 try:
-                    # print(program)
-                    kind, name, spec = parser.parse(lexer.tokenize(program))
+                    kind, name, spec = self.parser.parse(self.lexer.tokenize(line))
                 except (ValueError, TypeError) as e:
-                    errs += 1
                     err = 1
-                    kind = program.split()[0]
-                    # get something to say about the error
+                    kind = line.split()[0]
                     ea = getattr(e, 'args', None)
                     if ea is not None:
-                        # t = getattr(ea[0], 'type', ea[0])
-                        # v = getattr(ea[0], 'value', ea[0])
                         i = getattr(ea[0], 'index', 0)
-                        if type(i) != int:
+                        if not isinstance(i, int):
                             i = 0
-                        # print(i, ea)
-                        txt = program[0:i] + f'>>>' + program[i:]
+                        spec = line[0:i] + '>>>' + line[i:]
                         name = 'parse error'
                     else:
-                        txt = str(e)
+                        spec = str(e)
                         name = 'other error'
-                    spec = txt
-                else:
-                    no_errs += 1
-                ans[test_name] = [kind, err, name, spec,
-                                  program, f(program, program_in)]
-            elif len(program) > 1:
-                logger.info(
-                    f'{program_in} preprocesses to {len(program)} lines; not processing.')
-                logger.info(program)
-                ans[test_name] = ['multiline', err,
-                                  None, None, program, program_in]
+                ans[test_name] = [kind, err, name, spec, line, _changed(line, program_in)]
+            elif len(preprocessed) > 1:
+                logger.info('%s preprocesses to %d lines; not processing.',
+                            program_in, len(preprocessed))
+                ans[test_name] = ['multiline', err, None, None, preprocessed, program_in]
             else:
-                logger.info(
-                    f'{program_in} preprocesses to a blank line; ignoring.')
-                ans[test_name] = ['blank', err, None, None, program, program_in]
+                logger.info('%s preprocesses to a blank line; ignoring.', program_in)
+                ans[test_name] = ['blank', err, None, None, preprocessed, program_in]
 
-        df_out = pd.DataFrame(ans,
-                              index=['kind', 'error', 'name', 'output', 'preprocessed program',
-                                     'program']).T
+        df_out = pd.DataFrame(ans, index=['kind', 'error', 'name', 'output',
+                                          'preprocessed program', 'program']).T
         df_out.index.name = 'index'
         return df_out
+
+    def run_test_suite(self):
+        """Run :meth:`interpret_test_file` on the bundled test suite."""
+        df = self.interpret_test_file(filename=self.test_suite_file)
+        num_errors = df.error.sum()
+        if num_errors != 0:
+            logger.error('%d errors in test suite', num_errors)
+        return df
 
     def more(self, regex):
         """
@@ -900,7 +852,7 @@ class Underwriter(object):
                 a = self.build(p, **kwargs)
                 ans.append(a)
             except NotImplementedError:
-                logger.error(f'skipping {n}...element not implemented')
+                logger.error('skipping %s...element not implemented', n)
             else:
                 if describe:
                     pp = getattr(a, 'pprogram', None)
@@ -955,8 +907,10 @@ class Underwriter(object):
         return ans
 
 
-# exported instance
-# self = dbuild = None
+# Module-level singleton — the canonical user-facing entry point. Importable
+# as `from aggregate import build`. `update=True` is why `build('agg ...')`
+# auto-updates the constructed object's discrete distribution; pass
+# `update=False` (or override at call time) to disable.
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

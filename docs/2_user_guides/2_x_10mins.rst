@@ -247,28 +247,25 @@ Each object has a kind property and a name property, and it can be manifest as a
 * It calls :meth:`Underwriter.interpret_program` to pre-process the DecL and then lex and parse it one line at a time.
 * It looks up occurrences of ``sev.ID``, ``agg.ID`` (``ID`` is an object name) in the knowledge and replaces them with their definitions.
 * It calls :meth:`Underwriter.factory` to create any objects and update them if requested.
-* It returns a list of :class:`Answer` objects, with kind, name, spec, program, and object attributes.
+* It returns a list of :class:`ParsedProgram` objects, with ``kind``, ``name``, ``spec``, ``program``, and ``object`` attributes.
 
 :meth:`Underwriter.write_file` reads a file and passes it to :meth:`Underwriter.write`. It is a convenience function.
 
 The :meth:`Underwriter.build` method wraps the
-:meth:`Underwriter.write` and provides sensible defaults to shield the user from its internal details. :math:`build` takes the following steps:
+:meth:`Underwriter.write` and provides sensible defaults to shield the user from its internal details. ``build`` takes the following steps:
 
 * It calls :meth:`write` with ``update=False``.
 * It then estimates sensible hyper-parameters and uses them to :meth:`update` the object's discrete distribution. It tries to distinguish discrete output distributions from continuous or mixed ones.
-* If the DecL program produces only one output, it strips it out of the answer returned by ``write`` and returns just that object.
-* If the DecL program produces only one portfolio output (but possibly other non-portfolio objects), it returns just that.
+* If the DecL program produces exactly one output, it returns that object directly.
+* If the program produces zero or more than one output, it raises :class:`ValueError` pointing the user at :meth:`build_many`.
 
-:meth:`Underwriter.interpret_program` interprets DecL programs and matches them with the parsed specs in an ``Answer(kind, name, spec, program, object=None)`` object. It adds the result to the knowledge.
+:meth:`Underwriter.build_many` is the explicit-batch counterpart to :meth:`build`. It always returns the full list of :class:`ParsedProgram`, regardless of count, and never raises on multi-output programs.
 
-:meth:`Underwriter.factory` takes an ``Answer`` argument and updates it by creating the relevant object and updating it if ``build.update is True``.
+:meth:`Underwriter.interpret_program` interprets DecL programs and stores each parsed spec as a :class:`ParsedProgram` (kind, name, spec, program, object=None) in the knowledge.
 
-A set of methods called :meth:`interpreter_xxx` run DecL  programs through parser for debugging purposes, but do not create any output or add anything to the knowledge.
+:meth:`Underwriter.factory` takes a :class:`ParsedProgram` argument and populates its ``object`` field by creating the relevant Aggregate / Severity / Portfolio / Distortion.
 
-* :meth:`Underwriter.interpreter_line` works on one line.
-* :meth:`Underwriter.interpreter_file`  works on each line in a file.
-* :meth:`Underwriter.interpreter_list` works on each item in a list.
-* :meth:`Underwriter._interpreter_work` does the actual parsing.
+For interactive parser debugging, :meth:`Underwriter.interpret_test_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with parse-error info. :meth:`Underwriter.run_test_suite` is the convenience wrapper for the bundled test suite.
 
 .. _10 min how:
 

@@ -386,7 +386,7 @@ Objects created by :meth:`build` in this guide. Objects created directly by clas
     :okexcept:
 
     from aggregate import pprint_ex
-    for n, r in build.qlist('^Samp:').iterrows():
+    for n, r in build.discover('^Samp:').iterrows():
         pprint_ex(r.program, split=20)
 
 

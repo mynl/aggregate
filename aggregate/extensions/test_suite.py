@@ -25,7 +25,7 @@ class TestSuite(object):
 
         :param build_in: build object, allows input custom build object
         :param fn: test suite file name, default test_suite.agg
-        :param out_dir_name: output directory name, default site_dir/generated
+        :param out_dir_name: output directory name, default user_dir/generated
         """
 
         self.build = build_in if build_in else build_uw
@@ -35,7 +35,7 @@ class TestSuite(object):
             if self.out_dir.exists() is False:
                 raise FileExistsError(f'Directory {out_dir_name} does not exist.')
         else:
-            self.out_dir = self.build.site_dir.parent / 'generated'
+            self.out_dir = self.build.user_dir / 'generated'
             self.out_dir.mkdir(exist_ok=True)
             (self.out_dir / "img").mkdir(exist_ok=True)
 
@@ -63,7 +63,7 @@ class TestSuite(object):
         :param kwargs: passed to savefig
         """
         ans = []
-        for n in self.build.qshow(regex, tacit=False).index:
+        for n in self.build.discover(regex).index:
             a = self.build(n)
             ans.append(a.html_info_blob().replace('h3>', 'h2>'))
             ans.append(pprint_ex(a.program, 50, True))
@@ -80,7 +80,9 @@ class TestSuite(object):
         fn.write_text(blob, encoding='utf-8')
 
         fn2 = self.out_dir / f'{fn.stem}_wrapped.html'
-        fn3 = self.build.template_dir / 'test_suite_template.html'
+        # Templates live inside the installed aggregate package (aggregate/templates/).
+        from importlib.resources import files
+        fn3 = Path(files('aggregate')) / 'templates' / 'test_suite_template.html'
         # TODO JINJA!
         template = fn3.read_text()
         template = template.replace('HEADING GOES HERE', title).replace(

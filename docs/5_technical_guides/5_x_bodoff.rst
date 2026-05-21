@@ -217,7 +217,7 @@ Bodoff introduces four thought experiments:
 
 The units are independent. The next block of code sets up and validates :class:`Portfolio`
 objects for each. The Bodoff portfolios are part of the base library and can be extracted with
-``build.qlist``.
+``build.discover``.
 
 .. ipython:: python
    :okwarning:
@@ -226,7 +226,7 @@ objects for each. The Bodoff portfolios are part of the base library and can be 
    from collections import OrderedDict
    from aggregate import build, qd
    from aggregate.extensions import bodoff_exhibit
-   bodoff = list(build.qlist('.*Bodoff').program)
+   bodoff = list(build.discover('.*Bodoff').program)
    ports = OrderedDict()
    for s in bodoff:
        port = build(s)

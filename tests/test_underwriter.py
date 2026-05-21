@@ -77,7 +77,7 @@ def test_build_many_returns_list():
 
 def test_getitem_returns_parsed_program():
     uw = Underwriter()
-    uw.interpret_program('sev PhaseZero:One dsev [1]')
+    uw._interpret_program('sev PhaseZero:One dsev [1]')
     rv = uw['sev', 'PhaseZero:One']
     assert rv.kind == 'sev'
     assert rv.name == 'PhaseZero:One'
@@ -85,8 +85,10 @@ def test_getitem_returns_parsed_program():
 
 
 def test_interpret_program_returns_list_fills_knowledge():
+    """The private _interpret_program API is exercised here as a regression test —
+    it's the parse-only path that fills the knowledge base without constructing objects."""
     uw = Underwriter()
-    rv = uw.interpret_program('agg PhaseZero:IP 1 claim sev lognorm 10 cv 1 fixed')
+    rv = uw._interpret_program('agg PhaseZero:IP 1 claim sev lognorm 10 cv 1 fixed')
     assert isinstance(rv, list)
     assert len(rv) == 1
     parsed = rv[0]
@@ -117,7 +119,7 @@ def test_read_databases_is_idempotent():
 
 
 # ---------------------------------------------------------------------------
-# __repr__ — sanity (drops "help" block after S5)
+# __repr__ — sanity
 # ---------------------------------------------------------------------------
 
 def test_repr_is_multiline_and_includes_identity():
@@ -125,3 +127,71 @@ def test_repr_is_multiline_and_includes_identity():
     s = repr(uw)
     assert 'PhaseZeroTest' in s
     assert '\n' in s
+    # no embedded help block
+    assert 'build.knowledge' not in s
+    assert 'build.qshow' not in s
+
+
+def test_repr_lazy_load_pending():
+    """When databases are configured but not yet loaded, repr should say so."""
+    uw = Underwriter(databases='test_suite')
+    s = repr(uw)
+    assert '0 loaded' in s
+    # touch knowledge to trigger load
+    _ = uw.knowledge
+    s2 = repr(uw)
+    assert '0 loaded' not in s2
+    assert 'programs' in s2
+
+
+# ---------------------------------------------------------------------------
+# interpret_file — bug fix pin + happy path
+# ---------------------------------------------------------------------------
+
+def test_interpret_file_runs_clean():
+    """interpret_file() with no args should parse the bundled test_suite.agg cleanly."""
+    df = global_build.interpret_file()
+    assert df.error.sum() == 0
+    assert len(df) >= 140
+
+
+# ---------------------------------------------------------------------------
+# discover — replaces qshow/qlist/show
+# ---------------------------------------------------------------------------
+
+def test_discover_default_lists():
+    """discover() with no plot/describe is a lightweight DataFrame view."""
+    df = global_build.discover('^A\\.')
+    import pandas as pd
+    assert isinstance(df, pd.DataFrame)
+    assert 'program' in df.columns
+    assert len(df) > 0
+
+
+def test_discover_empty_regex_lists_all():
+    df = global_build.discover()
+    assert len(df) > 0
+
+
+# ---------------------------------------------------------------------------
+# directory rationalization — user_dir replaces site/case/template
+# ---------------------------------------------------------------------------
+
+def test_user_dir_path():
+    from pathlib import Path
+    uw = Underwriter()
+    assert uw.user_dir == Path.home() / '.aggregate'
+
+
+def test_databases_site_raises_with_migration_hint():
+    """Old `databases='site'` should fail loudly, directing the user to 'user'."""
+    uw = Underwriter(databases='site')
+    with pytest.raises(ValueError, match="'user'"):
+        uw.read_databases()
+
+
+def test_dropped_properties_no_longer_exist():
+    uw = Underwriter()
+    assert not hasattr(uw, 'site_dir')
+    assert not hasattr(uw, 'case_dir')
+    assert not hasattr(uw, 'template_dir')

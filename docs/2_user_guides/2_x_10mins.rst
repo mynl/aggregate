@@ -104,7 +104,7 @@ To get started, import ``build``, a pre-configured :class:`Underwriter` and :fun
     from aggregate import build, qd
     import pandas as pd, numpy as np, matplotlib.pyplot as plt
 
-Printing ``build`` reports its name, the number of objects in its knowledge, and other information about hyper-parameter default values. ``site_dir`` is where various outputs will be stored. ``default_dir`` is for internal package data. The ``build`` object loads an extensive test suite of DecL programs with over 130 entries.
+Printing ``build`` reports its name, the number of objects in its knowledge, and other information about hyper-parameter default values. ``user_dir`` (``~/.aggregate``) is where user-installed databases live and where various outputs are stored. ``default_dir`` is for internal package data. The ``build`` object loads an extensive test suite of DecL programs with over 130 entries.
 
 .. ipython:: python
     :okwarning:
@@ -213,18 +213,18 @@ A row in the knowledge can be created as a Python object using:
 
 The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``A.Dice00`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
 
-The method :meth:`build.qlist` (quick list) searches the knowledge using a regex (regular expression) applied to the names, and returning a dataframe of specifications. :meth:`build.qshow` (quick show) just displays them.
+The method :meth:`build.discover` searches the knowledge using a regex (regular expression) applied to the names and returns a dataframe of matching programs. By default it does no building or plotting — pass ``plot=True`` or ``describe=True`` to also build each match.
 
 .. ipython:: python
     :okwarning:
 
-    build.qshow('Dice')
+    build.discover('Dice')
 
-The method :meth:`build.show` also searches the knowledge using a regex applied to the names, but it creates and plots each match by default. Be careful not to create too many objects! Try running::
+To also build and plot each match, pass ``plot=True``. Be careful not to create too many objects! Try::
 
-    build.show('Dice')
+    build.discover('Dice', plot=True)
 
-Add argument ``return_df=True`` to return a list of created objects and a dataframe containing information about each.
+Add ``return_objects=True`` to also return the list of built objects alongside the dataframe.
 
 .. _10 min bts:
 
@@ -241,31 +241,12 @@ Each object has a kind property and a name property, and it can be manifest as a
 4. program is the DecL program as a text string; and
 5. object is the actual Python object, an instance of a class.
 
-:meth:`Underwriter.write` is a low-level creator function. It takes a DecL program or knowledge item name as input.
+The primary user-facing entry points are :meth:`Underwriter.build` and :meth:`Underwriter.build_many`:
 
-* It searches the knowledge for the argument and returns it if it finds one object. It throws an error if the name is not unique. If the name is not in the knowledge it continues.
-* It calls :meth:`Underwriter.interpret_program` to pre-process the DecL and then lex and parse it one line at a time.
-* It looks up occurrences of ``sev.ID``, ``agg.ID`` (``ID`` is an object name) in the knowledge and replaces them with their definitions.
-* It calls :meth:`Underwriter.factory` to create any objects and update them if requested.
-* It returns a list of :class:`ParsedProgram` objects, with ``kind``, ``name``, ``spec``, ``program``, and ``object`` attributes.
+* :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the knowledge base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise calling :meth:`recommend_bucket`), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
+* :meth:`Underwriter.build_many` is the explicit-batch counterpart: it parses a (possibly multi-output) DecL program and returns the full ``list[ParsedProgram]`` regardless of count. Use ``update=False`` to skip the smart-update step (useful when you intend to call :meth:`update` yourself with chosen bucket parameters).
 
-:meth:`Underwriter.write_file` reads a file and passes it to :meth:`Underwriter.write`. It is a convenience function.
-
-The :meth:`Underwriter.build` method wraps the
-:meth:`Underwriter.write` and provides sensible defaults to shield the user from its internal details. ``build`` takes the following steps:
-
-* It calls :meth:`write` with ``update=False``.
-* It then estimates sensible hyper-parameters and uses them to :meth:`update` the object's discrete distribution. It tries to distinguish discrete output distributions from continuous or mixed ones.
-* If the DecL program produces exactly one output, it returns that object directly.
-* If the program produces zero or more than one output, it raises :class:`ValueError` pointing the user at :meth:`build_many`.
-
-:meth:`Underwriter.build_many` is the explicit-batch counterpart to :meth:`build`. It always returns the full list of :class:`ParsedProgram`, regardless of count, and never raises on multi-output programs.
-
-:meth:`Underwriter.interpret_program` interprets DecL programs and stores each parsed spec as a :class:`ParsedProgram` (kind, name, spec, program, object=None) in the knowledge.
-
-:meth:`Underwriter.factory` takes a :class:`ParsedProgram` argument and populates its ``object`` field by creating the relevant Aggregate / Severity / Portfolio / Distortion.
-
-For interactive parser debugging, :meth:`Underwriter.interpret_test_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with parse-error info. :meth:`Underwriter.run_test_suite` is the convenience wrapper for the bundled test suite.
+For interactive parser debugging, :meth:`Underwriter.interpret_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with per-line parse-error info. Call it with no arguments to run the bundled test suite (at :attr:`Underwriter.test_suite_file`).
 
 .. _10 min how:
 
@@ -1615,7 +1596,7 @@ Each of the objects created by :meth:`build` is automatically stored in the know
     :okwarning:
 
     from aggregate import pprint_ex
-    for n, r in build.qlist('^TenM:').iterrows():
+    for n, r in build.discover('^TenM:').iterrows():
         pprint_ex(r.program, split=20)
 
 

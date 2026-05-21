@@ -126,15 +126,15 @@ class Portfolio(object):
                     a = None
             elif isinstance(spec, str):
                 # look up object in uw return actual instance
-                # note here you could do uw.aggregate[spec] and get the dictionary def
-                # or uw.write(spec) to return the already-created (and maybe updated) object
-                # we go the latter route...if user wants they can pull off the dict item themselves
+                # uw.build_many(spec, update=False) parses or looks up by name
+                # and returns a list[ParsedProgram] with `.object` populated but
+                # not smart-updated — Portfolio handles its own update later.
                 if uw is None:
-                    raise ValueError(f'Must pass valid Underwriter instance to create aggs by name')
+                    raise ValueError('Must pass valid Underwriter instance to create aggs by name')
                 try:
-                    a_out = uw.write(spec)
+                    a_out = uw.build_many(spec, update=False)
                 except Exception as e:
-                    logger.error(f'Item {spec} not found in your underwriter')
+                    logger.error('Item %s not found in your underwriter', spec)
                     raise e
                 # a is a disct (kind, name) -> (obj or spec, program) pair. Portfolios are ?always created so
                 # here, spec is the name
@@ -5101,7 +5101,7 @@ Consider adding **{line}** to the existing portfolio. The existing portfolio has
                 if l in sub_port:
                     pgm += f'\t{agg_dict[l]}\n'
             if uw:
-                ports[name] = uw.write(pgm)
+                ports[name] = uw.build_many(pgm, update=False)
             else:
                 ports[name] = pgm
             if uw and bs * log2 > 0:

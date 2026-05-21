@@ -4,7 +4,8 @@ from enum import Flag, auto
 
 __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
-           'RECOMMEND_P', 'Validation']
+           'RECOMMEND_P', 'Validation',
+           'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
 FIG_W = 3.5
 FIG_H = 2.45
@@ -21,6 +22,13 @@ PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
 VALIDATION_EPS = 1e-4
 RECOMMEND_P = 0.99999
+
+# User-local data directory (under Path.home())
+USER_DIR_NAME = '.aggregate'
+# Subdirectory inside the installed `aggregate` package holding bundled .agg files
+PACKAGE_DATA_DIR = 'agg'
+# The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR)
+TEST_SUITE_FILENAME = 'test_suite.agg'
 
 class Validation(Flag):
     NOT_UNREASONABLE = 0

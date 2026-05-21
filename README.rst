@@ -28,6 +28,25 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a1 (in progress)
+----------------------
+
+Underwriter surface rationalization (breaking changes; v1.0 cleanup):
+
+* ``Underwriter.discover(regex, kind='', plot=False, describe=False, return_objects=False, **kwargs)`` replaces ``show`` / ``qshow`` / ``qlist`` (all three removed). Default behavior is the lightweight directory view (matches today's ``qshow``); pass ``plot=True`` or ``describe=True`` to build each match.
+* ``Underwriter.build_many(program, ...)`` is the explicit-batch counterpart to ``build``; ``build`` now raises ``ValueError`` when its program produces 0 or >1 top-level outputs (directing the user to ``build_many``).
+* ``Underwriter.interpret_file(filename=None, where='')`` replaces ``interpret_test_file`` and absorbs ``run_test_suite``; with no arguments it runs the bundled test suite. Fixes a ``KeyError: 0`` bug from the pandas iterrows path.
+* Directory rationalization: ``site_dir``, ``case_dir``, ``template_dir`` properties removed. Single new ``user_dir`` (``~/.aggregate``). ``default_dir`` is now located via ``importlib.resources.files``.
+* Base data directory moved from ``~/aggregate`` to ``~/.aggregate`` (dotted convention). No fallback — existing users must ``mv ~/aggregate ~/.aggregate``.
+* Constructor magic strings: ``databases='all'`` now expands to ``['default', 'user']``; ``databases='site'`` raises ``ValueError`` directing users to ``'user'``.
+* Methods privatized (now leading underscore): ``write`` → ``_build_work``, ``factory`` → ``_factory``, ``safe_lookup`` → ``_safe_lookup``, ``interpret_program`` → ``_interpret_program``. ``write_from_file``, ``dir``, ``test_suite()`` method, ``run_test_suite`` deleted (all unused).
+* Portfolio and case_studies internal callers switched from ``uw.write(spec)`` to ``uw.build_many(spec, update=False)`` (equivalent — same ``ParsedProgram`` list, no smart-update).
+* ``ParsedProgram`` (dataclass) replaces ``Answer`` for the Underwriter parse-output type. ``Answer`` itself remains in ``utilities.py`` and continues to be used by ``Portfolio``.
+* ``Underwriter.__repr__`` clarified: shows ``0 loaded (access .knowledge to read configured database(s))`` when knowledge is pending; no I/O side effect.
+* Several bug fixes: ``factory`` ``ValueError`` is now actually raised; the buggy "1 port among many" return path is gone; ``__getitem__`` ``TypeError`` → ``KeyError`` chain preserved with ``from e``; ``read_database`` narrows to ``OSError`` and uses ``logger.exception``.
+* Three new constants in ``constants.py``: ``USER_DIR_NAME``, ``PACKAGE_DATA_DIR``, ``TEST_SUITE_FILENAME``.
+* Internal cleanup: lazy ``%s``-formatted logger calls throughout; ~130 lines of stale commented-out code removed from ``utilities.py``.
+
 0.30.1
 -------
 * Confirmed support for Python 3.13 and 3.14

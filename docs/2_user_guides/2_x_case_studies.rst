@@ -134,7 +134,7 @@ Case Study exhibits are managed by the class :class:`CaseStudy` in ``aggregate.e
 
 **Details.**
 
-Exhibit output files are stored in ``build.case_dir``, which by default is the subdirectory aggregate/cases of your home directory (``~`` on Linux, ``\users\<user name>`` on Windows, and who knows on an Apple). The book exhibits are marshaled in  ``f'{my_case.case_id}_book.html'`` and a set of extended exhibits are in ``f'{my_case.case_id}_extended.html'``. The detailed files are in a subdirectory called ``my_case.case_id``.
+Exhibit output files are stored under ``build.user_dir / 'cases'`` (i.e. ``~/.aggregate/cases``). The book exhibits are marshaled in ``f'{my_case.case_id}_book.html'`` and a set of extended exhibits are in ``f'{my_case.case_id}_extended.html'``. The detailed files are in a subdirectory called ``my_case.case_id``.
 
 
 Case Study Factory Arguments

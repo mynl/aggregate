@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from importlib.resources import files
 import logging
 from pathlib import Path
 import re
@@ -8,7 +9,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .constants import WL, VALIDATION_EPS, RECOMMEND_P
+from .constants import (WL, VALIDATION_EPS, RECOMMEND_P,
+                        USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME)
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
@@ -88,9 +90,7 @@ class Underwriter(object):
 
         # do not read in until needed for faster loading
         self._default_dir = None
-        self._site_dir = None
-        self._case_dir = None
-        self._template_dir = None
+        self._user_dir = None
         self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
             ['kind', 'name'])
 
@@ -106,43 +106,38 @@ class Underwriter(object):
     @property
     def parser(self):
         if self._parser is None:
-            self._parser = UnderwritingParser(self.safe_lookup, self.debug)
+            self._parser = UnderwritingParser(self._safe_lookup, self.debug)
         return self._parser
 
-    # The four *_dir properties below are lazily resolved and mkdir on first
-    # access — downstream code in extensions/case_studies and the visual
-    # test_suite reporter relies on these directories existing.
     @property
     def default_dir(self):
-        """Installation directory holding the bundled ``.agg`` databases."""
+        """
+        Installation directory holding the bundled ``.agg`` databases.
+
+        Read-only package data, located via :func:`importlib.resources.files`.
+        List bundled databases::
+
+            list(uw.default_dir.glob('*.agg'))
+        """
         if self._default_dir is None:
-            self._default_dir = Path(__file__).parent / 'agg'
-            self._default_dir.mkdir(parents=True, exist_ok=True)
+            self._default_dir = Path(files('aggregate')) / PACKAGE_DATA_DIR
         return self._default_dir
 
     @property
-    def site_dir(self):
-        """User-local directory under ``~/aggregate/databases`` for custom ``.agg`` files."""
-        if self._site_dir is None:
-            self._site_dir = Path.home() / 'aggregate/databases'
-            self._site_dir.mkdir(parents=True, exist_ok=True)
-        return self._site_dir
+    def user_dir(self):
+        """
+        User-local data directory (``~/.aggregate``); mkdir'd on first access.
 
-    @property
-    def case_dir(self):
-        """User-local directory under ``~/aggregate/cases`` (used by case studies)."""
-        if self._case_dir is None:
-            self._case_dir = Path.home() / 'aggregate/cases'
-            self._case_dir.mkdir(parents=True, exist_ok=True)
-        return self._case_dir
+        Drop your own ``.agg`` databases here and they will be picked up by
+        ``Underwriter(databases='all')`` (or ``='user'``) or by
+        ``read_database('my_curves')``.  List user databases::
 
-    @property
-    def template_dir(self):
-        """Packaged Jinja/HTML template directory."""
-        if self._template_dir is None:
-            self._template_dir = self.default_dir.parent / 'templates'
-            self._template_dir.mkdir(parents=True, exist_ok=True)
-        return self._template_dir
+            list(uw.user_dir.glob('*.agg'))
+        """
+        if self._user_dir is None:
+            self._user_dir = Path.home() / USER_DIR_NAME
+            self._user_dir.mkdir(parents=True, exist_ok=True)
+        return self._user_dir
 
     def read_databases(self):
         """
@@ -154,36 +149,38 @@ class Underwriter(object):
         if not requested:
             return
         if requested == 'all':
-            requested = ['default', 'site']
+            requested = ['default', 'user']
         elif isinstance(requested, str):
             requested = [requested]
 
-        files = []
+        db_files = []
         for entry in requested:
             if entry == 'default':
-                files.extend(self.default_dir.glob('*.agg'))
+                db_files.extend(self.default_dir.glob('*.agg'))
+            elif entry == 'user':
+                db_files.extend(self.user_dir.glob('*.agg'))
             elif entry == 'site':
-                files.extend(self.site_dir.glob('*.agg'))
+                raise ValueError(
+                    "databases='site' is not recognized; use 'user' "
+                    "(renamed for v1.0; data lives in ~/.aggregate)")
             else:
-                files.append(entry)
+                db_files.append(entry)
 
-        for fn in files:
+        for fn in db_files:
             self.read_database(fn)
 
     def read_database(self, fn):
         """
-        read database of curves, aggs and portfolios. These can live in the default directory
-        that is part of the instalation or ~/aggregate/
+        Read a database of curves, aggs, and portfolios from a ``.agg`` file.
 
-        fn can be a string filename, with or without extension. A .agg extension is
-        added if there is no suffix. Search path:
+        ``fn`` may be a string filename, with or without extension; a ``.agg``
+        extension is added if there is no suffix. Search path:
 
-        * in the current dir
-        * in site_dir (user)
-        * in default_dir (installation)
+        * the current directory
+        * :attr:`user_dir` (``~/.aggregate``)
+        * :attr:`default_dir` (installed)
 
-        :param fn: database file name
-
+        :param fn: database file name (with or without ``.agg`` suffix).
         """
 
         p = Path(fn)
@@ -191,8 +188,8 @@ class Underwriter(object):
             p = p.with_suffix('.agg')
         if p.exists():
             db_path = p
-        elif (self.site_dir / p).exists():
-            db_path = self.site_dir / fn
+        elif (self.user_dir / p).exists():
+            db_path = self.user_dir / p
         elif (self.default_dir / p).exists():
             db_path = self.default_dir / p
         else:
@@ -211,7 +208,7 @@ class Underwriter(object):
             program = re.sub(' +', ' ', program)
             logger.info('Reading database %s...', fn)
             n = len(self._knowledge)
-            self.interpret_program(program)
+            self._interpret_program(program)
             n = len(self._knowledge) - n
             logger.info('Database %s read into knowledge, adding %d entries.', fn, n)
 
@@ -267,24 +264,32 @@ class Underwriter(object):
     def __repr__(self):
         # Count knowledge entries from the cached frame directly — avoid
         # self.knowledge here, which would trigger a database read.
+        n = len(self._knowledge)
+        if n == 0 and self.databases:
+            kn_line = (
+                'knowledge          0 loaded '
+                '(access .knowledge to read configured database(s))'
+            )
+        else:
+            kn_line = f'knowledge          {n} programs'
         return (
             f'Underwriter        {self.name}\n'
             f'version            {self.version}\n'
-            f'knowledge          {len(self._knowledge)} programs\n'
+            f'{kn_line}\n'
             f'update             {self.update}\n'
             f'log2               {self.log2}\n'
             f'debug              {self.debug}\n'
             f'validation_eps     {VALIDATION_EPS}\n'
-            f'site dir           {self._format_dir(self.site_dir)}\n'
+            f'user dir           {self._format_dir(self.user_dir)}\n'
             f'default dir        {self._format_dir(self.default_dir)}'
         )
 
-    def factory(self, parsed):
+    def _factory(self, parsed):
         """
-        Construct the object described by a :class:`ParsedProgram` and attach it.
+        Internal: construct the object described by a :class:`ParsedProgram`.
 
-        Portfolio construction needs ``self`` (it is passed as the ``uw``
-        argument), which is why this is not a staticmethod.
+        Portfolio construction needs ``self`` (passed as ``uw``), which is why
+        this is not a staticmethod.
 
         :param parsed: a :class:`ParsedProgram` with ``kind``, ``name``, ``spec``,
             and ``program`` populated; ``object`` is None on input.
@@ -335,187 +340,115 @@ class Underwriter(object):
         import aggregate
         return aggregate.__version__
 
-    def test_suite(self):
-        f = self.default_dir / 'test_suite.agg'
-        txt = f.read_text(encoding='utf-8')
-        return txt
-
     @property
     def test_suite_file(self):
+        """Path to the bundled test suite ``.agg`` file, or ``None`` if not present."""
+        f = self.default_dir / TEST_SUITE_FILENAME
+        return f if f.exists() else None
+
+    def _build_work(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
-        Return the test_suite filename, or None if it does not exist
-        """
-        f = self.default_dir / 'test_suite.agg'
-        if f.exists():
-            return f
-        else:
-            return None
+        Internal: parse → factory (without smart-update). Used by :meth:`build_many`.
 
-    def write(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
-        """
-        Interpret a DecL program and create the corresponding objects.
-
-        Steps:
-
-        1. Preprocess the program (strip comments, normalize whitespace,
-           handle line continuations).
-        2. Parse line by line to create a dictionary spec for each sev, agg,
-           port, or distortion declaration.
-        3. Resolve ``sev.name`` / ``agg.name`` builtin references via the
-           knowledge base.
-        4. If ``update`` is set, update all created objects.
-
-        Sample input::
-
-            port MY_PORTFOLIO
-                agg Line1 20  loss xs 3 xs 2 sev gamma 5 cv 0.30 mixed gamma 0.4
-                agg Line2 10  claims xs 3 xs 2 sev gamma 12 cv 0.30 mixed gamma 1.2
-                agg Line3 100 premium at 0.4 lr 3 xs 2 sev 4 @ lognormal 3 cv 0.8 fixed 1
-
-        Each ``agg`` clause inside a portfolio must be tab-indented on its own
-        line; the preprocessor folds ``\\n\\t agg`` back into a single line for
-        the parser.
-
-        See ``aggregate/decl.lark`` for the full grammar and ``Aggregate``
-        for many examples.
+        Tries a name lookup in the knowledge first; falls back to parsing the
+        program. If ``update`` is True, calls each constructed object's
+        ``.update(log2, bs, **kwargs)`` with the *literal* log2/bs (no bucket
+        inference — that lives in :meth:`build_many`).
 
         :param portfolio_program: a DecL program (str), or the name of a
             previously-built object in the knowledge base.
-        :param log2: log2 of the number of buckets for the discrete
-            representation; 0 uses ``self.log2``.
-        :param bs: bucket size; 0 lets the object recommend one.
+        :param log2: passed verbatim to each object's ``update``.
+        :param bs: passed verbatim to each object's ``update``.
         :param update: override the class-level ``self.update`` default.
         :param kwargs: passed to each created object's ``update`` method.
         :return: list of :class:`ParsedProgram` (one per top-level declaration).
         """
-
-        # prepare for update
-        # what / how to do; little awkward: to make easier for user have to strip named update args
-        # out of kwargs
         if update is None:
             update = self.update
-
         if update is True and log2 == 0:
             log2 = self.log2
 
         # first see if portfolio_program refers to a built-in object
         try:
-            # calls __getitem__
             answer = self[portfolio_program]
         except (LookupError, TypeError):
-            logger.debug('underwriter.write | object not found, processing as a program.')
+            logger.debug('underwriter._build_work | object not found, processing as a program.')
         else:
-            logger.debug('underwriter.write | %s object found.', answer.kind)
-            answer = self.factory(answer)
+            logger.debug('underwriter._build_work | %s object found.', answer.kind)
+            answer = self._factory(answer)
             if update:
                 answer.object.update(log2, bs, **kwargs)
-            # rationalize return to be the same as parsed programs
             return [answer]
 
-        # if you fall through to here then the portfolio_program did not refer to a built-in object
-        # run the program, get the interpreter return value, the irv, which contains kind/name->spec,program
-        irv = self.interpret_program(portfolio_program)
+        # not a built-in reference — parse and factory each line
+        irv = self._interpret_program(portfolio_program)
         rv = []
         for answer in irv:
-            # create objects and update if needed
-            answer = self.factory(answer)
+            answer = self._factory(answer)
             if answer.object is not None:
-                # this can fail for named mixed severities, which can only
-                # be created in context of an agg... that behaviour is
-                # useful for named severities though... hence:
+                # this can fail for named mixed severities, which can only be
+                # created in the context of an agg — that behaviour is useful
+                # for named severities, hence:
                 if update:
                     update_method = getattr(answer.object, 'update', None)
                     if update_method is not None:
                         update_method(log2, bs, **kwargs)
             rv.append(answer)
 
-        # report on what has been done
         if not rv:
             logger.log(WL, 'Program did not contain any output')
         else:
             logger.info('Program created %d objects.', len(rv))
-
-        # return created objects
         return rv
 
-    def write_from_file(self, file_name, log2=0, bs=0, update=False, **kwargs):
+    def _interpret_program(self, portfolio_program):
         """
-        Read program from file. Delegates to write.
+        Internal: preprocess and parse a program one line at a time, storing
+        each parsed spec in the knowledge base. No objects are constructed.
 
-        :param file_name:
-        :param log2:
-        :param bs:
-        :param update:
-        :param kwargs:
-        :return:
+        :param portfolio_program: the DecL program text.
+        :return: list of :class:`ParsedProgram` (``object`` is ``None`` for each).
         """
-        portfolio_program = Path(file_name).read_text(encoding='utf-8')
-        return self.write(portfolio_program, log2=log2, bs=bs, update=update, **kwargs)
-
-    def interpret_program(self, portfolio_program):
-        """
-        Preprocess and then parse a program one line at a time. Each output is
-        stored in the Underwriter's knowledge database. No objects are created.
-
-        Error handling through parser.
-
-        :param portfolio_program:
-        :return:
-        """
-        # Preprocess ---------------------------------------------------------------------
         portfolio_program = self.lexer.preprocess(portfolio_program)
-
-        # create return value list
         rv = []
-
-        # Parse and Postprocess-----------------------------------------------------------
-        # self.parser.reset()
-        # program_line_dict = {}
         for program_line in portfolio_program:
             logger.debug(program_line)
-            # preprocessor only returns lines of length > 0
             try:
-                # parser returns the type, name, and spec of the object
-                # this is where you can marry up with the program
-                kind, name, spec = self.parser.parse(
-                    self.lexer.tokenize(program_line))
+                kind, name, spec = self.parser.parse(self.lexer.tokenize(program_line))
             except ValueError as e:
                 if isinstance(e.args[0], str):
                     logger.error(e)
-                    raise e
-                else:
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    i = e.args[0].index
-                    txt2 = program_line[0:i] + '>>>' + program_line[i:]
-                    logger.error('Parse error in input "%s"\nValue %s of type %s not expected',
-                                 txt2, v, t)
-                    raise e
+                    raise
+                t = e.args[0].type
+                v = e.args[0].value
+                i = e.args[0].index
+                txt2 = program_line[0:i] + '>>>' + program_line[i:]
+                logger.error('Parse error in input "%s"\nValue %s of type %s not expected',
+                             txt2, v, t)
+                raise
             else:
-                # store in uw dictionary and create if needed
                 logger.info('answer out: %s object %s parsed successfully...adding to knowledge',
                             kind, name)
                 self._knowledge.loc[(kind, name), :] = [spec, program_line]
                 rv.append(ParsedProgram(kind=kind, name=name, spec=spec, program=program_line))
-
         return rv
 
-    def safe_lookup(self, buildinid):
+    def _safe_lookup(self, buildinid):
         """
-        Lookup buildinid=kind.name in uw to find expected kind and merge safely into self.arg_dict.
+        Internal: parser callback that looks up ``kind.name`` in the knowledge
+        and returns a deepcopy of the spec.
 
-        Different from getitem because it splits the item into kind and name and double
-        checks you get the expected kind.
+        Different from :meth:`__getitem__` in that it splits the dotted id into
+        ``(kind, name)`` and verifies the resulting entry has the expected
+        kind.
 
-        :param buildinid:  a string in kind.name format
-        :return:
+        :param buildinid: a string in ``kind.name`` form.
+        :return: deep-copied spec dict.
         """
-
         # allow for sev.WC.1 name
         kind, *name = buildinid.split('.')
         name = '.'.join(name)
         try:
-            # lookup in Underwriter
             parsed = self[(kind, name)]
         except LookupError:
             logger.error('ERROR id %s.%s not found in the knowledge.', kind, name)
@@ -524,18 +457,33 @@ class Underwriter(object):
                      kind, name, parsed.kind, parsed.name)
         if parsed.kind != kind:
             raise ValueError(f'Error: type of {name} is  {parsed.kind}, not expected {kind}')
-        # don't want to pass back the original otherwise changes can be reflected in the knowledge
+        # don't want to pass back the original; changes would be reflected in the knowledge
         return deepcopy(parsed.spec)
 
-    def _build_all(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
+    def build_many(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
         """
-        Parse, build, and smart-update — the heavy lifting shared by
-        :meth:`build` and :meth:`build_many`.
+        Parse a (possibly multi-output) DecL program, construct each object, and smart-update.
 
-        Returns the full list of :class:`ParsedProgram` regardless of count.
-        Callers enforce their own count contract.
+        Always returns the full ``list[ParsedProgram]`` regardless of count.
+        Use :meth:`build` instead when you expect a single output.
+
+        Smart-update logic: discrete severities pick ``bs=1`` with a log2 sized
+        to the max possible loss; continuous ones call :meth:`recommend_bucket`;
+        portfolios use :meth:`best_bucket`. ``note{}`` hints in the program
+        can override these.
+
+        :param program: a DecL program producing one or more top-level outputs.
+        :param update: override the class-level ``self.update`` default.
+        :param log2: 0 (default) estimates log2 for discrete severities and
+            uses ``self.log2`` for everything else.
+        :param bs: bucket size; 0 lets the object recommend one.
+        :param recommend_p: passed to :meth:`recommend_bucket`; raise (closer
+            to 1) for thick-tailed distributions.
+        :param kwargs: passed to each ``update`` call. ``force_severity=True``
+            is always applied.
+        :return: list of :class:`ParsedProgram`, one per top-level output.
         """
-        rv = self.write(program, update=False, force_severity=True)
+        rv = self._build_work(program, update=False, force_severity=True)
 
         if not rv:
             logger.log(WL, 'build produced no output')
@@ -617,18 +565,13 @@ class Underwriter(object):
         """
         Parse a single DecL program and return the constructed object.
 
-        ``build`` is the primary user-facing entry point. It parses the
-        program, constructs the corresponding object, and smart-updates the
-        discrete distribution (detecting discrete severities to pick ``bs=1``,
-        otherwise calling :meth:`recommend_bucket`).
-
-        ``__call__`` delegates to ``build``.
+        Primary user-facing entry point. Calls :meth:`build_many` and unwraps
+        the single result. ``__call__`` delegates to ``build``.
 
         :param program: a DecL program producing exactly one top-level output.
         :param update: override the class-level ``self.update`` default.
         :param log2: 0 (default) estimates log2 for discrete severities and
-            uses ``self.log2`` for everything else. A nonzero value overrides
-            the discrete-mode estimation.
+            uses ``self.log2`` for everything else.
         :param bs: bucket size; 0 lets the object recommend one.
         :param recommend_p: passed to :meth:`recommend_bucket`; raise (closer
             to 1) for thick-tailed distributions.
@@ -640,7 +583,7 @@ class Underwriter(object):
         :raises ValueError: if the program produces zero or more than one
             top-level output. Use :meth:`build_many` for batched programs.
         """
-        rv = self._build_all(program, update=update, log2=log2, bs=bs,
+        rv = self.build_many(program, update=update, log2=log2, bs=bs,
                              recommend_p=recommend_p, **kwargs)
         if len(rv) != 1:
             raise ValueError(
@@ -650,43 +593,33 @@ class Underwriter(object):
         answer = rv[0]
         return answer if answer.object is None else answer.object
 
-    def build_many(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
-        """
-        Parse a (possibly multi-output) DecL program and return all results.
-
-        Same smart-update logic as :meth:`build`, but returns the full
-        ``list[ParsedProgram]`` regardless of count. Use this when a program
-        deliberately produces multiple top-level outputs.
-
-        :return: list of :class:`ParsedProgram`, one per top-level output.
-        """
-        return self._build_all(program, update=update, log2=log2, bs=bs,
-                               recommend_p=recommend_p, **kwargs)
-
     def __call__(self, *args, **kwargs):
         return self.build(*args, **kwargs)
 
-    def interpret_test_file(self, *, filename='', where=''):
+    def interpret_file(self, filename=None, *, where=''):
         """
-        Run every DecL program in a ``.agg`` or ``.csv`` file through the parser
-        without creating output, returning a DataFrame with per-line parse-error info.
+        Parse every DecL program in a ``.agg`` or ``.csv`` file and return per-line error info.
 
-        This is for *testing* the interpreter — that is, exercising the lex/parse
-        path and reporting which lines fail — not for actually interpreting
-        anything into objects. Use :meth:`build` or :meth:`build_many` for that.
+        Useful for validating a new ``.agg`` file before installing it into
+        :attr:`user_dir`. Unlike :meth:`read_database` (which aborts on the first
+        parse error), this method collects errors for every line and returns a
+        DataFrame with columns ``kind, error, name, output, preprocessed program,
+        program``.
+
+        The bundled test suite lives at :attr:`test_suite_file` — call
+        ``interpret_file()`` with no arguments to run it.
 
         For ``.csv`` files, the first column is used as index. For ``.agg`` files,
         the text is preprocessed (``\\n\\tagg`` folded back into one line, comments
         stripped) and then split on newlines.
 
-        :param filename: a string or Path. Defaults to
-            ``~/aggregate/tests/test_suite.csv`` if empty.
-        :param where: regex filter on the DataFrame index; '' means all rows.
-        :return: DataFrame with columns ``kind, error, name, output,
-            preprocessed program, program``.
+        :param filename: a string or :class:`Path`. When ``None`` (default),
+            uses :attr:`test_suite_file`.
+        :param where: regex filter on the DataFrame index; ``''`` means all rows.
+        :return: DataFrame with one row per line of the input file.
         """
-        if filename == '':
-            filename = Path.home() / 'aggregate/tests/test_suite.csv'
+        if filename is None:
+            filename = self.test_suite_file
         elif isinstance(filename, str):
             filename = Path(filename)
         if filename.suffix == '.csv':
@@ -701,15 +634,16 @@ class Underwriter(object):
         if where != '':
             df = df.loc[df.index.str.match(where)]
         # ensure the canonical One severity is present for any sev.One references
-        self.write('sev One dsev [1]')
+        self.build_many('sev One dsev [1]', update=False)
 
         ans = {}
         # detect a non-trivial change between preprocessed and input program
         def _changed(preprocessed, original):
             return 'same' if preprocessed.replace(' ', '') == original.replace(' ', '').replace('\t', '') else original
 
-        for test_name, program in df.iterrows():
-            program_in = program[0] if not isinstance(program, str) else program
+        # df has exactly one column (program text). Iterate index + first-column-by-position;
+        # `program[0]` on a labeled pandas Series raises in modern pandas.
+        for test_name, program_in in zip(df.index, df.iloc[:, 0]):
             preprocessed = self.lexer.preprocess(program_in)
             err = 0
             if len(preprocessed) == 1:
@@ -741,15 +675,10 @@ class Underwriter(object):
         df_out = pd.DataFrame(ans, index=['kind', 'error', 'name', 'output',
                                           'preprocessed program', 'program']).T
         df_out.index.name = 'index'
+        n_errors = df_out.error.sum()
+        if n_errors:
+            logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
-
-    def run_test_suite(self):
-        """Run :meth:`interpret_test_file` on the bundled test suite."""
-        df = self.interpret_test_file(filename=self.test_suite_file)
-        num_errors = df.error.sum()
-        if num_errors != 0:
-            logger.error('%d errors in test suite', num_errors)
-        return df
 
     def more(self, regex):
         """
@@ -758,154 +687,83 @@ class Underwriter(object):
         """
         more(self, regex)
 
-    def qlist(self, regex):
+    def discover(self, regex='', kind='', plot=False, describe=False,
+                 return_objects=False, **kwargs):
         """
-        Wrapper for show to just list elements in knowledge that match ``regex``.
-        Returns a dataframe.
+        Match knowledge entries against ``regex`` (and optional ``kind``);
+        optionally build, plot, and describe each.
+
+        Default behavior (``plot=False, describe=False``) is a lightweight
+        directory view — just filter the knowledge base by name and return
+        the matching DataFrame. Pass ``plot=True`` or ``describe=True`` to
+        build each match and visualize/describe it.
+
+        Examples::
+
+            build.discover()                        # all entries
+            build.discover('^A\\.')                  # entries whose name starts with "A."
+            build.discover('Dice', plot=True)        # build + plot
+            build.discover('^B\\.', describe=True)   # build + qd describe
+
+        :param regex: filter on the knowledge index (name); '' matches all.
+        :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); '' matches all.
+        :param plot: build each match and call its ``.plot()``.
+        :param describe: build each match and ``qd()`` its describe table.
+        :param return_objects: when building, also return the list of built
+            objects alongside the DataFrame.
+        :param kwargs: passed to :meth:`build` for each match.
+        :return: DataFrame of matches; ``(objects, DataFrame)`` if
+            ``return_objects=True``.
         """
-        return self.show(regex, kind='', plot=False, describe=False, verbose=True)
+        # base frame: optionally restricted to a kind
+        base = self.knowledge.droplevel('kind') if not kind else self.knowledge.loc[kind]
+        # empty regex means "no filter" — return everything
+        df = base.filter(regex=regex, axis=0).copy() if regex else base.copy()
 
-    def qshow(self, regex, tacit=True):
-        """
-        Wrapper for show to just show (display) elements in knowledge that match ``regex``.
-        No reutrn value if tacit, else returns a dataframe.
-
-        """
-        def ff(x):
-            fs = '{x:120s}'
-            return fs.format(x=x)
-        bit = self.show(regex, kind='', plot=False,
-                        describe=False)[['program']]
-        bit['program'] = bit['program'].str.replace(
-            r' note\{[^}]+\}', '').str.replace('  +', ' ')  # , flags=re.MULTILINE)
-        # bit['program'] = bit['program'].str.replace(' ( +)', ' ') #, flags=re.MULTILINE)
-        # bit['program'] = bit['program'].str.replace(r' note\{[^}]+\}$|  *', ' '   ) #, flags=re.MULTILINE)
-        if tacit:
-            qd(bit,
-               line_width=160, max_colwidth=130, col_space=15, justify='left',
-               max_rows=200, formatters={'program': ff})
-        else:
-            return bit
-
-    def show(self, regex, kind='', plot=True, describe=True, verbose=False, **kwargs):
-        """
-        Create from knowledge by name or match to name.
-        Optionally plot. Returns the created object plus dataframe with more detailed information.
-        Allows exploration of preloaded databases.
-
-        Eg ``regex = "A.*[234]`` to run examples named A...2, 3 and 4.
-
-        See ``qshow`` for a wrapper that just returns the matches, with no object
-        creation or plotting.
-
-        Examples.
-        ::
-
-            from aggregate.utilities import pprint
-            # pretty print all prgrams starting A; no object creation
-            build.show('^A.*', 'agg', False, False).program.apply(pprint);
-
-            # build and plot A..234
-            ans, df = build.show('^A.*')
-
-        :param regex: for filtering name
-        :param kind: the kind of object, port, agg, etc.
-        :param plot:    if True, plot   (default True)
-        :param describe: if True, print the describe dataframe
-        :param verbose: if True, return the dataframe and objects; else no return value
-        :param kwargs: passed to build for calculation instructions
-        :return: dictionary of created objects and DataFrame with info about each.
-        """
-        # too painful getting the one thing out!
-        ans = []
-
-        if kind is None or kind == '':
-            df = self.knowledge.droplevel('kind').filter(
-                regex=regex, axis=0).copy()
-        else:
-            df = self.knowledge.loc[kind].filter(regex=regex, axis=0).copy()
-
-        # severity causes an error: no est_m etc.
+        # the canonical "One" severity has no moments — drop it from the build path
         if "One" in df.index:
             df = df.drop(index='One')
 
-        if plot is False and describe is False:
-            # just act like a filtered listing on knowledge
-            return df.sort_values('name')
+        if not plot and not describe:
+            # lightweight directory view; format the program column for readability
+            bit = df[['program']].copy()
+            bit['program'] = (bit['program']
+                              .str.replace(r' note\{[^}]+\}', '', regex=True)
+                              .str.replace(r' {2,}', ' ', regex=True))
+            return bit.sort_index()
 
-        # added detail columns
-        df['log2'] = 0
-        df['bs'] = 0.
-        df['agg_m'] = 0.
-        df['agg_cv'] = 0.
-        df['agg_sd'] = 0.
-        df['agg_skew'] = 0.
-        df['emp_m'] = 0.
-        df['emp_cv'] = 0.
-        df['emp_sd'] = 0.
-        df['emp_skew'] = 0.
+        # build + plot/describe path: augment df with summary statistics
+        for col in ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
+                    'emp_m', 'emp_cv', 'emp_sd', 'emp_skew']:
+            df[col] = 0.
         df['valid'] = False
 
+        objects = []
         for n, row in df.iterrows():
-            p = row.program
             try:
-                a = self.build(p, **kwargs)
-                ans.append(a)
+                a = self.build(row.program, **kwargs)
+                objects.append(a)
             except NotImplementedError:
                 logger.error('skipping %s...element not implemented', n)
-            else:
-                if describe:
-                    pp = getattr(a, 'pprogram', None)
-                    if pp is not None:
-                        print(pp)
-                    qd(a)
-                if plot is True:
-                    a.plot(figsize=(8, 2.4))
-                    # print('\nDensity and Quantiles')
-                    print()
-                    show_fig(a.figure, format='svg')
-                if describe:
-                    print('\n')
-                df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
-                           'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']] = (
-                    a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, a.agg_skew, a.est_m, a.est_cv, a.est_sd,
-                    a.est_skew, a.explain_validation())
-        # if only one item, return it...much easier to use
-        if len(ans) == 1:
-            # noinspection PyUnboundLocalVariable
-            ans = a
-        if verbose:
-            return ans, df
+                continue
+            if describe:
+                pp = getattr(a, 'pprogram', None)
+                if pp is not None:
+                    print(pp)
+                qd(a)
+                print('\n')
+            if plot:
+                a.plot(figsize=(8, 2.4))
+                print()
+                show_fig(a.figure, format='svg')
+            df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
+                       'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']] = (
+                a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, a.agg_skew,
+                a.est_m, a.est_cv, a.est_sd, a.est_skew, a.explain_validation())
 
-    def dir(self, pattern=''):
-        """
-        List all agg databases in site and default directories.
-        If entries is True then read them and return named objects.
-
-        :param pattern:  glob pattern for filename; .agg is added
-
-        """
-
-        if pattern == '':
-            pattern = '*.agg'
-        else:
-            pattern += '.agg'
-
-        entries = []
-
-        for dn, d in zip(['site', 'default'], [self.site_dir, self.default_dir]):
-            for fn in d.glob(pattern):
-                txt = fn.read_text(encoding='utf-8')
-                stxt = txt.split('\n')
-                for r in stxt:
-                    rs = r.split(' ')
-                    if rs[0] in ['agg', 'port', 'dist', 'distortion', 'sev']:
-                        entries.append([dn, fn.name] + rs[:2])
-
-        ans = pd.DataFrame(entries, columns=[
-                           'Directory', 'Database', 'kind', 'name'])
-        return ans
-
+        if return_objects:
+            return (objects[0] if len(objects) == 1 else objects), df
+        return df
 
 # Module-level singleton — the canonical user-facing entry point. Importable
 # as `from aggregate import build`. `update=True` is why `build('agg ...')`

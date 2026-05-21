@@ -232,7 +232,7 @@ class Frequency(object):
             """
             Decorator to zero modify the frequency function moms_func(n).
 
-            Assmes there is a nonlocal function prn_eq_0(x), giving the unmodified prob(N=0)
+            Assumes there is a non-local function prn_eq_0(x), giving the unmodified prob(N=0)
             when the mean is x, and the global solve_n_base function. The value p0 is also
             non-local.
             """

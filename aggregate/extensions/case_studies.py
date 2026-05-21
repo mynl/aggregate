@@ -370,15 +370,16 @@ class CaseStudy(object):
         self.bs = bs
         self.padding = padding
 
-        # new style output from uw as list of Answer(...) object
-        out = self.uw.write(f'port Gross_{self.case_id} {self.a_distribution} {self.b_distribution_gross}')
+        # build_many(update=False) parses + factories without smart-update;
+        # Portfolio.update is invoked explicitly below with chosen bs/log2.
+        out = self.uw.build_many(f'port Gross_{self.case_id} {self.a_distribution} {self.b_distribution_gross}', update=False)
         self.gross = out[0].object
         # sort out better bucket
         if self.bs == 0 or np.isnan(self.bs):
             self.bs = self.gross.best_bucket(self.log2)
         self.gross.update(log2=self.log2, bs=self.bs, padding=self.padding, remove_fuzz=True)
 
-        out = self.uw.write(f'port Net_{self.case_id} {self.a_distribution} {self.b_distribution_net}')
+        out = self.uw.build_many(f'port Net_{self.case_id} {self.a_distribution} {self.b_distribution_net}', update=False)
         self.net = out[0].object
         self.net.update(log2=self.log2, bs=self.bs, remove_fuzz=True)
         self.ports = OrderedDict(gross=self.gross, net=self.net)

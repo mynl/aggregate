@@ -1,4 +1,7 @@
 {
+  "env": {
+    "UV_LINK_MODE": "copy"
+  },
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem *)",
@@ -6,8 +9,5 @@
       "Bash(echo \"exit $?\")",
       "Bash(cd *)"
     ]
-  },
-  "env": {
-    "UV_LINK_MODE": "copy"
   }
 }

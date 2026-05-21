@@ -173,6 +173,49 @@ def test_discover_empty_regex_lists_all():
     assert len(df) > 0
 
 
+def test_discover_describe_handles_severity():
+    """Severity in knowledge should not crash discover(describe=True)."""
+    global_build('sev DiscSevTest lognorm 100 cv 1')
+    df = global_build.discover('DiscSevTest', describe=True)
+    assert 'DiscSevTest' in df.index
+    # Severity has theoretical moments but no log2/bs/est_*/valid
+    assert df.loc['DiscSevTest', 'agg_m'] is not None
+    assert df.loc['DiscSevTest', 'log2'] is None
+    assert df.loc['DiscSevTest', 'emp_m'] is None
+    assert df.loc['DiscSevTest', 'valid'] is None
+
+
+def test_discover_describe_handles_distortion():
+    """Distortion in knowledge should not crash discover(describe=True)."""
+    global_build('distortion DiscDistTest ph 0.3')
+    df = global_build.discover('DiscDistTest', describe=True)
+    assert 'DiscDistTest' in df.index
+    # Distortion has none of the moment fields
+    for col in ['log2', 'bs', 'agg_m', 'agg_cv', 'emp_m', 'valid']:
+        assert df.loc['DiscDistTest', col] is None
+
+
+def test_discover_plot_handles_all_kinds():
+    """discover(plot=True) must not crash on any kind in the knowledge.
+
+    Pins the regression where Distortion.plot rejected the hardcoded
+    figsize=(8, 2.4) we used to pass.
+    """
+    import matplotlib
+    matplotlib.use('Agg')  # headless backend; no figure window
+    import matplotlib.pyplot as plt
+
+    global_build('sev DiscPlotSev lognorm 100 cv 1')
+    global_build('distortion DiscPlotDist ph 0.3')
+    # Distortion path — must not raise
+    df = global_build.discover('DiscPlotDist', plot=True)
+    assert 'DiscPlotDist' in df.index
+    # Severity path
+    df = global_build.discover('DiscPlotSev', plot=True)
+    assert 'DiscPlotSev' in df.index
+    plt.close('all')
+
+
 # ---------------------------------------------------------------------------
 # directory rationalization — user_dir replaces site/case/template
 # ---------------------------------------------------------------------------

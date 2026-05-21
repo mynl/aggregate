@@ -54,6 +54,11 @@ cd docs && uv run make.bat html          # Windows
 cd docs && uv run make html              # Unix
 ```
 
+**Do NOT build docs as part of a verification cycle.** The doc tree is large (500+ rendered pages) and the build is slow. When editing `.rst` files during a refactor:
+- Keep the `.rst` edits in lockstep with code changes (grep for stale `:meth:` / `:class:` references against deleted/renamed symbols).
+- Note in the PR / commit that docs are pending a rebuild.
+- The author runs the build manually outside the iteration loop.
+
 **Quick interactive smoke test** (Python/Jupyter):
 ```python
 from aggregate import build, qd

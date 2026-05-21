@@ -20,6 +20,50 @@ from .utilities import (round_bucket, qd, show_fig, more, parse_note_ex)
 logger = logging.getLogger(__name__)
 
 
+def _row_stats(a, summary_cols):
+    """
+    Return a list of summary statistics for ``a`` aligned with ``summary_cols``.
+
+    Per-class capability matrix:
+
+    - :class:`Aggregate` / :class:`Portfolio`: all fields populated (log2, bs,
+      theoretical and empirical moments, validation).
+    - :class:`Severity`: theoretical moments only via ``a.stats('mvsk')``; no
+      discretization, no empirical moments, no validation.
+    - :class:`Distortion`: none of these fields apply — all returned as ``None``.
+
+    Inapplicable fields are returned as ``None``; the caller's DataFrame is
+    object dtype so this mixes cleanly with numeric values from other rows.
+    """
+    row = {col: None for col in summary_cols}
+    if isinstance(a, (Aggregate, Portfolio)):
+        row.update(log2=a.log2, bs=a.bs,
+                   agg_m=a.agg_m, agg_cv=a.agg_cv, agg_sd=a.agg_sd, agg_skew=a.agg_skew,
+                   emp_m=a.est_m, emp_cv=a.est_cv, emp_sd=a.est_sd, emp_skew=a.est_skew,
+                   valid=a.explain_validation())
+    elif isinstance(a, Severity):
+        # theoretical moments only; severity has no discretization. Use the
+        # project's own .moms(), which returns raw moments (E[X], E[X^2], E[X^3]);
+        # scipy's .stats('mvsk') currently raises a UFuncTypeError on Severity.
+        try:
+            ex1, ex2, ex3 = a.moms()
+            m = float(ex1)
+            var = float(ex2) - m * m
+            sd = float(np.sqrt(var)) if var > 0 else 0.0
+            cv = (sd / m) if m else None
+            if var > 0:
+                # central third moment, then standardized skew
+                mu3 = float(ex3) - 3 * m * float(ex2) + 2 * m ** 3
+                skew = mu3 / sd ** 3
+            else:
+                skew = None
+            row.update(agg_m=m, agg_sd=sd, agg_cv=cv, agg_skew=skew)
+        except Exception as e:
+            logger.debug('Severity %s: moms unavailable (%s)', getattr(a, 'name', '?'), e)
+    # Distortion: nothing applies — all fields left as None
+    return [row[col] for col in summary_cols]
+
+
 @dataclass
 class ParsedProgram:
     """One DecL declaration after parsing, with optional constructed object.
@@ -628,11 +672,14 @@ class Underwriter(object):
             txt = filename.read_text(encoding='utf-8')
             stxt = re.sub('\n\tagg', ' agg', txt, flags=re.MULTILINE)
             stxt = [i for i in stxt.split('\n') if len(i) and i[0] != '#']
-            df = pd.DataFrame(stxt, columns=['program'])
+            # Use the program name (second token of '<kind> <name> ...') as the
+            # DataFrame index so a `where` regex can filter by name.
+            names = [(line.split() + ['?'])[1] for line in stxt]
+            df = pd.DataFrame({'program': stxt}, index=names)
         else:
             raise ValueError(f'File suffix must be .csv or .agg, not {filename.suffix}')
         if where != '':
-            df = df.loc[df.index.str.match(where)]
+            df = df.loc[df.index.astype(str).str.match(where)]
         # ensure the canonical One severity is present for any sev.One references
         self.build_many('sev One dsev [1]', update=False)
 
@@ -720,11 +767,10 @@ class Underwriter(object):
         # empty regex means "no filter" — return everything
         df = base.filter(regex=regex, axis=0).copy() if regex else base.copy()
 
-        # the canonical "One" severity has no moments — drop it from the build path
-        if "One" in df.index:
-            df = df.drop(index='One')
+        # asking for the built objects implies we must run the build loop
+        do_build = plot or describe or return_objects
 
-        if not plot and not describe:
+        if not do_build:
             # lightweight directory view; format the program column for readability
             bit = df[['program']].copy()
             bit['program'] = (bit['program']
@@ -732,11 +778,14 @@ class Underwriter(object):
                               .str.replace(r' {2,}', ' ', regex=True))
             return bit.sort_index()
 
-        # build + plot/describe path: augment df with summary statistics
-        for col in ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
-                    'emp_m', 'emp_cv', 'emp_sd', 'emp_skew']:
-            df[col] = 0.
-        df['valid'] = False
+        # build + plot/describe path: augment df with summary statistics.
+        # Initialize as object dtype to avoid pandas LossySetitemError on the
+        # mixed-type .loc assignment below (modern pandas refuses to coerce a
+        # non-bool result of explain_validation into a bool column).
+        summary_cols = ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
+                        'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']
+        for col in summary_cols:
+            df[col] = pd.Series([None] * len(df), index=df.index, dtype=object)
 
         objects = []
         for n, row in df.iterrows():
@@ -750,16 +799,23 @@ class Underwriter(object):
                 pp = getattr(a, 'pprogram', None)
                 if pp is not None:
                     print(pp)
-                qd(a)
+                # only Aggregate / Portfolio have a `.describe` table
+                if hasattr(a, 'describe'):
+                    qd(a)
+                else:
+                    print(repr(a))
                 print('\n')
             if plot:
-                a.plot(figsize=(8, 2.4))
+                # Delegate sizing to each class's own .plot default —
+                # Aggregate/Severity/Portfolio/Distortion all set sensible
+                # ones, and Distortion.plot in particular does not accept
+                # `figsize` (would forward to ax.plot and crash).
+                a.plot()
                 print()
-                show_fig(a.figure, format='svg')
-            df.loc[n, ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
-                       'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']] = (
-                a.log2, a.bs, a.agg_m, a.agg_cv, a.agg_sd, a.agg_skew,
-                a.est_m, a.est_cv, a.est_sd, a.est_skew, a.explain_validation())
+                fig = getattr(a, 'figure', None)
+                if fig is not None:
+                    show_fig(fig, format='svg')
+            df.loc[n, summary_cols] = _row_stats(a, summary_cols)
 
         if return_objects:
             return (objects[0] if len(objects) == 1 else objects), df

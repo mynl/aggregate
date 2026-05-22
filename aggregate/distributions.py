@@ -3678,6 +3678,27 @@ def make_layer_attachment_ppf(attachment, limit, pattach, pdetach, conditional):
 # ---------------------------------------------------------------------------
 
 
+def _scalar_bound(v):
+    """Coerce a splice bound (``sev_lb`` / ``sev_ub``) to a Python scalar.
+
+    Notes
+    -----
+    The DecL parser returns single-element lists for the single-segment
+    splice form (``splice [a b]`` -> ``sev_lb=[a]``, ``sev_ub=[b]``).
+    Severity treats these as scalars throughout; allowing them to stay as
+    1-element arrays would make ``np.where(...)`` in the wrapped scipy
+    methods return ``(1,)``-shaped outputs that ``scipy.integrate.quad``
+    cannot consume.
+    """
+    arr = np.asarray(v)
+    if arr.size == 1:
+        return arr.item()
+    raise ValueError(
+        f'Splice bound must be a scalar or length-1 sequence; got {v!r} '
+        f'(size {arr.size}). Multi-segment splice is not implemented.'
+    )
+
+
 def _classify_sev(sev_name, sev_xs):
     """Classify a ``Severity`` constructor call into a single registry key.
 
@@ -3898,43 +3919,55 @@ def _numerical_moms(severity):
     continue_calc = True
     max_rel_error = 1e-3
 
-    if moments_finite[0]:
-        ex1 = _safe_integrate(severity.fz.isf, lower, upper, 1, severity.sev_name)
-        if ex1[0] != 0 and ex1[1] / ex1[0] < max_rel_error:
-            ex1 = ex1[0]
-        else:
-            ex1 = np.nan
-            continue_calc = False
+    if upper <= lower:
+        # Zero-width integration window: arises when the (possibly spliced)
+        # severity support sits entirely above the policy attachment AND
+        # the detachment also lies at or below the support — every claim
+        # is exactly the full limit. Skip the integration; the
+        # binomial-expansion adjustment block below produces the correct
+        # full-limit moments via the ``dma * lower`` term. Without this
+        # short-circuit the ``ex1[0] != 0`` rel-error check would reject
+        # the genuine zero integral as failure and propagate NaN through
+        # the result.
+        ex1 = ex2 = ex3 = 0.0
     else:
-        logger.info('First moment does not exist.')
-        ex1 = np.inf
-
-    if continue_calc and moments_finite[1]:
-        ex2 = _safe_integrate(lambda x: severity.fz.isf(x) ** 2,
-                              lower, upper, 2, severity.sev_name)
-        if ex2[1] / ex2[0] < max_rel_error:
-            ex2 = ex2[0]
+        if moments_finite[0]:
+            ex1 = _safe_integrate(severity.fz.isf, lower, upper, 1, severity.sev_name)
+            if ex1[0] != 0 and ex1[1] / ex1[0] < max_rel_error:
+                ex1 = ex1[0]
+            else:
+                ex1 = np.nan
+                continue_calc = False
         else:
+            logger.info('First moment does not exist.')
+            ex1 = np.inf
+
+        if continue_calc and moments_finite[1]:
+            ex2 = _safe_integrate(lambda x: severity.fz.isf(x) ** 2,
+                                  lower, upper, 2, severity.sev_name)
+            if ex2[1] / ex2[0] < max_rel_error:
+                ex2 = ex2[0]
+            else:
+                ex2 = np.nan
+                continue_calc = False
+        elif not continue_calc:
             ex2 = np.nan
-            continue_calc = False
-    elif not continue_calc:
-        ex2 = np.nan
-    else:
-        logger.info('Second moment does not exist.')
-        ex2 = np.inf
-
-    if continue_calc and moments_finite[2]:
-        ex3 = _safe_integrate(lambda x: severity.fz.isf(x) ** 3,
-                              lower, upper, 3, severity.sev_name)
-        if ex3[1] / ex3[0] < max_rel_error:
-            ex3 = ex3[0]
         else:
+            logger.info('Second moment does not exist.')
+            ex2 = np.inf
+
+        if continue_calc and moments_finite[2]:
+            ex3 = _safe_integrate(lambda x: severity.fz.isf(x) ** 3,
+                                  lower, upper, 3, severity.sev_name)
+            if ex3[1] / ex3[0] < max_rel_error:
+                ex3 = ex3[0]
+            else:
+                ex3 = np.nan
+        elif not continue_calc:
             ex3 = np.nan
-    elif not continue_calc:
-        ex3 = np.nan
-    else:
-        logger.info('Third moment does not exist.')
-        ex3 = np.inf
+        else:
+            logger.info('Third moment does not exist.')
+            ex3 = np.inf
 
     # Attachment/detachment adjustments: convert raw integrals into the
     # layered moments E[X(a, d)^k].
@@ -4100,8 +4133,14 @@ class Severity(ss.rv_continuous):
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
         self.sev_loc = sev_loc
-        self.sev_lb = sev_lb
-        self.sev_ub = sev_ub
+        # The DecL parser returns ``sev_lb`` / ``sev_ub`` as 1-element
+        # sequences for single-segment splices (and may pass multi-element
+        # sequences for the never-implemented multi-segment form). Coerce
+        # to a Python scalar so downstream ``np.where`` calls in the
+        # ``make_conditional_*`` decorators return 0-d outputs that
+        # QUADPACK can consume in ``_safe_integrate``.
+        self.sev_lb = _scalar_bound(sev_lb)
+        self.sev_ub = _scalar_bound(sev_ub)
         self.sev_mean = sev_mean
         self.sev_cv = sev_cv
         self.sev_a = sev_a
@@ -4177,32 +4216,43 @@ class Severity(ss.rv_continuous):
         self.fz.pdf = make_conditional_pdf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.pdf)
 
     def _apply_layer_attachment(self):
-        """Wrap ``self.fz`` methods with the layer/attachment transform.
+        """Build layered-loss wrappers from the (splice-only) ``self.fz`` methods.
 
         Notes
         -----
-        Mirrors :meth:`_apply_lb_ub` in shape but represents a different
-        conceptual layer: ``sev_lb``/``sev_ub`` (splice) reshape the
-        underlying severity *distribution*; ``exp_attachment``/``exp_limit``
-        impose the *policy* on top.
+        Stores the wrappers as ``self._layered_<method>`` rather than
+        mutating ``self.fz.<method>``. The :class:`Severity` scipy
+        overrides ``_pdf`` / ``_cdf`` / ``_sf`` / ``_ppf`` / ``_isf``
+        route through these; ``self.fz.<method>`` stays splice-only so
+        the numerical-moments integration (:func:`_numerical_moms` and
+        :func:`moms_analytic` in ``utilities.py``) sees the underlying
+        spliced distribution, not the doubly-transformed claim-space view.
+
+        This is the right division because there is no such thing as a
+        "raw" severity *with a layer and attachment*: the splice (``sev_lb``
+        / ``sev_ub``) is part of the severity distribution itself, while
+        the layer/attachment (``exp_attachment`` / ``exp_limit``) is the
+        policy applied on top of that distribution. ``self.fz`` represents
+        the distribution; the layered wrappers represent the policy.
 
         Always runs, even for the trivial ``attachment=0, limit=inf`` case,
         because the layered-loss transform clamps ``x < 0 -> 0`` regardless
-        of the layer parameters. Distributions with support extending below
+        of the layer parameters. Distributions whose support extends below
         zero (e.g. ``norm``) rely on this clamp.
 
         Closure captures ``attachment``, ``limit``, ``detachment``,
         ``pattach``, ``pdetach``, ``conditional`` at construction. Mutating
-        any of those after ``__init__`` will produce stale results.
+        any of those after ``__init__`` will produce stale results from the
+        layered wrappers (though ``self.fz`` would still be self-consistent).
         """
         a, l, d = self.attachment, self.limit, self.detachment
         pa, pd = self.pattach, self.pdetach
         cond = self.conditional
-        self.fz.cdf = make_layer_attachment_cdf(a, l, pa, cond)(self.fz.cdf)
-        self.fz.sf  = make_layer_attachment_sf (a, l, pa, cond)(self.fz.sf)   # noqa
-        self.fz.pdf = make_layer_attachment_pdf(a, l, d, pa, pd, cond)(self.fz.pdf)
-        self.fz.isf = make_layer_attachment_isf(a, l, pa, pd, cond)(self.fz.isf)
-        self.fz.ppf = make_layer_attachment_ppf(a, l, pa, pd, cond)(self.fz.ppf)
+        self._layered_cdf = make_layer_attachment_cdf(a, l, pa, cond)(self.fz.cdf)
+        self._layered_sf  = make_layer_attachment_sf (a, l, pa, cond)(self.fz.sf)   # noqa
+        self._layered_pdf = make_layer_attachment_pdf(a, l, d, pa, pd, cond)(self.fz.pdf)
+        self._layered_isf = make_layer_attachment_isf(a, l, pa, pd, cond)(self.fz.isf)
+        self._layered_ppf = make_layer_attachment_ppf(a, l, pa, pd, cond)(self.fz.ppf)
 
     def _compute_attachment_probs(self):
         """Compute ``pdetach``, ``pattach``, and ``moment_pattach``.
@@ -4275,30 +4325,32 @@ class Severity(ss.rv_continuous):
 
     # ------------------------------------------------------------------
     # scipy ``rv_continuous`` private overrides — pass-throughs to the
-    # wrapped ``self.fz`` methods.
+    # layered wrappers built by ``_apply_layer_attachment``.
     #
-    # All layer/attachment + splice logic lives in the decorator factories
-    # applied to ``self.fz.<method>`` at construction time
-    # (see ``_apply_lb_ub`` and ``_apply_layer_attachment``). These five
-    # overrides exist only because scipy's ``rv_continuous`` machinery
-    # routes ``rvs``, ``interval``, ``expect``, etc. through the
-    # private ``_<method>`` form.
+    # Splice (``sev_lb`` / ``sev_ub``) lives on ``self.fz.<method>``
+    # (mutated by ``_apply_lb_ub``); layer/attachment lives on
+    # ``self._layered_<method>``. The two transforms are kept on different
+    # objects so internal moment integration (``_numerical_moms``,
+    # ``moms_analytic``) can see the splice-only distribution via
+    # ``self.fz``, while user-facing scipy calls (``rvs``, ``interval``,
+    # ``stats``, etc.) route through these overrides to the fully-layered
+    # claim-space view.
     # ------------------------------------------------------------------
 
     def _pdf(self, x, *args):
-        return self.fz.pdf(x)
+        return self._layered_pdf(x)
 
     def _cdf(self, x, *args):
-        return self.fz.cdf(x)
+        return self._layered_cdf(x)
 
     def _sf(self, x, *args):
-        return self.fz.sf(x)
+        return self._layered_sf(x)
 
     def _isf(self, q, *args):
-        return self.fz.isf(q)
+        return self._layered_isf(q)
 
     def _ppf(self, q, *args):
-        return self.fz.ppf(q)
+        return self._layered_ppf(q)
 
     def _stats(self, *args, **kwds):
         """Mean, variance, skew of the layered severity (from ``moms``)."""

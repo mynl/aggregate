@@ -20,7 +20,7 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
                         make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
                         more, parse_note, parse_note_ex, introspect, explain_validation,
-                        beta_fit)
+                        beta_fit, invgamma_fit, invgauss_fit)
 from .spectral import Distortion, approx_ccoc, tvar_weights, consistent_distortions, p_to_parameters
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward

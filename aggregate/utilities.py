@@ -267,6 +267,31 @@ def beta_fit(m, cv):
     return sev_a, sev_b
 
 
+def invgamma_fit(cv):
+    """
+    Inverse gamma shape parameter from cv.
+
+    Notes
+    -----
+    For ``ss.invgamma(a)`` the squared coefficient of variation satisfies
+    :math:`\\mathrm{cv}^2 = 1 / (a - 2)`, giving :math:`a = 1/\\mathrm{cv}^2 + 2`.
+    Valid for :math:`a > 2`, i.e. when the variance exists.
+    """
+    return 1 / cv ** 2 + 2
+
+
+def invgauss_fit(cv):
+    """
+    Inverse Gaussian shape parameter from cv.
+
+    Notes
+    -----
+    For ``ss.invgauss(mu)`` the cv equals :math:`\\sqrt{\\mu}`, so
+    :math:`\\mu = \\mathrm{cv}^2`.
+    """
+    return cv ** 2
+
+
 def approximate_work(m, cv, skew, name, agg_str, note, approx_type, output):
     """
     Does the work for Portfolio.approximate and Aggregate.approximate. See their documentation.

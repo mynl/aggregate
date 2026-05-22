@@ -31,7 +31,7 @@ from .utilities import (ft, ift, axiter_factory, AxisManager, html_title,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, Answer, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
-                        make_var_tvar, more, explain_validation,
+                        make_var_tvar, agg_help, explain_validation,
                         make_comonotonic_allocations as make_comonotonic_allocations_work)
 import aggregate.random_agg as ar
 
@@ -228,12 +228,11 @@ class Portfolio(object):
         self.EX_accounting_economic_balance_sheet = None
         self.validation_eps = VALIDATION_EPS
 
-    def more(self, regex):
+    def help(self, regex):
         """
-        More information about methods and properties matching regex
-
+        Lookup help on methods and properties matching ``regex``.
         """
-        more(self, regex)
+        agg_help(self, regex)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """

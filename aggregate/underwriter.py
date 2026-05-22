@@ -15,7 +15,7 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import (round_bucket, qd, show_fig, more, parse_note_ex)
+from .utilities import (round_bucket, qd, show_fig, agg_help, parse_note_ex)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,19 @@ class ParsedProgram:
     spec: Any           # dict of kwargs for the constructor
     program: str        # the original DecL source line
     object: Any = None  # the constructed object once factory has run
+
+
+class CannotBuild(ValueError):
+    """Raised by :meth:`Underwriter.build` when a parsed spec produces no top-level object.
+
+    Typically the named-mixed-severity case: a ``sev`` declaration with ``wts``
+    can only live inside an :class:`Aggregate`, not standalone. Use
+    :meth:`Underwriter.build_many` to receive the :class:`ParsedProgram`
+    instead, then inspect ``.spec`` directly.
+
+    Subclass of :class:`ValueError` so existing broad ``except ValueError``
+    callers continue to catch it.
+    """
 
 
 class Underwriter(object):
@@ -622,10 +635,12 @@ class Underwriter(object):
         :param kwargs: passed to ``update`` (e.g. ``padding``). ``force_severity=True``
             is always applied.
         :return: the constructed Aggregate / Severity / Portfolio / Distortion.
-            For the named-mixed-severity case where the spec cannot be built
-            standalone, returns the :class:`ParsedProgram` with ``object=None``.
         :raises ValueError: if the program produces zero or more than one
             top-level output. Use :meth:`build_many` for batched programs.
+        :raises CannotBuild: if the spec parses but no top-level object can be
+            built standalone (e.g. a named mixture severity, which can only
+            live inside an :class:`Aggregate`). Use :meth:`build_many` to
+            receive the :class:`ParsedProgram` instead.
         """
         rv = self.build_many(program, update=update, log2=log2, bs=bs,
                              recommend_p=recommend_p, **kwargs)
@@ -635,7 +650,14 @@ class Underwriter(object):
                 f'use build_many() for batched programs.'
             )
         answer = rv[0]
-        return answer if answer.object is None else answer.object
+        if answer.object is None:
+            raise CannotBuild(
+                f'build() could not construct {answer.kind} {answer.name!r}: '
+                f'spec parses but cannot be built standalone (typically a '
+                f'mixture severity — wrap it in an Aggregate, or use '
+                f'build_many() to receive the ParsedProgram).'
+            )
+        return answer.object
 
     def __call__(self, *args, **kwargs):
         return self.build(*args, **kwargs)
@@ -727,12 +749,11 @@ class Underwriter(object):
             logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
 
-    def more(self, regex):
+    def help(self, regex):
         """
-        More information about methods and properties matching regex
-
+        Lookup help on methods and properties matching ``regex``.
         """
-        more(self, regex)
+        agg_help(self, regex)
 
     def discover(self, regex='', kind='', plot=False, describe=False,
                  return_objects=False, **kwargs):
@@ -791,10 +812,13 @@ class Underwriter(object):
         for n, row in df.iterrows():
             try:
                 a = self.build(row.program, **kwargs)
-                objects.append(a)
             except NotImplementedError:
                 logger.error('skipping %s...element not implemented', n)
                 continue
+            except CannotBuild as e:
+                logger.warning('skipping %s — %s', n, e)
+                continue
+            objects.append(a)
             if describe:
                 pp = getattr(a, 'pprogram', None)
                 if pp is not None:

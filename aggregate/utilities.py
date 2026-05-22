@@ -3589,10 +3589,14 @@ def kaplan_meier_np(loss, closed):
     return kaplan_meier(df)
 
 
-def more(self, regex):
+def agg_help(self, regex):
     """
     Investigate self for matches to the regex. If callable, try calling with no args, else display.
 
+    Module-level free function backing the ``.help(regex)`` method on
+    :class:`Aggregate`, :class:`Portfolio`, and :class:`Underwriter`. Named
+    ``agg_help`` (not ``help``) to avoid shadowing Python's builtin ``help``
+    at module / package scope.
     """
     for i in dir(self):
         if re.search(regex, i):

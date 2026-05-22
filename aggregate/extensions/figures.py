@@ -280,7 +280,7 @@ def discretization_sev_example(outcomes):
     a01 = build(f'agg Num:01 1 claim dsev [{outcomes}] fixed', update=False)
     aex = build(f'agg Num:01e 1 claim dsev [{outcomes}] fixed', update=False)
     aex.update(log2=16, bs=1/2048)
-    xlim = aex.limits()
+    xlim = aex._limits()
     xlim = (xlim[0], np.round(xlim[1], 0))
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
         constrained_layout=True)
@@ -308,7 +308,7 @@ def discretization_agg_example(outcomes):
     a02 = build(f'agg Num:02 4 claims dsev [{outcomes}] poisson', update=False)
     aex = build(f'agg Num:02e 4 claims dsev [{outcomes}] poisson', update=False)
     aex.update(log2=16, bs=1/2048)
-    xlim = aex.limits()
+    xlim = aex._limits()
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45 + 0.1),
         constrained_layout=True)
     for bs, ax in zip([1, 1/2, 1/4, 1/8], axs.flat):

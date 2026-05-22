@@ -29,7 +29,7 @@ from .utilities import (sln_fit, sgamma_fit, ln_fit, gamma_fit, beta_fit,
                         make_mosaic_figure, nice_multiple, xsden_to_meancvskew,
                         pprint_ex, approximate_work, moms_analytic, picks_work,
                         integral_by_doubling, logarithmic_theta, make_var_tvar,
-                        more, explain_validation)
+                        agg_help, explain_validation)
 import aggregate.random_agg as ar
 from .spectral import Distortion
 
@@ -806,10 +806,10 @@ class FrequencySichel(_FrequencySichelBase):
             params = broyden2(f, (np.log(mu), np.log(beta)),
                               verbose=False, iter=10000, f_rtol=1e-11)
         except NoConvergence as e:
-            logger.error(f'Sichel calibration: Broyden did not converge: {e}')
+            logger.error('Sichel calibration: Broyden did not converge: %s', e)
             raise
 
-        logger.debug(f'sichel params from Broyden {params}')
+        logger.debug('sichel params from Broyden %s', params)
         mu_, beta_ = params
         return np.exp(mu_), np.exp(beta_), lam
 
@@ -853,12 +853,12 @@ class _FrequencySichelMatched(_FrequencySichelBase):
                     f'Newton-Krylov {params1}')
                 if np.linalg.norm(params) > np.linalg.norm(params1):
                     params = params1
-                    logger.warning(f'{self.freq_name}: using Newton-Krylov')
+                    logger.warning('%s: using Newton-Krylov', self.freq_name)
         except NoConvergence as e:
-            logger.error(f'{self.freq_name} calibration: Broyden did not converge: {e}')
+            logger.error('%s calibration: Broyden did not converge: %s', self.freq_name, e)
             raise
 
-        logger.debug(f'{self.freq_name} params from Broyden {params}')
+        logger.debug('%s params from Broyden %s', self.freq_name, params)
         mu_, beta_, lam_ = params
         return np.exp(mu_), np.exp(beta_), lam_
 
@@ -889,11 +889,68 @@ class FrequencySichelIG(_FrequencySichelMatched):
 
 
 class Aggregate:
-    # TODO must be able to automate this with inspect
+    """Compound (aggregate) probability distribution.
+
+    Implements the FFT-based algorithm of Mildenhall (2024): discretize
+    severity, FFT, apply frequency PGF, inverse FFT. See
+    ``_freq_sev_convolution`` for the five-line core; ``update_work`` for the
+    orchestration (severity prep → occurrence reinsurance → convolution →
+    aggregate reinsurance → audit). Validation by theoretical-vs-empirical
+    moment comparison (paper §4.7) lives in the ``audit_df`` materialised at
+    the end of ``update_work``.
+
+    Construction is via the ``__init__`` arguments below, or — more usually —
+    via :func:`build` parsing DecL.
+
+    **Public surface that Portfolio and Bounds depend on.** These are the
+    integration points; treat as a stable contract:
+
+    Data attributes
+        - ``report_ser``: totals series of theoretical freq/sev/agg moments
+          (consumed by Portfolio).
+        - ``statistics_df``: per-component theoretical moments.
+        - ``agg_density``: empirical PMF on the bucket grid (set by
+          ``update_work``; consumed by Portfolio).
+        - ``ftagg_density``: FT of the aggregate density (consumed by
+          Portfolio's copula combine).
+        - ``density_df``: per-bucket density / CDF / risk-measure frame (see
+          the property for column documentation).
+        - ``n``: total frequency.
+        - ``name``, ``program``, ``note``: spec metadata.
+        - ``bs``, ``log2``, ``xs``: discretization grid.
+
+    User-facing display
+        - ``describe``: theoretical-vs-empirical moments table — the
+          daily-driver display.
+        - ``report_df``: mixing audit (independent vs. mixed totals).
+        - ``statistics``: reshape of ``statistics_df`` for display.
+        - ``info``, ``__repr__``, ``_repr_html_``: textual / HTML reprs.
+
+    Methods
+        - ``update``, ``update_work``: trigger / drive the compute.
+        - ``q``, ``q_sev``, ``tvar``, ``tvar_sev``, ``cdf``, ``sf``, ``pdf``,
+          ``pmf``, ``var_dict``: risk-measure surface.
+        - ``sample``: draw from the discretised aggregate.
+        - ``price``: distortion-based pricing.
+        - ``approximate``, ``entropy_fit``: parametric fits to the FFT output.
+        - ``apply_distortion``, ``pollaczeck_khinchine``: distortion / ruin.
+        - ``plot``: single plotting entry point.
+        - ``snap``, ``picks``, ``unwrap``, ``recommend_bucket``,
+          ``aggregate_error_analysis``, ``severity_error_analysis``: utilities.
+
+    Methods with a leading underscore (``_audit_df``, ``_statistics_total_df``,
+    ``_record_component``, ``_freq_sev_convolution``, ``_apply_reins_work``,
+    ``_limits``, ``_html_info_blob``, ``_make_var_tvar``, …) are internal.
+    """
+
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
                       'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
                       'sev_wt', 'occ_kind', 'occ_reins', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
                       'agg_kind', 'agg_reins', 'note']
+
+    # ================================================================
+    # Public read-only properties: spec, density frame, reinsurance frames
+    # ================================================================
 
     @property
     def spec(self):
@@ -917,12 +974,43 @@ class Aggregate:
 
     @property
     def density_df(self):
-        """
-        Create and return the density_df data frame. A read only property, though if you write d = a.density_df you
-        can obviously edit d. Some duplication of columns (p and p_total) to ensure consistency with Portfolio.
+        """Per-bucket density / distribution / risk-measure frame.
 
-        :return: DataFrame similar to Portfolio.density_df.
+        Built lazily on first access after ``update``. Stored in
+        ``self._density_df``; treat as read-only.
 
+        Columns (in construction order):
+
+        ================  =====================================  =========================
+        Column            Set from                               Read by
+        ================  =====================================  =========================
+        ``loss``          ``self.xs`` (also the index)           ``plot``, ``q``, bounds
+        ``p_total``       ``self.agg_density``                   Portfolio (when Aggregate
+                                                                  is in a port), bounds,
+                                                                  ``plot``, user code
+        ``p``             alias of ``p_total``                   Portfolio API compat
+        ``p_sev``         ``self.sev_density``                   ``plot``, severity-error
+        ``log_p``         ``np.log(p)``                          ``plot`` log scale
+        ``log_p_sev``     ``np.log(p_sev)``                      ``plot`` log scale
+        ``F``             ``p.cumsum()``                         ``q``, ``var``, ``tvar``
+        ``F_sev``         ``p_sev.cumsum()``                     ``q_sev``, ``plot``
+        ``S``             ``1 - p_total.cumsum()``               ``q``, ``tvar``, ``plot``
+        ``S_sev``         ``1 - p_sev.cumsum()``                 ``tvar_sev``, ``plot``
+        ``lev``           ``S.shift(1).cumsum() * bs``           ``epd``, pricing
+        ``exa``           alias of ``lev``                       Portfolio API compat
+        ``exlea``         ``(lev - loss * S) / F``               pricing
+        ``e``             ``self.est_m`` (constant column)       ``epd``
+        ``epd``           ``max(0, e - lev) / e``                pricing, allocation
+        ``exgta``         ``loss + (e - exa) / S``               pricing
+        ``exeqa``         ``loss`` (since ``E[X|X=a] = a``)      Portfolio API compat
+        ================  =====================================  =========================
+
+        Duplicated columns (``p == p_total``, ``exa == lev``, ``exeqa == loss``) are
+        intentional: Portfolio's ``filter(regex='p_<name>')`` / ``exeqa_*`` /
+        ``exa_*`` patterns require these names exist on the unit's frame so the
+        unit can be inlined into a portfolio.
+
+        :return: DataFrame indexed by ``loss``, columns as tabulated above.
         """
         if self._density_df is None:
             # really should have one of these anyway...
@@ -1005,7 +1093,6 @@ class Aggregate:
                              index=pd.Index(self.xs, name='loss'))
             if self.occ_reins is not None:
                 # add agg with gcn occ
-                # TODO sort out
                 logger.info('Computing aggregates with gcn severities; assumes approx=exact')
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
@@ -1046,7 +1133,6 @@ class Aggregate:
         # i = (share, layer, attach)
         bit3 = bit0['ceded']
         bit3 = bit3.iloc[:] / bit0['subject'].iloc[-1]
-        # TODO: not sure total cession is correct
         bit2['ceded'] = [v.ceded if i[-1] == 'gup' else v.ceded / self.sev.sf(i[-1] / i[0])
                          for i, v in bit0[['ceded']].iterrows()]
         ans = pd.concat((
@@ -1087,7 +1173,6 @@ class Aggregate:
         ax0, ax1 = axs.flat
 
         self.occ_reins_df.filter(regex='p_[scn]').rename(columns=lambda x: x[2:]).plot(ax=ax0, logy=True)
-        # TODO: better limit
         xl = ax0.get_xlim()
         l = self.spec['exp_limit']
         if type(l) != float:
@@ -1244,6 +1329,10 @@ class Aggregate:
             raise ValueError(f'Inadmissible option {kind} passed to rescale, kind should be homog or inhomog.')
         return Aggregate(**spec)
 
+    # ================================================================
+    # Construction: __init__ and its component-recording helper
+    # ================================================================
+
     def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=None, exp_limit=np.inf,
                  sev_name='', sev_a=np.nan, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
                  sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf, sev_conditional=True,
@@ -1303,17 +1392,8 @@ class Aggregate:
 
         # class variables
         self.name = get_value(name)
-        # for persistence, save the raw called spec... (except lookups have been replaced...)
-        # TODO want to use the trick with setting properties so that if they are altered spec gets altered...
-        # self._spec = dict(name=name, exp_el=exp_el, exp_premium=exp_premium, exp_lr=exp_lr, exp_en=exp_en,
-        #                   exp_attachment=exp_attachment, exp_limit=exp_limit,
-        #                   sev_name=sev_name, sev_a=sev_a, sev_b=sev_b, sev_mean=sev_mean, sev_cv=sev_cv,
-        #                   sev_loc=sev_loc, sev_scale=sev_scale, sev_xs=sev_xs, sev_ps=sev_ps, sev_wt=sev_wt,
-        #                   sev_conditional=sev_conditional,
-        #                   occ_reins=occ_reins, occ_kind=occ_kind,
-        #                   freq_name=freq_name, freq_a=freq_a, freq_b=freq_b,
-        #                   agg_reins=agg_reins, agg_kind=agg_kind, note=note)
-        # using inspect, more robust...must call before you create other variables
+        # for persistence, save the raw called spec via inspect; must call before
+        # creating any other local variables.
         frame = inspect.currentframe()
         self._spec = dict(inspect.getargvalues(frame).locals)
         for n in ['frame', 'get_value', 'self']:
@@ -1327,12 +1407,44 @@ class Aggregate:
         self.frequency = Frequency(
             get_value(freq_name), get_value(freq_a), get_value(freq_b),
             get_value(freq_zm), get_value(freq_p0))
+        # Spec passthroughs from constructor arguments
+        self.note = note
+        self.program = ''  # can be set externally
+        self.occ_reins = occ_reins
+        self.occ_kind = occ_kind
+        self.agg_reins = agg_reins
+        self.agg_kind = agg_kind
+        self.sev_pick_attachments = sev_pick_attachments
+        self.sev_pick_losses = sev_pick_losses
+
+        # Grid + runtime config (set by update / update_work)
         self.figure = None
         self.xs = None
         self.bs = 0
         self.log2 = 0
-        # default validation error
+        self.padding = 0
         self.validation_eps = VALIDATION_EPS
+        self.sev_calc = ""
+        self.discretization_calc = ""
+        self.normalize = ""
+        self.approximation = ''
+
+        # Exposure / mixture outputs (filled by broadcasting below)
+        self.en = None   # per-component frequency (e.g. for a limit profile)
+        self.n = 0       # total frequency
+        self.attachment = None
+        self.limit = None
+        self.sevs = None
+
+        # Computed densities (set by update_work)
+        self.sev_density = None
+        self.agg_density = None
+        self.ftagg_density = None
+        self.fzapprox = None
+        self._audit_df = None
+        self._density_df = None
+
+        # Empirical moment estimates (set by update_work; consumed by q / tvar)
         self.est_m = 0
         self.est_cv = 0
         self.est_sd = 0
@@ -1343,36 +1455,19 @@ class Aggregate:
         self.est_sev_sd = 0
         self.est_sev_var = 0
         self.est_sev_skew = 0
-        self._valid = None
 
-        self.note = note
-        self.program = ''  # can be set externally
-        self.en = None  # this is for a sublayer e.g. for limit profile
-        self.n = 0  # this is total frequency
-        self.attachment = None
-        self.limit = None
-        self.agg_density = None
-        self.sev_density = None
-        self.ftagg_density = None
-        self.fzapprox = None
+        # Cached lazy functions (built on demand)
+        self._valid = None
         self._var_tvar_function = None
         self._sev_var_tvar_function = None
         self._cdf = None
         self._pdf = None
         self._sev = None
-        self.sevs = None
-        self.audit_df = None
-        self._density_df = None
-        self._reinsurance_audit_df = None
-        self._reinsurance_report_df = None
-        self._reinsurance_df = None
-        self.occ_reins = occ_reins
-        self.occ_kind = occ_kind
+
+        # Reinsurance state (set by apply_occ_reins / apply_agg_reins)
         self.occ_netter = None
         self.occ_ceder = None
         self.occ_reins_df = None
-        self.agg_reins = agg_reins
-        self.agg_kind = agg_kind
         self.agg_netter = None
         self.agg_ceder = None
         self.agg_reins_df = None
@@ -1382,17 +1477,15 @@ class Aggregate:
         self.agg_density_ceded = None
         self.agg_density_net = None
         self.agg_density_gross = None
-        self.sev_pick_attachments = sev_pick_attachments
-        self.sev_pick_losses = sev_pick_losses
-        self.sev_calc = ""
-        self.discretization_calc = ""
-        self.normalize = ""
-        self.approximation = ''
-        self.padding = 0
+        self._reinsurance_audit_df = None
+        self._reinsurance_report_df = None
+        self._reinsurance_df = None
+
+        # Theoretical moment tables (populated by broadcasting below)
         self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
                                                   MomentAggregator.column_names() +
                                                   ['mix_cv'])
-        self.statistics_total_df = self.statistics_df.copy()
+        self._statistics_total_df = self.statistics_df.copy()
         ma = MomentAggregator(self.frequency.freq_moms)
 
         # overall freq CV with common mixing
@@ -1429,8 +1522,8 @@ class Aggregate:
             self.limit = limit
             # these all have the same length because have been broadcast
             n_components = len(exp_el)
-            logger.debug(f'Aggregate.__init__ | Broadcast/align: exposures + severity = {len(exp_el)} exp = '
-                         f'{len(sev_a)} sevs = {n_components} componets')
+            logger.debug('Aggregate.__init__ | Broadcast/align: exposures + severity = %d exp = '
+                         '%d sevs = %d componets', len(exp_el), len(sev_a), n_components)
             self.sevs = np.empty(n_components, dtype=type(Severity))
 
             # perform looping creation of severity distribution
@@ -1467,12 +1560,8 @@ class Aggregate:
                 # _lr *= _swt  ?? seems wrong
                 _en *= _swt
 
-                # accumulate moments
-                ma.add_f1s(_en, sev1, sev2, sev3)
-
-                # store
-                self.statistics_df.loc[r, :] = \
-                    [self.name, _y, _at, _scv, _el, _pr, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
+                self._record_component(r, ma, _at, _y, _scv, _en, _el, _pr, _lr,
+                                       mix_cv, sev1, sev2, sev3)
                 r += 1
 
         else:
@@ -1537,7 +1626,8 @@ class Aggregate:
                 # figure claim count if not entered, for the group (at this point we have not weighted down)
                 # this forces subsequent calcuations to use (correct) en weighting even if premium or loss are
                 # entered
-                logger.info(f'{_y} xs {_at}, component_mean = {component_mean}, {[m[0] for m in moms]}')
+                logger.info('%s xs %s, component_mean = %s, %s',
+                            _y, _at, component_mean, [m[0] for m in moms])
                 if _en == 0:
                     _en = _el / component_mean
 
@@ -1558,10 +1648,12 @@ class Aggregate:
                         # ignore the (small) weights that are being ignored
                         self.sevs[r] = zero
                         _sn = 'dhistogram'
-                        logger.info(f'{_y} xs {_at} on {_ssc} x ({_at}, {_sm}, {_scv}, {_sa}, {_sb}) + {_sloc} '
-                                    f' | {_slb} < X le {_sub} '
-                                    f'component has sev=({sev1}, {sev2}, {sev3}), '
-                                    f' weight = {_swt}; replacing with zero.')
+                        logger.info('%s xs %s on %s x (%s, %s, %s, %s, %s) + %s '
+                                    ' | %s < X le %s '
+                                    'component has sev=(%s, %s, %s), '
+                                    ' weight = %s; replacing with zero.',
+                                    _y, _at, _ssc, _at, _sm, _scv, _sa, _sb, _sloc,
+                                    _slb, _sub, sev1, sev2, sev3, _swt)
                         sev1 = sev2 = sev3 = 0.0
                     else:
                         self.sevs[r] = s
@@ -1574,13 +1666,14 @@ class Aggregate:
                         _en = np.sum(self.frequency.freq_a * self.frequency.freq_b)
                         _el = _en * sev1
                     else:
-                        logger.info(f'{_y} xs {_at} on {_ssc} x ({_at}, {_sm}, {_scv}, {_sa}, {_sb}) + {_sloc} '
-                                    f' | {_slb} < X le {_sub} has '
-                                    f'_en = {_en}. Adjusting el to 0.')
+                        logger.info('%s xs %s on %s x (%s, %s, %s, %s, %s) + %s '
+                                    ' | %s < X le %s has '
+                                    '_en = %s. Adjusting el to 0.',
+                                    _y, _at, _ssc, _at, _sm, _scv, _sa, _sb, _sloc,
+                                    _slb, _sub, _en)
                         _el = 0.
 
                     # if premium compute loss ratio, if loss ratio compute premium
-                    # TODO where are these used? are they correct?
                     if _pr > 0:
                         _lr = _el / _pr
                     elif _lr > 0:
@@ -1591,12 +1684,8 @@ class Aggregate:
                     _el0 = _el * _swt
                     _en0 = _en * _swt
 
-                    # accumulate moments
-                    ma.add_f1s(_en0, sev1, sev2, sev3)
-
-                    # store
-                    self.statistics_df.loc[r, :] = \
-                        [self.name, _y, _at, _scv, _el0, _pr0, _lr] + ma.get_fsa_stats(total=False) + [mix_cv]
+                    self._record_component(r, ma, _at, _y, _scv, _en0, _el0, _pr0, _lr,
+                                           mix_cv, sev1, sev2, sev3)
 
                     self.en[r] = _en0
                     self.attachment[r] = _at
@@ -1616,29 +1705,68 @@ class Aggregate:
             lr = tot_loss / tot_prem
         else:
             lr = np.nan
-        self.statistics_total_df.loc[f'mixed', :] = \
+        self._statistics_total_df.loc[f'mixed', :] = \
             [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=True) \
             + [mix_cv]
-        self.statistics_total_df.loc[f'independent', :] = \
+        self._statistics_total_df.loc[f'independent', :] = \
             [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) \
             + [mix_cv]
         self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
-        self.statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
+        self._statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
         self.n = ma.tot_freq_1
-        self.agg_m = self.statistics_total_df.loc['mixed', 'agg_m']
-        self.agg_cv = self.statistics_total_df.loc['mixed', 'agg_cv']
-        self.agg_skew = self.statistics_total_df.loc['mixed', 'agg_skew']
+        self.agg_m = self._statistics_total_df.loc['mixed', 'agg_m']
+        self.agg_cv = self._statistics_total_df.loc['mixed', 'agg_cv']
+        self.agg_skew = self._statistics_total_df.loc['mixed', 'agg_skew']
         # variance and sd come up in exam questions
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
         # severity exact moments
-        self.sev_m, self.sev_cv, self.sev_skew = self.statistics_total_df.loc['mixed',
+        self.sev_m, self.sev_cv, self.sev_skew = self._statistics_total_df.loc['mixed',
         ['sev_m', 'sev_cv', 'sev_skew']]
         self.sev_sd = self.sev_m * self.sev_cv
         self.sev_var = self.sev_sd * self.sev_sd
 
         # finally, need a report_ser series for Portfolio to consolidate
         self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
+
+    def _record_component(self, r, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
+                          sev1, sev2, sev3):
+        """Accumulate this component into ``ma`` and write its row of ``statistics_df``.
+
+        Called once per component from each of the two broadcasting arms of
+        ``__init__``: the limit-profile arm (all weights == 1) and the
+        mixture-product arm. Centralises the column ordering of
+        ``statistics_df`` so the two arms cannot drift apart.
+
+        Parameters
+        ----------
+        r : int
+            Row index in ``statistics_df`` (matches the component slot in
+            ``self.sevs``).
+        ma : MomentAggregator
+            Accumulator collecting freq, sev, agg moments across all components.
+        attach, layer : float
+            Per-component attachment and layer height.
+        scv : float
+            Severity CV parameter for this component.
+        en, el, prem, lr : float
+            Per-component frequency, expected loss, premium, loss ratio, already
+            scaled by the mixture weight by the caller.
+        mix_cv : float
+            Overall mixing-distribution CV (constant across rows).
+        sev1, sev2, sev3 : float
+            First three raw severity moments for this component.
+        """
+        ma.add_f1s(en, sev1, sev2, sev3)
+        self.statistics_df.loc[r, :] = (
+            [self.name, layer, attach, scv, el, prem, lr]
+            + ma.get_fsa_stats(total=False)
+            + [mix_cv]
+        )
+
+    # ================================================================
+    # Repr / info / help — string and HTML representations
+    # ================================================================
 
     def __repr__(self):
         """
@@ -1664,12 +1792,15 @@ class Aggregate:
         # s.append(super().__repr__())
         return '\n'.join(s)
 
-    def more(self, regex):
+    def help(self, regex):
         """
-        More information about methods and properties matching regex
+        Lookup help on methods and properties matching ``regex``.
 
+        Thin wrapper over :func:`aggregate.utilities.agg_help` — the free
+        function is prefixed to avoid shadowing Python's builtin ``help`` at
+        module / package scope.
         """
-        more(self, regex)
+        agg_help(self, regex)
 
     @property
     def info(self):
@@ -1708,7 +1839,7 @@ class Aggregate:
         """
         return explain_validation(self.valid)
 
-    def html_info_blob(self):
+    def _html_info_blob(self):
         """
         Text top of _repr_html_
 
@@ -1745,7 +1876,13 @@ class Aggregate:
         For IPython.display
 
         """
-        return self.html_info_blob() + self.describe.to_html()
+        return self._html_info_blob() + self.describe.to_html()
+
+    # ================================================================
+    # Discretization, snap, update, FFT convolution
+    # The 5-line FFT core (Mildenhall 2024, §2.2) lives in
+    # ``_freq_sev_convolution`` below.
+    # ================================================================
 
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
@@ -1856,11 +1993,6 @@ class Aggregate:
         if bs == 0:
             bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
         xs = np.arange(0, 1 << log2, dtype=float) * bs
-        # if 'approximation' not in kwargs:
-        #     if self.n > 10000:
-        #         kwargs['approximation'] = 'slognorm'
-        #     else:
-        #         kwargs['approximation'] = 'exact'
         return self.update_work(xs, debug=debug, **kwargs)
 
     # for backwards compatibility
@@ -1904,7 +2036,6 @@ class Aggregate:
         self.padding = padding
         self.xs = xs
         self.bs = xs[1]
-        # WHOA! WTF
         self.log2 = int(np.log2(len(xs)))
 
         if type(tilt_vector) == float:
@@ -1930,7 +2061,6 @@ class Aggregate:
             return
 
         # deal with per occ reinsurance
-        # TODO issues with force_severity = False.... get rid of that option entirely?
         # reinsurance converts sev_density to a Series from np.array
         if self.occ_reins is not None:
             if self.sev_density_gross is not None:
@@ -1940,31 +2070,10 @@ class Aggregate:
 
         if approximation == 'exact':
             if self.n > 100:
-                logger.info(f'Claim count {self.n} is high; consider an approximation ')
-
-            if self.n == 0:
-                # for dynamics, it is helpful to have a zero risk return zero appropriately
-                # z = ft(self.sev_density, padding, tilt_vector)
-                self.agg_density = np.zeros_like(self.xs)
-                self.agg_density[0] = 1
-                # extreme idleness...but need to make sure it is the right shape and type
-                self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
-            else:
-                # usual calculation...this is where the magic happens!
-                # have already dealt with per occ reinsurance
-                # don't lose accuracy and time by going through this step if freq is fixed 1
-                # these are needed when agg is part of a portfolio
-                z = ft(self.sev_density, padding, tilt_vector)
-                self.ftagg_density = self.frequency.freq_pgf(self.n, z)
-                if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-                    logger.info('FIXED 1: skipping FFT calculation')
-                    # copy to be safe
-                    self.agg_density = self.sev_density.copy()
-                else:
-                    # logger.info('Performing fft convolution')
-                    self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
-
-                # NOW have to apply agg reinsurance to this line
+                logger.info('Claim count %s is high; consider an approximation ', self.n)
+            self._freq_sev_convolution(padding, tilt_vector)
+            if self.n > 0:
+                # zero-risk case has no aggregate to reinsure
                 self.apply_agg_reins(debug)
 
         else:
@@ -2008,8 +2117,8 @@ class Aggregate:
         # cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_m', 'agg_cv', 'agg_skew']
         cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'freq_cv', 'freq_skew',
                 'sev_1', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
-        self.audit_df = pd.concat((self.statistics_df[cols],
-                                   self.statistics_total_df.loc[['mixed'], cols]),
+        self._audit_df = pd.concat((self.statistics_df[cols],
+                                   self._statistics_total_df.loc[['mixed'], cols]),
                                   axis=0)
         # add empirical sev stats
         if self.sev_density is not None:
@@ -2018,17 +2127,17 @@ class Aggregate:
             _m = np.nan
             _cv = np.nan
             _sk = np.nan
-        self.audit_df.loc['mixed', 'emp_sev_1'] = _m
-        self.audit_df.loc['mixed', 'emp_sev_cv'] = _cv
-        self.audit_df.loc['mixed', 'emp_sev_skew'] = _sk
+        self._audit_df.loc['mixed', 'emp_sev_1'] = _m
+        self._audit_df.loc['mixed', 'emp_sev_cv'] = _cv
+        self._audit_df.loc['mixed', 'emp_sev_skew'] = _sk
         self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _m, _cv, _sk
         self.est_sev_sd = self.est_sev_m * self.est_sev_cv
         self.est_sev_var = self.est_sev_sd * self.est_sev_sd
         # add empirical agg stats
         _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.agg_density)
-        self.audit_df.loc['mixed', 'emp_agg_1'] = _m
-        self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
-        self.audit_df.loc['mixed', 'emp_agg_skew'] = _sk
+        self._audit_df.loc['mixed', 'emp_agg_1'] = _m
+        self._audit_df.loc['mixed', 'emp_agg_cv'] = _cv
+        self._audit_df.loc['mixed', 'emp_agg_skew'] = _sk
         self.est_m = _m
         self.est_cv = _cv
         self.est_sd = _m * _cv
@@ -2037,6 +2146,68 @@ class Aggregate:
 
         # invalidate stored functions
         self._cdf = None
+
+    def _freq_sev_convolution(self, padding, tilt_vector):
+        """Compute the aggregate density by FFT convolution (Mildenhall 2024, §2.2).
+
+        Implements the four-step FFT-based algorithm for compound distributions:
+
+        1. Discretize the severity CDF to obtain :math:`p_Y` (already done by
+           the caller — see ``self.sev_density``).
+        2. Apply the FFT to approximate the severity characteristic function
+           :math:`\\phi_Y(t)`.
+        3. Apply the frequency PGF element-wise to obtain the aggregate
+           characteristic function
+           :math:`\\phi_A(t) = \\mathcal{P}_N(\\phi_Y(t))`.
+        4. Inverse FFT to recover the discretized aggregate mass function
+           :math:`p_A`.
+
+        Sets ``self.ftagg_density`` (the FT of the aggregate, used by Portfolio
+        for copula combination) and ``self.agg_density`` (the empirical PMF on
+        the bucket grid). Two shortcuts apply:
+
+        - ``self.n == 0``: zero-risk case. Returns unit mass at zero; FFT only
+          for shape/type consistency.
+        - Fixed frequency of 1: aggregate IS severity. Skips the inverse FFT.
+
+        Parameters
+        ----------
+        padding : int
+            Padding factor passed to ``ft`` / ``ift`` to mitigate FFT aliasing
+            (see Mildenhall 2024, §2.3.2).
+        tilt_vector : np.ndarray or None
+            Optional exponential tilt for the FFT.
+
+        Notes
+        -----
+        Per-occurrence reinsurance is applied to ``sev_density`` *before* this
+        method is called; aggregate reinsurance is applied to ``agg_density``
+        *after*. The FFT here is unaware of either.
+        """
+        if self.n == 0:
+            # zero risk: unit mass at zero. FFT only to give ftagg_density the
+            # right shape and dtype (needed when agg is part of a portfolio).
+            self.agg_density = np.zeros_like(self.xs)
+            self.agg_density[0] = 1
+            self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+            return
+
+        # Steps 2-3: FT of severity, then apply frequency PGF element-wise.
+        z = ft(self.sev_density, padding, tilt_vector)
+        self.ftagg_density = self.frequency.freq_pgf(self.n, z)
+
+        if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
+            # Fixed frequency of 1: aggregate IS severity. Skip the inverse FFT
+            # to preserve accuracy and time.
+            logger.info('FIXED 1: skipping FFT calculation')
+            self.agg_density = self.sev_density.copy()
+        else:
+            # Step 4: inverse FFT to recover p_A.
+            self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+
+    # ================================================================
+    # Validation (paper §4.7), unwrap, picks, freq_pmf
+    # ================================================================
 
     @property
     def valid(self):
@@ -2128,7 +2299,7 @@ class Aggregate:
             logger.info('Caution: not all validation tests applied')
             pass
         if rv != Validation.NOT_UNREASONABLE:
-            logger.info(f'Aggregate {self.name} does not fail any validation: not unreasonable')
+            logger.info('Aggregate %s does not fail any validation: not unreasonable', self.name)
         self._valid = rv
         return rv
 
@@ -2249,8 +2420,12 @@ class Aggregate:
         # remove fuzz
         dist[dist < np.finfo(float).eps] = 0
         if not np.allclose(self.n,  self.en):
-            logger.warning(f'Frequency.pmf | n {self.n} != en {self.en}; using en')
+            logger.warning('Frequency.pmf | n %s != en %s; using en', self.n, self.en)
         return dist
+
+    # ================================================================
+    # Reinsurance application: occ pre-FFT, agg post-FFT
+    # ================================================================
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
@@ -2285,7 +2460,7 @@ class Aggregate:
             # net is a fixed value, need a step function
             loss = sn.index[0]
             value = sn.iloc[0]
-            logger.info(f'Only one net value at {loss} with prob = {value}')
+            logger.info('Only one net value at %s with prob = %s', loss, value)
             reins_df['F_net'] = 0.0
             reins_df.loc[loss:, 'F_net'] = value
         else:
@@ -2294,7 +2469,7 @@ class Aggregate:
         if len(sc) == 1:
             loss = sc.index[0]
             value = sc.iloc[0]
-            logger.info(f'Only one net value at {loss} with prob = {value}')
+            logger.info('Only one net value at %s with prob = %s', loss, value)
             reins_df['F_ceded'] = 0.0
             reins_df.loc[loss:, 'F_ceded'] = value
         else:
@@ -2310,7 +2485,7 @@ class Aggregate:
         # quick debug; need to know kind=occ|agg here
         f = plt.figure(constrained_layout=True, figsize=(12, 9))
         axd = f.subplot_mosaic('AB\nCD')
-        xlim = self.limits()
+        xlim = self._limits()
         # scale??
         x = np.linspace(0, xlim[1], 201)
         y = ceder(x)
@@ -2398,7 +2573,7 @@ class Aggregate:
         # generic function makes netter and ceder functions
         if self.agg_reins is None:
             return
-        logger.info(f'Applying aggregate reinsurance for {self.name}')
+        logger.info('Applying aggregate reinsurance for %s', self.name)
         # aggregate moments (lose f x sev view) are computed after this step, so no adjustment needed there
         # agg: no way to make total = f x sev
         # initial empirical moments
@@ -2425,18 +2600,15 @@ class Aggregate:
 
         # see impact on moments
         _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.agg_density)
-        # self.audit_df.loc['mixed', 'emp_agg_1'] = _m
-        # old_m = self.ex
         self.est_m = _m2
         self.est_cv = _cv2
         self.est_sd = _m2 * _cv2
         self.est_var = self.est_sd ** 2
         self.est_skew = _sk2
-        # self.audit_df.loc['mixed', 'emp_agg_cv'] = _cv
-        # invalidate quantile function
 
-        logger.info(f'Applying agg reins to {self.name}\tOld mean and cv= {_m:,.3f}\t{_m:,.3f}\n'
-                    f'New mean and cv = {_m2:,.3f}\t{_cv2:,.3f}')
+        logger.info('Applying agg reins to %s\tOld mean and cv= %.3f\t%.3f\n'
+                    'New mean and cv = %.3f\t%.3f',
+                    self.name, _m, _m, _m2, _cv2)
 
     def reinsurance_description(self, kind='both', width=0):
         """
@@ -2503,15 +2675,19 @@ class Aggregate:
         else:
             return 'Occurrence and aggregate'
 
+    # ================================================================
+    # Distortion, ruin theory, plotting
+    # ================================================================
+
     def apply_distortion(self, dist):
         """
         Apply distortion to the aggregate density and append as exag column to density_df.
-        # TODO check consistent with other implementations.
+
         :param dist:
         :return:
         """
         if self.agg_density is None:
-            logger.warning(f'You must update before applying a distortion ')
+            logger.warning('You must update before applying a distortion ')
             return
 
         S = self.density_df.S
@@ -2660,9 +2836,9 @@ class Aggregate:
             if xmax > 0:
                 xlim = [-xmax / 50, xmax * 1.025]
             else:
-                xlim = self.limits(stat='range', kind='linear')
-            xlim2 = self.limits(stat='range', kind='log')
-            ylim = self.limits(stat='density')
+                xlim = self._limits(stat='range', kind='linear')
+            xlim2 = self._limits(stat='range', kind='log')
+            ylim = self._limits(stat='density')
 
             ax = axd['A']
             # divide by bucket size...approximating the density
@@ -2685,7 +2861,7 @@ class Aggregate:
             ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
             ax.legend().set(visible=False)
 
-    def limits(self, stat='range', kind='linear', zero_mass='include'):
+    def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """
         Suggest sensible plotting limits for kind=range, density, etc., same as Portfolio.
 
@@ -2738,6 +2914,10 @@ class Aggregate:
             # if you fall through to here, wrong args
             raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
+    # ================================================================
+    # Display reports, diagnostics, queries, risk measures, pricing
+    # ================================================================
+
     @property
     def report_df(self):
         """
@@ -2748,20 +2928,20 @@ class Aggregate:
         :return:
         """
 
-        if self.audit_df is not None:
+        if self._audit_df is not None:
             # want both mixed and unmixed
             cols = ['name', 'limit', 'attachment', 'el', 'freq_m', 'freq_cv', 'freq_skew',
                     'sev_m', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
             # massaged version of original audit_df, including indep and mixed total views
-            df = pd.concat((self.statistics_df[cols], self.statistics_total_df[cols]), axis=0).T
+            df = pd.concat((self.statistics_df[cols], self._statistics_total_df[cols]), axis=0).T
             df['empirical'] = np.nan
             # add empirical stats
-            df.loc['sev_m', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_1']
-            df.loc['sev_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_cv']
-            df.loc['sev_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_sev_skew']
-            df.loc['agg_m', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_1']
-            df.loc['agg_cv', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_cv']
-            df.loc['agg_skew', 'empirical'] = self.audit_df.loc['mixed', 'emp_agg_skew']
+            df.loc['sev_m', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_1']
+            df.loc['sev_cv', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_cv']
+            df.loc['sev_skew', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_skew']
+            df.loc['agg_m', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_1']
+            df.loc['agg_cv', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_cv']
+            df.loc['agg_skew', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_skew']
             df = df
             df['error'] = df['empirical'] / df['mixed'] - 1
             df = df.fillna('')
@@ -2786,7 +2966,7 @@ class Aggregate:
         """
         if len(self.statistics_df) > 1:
             # there are mixture components
-            df = pd.concat((self.statistics_df, self.statistics_total_df), axis=0)
+            df = pd.concat((self.statistics_df, self._statistics_total_df), axis=0)
         else:
             df = self.statistics_df.copy()
         # edit to make equivalent to Portfolio statistics
@@ -2802,17 +2982,16 @@ class Aggregate:
 
     @property
     def pprogram(self):
+        """Cleaned DecL program text (notes removed, whitespace collapsed).
+
+        For the raw input as supplied to ``build`` use ``self.program``.
         """
-        pretty print the program
-        """
-        return pprint_ex(self.program, 20)
+        return pprint_ex(self.program, split=0, show=False)
 
     @property
     def pprogram_html(self):
-        """
-        pretty print the program to html
-        """
-        return pprint_ex(self.program, 0, html=True)
+        """Syntax-highlighted DecL program for IPython / Jupyter display."""
+        return pprint_ex(self.program, split=0, html=True, show=False)
 
     @property
     def describe(self):
@@ -2820,7 +2999,7 @@ class Aggregate:
         Theoretic and empirical stats. Used in _repr_html_.
 
         """
-        st = self.statistics_total_df.loc['mixed', :]
+        st = self._statistics_total_df.loc['mixed', :]
         sev_m = st.sev_m
         sev_cv = st.sev_cv
         sev_skew = st.sev_skew
@@ -2829,14 +3008,14 @@ class Aggregate:
         a_m = st.agg_m
         a_cv = st.agg_cv
         df = pd.DataFrame({'E[X]': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                           'Skew(X)': [sev_skew, self.statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
+                           'Skew(X)': [sev_skew, self._statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
                           index=['Sev', 'Freq', 'Agg'])
         df.index.name = 'X'
-        if self.audit_df is not None:
-            esev_m = self.audit_df.loc['mixed', 'emp_sev_1']
-            esev_cv = self.audit_df.loc['mixed', 'emp_sev_cv']
-            ea_m = self.audit_df.loc['mixed', 'emp_agg_1']
-            ea_cv = self.audit_df.loc['mixed', 'emp_agg_cv']
+        if self._audit_df is not None:
+            esev_m = self._audit_df.loc['mixed', 'emp_sev_1']
+            esev_cv = self._audit_df.loc['mixed', 'emp_sev_cv']
+            ea_m = self._audit_df.loc['mixed', 'emp_agg_1']
+            ea_cv = self._audit_df.loc['mixed', 'emp_agg_cv']
             df.loc['Sev', 'Est E[X]'] = esev_m
             df.loc['Agg', 'Est E[X]'] = ea_m
             df.loc[:, 'Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
@@ -2844,8 +3023,8 @@ class Aggregate:
             df.loc['Agg', 'Est CV(X)'] = ea_cv
             df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
             df['Est Skew(X)'] = np.nan
-            df.loc['Sev', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_sev_skew']
-            df.loc['Agg', 'Est Skew(X)'] = self.audit_df.loc['mixed', 'emp_agg_skew']
+            df.loc['Sev', 'Est Skew(X)'] = self._audit_df.loc['mixed', 'emp_sev_skew']
+            df.loc['Agg', 'Est Skew(X)'] = self._audit_df.loc['mixed', 'emp_agg_skew']
             df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)', 'Est Skew(X)']]
         df = df.loc[['Freq', 'Sev', 'Agg']]
         return df
@@ -2871,7 +3050,8 @@ class Aggregate:
                 limit_est = 0
                 p = max(p, 1 - 10 ** -8)
             moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
-            logger.debug(f'Agg.recommend_bucket | {self.name} moment: {moment_est}, limit {limit_est}')
+            logger.debug('Agg.recommend_bucket | %s moment: %s, limit %s',
+                         self.name, moment_est, limit_est)
             recommended = max(moment_est, limit_est)
         else:
             for n in sorted({log2, 16, 13, 10}):
@@ -3262,11 +3442,11 @@ class Aggregate:
             return {kind: self.approximate(kind)
                     for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
 
-        if self.audit_df is None:
+        if self._audit_df is None:
             # not updated
-            m = self.statistics_total_df.loc['mixed', 'agg_m']
-            cv = self.statistics_total_df.loc['mixed', 'agg_cv']
-            skew = self.statistics_total_df.loc['mixed', 'agg_skew']
+            m = self._statistics_total_df.loc['mixed', 'agg_m']
+            cv = self._statistics_total_df.loc['mixed', 'agg_cv']
+            skew = self._statistics_total_df.loc['mixed', 'agg_skew']
         else:
             # use statistics_df matched to computed aggregate_project
             m, cv, skew = self.report_df.loc[['agg_m', 'agg_cv', 'agg_skew'], 'empirical']
@@ -3782,7 +3962,7 @@ def _cv_to_shape(sev_name, cv, hint=1):
     try:
         shape = newton(_residual, hint)
     except RuntimeError:
-        logger.error(f'_cv_to_shape | newton solve failed for {sev_name}, cv={cv}')
+        logger.error('_cv_to_shape | newton solve failed for %s, cv=%s', sev_name, cv)
         return np.inf, None
     return shape, gen(shape)
 
@@ -4549,10 +4729,10 @@ class SeverityScipy(Severity):
                     'sev_a not set and sev_cv=0 is invalid, no way to determine shape.')
 
             if sev_mean > 0:
-                logger.info(f'creating with sev_mean={sev_mean} and sev_loc={sev_loc}')
+                logger.info('creating with sev_mean=%s and sev_loc=%s', sev_mean, sev_loc)
                 sev_scale, self.fz = _mean_to_scale(sev_name, sev_a, sev_mean, sev_loc)
             elif sev_scale > 0 and sev_mean == 0:
-                logger.info(f'creating with sev_scale={sev_scale} and sev_loc={sev_loc}')
+                logger.info('creating with sev_scale=%s and sev_loc=%s', sev_scale, sev_loc)
                 self.fz = gen(sev_a, scale=sev_scale, loc=sev_loc)
             else:
                 raise ValueError('sev_scale and sev_mean both equal zero.')
@@ -4619,7 +4799,7 @@ class SeverityDHistogram(Severity):
         # ``max_log2`` picks a step small enough that subtracting it from the
         # largest support point stays representable in float64.
         d = max_log2(np.max(xs))
-        logger.info(f'Severity._build | {self.sev_name} d={d}')
+        logger.info('Severity._build | %s d=%s', self.sev_name, d)
         xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
         pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
         self.fz = ss.rv_histogram((pss, xss), density=False)

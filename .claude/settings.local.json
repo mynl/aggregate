@@ -7,7 +7,9 @@
       "Bash(Get-ChildItem *)",
       "Bash(uv run *)",
       "Bash(echo \"exit $?\")",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Bash(UV_LINK_MODE=copy uv run pytest -q)",
+      "Bash(UV_LINK_MODE=copy uv run python -m aggregate.extensions.test_suite)"
     ]
   }
 }

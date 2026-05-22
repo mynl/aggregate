@@ -19,12 +19,12 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
                         sEngFormatter, mv, picks_work, GCN, lognorm_approx,
                         integral_by_doubling, logarithmic_theta, block_iman_conover,
                         make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
-                        more, parse_note, parse_note_ex, introspect, explain_validation,
+                        agg_help, parse_note, parse_note_ex, introspect, explain_validation,
                         beta_fit, invgamma_fit, invgauss_fit)
 from .spectral import Distortion, approx_ccoc, tvar_weights, consistent_distortions, p_to_parameters
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
-from .underwriter import Underwriter, build, build_many
+from .underwriter import Underwriter, build, build_many, CannotBuild
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *

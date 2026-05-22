@@ -26,6 +26,7 @@ MANIFEST
 # Virtual environments
 .env
 .venv
+.doc-venv
 env/
 venv/
 venv-agg/

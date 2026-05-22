@@ -24,7 +24,7 @@ from .utilities import (get_fmts, pprint, pprint_ex, ft,
 from .spectral import Distortion, approx_ccoc, tvar_weights, consistent_distortions, p_to_parameters
 from .distributions import Frequency, Severity, Aggregate
 from .portfolio import Portfolio, make_awkward
-from .underwriter import Underwriter, build
+from .underwriter import Underwriter, build, build_many
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *

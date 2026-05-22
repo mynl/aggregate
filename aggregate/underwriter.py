@@ -826,5 +826,9 @@ class Underwriter(object):
 # auto-updates the constructed object's discrete distribution; pass
 # `update=False` (or override at call time) to disable.
 build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
+# Sibling entry point for building several objects from one program text.
+# Bound to the same singleton so `from aggregate import build_many` returns
+# a DataFrame summary across all objects in the input.
+build_many = build.build_many
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

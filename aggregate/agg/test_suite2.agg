@@ -1,0 +1,14 @@
+# Mixed and Spliced severities
+# ============================
+sev G.Splice01  10 * uniform + 5 splice [8  12]
+sev G.Splice02  10 * uniform + 5 splice [1   2]  note{error in plot}
+sev G.Splice03  10 * uniform + 5 splice [1  10]
+sev G.Splice04  10 * uniform + 5 splice [12 20]
+sev G.Splice05  10 * uniform + 5 splice [20 30]  note{error in plot}
+agg G.Splice06  1  claim          sev 10 * uniform + 5 splice [8 12] fixed
+agg G.Splice07  1  claim          sev 10 * uniform + 5 splice [1  2] fixed note{error in plot}
+agg G.Splice08  1  claim          sev 10 * uniform + 5 splice [1 10] fixed
+agg G.Splice09  1  claim          sev 10 * uniform + 5 splice [12 20] fixed
+agg G.Splice10  1  claim          sev 10 * uniform + 5 splice [20 30] fixed note{error in plot}
+agg G.Splice11  1  claim  5 xs 3        sev 10 * uniform + 5 splice [8 12] fixed note{full limit loss}
+agg G.Splice12  1  claim  2 xs 8        sev 10 * uniform + 5 splice [8 12] fixed note{proper excess layer}

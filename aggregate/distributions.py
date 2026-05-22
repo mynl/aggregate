@@ -3508,6 +3508,167 @@ def make_conditional_ppf(lb, ub, plb, pub):
 
 
 # ---------------------------------------------------------------------------
+# Layer/attachment decorator factories. Parallel to ``make_conditional_*``
+# above but applied AFTER it — splice (lb/ub) modifies the severity
+# distribution; layer/attachment is the policy sitting on top.
+#
+# Each factory resolves the conditional/unconditional branch (and, for pdf,
+# the pattach<1 sub-branch) at wrap time so hot-path calls do not re-test
+# these flags on every invocation. Closure captures the layer parameters
+# at wrap time, so mutating the Severity instance's attachment/limit/pattach
+# /pdetach/conditional AFTER construction produces stale results — see the
+# Warnings note on ``Severity.__init__``.
+# ---------------------------------------------------------------------------
+
+
+def make_layer_attachment_cdf(attachment, limit, pattach, conditional):
+    """Decorator that wraps a CDF to apply the layered-loss transform.
+
+    Notes
+    -----
+    Maps layered-loss x in [0, limit] to the underlying value x + attachment
+    before calling ``fzcdf``. Conditional: rescales by ``pattach`` after
+    removing the truncated below-attachment mass. Unconditional: cdf(0) =
+    1 - pattach (mass at zero from P(X <= attachment)); cdf(>= limit) = 1.
+    """
+    def actual_decorator(fzcdf):
+        if conditional:
+            def wrapper(x):
+                return np.where(x >= limit, 1,
+                                np.where(x < 0, 0,
+                                         (fzcdf(x + attachment) - (1 - pattach)) / pattach))
+        else:
+            def wrapper(x):
+                return np.where(x < 0, 0,
+                                np.where(x == 0, 1 - pattach,
+                                         np.where(x > limit, 1,
+                                                  fzcdf(x + attachment))))
+        return wrapper
+
+    return actual_decorator
+
+
+def make_layer_attachment_sf(attachment, limit, pattach, conditional):
+    """Decorator that wraps a survival function for the layered-loss transform.
+
+    Notes
+    -----
+    Conditional: rescales by ``pattach``. Unconditional: sf(0) = pattach
+    (probability that any layer claim occurs at all); sf(>= limit) = 0.
+    """
+    def actual_decorator(fzsf):
+        if conditional:
+            def wrapper(x):
+                return np.where(x >= limit, 0,
+                                np.where(x < 0, 1,
+                                         fzsf(x + attachment) / pattach))
+        else:
+            def wrapper(x):
+                return np.where(x < 0, 1,
+                                np.where(x == 0, pattach,
+                                         np.where(x > limit, 0,
+                                                  fzsf(x + attachment))))
+        return wrapper
+
+    return actual_decorator
+
+
+def make_layer_attachment_pdf(attachment, limit, detachment, pattach, pdetach,
+                              conditional):
+    """Decorator that wraps a PDF for the layered-loss transform.
+
+    Notes
+    -----
+    Three resolved bodies depending on construction:
+
+    - Conditional: rescaled by ``pattach`` with a point mass at ``limit``
+      when ``pdetach > 0`` (the layer ceiling absorbs detachment probability).
+    - Unconditional with ``pattach < 1``: extra ``inf`` at x = 0 marks the
+      lump from ``P(X <= attachment)``.
+    - Unconditional with ``pattach == 1``: no mass at zero; otherwise as above.
+
+    The point masses at ``limit`` / ``detachment`` reflect the absorbed
+    probability beyond the policy ceiling.
+    """
+    def actual_decorator(fzpdf):
+        if conditional:
+            limit_mass = np.inf if pdetach > 0 else 0
+
+            def wrapper(x):
+                return np.where(x >= limit, 0,
+                                np.where(x == limit, limit_mass,
+                                         fzpdf(x + attachment) / pattach))
+        elif pattach < 1:
+            def wrapper(x):
+                return np.where(x < 0, 0,
+                                np.where(x == 0, np.inf,
+                                         np.where(x == detachment, np.inf,
+                                                  np.where(x > detachment, 0,
+                                                           fzpdf(x + attachment)))))
+        else:
+            def wrapper(x):
+                return np.where(x < 0, 0,
+                                np.where(x == detachment, np.inf,
+                                         np.where(x > detachment, 0,
+                                                  fzpdf(x + attachment))))
+        return wrapper
+
+    return actual_decorator
+
+
+def make_layer_attachment_isf(attachment, limit, pattach, pdetach, conditional):
+    """Decorator that wraps an inverse survival function for the layered-loss transform.
+
+    Notes
+    -----
+    Conditional: q is rescaled by ``pattach`` for the underlying call; the
+    layer ceiling kicks in when q < pdetach / pattach. Unconditional: 0
+    when q >= pattach (no layer claim); ``limit`` when q < pdetach.
+    """
+    def actual_decorator(fzisf):
+        if conditional:
+            threshold = pdetach / pattach
+
+            def wrapper(q):
+                return np.where(q < threshold, limit,
+                                fzisf(q * pattach) - attachment)
+        else:
+            def wrapper(q):
+                return np.where(q >= pattach, 0,
+                                np.where(q < pdetach, limit,
+                                         fzisf(q) - attachment))
+        return wrapper
+
+    return actual_decorator
+
+
+def make_layer_attachment_ppf(attachment, limit, pattach, pdetach, conditional):
+    """Decorator that wraps a percent-point function for the layered-loss transform.
+
+    Notes
+    -----
+    Conditional: rescales the residual tail probability into the underlying
+    ppf input. Unconditional: 0 below the below-layer mass and ``limit``
+    above the at-detachment mass.
+    """
+    def actual_decorator(fzppf):
+        if conditional:
+            threshold = 1 - pdetach / pattach
+
+            def wrapper(q):
+                return np.where(q > threshold, limit,
+                                fzppf(1 - pattach * (1 - q)) - attachment)
+        else:
+            def wrapper(q):
+                return np.where(q <= 1 - pattach, 0,
+                                np.where(q > 1 - pdetach, limit,
+                                         fzppf(q) - attachment))
+        return wrapper
+
+    return actual_decorator
+
+
+# ---------------------------------------------------------------------------
 # Severity module-level scaffolding (Stage 1d).
 #
 # These helpers are used by the ``Severity`` registry/subclass machinery added
@@ -3897,6 +4058,25 @@ class Severity(ss.rv_continuous):
             Identifier (e.g. set by ``sev SOMENAME …`` in DecL).
         note : str
             Free-text annotation.
+
+        Warnings
+        --------
+        Layer/attachment parameters (``attachment``, ``limit``, ``detachment``,
+        ``pattach``, ``pdetach``, ``conditional``) and splice parameters
+        (``sev_lb``, ``sev_ub``) are captured in closure by
+        :meth:`_apply_lb_ub` and :meth:`_apply_layer_attachment` at the end of
+        ``__init__``. Mutating these attributes on an existing instance
+        produces stale results because the wrapped methods on ``self.fz``
+        retain the original values. If the policy changes, build a new
+        ``Severity`` rather than reassigning fields on an existing one.
+
+        Raises
+        ------
+        ValueError
+            If ``sev_lb`` / ``sev_ub`` describe a splice window with zero
+            probability mass under the underlying distribution
+            (``fz.cdf(sev_ub) - fz.cdf(sev_lb) <= 1e-15``); conditioning on
+            a measure-zero set is mathematically undefined.
         """
         super().__init__(self, name=sev_name if isinstance(sev_name, str) else '')
 
@@ -3936,9 +4116,14 @@ class Severity(ss.rv_continuous):
         self._build()
 
         # ---- shared post-build steps -------------------------------------
+        # Order is load-bearing: splice (lb/ub) modifies the underlying
+        # distribution FIRST, then attachment probabilities are computed
+        # against the already-spliced fz, then validation, then the policy
+        # layer wraps on top of everything.
         self._apply_lb_ub()
         self._compute_attachment_probs()
         self._validate_moments()
+        self._apply_layer_attachment()
 
         assert self.fz is not None
 
@@ -3966,16 +4151,58 @@ class Severity(ss.rv_continuous):
         scipy method (``cdf``, ``sf``, ``isf``, ``ppf``, ``pdf``) is replaced
         on the frozen RV instance with a conditional version that rescales
         probabilities to the ``[lb, ub]`` window.
+
+        Raises
+        ------
+        ValueError
+            If the splice window ``[sev_lb, sev_ub]`` has zero probability
+            mass under the underlying distribution
+            (``fz.cdf(sev_ub) - fz.cdf(sev_lb) <= 1e-15``). Conditioning on
+            a measure-zero set is mathematically undefined.
         """
         if self.sev_lb == 0 and self.sev_ub == np.inf:
             return
         plb = self.fz.cdf(self.sev_lb)
         pub = self.fz.cdf(self.sev_ub)
+        if pub - plb <= 1e-15:
+            raise ValueError(
+                f'Severity {self.sev_name!r} splice [{self.sev_lb}, {self.sev_ub}] '
+                f'has zero probability mass (CDF at lb = {plb}, CDF at ub = {pub}). '
+                f'Conditioning on a measure-zero set is undefined.'
+            )
         self.fz.cdf = make_conditional_cdf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.cdf)
         self.fz.sf  = make_conditional_sf (self.sev_lb, self.sev_ub, plb, pub)(self.fz.sf)   # noqa
         self.fz.isf = make_conditional_isf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.isf)
         self.fz.ppf = make_conditional_ppf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.ppf)
         self.fz.pdf = make_conditional_pdf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.pdf)
+
+    def _apply_layer_attachment(self):
+        """Wrap ``self.fz`` methods with the layer/attachment transform.
+
+        Notes
+        -----
+        Mirrors :meth:`_apply_lb_ub` in shape but represents a different
+        conceptual layer: ``sev_lb``/``sev_ub`` (splice) reshape the
+        underlying severity *distribution*; ``exp_attachment``/``exp_limit``
+        impose the *policy* on top.
+
+        Always runs, even for the trivial ``attachment=0, limit=inf`` case,
+        because the layered-loss transform clamps ``x < 0 -> 0`` regardless
+        of the layer parameters. Distributions with support extending below
+        zero (e.g. ``norm``) rely on this clamp.
+
+        Closure captures ``attachment``, ``limit``, ``detachment``,
+        ``pattach``, ``pdetach``, ``conditional`` at construction. Mutating
+        any of those after ``__init__`` will produce stale results.
+        """
+        a, l, d = self.attachment, self.limit, self.detachment
+        pa, pd = self.pattach, self.pdetach
+        cond = self.conditional
+        self.fz.cdf = make_layer_attachment_cdf(a, l, pa, cond)(self.fz.cdf)
+        self.fz.sf  = make_layer_attachment_sf (a, l, pa, cond)(self.fz.sf)   # noqa
+        self.fz.pdf = make_layer_attachment_pdf(a, l, d, pa, pd, cond)(self.fz.pdf)
+        self.fz.isf = make_layer_attachment_isf(a, l, pa, pd, cond)(self.fz.isf)
+        self.fz.ppf = make_layer_attachment_ppf(a, l, pa, pd, cond)(self.fz.ppf)
 
     def _compute_attachment_probs(self):
         """Compute ``pdetach``, ``pattach``, and ``moment_pattach``.
@@ -4047,121 +4274,31 @@ class Severity(ss.rv_continuous):
         del self
 
     # ------------------------------------------------------------------
-    # scipy ``rv_continuous`` private overrides — the layer/attachment
-    # transformation lives here.
+    # scipy ``rv_continuous`` private overrides — pass-throughs to the
+    # wrapped ``self.fz`` methods.
     #
-    # Notation throughout:
-    #   X       — the underlying severity (``self.fz``).
-    #   a       — ``self.attachment``.
-    #   d       — ``self.detachment`` = a + limit.
-    #   pattach — ``P(X > a)``  (or 1 when not conditioning on X > a).
-    #   pdetach — ``P(X > d)``  (the tail probability at detachment).
-    #
-    # The layered loss is ``X(a, d) = min(d, (X - a)+)``. When
-    # ``self.conditional`` is True, all probabilities are rescaled to
-    # condition on a layer claim (``X > a``); otherwise the layered loss
-    # is returned unconditionally, with the mass at zero from
-    # ``P(X <= a)`` and the mass at d from ``P(X >= d)`` preserved.
+    # All layer/attachment + splice logic lives in the decorator factories
+    # applied to ``self.fz.<method>`` at construction time
+    # (see ``_apply_lb_ub`` and ``_apply_layer_attachment``). These five
+    # overrides exist only because scipy's ``rv_continuous`` machinery
+    # routes ``rvs``, ``interval``, ``expect``, etc. through the
+    # private ``_<method>`` form.
     # ------------------------------------------------------------------
 
-    def _x_to_underlying(self, x):
-        """Map a layered-loss x value to the underlying severity's x value."""
-        return x + self.attachment
-
     def _pdf(self, x, *args):
-        """Layered PDF.
-
-        Notes
-        -----
-        Conditional: rescaled by ``pattach``; point mass at x = limit when
-        ``pdetach > 0`` (the layer ceiling absorbs all probability beyond
-        the detachment). Non-conditional: extra inf at x = 0 when
-        ``pattach < 1`` (mass at zero from ``P(X <= a)``).
-        """
-        if self.conditional:
-            return np.where(x >= self.limit, 0,
-                            np.where(x == self.limit, np.inf if self.pdetach > 0 else 0,
-                                     self.fz.pdf(self._x_to_underlying(x)) / self.pattach))
-        if self.pattach < 1:
-            return np.where(x < 0, 0,
-                            np.where(x == 0, np.inf,
-                                     np.where(x == self.detachment, np.inf,
-                                              np.where(x > self.detachment, 0,
-                                                       self.fz.pdf(self._x_to_underlying(x), *args)))))
-        return np.where(x < 0, 0,
-                        np.where(x == self.detachment, np.inf,
-                                 np.where(x > self.detachment, 0,
-                                          self.fz.pdf(self._x_to_underlying(x), *args))))
+        return self.fz.pdf(x)
 
     def _cdf(self, x, *args):
-        """Layered CDF.
-
-        Notes
-        -----
-        Conditional: shifts and rescales ``fz.cdf(x + a)`` by ``pattach``
-        with the subtraction ``-(1 - pattach)`` removing the truncated
-        below-attachment mass. Non-conditional: cdf(0) = 1 - pattach,
-        cdf(>=limit) = 1.
-        """
-        if self.conditional:
-            return np.where(x >= self.limit, 1,
-                            np.where(x < 0, 0,
-                                     (self.fz.cdf(self._x_to_underlying(x)) - (1 - self.pattach)) / self.pattach))
-        return np.where(x < 0, 0,
-                        np.where(x == 0, 1 - self.pattach,
-                                 np.where(x > self.limit, 1,
-                                          self.fz.cdf(self._x_to_underlying(x), *args))))
+        return self.fz.cdf(x)
 
     def _sf(self, x, *args):
-        """Layered survival function ``S(x) = P(layered > x)``.
-
-        Notes
-        -----
-        Conditional: rescaled by ``pattach``. Non-conditional: sf(0) =
-        pattach (the probability that any layer claim occurs), sf(>limit) = 0.
-        """
-        if self.conditional:
-            return np.where(x >= self.limit, 0,
-                            np.where(x < 0, 1,
-                                     self.fz.sf(self._x_to_underlying(x), *args) / self.pattach))
-        return np.where(x < 0, 1,
-                        np.where(x == 0, self.pattach,
-                                 np.where(x > self.limit, 0,
-                                          self.fz.sf(self._x_to_underlying(x), *args))))
+        return self.fz.sf(x)
 
     def _isf(self, q, *args):
-        """Layered inverse survival function ``isf(q) = sf^{-1}(q)``.
-
-        Notes
-        -----
-        Conditional: q is rescaled by ``pattach`` for the underlying call,
-        with the layer ceiling kicked in when q falls below
-        ``pdetach / pattach`` (probability the loss exceeds detachment,
-        normalised). Non-conditional: returns 0 for q >= pattach (no
-        layer claim) and limit for q < pdetach (capped at the ceiling).
-        """
-        if self.conditional:
-            return np.where(q < self.pdetach / self.pattach, self.limit,
-                            self.fz.isf(q * self.pattach) - self.attachment)
-        return np.where(q >= self.pattach, 0,
-                        np.where(q < self.pdetach, self.limit,
-                                 self.fz.isf(q, *args) - self.attachment))
+        return self.fz.isf(q)
 
     def _ppf(self, q, *args):
-        """Layered percent-point function ``ppf(q) = cdf^{-1}(q)``.
-
-        Notes
-        -----
-        Conditional: rescales the residual tail probability into the
-        underlying ppf input. Non-conditional: returns 0 below the
-        below-layer mass and limit above the at-detachment mass.
-        """
-        if self.conditional:
-            return np.where(q > 1 - self.pdetach / self.pattach, self.limit,
-                            self.fz.ppf(1 - self.pattach * (1 - q)) - self.attachment)
-        return np.where(q <= 1 - self.pattach, 0,
-                        np.where(q > 1 - self.pdetach, self.limit,
-                                 self.fz.ppf(q, *args) - self.attachment))
+        return self.fz.ppf(q)
 
     def _stats(self, *args, **kwds):
         """Mean, variance, skew of the layered severity (from ``moms``)."""

@@ -28,8 +28,34 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a1 (in progress)
+1.0.0a2 (in progress)
 ----------------------
+
+Aggregate surface rationalization (breaking changes; v1.0 cleanup):
+
+* Visible layer structure: file-level section dividers in ``distributions.py`` and a public-API block in the ``Aggregate`` class docstring document the integration surface (``report_ser``, ``statistics_df``, ``update_work``, ``agg_density``, ``ftagg_density``, ``density_df``, plus the risk-measure surface ``q`` / ``tvar`` / ``cdf`` / ``sf`` / …) that ``Portfolio`` and ``Bounds`` consume.
+* FFT five-line core extracted to ``Aggregate._freq_sev_convolution``; docstring references the four-step algorithm in §2.2 of the paper. ``update_work`` reads top-to-bottom as compute-severity → occurrence reinsurance → convolution → aggregate reinsurance → audit.
+* Shared inner-block of ``__init__``'s two broadcasting arms factored into ``Aggregate._record_component`` (centralises ``statistics_df`` column ordering across the limit-profile arm and the mixture-product arm).
+* ``__init__`` state initialization regrouped into labelled blocks: spec passthroughs, grid + runtime config, exposure outputs, computed densities, empirical moment estimates, cached lazy functions, reinsurance state, theoretical moment tables.
+* ``density_df`` property docstring expanded with a column-by-column reference table (set-by / read-by for each of 17 columns) — no behavior change.
+* Aggregate methods privatised (leading underscore): ``audit_df`` → ``_audit_df``, ``statistics_total_df`` → ``_statistics_total_df``, ``limits`` → ``_limits``, ``html_info_blob`` → ``_html_info_blob``. ``aggregate/extensions/figures.py`` and ``aggregate/extensions/test_suite.py`` updated for the renames.
+* ``Aggregate.more``, ``Portfolio.more``, ``Underwriter.more`` renamed to ``.help``. Backing free function in ``utilities.py`` renamed ``more`` → ``agg_help`` (prefixed so it doesn't shadow Python's builtin ``help`` at module / package level).
+* ``pprogram`` / ``pprogram_html`` collapsed: dropped the ``split=20`` line-magic and the ``show=True`` side-effect print. Methods preserved — cheat sheets and Underwriter consume them.
+* Historical-comment sweep across the ``Aggregate`` class: stale ``# TODO`` / ``# WHOA! WTF`` markers and a commented-out spec-dict block removed.
+* Logger calls in ``distributions.py`` converted to lazy ``%s``-style formatting (extends the earlier ``utilities.py`` cleanup).
+* Public surface intentionally retained after a docs audit revealed heavy tutorial usage: ``statistics``, ``statistics_df``, ``report_df``, ``report_ser``, ``info``, ``describe``, ``snap``, ``unwrap``, ``picks``, ``recommend_bucket``.
+
+``Underwriter.build()`` return contract uniform:
+
+* ``Underwriter.build()`` now raises ``CannotBuild`` (subclass of ``ValueError``) when a parsed spec produces no top-level object — previously returned a ``ParsedProgram`` with ``object=None`` in the named-mixed-severity edge case. The contract is now uniform: ``build → object`` always (or raises), ``build_many → list[ParsedProgram]`` always. ``CannotBuild`` is exported from the ``aggregate`` package.
+* ``Underwriter.discover()`` catches ``CannotBuild`` and skips the row with a ``logger.warning`` (mirrors today's ``NotImplementedError`` handling).
+
+Tooling:
+
+* New ``doc-test-uv.ps1`` script: uv-managed doc build that replaces the clone-to-tmp dance in ``doc-test.ps1``. Builds in place, uses a dedicated ``.doc-venv\`` (set via ``UV_PROJECT_ENVIRONMENT``) so doc builds don't disturb the main development ``.venv``. Supports any Python via ``--python X.Y`` (uv auto-downloads if needed).
+
+1.0.0a1
+--------
 
 Underwriter surface rationalization (breaking changes; v1.0 cleanup):
 

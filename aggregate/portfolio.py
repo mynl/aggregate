@@ -159,8 +159,9 @@ class Portfolio(object):
                 self.agg_list.append(a)
                 self.line_names.append(agg_name)
                 self.__setattr__(agg_name, a)
-                ma.add_fs(a.report_ser[('freq', 'ex1')], a.report_ser[('freq', 'ex2')], a.report_ser[('freq', 'ex3')],
-                          a.report_ser[('sev', 'ex1')], a.report_ser[('sev', 'ex2')], a.report_ser[('sev', 'ex3')])
+                mixed = a.stats_df['mixed']
+                ma.add_fs(mixed[('freq', 'ex1')], mixed[('freq', 'ex2')], mixed[('freq', 'ex3')],
+                          mixed[('sev',  'ex1')], mixed[('sev',  'ex2')], mixed[('sev',  'ex3')])
                 max_limit = max(max_limit, np.max(np.array(a.limit)))
 
         self.line_names_ex = self.line_names + ['total']
@@ -170,7 +171,10 @@ class Portfolio(object):
             if n == 'total':
                 raise ValueError('Line names cannot equal total, it is reserved for...total')
         # make a pandas data frame of all the statistics_df
-        temp_report = pd.concat([a.report_ser for a in self.agg_list], axis=1)
+        temp_report = pd.concat(
+            [a.stats_df['mixed'].rename(a.name) for a in self.agg_list],
+            axis=1,
+        )
 
         # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
         temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, remix=False))

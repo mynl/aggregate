@@ -9,7 +9,8 @@
       "Bash(echo \"exit $?\")",
       "Bash(cd *)",
       "Bash(UV_LINK_MODE=copy uv run pytest -q)",
-      "Bash(UV_LINK_MODE=copy uv run python -m aggregate.extensions.test_suite)"
+      "Bash(UV_LINK_MODE=copy uv run python -m aggregate.extensions.test_suite)",
+      "Bash(UV_LINK_MODE=copy uv run python -c ' *)"
     ]
   }
 }

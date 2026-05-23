@@ -28,8 +28,71 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a2 (in progress)
+1.0.0a4 (in progress)
 ----------------------
+
+``Aggregate`` stats consolidation — finish the job: eliminate the
+``_statistics_df`` / ``_statistics_total_df`` scratch frames so ``stats_df``
+is the only theoretical-moment DataFrame the class holds:
+
+* ``Aggregate.__init__`` now pre-creates an empty ``stats_df`` (canonical
+  ``MultiIndex`` rows, NaN-filled) right after ``n_components`` is known in
+  each broadcasting arm, via a new ``_init_stats_df`` helper.
+* ``_record_component`` writes a column of ``stats_df`` directly (no more
+  intermediate row in ``_statistics_df``).
+* The post-loop totals block writes ``mixed`` / ``independent`` /
+  ``('meta', 'wt')`` directly into ``stats_df`` columns.
+* ``('agg', 'P99.9e')`` row dropped — it had only two populated cells
+  (``mixed`` and ``independent``), was read in one spot (``_limits``
+  fallback when ``agg_density`` is ``None``), and is cheaply rebuildable
+  on demand via ``estimate_agg_percentile``. That one read site now
+  computes on the fly.
+* All readers migrated: ``avg_limit`` / ``avg_attach`` / ``tot_prem`` /
+  ``tot_loss``, ``self.agg_m`` / ``agg_cv`` / ``agg_skew`` / ``sev_*``,
+  ``update_work`` severity weights, ``severity_error_analysis`` weights,
+  ``info`` / ``_html_info_blob`` component count.
+* ``_statistics_df``, ``_statistics_total_df``, and the
+  ``_build_stats_df`` method are gone.
+* Side benefit: ``stats_df`` row layout is now cleaner — all ``meta`` rows
+  together at the top (``mix_cv`` and ``wt`` previously trailed at the
+  bottom because of how the legacy scratch frames were ordered).
+
+1.0.0a3
+--------
+
+``Aggregate`` stats consolidation: six overlapping moment DataFrames → one
+``stats_df`` (breaking changes; v1.0 cleanup):
+
+* New canonical ``Aggregate.stats_df``: single source of truth for moment
+  statistics. ``MultiIndex (component, measure)`` rows (``component`` ∈
+  ``{meta, freq, sev, agg}``; ``measure`` ∈ ``{mean, cv, skew, ex1, ex2,
+  ex3, …}``); columns are per-component (``comp_0``, …), ``mixed``,
+  ``independent``, ``empirical``, and ``error``. Built in two phases:
+  theoretical content in ``__init__``, ``empirical`` and ``error`` appended
+  in ``update_work`` after the FFT. Empty cells are ``NaN`` where
+  meaningful (e.g. ``('freq', *) × empirical`` is undefined — the FFT
+  produces one combined empirical distribution, not per-component
+  empirical moments).
+* Naming convention unified: ``ex1`` / ``ex2`` / ``ex3`` for raw moments
+  and ``mean`` / ``cv`` / ``skew`` for derived. The legacy ``_1`` / ``_m``
+  flat-column convention is gone.
+* The Aggregate "stats surface" is now exactly three things — ``info`` (text
+  about the Aggregate), ``describe`` (the daily-driver moment audit), and
+  ``stats_df``. Removed: ``report_df``, ``report_ser``, ``statistics``,
+  ``audit_df``. Privatised: ``statistics_df`` → ``_statistics_df``,
+  ``statistics_total_df`` → ``_statistics_total_df``.
+* ``Aggregate.describe`` rewritten to source from ``stats_df``; output
+  byte-identical.
+* ``Portfolio`` migrated to read ``a.stats_df['mixed']`` instead of
+  ``a.report_ser`` (three lines in ``portfolio.py``). Portfolio's own
+  ``statistics_df`` / ``audit_df`` / ``report_df`` are unaffected — they
+  live on Portfolio, not Aggregate, and will be rationalised in Stage 2.
+* Docs migrated: ~30 references to ``report_df`` / ``statistics`` /
+  ``statistics_df`` across nine tutorial pages rewritten to use
+  ``stats_df`` with explicit row / column accessors.
+
+1.0.0a2
+--------
 
 Aggregate surface rationalization (breaking changes; v1.0 cleanup):
 

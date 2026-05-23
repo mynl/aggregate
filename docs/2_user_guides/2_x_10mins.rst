@@ -1057,39 +1057,40 @@ It applies to the **gross** outcome when there is reinsurance, so the results fo
     oco = ['display.width', 150, 'display.max_columns', 15,
             'display.float_format', lambda x: f'{x:.5g}']
     with pd.option_context(*oco):
-        print(a05g.statistics)
+        print(a05g.stats_df)
         print('\n')
-        print(p07.statistics)
+        print(p07.statistics_df)
 
 .. _10 min report:
 
-The ``report_df`` Dataframe
+The ``stats_df`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``report_df`` dataframe combines information from ``statistics`` with
-estimated moments to test if the numerical approximations appear valid. It
-is an expanded version of ``describe``. Numerically estimated statistics are
-prefaced ``est`` or ``empirical``.
+The ``stats_df`` dataframe is the single source of truth for an Aggregate's
+moments — theoretical and (after ``update``) empirical. It has a MultiIndex on
+``(component, measure)`` rows and one column per mixture component plus
+``mixed``, ``independent``, ``empirical``, and ``error`` (relative). It is
+an expanded version of ``describe``.
 
 .. ipython:: python
     :okwarning:
 
     with pd.option_context(*oco):
-        print(a05g.report_df)
+        print(a05g.stats_df)
         print('\n')
-        print(p07.report_df)
+        print(p07.statistics_df)
 
 .. _10mins extra info:
 
-The ``report_df`` provides extra information when there is a mixed severity.
+``stats_df`` provides extra information when there is a mixed severity.
 
 .. ipython:: python
     :okwarning:
 
     with pd.option_context(*oco):
-        print(a03.report_df)
+        print(a03.stats_df)
 
-The dataframe shows statistics for each mixture component, columns ``0,1,2``,
+The dataframe shows statistics for each mixture component, columns ``comp_0,comp_1,comp_2``,
 their sum if they are added independently and their sum if there is a shared
 mixing variable, as there is here. The common mixing induces correlation
 between the mix components, acting to increases the CV and skewness, often

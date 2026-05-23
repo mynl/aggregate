@@ -888,6 +888,60 @@ class FrequencySichelIG(_FrequencySichelMatched):
         return np.array([1, nu, 3.0 * nu / (1 - f)])
 
 
+# ---------------------------------------------------------------------------
+# Stats DataFrame helpers
+# ---------------------------------------------------------------------------
+# ``Aggregate.stats_df`` is the canonical (component, measure) × view
+# DataFrame holding theoretical + empirical moments. ``MomentAggregator``
+# emits its per-component / totals statistics as flat names like ``freq_1``,
+# ``agg_m``; ``_flat_col_to_stats_index`` maps each to the
+# ``(component, measure)`` tuple used by the ``stats_df`` row MultiIndex.
+
+_STATS_META_NAMES = frozenset({
+    'name', 'limit', 'attachment', 'el', 'prem', 'lr', 'sevcv_param',
+    'mix_cv', 'wt',
+})
+
+_STATS_MEASURE_MAP = {'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean'}
+
+
+def _flat_col_to_stats_index(col):
+    """Map a flat ``statistics_df`` column name to ``(component, measure)``.
+
+    Examples: ``'freq_1' → ('freq', 'ex1')``, ``'agg_m' → ('agg', 'mean')``,
+    ``'limit' → ('meta', 'limit')``.
+
+    Used to bridge the flat moment names emitted by
+    :meth:`MomentAggregator.get_fsa_stats` / ``column_names()`` to the
+    canonical ``(component, measure)`` MultiIndex used by ``stats_df``.
+    """
+    if col in _STATS_META_NAMES:
+        return ('meta', col)
+    comp, _, measure = col.partition('_')
+    if comp in ('freq', 'sev', 'agg'):
+        return (comp, _STATS_MEASURE_MAP.get(measure, measure))
+    raise ValueError(f'Cannot map column {col!r} for stats_df build.')
+
+
+# Canonical row MultiIndex for ``stats_df`` — written directly in __init__
+# (component columns) and the post-loop totals block (``mixed`` /
+# ``independent``). All ``meta`` rows up top, then freq/sev/agg moment blocks.
+_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
+    [
+        ('meta', 'name'), ('meta', 'limit'), ('meta', 'attachment'),
+        ('meta', 'el'), ('meta', 'prem'), ('meta', 'lr'),
+        ('meta', 'sevcv_param'), ('meta', 'mix_cv'), ('meta', 'wt'),
+        ('freq', 'ex1'), ('freq', 'ex2'), ('freq', 'ex3'),
+        ('freq', 'mean'), ('freq', 'cv'), ('freq', 'skew'),
+        ('sev', 'ex1'), ('sev', 'ex2'), ('sev', 'ex3'),
+        ('sev', 'mean'), ('sev', 'cv'), ('sev', 'skew'),
+        ('agg', 'ex1'), ('agg', 'ex2'), ('agg', 'ex3'),
+        ('agg', 'mean'), ('agg', 'cv'), ('agg', 'skew'),
+    ],
+    names=['component', 'measure'],
+)
+
+
 class Aggregate:
     """Compound (aggregate) probability distribution.
 
@@ -896,35 +950,37 @@ class Aggregate:
     ``_freq_sev_convolution`` for the five-line core; ``update_work`` for the
     orchestration (severity prep → occurrence reinsurance → convolution →
     aggregate reinsurance → audit). Validation by theoretical-vs-empirical
-    moment comparison (paper §4.7) lives in the ``audit_df`` materialised at
-    the end of ``update_work``.
+    moment comparison (paper §4.7) lives in the ``empirical`` and ``error``
+    columns of ``stats_df`` written at the end of ``update_work``.
 
     Construction is via the ``__init__`` arguments below, or — more usually —
     via :func:`build` parsing DecL.
 
-    **Public surface that Portfolio and Bounds depend on.** These are the
-    integration points; treat as a stable contract:
+    **Public surface that Portfolio and Bounds depend on.** Three stats
+    surfaces — ``info`` for text, ``describe`` for the daily moment audit,
+    and ``stats_df`` for everything else — plus the compute and risk-measure
+    surface:
+
+    Stats / display
+        - ``info``: one-screen textual summary (frequency, severity, layer,
+          grid, validation flag). Not stats.
+        - ``describe``: 3-row Freq / Sev / Agg moment table with theoretical
+          and (post-``update``) empirical estimates plus relative errors.
+          The daily-driver display.
+        - ``stats_df``: ``MultiIndex (component, measure)`` × per-component
+          / ``mixed`` / ``independent`` / ``empirical`` / ``error``.
+          Single source of truth for Aggregate moments — see the property
+          for the row / column reference.
 
     Data attributes
-        - ``report_ser``: totals series of theoretical freq/sev/agg moments
-          (consumed by Portfolio).
-        - ``statistics_df``: per-component theoretical moments.
         - ``agg_density``: empirical PMF on the bucket grid (set by
           ``update_work``; consumed by Portfolio).
         - ``ftagg_density``: FT of the aggregate density (consumed by
           Portfolio's copula combine).
-        - ``density_df``: per-bucket density / CDF / risk-measure frame (see
-          the property for column documentation).
+        - ``density_df``: per-bucket density / CDF / risk-measure frame.
         - ``n``: total frequency.
         - ``name``, ``program``, ``note``: spec metadata.
         - ``bs``, ``log2``, ``xs``: discretization grid.
-
-    User-facing display
-        - ``describe``: theoretical-vs-empirical moments table — the
-          daily-driver display.
-        - ``report_df``: mixing audit (independent vs. mixed totals).
-        - ``statistics``: reshape of ``statistics_df`` for display.
-        - ``info``, ``__repr__``, ``_repr_html_``: textual / HTML reprs.
 
     Methods
         - ``update``, ``update_work``: trigger / drive the compute.
@@ -938,9 +994,13 @@ class Aggregate:
         - ``snap``, ``picks``, ``unwrap``, ``recommend_bucket``,
           ``aggregate_error_analysis``, ``severity_error_analysis``: utilities.
 
-    Methods with a leading underscore (``_audit_df``, ``_statistics_total_df``,
-    ``_record_component``, ``_freq_sev_convolution``, ``_apply_reins_work``,
-    ``_limits``, ``_html_info_blob``, ``_make_var_tvar``, …) are internal.
+    Methods / attributes with a leading underscore are internal —
+    ``_init_stats_df``, ``_record_component``, ``_freq_sev_convolution``,
+    ``_apply_reins_work``, ``_limits``, ``_html_info_blob``,
+    ``_make_var_tvar``, … . The legacy ``audit_df`` / ``report_df`` /
+    ``report_ser`` / ``statistics`` / ``statistics_df`` /
+    ``statistics_total_df`` surface has been removed; consult ``stats_df``
+    instead.
     """
 
     aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
@@ -1441,7 +1501,6 @@ class Aggregate:
         self.agg_density = None
         self.ftagg_density = None
         self.fzapprox = None
-        self._audit_df = None
         self._density_df = None
 
         # Empirical moment estimates (set by update_work; consumed by q / tvar)
@@ -1481,11 +1540,8 @@ class Aggregate:
         self._reinsurance_report_df = None
         self._reinsurance_df = None
 
-        # Theoretical moment tables (populated by broadcasting below)
-        self.statistics_df = pd.DataFrame(columns=['name', 'limit', 'attachment', 'sevcv_param', 'el', 'prem', 'lr'] +
-                                                  MomentAggregator.column_names() +
-                                                  ['mix_cv'])
-        self._statistics_total_df = self.statistics_df.copy()
+        # ``stats_df`` is pre-created inside each broadcasting arm below once
+        # ``n_components`` is known; see ``_init_stats_df``.
         ma = MomentAggregator(self.frequency.freq_moms)
 
         # overall freq CV with common mixing
@@ -1525,6 +1581,7 @@ class Aggregate:
             logger.debug('Aggregate.__init__ | Broadcast/align: exposures + severity = %d exp = '
                          '%d sevs = %d componets', len(exp_el), len(sev_a), n_components)
             self.sevs = np.empty(n_components, dtype=type(Severity))
+            self._init_stats_df(n_components)
 
             # perform looping creation of severity distribution
             # in this case wts are all 1, so no need to broadcast
@@ -1587,6 +1644,7 @@ class Aggregate:
                 f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_el)} x {len(sev_name)} '
                 f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
+            self._init_stats_df(n_components)
 
             # WARNING: note sev_xs and sev_ps are NOT broadcast
             # In this case, there is only one ground up severity, but it is a mixture. We need to
@@ -1693,41 +1751,83 @@ class Aggregate:
 
                     r += 1
 
-        # average exp_limit and exp_attachment
-        avg_limit = np.sum(self.statistics_df.limit * self.statistics_df.freq_1) / ma.tot_freq_1
-        avg_attach = np.sum(self.statistics_df.attachment * self.statistics_df.freq_1) / ma.tot_freq_1
-        # assert np.allclose(ma.freq_1, self.statistics_df.exp_en)
+        # average exp_limit and exp_attachment — weighted by per-component
+        # frequency mean. Sourced from the stats_df columns populated by the
+        # broadcast loop above.
+        _comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
+        _comp_limit = self.stats_df.loc[('meta', 'limit'), _comp_cols].astype(float)
+        _comp_attach = self.stats_df.loc[('meta', 'attachment'), _comp_cols].astype(float)
+        _comp_freq = self.stats_df.loc[('freq', 'ex1'), _comp_cols].astype(float)
+        avg_limit = float(np.sum(_comp_limit * _comp_freq) / ma.tot_freq_1)
+        avg_attach = float(np.sum(_comp_attach * _comp_freq) / ma.tot_freq_1)
 
         # store answer for total
-        tot_prem = self.statistics_df.prem.sum()
-        tot_loss = self.statistics_df.el.sum()
+        tot_prem = float(self.stats_df.loc[('meta', 'prem'), _comp_cols].astype(float).sum())
+        tot_loss = float(self.stats_df.loc[('meta', 'el'), _comp_cols].astype(float).sum())
         if tot_prem > 0:
             lr = tot_loss / tot_prem
         else:
             lr = np.nan
-        self._statistics_total_df.loc[f'mixed', :] = \
-            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=True) \
-            + [mix_cv]
-        self._statistics_total_df.loc[f'independent', :] = \
-            [self.name, avg_limit, avg_attach, 0, tot_loss, tot_prem, lr] + ma.get_fsa_stats(total=True, remix=False) \
-            + [mix_cv]
-        self.statistics_df['wt'] = self.statistics_df.freq_1 / ma.tot_freq_1
-        self._statistics_total_df['wt'] = self.statistics_df.wt.sum()  # better equal 1.0!
+
+        # Write the post-loop totals directly into ``stats_df``: per-component
+        # weights, then ``mixed`` and ``independent`` columns (theoretical
+        # moments + meta).
+        comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
+        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float)
+        self.stats_df.loc[('meta', 'wt'), comp_cols] = (freq_ex1 / ma.tot_freq_1).values
+        # mixed and independent totals
+        _flat_names = MomentAggregator.column_names()
+        for _col, _remix in (('mixed', True), ('independent', False)):
+            for _flat, _val in zip(_flat_names, ma.get_fsa_stats(total=True, remix=_remix)):
+                self.stats_df.loc[_flat_col_to_stats_index(_flat), _col] = _val
+            self.stats_df.loc[('meta', 'name'), _col] = self.name
+            self.stats_df.loc[('meta', 'limit'), _col] = avg_limit
+            self.stats_df.loc[('meta', 'attachment'), _col] = avg_attach
+            self.stats_df.loc[('meta', 'sevcv_param'), _col] = 0
+            self.stats_df.loc[('meta', 'el'), _col] = tot_loss
+            self.stats_df.loc[('meta', 'prem'), _col] = tot_prem
+            self.stats_df.loc[('meta', 'lr'), _col] = lr
+            self.stats_df.loc[('meta', 'mix_cv'), _col] = mix_cv
+            self.stats_df.loc[('meta', 'wt'), _col] = self.stats_df.loc[
+                ('meta', 'wt'), comp_cols
+            ].astype(float).sum()
+
         self.n = ma.tot_freq_1
-        self.agg_m = self._statistics_total_df.loc['mixed', 'agg_m']
-        self.agg_cv = self._statistics_total_df.loc['mixed', 'agg_cv']
-        self.agg_skew = self._statistics_total_df.loc['mixed', 'agg_skew']
+        # Pull the headline moments off the canonical stats_df mixed column.
+        _mixed = self.stats_df['mixed']
+        self.agg_m = float(_mixed[('agg', 'mean')])
+        self.agg_cv = float(_mixed[('agg', 'cv')])
+        self.agg_skew = float(_mixed[('agg', 'skew')])
         # variance and sd come up in exam questions
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
         # severity exact moments
-        self.sev_m, self.sev_cv, self.sev_skew = self._statistics_total_df.loc['mixed',
-        ['sev_m', 'sev_cv', 'sev_skew']]
+        self.sev_m = float(_mixed[('sev', 'mean')])
+        self.sev_cv = float(_mixed[('sev', 'cv')])
+        self.sev_skew = float(_mixed[('sev', 'skew')])
         self.sev_sd = self.sev_m * self.sev_cv
         self.sev_var = self.sev_sd * self.sev_sd
 
-        # finally, need a report_ser series for Portfolio to consolidate
-        self.report_ser = ma.stats_series(self.name, np.max(self.limit), 0.999, remix=True)
+    def _init_stats_df(self, n_components):
+        """Pre-create the empty ``stats_df`` (NaN-filled).
+
+        Called from each broadcasting arm of ``__init__`` once ``n_components``
+        is known. Columns: one ``comp_<i>`` per broadcast component plus
+        ``mixed``, ``independent``, ``empirical``, ``error``. Rows: the
+        canonical ``_STATS_ROW_INDEX`` (meta + freq + sev + agg measures).
+
+        ``_record_component`` writes each ``comp_<i>`` column inside the
+        broadcast loop; the post-loop block writes ``mixed`` and
+        ``independent``; ``update_work`` writes ``empirical`` and ``error``
+        after the FFT.
+        """
+        cols = [f'comp_{i}' for i in range(n_components)] + [
+            'mixed', 'independent', 'empirical', 'error',
+        ]
+        # dtype=object so we can hold meta strings (name) alongside floats.
+        self.stats_df = pd.DataFrame(
+            np.nan, index=_STATS_ROW_INDEX, columns=cols, dtype=object,
+        )
 
     def _record_component(self, r, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
                           sev1, sev2, sev3):
@@ -1758,11 +1858,22 @@ class Aggregate:
             First three raw severity moments for this component.
         """
         ma.add_f1s(en, sev1, sev2, sev3)
-        self.statistics_df.loc[r, :] = (
-            [self.name, layer, attach, scv, el, prem, lr]
-            + ma.get_fsa_stats(total=False)
-            + [mix_cv]
-        )
+        moments = ma.get_fsa_stats(total=False)
+        # Write this component's data directly into the canonical ``stats_df``
+        # column. Maps MA's flat moment names to the ``(component, measure)``
+        # MultiIndex via ``_flat_col_to_stats_index``. ``('meta', 'wt')`` is
+        # filled in by the post-loop block (it depends on total frequency).
+        col = f'comp_{r}'
+        self.stats_df.loc[('meta', 'name'), col] = self.name
+        self.stats_df.loc[('meta', 'limit'), col] = layer
+        self.stats_df.loc[('meta', 'attachment'), col] = attach
+        self.stats_df.loc[('meta', 'el'), col] = el
+        self.stats_df.loc[('meta', 'prem'), col] = prem
+        self.stats_df.loc[('meta', 'lr'), col] = lr
+        self.stats_df.loc[('meta', 'sevcv_param'), col] = scv
+        self.stats_df.loc[('meta', 'mix_cv'), col] = mix_cv
+        for flat, val in zip(MomentAggregator.column_names(), moments):
+            self.stats_df.loc[_flat_col_to_stats_index(flat), col] = val
 
     # ================================================================
     # Repr / info / help — string and HTML representations
@@ -1807,7 +1918,7 @@ class Aggregate:
         s = [f'aggregate object name    {self.name}',
              f'claim count              {self.n:0,.2f}',
              f'frequency distribution   {self.frequency.freq_name}']
-        n = len(self.statistics_df)
+        n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
             if sv.limit == np.inf and sv.attachment == 0:
@@ -1846,7 +1957,7 @@ class Aggregate:
         """
         s = [f'<h3>Aggregate object: {self.name}</h3>']
         s.append(f'<p>{self.frequency.freq_name} frequency distribution.')
-        n = len(self.statistics_df)
+        n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
             if sv.limit == np.inf and sv.attachment == 0:
@@ -2043,9 +2154,11 @@ class Aggregate:
 
         # make the severity vector: a claim count weighted average of the severities
         if approximation == 'exact' or force_severity:
-            wts = self.statistics_df.freq_1 / self.statistics_df.freq_1.sum()
+            comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
+            freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
+            wts = freq_ex1 / freq_ex1.sum()
             if self.en.sum() == 0:
-                self.en = self.statistics_df.freq_1.values
+                self.en = freq_ex1
             self.sev_density = np.zeros_like(xs)
             beds = self.discretize(sev_calc, discretization_calc, normalize)
             for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
@@ -2112,37 +2225,33 @@ class Aggregate:
             # can still apply aggregate in this mode
             self.apply_agg_reins(debug)
 
-        # make a suitable audit_df
-        # originally...irritating no freq cv or sev cv
-        # cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'sev_1', 'agg_m', 'agg_cv', 'agg_skew']
-        cols = ['name', 'limit', 'attachment', 'el', 'freq_1', 'freq_cv', 'freq_skew',
-                'sev_1', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
-        self._audit_df = pd.concat((self.statistics_df[cols],
-                                   self._statistics_total_df.loc[['mixed'], cols]),
-                                  axis=0)
-        # add empirical sev stats
+        # Empirical severity moments from the discretised distribution.
         if self.sev_density is not None:
-            _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.sev_density)
+            self.est_sev_m, self.est_sev_cv, self.est_sev_skew = \
+                xsden_to_meancvskew(self.xs, self.sev_density)
         else:
-            _m = np.nan
-            _cv = np.nan
-            _sk = np.nan
-        self._audit_df.loc['mixed', 'emp_sev_1'] = _m
-        self._audit_df.loc['mixed', 'emp_sev_cv'] = _cv
-        self._audit_df.loc['mixed', 'emp_sev_skew'] = _sk
-        self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _m, _cv, _sk
+            self.est_sev_m = np.nan
+            self.est_sev_cv = np.nan
+            self.est_sev_skew = np.nan
         self.est_sev_sd = self.est_sev_m * self.est_sev_cv
         self.est_sev_var = self.est_sev_sd * self.est_sev_sd
-        # add empirical agg stats
-        _m, _cv, _sk = xsden_to_meancvskew(self.xs, self.agg_density)
-        self._audit_df.loc['mixed', 'emp_agg_1'] = _m
-        self._audit_df.loc['mixed', 'emp_agg_cv'] = _cv
-        self._audit_df.loc['mixed', 'emp_agg_skew'] = _sk
-        self.est_m = _m
-        self.est_cv = _cv
-        self.est_sd = _m * _cv
+
+        # Empirical aggregate moments from the FFT output.
+        self.est_m, self.est_cv, self.est_skew = \
+            xsden_to_meancvskew(self.xs, self.agg_density)
+        self.est_sd = self.est_m * self.est_cv
         self.est_var = self.est_sd ** 2
-        self.est_skew = _sk
+
+        # Write empirical and error columns into the canonical stats_df.
+        # This is the validation showpiece of Mildenhall 2024, §4.7:
+        # theoretical (``mixed`` column) vs. empirical (FFT output).
+        self.stats_df.loc[('sev', 'mean'), 'empirical'] = self.est_sev_m
+        self.stats_df.loc[('sev', 'cv'),   'empirical'] = self.est_sev_cv
+        self.stats_df.loc[('sev', 'skew'), 'empirical'] = self.est_sev_skew
+        self.stats_df.loc[('agg', 'mean'), 'empirical'] = self.est_m
+        self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
+        self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
+        self.stats_df['error'] = self.stats_df['empirical'] / self.stats_df['mixed'] - 1
 
         # invalidate stored functions
         self._cdf = None
@@ -2890,7 +2999,13 @@ class Aggregate:
         # GOTCHA: if you call q and it fails because not agg_density then q is set to {}
         # which is not None
         if self.agg_density is None:
-            return f(self.report_ser[('agg', 'P99.9e')])
+            # No FFT output yet; estimate the 0.999 quantile from the theoretical
+            # mixed-total agg moments.
+            try:
+                p999 = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, 0.999)
+            except ValueError:
+                p999 = np.inf
+            return f(p999)
 
         if stat == 'range':
             if kind == 'linear':
@@ -2919,68 +3034,6 @@ class Aggregate:
     # ================================================================
 
     @property
-    def report_df(self):
-        """
-        Created on the fly report to audit creation of object.
-        There were some bad choices of columns in audit_df...but it [maybe] embedded in other code....
-        Eg the use of _1 vs _m for mean is inconsistent.
-
-        :return:
-        """
-
-        if self._audit_df is not None:
-            # want both mixed and unmixed
-            cols = ['name', 'limit', 'attachment', 'el', 'freq_m', 'freq_cv', 'freq_skew',
-                    'sev_m', 'sev_cv', 'sev_skew', 'agg_m', 'agg_cv', 'agg_skew']
-            # massaged version of original audit_df, including indep and mixed total views
-            df = pd.concat((self.statistics_df[cols], self._statistics_total_df[cols]), axis=0).T
-            df['empirical'] = np.nan
-            # add empirical stats
-            df.loc['sev_m', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_1']
-            df.loc['sev_cv', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_cv']
-            df.loc['sev_skew', 'empirical'] = self._audit_df.loc['mixed', 'emp_sev_skew']
-            df.loc['agg_m', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_1']
-            df.loc['agg_cv', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_cv']
-            df.loc['agg_skew', 'empirical'] = self._audit_df.loc['mixed', 'emp_agg_skew']
-            df = df
-            df['error'] = df['empirical'] / df['mixed'] - 1
-            df = df.fillna('')
-            # better column order  units; indep sum; mixed sum; empirical; error
-            c = list(df.columns)
-            c = c[:-4] + [c[-3], c[-4], c[-2], c[-1]]
-            df = df[c]
-            if df.shape[1] == 4:
-                # only one sev, don't show extra sev column
-                df = df.iloc[:, 1:]
-            df.index.name = 'statistic'
-            df.columns.name = 'view'
-            return df
-
-    @property
-    def statistics(self):
-        """
-        Pandas series of theoretic frequency, severity, and aggregate 1st, 2nd, and 3rd moments.
-        Mean, cv, and skewness.
-
-        :return:
-        """
-        if len(self.statistics_df) > 1:
-            # there are mixture components
-            df = pd.concat((self.statistics_df, self._statistics_total_df), axis=0)
-        else:
-            df = self.statistics_df.copy()
-        # edit to make equivalent to Portfolio statistics
-        df = df.T
-        if df.shape[1] == 1:
-            df.columns = [df.iloc[0, 0]]
-            df = df.iloc[1:]
-        df.index = df.index.str.split("_", expand=True, )
-        df = df.rename(index={'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean', np.nan: ''})
-        df.index.names = ['component', 'measure']
-        df.columns.name = 'name'
-        return df
-
-    @property
     def pprogram(self):
         """Cleaned DecL program text (notes removed, whitespace collapsed).
 
@@ -2995,38 +3048,41 @@ class Aggregate:
 
     @property
     def describe(self):
-        """
-        Theoretic and empirical stats. Used in _repr_html_.
+        """Theoretical-vs-empirical moment table for Freq / Sev / Agg.
 
+        The daily-driver display used by ``qd(agg)`` and ``_repr_html_``.
+        Three-row Freq / Sev / Agg frame; columns are theoretical
+        ``E[X] / CV(X) / Skew(X)`` and — if ``update`` has run — the
+        empirical estimates and relative errors.
+
+        Sources from the canonical ``self.stats_df`` (``mixed`` and
+        ``empirical`` columns).
         """
-        st = self._statistics_total_df.loc['mixed', :]
-        sev_m = st.sev_m
-        sev_cv = st.sev_cv
-        sev_skew = st.sev_skew
-        n_m = st.freq_m
-        n_cv = st.freq_cv
-        a_m = st.agg_m
-        a_cv = st.agg_cv
-        df = pd.DataFrame({'E[X]': [sev_m, n_m, a_m], 'CV(X)': [sev_cv, n_cv, a_cv],
-                           'Skew(X)': [sev_skew, self._statistics_total_df.loc['mixed', 'freq_skew'], st.agg_skew]},
-                          index=['Sev', 'Freq', 'Agg'])
+        st = self.stats_df['mixed']
+        df = pd.DataFrame(
+            {
+                'E[X]':    [st[('freq', 'mean')], st[('sev', 'mean')], st[('agg', 'mean')]],
+                'CV(X)':   [st[('freq', 'cv')],   st[('sev', 'cv')],   st[('agg', 'cv')]],
+                'Skew(X)': [st[('freq', 'skew')], st[('sev', 'skew')], st[('agg', 'skew')]],
+            },
+            index=['Freq', 'Sev', 'Agg'],
+        )
         df.index.name = 'X'
-        if self._audit_df is not None:
-            esev_m = self._audit_df.loc['mixed', 'emp_sev_1']
-            esev_cv = self._audit_df.loc['mixed', 'emp_sev_cv']
-            ea_m = self._audit_df.loc['mixed', 'emp_agg_1']
-            ea_cv = self._audit_df.loc['mixed', 'emp_agg_cv']
-            df.loc['Sev', 'Est E[X]'] = esev_m
-            df.loc['Agg', 'Est E[X]'] = ea_m
+        emp = self.stats_df['empirical']
+        # ``emp[('agg','mean')]`` is non-NaN iff ``update_work`` has run.
+        if pd.notna(emp.get(('agg', 'mean'), np.nan)):
+            df.loc['Sev', 'Est E[X]'] = emp[('sev', 'mean')]
+            df.loc['Agg', 'Est E[X]'] = emp[('agg', 'mean')]
             df.loc[:, 'Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
-            df.loc['Sev', 'Est CV(X)'] = esev_cv
-            df.loc['Agg', 'Est CV(X)'] = ea_cv
+            df.loc['Sev', 'Est CV(X)'] = emp[('sev', 'cv')]
+            df.loc['Agg', 'Est CV(X)'] = emp[('agg', 'cv')]
             df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
             df['Est Skew(X)'] = np.nan
-            df.loc['Sev', 'Est Skew(X)'] = self._audit_df.loc['mixed', 'emp_sev_skew']
-            df.loc['Agg', 'Est Skew(X)'] = self._audit_df.loc['mixed', 'emp_agg_skew']
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)', 'Est Skew(X)']]
-        df = df.loc[['Freq', 'Sev', 'Agg']]
+            df.loc['Sev', 'Est Skew(X)'] = emp[('sev', 'skew')]
+            df.loc['Agg', 'Est Skew(X)'] = emp[('agg', 'skew')]
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]',
+                     'CV(X)', 'Est CV(X)', 'Err CV(X)',
+                     'Skew(X)', 'Est Skew(X)']]
         return df
 
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
@@ -3344,7 +3400,8 @@ class Aggregate:
                 wts = np.array([i.sev_wt for i in self.sevs])
                 # for non-broadcast weights the sum is n = number of components; rescale
                 if wts.sum() == len(self.sevs):
-                    wts = self.statistics_df.freq_1.values
+                    comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
+                    wts = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
                 wts = wts / wts.sum()
 
                 # tried a couple of different approaches here and this is as fast as any
@@ -3442,14 +3499,13 @@ class Aggregate:
             return {kind: self.approximate(kind)
                     for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
 
-        if self._audit_df is None:
-            # not updated
-            m = self._statistics_total_df.loc['mixed', 'agg_m']
-            cv = self._statistics_total_df.loc['mixed', 'agg_cv']
-            skew = self._statistics_total_df.loc['mixed', 'agg_skew']
+        # Prefer empirical moments (post-update) over theoretical (pre-update).
+        emp = self.stats_df['empirical']
+        if pd.notna(emp.get(('agg', 'mean'), np.nan)):
+            m, cv, skew = (emp[('agg', 'mean')], emp[('agg', 'cv')], emp[('agg', 'skew')])
         else:
-            # use statistics_df matched to computed aggregate_project
-            m, cv, skew = self.report_df.loc[['agg_m', 'agg_cv', 'agg_skew'], 'empirical']
+            mixed = self.stats_df['mixed']
+            m, cv, skew = (mixed[('agg', 'mean')], mixed[('agg', 'cv')], mixed[('agg', 'skew')])
 
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '

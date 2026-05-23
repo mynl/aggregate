@@ -366,14 +366,17 @@ The following code reproduces Table 6.3. First, define the controlling variables
                'sev exp(7) * lognorm 2.4 '
                'poisson'
                , bs=50, log2=18)
-    qd(bl.report_df.iloc[:, :-4], accuracy=4)
+    qd(bl.stats_df.iloc[:, :-4], accuracy=4)
 
-Next, extract the required columns from ``report_df`` and manipulate to compute the ILFs.
+Next, extract the required columns from ``stats_df`` and manipulate to compute the ILFs.
 
 .. ipython:: python
     :okwarning:
 
-    bit = bl.report_df.loc[['sev_m', 'sev_cv', 'agg_m', 'agg_cv']].iloc[:, :-4].T
+    bit = bl.stats_df.loc[
+        [('sev', 'mean'), ('sev', 'cv'), ('agg', 'mean'), ('agg', 'cv')]
+    ].iloc[:, :-4].T
+    bit.columns = ['sev_m', 'sev_cv', 'agg_m', 'agg_cv']
     bit.index = limits
     bit.index.name = 'limit'
     bit['vx'] = (bit.sev_m * bit.sev_cv) ** 2
@@ -472,14 +475,17 @@ We can build all of the required distributions simultaneously using vectorizatio
                'sev exp(7) * lognorm 2.4 ! '
                'poisson'
                , bs=50, log2=18)
-    qd(bl.report_df.iloc[:, :-4], accuracy=4)
+    qd(bl.stats_df.iloc[:, :-4], accuracy=4)
 
-Next, manipulate the ``report_df`` dataframe to compute the required quantities. The final exhibit replicates Table 6.5.
+Next, manipulate the ``stats_df`` dataframe to compute the required quantities. The final exhibit replicates Table 6.5.
 
 .. ipython:: python
     :okwarning:
 
-    bit = bl.report_df.iloc[:, :-4].loc[['attachment', 'freq_m', 'sev_m', 'agg_m']].T
+    bit = bl.stats_df.iloc[:, :-4].loc[
+        [('meta', 'attachment'), ('freq', 'mean'), ('sev', 'mean'), ('agg', 'mean')]
+    ].T
+    bit.columns = ['attachment', 'freq_m', 'sev_m', 'agg_m']
     bit = bit.rename(columns={'attachment': 'deductible'}).set_index('deductible')
     bit['F(d)'] = np.array([bl.sevs[0].fz.cdf(i) for i in bit.index])
     bit['freq_m'] = bit.loc[0, 'freq_m'] * (1 - bit['F(d)'])

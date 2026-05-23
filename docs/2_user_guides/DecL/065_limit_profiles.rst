@@ -47,7 +47,7 @@ aggregate CV is quite marked.
                 'sev lognorm 500 cv 1.25 '
                 'mixed gamma 0.6')
     qd(a10)
-    qd(a10.report_df.iloc[:, :-2])
+    qd(a10.stats_df.drop(columns=['empirical', 'error']))
 
 
 .. tidy up

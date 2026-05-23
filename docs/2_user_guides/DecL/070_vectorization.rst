@@ -32,8 +32,12 @@ dataframe shows the components (transposed extract shown). The mixture weights a
                 'sev lognorm 100 cv [1 2] wts [0.6 0.4] '
                 'poisson')
     qd(a11)
-    qd(a11.report_df.loc[['limit', 'attachment', 'freq_m',
-      'agg_m', 'agg_cv']].T.iloc[:-4])
+    df = a11.stats_df.loc[
+        [('meta', 'limit'), ('meta', 'attachment'),
+         ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
+    ].iloc[:, :-4].T
+    df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+    qd(df)
 
 
 **Example.**
@@ -57,8 +61,12 @@ The ``report_df`` shows all 20 components: 4 limits x 5 mixture components.
 .. ipython:: python
     :okwarning:
 
-    qd(a12.report_df.loc[['limit', 'attachment', 'freq_m',
-      'agg_m', 'agg_cv']].T.iloc[:-4])
+    df = a12.stats_df.loc[
+        [('meta', 'limit'), ('meta', 'attachment'),
+         ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
+    ].iloc[:, :-4].T
+    df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+    qd(df)
 
 
 
@@ -115,8 +123,12 @@ The next two examples illustrate the different behavior.
               'sev [gamma lognorm] [10 15] cv [1 1.5] '
               'mixed gamma 0.4 ')
    qd(a13)
-   qd(a13.report_df.loc[['limit', 'attachment', 'freq_m',
-      'agg_m', 'agg_cv']].T.iloc[:-4])
+   df = a13.stats_df.loc[
+       [('meta', 'limit'), ('meta', 'attachment'),
+        ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
+   ].iloc[:, :-4].T
+   df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+   qd(df)
 
 
 #. Adding weights results in a mixed severity, 80% for the gamma and 20% for
@@ -133,6 +145,10 @@ The next two examples illustrate the different behavior.
               'wts [.8 .2] '
               'mixed gamma 0.4 ')
    qd(a14)
-   qd(a14.report_df.loc[['limit', 'attachment', 'freq_m',
-      'agg_m', 'agg_cv']].T.iloc[:-4])
+   df = a14.stats_df.loc[
+       [('meta', 'limit'), ('meta', 'attachment'),
+        ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
+   ].iloc[:, :-4].T
+   df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+   qd(df)
 

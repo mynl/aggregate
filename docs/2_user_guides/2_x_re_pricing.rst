@@ -426,8 +426,9 @@ The shared mixing increases the frequency and aggregate CV and skewness.
 .. ipython:: python
     :okwarning:
 
-    qd(a08.report_df.loc[
-        ['freq_m', 'freq_cv', 'freq_skew', 'agg_cv', 'agg_skew'],
+    qd(a08.stats_df.loc[
+        [('freq', 'mean'), ('freq', 'cv'), ('freq', 'skew'),
+         ('agg', 'cv'), ('agg', 'skew')],
         ['independent', 'mixed']])
 
 Look at ``reinsurance_occ_layer_df`` to summarize the analysis.
@@ -740,12 +741,12 @@ Applying a 20% coinsurance and grossing up by 100/60 produces the premium and ra
     p, p / 6000
 
 
-``aggregate`` induces correlation between the three classes because they share mixing variables. The ``report_df`` shows the details by line and compares with an independent sum.
+``aggregate`` induces correlation between the three classes because they share mixing variables. The ``stats_df`` shows the details by line and compares with an independent sum.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a14.report_df.iloc[:, :-2])
+    qd(a14.stats_df.drop(columns=['empirical', 'error']))
 
 
 .. _re bear 3:
@@ -1135,12 +1136,12 @@ The basic stochastic model is as follows. Work in 000s. Using ``bs=1/2`` results
               'poisson', bs=1/2)
     qd(a19)
 
-The ``report_df`` dataframe shows the theoretic and empirical (i.e., modeled) statistics for each unit.
+The ``stats_df`` dataframe shows the theoretic and empirical (i.e., modeled) statistics for each unit.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a19.report_df.iloc[:, [0,1,2,3,4,-2]])
+    qd(a19.stats_df.loc[:, ['comp_0', 'comp_1', 'comp_2', 'comp_3', 'comp_4', 'empirical']])
 
 
 Mata et al. pay careful attention to the implied severity in each ceded layer, accounting for probability masses. They do this by considering losses in small intervals and weighting the underlying severity curves. ``aggregate`` automatically performs the same calculations to estimate the total layer severity. In this example, it uses a smaller bucket size of 0.5K compared to 2.5K in the original paper. The next plots reproduce [TODO Differences?!] Figures 2 and 3. The masses (spikes in density; jumps in distribution) occur when the lower limit unit has only limit losses.

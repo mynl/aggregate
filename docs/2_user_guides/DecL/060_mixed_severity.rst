@@ -59,7 +59,7 @@ Mixed severity with Poisson frequency is the same as the sum of five independent
 .. ipython:: python
     :okwarning:
 
-    qd(a01.report_df.iloc[:, :-3])
+    qd(a01.stats_df.drop(columns=['mixed', 'empirical', 'error']))
 
 This aggregate can also be built as a :class:`Portfolio`.
 
@@ -120,7 +120,7 @@ If exposures are determined via losses (directly or using premium and loss ratio
                  'poisson'
                  , bs=1/2, approximation='exact')
     qd(a01e)
-    qd(a01e.report_df.iloc[:, :-3])
+    qd(a01e.stats_df.drop(columns=['mixed', 'empirical', 'error']))
 
 .. _med example:
 
@@ -249,7 +249,7 @@ for each curve, rather than using weights, see :doc:`070_vectorization`.
                 'sev [gamma lognorm] [100 150] cv [1 0.5] '
                 'mixed gamma 0.5',
                 log2=16, bs=2.5)
-    qd(a06.report_df.iloc[:, :-2])
+    qd(a06.stats_df.drop(columns=['empirical', 'error']))
     @savefig mix_3.png
     a06.plot()
 
@@ -264,7 +264,7 @@ than a gamma, avoiding very good years.
                  'sev [gamma lognorm] [100 150] cv [1 0.5] '
                  'mixed delaporte 0.5 0.6',
                 log2=18, bs=2.5)
-    qd(a07.report_df.iloc[:, :-2])
+    qd(a07.stats_df.drop(columns=['empirical', 'error']))
     @savefig mix_4.png
     a07.plot()
 
@@ -305,14 +305,14 @@ The next block shows results with a Poisson frequency, where there is no mixing.
 .. ipython:: python
     :okwarning:
 
-    qd(a08.report_df.drop(['name']).iloc[:, :-2])
+    qd(a08.stats_df.drop(('meta', 'name')).drop(columns=['empirical', 'error']))
 
 This block shows mixed gamma (negative binomial) frequency. There are two differences: the individual components have higher CVs (they asymptotically approach 25% for a large portfolio), and the mixed column includes correlation between units (aggregate CV is greater than independent). Glenn Meyers had the idea of using shared mixing variables to ensure aggregate portfolio dynamics are not influenced by how the portfolio is split into units.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a09.report_df.drop(['name']).iloc[:, :-2])
+    qd(a09.stats_df.drop(('meta', 'name')).drop(columns=['empirical', 'error']))
 
 
 .. tidy up

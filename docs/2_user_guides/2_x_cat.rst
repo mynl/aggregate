@@ -284,11 +284,11 @@ The new models produce the following AALs, compare Jewson Figure 3.
 .. ipython:: python
     :okwarning:
 
-    base = pd.concat((w.report_df.loc['agg_m'].T,
-               m.report_df.loc['agg_m'].T), axis=1,
+    base = pd.concat((w.stats_df.loc[('agg', 'mean')],
+               m.stats_df.loc[('agg', 'mean')]), axis=1,
               keys=['Weinkle', 'Martinez']); \
-    cc = pd.concat((wcc.report_df.loc['agg_m'].T,
-               mcc.report_df.loc['agg_m'].T), axis=1,
+    cc = pd.concat((wcc.stats_df.loc[('agg', 'mean')],
+               mcc.stats_df.loc[('agg', 'mean')]), axis=1,
               keys=['Weinkle', 'Martinez']); \
     df = pd.concat((base, cc), axis=1,
                    keys=[' Base', 'Adjusted']); \

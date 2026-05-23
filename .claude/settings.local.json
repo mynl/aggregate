@@ -19,7 +19,8 @@
       "Bash(rg \"\\\\b\\(port|self\\\\.port|prt|p1|p2\\)\\\\.\\(\\\\w+\\)\" \"C:/S/TELOS/Python/PyWork/PMIR/python/current/045.05-examples-revisited.qmd\" --no-filename -o)",
       "Bash(UV_LINK_MODE=copy uv run python _peg_smoke.py)",
       "Bash(UV_LINK_MODE=copy uv run *)",
-      "Bash(git checkout *1)"
+      "Bash(git checkout *1)",
+      "Bash(git stash *)"
     ]
   }
 }

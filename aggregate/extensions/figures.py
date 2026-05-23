@@ -102,7 +102,7 @@ def mixing_convergence(freq_cv, sev_cv, bs=1/64):
     a = build('agg M '
               '1 claims '
               f'sev gamma 1 cv {sev_cv} '
-              f'mixed gamma {freq_cv} ', log2=16, bs=bs, approximation='exact')
+              f'mixed gamma {freq_cv} ', log2=16, bs=bs)
     dfnb = a.density_df[['p']].rename(columns={'p': 1})
     assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
     # print("1", a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
@@ -111,7 +111,7 @@ def mixing_convergence(freq_cv, sev_cv, bs=1/64):
         a = build('agg M '
                   f'{freq} claims '
                   f'sev gamma 1 cv {sev_cv} '
-                  f'mixed gamma {freq_cv} ', log2=16, bs=bs, approximation='exact')
+                  f'mixed gamma {freq_cv} ', log2=16, bs=bs)
         dfnb[freq] = a.density_df[['p']]
         assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
         # print(freq, a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
@@ -119,7 +119,7 @@ def mixing_convergence(freq_cv, sev_cv, bs=1/64):
     a = build('agg M '
               '1 claims '
               f'sev gamma 1 cv {sev_cv} '
-              'poisson ', log2=16, bs=bs, approximation='exact')
+              'poisson ', log2=16, bs=bs)
     dfp = a.density_df[['p']].rename(columns={'p': 1})
     assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
     # print("1", a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
@@ -128,7 +128,7 @@ def mixing_convergence(freq_cv, sev_cv, bs=1/64):
         a = build('agg M '
                   f'{freq} claims '
                   f'sev gamma 1 cv {sev_cv} '
-                  'poisson ', log2=16, bs=bs, approximation='exact')
+                  'poisson ', log2=16, bs=bs)
         dfp[freq] = a.density_df[['p']]
         assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
         # print(freq, a.agg_m, a.est_m, a.est_m / a.agg_m - 1)
@@ -327,17 +327,20 @@ def discretization_agg_example(outcomes):
 
 def gh_example(en):
     '''
-    Code to reproduce GHGrübel and Hermesmeier 1999, Table 1.
+    Code adapted from Grübel and Hermesmeier 1999, Table 1.
     The function ``exact_cdf`` calculates the compound probability
     that :math:`x-1/2 < X \le x+1/2`.
-    For AAS paper with en=20.
+
+    The original paper demonstrated FFT tilting; that path has been removed
+    from ``aggregate`` (use more buckets instead). The remaining example
+    compares the padded FFT result against the exact compound probability.
 
     '''
     from scipy.stats import levy
     a = build(f'agg L {en} claim sev levy poisson', update=False)
     qd(a)
     bs = 1
-    a.update(log2=16, bs=bs, padding=2, normalize=False, tilt_vector=None)
+    a.update(log2=16, bs=bs, padding=2, normalize=False)
     df = a.density_df.loc[[1, 10, 100, 1000], ['p_total']] / a.bs
     df.columns = ['Agg pad=2']
 
@@ -355,19 +358,9 @@ def gh_example(en):
         return np.sum(p * a)
 
     df['True'] = [exact_cdf(i) for i in df.index]
-
-    # other models
-    log2 = 10
-    for tilt in [None, 1/1024, 5/1024, 25/1024]:
-        a.update(log2=log2, bs=bs, padding=0,
-                 normalize=False, tilt_vector=tilt)
-        if tilt is None:
-            tilt = 0
-        df[f'Tilt {tilt:.2g}'] = a.density_df.loc[[1, 10, 100, 1000],
-                                  ['p_total']]/a.bs
     df.index = [f'{x: 6.0f}' for x in df.index]
     df.index.name = 'x'
-    qd(df.iloc[:, [1,0,2,3,4, 5]], ff=lambda x: f'{x:11.3e}')
+    qd(df, ff=lambda x: f'{x:11.3e}')
 
 
 def g_insurance_statistics(axi, dist, c='C0', ls='-', lw=1, diag=False, grid=False):

@@ -1153,15 +1153,15 @@ class Aggregate:
                              index=pd.Index(self.xs, name='loss'))
             if self.occ_reins is not None:
                 # add agg with gcn occ
-                logger.info('Computing aggregates with gcn severities; assumes approx=exact')
+                logger.info('Computing aggregates with gcn severities')
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
-                    z = ft(sv, self.padding, None)
+                    z = ft(sv, self.padding)
                     ftz = self.frequency.freq_pgf(self.n, z)
                     if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
                         ad = sv.copy()
                     else:
-                        ad = np.real(ift(ftz, self.padding, None))
+                        ad = np.real(ift(ftz, self.padding))
                     self._reinsurance_df[gcn] = ad
             if self.agg_density_gross is None:
                 # no agg program
@@ -1487,7 +1487,6 @@ class Aggregate:
         self.sev_calc = ""
         self.discretization_calc = ""
         self.normalize = ""
-        self.approximation = ''
 
         # Exposure / mixture outputs (filled by broadcasting below)
         self.en = None   # per-component frequency (e.g. for a limit profile)
@@ -1935,7 +1934,6 @@ class Aggregate:
             s.append(f'padding                  {self.padding}')
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
-            s.append(f'approximation            {self.approximation}')
             s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
@@ -2109,10 +2107,10 @@ class Aggregate:
     # for backwards compatibility
     easy_update = update
 
-    def update_work(self, xs, padding=1, tilt_vector=None, approximation='exact', sev_calc='discrete',
+    def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
-        Compute a discrete approximation to the aggregate density.
+        Compute a discrete approximation to the aggregate density via FFT.
 
         See discretize for sev_calc, discretization_calc and normalize.
 
@@ -2122,17 +2120,13 @@ class Aggregate:
 
         :param xs: range of x values used to discretize
         :param padding: for FFT calculation
-        :param tilt_vector: tilt_vector = np.exp(tilt_amount * np.arange(N)), N=2**log2, and
-               tilt_amount * N < 20 recommended
-        :param approximation: 'exact' = perform frequency / severity convolution using FFTs.
-               'slognorm' or 'sgamma' use a shifted lognormal or shifted gamma approximation.
         :param sev_calc:  discrete=round, forward, backward, or continuous
                and method becomes discrete otherwise
         :param discretization_calc:  survival, distribution or both; in addition
                the method then becomes survival
         :param normalize: if True, normalize the severity so sum probs = 1. This is generally what you want; but
                when dealing with thick tailed distributions it can be helpful to turn it off.
-        :param force_severity: make severities even if using approximation, for plotting
+        :param force_severity: make severities for plotting even when only the aggregate is requested
         :param debug: run reinsurance in debug model if True.
         :return:
         """
@@ -2143,31 +2137,26 @@ class Aggregate:
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
-        self.approximation = approximation
         self.padding = padding
         self.xs = xs
         self.bs = xs[1]
         self.log2 = int(np.log2(len(xs)))
 
-        if type(tilt_vector) == float:
-            tilt_vector = np.exp(-tilt_vector * np.arange(2 ** self.log2))
+        # claim-count weighted severity vector (always computed; FFT is the only path)
+        comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
+        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
+        wts = freq_ex1 / freq_ex1.sum()
+        if self.en.sum() == 0:
+            self.en = freq_ex1
+        self.sev_density = np.zeros_like(xs)
+        beds = self.discretize(sev_calc, discretization_calc, normalize)
+        for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
+            self.sev_density += temp * w
 
-        # make the severity vector: a claim count weighted average of the severities
-        if approximation == 'exact' or force_severity:
-            comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
-            freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
-            wts = freq_ex1 / freq_ex1.sum()
-            if self.en.sum() == 0:
-                self.en = freq_ex1
-            self.sev_density = np.zeros_like(xs)
-            beds = self.discretize(sev_calc, discretization_calc, normalize)
-            for temp, w, a, l, n in zip(beds, wts, self.attachment, self.limit, self.en):
-                self.sev_density += temp * w
-
-            # adjust for picks if necessary
-            if self.sev_pick_attachments is not None:
-                logger.log(WL, 'Adjusting for picks.')
-                self.sev_density = self.picks(self.sev_pick_attachments, self.sev_pick_losses)
+        # adjust for picks if necessary
+        if self.sev_pick_attachments is not None:
+            logger.log(WL, 'Adjusting for picks.')
+            self.sev_density = self.picks(self.sev_pick_attachments, self.sev_pick_losses)
 
         if force_severity == 'yes':
             # only asking for severity (used by plot)
@@ -2181,48 +2170,11 @@ class Aggregate:
                 self.sev_density = self.sev_density_gross
             self.apply_occ_reins(debug)
 
-        if approximation == 'exact':
-            if self.n > 100:
-                logger.info('Claim count %s is high; consider an approximation ', self.n)
-            self._freq_sev_convolution(padding, tilt_vector)
-            if self.n > 0:
-                # zero-risk case has no aggregate to reinsure
-                self.apply_agg_reins(debug)
-
-        else:
-            # regardless of request if skew == 0 have to use normal
-            # must check there is no per occ reinsurance... it won't work
-            if self.occ_reins is not None:
-                raise ValueError('Per occ reinsurance not supported with approximation')
-            if not np.isfinite(self.agg_cv):
-                raise ValueError('Cannot fit a distribution with infinite second moment.')
-            if self.agg_skew < 0:
-                logger.log(WL, 'Negative skewness, ignoring and fitting unshifted distribution.')
-
-            if self.agg_skew == 0:
-                self.fzapprox = ss.norm(scale=self.agg_m * self.agg_cv, loc=self.agg_m)
-            elif approximation == 'slognorm':
-                if np.isfinite(self.agg_skew) and self.agg_skew > 0:
-                    shift, mu, sigma = sln_fit(self.agg_m, self.agg_cv, self.agg_skew)
-                    self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-                else:
-                    mu, sigma = ln_fit(self.agg_m, self.agg_cv)
-                    self.fzapprox = ss.lognorm(sigma, scale=np.exp(mu))
-            elif approximation == 'sgamma':
-                if np.isfinite(self.agg_skew) and self.agg_skew > 0:
-                    shift, alpha, theta = sgamma_fit(self.agg_m, self.agg_cv, self.agg_skew)
-                    self.fzapprox = ss.gamma(alpha, scale=theta, loc=shift)
-                else:
-                    alpha, theta = gamma_fit(self.agg_m, self.agg_cv)
-                    self.fzapprox = ss.gamma(alpha, scale=theta)
-            else:
-                raise ValueError(f'Invalid approximation {approximation} option passed to CAgg density. '
-                                 'Allowable options are: exact | slogorm | sgamma')
-
-            ps = self.fzapprox.pdf(xs)
-            self.agg_density = ps / np.sum(ps)
-            self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
-            # can still apply aggregate in this mode
+        if self.n > 100:
+            logger.info('Claim count %s is high; consider increasing log2/buckets', self.n)
+        self._freq_sev_convolution(padding)
+        if self.n > 0:
+            # zero-risk case has no aggregate to reinsure
             self.apply_agg_reins(debug)
 
         # Empirical severity moments from the discretised distribution.
@@ -2256,7 +2208,7 @@ class Aggregate:
         # invalidate stored functions
         self._cdf = None
 
-    def _freq_sev_convolution(self, padding, tilt_vector):
+    def _freq_sev_convolution(self, padding):
         """Compute the aggregate density by FFT convolution (Mildenhall 2024, §2.2).
 
         Implements the four-step FFT-based algorithm for compound distributions:
@@ -2284,8 +2236,6 @@ class Aggregate:
         padding : int
             Padding factor passed to ``ft`` / ``ift`` to mitigate FFT aliasing
             (see Mildenhall 2024, §2.3.2).
-        tilt_vector : np.ndarray or None
-            Optional exponential tilt for the FFT.
 
         Notes
         -----
@@ -2298,11 +2248,11 @@ class Aggregate:
             # right shape and dtype (needed when agg is part of a portfolio).
             self.agg_density = np.zeros_like(self.xs)
             self.agg_density[0] = 1
-            self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+            self.ftagg_density = ft(self.agg_density, padding)
             return
 
         # Steps 2-3: FT of severity, then apply frequency PGF element-wise.
-        z = ft(self.sev_density, padding, tilt_vector)
+        z = ft(self.sev_density, padding)
         self.ftagg_density = self.frequency.freq_pgf(self.n, z)
 
         if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
@@ -2312,7 +2262,7 @@ class Aggregate:
             self.agg_density = self.sev_density.copy()
         else:
             # Step 4: inverse FFT to recover p_A.
-            self.agg_density = np.real(ift(self.ftagg_density, padding, tilt_vector))
+            self.agg_density = np.real(ift(self.ftagg_density, padding))
 
     # ================================================================
     # Validation (paper §4.7), unwrap, picks, freq_pmf
@@ -2523,9 +2473,9 @@ class Aggregate:
         n = 1 << log2
         z = np.zeros(n)
         z[1] = 1
-        fz = ft(z, 0, None)
+        fz = ft(z, 0)
         fz = self.frequency.freq_pgf(self.en, fz)
-        dist = ift(fz, 0, None)
+        dist = ift(fz, 0)
         # remove fuzz
         dist[dist < np.finfo(float).eps] = 0
         if not np.allclose(self.n,  self.en):
@@ -2669,7 +2619,7 @@ class Aggregate:
         self.est_sev_var = self.est_sev_sd ** 2
         self.est_sev_skew = _sk2
 
-    def apply_agg_reins(self, debug=False, padding=1, tilt_vector=None):
+    def apply_agg_reins(self, debug=False, padding=1):
         """
         Apply the entire agg reins structure and save output.
         For by layer detail create reins_audit_df.
@@ -2705,7 +2655,7 @@ class Aggregate:
             raise ValueError(f'Unexpected kind of agg reinsurance, {self.agg_kind}')
 
         # update ft of agg
-        self.ftagg_density = ft(self.agg_density, padding, tilt_vector)
+        self.ftagg_density = ft(self.agg_density, padding)
 
         # see impact on moments
         _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.agg_density)
@@ -2851,9 +2801,9 @@ class Aggregate:
         # difference = probability density
         dfi = np.diff(fi, prepend=0)
         # use loc FFT, with wrapping
-        fz = ft(dfi, padding, None)
+        fz = ft(dfi, padding)
         mfz = 1 / (1 - fz / (1 + rho))
-        f = ift(mfz, padding, None)
+        f = ift(mfz, padding)
         f = np.real(f) * rho / (1 + rho)
         f = np.cumsum(f)
         ruin = pd.Series(1 - f, index=bit.index)
@@ -3152,7 +3102,7 @@ class Aggregate:
         # aggregate analysis
         agg_ans = []
         for bs in bss:
-            cself.update(bs=bs, log2=log2, approximation='exact', **kwargs)
+            cself.update(bs=bs, log2=log2, **kwargs)
             agg_ans.append([bs, m, cself.est_m,
                             cself.est_m - m, cself.est_m / m - 1])
 

@@ -336,7 +336,7 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
         bit = None
 
     elif agg_log2 > 0:
-        ag.update(approximation='exact', log2=agg_log2, bs=bs, padding=0)
+        ag.update(log2=agg_log2, bs=bs, padding=0)
         qd(ag)
         print('-'*80)
         # percentiles - help determining log2 needed for hi freq calculation

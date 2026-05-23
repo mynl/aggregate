@@ -141,28 +141,22 @@ def pprint_ex(txt, split=0, html=False, show=True):
     return ans
 
 
-def ft(z, padding, tilt):
+def ft(z, padding):
     """
-    fft with padding and tilt
+    fft with padding
     padding = n makes vector 2^n as long
     n=1 doubles (default)
     n=2 quadruples
-    tilt is passed in as the tilting vector or None: easier for the caller to have a single instance
 
     :param z:
     :param padding: = 1 doubles
-    :param tilt: vector of tilt values
     :return:
     """
     locft = sft.rfft
     if z.shape != (len(z),):
         raise ValueError('ERROR wrong shape passed into ft: ' + str(z.shape))
-    # tilt
     # valeus per https://stackoverflow.com/questions/71706387/finding-fft-gives-keyerror-aligned-pandas
-    if tilt is not None:
-        zt = z * tilt
-    else:
-        zt = z
+    zt = z
     if type(zt) != np.ndarray:
         zt = zt.to_numpy()
     # padding handled by the ft routine
@@ -170,13 +164,12 @@ def ft(z, padding, tilt):
     return locft(zt, len(z) << padding)
 
 
-def ift(z, padding, tilt):
+def ift(z, padding):
     """
-    ift that strips out padding and adjusts for tilt
+    ift that strips out padding
 
     :param z:
     :param padding:
-    :param tilt:
     :return:
     """
     locift = sft.irfft
@@ -189,9 +182,6 @@ def ift(z, padding, tilt):
     # unpad
     if padding != 0:
         temp = temp[0:len(temp) >> padding]
-    # untilt
-    if tilt is not None:
-        temp /= tilt
     return temp
 
 

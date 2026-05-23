@@ -172,7 +172,6 @@ class Portfolio(object):
         self.audit_df = None
         self.independent_audit_df = None
         self.padding = 0
-        self.tilt_amount = 0
         self._var_tvar_function = None
         self._cdf = None
         self._pdf = None
@@ -184,8 +183,6 @@ class Portfolio(object):
         self._distortion = None
         self.sev_calc = ''
         self._remove_fuzz = 0
-        self.approx_type = ""
-        self.approx_freq_ge = 0
         self.discretization_calc = ''
         self.normalize = None
         self._line_renamer = None
@@ -668,8 +665,6 @@ class Portfolio(object):
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
             s.append(f'remove_fuzz              {self._remove_fuzz}')
-            s.append(f'approx_type              {self.approx_type}')
-            s.append(f'approx_freq_ge           {self.approx_freq_ge}')
             s.append(f'distortion               {repr(self._distortion)}')
 
         if isupdated:
@@ -808,12 +803,9 @@ class Portfolio(object):
         args["bs"] = self.bs
         args["log2"] = self.log2
         args["padding"] = self.padding
-        args["tilt_amount"] = self.tilt_amount
         args["distortion"] = repr(self._distortion)
         args["sev_calc"] = self.sev_calc
         args["remove_fuzz"] = self._remove_fuzz
-        args["approx_type"] = self.approx_type
-        args["approx_freq_ge"] = self.approx_freq_ge
         args["last_update"] = str(self.last_update)
         args["hash_rep_at_last_update"] = str(self.hash_rep_at_last_update)
 
@@ -1191,9 +1183,9 @@ class Portfolio(object):
 
         return round_bucket(bs)
 
-    def update(self, log2, bs, approx_freq_ge=100, approx_type='slognorm', remove_fuzz=False,
-               sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1, tilt_amount=0,
-               trim_df=False, add_exa=True, force_severity=True, recommend_p=RECOMMEND_P, approximation=None,
+    def update(self, log2, bs, remove_fuzz=False,
+               sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
+               trim_df=False, add_exa=True, force_severity=True, recommend_p=RECOMMEND_P,
                debug=False):
         """
 
@@ -1202,9 +1194,6 @@ class Portfolio(object):
         Create density_df, performs convolution. optionally adds additional information if ``add_exa=True``
         for allocation and priority analysis
 
-        tilting: [@Grubel1999]: Computation of Compound Distributions I: Aliasing Errors and Exponential Tilting
-        (ASTIN 1999)
-        tilt x numbuck < 20 is recommended log. 210
         num buckets and max loss from bucket size
 
         Aggregate reinsurance in parser has replaced the aggregate_cession_function (a function of a Portfolio object
@@ -1216,28 +1205,21 @@ class Portfolio(object):
 
         :param log2:
         :param bs: bucket size
-        :param approx_freq_ge: use method of moments if frequency is larger than ``approx_freq_ge``
-        :param approx_type: type of method of moments approx to use (slognorm or sgamma)
         :param remove_fuzz: remove machine noise elements from FFT
         :param sev_calc: how to calculate the severity, discrete (point masses as xs) or continuous (uniform between xs points)
         :param discretization_calc:  survival or distribution (accurate on right or left tails)
         :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
         :param padding: for fft 1 = double, 2 = quadruple
-        :param tilt_amount: for tiling methodology - see notes on density for suggested parameters
         :param epds: epd points for priority analysis; if None-> sensible defaults
         :param trim_df: remove unnecessary columns from density_df before returning
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
             epd info
         :param force_severity: force computation of severities for aggregate components even when approximating
         :param recommend_p: percentile to use for bucket recommendation.
-        :param approximation: if not None, use these instructions ('exact')
         :param debug: if True, print debug information
         :return:
         """
         self._valid = None # reset valid flag
-        if approximation is not None:
-            if approximation == 'exact':
-                approx_freq_ge = 1e9
 
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
@@ -1248,12 +1230,8 @@ class Portfolio(object):
         else:
             self.bs = bs
         self.padding = padding
-        self.tilt_amount = tilt_amount
-        self.approx_type = approx_type
         self.sev_calc = sev_calc
         self._remove_fuzz = remove_fuzz
-        self.approx_type = approx_type
-        self.approx_freq_ge = approx_freq_ge
         self.discretization_calc = discretization_calc
         self.normalize = normalize
 
@@ -1269,9 +1247,6 @@ class Portfolio(object):
         # not_line_density = {}
 
         # add the densities
-        # tilting: [@Grubel1999]: Computation of Compound Distributions I: Aliasing Errors and Exponential Tilting
-        # (ASTIN 1999)
-        # tilt x numbuck < 20 recommended log. 210
         # num buckets and max loss from bucket size
         N = 1 << log2
         MAXL = N * bs
@@ -1279,11 +1254,6 @@ class Portfolio(object):
         # make all the single line aggs
         # note: looks like duplication but will all be references
         # easier for add_exa to have as part of the portfolio module
-        # tilt
-        if self.tilt_amount != 0:
-            tilt_vector = np.exp(self.tilt_amount * np.arange(N))
-        else:
-            tilt_vector = None
 
         # where the answer will live
         self.density_df = pd.DataFrame(index=xs)
@@ -1293,8 +1263,8 @@ class Portfolio(object):
             raw_nm = agg.name
             nm = f'p_{agg.name}'
             # agg.update_work handles the reinsurance too
-            agg.update_work(xs, self.padding, tilt_vector, 'exact' if agg.n < approx_freq_ge else approx_type,
-                            sev_calc, discretization_calc, normalize, force_severity, debug)
+            agg.update_work(xs, self.padding, sev_calc, discretization_calc,
+                            normalize, force_severity, debug)
 
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[nm] = agg.agg_density
@@ -1302,7 +1272,7 @@ class Portfolio(object):
                 ft_all = np.copy(ft_line_density[raw_nm])
             else:
                 ft_all *= ft_line_density[raw_nm]
-        self.density_df['p_total'] = np.real(ift(ft_all, self.padding, tilt_vector))
+        self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
         # ft_line_density['total'] = ft_all
 
         # make the not self.line_density = sum of all but the given line
@@ -1920,17 +1890,17 @@ class Portfolio(object):
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
             df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
-    def ft(self, x, tilt=None):
+    def ft(self, x):
         """
-        FT of x with padding and tilt applied
+        FT of x with padding applied
         """
-        return ft(x, self.padding, tilt)
+        return ft(x, self.padding)
 
-    def ift(self, x, tilt=None):
+    def ift(self, x):
         """
-        IFT of x with padding and tilt applied
+        IFT of x with padding applied
         """
-        return ift(x, self.padding, tilt)
+        return ift(x, self.padding)
 
     def add_eta_mu(self):
         """ convenience function to just add the eta-mus. """
@@ -1994,10 +1964,10 @@ class Portfolio(object):
         if eta_mu:
             # recrecate the ημ columns (NO padding!)
             ft_line_density = {}
-            ft_all = ft(self.density_df.p_total, self.padding, None)
+            ft_all = ft(self.density_df.p_total, self.padding)
             for line in self.line_names:
                 # create all for inner loop below
-                ft_line_density[line] = ft(self.density_df[f'p_{line}'], self.padding, None)
+                ft_line_density[line] = ft(self.density_df[f'p_{line}'], self.padding)
             for line in self.line_names:
                 ft_not = np.ones_like(ft_all)
                 # this fails because the ft can contain very small quantites
@@ -2011,7 +1981,7 @@ class Portfolio(object):
                 else:
                     if len(self.line_names) > 1:
                         ft_not = ft_all / ft_line_density[line]
-                self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding, None))
+                self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding))
 
         if eta_mu == 'only':
             return
@@ -3599,12 +3569,12 @@ class Portfolio(object):
         for agg in self.agg_list:
             raw_nm = agg.name
             nm = f'p_{agg.name}'
-            ft_line_density[raw_nm] = ft(self.density_df[nm], padding, None)
+            ft_line_density[raw_nm] = ft(self.density_df[nm], padding)
             if ft_all is None:
                 ft_all = np.copy(ft_line_density[raw_nm])
             else:
                 ft_all *= ft_line_density[raw_nm]
-        self.density_df['p_total'] = np.real(ift(ft_all, padding, None))
+        self.density_df['p_total'] = np.real(ift(ft_all, padding))
         ft_nots = {}
         for line in self.line_names:
             ft_not = np.ones_like(ft_all)

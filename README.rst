@@ -31,6 +31,41 @@ Version History
 1.0.0a5 (in progress)
 ----------------------
 
+Portfolio refactor sub-project B — drop approximation and tilting paths
+from ``Portfolio.update`` and ``Aggregate.update_work``:
+
+* Removed the auto-fallback method-of-moments approximation path. The
+  ``approx_freq_ge`` / ``approx_type`` / ``approximation`` kwargs are gone
+  from ``Portfolio.update``; the matching ``approx_type`` /
+  ``approx_freq_ge`` attrs are gone from ``Portfolio.__init__``,
+  ``Portfolio.json``, and ``Portfolio.__repr__``. The
+  ``'exact' if agg.n < approx_freq_ge else approx_type`` ternary is gone;
+  callers always get the FFT path. The slognorm / sgamma branch in
+  ``Aggregate.update_work`` (and the ``approximation`` attribute on
+  ``Aggregate``) is deleted. ``Portfolio.approximate`` /
+  ``Aggregate.approximate`` (the user-facing on-demand
+  method-of-moments fit returning a ``scipy.stats`` frozen RV or a DecL
+  spec) are unchanged.
+* Removed FFT tilting (Grübel/Hermesmeier 1999) from the update pipeline:
+  the ``tilt_amount`` attr is gone from ``Portfolio.__init__``, the
+  ``tilt_vector`` construction block is gone from ``Portfolio.update``,
+  and the ``tilt=`` parameter is removed from the ``ft`` / ``ift``
+  module-level helpers in ``aggregate.utilities`` and the matching
+  ``Portfolio.ft`` / ``Portfolio.ift`` wrappers. The tilt branches inside
+  ``Aggregate.update_work``, ``Aggregate._freq_sev_convolution``, and
+  ``Aggregate.apply_agg_reins`` are gone. Use more buckets if aliasing
+  shows up — per author's standing preference.
+* ``aggregate.extensions.figures.gh_example`` was the only consumer of
+  tilting in the visualisation layer; it now compares the padded FFT
+  result against the exact compound probability without the
+  tilt-comparison loop.
+* PEG regression baseline (``tests/data/peg_baseline.json``) re-captured
+  against the exact FFT path. The previous baseline incidentally
+  exercised slognorm — PEG's two units (n=100 and n=150) tripped the
+  default ``approx_freq_ge=100`` threshold. The drift is ~5e-6 on
+  ``est_m`` and ~2e-5 on pricing cells; the new contract is the
+  exact-FFT result.
+
 Portfolio refactor sub-project A — pure deletions + PIR move
 (``portfolio.py`` shrinks from 6,133 → 3,707 LOC):
 

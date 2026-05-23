@@ -16,7 +16,8 @@
       "Bash(rg \"\\\\.\\\\w+\\\\\\(\" \"C:/S/TELOS/Python/PyWork/PMIR/python/pmir_package/src/\" --no-filename -o -t py)",
       "Bash(rg \"\\\\b\\(port|self\\\\.port|port_e|port_d|self\\\\._port\\)\\\\.\\(\\\\w+\\)\" \"C:/S/TELOS/Python/PyWork/PMIR/python/pmir_package/src/\" --no-filename -o -t py)",
       "Bash(rg \"create_from_sample|swap_density_df|add_exa_sample|independent_density_df|independent_audit_df\" \"C:/S/TELOS/Python/PyWork/PMIR/python/pmir_package/src/\" -n --no-filename)",
-      "Bash(rg \"\\\\b\\(port|self\\\\.port|prt|p1|p2\\)\\\\.\\(\\\\w+\\)\" \"C:/S/TELOS/Python/PyWork/PMIR/python/current/045.05-examples-revisited.qmd\" --no-filename -o)"
+      "Bash(rg \"\\\\b\\(port|self\\\\.port|prt|p1|p2\\)\\\\.\\(\\\\w+\\)\" \"C:/S/TELOS/Python/PyWork/PMIR/python/current/045.05-examples-revisited.qmd\" --no-filename -o)",
+      "Bash(UV_LINK_MODE=copy uv run python _peg_smoke.py)"
     ]
   }
 }

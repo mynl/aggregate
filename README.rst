@@ -31,6 +31,24 @@ Version History
 1.0.0a4 (in progress)
 ----------------------
 
+Portfolio refactor sub-project 0 — PEG regression baseline:
+
+* New regression fixture ``tests/peg.py`` exposes ``build_peg`` which
+  constructs the canonical two-unit ``port PEG`` Portfolio (limit-and-
+  attachment severity, three-component lognormal severity mixture per
+  unit, gamma frequency mixing with different mixing CVs per unit).
+* New capture script ``tests/capture_peg_baseline.py`` runs PEG through
+  ``calibrate_distortions(COCs=[.15], Ps=[.995])`` and
+  ``analyze_distortions2(.995)`` for the five-distortion suite
+  (``ccoc``, ``ph``, ``wang``, ``dual``, ``tvar``) and writes the
+  numerical baseline to ``tests/data/peg_baseline.json``.
+* New test module ``tests/test_portfolio_peg_regression.py`` pins
+  portfolio moments (``rtol=1e-10``), per-distortion calibration shapes
+  (``rtol=1e-8``, ``|error| < 1e-5``), and every cell of the
+  ``analyze_distortions2`` exhibit (120 values, ``rtol=1e-8``).
+* Every subsequent Portfolio refactor sub-project (A through E) must
+  reproduce these baseline numbers; the JSON is the contract.
+
 ``Aggregate`` stats consolidation — finish the job: eliminate the
 ``_statistics_df`` / ``_statistics_total_df`` scratch frames so ``stats_df``
 is the only theoretical-moment DataFrame the class holds:

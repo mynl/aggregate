@@ -9,6 +9,7 @@ Move per-distortion-name Newton iterations out of `Portfolio.calibrate_distortio
 ## Pre-conditions
 
 - Sub-projects A, B landed and committed.
+- hash: 6de20f2e57e4ec7b2a5a44a6a2b75aa44202265e
 - 415/415 pytest green.
 
 ## Touches

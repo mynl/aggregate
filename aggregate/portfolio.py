@@ -15,9 +15,7 @@ from pandas.io.formats.format import EngFormatter
 from pandas.plotting import scatter_matrix
 from pathlib import Path
 import re
-import scipy.stats as ss
 from scipy import interpolate
-from scipy.interpolate import interp1d
 from scipy.optimize import bisect
 from scipy.spatial import ConvexHull
 from textwrap import fill
@@ -2066,46 +2064,63 @@ class Portfolio(object):
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
                              S_calc='cumsum'):
         """
-        Find transform to hit a premium target given assets of ``assets``.
-        Fills in the values in ``g_spec`` and returns params and diagnostics...so
-        you can use it either way...more convenient
+        Find a distortion transform to hit a premium target at the given
+        asset level.
 
+        Portfolio.calibrate_distortion has been reduced to (a) resolving
+        the asset level / premium target / S vector / ``ess_sup`` from the
+        Portfolio state and (b) dispatching to the appropriate
+        ``Distortion`` subclass, whose ``calibrate`` method runs the
+        Newton iteration. The per-distortion math (the Newton ``f``
+        closures) now lives on each subclass in :mod:`aggregate.spectral`.
 
-        :param name: name of distortion
-        :param r0:   fixed parameter if applicable
-        :param df:  t-distribution degrees of freedom
-        :param premium_target: target premium
-        :param roe:             or ROE
-        :param assets: asset level
-        :param p:
-        :param kind:
-        :param S_column: column of density_df to use for calibration (allows routine to be used in other contexts; if
-                so used must input a premium_target directly. If assets they are used; else max assets used
-        :return:
+        Parameters
+        ----------
+        name : str
+            Distortion kind (``ph``, ``wang``, ``dual``, ``tvar``,
+            ``ccoc`` / ``roe``, ``ly``, ``clin``, ``lep``, ``cll``).
+        r0 : float, optional
+            Fixed parameter for mass-at-zero kinds.
+        df : list, optional
+            Kind-specific second parameter (kept on the returned
+            distortion for audit; unused by the migrated kinds).
+        premium_target : float, optional
+            Target premium. If 0, derived from ``roe`` and ``assets``.
+        roe : float, optional
+            Used to derive ``premium_target`` when not supplied.
+        assets : float, optional
+            Asset level. If 0, derived from ``p`` via ``self.q``.
+        p : float, optional
+            Probability used to derive ``assets`` via the quantile.
+        kind : str
+            Quantile interpolation kind for ``self.q``.
+        S_column, S_calc : str
+            Which column / method to use to construct ``S``; see existing
+            callers.
+
+        Returns
+        -------
+        Distortion
+            Calibrated distortion with ``shape``, ``error``, ``assets``,
+            and ``premium_target`` set.
         """
-
-        # figure assets
         assert S_calc in ('S', 'cumsum')
 
         if S_column == 'S':
             if assets == 0:
                 assert (p > 0)
                 assets = self.q(p, kind)
-
-            # figure premium target
             el = self.density_df.loc[assets, 'exa_total']
             if premium_target == 0:
                 assert (roe > 0)
-                # expected losses with assets
                 premium_target = (el + roe * assets) / (1 + roe)
         else:
-            # if assets not entered, calibrating to unlimited premium; set assets = max loss and let code trim it
+            # calibrating to unlimited premium; let code trim S at max loss
             if assets == 0:
                 assets = self.density_df.loss.iloc[-1]
             el = self.density_df.loc[assets, 'exa_total']
 
-        # extract S and trim it: we are doing int from zero to assets
-        # integration including ENDpoint is
+        # extract S over [0, assets]; integration is inclusive of endpoint
         if S_calc == 'S':
             Splus = self.density_df.loc[0:assets, S_column].values
         else:
@@ -2114,193 +2129,35 @@ class Portfolio(object):
         last_non_zero = np.argwhere(Splus)
         ess_sup = 0
         if len(last_non_zero) == 0:
-            # no nonzero element
             last_non_zero = len(Splus) + 1
         else:
             last_non_zero = last_non_zero.max()
-        # remember length = max index + 1 because zero based
         if last_non_zero + 1 < len(Splus):
-            # now you have issues...
-            # truncate at first zero; numpy indexing because values
+            # truncate at first zero
             S = Splus[:last_non_zero + 1]
             ess_sup = self.density_df.index[last_non_zero + 1]
             logger.info(
                 'Portfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
                 f'{name} at {last_non_zero}, loss = {ess_sup}')
         else:
-            # this calc sidesteps the Splus created above....
             if S_calc == 'original':
                 S = self.density_df.loc[0:assets - self.bs, S_column].values
             else:
                 S = (1 - self.density_df.loc[0:assets - self.bs, 'p_total'].cumsum()).values
 
-        # now all S values should be greater than zero  and it is decreasing
+        # S must be strictly positive and weakly decreasing
         assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
 
-        if name == 'ph':
-            lS = np.log(S)
-            shape = 0.95  # starting param
-
-            def f(rho):
-                trho = S ** rho
-                ex = np.sum(trho) * self.bs
-                ex_prime = np.sum(trho * lS) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'wang':
-            n = ss.norm()
-            shape = 0.95  # starting param
-
-            def f(lam):
-                temp = n.ppf(S) + lam
-                tlam = n.cdf(temp)
-                ex = np.sum(tlam) * self.bs
-                ex_prime = np.sum(n.pdf(temp)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'ly':
-            # linear yield model; min rol is ro/(1+ro)
-            shape = 1.25  # starting param
-            mass = ess_sup * r0 / (1 + r0)
-
-            def f(rk):
-                num = r0 + S * (1 + rk)
-                den = 1 + r0 + rk * S
-                tlam = num / den
-                ex = np.sum(tlam) * self.bs + mass
-                ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'clin':
-            # capped linear, input rf as min rol
-            shape = 1
-            mass = ess_sup * r0
-
-            def f(r):
-                r0_rS = r0 + r * S
-                ex = np.sum(np.minimum(1, r0_rS)) * self.bs + mass
-                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name in ['roe', 'ccoc']:
-            # constant roe
-            # TODO Note if you input the roe this is easy!
-            shape = 0.25
-            def f(r):
-                v = 1 / (1 + r)
-                d = 1 - v
-                mass = ess_sup * d
-                r0_rS = d + v * S
-                ex = np.sum(np.minimum(1, r0_rS)) * self.bs + mass
-                ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'lep':
-            # layer equivalent pricing
-            # params are d=r0/(1+r0) and delta* = r/(1+r)
-            d = r0 / (1 + r0)
-            shape = 0.25  # starting param
-            # these hard to compute variables do not change with the parameters
-            rSF = np.sqrt(S * (1 - S))
-            mass = ess_sup * d
-
-            def f(r):
-                spread = r / (1 + r) - d
-                temp = d + (1 - d) * S + spread * rSF
-                ex = np.sum(np.minimum(1, temp)) * self.bs + mass
-                ex_prime = (1 + r) ** -2 * np.sum(np.where(temp < 1, rSF, 0)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'tt':
-            # wang-t-t ... issue with df, will set equal to 5.5 per Shaun's paper
-            # finding that is a reasonable level; user can input alternative
-            # TODO bivariate solver for t degrees of freedom?
-            # param is shape like normal
-            t = ss.t(df)
-            shape = 0.95  # starting param
-
-            def f(lam):
-                temp = t.ppf(S) + lam
-                tlam = t.cdf(temp)
-                ex = np.sum(tlam) * self.bs
-                ex_prime = np.sum(t.pdf(temp)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'cll':
-            # capped loglinear
-            shape = 0.95  # starting parameter
-            lS = np.log(S)
-            lS[0] = 0
-            ea = np.exp(r0)
-
-            def f(b):
-                uncapped = ea * S ** b
-                ex = np.sum(np.minimum(1, uncapped)) * self.bs
-                ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'dual':
-            # dual moment
-            # be careful about partial at s=1
-            shape = 2.0  # starting parameter
-            with np.errstate(divide='ignore', invalid='ignore'):
-                lS = -np.log(1 - S)  # prob a bunch of zeros...
-            lS[S == 1] = 0
-
-            def f(rho):
-                temp = (1 - S) ** rho
-                trho = 1 - temp
-                ex = np.sum(trho) * self.bs
-                ex_prime = np.sum(temp * lS) * self.bs
-                return ex - premium_target, ex_prime
-        elif name == 'tvar':
-            # tvar
-            shape = 0.9   # starting parameter
-            def f(rho):
-                temp = np.where(S <= 1-rho, S / (1 - rho), 1)
-                temp2 = np.where(S <= 1-rho, S / (1 - rho)**2, 1)
-                ex = np.sum(temp) * self.bs
-                ex_prime = np.sum(temp2) * self.bs
-                return ex - premium_target, ex_prime
-
-        elif name == 'wtdtvar':
-            # weighted tvar with fixed p parameters
-            shape = 0.5  # starting parameter
-            p0, p1 = df
-            s = np.array([0., 1-p1, 1-p0, 1.])
-
-            def f(w):
-                pt = (1 - p1) / (1 - p0) * (1 - w) + w
-                gs = np.array([0.,  pt,   1., 1.])
-                g = interp1d(s, gs, kind='linear')
-                trho = g(S)
-                ex = np.sum(trho) * self.bs
-                ex_prime = (np.sum(np.minimum(S / (1 - p1), 1) - np.minimum(S / (1 - p0), 1))) * self.bs
-                return ex - premium_target, ex_prime
-        else:
-            raise ValueError(f'calibrate_distortion not implemented for {name}')
-
-        # numerical solve except for tvar, and roe when premium is known
-        if name in ('roe', 'ccoc'):
-            assert el and premium_target
-            r = (premium_target - el) / (assets - premium_target)
-            shape = r
-            r0 = 0
-            fx = 0
-        else:
-            i = 0
-            fx, fxp = f(shape)
-            # print(premium_target)
-            # print('dist    iter       error            shape          deriv')
-            max_iter = 200 if name == 'tvar' else 50
-            while abs(fx) > 1e-5 and i < max_iter:
-                # print(f'{name}\t{i: 3d}\t{fx: 8.3f}\t{shape:8.3f}\t{fxp:8.3f}')
-                shape = shape - fx / fxp
-                fx, fxp = f(shape)
-                i += 1
-            # print(f'{name}\t{i: 3d}\t{fx+premium_target: 8.3f}\t{shape:8.3f}\t{fxp:8.3f}\n\n')
-            if abs(fx) > 1e-5:
-                logger.warning(
-                    f'Portfolio.calibrate_distortion | Questionable convergence for {name} distortion, target '
-                    f'{premium_target} error {fx} after {i} iterations')
-
-        # build answer
-        dist = Distortion(name=name, shape=shape, r0=r0, df=df)
-        dist.error = fx
-        dist.assets = assets
-        dist.premium_target = premium_target
+        # dispatch to the subclass that owns this kind's calibration
+        lookup = 'ccoc' if name == 'roe' else name
+        subclass = Distortion._registry.get(lookup)
+        if subclass is None or subclass._calibration_init_shape is None:
+            raise ValueError(
+                f'calibrate_distortion not implemented for {name}')
+        dist = Distortion(name=name, shape=subclass._calibration_init_shape,
+                          r0=r0, df=df)
+        dist.calibrate(S=S, bs=self.bs, premium_target=premium_target,
+                       ess_sup=ess_sup, assets=assets, el=el)
         return dist
 
     def calibrate_distortions2(self, coc, reg_p):

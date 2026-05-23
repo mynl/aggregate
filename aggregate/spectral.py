@@ -1028,6 +1028,93 @@ class Distortion:
         return pd.DataFrame({'p': dS, 'q': dgS, 'S': S, 'gS': gS},
                             index=S.index)
 
+    # ------------------------------------------------------------------
+    # Calibration
+    # ------------------------------------------------------------------
+
+    # Starting shape used by ``Portfolio.calibrate_distortion`` to
+    # construct the uncalibrated distortion before ``calibrate`` is
+    # called. Each pricing subclass overrides; ``None`` means the kind
+    # is not calibratable through the Portfolio dispatch.
+    _calibration_init_shape = None
+
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """
+        Calibrate the shape parameter so the distorted integral matches
+        ``premium_target`` on the supplied survival vector ``S``.
+
+        The pricing-distortion subclasses (``ph``, ``wang``, ``dual``,
+        ``tvar``, ``ccoc``, ``ly``, ``clin``, ``lep``, ``cll``) implement
+        this; the base raises ``NotImplementedError``. After convergence
+        the method mutates ``self.shape`` (and audit fields ``error``,
+        ``premium_target``, ``assets``) and re-runs ``_build`` so any
+        cached state derived from ``shape`` is refreshed.
+
+        Parameters
+        ----------
+        S : ndarray
+            Survival function evaluated on the bs-grid up to the asset
+            limit; must be strictly positive and weakly decreasing.
+        bs : float
+            Bucket size of the discretisation; the integration step.
+        premium_target : float
+            Premium that the distorted integral ``∫ g(S) dx`` must hit.
+        ess_sup : float, optional
+            Essential supremum (used by mass-at-zero kinds: ``ly``,
+            ``clin``, ``lep``).
+        assets : float, optional
+            Asset level; recorded on the returned distortion for audit
+            and used by the closed-form ``ccoc`` calibration.
+        el : float, optional
+            Expected loss at ``assets``; required by ``ccoc``.
+
+        Returns
+        -------
+        Distortion
+            ``self``, mutated in place.
+        """
+        raise NotImplementedError(
+            f'calibrate not implemented for {type(self).__name__}')
+
+    def _newton_iterate(self, f, shape, *, max_iter=50, tol=1e-5):
+        """
+        Run a Newton iteration on ``f(x) → (residual, derivative)``.
+
+        Returns ``(converged_shape, residual)``. Callers warn on
+        non-convergence via :meth:`_finalize_calibration`.
+
+        Notes
+        -----
+        Faithful port of the inline Newton loop that lived in
+        ``Portfolio.calibrate_distortion``: initial residual is computed
+        before the loop, so a starting shape already within ``tol`` skips
+        iteration entirely. Step is ``shape -= fx / fxp``; no damping,
+        no line search.
+        """
+        fx, fxp = f(shape)
+        i = 0
+        while abs(fx) > tol and i < max_iter:
+            shape = shape - fx / fxp
+            fx, fxp = f(shape)
+            i += 1
+        return shape, fx
+
+    def _finalize_calibration(self, shape, fx, premium_target, assets,
+                              *, tol=1e-5):
+        """Write the calibrated shape and audit fields, log on
+        non-convergence, and re-run ``_build`` so cached state matches.
+        """
+        self.shape = shape
+        self.error = fx
+        self.premium_target = premium_target
+        self.assets = assets
+        if abs(fx) > tol:
+            logger.warning(
+                f'{type(self).__name__} calibration: questionable '
+                f'convergence, target {premium_target} error {fx}')
+        self._build()
+
 
 # ===========================================================================
 # Concrete distortion kinds. Order of declaration is the order that
@@ -1048,6 +1135,7 @@ class CCoCDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 0.25
 
     def _build(self):
         r = self.shape
@@ -1072,6 +1160,20 @@ class CCoCDistortion(Distortion):
     def g_prime(self, x):
         return self._v
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """
+        Closed-form calibration: ``r = (premium - el) / (assets - premium)``.
+
+        No iteration; ``r0`` is forced to zero on the returned distortion.
+        """
+        assert el is not None and premium_target, \
+            'CCoC calibration requires el and a non-zero premium_target'
+        r = (premium_target - el) / (assets - premium_target)
+        self.r0 = 0.0
+        self._finalize_calibration(r, 0.0, premium_target, assets)
+        return self
+
 
 class PHDistortion(Distortion):
     """Proportional-hazard distortion: :math:`g(x) = x^\\rho`."""
@@ -1081,6 +1183,7 @@ class PHDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 0.95
 
     def _build(self):
         self.standard_shape = (1 - self.shape) / (1 + self.shape)
@@ -1095,6 +1198,21 @@ class PHDistortion(Distortion):
         rho = self.shape
         return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on ``∫ S^ρ dx = premium_target``."""
+        lS = np.log(S)
+
+        def f(rho):
+            trho = S ** rho
+            ex = np.sum(trho) * bs
+            ex_prime = np.sum(trho * lS) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class WangDistortion(Distortion):
     """Wang distortion: :math:`g(x) = \\Phi(\\Phi^{-1}(x) + \\lambda)`."""
@@ -1104,6 +1222,7 @@ class WangDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 0.95
 
     def _build(self):
         n = ss.norm()
@@ -1122,6 +1241,22 @@ class WangDistortion(Distortion):
         n = self._norm
         return n.pdf(n.ppf(x) + self.shape) / n.pdf(n.ppf(x))
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on ``∫ Φ(Φ⁻¹(S) + λ) dx = premium_target``."""
+        n = ss.norm()
+
+        def f(lam):
+            temp = n.ppf(S) + lam
+            tlam = n.cdf(temp)
+            ex = np.sum(tlam) * bs
+            ex_prime = np.sum(n.pdf(temp)) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class DualDistortion(Distortion):
     """Dual-moment distortion: :math:`g(x) = 1 - (1-x)^p`."""
@@ -1131,6 +1266,7 @@ class DualDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 2.0
 
     def _build(self):
         self.standard_shape = (self.shape - 1) / (self.shape + 1)
@@ -1145,6 +1281,31 @@ class DualDistortion(Distortion):
         p = self.shape
         return p * (1 - x) ** (p - 1)
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on ``∫ (1 - (1-S)^ρ) dx = premium_target``.
+
+        Notes
+        -----
+        ``log(1 - S)`` is masked to 0 wherever ``S == 1`` to avoid the
+        log-singularity contaminating the derivative; on that region
+        ``(1 - S)^ρ = 0`` so the derivative contribution is zero anyway.
+        """
+        with np.errstate(divide='ignore', invalid='ignore'):
+            lS = -np.log(1 - S)
+        lS[S == 1] = 0
+
+        def f(rho):
+            temp = (1 - S) ** rho
+            trho = 1 - temp
+            ex = np.sum(trho) * bs
+            ex_prime = np.sum(temp * lS) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class TVaRDistortion(Distortion):
     """
@@ -1158,6 +1319,7 @@ class TVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 0.9
 
     def _build(self):
         p = self.shape
@@ -1198,6 +1360,27 @@ class TVaRDistortion(Distortion):
             return tvar_ra(den.values, np.array(den.index), p)
         assert x is not None
         return tvar_ra(den, x, p)
+
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """
+        Newton on ``∫ min(S/(1-ρ), 1) dx = premium_target``.
+
+        TVaR uses ``max_iter=200`` instead of the default 50 — the loop
+        often takes longer to find a clean ρ near 1 when the premium
+        target sits in the deep tail.
+        """
+        def f(rho):
+            temp = np.where(S <= 1 - rho, S / (1 - rho), 1)
+            temp2 = np.where(S <= 1 - rho, S / (1 - rho) ** 2, 1)
+            ex = np.sum(temp) * bs
+            ex_prime = np.sum(temp2) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(
+            f, self._calibration_init_shape, max_iter=200)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
 
 
 class BiTVaRDistortion(Distortion):
@@ -1643,6 +1826,7 @@ class CLLDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    _calibration_init_shape = 0.95
 
     def _build(self):
         self._ea = np.exp(self.r0)
@@ -1657,6 +1841,28 @@ class CLLDistortion(Distortion):
         ea = self._ea
         return np.where(x < 1, np.minimum(1, (x / ea) ** (1 / b)), 1)
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on ``∫ min(1, e^{r0} S^b) dx = premium_target``.
+
+        ``log S`` is forced to 0 in the first cell because ``S[0]`` is
+        often 1 (numerically), and the resulting log(1)=0 step pollutes
+        the derivative with a NaN if ``S[0]`` happens to be exactly 1.
+        """
+        lS = np.log(S)
+        lS[0] = 0
+        ea = np.exp(self.r0)
+
+        def f(b):
+            uncapped = ea * S ** b
+            ex = np.sum(np.minimum(1, uncapped)) * bs
+            ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class CLinDistortion(Distortion):
     """Capped linear distortion: needs shape >= 1 - r0."""
@@ -1667,6 +1873,7 @@ class CLinDistortion(Distortion):
     pricing_ok = True
     strict_pricing = True
     has_mass_default = True
+    _calibration_init_shape = 1.0
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -1680,6 +1887,25 @@ class CLinDistortion(Distortion):
         sl = self.shape
         return np.where(x <= self.r0, 0, (x - self.r0) / sl)
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on ``∫ min(1, r0 + r·S) dx + ess_sup·r0 = premium_target``.
+
+        The ``ess_sup * r0`` term accounts for the point mass at zero;
+        ``r0`` is the minimum rate-on-line.
+        """
+        mass = ess_sup * self.r0
+
+        def f(r):
+            r0_rS = self.r0 + r * S
+            ex = np.sum(np.minimum(1, r0_rS)) * bs + mass
+            ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class LEPDistortion(Distortion):
     """Leverage-equivalent pricing distortion."""
@@ -1690,6 +1916,7 @@ class LEPDistortion(Distortion):
     pricing_ok = True
     strict_pricing = True
     has_mass_default = True
+    _calibration_init_shape = 0.25
 
     def _build(self):
         r = self.shape
@@ -1719,6 +1946,29 @@ class LEPDistortion(Distortion):
         u = (mb - rad) / (2 * a)
         return np.where(y < d, 0, np.maximum(0, u))
 
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on the layer-equivalent-pricing distortion.
+
+        Parameterised by ``d = r0/(1+r0)`` (mass) and ``δ* = r/(1+r)``;
+        ``√(S(1-S))`` is precomputed since it does not depend on ``r``.
+        """
+        d = self.r0 / (1 + self.r0)
+        rSF = np.sqrt(S * (1 - S))
+        mass = ess_sup * d
+
+        def f(r):
+            spread = r / (1 + r) - d
+            temp = d + (1 - d) * S + spread * rSF
+            ex = np.sum(np.minimum(1, temp)) * bs + mass
+            ex_prime = (1 + r) ** -2 * \
+                np.sum(np.where(temp < 1, rSF, 0)) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
+
 
 class LYDistortion(Distortion):
     """Linear yield distortion: ``r_0`` = occupancy, shape = consumption."""
@@ -1729,6 +1979,7 @@ class LYDistortion(Distortion):
     pricing_ok = True
     strict_pricing = True
     has_mass_default = True
+    _calibration_init_shape = 1.25
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -1744,6 +1995,27 @@ class LYDistortion(Distortion):
         rk = self.shape
         return np.maximum(0,
                           (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
+
+    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        """Newton on the linear-yield distortion.
+
+        Minimum rate-on-line is ``r0/(1+r0)``; the mass at zero is
+        ``ess_sup·r0/(1+r0)``.
+        """
+        mass = ess_sup * self.r0 / (1 + self.r0)
+
+        def f(rk):
+            num = self.r0 + S * (1 + rk)
+            den = 1 + self.r0 + rk * S
+            tlam = num / den
+            ex = np.sum(tlam) * bs + mass
+            ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * bs
+            return ex - premium_target, ex_prime
+
+        shape, fx = self._newton_iterate(f, self._calibration_init_shape)
+        self._finalize_calibration(shape, fx, premium_target, assets)
+        return self
 
 
 

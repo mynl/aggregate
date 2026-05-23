@@ -28,8 +28,49 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a5 (in progress)
+1.0.0a6 (in progress)
 ----------------------
+
+Portfolio refactor sub-project C — distortion calibration moves to the
+``Distortion`` subclasses themselves:
+
+* ``Portfolio.calibrate_distortion`` was ~240 LOC of per-name Newton
+  iterations in a giant ``if name == 'ph': ... elif name == 'wang': ...``
+  switch. Each branch defined a local ``f(shape) → (residual, derivative)``
+  closure and ran a hand-rolled Newton loop. That code now lives on the
+  ``Distortion`` subclasses — each pricing-distortion class owns its own
+  ``calibrate(S, bs, premium_target, *, ess_sup, assets, el, **kwargs)``
+  method: ``PHDistortion``, ``WangDistortion``, ``DualDistortion``,
+  ``TVaRDistortion`` (``max_iter=200``), ``CCoCDistortion`` (closed-form,
+  no iteration), ``LYDistortion``, ``CLinDistortion``, ``LEPDistortion``,
+  ``CLLDistortion``.
+* ``Portfolio.calibrate_distortion`` shrinks to ~100 LOC — about half
+  asset/S resolution (unchanged), about half dispatch to the subclass via
+  ``Distortion._registry``. The ``tt`` (Wang-t) branch is gone — there is
+  no ``TtDistortion`` subclass to host it and the branch was dead code.
+  ``wtdtvar`` calibration is also dropped from the dispatcher (the
+  parametrisation overload between calibration form ``(w, [p0, p1])`` and
+  the standard form ``(ps, wts)`` was already broken in the constructor;
+  pick a pricing distortion that calibrates cleanly instead).
+* New ``Distortion`` base-class methods ``_newton_iterate(f, shape, *,
+  max_iter, tol)`` and ``_finalize_calibration(shape, fx, prem, assets)``
+  factor the Newton loop and the post-iteration bookkeeping (write
+  ``shape`` / ``error`` / ``premium_target`` / ``assets``, log on
+  non-convergence, re-run ``_build`` to refresh cached state) out of the
+  per-subclass methods.
+* Class attribute ``Distortion._calibration_init_shape`` is the
+  per-kind starting shape used both to construct the uncalibrated
+  distortion and as the Newton iteration's starting point. ``None`` on
+  the base means "not calibratable through the Portfolio dispatch."
+* Each subclass is now testable in isolation. New
+  ``tests/test_distortion_calibrate.py`` (12 cases) exercises every
+  migrated kind directly on a synthetic ``S`` vector and asserts the
+  achieved premium matches the target.
+* PEG regression baseline unchanged — the new subclass-based Newton
+  iteration reproduces bit-identical Newton convergence.
+
+1.0.0a5
+-------
 
 Portfolio refactor sub-project B — drop approximation and tilting paths
 from ``Portfolio.update`` and ``Aggregate.update_work``:

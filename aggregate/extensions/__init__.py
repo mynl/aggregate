@@ -13,6 +13,7 @@ from . samples import *
 from . test_suite import *
 from . pir_figures import *
 from . figures import *
+from . portfolio_pir import *
 from . risk_progression import *
 from . bodoff import *
 from . ft import *

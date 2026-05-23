@@ -34,10 +34,13 @@ def bodoff_exhibit(self, reg_p):
     # naive tvar view
     basic.loc['naive coTVaR'] = (self.density_df.loc[a - self.bs, [f'exgta_{i}' for i in self.line_names_ex]] / self.density_df.at[a - self.bs, 'exgta_total']).values * a
 
-    # proper co-tvar with calibration
+    # proper co-tvar with calibration; cotvar was inlined when the helper
+    # method on Portfolio was deleted in the refactor (returns the
+    # tail-conditional expectations at the p-quantile asset level).
     pt = self.tvar_threshold(reg_p, 'lower')
-    # not the generic answer...
-    basic.loc['coTVaR'] = self.cotvar(pt)  # list(self.var_dict(pt, 'tvar').values())
+    av = self.q(pt)
+    basic.loc['coTVaR'] = self.density_df.loc[
+        av, [f'exgta_{l}' for l in self.line_names_ex]].values
 
     bit = self.density_df[[f'exi_xgta_{i}' for i in self.line_names]].shift(1).cumsum() * self.bs
     bit['total'] = bit.sum(1)

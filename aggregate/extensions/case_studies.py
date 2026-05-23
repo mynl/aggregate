@@ -6,6 +6,9 @@
 
 import aggregate as agg
 from aggregate import Aggregate, round_bucket, make_mosaic_figure, FigureManager, Bounds, plot_max_min
+from aggregate.extensions.portfolio_pir import (
+    calibrate_blends, stand_alone_pricing, twelve_plot,
+)
 import argparse
 from collections import OrderedDict
 from datetime import datetime
@@ -408,7 +411,7 @@ class CaseStudy(object):
         self.make_cap_table()
         prem = self.pricings['gross'].at['P', 'total']
         a = self.pricings['gross'].at['a', 'total']
-        self.blend_distortions = self.gross.calibrate_blends(a, prem, s_values, gs_values, debug=False)
+        self.blend_distortions = calibrate_blends(self.gross, a, prem, s_values, gs_values, debug=False)
 
         self.roe_d = self.approx_roe(e=1e-10)
         self.dist_dict = OrderedDict(ccoc=self.roe_d, **self.blend_distortions)
@@ -1168,7 +1171,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             f, axs = self.smfig(4, 3, (10.8, 12.0))
             # ad comps does not create augmented
             port.apply_distortion(port.dists['dual'], efficient=False)
-            port.twelve_plot(f, axs, xmax=xlim[1], ymax2=xlim[1],
+            twelve_plot(port, f, axs, xmax=xlim[1], ymax2=xlim[1],
                         contour_scale=port.q(self.reg_p), sort_order=sort_order, cmap=self.colormap)
             axs[0][0].set(ylim=ylim, xlim=xlim)
             axs[0][1].set(xlim=xlim)
@@ -1973,7 +1976,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         bitsgross = []
         for port in self.ports.values():
             # unlike
-            bitgross = port.stand_alone_pricing(self.roe_d, p=self.reg_p, kind='var')
+            bitgross = stand_alone_pricing(port, self.roe_d, p=self.reg_p, kind='var')
             bitgross = bitgross.swaplevel(0, 1).sort_index(ascending=[1, 0]).rename(
                 index={'traditional - no default': 'no default', f'sa {self.roe_d}': 'constant roe'})
             # if len(bitsgross) == 0:
@@ -2008,7 +2011,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         distortions = [self.ports['gross'].dists[dn] for dn in ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']]
         bit_apply_gross = []
         for port in self.ports.values():
-            temp = port.stand_alone_pricing(distortions, p=self.reg_p, kind='var')
+            temp = stand_alone_pricing(port, distortions, p=self.reg_p, kind='var')
             temp = temp.swaplevel(0, 1).sort_index(ascending=[1, 0])
             bit_apply_gross.append(temp.filter(regex='sa', axis=0).rename(index=distortion_namer))
         bit = pd.concat([bg.loc[['L', 'M', 'P', 'LR', 'Q', 'ROE', 'PQ', 'a']]

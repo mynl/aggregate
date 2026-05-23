@@ -28,8 +28,43 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a4 (in progress)
+1.0.0a5 (in progress)
 ----------------------
+
+Portfolio refactor sub-project A — pure deletions + PIR move
+(``portfolio.py`` shrinks from 6,133 → 3,707 LOC):
+
+* Deleted ~700 LOC of dead code from ``Portfolio``: ``gradient`` (~196 LOC),
+  non-spectral allocations (``merton_perold``, ``cotvar``,
+  ``equal_risk_var_tvar``, ``equal_risk_epd``), the EPD / priority /
+  collateral family (``analysis_priority``, ``analysis_collateral``,
+  ``priority_capital_df``, ``epd_2_assets``, ``assets_2_epd`` properties
+  plus their backing attrs), the ``uat`` / ``uat_differential`` /
+  ``uat_interpolation_functions`` trio, ``collapse``, ``audits``,
+  ``stat_renamer``, and the ``var_dict(kind='epd')`` branch.
+* Stripped ``analyze_distortion_add_comps`` and
+  ``analyze_distortion_plots`` (~470 LOC) — both consumed the deleted
+  allocation methods. ``analyze_distortion`` keeps ``add_comps`` and
+  ``plot`` parameters as no-op defaults (``add_comps=False`` now).
+* Moved ~1,800 LOC of PIR-exhibit machinery to the new
+  ``aggregate.extensions.portfolio_pir`` module as free functions taking
+  a ``Portfolio`` as the first argument: ``premium_capital``,
+  ``multi_premium_capital``, ``accounting_economic_balance_sheet``,
+  ``make_all``, ``show_enhanced_exhibits``, ``set_a_p``,
+  ``profit_segment_plot``, ``natural_profit_segment_plot``,
+  ``density_sample``, ``biv_contour_plot``, ``twelve_plot``,
+  ``short_renamer``, ``gamma``, ``stand_alone_pricing``,
+  ``stand_alone_pricing_work``, ``calibrate_blends`` (with helpers
+  ``check01`` / ``make_array`` / ``convex_points``), the bulk
+  constructors ``from_DataFrame`` / ``from_Excel`` /
+  ``from_dict_of_aggs``, and the big ``renamer`` plus
+  ``premium_capital_renamer``.
+* ``aggregate.extensions.case_studies`` updated to call the moved
+  functions as free functions; ``aggregate.extensions.bodoff`` inlines
+  the deleted ``cotvar`` lookup.
+
+1.0.0a4
+--------
 
 Portfolio refactor sub-project 0 — PEG regression baseline:
 

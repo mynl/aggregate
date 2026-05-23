@@ -152,4 +152,57 @@ Per CLAUDE.md: `UV_LINK_MODE=copy` is required for `uv` on this path.
 
 ## Working notes / parking lot
 
-For decisions made mid-stage that affect later stages. Empty at start.
+For decisions made mid-stage that affect later stages.
+
+### Deferred — second numerical sweep on `distributions.py`
+
+After Stage 1c / 1c+ / 1c++ landed (surface rationalised, ``stats_df`` is
+the single source of truth, scratch frames gone, all 415 tests green
+through ``1.0.0a4``), a second pass is wanted that focuses on the
+**numerical methods themselves**, not the surface:
+
+* **``Severity.moms()`` (severity moments via numerical integration).** ~290
+  LOC of ``scipy.integrate.quad`` calls with nested ``safe_integrate``
+  fallbacks, heuristics for thick tails, and conditional moment
+  adjustments for layer/attachment. Likely improvable — alternative
+  formulations (analytic where possible, better integration substitutions
+  for heavy-tailed sevs, asymptotic expansions) should be considered.
+  Currently isolated behind ``Severity.moms()`` so a rewrite can land
+  without disturbing the layer/attachment decorator wrapper or the rest
+  of the class.
+* **``Aggregate.__init__`` mixture inner block.** A general look at the
+  numerical methods inside the broadcast loop — the ground-up severity
+  re-weighting for excess attachment (the ``actual_sevs`` /
+  ``sev_wt0`` / ``moms`` path in Arm B at distributions.py:1626+),
+  the zero-component substitution when a mixture component has no losses
+  in a layer, and the per-component moment / claim-count derivation
+  logic. Worth a careful read for accuracy on heavy-tailed mixtures and
+  for cases where mixture components have very different magnitudes.
+
+This is a **numerical correctness/accuracy** sweep, not surface
+refactoring — separate from the broader Stage 2 (portfolio.py) work and
+should happen after that lands (or as a parallel side task).
+
+### Other items flagged across Stage 1, still open
+
+* **``Cc.Freq20`` ZT-Poisson ``brentq`` NaN crash** in the visual
+  ``test_suite``. Pre-existing; surfaces at zero-modified frequency
+  calibration.
+* **``Severity`` meta/copy super-init crash** for ``Severity(aggregate_obj, ...)``
+  paths. Flagged during Stage 1d.
+* **Multi-segment splice grammar tightening** — ``decl.lark`` allows
+  ``splice [a b] [c d]`` syntactically; runtime ``ValueError`` in
+  ``_scalar_bound`` catches it, but the grammar should reject at parse
+  time.
+* **``panjer_ab`` / ``unmodified_mean`` cleanup** — flagged in the
+  original Stage 1 plan as "end-of-Stage-1 review"; never reviewed.
+* **Physical method reordering** inside the ``Aggregate`` class to match
+  the L0–L8 layer scheme — Stage 1c E1 landed section divider comments
+  only; physical movement of methods was deemed too risky for the same
+  commit. Available as a clean code-motion-only follow-up pass.
+
+### Side task
+
+* ``frequency_examples`` → Quarto migration. ~320-LOC educational blob in
+  ``utilities.py`` with no callers. Migrate to an executable Quarto page;
+  add zero-truncated distribution options at the same time.

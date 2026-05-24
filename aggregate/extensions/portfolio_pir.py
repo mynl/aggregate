@@ -47,7 +47,8 @@ from IPython.display import HTML, display
 
 from ..constants import WL
 from ..spectral import Distortion
-from ..utilities import Answer, subsets
+from ..results import GammaResult
+from ..utilities import subsets
 
 
 logger = logging.getLogger(__name__)
@@ -692,7 +693,7 @@ def gamma(port, a=None, p=None, kind='lower', compute_stand_alone=False,
     γ_{a,i}(x) = E[ E[X_i | X] / X · (X ∧ a) / X · 1_{X>x} ]
                  / E[ E[X_i | X] / X · 1_{X>x} ].
 
-    Returns an :class:`Answer` carrying the augmented density frame. If
+    Returns a :class:`GammaResult` carrying the augmented density frame. If
     ``axs`` is provided, also draws diagnostic plots.
     """
     if a is None:
@@ -815,8 +816,8 @@ def gamma(port, a=None, p=None, kind='lower', compute_stand_alone=False,
         except StopIteration:
             pass
     temp.drop(columns=['BEST', 'WORST'])
-    return Answer(gamma_df=temp.sort_index(axis=1), base=port.name,
-                  assets=a, p=p, kind=kind)
+    return GammaResult(gamma_df=temp.sort_index(axis=1), base=port.name,
+                       assets=a, p=p, kind=kind)
 
 
 # ---------------------------------------------------------------------------
@@ -1060,7 +1061,7 @@ def from_dict_of_aggs(prefix, agg_dict, sub_ports=None, uw=None,
     program text. Sub-portfolios are named ``f'{prefix}_{concat keys}'``.
     """
     agg_names = list(agg_dict.keys())
-    ports = Answer()
+    ports: dict = {}
     if sub_ports == 'all':
         sub_ports = subsets(agg_names)
 

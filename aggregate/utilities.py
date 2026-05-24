@@ -1694,62 +1694,6 @@ def frequency_examples(n, ν, f, κ, sichel_case, log2, xmax=500):
     return df, ans
 
 
-class Answer(dict):
-    # TODO replace with collections.namedtuple? Or at least, stop using it!
-    # Maybe not, namedtuples are immutable
-    def __init__(self, **kwargs):
-        """
-        Generic answer wrapping class with plotting
-
-        :param kwargs: key=value to wrap
-        """
-        super().__init__(kwargs)
-
-    def __getattr__(self, item):
-        return self[item]
-
-    def __repr__(self):
-        return str(self.list())
-
-    def __str__(self):
-        return self.list()
-
-    def list(self):
-        """ List elements """
-        return pd.DataFrame(zip(self.keys(),
-                                [self.nice(v) for v in self.values()]),
-                            columns=['Item', 'Type']).set_index('Item')
-
-    _repr_html_ = list
-
-    def __str__(self):
-        return '\n'.join([f'{i[0]:<20s}\t{i[1]}'
-                          for i in zip(self.keys(), [self.nice(v) for v in self.values()])
-                          ])
-    @staticmethod
-    def nice(x):
-        """ return a nice rep of x """
-        if type(x) in [str, float, int]:
-            return x
-        else:
-            return type(x)
-
-    def summary(self):
-        """
-        just print out the dataframes: horz or vertical as appropriate
-        reasonable styling
-        :return:
-        """
-
-        for k, v in self.items():
-            if isinstance(v, pd.core.frame.DataFrame):
-                print(f'\n{k}\n{"=" * len(k)}\n')
-                if v.shape[1] > 12:
-                    display(v.head(5).T)
-                else:
-                    display(v.head(10))
-
-
 # Logger configuration is controlled by the user of the package, not the package itself.
 
 

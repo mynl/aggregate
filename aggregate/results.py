@@ -2,11 +2,15 @@
 
 Replaces the legacy ``Answer`` dict (a glorified ``dict`` with attribute
 access). Each public ``Portfolio`` method that previously returned an
-``Answer`` returns a frozen dataclass declared here.
+``Answer`` or an inline ``namedtuple`` returns a dataclass declared here.
 
-D.2 introduces ``AnalyzeDistortionResult`` and ``AnalyzeDistortionsResult``
-to back the rewritten ``analyze_distortion(s)`` methods. D.3 extends with
-``PricingResult`` and ``PricingBoundsResult``, completing the sweep.
+Currently defined:
+
+- ``AnalyzeDistortionResult`` — single-distortion pricing readout.
+- ``AnalyzeDistortionsResult`` — multi-distortion exhibit.
+- ``PricingResult`` — :meth:`Portfolio.price`.
+- ``PricingBoundsResult`` — :meth:`Portfolio.pricing_bounds`.
+- ``GammaResult`` — gamma sweep in ``extensions.portfolio_pir``.
 """
 from __future__ import annotations
 
@@ -16,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 if TYPE_CHECKING:
+    from .bounds import Bounds
     from .spectral import Distortion
 
 
@@ -62,3 +67,88 @@ class AnalyzeDistortionsResult:
     distortions: dict[str, 'Distortion']
     pricing_df: pd.DataFrame
     augmented_dfs: dict[str, pd.DataFrame] = field(default_factory=dict)
+
+
+@dataclass
+class PricingResult:
+    """Return type for :meth:`Portfolio.price`.
+
+    Attributes
+    ----------
+    df : pandas.DataFrame
+        Per-(distortion, line) pricing readout. MultiIndex
+        ``(distortion, unit)`` on rows; columns include ``L``, ``P``,
+        ``M``, ``Q``, ``a``, ``LR``, ``PQ``, ``COC``.
+    price : float
+        Total premium for the last distortion applied (back-compat with
+        the legacy single-distortion case).
+    price_dict : dict[str, float]
+        Premium keyed by distortion name.
+    a_reg : float
+        Regulatory asset level used in the calculation.
+    reg_p : float
+        Corresponding probability ``self.cdf(a_reg)``.
+    """
+
+    df: pd.DataFrame
+    price: float
+    price_dict: dict[str, float]
+    a_reg: float
+    reg_p: float
+
+
+@dataclass
+class PricingBoundsResult:
+    """Return type for :meth:`Portfolio.pricing_bounds`.
+
+    Attributes
+    ----------
+    bounds : Bounds
+        The underlying ``Bounds`` object (with ``cloud_df`` / ``weight_df``
+        attached) used to compute the natural allocation cloud.
+    allocs : pandas.DataFrame
+        Natural allocations across the bound cloud (fast path).
+    stats : pandas.DataFrame
+        Summary statistics of the natural allocations across the cloud.
+    comp : pandas.DataFrame or None
+        Per-line min/mean/max comparison of slow-path natural allocations
+        with the fast-path allocations. ``None`` if the slow path was not
+        run.
+    allocs_slow : pandas.DataFrame or None
+        Per-(pl, pu) bi-TVaR allocations from the slow path. ``None`` if
+        the slow path was not run.
+    p_star : float
+        Calibrating ``p*`` for the bi-TVaR family at the input premium.
+    """
+
+    bounds: 'Bounds'
+    allocs: pd.DataFrame
+    stats: pd.DataFrame
+    comp: pd.DataFrame | None
+    allocs_slow: pd.DataFrame | None
+    p_star: float
+
+
+@dataclass
+class GammaResult:
+    """Return type for ``extensions.portfolio_pir.gamma_test`` and friends.
+
+    Attributes
+    ----------
+    gamma_df : pandas.DataFrame
+        The gamma-function sweep table.
+    base : str
+        Name of the base Portfolio analysed.
+    assets : float
+        Asset level (in monetary units) at which the sweep was evaluated.
+    p : float
+        Probability associated with ``assets`` (``self.cdf(assets)``).
+    kind : str
+        VaR ``kind`` used to derive ``assets`` when input as a probability.
+    """
+
+    gamma_df: pd.DataFrame
+    base: str
+    assets: float
+    p: float
+    kind: str

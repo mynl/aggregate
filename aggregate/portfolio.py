@@ -1,4 +1,3 @@
-from collections import namedtuple
 from collections.abc import Iterable
 from copy import deepcopy
 import json
@@ -24,11 +23,12 @@ from IPython.display import HTML, display
 
 from .constants import *
 from .distributions import Aggregate, Severity
-from .results import AnalyzeDistortionResult, AnalyzeDistortionsResult
+from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
+                      PricingBoundsResult, PricingResult)
 from .spectral import Distortion
 from .utilities import (ft, ift, html_title,
                         suptitle_and_tight, pprint_ex,
-                        MomentAggregator, Answer, subsets, round_bucket,
+                        MomentAggregator, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
                         make_var_tvar, agg_help, explain_validation,
                         make_comonotonic_allocations as make_comonotonic_allocations_work)
@@ -578,9 +578,10 @@ class Portfolio(object):
         else:
             comp = allocs_slow = None
         # assemble answer
-        ans = namedtuple('pricing_bounds', 'bounds allocs stats comp allocs_slow p_star')
         p_star = bounds.p_star('total', premium, a, kind=kind)
-        return ans(bounds, allocs, stats, comp, allocs_slow, p_star)
+        return PricingBoundsResult(
+            bounds=bounds, allocs=allocs, stats=stats, comp=comp,
+            allocs_slow=allocs_slow, p_star=p_star)
 
     @property
     def distortion(self):
@@ -2769,13 +2770,13 @@ class Portfolio(object):
         :param allocation: 'lifted' (default for legacy reasons) or 'linear': treatment in default scenarios. See PIR.
         :param view: bid or ask
         :param efficient: for apply_distortion, lifted only.
-        :return: PricingResult namedtuple with 'price', 'assets', 'reg_p', 'distortion', 'df'
+        :return: :class:`PricingResult` dataclass with fields ``df``, ``price``,
+            ``price_dict``, ``a_reg``, ``reg_p``.
         """
 
         # warnings.warn('In 0.13.0 the default allocation will become linear not lifted.', DeprecationWarning)
 
         assert allocation in ('lifted', 'linear'), "allocation must be 'lifted' or 'linear'"
-        PricingResult = namedtuple('PricingResult', ['df', 'price', 'price_dict', 'a_reg', 'reg_p'])
 
         if isinstance(distortion, Distortion):
             distortion = {str(distortion): distortion}

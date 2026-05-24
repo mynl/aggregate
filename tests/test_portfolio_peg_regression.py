@@ -1,7 +1,7 @@
 """PEG Portfolio regression test.
 
 Locks the numerical output of ``calibrate_distortions`` and
-``analyze_distortions2`` on the two-unit PEG Portfolio against the captured
+``analyze_distortions`` on the two-unit PEG Portfolio against the captured
 baseline in ``tests/data/peg_baseline.json``. Every subsequent Portfolio
 refactor sub-project must keep these assertions green.
 
@@ -11,8 +11,8 @@ Three tests today; grows to six by the end of Sub-project D when
 - ``test_portfolio_moments`` — agg/est moments match baseline (``rtol=1e-10``).
 - ``test_calibration_shapes`` — each distortion's ``shape`` matches baseline
   (``rtol=1e-8``) and its calibration residual is within ``1e-5``.
-- ``test_pricing`` — every cell of ``analyze_distortions2(.995)`` matches the
-  baseline (``rtol=1e-8``).
+- ``test_pricing`` — every cell of ``analyze_distortions(.995).pricing_df``
+  matches the baseline (``rtol=1e-8``).
 
 Notes
 -----
@@ -38,9 +38,11 @@ BASELINE = json.loads(BASELINE_PATH.read_text(encoding='utf-8'))
 
 @pytest.fixture(scope='module')
 def peg():
-    """Build PEG once, calibrate, and run analyze_distortions2 at p=0.995.
+    """Build PEG once, calibrate, and run analyze_distortions at p=0.995.
 
-    Returns ``(port, ad)`` where ``ad`` is the exhibit DataFrame.
+    Returns ``(port, ad)`` where ``ad`` is the pricing DataFrame extracted
+    from the ``AnalyzeDistortionsResult`` (rows MultiIndex
+    ``(distortion, stat)``, columns are line names).
     """
     p = BASELINE['meta']['p_calibration']
     coc = BASELINE['meta']['coc_calibration']
@@ -48,7 +50,7 @@ def peg():
     bs = BASELINE['meta']['bs']
     port = build_peg(update=True, calibrate=True, p=p, coc=coc,
                      log2=log2, bs=bs)
-    ad = port.analyze_distortions2(p)
+    ad = port.analyze_distortions(p=p).pricing_df
     return port, ad
 
 
@@ -74,7 +76,7 @@ def test_calibration_shapes(peg):
 
 
 def test_pricing(peg):
-    """Every cell of analyze_distortions2(.995) matches baseline.
+    """Every cell of analyze_distortions(.995).pricing_df matches baseline.
 
     Indexed as ``ad.loc[(distortion, stat), column]``. Five distortions × 8
     stats × 3 columns = 120 cells; all must match within ``rtol=1e-8``.
@@ -82,7 +84,7 @@ def test_pricing(peg):
     _, ad = peg
     for dname, by_column in BASELINE['pricing'].items():
         assert dname in ad.index.get_level_values(0).unique(), \
-            f'distortion {dname!r} missing from analyze_distortions2 output'
+            f'distortion {dname!r} missing from analyze_distortions output'
         for column, by_stat in by_column.items():
             for stat, expected in by_stat.items():
                 actual = ad.loc[(dname, stat), column]

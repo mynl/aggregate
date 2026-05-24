@@ -24,8 +24,9 @@ from IPython.display import HTML, display
 
 from .constants import *
 from .distributions import Aggregate, Severity
+from .results import AnalyzeDistortionResult, AnalyzeDistortionsResult
 from .spectral import Distortion
-from .utilities import (ft, ift, axiter_factory, AxisManager, html_title,
+from .utilities import (ft, ift, html_title,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, Answer, subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
@@ -166,7 +167,8 @@ class Portfolio(object):
         # future storage
         self.density_df = None
         self.independent_density_df = None
-        self.augmented_df = None
+        self._augmented_dfs: dict[str, pd.DataFrame] = {}
+        self._last_applied_distortion_name: str | None = None
         self.audit_df = None
         self.independent_audit_df = None
         self.padding = 0
@@ -1239,6 +1241,9 @@ class Portfolio(object):
             return
 
         self._var_tvar_function = None
+        # density changes invalidate the augmented_df cache
+        self._augmented_dfs = {}
+        self._last_applied_distortion_name = None
 
         ft_line_density = {}
         # line_density = {}
@@ -2160,73 +2165,82 @@ class Portfolio(object):
                        ess_sup=ess_sup, assets=assets, el=el)
         return dist
 
-    def calibrate_distortions2(self, coc, reg_p):
-        """Simplified calibrate_distortions reflecting how it is used."""
-        ans = self.calibrate_distortions(COCs=[coc], Ps=[reg_p])
-
-    def calibrate_distortions(self, LRs=None, COCs=None, ROEs=None, As=None, Ps=None, kind='lower', r0=0.03, df=5.5,
-                              strict='ordered', S_calc='cumsum'):
+    def calibrate_distortions(self, coc, *, p=None, a=None,
+                              r0=0.03, df=5.5, kind='lower'):
         """
-        Calibrate assets a to loss ratios LRs and asset levels As (iterables)
-        ro for LY, it :math:`ro/(1+ro)` corresponds to a minimum rate online
+        Calibrate the standard pricing distortion set to a cost-of-capital target.
 
+        Parameters
+        ----------
+        coc : float
+            Target cost of capital ``COC = (P - L) / Q``.
+        p : float, optional
+            Probability at which the calibration applies; converted to asset
+            level via ``self.q(p, kind)``. Exactly one of ``p`` or ``a`` must
+            be provided.
+        a : float, optional
+            Asset level; snapped to the index. Exactly one of ``p`` or ``a``
+            must be provided.
+        r0 : float, optional
+            ``r0`` parameter for distortions with a minimum rate-on-line
+            (``ly``, ``clin``, ``lep``). Default 0.03.
+        df : float, optional
+            Degrees-of-freedom for ``tt``. Default 5.5.
+        kind : {'lower', 'upper'}, optional
+            VaR kind when ``p`` is provided. Default ``'lower'``.
 
-        :param LRs:  LR or ROEs given
-        :param ROEs: ROEs override LRs
-        :param COCs: CoCs override LRs, preferred terms to ROE; ROE maintained for backwards compatibility.
-        :param As:  Assets or probs given
-        :param Ps: probability levels for quantiles
-        :param kind:
-        :param r0: for distortions that have a min ROL
-        :param df: for tt
-        :param strict: if=='ordered' then use the book nice ordering else
-            if True only use distortions with no mass at zero, otherwise
-            use anything reasonable for pricing
-        :param S_calc:
-        :return:
+        Returns
+        -------
+        pandas.DataFrame
+            Calibration audit table (one row per distortion in
+            ``[ccoc, ph, wang, dual, tvar]``) recording ``S``, ``iota``,
+            ``delta``, ``nu``, ``EL``, ``P``, ``Levg``, ``K``, ``ROE``,
+            ``param``, ``std_param``, ``error``. Also stored on
+            ``self.dist_ans``. The calibrated distortions are stored on
+            ``self.dists`` keyed by name.
+
+        Notes
+        -----
+        Replaces both the legacy
+        ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, ...)`` and
+        ``calibrate_distortions2(coc, reg_p)``. Single coc, single asset
+        level: that is the only usage pattern PMIR ever exercised.
         """
-        if COCs is not None:
-            ROEs = COCs
-
-        ans = pd.DataFrame(
-            columns=['$a$', 'LR', '$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$', 'Levg', '$K$',
-                     'ROE', 'param', 'std_param', 'error', 'method'], dtype=float)
-        ans = ans.set_index(['$a$', 'LR', 'method'], drop=True)
+        if (p is None) == (a is None):
+            raise ValueError(
+                'calibrate_distortions requires exactly one of p= (probability) '
+                'or a= (asset level).')
+        if a is None:
+            a = self.q(p, kind)
+        else:
+            a = self.snap(a)
+        exa, S = self.density_df.loc[a, ['exa_total', 'S']]
+        # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
+        delta = coc / (1 + coc)
+        nu = 1 - delta
+        P = nu * exa + delta * a
+        LR = exa / P
+        profit = P - exa
+        K = a - P
+        iota = profit / K  # numerically == coc by construction
+        d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
+        rows = {}
         dists = {}
-        if As is None:
-            if Ps is None:
-                raise ValueError('Must specify assets or quantile probabilities')
-            else:
-                As = [self.q(p, kind) for p in Ps]
-        for a in As:
-            exa, S = self.density_df.loc[a, ['exa_total', 'S']]
-            if ROEs is not None:
-                # figure loss ratios
-                LRs = []
-                for r in ROEs:
-                    delta = r / (1 + r)
-                    nu = 1 - delta
-                    prem = nu * exa + delta * a
-                    LRs.append(exa / prem)
-            for lr in LRs:
-                P = exa / lr
-                profit = P - exa
-                K = a - P
-                iota = profit / K
-                delta = iota / (1 + iota)
-                nu = 1 - delta
-                if strict == 'ordered':
-                    # d_list = ['roe', 'ph', 'wang', 'dual', 'tvar']
-                    d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
-                else:
-                    d_list = Distortion.available_distortions(pricing=True, strict=strict)
-
-                for dname in d_list:
-                    dist = self.calibrate_distortion(name=dname, r0=r0, df=df, premium_target=P, assets=a, S_calc=S_calc)
-                    dists[dname] = dist
-                    ans.loc[(a, lr, dname), :] = [S, iota, delta, nu, exa, P, P / K, K, profit / K,
-                                                  dist.shape, dist.standard_shape, dist.error]
-        # very helpful to keep these...
+        for dname in d_list:
+            dist = self.calibrate_distortion(
+                name=dname, r0=r0, df=df, premium_target=P, assets=a)
+            dists[dname] = dist
+            rows[(a, LR, dname)] = [
+                S, iota, delta, nu, exa, P, P / K, K, profit / K,
+                dist.shape, dist.standard_shape, dist.error,
+            ]
+        ans = pd.DataFrame.from_dict(
+            rows, orient='index',
+            columns=['$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$',
+                     'Levg', '$K$', 'ROE', 'param', 'std_param', 'error'],
+        )
+        ans.index = pd.MultiIndex.from_tuples(
+            ans.index.tolist(), names=['$a$', 'LR', 'method'])
         self.dist_ans = ans
         self.dists = dists
         return ans
@@ -2246,100 +2260,148 @@ class Portfolio(object):
         df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'std_param', 'error']
         return df
 
-    def apply_distortions(self, dist_dict, As=None, Ps=None, kind='lower', efficient=True):
+    def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards', efficient=True):
         """
-        Apply a list of distortions, summarize pricing and produce graphical output
-        show loss values where  :math:`s_ub > S(loss) > s_lb` by jump
+        Apply ``distortion`` and return the resulting augmented_df.
 
-        :param kind:
-        :param dist_dict: dictionary of Distortion objects
-        :param As: input asset levels to consider OR
-        :param Ps: input probs (near 1) converted to assets using ``self.q()``
-        :return:
+        Results are cached on ``self._augmented_dfs`` keyed by distortion name. A
+        second call with the same distortion is an O(1) dict lookup; the returned
+        DataFrame is the same object (``is``-identical) as the prior call.
+
+        Parameters
+        ----------
+        distortion : Distortion or str
+            A ``Distortion`` instance, or the name of a previously calibrated
+            distortion (looked up in ``self.dists``).
+        view : {'ask', 'bid'}
+            Pricing view. Default 'ask'.
+        S_calculation : {'forwards', 'backwards'}
+            How to (re)compute the total survival ``S``. Default 'forwards' --
+            recompute from ``1 - p_total.cumsum()`` to keep the tail accurate.
+        efficient : bool
+            If True (the default) compute only the columns needed for pricing
+            (T.* series). If False, also build the M.* marginal columns.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The cached ``augmented_df`` for this distortion.
+
+        Notes
+        -----
+        The actual construction lives in ``_build_augmented``. The cache is
+        invalidated whenever ``update`` is called (the underlying density
+        changes).
         """
-        ans = []
-        if As is None:
-            As = np.array([float(self.q(p, kind)) for p in Ps])
+        if isinstance(distortion, str):
+            distortion = self.dists[distortion]
+        name = distortion.name
+        if name not in self._augmented_dfs:
+            self._augmented_dfs[name] = self._build_augmented(
+                distortion, view=view, S_calculation=S_calculation, efficient=efficient)
+        self._distortion = distortion
+        self._last_applied_distortion_name = name
+        return self._augmented_dfs[name]
 
-        for g in dist_dict.values():
-            _x = self.apply_distortion(g, efficient=efficient)
-            df = _x.augmented_df
-            # extract range of S values
-            if As[0] in df.index:
-                temp = df.loc[As, :].filter(regex=r'^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
-            else:
-                logger.warning(f'{As} not in index...max value is {max(df.index)}...selecing that!')
-                temp = df.iloc[[-1], :].filter(regex=r'^loss|^S|exa[g]?_[^η][\.:~a-zA-Z0-9]*$|exag_sumparts|lr_').copy()
-            # jump = sensible_jump(len(temp), num_assets)
-            # temp = temp.loc[::jump, :].copy()
-            temp['method'] = g.name
-            ans.append(temp)
-
-        ans_table = pd.concat(ans)
-        ans_table['return'] = np.round(1 / ans_table.S, 0)
-
-        df2 = ans_table.copy()
-        df2 = df2.set_index(['loss', 'method', 'return', 'S'])
-        df2.columns = df2.columns.str.split('_', expand=True)
-        ans_stacked = pd.DataFrame(df2.stack().stack()).reset_index()
-        ans_stacked.columns = ['assets', 'method', 'return', 'S', 'line', 'stat', 'value']
-
-        # figure reasonable max and mins for LR plots
-        mn = ans_table.filter(regex='^lr').min().min()
-        mn1 = mn
-        mx = ans_table.filter(regex='^lr').max().max()
-        mn = np.round(mn * 20, 0) / 20
-        mx = np.round(mx * 20, 0) / 20
-        if mx >= 0.9:
-            mx = 1
-        if mn <= 0.2:
-            mn = 0
-        if mn1 < mn:
-            mn -= 0.1
-
-        return ans_table, ans_stacked
-
-    def apply_distortion(self, dist, view='ask', plots=None, df_in=None, create_augmented=True,
-                         S_calculation='forwards', efficient=True):
+    def augmented_df(self, distortion):
         """
-        Apply the distortion, make a copy of density_df and append various columns to create augmented_df.
+        Return the cached augmented_df for ``distortion`` (building it on demand).
 
-        augmented_df depends on the distortion but only includes variables that work for all asset levels, e.g.
-
-        1. marginal loss, lr, roe etc.
-        2. bottom up totals
-
-        Top down total depend on where the "top" is and do not work in general. They are handled in analyze_distortions
-        where you explicitly provide a top.
-
-        Does not touch density_df: that is independent of distortions
-
-        Optionally produce graphics of results controlled by plots a list containing none or more of:
-
-        1. basic: exag_sumparts, exag_total df.exa_total
-        2. extended: the full original set
-
-        Per 0.11.0: no mass at 0 allowed. If you want to use a distortion with mass at 0 you must use
-        a close approximation.
-
-
-        :type create_augmented: object
-        :param dist: agg.Distortion
-        :param view: bid or ask price
-        :param plots: iterable of plot types
-        :param df_in: when called from gradient you want to pass in gradient_df and use that; otherwise use self.density_df
-        :param create_augmented: store the output in self.augmented_df
-        :param S_calculation: if forwards, recompute S summing p_total forwards...this gets the tail right; the old method was
-                backwards, which does not change S
-        :param efficient: just compute the bare minimum (T. series, not M. series) and return
-        :return: density_df with extra columns appended
+        Identical to ``apply_distortion(distortion)`` with default kwargs --
+        provided as the clean read-side accessor.
         """
+        return self.apply_distortion(distortion)
 
-        # initially work will "full precision"
-        if df_in is None:
-            df = self.density_df.copy()
+    @property
+    def augmented_dfs(self):
+        """
+        The augmented_df cache as a dict ``{distortion_name: DataFrame}``.
+
+        Read-only view -- mutate via ``apply_distortion`` (insert) or
+        ``update`` (clear).
+        """
+        return self._augmented_dfs
+
+    def pricing_at(self, distortion, *, p=None, a=None):
+        """
+        Extract per-line pricing readout at probability ``p`` or asset level ``a``.
+
+        Warms the augmented_df cache for ``distortion``, then pulls the
+        L/LR/M/P/PQ/Q/ROE row at the requested asset level.
+
+        Parameters
+        ----------
+        distortion : Distortion or str
+            Passed through to ``apply_distortion``.
+        p : float, optional
+            Probability; converted to asset level via ``self.q(p)``. Exactly
+            one of ``p`` or ``a`` must be provided.
+        a : float, optional
+            Asset level; snapped to the index. Exactly one of ``p`` or ``a``
+            must be provided.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows indexed by line (units + 'total'), columns
+            ``['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE']``.
+
+        Notes
+        -----
+        Consolidates row-extraction logic that previously lived in ``price``
+        (lifted allocation) and ``analyze_distortion``.
+        """
+        if (p is None) == (a is None):
+            raise ValueError(
+                'pricing_at requires exactly one of p= (probability) '
+                'or a= (asset level).')
+        if a is None:
+            a = self.q(p)
         else:
-            df = df_in
+            a = self.snap(a)
+        aug = self.apply_distortion(distortion)
+        if a in aug.index:
+            row = aug.loc[a]
+        else:
+            logger.warning(
+                f'pricing_at: asset level {a} not in augmented_df.index; using last row.')
+            row = aug.iloc[-1]
+        lines = list(self.line_names_ex)
+        out = pd.DataFrame(
+            index=lines,
+            columns=['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE'],
+            dtype=float,
+        )
+        out.index.name = 'line'
+        for line in lines:
+            L = row[f'exa_{line}']
+            P = row[f'exag_{line}']
+            M = row[f'T.M_{line}']
+            Q = row[f'T.Q_{line}']
+            out.loc[line, 'L'] = L
+            out.loc[line, 'P'] = P
+            out.loc[line, 'M'] = M
+            out.loc[line, 'Q'] = Q
+        # exact Q_total = a - exag_total beats the layer-by-layer cumsum,
+        # which can drift by a few buckets in the tail (matches the legacy
+        # ``analyze_distortion`` correction).
+        out.loc['total', 'Q'] = a - row['exag_total']
+        out['LR'] = out['L'] / out['P']
+        out['PQ'] = out['P'] / out['Q']
+        out['ROE'] = out['M'] / out['Q']
+        return out
+
+    def _build_augmented(self, dist, *, view='ask', S_calculation='forwards', efficient=True):
+        """
+        Construct an augmented_df from ``self.density_df`` under ``dist``.
+
+        Pure builder: returns the frame without touching ``self`` (the
+        ``apply_distortion`` wrapper writes it into the cache). The body
+        is the former ``apply_distortion`` minus the ``df_in`` / ``plots`` /
+        ``create_augmented`` branches.
+        """
+
+        df = self.density_df.copy()
 
         # PREVIOUSLY: did not make this adjustment because loss of resolution on small S values
         # however, it doesn't work well for very thick tailed distributions, hence intro of S_calculation
@@ -2347,10 +2409,6 @@ class Portfolio(object):
         if S_calculation == 'forwards':
             logger.debug('Using updated S_forwards calculation in apply_distortion! ')
             df['S'] = 1 - df.p_total.cumsum()
-
-        if type(dist) == str:
-            # try looking it up in calibrated distortions
-            dist = self.dists[dist]
 
         # make g and ginv and other interpolation functions
         if view == 'bid':
@@ -2562,9 +2620,7 @@ class Portfolio(object):
                 df[f'T.Q_{line}'] = mq_l.shift(1).cumsum() * self.bs
                 df.loc[0, f'T.Q_{line}'] = 0
 
-            if create_augmented:
-                self.augmented_df = df
-            return Answer(augmented_df=df)
+            return df
 
         # sum of parts: careful not to include the total twice!
         # not used
@@ -2655,111 +2711,7 @@ class Portfolio(object):
         df['T.LR_total'] = df['T.L_total'] / df['T.P_total']
         df['T.ROE_total'] = df['T.M_total'] / df['T.Q_total']
 
-        f_distortion = f_byline = f_bylineg = f_exas = None
-        if plots == 'all':
-            plots = ['basic', 'extended']
-        if plots:
-            if 'basic' in plots:
-                f_distortion, ax = plt.subplots(1, 1, figsize=(4, 4))
-                ax.plot(df.filter(regex='^exag_[^η]').sum(axis=1), label='Sum of Parts')
-                ax.plot(df.exag_total, label='Total')
-                ax.plot(df.exa_total, label='Loss')
-                ax.legend()
-                ax.set_title(f'Mass audit for {dist.name}')
-                ax.legend(loc="upper right")
-                ax.grid()
-
-            if 'extended' in plots:
-                # yet more graphics, but the previous one is the main event
-                # truncate for graphics
-                max_x = 1.1 * self.q(1 - 1e-6)
-                df_plot = df.loc[0:max_x, :]
-
-                f_exas, axs, axiter = AxisManager.make_figure(12, sharex=True)
-
-                ax = next(axiter)
-                df_plot.filter(regex='^p_').sort_index(axis=1).plot(ax=ax)
-                ax.set_ylim(0, df_plot.filter(regex='p_[^η]').iloc[1:, :].max().max())
-                ax.set_title("Densities")
-                ax.legend(loc="upper right")
-                ax.grid()
-
-                ax = next(axiter)
-                df_plot.loc[:, ['p_total', 'gp_total']].plot(ax=ax)
-                ax.set_title("Total Density and Distortion")
-                ax.legend(loc="upper right")
-                ax.grid()
-
-                ax = next(axiter)
-                df_plot.loc[:, ['S', 'gS']].plot(ax=ax)
-                ax.set_title("S, gS")
-                ax.legend(loc="upper right")
-                ax.grid()
-
-                # exi_xlea removed
-                for prefix in ['exa', 'exag', 'exeqa', 'exgta', 'exi_xeqa', 'exi_xgta']:
-                    # look ahead operator: does not match n just as the next char, vs [^n] matches everything except n
-                    ax = next(axiter)
-                    df_plot.filter(regex=f'^{prefix}_(?!ημ)[a-zA-Z0-9]+$').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{prefix} by line')
-                    ax.legend(loc="upper left")
-                    ax.grid()
-                    if prefix.find('xi_x') > 0:
-                        # fix scale for proportions
-                        ax.set_ylim(-0.025, 1.025)
-
-                ax = next(axiter)
-                # _ = df_plot[[f'exa_{i}' for i in self.line_names]] / df.exa_total
-                # _.sort_index(axis=1).plot(ax=ax)
-                ax.set_title('Proportion of loss: T.L_line / T.L_total')
-                ax.set_ylim(0, 1.05)
-                ax.legend(loc='upper left')
-                ax.grid()
-
-                ax = next(axiter)
-                # _ = df_plot[[f'exag_{i}' for i in self.line_names]] / df.exag_total
-                # _.sort_index(axis=1).plot(ax=ax)
-                ax.set_title('Proportion of premium: T.P_line / T.P_total')
-                # ax.set_ylim(0, 1.05)
-                ax.legend(loc='upper left')
-                ax.grid()
-
-                ax = next(axiter)
-                df_plot.filter(regex='^M.LR_').sort_index(axis=1).plot(ax=ax)
-                ax.set_title('LR with the Natural (constant layer ROE) Allocation')
-                ax.legend(loc='lower right')
-                ax.grid()
-
-                # by line plots
-                nl = len(self.line_names_ex)
-                f_byline, axs, axiter = AxisManager.make_figure(nl)
-                for line in self.line_names:
-                    ax = next(axiter)
-                    df_plot.filter(regex=f'ex(le|eq|gt)a_{line}').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{line} EXs')
-                    # ?
-                    ax.set(ylim=[0, self.q(0.999, 'lower')])
-                    ax.legend(loc='upper left')
-                    ax.grid()
-                AxisManager.tidy_up(f_byline, axiter)
-
-                # compare exa with exag for all lines
-                f_bylineg, axs, axiter = AxisManager.make_figure(nl)
-                for line in self.line_names_ex:
-                    ax = next(axiter)
-                    df_plot.filter(regex=f'exa[g]?_{line}$').sort_index(axis=1).plot(ax=ax)
-                    ax.set_title(f'{line} T.L and T.P')
-                    ax.legend(loc='lower right')
-                    ax.grid()
-                AxisManager.tidy_up(f_bylineg, axiter)
-
-        if create_augmented:
-            self.augmented_df = df
-            # store associated distortion
-            self._distortion = dist
-
-        return Answer(augmented_df=df,
-                      f_distortion=f_distortion, f_byline=f_byline, f_bylineg=f_bylineg, f_exas=f_exas)
+        return df
 
     def var_dict(self, p, kind='lower', total='total', snap=False):
         """
@@ -2848,12 +2800,12 @@ class Portfolio(object):
             for k, v in distortion.items():
                 # this code is unchanged from original
                 logger.info(f'Executing for {k}, lifted')
-                ans_ad = self.apply_distortion(v, view=view, create_augmented=False, efficient=efficient)
-                if a_reg in ans_ad.augmented_df.index:
-                    aug_row = ans_ad.augmented_df.loc[a_reg]
+                aug_df = self.apply_distortion(v, view=view, efficient=efficient)
+                if a_reg in aug_df.index:
+                    aug_row = aug_df.loc[a_reg]
                 else:
                     logger.warning('Regulatory assets not in augmented_df. Using last.')
-                    aug_row = ans_ad.augmented_df.iloc[-1]
+                    aug_row = aug_df.iloc[-1]
 
                 # holder for the answer
                 df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
@@ -2988,271 +2940,128 @@ class Portfolio(object):
                           index=['total'])
         return df
 
-    def analyze_distortions(self, a=0, p=0, kind='lower',  efficient=True,
-                            augmented_dfs=None, regex='', add_comps=True):
+    def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """
-        Run analyze_distortion on self.dists
+        Pricing readout for ``distortion`` at probability ``p`` or asset level ``a``.
 
-        :param a:
-        :param p: the percentile of capital that the distortions are calibrated to
-        :param kind: var, upper var, tvar, epd
-        :param efficient:
-        :param augmented_dfs: input pre-computed augmented_dfs (distortions applied)
-        :param regex: apply only distortion names matching regex
-        :param add_comps: add traditional pricing comps to the answer
-        :return:
+        Parameters
+        ----------
+        distortion : Distortion or str
+            A ``Distortion`` instance, or the name of a previously calibrated
+            distortion (looked up in ``self.dists``).
+        p : float, optional
+            Probability; converted to asset level via ``self.q(p, kind)``.
+            Exactly one of ``p`` or ``a`` must be provided.
+        a : float, optional
+            Asset level; snapped to the index. Exactly one of ``p`` or ``a``
+            must be provided.
+        kind : {'lower', 'upper'}
+            Type of VaR (only relevant when ``p`` is provided).
 
+        Returns
+        -------
+        AnalyzeDistortionResult
+            Holds the per-line pricing DataFrame (from :meth:`pricing_at`)
+            and a small audit DataFrame with the total-level calibration
+            quantities (a, L, P, M, Q, LR, ROE, dname, dshape).
         """
-        import re
-
-        a, p = self.set_a_p(a, p)
-        dfs = []
-        ans = Answer()
-        if augmented_dfs is None:
-            augmented_dfs = {}
-        ans['augmented_dfs'] = augmented_dfs
-        for k, d in self.dists.items():
-            if regex == '' or re.match(regex, k):
-                if augmented_dfs is not None and k in augmented_dfs:
-                    use_self = True
-                    self.augmented_df = augmented_dfs[k]
-                    logger.info(f'Found {k} in provided augmented_dfs...')
-                else:
-                    use_self = False
-                    logger.info(f'Running distortion {d} through analyze_distortion, p={p}...')
-                # first distortion...add the comps...these are same for all dists
-                ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=(len(dfs) == 0) and add_comps,
-                                                 efficient=efficient, use_self=use_self)
-                dfs.append(ad_ans.exhibit)
-                ans[f'{k}_exhibit'] = ad_ans.exhibit
-                ans[f'{k}_pricing'] = ad_ans.pricing
-                if not efficient and k not in augmented_dfs:
-                    # remember, augmented_dfs is part of ans
-                    augmented_dfs[k] = ad_ans.augmented_df
-        ans['comp_df'] = pd.concat(dfs).sort_index()
-        return ans
-
-    def analyze_distortions2(self, p, dists=None):
-        """
-        Updated version of analyze_distortions reflecting how it is really used!
-
-        Use dists or self.dists
-
-        Returns only comp_df.
-        """
-        dfs = {}
-        dists = dists or self.dists
-        if dists is None:
-            raise ValueError('Must pass dists or self must have dists. '
-                             'Did you forget to calibrate_distortions?')
-
-        # defaults that we always select
-        use_self = add_comps = False
-        kind = 'lower'
-        efficient = True
-        for k, d in dists.items():
-            # first distortion...add the comps...these are same for all dists
-            ad_ans = self.analyze_distortion(d, p=p, kind=kind, add_comps=add_comps,
-                                             efficient=efficient, use_self=use_self,
-                                             rename_dists=False)
-            dfs[d] = ad_ans.exhibit
-        ans = pd.concat(dfs.values(), keys=[str(i) for i in dfs.keys()])   #.sort_index()
-        ans = ans.droplevel(1, axis=0)
-
-        # force the same order as input dist
-        # ans.index.name = 'distortion'
-        # new_index_df = ans.index.to_frame()
-        # new_index_df['distortion'] = (
-        #     new_index_df['distortion']
-        #     .astype(pd.CategoricalDtype(categories=dists.keys(), ordered=True))
-        # )
-        # # Reassign and sort
-        # ans.index = new_index_df.distortion
-        # ans = ans.sort_index()
-        return ans
-
-    def analyze_distortion(self, dname, dshape=None, dr0=.025, ddf=5.5, LR=None, ROE=None,
-                           p=None, kind='lower', A=None, use_self=False, plot=False,
-                           a_max_p=1-1e-8, add_comps=False, efficient=True, rename_dists=True):
-        """
-
-        Graphic and summary DataFrame for one distortion showing results that vary by asset level.
-        such as increasing or decreasing cumulative premium.
-
-        Characterized by the need to know an asset level, vs. apply_distortion that produced
-        values for all asset levels.
-
-        Returns DataFrame with values upto the input asset level...differentiates from apply_distortion
-        graphics that cover the full range.
-
-        analyze_pricing will then zoom in and only look at one asset level for micro-dynamics...
-
-        Logic of arguments:
-        ::
-
-            if data_in == 'self' use self.augmented_df; this implies a distortion self.distortion
-
-            else need to build the distortion and apply it
-                if dname is a distortion use it
-                else built one calibrated to input data
-
-            LR/ROE/a/p:
-                if p then a=q(p, kind) else p = MESSY
-                if LR then P and ROE; if ROE then Q to P to LR
-                these are used to calibrate distortion
-
-            A newly made distortion is run through apply_distortion with no plot
-
-        Logic to determine assets similar to calibrate_distortions.
-
-        Can pass in a pre-calibrated distortion in dname
-
-        Must pass LR or ROE to determine profit
-
-        Must pass p or A to determine assets
-
-        Output is an `Answer` class object containing
-        ::
-
-                Answer(augmented_df=deets, trinity_df=df, distortion=dist, fig1=f1 if plot else None,
-                      fig2=f2 if plot else None, pricing=pricing, exhibit=exhibit, roe_compare=exhibit2,
-                      audit_df=audit_df)
-
-        Originally `example_factory`.
-
-
-        example_factory_exhibits included:
-
-        do the work to extract the pricing, exhibit and exhibit 2 DataFrames from deets
-        Can also accept an ans object with an augmented_df element (how to call from outside)
-        POINT: re-run exhibits at different p/a thresholds without recalibrating
-        add relevant items to audit_df
-        a = q(p) if both given; if not both given derived as usual
-
-        Figures show
-
-        :param dname: name of distortion
-        :param dshape:  if input use dshape and dr0 to make the distortion
-        :param dr0:
-        :param ddf:  r0 and df params for distortion
-        :param LR: otherwise use loss ratio and p or a loss ratio
-        :param ROE:
-        :param p: p value to determine capital.
-        :param kind: type of VaR, upper or lower
-        :param A:
-        :param use_self:  if true use self.augmented and self.distortion...else recompute
-        :param plot:
-        :param a_max_p: percentile to use to set the right hand end of plots
-        :param add_comps: add old-fashioned method comparables (included = True as default to make backwards comp.)
-        :param efficient:
-        :return: various dataframes in an Answer class object
-
-        """
-
-        # setup: figure what distortion to use, apply if necessary
-        if use_self:
-            # augmented_df was called deets before, FYI
-            augmented_df = self.augmented_df
-            if type(dname) == str:
-                dist = self.dists[dname]
-            elif isinstance(dname, Distortion):
-                dist = dname
-            else:
-                raise ValueError(f'Unexpected dname={dname} passed to analyze_distortion')
+        if (p is None) == (a is None):
+            raise ValueError(
+                'analyze_distortion requires exactly one of p= (probability) '
+                'or a= (asset level).')
+        if isinstance(distortion, str):
+            distortion = self.dists[distortion]
+        if a is None:
             a_cal = self.q(p, kind)
-            exa = self.density_df.loc[a_cal, 'exa_total']
-            exag = augmented_df.loc[a_cal, 'exag_total']
-            K = a_cal - exag
-            LR = exa / exag
-            ROE = (exag - exa) / K
         else:
-            # figure assets a_cal (for calibration) from p or A
-            if p:
-                # have p
-                a_cal = self.q(p, kind)
-                exa = self.density_df.loc[a_cal, 'exa_total']
-            else:
-                # must have A...must be in index
-                assert A is not None
-                p = self.cdf(A)
-                a_cal = self.q(p)
-                exa = self.density_df.loc[a_cal, 'exa_total']
-                if a_cal != A:
-                    logger.info(f'a_cal:=q(p)={a_cal} is not equal to A={A} at p={p}')
+            a_cal = self.snap(a)
+        pricing_df = self.pricing_at(distortion, a=a_cal)
+        L = pricing_df.loc['total', 'L']
+        P = pricing_df.loc['total', 'P']
+        M = pricing_df.loc['total', 'M']
+        Q = pricing_df.loc['total', 'Q']
+        audit_df = pd.DataFrame(
+            {'value': [a_cal, L, P, M, Q,
+                       pricing_df.loc['total', 'LR'],
+                       pricing_df.loc['total', 'ROE'],
+                       distortion.name, distortion.shape]},
+            index=['a', 'L', 'P', 'M', 'Q', 'LR', 'ROE', 'dname', 'dshape'],
+        )
+        return AnalyzeDistortionResult(
+            distortion=distortion,
+            pricing_df=pricing_df,
+            audit_df=audit_df,
+        )
 
-            if dshape or isinstance(dname, Distortion):
-                # specified distortion, fill in
-                if isinstance(dname, Distortion):
-                    dist = dname
-                else:
-                    dist = Distortion(dname, dshape, dr0, ddf)
-                _x = self.apply_distortion(dist, create_augmented=False, efficient=efficient)
-                augmented_df = _x.augmented_df
-                exa = self.density_df.loc[a_cal, 'exa_total']
-                exag = augmented_df.loc[a_cal, 'exag_total']
-                profit = exag - exa
-                K = a_cal - exag
-                ROE = profit / K
-                LR = exa / exag
-            else:
-                # figure distortion from LR or ROE and apply
-                if LR is None:
-                    assert ROE is not None
-                    delta = ROE / (1 + ROE)
-                    nu = 1 - delta
-                    exag = nu * exa + delta * a_cal
-                    LR = exa / exag
-                else:
-                    exag = exa / LR
+    def analyze_distortions(self, *, p=None, a=None, distortions=None):
+        """
+        Pricing readout for a set of distortions at probability ``p`` or asset ``a``.
 
-                profit = exag - exa
-                K = a_cal - exag
-                ROE = profit / K
-                # was wasteful
-                # cd = self.calibrate_distortions(LRs=[LR], As=[a_cal], r0=dr0, df=ddf)
-                dist = self.calibrate_distortion(dname, r0=dr0, df=ddf, roe=ROE, assets=a_cal)
-                _x = self.apply_distortion(dist, create_augmented=False, efficient=efficient)
-                augmented_df = _x.augmented_df
+        Parameters
+        ----------
+        p : float, optional
+            Probability; converted to asset level via ``self.q(p)``. Exactly
+            one of ``p`` or ``a`` must be provided.
+        a : float, optional
+            Asset level; snapped to the index. Exactly one of ``p`` or ``a``
+            must be provided.
+        distortions : dict[str, Distortion], optional
+            The distortions to analyse. Defaults to ``self.dists`` (populated
+            by :meth:`calibrate_distortions`).
 
-        # other helpful audit values
-        # keeps track of details of calc for Answer
-        audit_df = pd.DataFrame(dict(stat=[p, LR, ROE, a_cal, K, dist.name, dist.shape]),
-                                index=['p', 'LR', "ROE", 'a_cal', 'K', 'dname', 'dshape'])
-        audit_df.loc['a'] = a_cal
-        audit_df.loc['kind'] = kind
+        Returns
+        -------
+        AnalyzeDistortionsResult
+            ``pricing_df`` is the concatenated exhibit with MultiIndex
+            ``(distortion, stat)`` on rows and line names on columns;
+            ``stat`` runs over ``['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE', 'a']``.
+            ``augmented_dfs`` is a snapshot of the cache for the analysed
+            distortions.
 
-        # make the pricing summary DataFrame and exhibit: this just contains info about dist
-        # in non-efficient the renamer and existing columns collide and you get duplicates
-        # transpose turns into rows...
-        pricing = augmented_df.rename(columns=self.tm_renamer).loc[[a_cal]].T. \
-                    filter(regex=r'^(T)\.(L|P|M|Q)_', axis=0).copy()
-        pricing = pricing.loc[~pricing.index.duplicated()]
-        # put in exact Q rather than add up the parts...more accurate
-        pricing.at['T.Q_total', a_cal] = a_cal - exag
-        # TODO EVIL! this reorders the lines and so messes up when port has lines not in alpha order
-        pricing.index = pricing.index.str.split(r'_|\.', expand=True)
-        pricing = pricing.sort_index()
-        pricing = pd.concat((pricing,
-                             pricing.xs(('T','P'), drop_level=False).rename(index={'P': 'PQ'}) / pricing.xs(('T', 'Q')).to_numpy(),
-                             pricing.xs(('T', 'L'), drop_level=False).rename(index={'L': 'LR'}) / pricing.xs(('T', 'P')).to_numpy(),
-                             pricing.xs(('T', 'M'), drop_level=False).rename(index={'M': 'ROE'}) / pricing.xs(('T', 'Q')).to_numpy()
-                            ))
-        pricing.index.set_names(['Method', 'stat', 'line'], inplace=True)
-        pricing = pricing.sort_index()
-        # make nicer exhibit
-        exhibit = pricing.unstack(2).copy()
-        exhibit.columns = exhibit.columns.droplevel(level=0)
-        exhibit.loc[('T', 'a'), :] = exhibit.loc[('T', 'P'), :] + exhibit.loc[('T', 'Q'), :]
-        exhibit.loc[('T', 'a'), :] = exhibit.loc[('T', 'a'), :] * a_cal / exhibit.at[('T', 'a'), 'total']
-        ans = Answer(augmented_df=augmented_df, distortion=dist, audit_df=audit_df, pricing=pricing, exhibit=exhibit)
-        # ``add_comps`` and ``plot`` branches removed in Sub-project A: the
-        # backing helpers (analyze_distortion_add_comps and
-        # analyze_distortion_plots) consumed deleted Bucket-D allocation
-        # methods (cotvar, merton_perold, equal_risk_*, EPD); PMIR always
-        # passes add_comps=False and never sets plot=True.
-        if rename_dists:
-            ans['exhibit'] = ans.exhibit.rename(index={'T': f'Dist {dist.name}'}).sort_index()
-        return ans
+        Notes
+        -----
+        Replaces both the legacy ``analyze_distortions(a=0, p=0, ...)`` and
+        ``analyze_distortions2(p, dists=None)``. The output shape matches the
+        legacy ``analyze_distortions2``: rows are ``(distortion, stat)``,
+        columns are line names.
+        """
+        if (p is None) == (a is None):
+            raise ValueError(
+                'analyze_distortions requires exactly one of p= (probability) '
+                'or a= (asset level).')
+        distortions = distortions or self.dists
+        if not distortions:
+            raise ValueError(
+                'No distortions to analyse. Pass distortions=, or call '
+                'calibrate_distortions first.')
+        if a is None:
+            a_cal = self.q(p)
+        else:
+            a_cal = self.snap(a)
+        per_dist = {}
+        for name, d in distortions.items():
+            # rows: line, cols: [L, LR, M, P, PQ, Q, ROE] -> transpose so
+            # stats are rows and lines are columns.
+            exhibit = self.pricing_at(d, a=a_cal).T
+            # 'a' row: P + Q per line, rescaled so totals sum to a_cal.
+            a_row = exhibit.loc['P'] + exhibit.loc['Q']
+            a_row = a_row * a_cal / a_row['total']
+            exhibit.loc['a'] = a_row
+            per_dist[name] = exhibit
+        pricing_df = pd.concat(
+            per_dist.values(),
+            keys=per_dist.keys(),
+            names=['distortion', 'stat'],
+        )
+        # snapshot only the distortions analysed
+        augmented_dfs = {
+            n: self._augmented_dfs[n] for n in distortions if n in self._augmented_dfs
+        }
+        return AnalyzeDistortionsResult(
+            distortions=dict(distortions),
+            pricing_df=pricing_df,
+            augmented_dfs=augmented_dfs,
+        )
 
 
     @property

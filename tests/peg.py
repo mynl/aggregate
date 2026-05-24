@@ -40,8 +40,8 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
         If True, call ``port.update(log2, bs)`` after construction.
     calibrate : bool
         If True (and ``update`` is True), call
-        ``port.calibrate_distortions(COCs=[coc], Ps=[p])`` so
-        ``port.dists`` is populated.
+        ``port.calibrate_distortions(coc, p=p)`` so ``port.dists`` is
+        populated.
     p : float
         Calibration percentile (default 0.995).
     coc : float
@@ -58,9 +58,10 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
 
     Notes
     -----
-    Sub-project D renames the calibration API; when that lands, update the
-    ``calibrate_distortions`` call here to the new signature. The baseline
-    JSON values are unchanged — same numerics, different access pattern.
+    Sub-project D landed the calibration API rename. The baseline JSON
+    values are unchanged — same numerics, new access pattern
+    (``calibrate_distortions(coc, p=p)`` instead of the legacy
+    ``COCs=/Ps=`` kwargs; explicit ``p=`` / ``a=`` after the D.2 tweak).
     """
     port = build(PEG_PROGRAM)
     if update:
@@ -68,5 +69,5 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
             bs = port.best_bucket(log2)
         port.update(log2=log2, bs=bs, remove_fuzz=True)
         if calibrate:
-            port.calibrate_distortions(COCs=[coc], Ps=[p])
+            port.calibrate_distortions(coc, p=p)
     return port

@@ -9,6 +9,7 @@ Six related changes that together produce a clean distortion-pricing pipeline on
 ## Pre-conditions
 
 - Sub-projects A, B, C landed and committed.
+- Hash e635bdb51069feffba0e8c9c6e43e08111ff41f1
 - `Distortion` subclasses know how to calibrate themselves (from C).
 - 415/415 pytest green.
 

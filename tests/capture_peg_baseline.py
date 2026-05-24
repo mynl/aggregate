@@ -1,7 +1,7 @@
 """Capture the PEG Portfolio regression baseline to JSON.
 
 Runs the canonical PEG Portfolio through the current
-``calibrate_distortions`` → ``analyze_distortions2`` pipeline and writes
+``calibrate_distortions`` → ``analyze_distortions`` pipeline and writes
 the numerical results to ``tests/data/peg_baseline.json``. Every subsequent
 Portfolio-refactor sub-project must reproduce these numbers.
 
@@ -23,7 +23,7 @@ Layout of the captured baseline:
   ``port.dists``
 - ``audit``: minimal calibration inputs (``a_cal = port.q(p)``, ``p``)
   reproducible without parsing ``pricing``
-- ``pricing``: full ``analyze_distortions2`` exhibit, nested
+- ``pricing``: full ``analyze_distortions(p).pricing_df`` exhibit, nested
   ``{distortion: {column: {stat: value}}}``
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ def extract_calibration(port):
 
 
 def extract_pricing(ad):
-    """Nested dict view of the ``analyze_distortions2`` exhibit DataFrame.
+    """Nested dict view of the ``analyze_distortions(p).pricing_df`` exhibit.
 
     ``ad`` is a DataFrame with MultiIndex ``(distortion, stat)`` and columns
     one per unit + ``total``. Return shape is
@@ -70,7 +70,7 @@ def extract_pricing(ad):
 def main() -> None:
     port = build_peg(update=True, calibrate=True, p=P_CAL, coc=COC_CAL,
                      log2=LOG2)
-    ad = port.analyze_distortions2(P_CAL)
+    ad = port.analyze_distortions(p=P_CAL).pricing_df
 
     baseline = {
         'meta': {

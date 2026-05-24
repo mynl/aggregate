@@ -871,7 +871,7 @@ def similar_risks_example():
     v = 1 - d
     roe = d / v
     prem, roe
-    p_base.calibrate_distortions(As=[1], ROEs=[roe], strict='ordered')
+    p_base.calibrate_distortions(roe, a=a)
     bounds = Bounds(p_base)
     bounds.tvar_cloud('total', prem, a, 128 * 2, 64 * 2, 'interp')
     p_star = bounds.p_star('total', prem, kind='interp')

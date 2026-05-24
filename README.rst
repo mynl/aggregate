@@ -90,6 +90,23 @@ into a single canonical ``stats_df``. Public stats surface on
 * PEG regression baseline unchanged (numbers reproduce bit-identically
   at ``rtol=1e-10``).
 
+Housekeeping in the same release block:
+
+* ``extensions.portfolio_pir.gamma`` (the ~136-LOC conditional layer
+  effectiveness γ exhibit) and its ``GammaResult`` dataclass deleted —
+  both were orphaned: not called from ``make_all``, not exercised by
+  any test, not referenced in any rendered doc.
+* ``Underwriter.__repr__`` gains a one-line usage hint pointing at
+  ``.discover(regex)`` — fills the discoverability gap left when
+  ``qshow`` / ``qlist`` / ``show`` were removed in 1.0.0a1.
+* Eight stale comments and docstrings across ``distributions.py`` /
+  ``utilities.py`` / ``portfolio.py`` that still mentioned
+  ``statistics_df`` / ``report_ser`` / ``audit_df`` (in their
+  stats-consolidation sense) refreshed. Distinct
+  ``reinsurance_audit_df`` / ``reinsurance_report_df`` attributes
+  and the ``audit_df`` field on ``AnalyzeDistortionResult`` are
+  unrelated and unchanged.
+
 1.0.0a7
 -------
 

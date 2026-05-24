@@ -338,7 +338,8 @@ class Underwriter(object):
             f'debug              {self.debug}\n'
             f'validation_eps     {VALIDATION_EPS}\n'
             f'user dir           {self._format_dir(self.user_dir)}\n'
-            f'default dir        {self._format_dir(self.default_dir)}'
+            f'default dir        {self._format_dir(self.default_dir)}\n'
+            f'browse             call .discover(regex) to list knowledge entries'
         )
 
     def _factory(self, parsed):

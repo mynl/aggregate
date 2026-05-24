@@ -819,10 +819,8 @@ def suptitle_and_tight(title, **kwargs):
 
 class MomentAggregator(object):
     """
-    Purely accumulates moments
-    Used by Portfolio
-    Not frequency aware
-    makes report_ser df and statistics_df
+    Purely accumulates moments. Used by ``Aggregate`` and ``Portfolio`` to
+    feed their ``stats_df``. Not frequency aware.
 
     Internal variables agg, sev, freq, tot = running total, 1, 2, 3 = noncentral moments, E(X^k)
 
@@ -867,7 +865,7 @@ class MomentAggregator(object):
         self.freq_2 = f2
         self.freq_3 = f3
 
-        # load current sev statistics_df
+        # load current sev moments
         self.sev_1 = s1
         self.sev_2 = s2
         self.sev_3 = s3
@@ -921,9 +919,9 @@ class MomentAggregator(object):
 
     def get_fsa_stats(self, total, remix=False):
         """
-        get the current f x s = agg statistics_df and moments
+        Get the current f x s = agg flat moment list.
         total = true use total else, current
-        remix = true for total only, re-compute freq statistics_df based on total freq 1
+        remix = true for total only, re-compute freq moments based on total freq 1
 
         :param total: binary
         :param remix: combine all sevs and recompute the freq moments from total freq
@@ -1103,7 +1101,10 @@ class MomentAggregator(object):
     @staticmethod
     def column_names():
         """
-        list of the moment and statistics_df names for f x s = a
+        Flat moment names for f x s = a (the order matches ``get_fsa_stats``;
+        bridged to the canonical ``(component, measure)`` MultiIndex by
+        :func:`aggregate.distributions._flat_col_to_stats_index` during
+        ``stats_df`` builds).
 
         :return:
         """

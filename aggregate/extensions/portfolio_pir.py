@@ -24,7 +24,6 @@ Contents
   ``make_all``, ``show_enhanced_exhibits``, ``set_a_p``.
 - Plots: ``profit_segment_plot``, ``natural_profit_segment_plot``,
   ``density_sample``, ``biv_contour_plot``, ``twelve_plot``.
-- Layer effectiveness: ``gamma``.
 - Stand-alone pricing: ``stand_alone_pricing_work``, ``stand_alone_pricing``,
   ``calibrate_blends`` (with helpers ``check01``, ``make_array``,
   ``convex_points``).
@@ -47,7 +46,6 @@ from IPython.display import HTML, display
 
 from ..constants import WL
 from ..spectral import Distortion
-from ..results import GammaResult
 from ..utilities import subsets
 
 
@@ -69,7 +67,6 @@ __all__ = [
     'density_sample',
     'biv_contour_plot',
     'twelve_plot',
-    'gamma',
     'stand_alone_pricing_work',
     'stand_alone_pricing',
     'calibrate_blends',
@@ -682,148 +679,6 @@ def twelve_plot(port, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0,
                     ax.legend(prop={'size': 7})
             except Exception:
                 pass
-
-
-# ---------------------------------------------------------------------------
-# Layer effectiveness γ
-# ---------------------------------------------------------------------------
-
-def gamma(port, a=None, p=None, kind='lower', compute_stand_alone=False,
-          axs=None, plot_mode='return'):
-    r"""Conditional layer effectiveness γ_a(x) given assets ``a``.
-
-    See *Pricing Insurance Risk* "Main Result for Conditional Layer
-    Effectiveness; Piano Diagram". In total
-    γ_a(x) = E[(a ∧ X) / X | X > x] is the average reimbursement rate above
-    x given capital a. By line
-    γ_{a,i}(x) = E[ E[X_i | X] / X · (X ∧ a) / X · 1_{X>x} ]
-                 / E[ E[X_i | X] / X · 1_{X>x} ].
-
-    Returns a :class:`GammaResult` carrying the augmented density frame. If
-    ``axs`` is provided, also draws diagnostic plots.
-    """
-    if a is None:
-        assert p is not None
-        a = port.q(p, kind)
-    else:
-        p = port.cdf(a)
-        ql = port.q(p, 'lower')
-        qu = port.q(p, 'upper')
-        logger.log(
-            WL,
-            f'Input a={a} to gamma; computed p={p:.8g}, '
-            f'lower and upper quantiles are {ql:.8g} and {qu:.8g}',
-        )
-
-    temp = port.density_df.filter(
-        regex='^(p_|e1xi_1gta_|exi_xgta_|exi_xeqa_|exeqa_)[a-zA-Z]|^S$|^loss$'
-    ).copy()
-
-    var_dict = port.var_dict(p, kind, 'total')
-    extreme_var_dict = port.var_dict(1 - (1 - p) / 100, kind, 'total')  # noqa: F841
-
-    min_xa = np.minimum(temp.loss, a) / temp.loss
-    temp['min_xa_x'] = min_xa
-
-    ln = 'total'
-    gam_name = f'gamma_{port.name}_{ln}'
-    temp[f'exi_x1gta_{ln}'] = (
-        (temp['loss'] * temp.p_total / temp.loss)
-        .shift(-1)[::-1].cumsum() * port.bs
-    )
-    s_ = temp.p_total.shift(-1)[::-1].cumsum() * port.bs
-    t1, t2 = (
-        np.allclose(s_[:-1:-1], temp[f'exi_x1gta_{ln}'].iloc[-1]),
-        np.allclose(temp[f'exi_x1gta_{ln}'].iloc[:-1], temp.S.iloc[:-1] * port.bs),
-    )
-    logger.debug(f'TEMP: the following should be close: {t1}, {t2} (expect True/True)')
-
-    temp[gam_name] = (
-        (min_xa * 1.0 * temp.p_total).shift(-1)[::-1].cumsum()
-        / temp[f'exi_x1gta_{ln}'] * port.bs
-    )
-
-    for ln in port.line_names:
-        if axs is not None or compute_stand_alone:
-            a_l = var_dict[ln]
-            a_l_ = a_l - port.bs
-            xinv = temp[f'e1xi_1gta_{ln}']
-            gam_name = f'gamma_{ln}_sa'
-            s = 1 - temp[f'p_{ln}'].cumsum()
-            temp[f'S_{ln}'] = s
-            temp[gam_name] = 0
-            temp.loc[0:a_l_, gam_name] = (s[0:a_l_] - s[a_l] + a_l * xinv[a_l]) / s[0:a_l_]
-            temp.loc[a_l:, gam_name] = a_l * xinv[a_l:] / s[a_l:]
-            temp[gam_name] = temp[gam_name].shift(1)
-
-        gam_name = f'gamma_{port.name}_{ln}'
-        temp[f'exi_x1gta_{ln}'] = (
-            (temp[f'exeqa_{ln}'] * temp.p_total / temp.loss)
-            .shift(-1)[::-1].cumsum() * port.bs
-        )
-        temp[gam_name] = (
-            (min_xa * temp[f'exi_xeqa_{ln}'] * temp.p_total)
-            .shift(-1)[::-1].cumsum()
-            / temp[f'exi_x1gta_{ln}'] * port.bs
-        )
-
-    if axs is not None:
-        axi = iter(axs.flat)
-        nr, nc = axs.shape
-        v = port.var_dict(.996, 'lower', 'total')
-        ef = EngFormatter(3, True)
-
-        if plot_mode == 'return':
-            def transformer(x):
-                return np.where(x == 0, np.nan, 1.0 / (1 - x))
-            yscale = 'log'
-        else:
-            def transformer(x):
-                return x
-            yscale = 'linear'
-
-        s1 = 1 / temp.S
-        for i, ln in enumerate(port.line_names_ex):
-            r, c = i // nc, i % nc
-            ax = next(axi)
-            if ln != 'total':
-                ls1 = 1 / temp[f'S_{ln}']
-                ax.plot(ls1, transformer(temp[f'gamma_{ln}_sa']),
-                        c='C1', label=f'SA {ln}')
-                ax.plot(s1, transformer(temp[f'gamma_{port.name}_total']),
-                        lw=1, c='C7', label='total')
-                color = 'C1'
-            else:
-                ls1 = s1
-                color = 'C0'
-            ax.plot(s1, transformer(temp[f'gamma_{port.name}_{ln}']),
-                    c='C0', label=f'Pooled {ln}')
-            temp['WORST'] = np.maximum(0, 1 - (1 - p) * ls1)
-            temp['BEST'] = 1
-            temp.loc[v[ln]:, 'BEST'] = v[ln] / temp.loc[v[ln]:, 'loss']
-            ax.fill_between(ls1, transformer(temp.WORST), transformer(temp.BEST),
-                            lw=.5, ls='--', alpha=.1, color=color, label='Possible range')
-            ax.plot(ls1, transformer(temp.BEST), lw=.5, ls='--', alpha=1, c=color)
-            ax.plot(ls1, transformer(temp.WORST), lw=.5, ls=':', alpha=1, c=color)
-            ax.set(xlim=[1, 1e9], xscale='log', yscale=yscale,
-                   xlabel='Loss return period' if r == nr - 1 else None,
-                   ylabel='Coverage Effectiveness (RP)' if c == 0 else None,
-                   title=f'{ln}, a={ef(v[ln]).strip()}')
-            ax.axvline(1 / (1 - .996), ls='--', c='C7', lw=.5, label='Capital p')
-            ll = ticker.LogLocator(10, numticks=10)
-            ax.xaxis.set_major_locator(ll)
-            lm = ticker.LogLocator(base=10.0, subs=np.arange(1.0, 10.0) * 0.1, numticks=10)
-            ax.xaxis.set_minor_locator(lm)
-            ax.grid(lw=.25)
-            ax.legend(loc='upper right')
-        try:
-            while 1:
-                ax.figure.delaxes(next(axi))
-        except StopIteration:
-            pass
-    temp.drop(columns=['BEST', 'WORST'])
-    return GammaResult(gamma_df=temp.sort_index(axis=1), base=port.name,
-                       assets=a, p=p, kind=kind)
 
 
 # ---------------------------------------------------------------------------

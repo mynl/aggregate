@@ -906,7 +906,7 @@ _STATS_MEASURE_MAP = {'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean'}
 
 
 def _flat_col_to_stats_index(col):
-    """Map a flat ``statistics_df`` column name to ``(component, measure)``.
+    """Map a flat ``MomentAggregator`` moment name to ``(component, measure)``.
 
     Examples: ``'freq_1' → ('freq', 'ex1')``, ``'agg_m' → ('agg', 'mean')``,
     ``'limit' → ('meta', 'limit')``.
@@ -1830,18 +1830,19 @@ class Aggregate:
 
     def _record_component(self, r, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
                           sev1, sev2, sev3):
-        """Accumulate this component into ``ma`` and write its row of ``statistics_df``.
+        """Accumulate this component into ``ma`` and write its ``stats_df`` column.
 
         Called once per component from each of the two broadcasting arms of
         ``__init__``: the limit-profile arm (all weights == 1) and the
-        mixture-product arm. Centralises the column ordering of
-        ``statistics_df`` so the two arms cannot drift apart.
+        mixture-product arm. Centralises which ``stats_df`` per-component
+        column (``comp_<r>``) gets written so the two arms cannot drift
+        apart.
 
         Parameters
         ----------
         r : int
-            Row index in ``statistics_df`` (matches the component slot in
-            ``self.sevs``).
+            Index of the per-component column in ``stats_df`` — written as
+            ``comp_<r>`` and matching the component slot in ``self.sevs``.
         ma : MomentAggregator
             Accumulator collecting freq, sev, agg moments across all components.
         attach, layer : float
@@ -1892,7 +1893,6 @@ class Aggregate:
 
         :return:
         """
-        # pull out agg statistics_df
         s = [self.info]
         with pd.option_context('display.width', 200,
                                'display.max_columns', 15,
@@ -2928,8 +2928,7 @@ class Aggregate:
 
         Called by ploting routines. Single point of failure!
 
-        Must work without q function when not computed (apply_reins_work for
-        occ reins; then use report_ser instead).
+        Must work without ``q`` function when not yet computed.
 
         :param stat:  range or density (for y axis)
         :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)

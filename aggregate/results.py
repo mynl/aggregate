@@ -10,7 +10,6 @@ Currently defined:
 - ``AnalyzeDistortionsResult`` — multi-distortion exhibit.
 - ``PricingResult`` — :meth:`Portfolio.price`.
 - ``PricingBoundsResult`` — :meth:`Portfolio.pricing_bounds`.
-- ``GammaResult`` — gamma sweep in ``extensions.portfolio_pir``.
 """
 from __future__ import annotations
 
@@ -127,28 +126,3 @@ class PricingBoundsResult:
     comp: pd.DataFrame | None
     allocs_slow: pd.DataFrame | None
     p_star: float
-
-
-@dataclass
-class GammaResult:
-    """Return type for ``extensions.portfolio_pir.gamma_test`` and friends.
-
-    Attributes
-    ----------
-    gamma_df : pandas.DataFrame
-        The gamma-function sweep table.
-    base : str
-        Name of the base Portfolio analysed.
-    assets : float
-        Asset level (in monetary units) at which the sweep was evaluated.
-    p : float
-        Probability associated with ``assets`` (``self.cdf(assets)``).
-    kind : str
-        VaR ``kind`` used to derive ``assets`` when input as a probability.
-    """
-
-    gamma_df: pd.DataFrame
-    base: str
-    assets: float
-    p: float
-    kind: str

@@ -1171,8 +1171,8 @@ class Portfolio(object):
 
     def percentiles(self, pvalues=None):
         """
-        report_ser on percentiles and large losses.
-        Uses interpolation, audit_df uses nearest.
+        Per-line percentiles (interpolated) of the FFT-derived
+        ``density_df`` distribution.
 
         :param pvalues: optional vector of log values to use. If None sensible defaults provided
         :return: DataFrame of percentiles indexed by line and log
@@ -1665,8 +1665,7 @@ class Portfolio(object):
 
         Called by ploting routines. Single point of failure!
 
-        Must work without q function when not computed (apply_reins_work for
-        occ reins...uses report_ser instead).
+        Must work without ``q`` function when not yet computed.
 
         :param stat:  range or density or logy (for log density/survival function...ensure consistency)
         :param kind:  linear or log (this is the y-axis, not log of range...that is rarely plotted)

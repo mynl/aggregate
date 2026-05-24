@@ -67,8 +67,8 @@ def test_calibration_shapes(peg):
     """Each calibrated distortion reproduces baseline shape and residual."""
     port, _ = peg
     for name, expected in BASELINE['calibration'].items():
-        assert name in port.dists, f'distortion {name!r} missing from port.dists'
-        d = port.dists[name]
+        assert name in port.distortions, f'distortion {name!r} missing from port.distortions'
+        d = port.distortions[name]
         assert np.isclose(d.shape, expected['shape'], rtol=1e-8), \
             f'{name}.shape: {d.shape!r} vs baseline {expected["shape"]!r}'
         assert abs(d.error) < 1e-5, \

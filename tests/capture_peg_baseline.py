@@ -20,7 +20,7 @@ Layout of the captured baseline:
 - ``portfolio_moments``: theoretical and empirical moments of the
   aggregate (``agg_m/cv/skew``, ``est_m/cv/skew``)
 - ``calibration``: per-distortion ``shape`` and ``error`` from
-  ``port.dists``
+  ``port.distortions``
 - ``audit``: minimal calibration inputs (``a_cal = port.q(p)``, ``p``)
   reproducible without parsing ``pricing``
 - ``pricing``: full ``analyze_distortions(p).pricing_df`` exhibit, nested
@@ -45,7 +45,7 @@ def extract_calibration(port):
     """Per-distortion ``shape`` and ``error`` from a calibrated Portfolio."""
     return {
         name: {'shape': float(d.shape), 'error': float(d.error)}
-        for name, d in port.dists.items()
+        for name, d in port.distortions.items()
     }
 
 

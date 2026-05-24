@@ -41,6 +41,16 @@ from .random_agg import RANDOM
 from .utilities import short_hash
 
 
+# Canonical display order for distortion names. Used as a pandas
+# ``CategoricalDtype`` to keep ``distortion_df`` / pricing exhibits sorted
+# in this order without ad-hoc reordering.
+DISTORTION_ORDER = [
+    'ccoc', 'ph', 'wang', 'dual', 'tvar', 'wtdtvar',
+    'lep', 'ly', 'clin', 'tt', 'cll', 'bitvar', 'blend',
+]
+DISTORTION_DTYPE = pd.CategoricalDtype(categories=DISTORTION_ORDER, ordered=True)
+
+
 # ---------------------------------------------------------------------------
 # Numba-compiled helpers for TVaR and BiTVaR (used by Distortion.quick_gS /
 # .quick_ra). These compute g(1 - probs.cumsum()) or the risk-adjusted

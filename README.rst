@@ -28,8 +28,68 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a6 (in progress)
+1.0.0a7 (in progress)
 ----------------------
+
+Portfolio refactor sub-project D — distortion-pricing pipeline redesign.
+Six related changes that together collapse ~500 LOC of pricing code into
+a small cache + a single signature convention:
+
+* **D.1 — augmented_df lazy-eval cache.** ``Portfolio.apply_distortion``
+  becomes a thin cache lookup-or-build keyed on distortion name; the
+  construction logic lives in a private ``_build_augmented``. Second
+  calls return the cached frame (``frame_a is frame_b``).
+  ``port.augmented_dfs`` is a dict view of the cache; ``port.augmented_df``
+  is the clean read-side accessor (also routes through the cache).
+  ``apply_distortion`` drops the ``df_in=`` (gradient path, gone),
+  ``create_augmented=`` (the cache replaces it), and ``plots=``
+  (uninvoked) kwargs. ``apply_distortions`` (plural) deleted. New
+  ``Portfolio.pricing_at(distortion, *, p=None, a=None)`` consolidates
+  the row-extraction logic that previously lived in ``price`` and
+  ``analyze_distortion``.
+* **D.2 — analyze_distortion(s) and calibrate_distortions collapse onto
+  the cache.** Each former 100-250 LOC method becomes ~25 LOC.
+  ``analyze_distortion(distortion, *, p=None, a=None)`` returns an
+  ``AnalyzeDistortionResult`` dataclass with ``pricing_df`` and
+  ``audit_df``. ``analyze_distortions(*, p=None, a=None,
+  distortions=None)`` returns ``AnalyzeDistortionsResult`` with the
+  multi-distortion exhibit (MultiIndex ``(distortion, stat)``) and a
+  cache snapshot. ``analyze_distortions2`` and the list-based
+  ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, …)`` deleted in
+  favour of single-coc / single-p forms.
+* **Explicit ``p=`` / ``a=`` convention** across the pricing surface
+  (``pricing_at``, ``analyze_distortion``, ``analyze_distortions``,
+  ``calibrate_distortions``). The legacy implicit ``p > 1 → asset``
+  threshold is gone; callers state intent. Each method raises
+  ``ValueError`` if both or neither is supplied.
+* **D.3 — Answer → typed dataclasses.** The legacy ``Answer`` dict
+  class is deleted. ``aggregate.results`` defines ``PricingResult``,
+  ``PricingBoundsResult``, ``AnalyzeDistortionResult``,
+  ``AnalyzeDistortionsResult``, and ``GammaResult`` (the last used by
+  ``extensions.portfolio_pir``). Inline ``namedtuple`` definitions in
+  ``Portfolio.price`` and ``Portfolio.pricing_bounds`` promoted to the
+  same module.
+* **D.4 — ordered categoricals.** ``aggregate.spectral.DISTORTION_ORDER``
+  / ``DISTORTION_DTYPE`` (``ccoc, ph, wang, dual, tvar, wtdtvar, lep,
+  ly, clin, tt, cll, bitvar, blend``) and
+  ``aggregate.portfolio.PRICING_STAT_ORDER`` / ``PRICING_STAT_DTYPE``
+  (``L, LR, M, P, PQ, Q, ROE``) bake the canonical order into the data.
+  ``Portfolio.distortion_df`` ``method`` index level, ``pricing_at``
+  columns, and ``analyze_distortions`` pricing_df ``distortion`` level
+  are typed categoricals -- ``sort_index()`` produces the canonical
+  order without ad-hoc reordering.
+* **D.5 — renames.** ``Portfolio.dists`` → ``Portfolio.distortions``;
+  ``Portfolio.dist_ans`` and the ``distortion_df`` property merged into
+  a single ``Portfolio.distortion_df`` attribute with the trimmed 9-col
+  layout (``S, L, P, PQ, Q, COC, param, std_param, error``) and index
+  names ``('a', 'LR', 'method')``; ``Portfolio.limits`` →
+  ``Portfolio._limits`` (internal helper).
+* PEG regression baseline unchanged -- ``test_pricing`` at ``rtol=1e-8``
+  reproduces the legacy ``analyze_distortions2`` exhibit bit-identically.
+  The new pipeline is mathematically the same; only the API surface changed.
+
+1.0.0a6
+-------
 
 Portfolio refactor sub-project C — distortion calibration moves to the
 ``Distortion`` subclasses themselves:

@@ -25,7 +25,7 @@ from .constants import *
 from .distributions import Aggregate, Severity
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
-from .spectral import Distortion
+from .spectral import Distortion, DISTORTION_DTYPE
 from .utilities import (ft, ift, html_title,
                         suptitle_and_tight, pprint_ex,
                         MomentAggregator, subsets, round_bucket,
@@ -38,6 +38,15 @@ import aggregate.random_agg as ar
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
 logger = logging.getLogger(__name__)
+
+
+# Canonical column order for pricing exhibits. Used as a pandas
+# ``CategoricalDtype`` so ``pricing_at`` results sort consistently.
+# Letters: L=loss, LR=loss ratio, M=margin, P=premium, PQ=P/Q (leverage),
+# Q=capital/equity, ROE=return on equity. ``a`` (asset level) is not a
+# pricing statistic and is not included here.
+PRICING_STAT_ORDER = ['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE']
+PRICING_STAT_DTYPE = pd.CategoricalDtype(categories=PRICING_STAT_ORDER, ordered=True)
 
 
 class Portfolio(object):
@@ -190,8 +199,8 @@ class Portfolio(object):
         # if created by uw it stores the program here
         self.program = ''
         self.audit_percentiles = [.9, .95, .99, .996, .999, .9999, 1 - 1e-6]
-        self.dists = None
-        self.dist_ans = None
+        self.distortions = None
+        self.distortion_df = None
         self.figure = None
 
         # for consistency with Aggregates
@@ -1562,7 +1571,7 @@ class Portfolio(object):
         """
         return pprint_ex(self.program, 0, html=True)
 
-    def limits(self, stat='range', kind='linear', zero_mass='include'):
+    def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """
         Suggest sensible plotting limits for kind=range, density, .. (same as Aggregate).
 
@@ -1625,8 +1634,8 @@ class Portfolio(object):
             self.figure, axd = make_mosaic_figure('AB', figsize=figsize)
 
         ax = axd['A']
-        xl = self.limits()
-        yl = self.limits(stat='density', zero_mass='exclude')
+        xl = self._limits()
+        yl = self._limits(stat='density', zero_mass='exclude')
         bit = self.density_df.filter(regex='p_[a-zA-Z]')
         if bit.shape[1] == 3:
             # put total first = Book standard
@@ -1636,8 +1645,8 @@ class Portfolio(object):
         ax.legend()
 
         ax = axd['B']
-        xl = self.limits(kind='log')
-        yl = self.limits(stat='logy')
+        xl = self._limits(kind='log')
+        yl = self._limits(stat='logy')
         bit.plot(ax=ax, logy=True, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Log density')
         ax.legend().set(visible=False)
@@ -2194,11 +2203,13 @@ class Portfolio(object):
         -------
         pandas.DataFrame
             Calibration audit table (one row per distortion in
-            ``[ccoc, ph, wang, dual, tvar]``) recording ``S``, ``iota``,
-            ``delta``, ``nu``, ``EL``, ``P``, ``Levg``, ``K``, ``ROE``,
-            ``param``, ``std_param``, ``error``. Also stored on
-            ``self.dist_ans``. The calibrated distortions are stored on
-            ``self.dists`` keyed by name.
+            ``[ccoc, ph, wang, dual, tvar]``) with columns
+            ``[S, L, P, PQ, Q, COC, param, std_param, error]`` and
+            MultiIndex ``(a, LR, method)``. ``method`` is an ordered
+            categorical so sorts produce the canonical distortion order.
+            Also stored on ``self.distortion_df``. The calibrated
+            distortion objects are stored on ``self.distortions`` keyed
+            by name.
 
         Notes
         -----
@@ -2223,43 +2234,30 @@ class Portfolio(object):
         LR = exa / P
         profit = P - exa
         K = a - P
-        iota = profit / K  # numerically == coc by construction
         d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
-        rows = {}
-        dists = {}
+        rows = []
+        distortions = {}
         for dname in d_list:
             dist = self.calibrate_distortion(
                 name=dname, r0=r0, df=df, premium_target=P, assets=a)
-            dists[dname] = dist
-            rows[(a, LR, dname)] = [
-                S, iota, delta, nu, exa, P, P / K, K, profit / K,
-                dist.shape, dist.standard_shape, dist.error,
-            ]
-        ans = pd.DataFrame.from_dict(
-            rows, orient='index',
-            columns=['$S$', '$\\iota$', '$\\delta$', '$\\nu$', '$EL$', '$P$',
-                     'Levg', '$K$', 'ROE', 'param', 'std_param', 'error'],
+            distortions[dname] = dist
+            rows.append(
+                [S, exa, P, P / K, K, profit / K,
+                 dist.shape, dist.standard_shape, dist.error])
+        distortion_df = pd.DataFrame(
+            rows,
+            columns=['S', 'L', 'P', 'PQ', 'Q', 'COC',
+                     'param', 'std_param', 'error'],
         )
-        ans.index = pd.MultiIndex.from_tuples(
-            ans.index.tolist(), names=['$a$', 'LR', 'method'])
-        self.dist_ans = ans
-        self.dists = dists
-        return ans
-
-    @property
-    def distortion_df(self):
-        """
-        Nicely formatted version of self.dist_ans (that exhibited several bad choices!).
-
-        ROE returned as COC in modern parlance.
-        """
-        if self.dist_ans is None:
-            return None
-
-        df = self.dist_ans.iloc[:, [0,4,5,6,7,8,9,10,11]].copy()
-        df.index.names = ['a', 'LR', 'method']
-        df.columns = ['S', 'L', 'P', 'PQ', 'Q', 'COC', 'param', 'std_param', 'error']
-        return df
+        distortion_df.index = pd.MultiIndex.from_arrays(
+            [[a] * len(d_list),
+             [LR] * len(d_list),
+             pd.Categorical(d_list, dtype=DISTORTION_DTYPE)],
+            names=['a', 'LR', 'method'],
+        )
+        self.distortion_df = distortion_df
+        self.distortions = distortions
+        return distortion_df
 
     def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards', efficient=True):
         """
@@ -2273,7 +2271,7 @@ class Portfolio(object):
         ----------
         distortion : Distortion or str
             A ``Distortion`` instance, or the name of a previously calibrated
-            distortion (looked up in ``self.dists``).
+            distortion (looked up in ``self.distortions``).
         view : {'ask', 'bid'}
             Pricing view. Default 'ask'.
         S_calculation : {'forwards', 'backwards'}
@@ -2295,7 +2293,7 @@ class Portfolio(object):
         changes).
         """
         if isinstance(distortion, str):
-            distortion = self.dists[distortion]
+            distortion = self.distortions[distortion]
         name = distortion.name
         if name not in self._augmented_dfs:
             self._augmented_dfs[name] = self._build_augmented(
@@ -2390,6 +2388,9 @@ class Portfolio(object):
         out['LR'] = out['L'] / out['P']
         out['PQ'] = out['P'] / out['Q']
         out['ROE'] = out['M'] / out['Q']
+        # bake the canonical pricing-stat order into the columns
+        out.columns = pd.CategoricalIndex(
+            out.columns, dtype=PRICING_STAT_DTYPE, name='stat')
         return out
 
     def _build_augmented(self, dist, *, view='ask', S_calculation='forwards', efficient=True):
@@ -2766,7 +2767,7 @@ class Portfolio(object):
 
         :param p: float; if >1 assets if <1 a prob converted to quantile
         :param distortion: a distortion, list or dictionary (name: dist) of distortions. If None then
-          ``self.dists`` dictionary is used.
+          ``self.distortions`` dictionary is used.
         :param allocation: 'lifted' (default for legacy reasons) or 'linear': treatment in default scenarios. See PIR.
         :param view: bid or ask
         :param efficient: for apply_distortion, lifted only.
@@ -2783,8 +2784,8 @@ class Portfolio(object):
         elif isinstance(distortion, list):
             distortion = {str(d): d for d in distortion}
         elif distortion is None:
-            assert self.dists is not None, 'Must pass a distortion or calibrate distortions prior to calling'
-            distortion = self.dists
+            assert self.distortions is not None, 'Must pass a distortion or calibrate distortions prior to calling'
+            distortion = self.distortions
 
         # figure regulatory assets; applied to unlimited losses
         if p > 1:
@@ -2949,7 +2950,7 @@ class Portfolio(object):
         ----------
         distortion : Distortion or str
             A ``Distortion`` instance, or the name of a previously calibrated
-            distortion (looked up in ``self.dists``).
+            distortion (looked up in ``self.distortions``).
         p : float, optional
             Probability; converted to asset level via ``self.q(p, kind)``.
             Exactly one of ``p`` or ``a`` must be provided.
@@ -2971,7 +2972,7 @@ class Portfolio(object):
                 'analyze_distortion requires exactly one of p= (probability) '
                 'or a= (asset level).')
         if isinstance(distortion, str):
-            distortion = self.dists[distortion]
+            distortion = self.distortions[distortion]
         if a is None:
             a_cal = self.q(p, kind)
         else:
@@ -3007,7 +3008,7 @@ class Portfolio(object):
             Asset level; snapped to the index. Exactly one of ``p`` or ``a``
             must be provided.
         distortions : dict[str, Distortion], optional
-            The distortions to analyse. Defaults to ``self.dists`` (populated
+            The distortions to analyse. Defaults to ``self.distortions`` (populated
             by :meth:`calibrate_distortions`).
 
         Returns
@@ -3030,7 +3031,7 @@ class Portfolio(object):
             raise ValueError(
                 'analyze_distortions requires exactly one of p= (probability) '
                 'or a= (asset level).')
-        distortions = distortions or self.dists
+        distortions = distortions or self.distortions
         if not distortions:
             raise ValueError(
                 'No distortions to analyse. Pass distortions=, or call '
@@ -3042,8 +3043,11 @@ class Portfolio(object):
         per_dist = {}
         for name, d in distortions.items():
             # rows: line, cols: [L, LR, M, P, PQ, Q, ROE] -> transpose so
-            # stats are rows and lines are columns.
+            # stats are rows and lines are columns. The transpose drops the
+            # categorical column dtype, so we work in plain string indices
+            # here and reapply the canonical ordering after concat.
             exhibit = self.pricing_at(d, a=a_cal).T
+            exhibit.index = exhibit.index.astype(str)
             # 'a' row: P + Q per line, rescaled so totals sum to a_cal.
             a_row = exhibit.loc['P'] + exhibit.loc['Q']
             a_row = a_row * a_cal / a_row['total']
@@ -3054,6 +3058,9 @@ class Portfolio(object):
             keys=per_dist.keys(),
             names=['distortion', 'stat'],
         )
+        # bake the canonical distortion order into level 0 of the index
+        pricing_df.index = pricing_df.index.set_levels(
+            pricing_df.index.levels[0].astype(DISTORTION_DTYPE), level='distortion')
         # snapshot only the distortions analysed
         augmented_dfs = {
             n: self._augmented_dfs[n] for n in distortions if n in self._augmented_dfs

@@ -40,7 +40,7 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
         If True, call ``port.update(log2, bs)`` after construction.
     calibrate : bool
         If True (and ``update`` is True), call
-        ``port.calibrate_distortions(coc, p=p)`` so ``port.dists`` is
+        ``port.calibrate_distortions(coc, p=p)`` so ``port.distortions`` is
         populated.
     p : float
         Calibration percentile (default 0.995).

@@ -462,8 +462,8 @@ class Bounds(object):
             assert isinstance(self.distribution_spec, Portfolio), \
                 'distortion=ordered only available for Portfolio'
             distortions = [
-                {k: self.distribution_spec.dists[k] for k in ['ccoc', 'tvar']},
-                {k: self.distribution_spec.dists[k] for k in ['ph', 'wang', 'dual']}]
+                {k: self.distribution_spec.distortions[k] for k in ['ccoc', 'tvar']},
+                {k: self.distribution_spec.distortions[k] for k in ['ph', 'wang', 'dual']}]
 
         bit = None
         if check:
@@ -645,7 +645,7 @@ class Bounds(object):
             b.principal_extreme_distortion_analysis(gs)
 
         :param gs: either g(s) evaluated on s = cloud_df.index or the name of a calibrated distortion in
-            distribution_spec.dists (created by a call to calibrate_distortions)
+            distribution_spec.distortions (created by a call to calibrate_distortions)
         :param pricing: if try, try just using pricing distortions
         :return:
         """
@@ -654,7 +654,7 @@ class Bounds(object):
 
         if type(gs) == str:
             s = np.array(self.cloud_df.index)
-            gs = self.distribution_spec.dists[gs].g(s)
+            gs = self.distribution_spec.distortions[gs].g(s)
 
         assert len(gs) == len(self.cloud_df)
 
@@ -843,7 +843,7 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     ax = axd['F']
     plot_max_min(bounds, ax)
     for c, dd in zip(['C0', 'C1', 'C2'], ['ph', 'wang', 'dual']):
-        port.dists[dd].plot(ax=ax, both=False, lw=1)
+        port.distortions[dd].plot(ax=ax, both=False, lw=1)
         ax.lines[n].set(c=c, label=dd)
         n += 2
     ax.legend(loc='lower right')
@@ -886,8 +886,8 @@ def similar_risks_example():
 
     bounds.cloud_view(axs=axs.flatten(), n_resamples=0, alpha=1, pricing=True,
                       title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={p_star:.3f}',
-                      distortions=[{k: p_base.dists[k] for k in ['ccoc', 'tvar']},
-                                   {k: p_base.dists[k] for k in ['ph', 'wang', 'dual']}])
+                      distortions=[{k: p_base.distortions[k] for k in ['ccoc', 'tvar']},
+                                   {k: p_base.distortions[k] for k in ['ph', 'wang', 'dual']}])
     for ax in axs.flatten()[1:]:
             ax.legend(ncol=1, loc='lower right')
     for ax in axs.flatten():

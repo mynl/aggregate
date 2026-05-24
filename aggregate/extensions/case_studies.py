@@ -806,7 +806,7 @@ The column sop shows the sum by unit. {self.re_description} All units produce th
             # table_no = 11.5
             # caption = f'Table {table_no}: '
             caption = f"""Parameter estimates for the five base spectral risk measures."""
-            tab115 = self.gross.dist_ans.droplevel((0, 1), axis=0).loc[
+            tab115 = self.gross.distortion_df.droplevel((0, 1), axis=0).loc[
                 ['ccoc', 'ph', 'wang', 'dual', 'tvar'], ['param', 'error', '$P$', '$K$', 'ROE', '$S$']]. \
                 rename(columns={'$P$': 'P', '$K$': 'K', '$S$': 'S', 'ROE': 'ι'})
             self._display("N", urn(tab115), caption, None)
@@ -1019,7 +1019,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             d = agg.Distortion('ph', 0.5)
             self.gross.apply_distortion(d)
         else:
-            self.gross.apply_distortion(self.gross.dists[distortion_name])
+            self.gross.apply_distortion(self.gross.distortions[distortion_name])
 
         bit = self.gross.augmented_df.query('p_total > 0').filter(regex='loss|p_t|S').copy()
         bit.index = range(1, len(bit) + 1)
@@ -1083,9 +1083,9 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         self.dgross = dgross
 
         net = self.ports['net']
-        net.apply_distortion(net.dists[dnet])
+        net.apply_distortion(net.distortions[dnet])
         gross = self.ports['gross']
-        gross.apply_distortion(gross.dists[dgross])
+        gross.apply_distortion(gross.distortions[dgross])
 
     def _display_plot(self, plot_id, f, caption):
         """
@@ -1155,8 +1155,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             legend_loc = 'center right'
         else:
             # initial version...
-            ylim = self.gross.limits(stat='density')
-            xlim = self.gross.limits()
+            ylim = self.gross._limits(stat='density')
+            xlim = self.gross._limits()
             xm = round_bucket(xlim[1])
             xlim = [-xm / 50 , xm]
             sort_order = [2, 0, 1]
@@ -1170,7 +1170,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         for port, nm, caption in zip((self.net, self.gross), ('T_net', 'T_gross'), captions):
             f, axs = self.smfig(4, 3, (10.8, 12.0))
             # ad comps does not create augmented
-            port.apply_distortion(port.dists['dual'], efficient=False)
+            port.apply_distortion(port.distortions['dual'], efficient=False)
             twelve_plot(port, f, axs, xmax=xlim[1], ymax2=xlim[1],
                         contour_scale=port.q(self.reg_p), sort_order=sort_order, cmap=self.colormap)
             axs[0][0].set(ylim=ylim, xlim=xlim)
@@ -1200,7 +1200,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         ax0, ax1, ax2 = axs.flat
 
         ps = np.hstack((np.linspace(0, 0.1, 2000, endpoint=False), np.linspace(0.1, 1, 100)))
-        ph = self.gross.dists['ph'].g(ps)
+        ph = self.gross.distortions['ph'].g(ps)
 
         # ax.plot(ps, blend, label='Naive blend')
         lsi = iter([':', '--', '-.'] * 5)
@@ -1380,7 +1380,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         ax = axd['F']
         plot_max_min(bounds, ax)
         for c, dd in zip(['r', 'g', 'b'], ['ph', 'wang', 'dual']):
-            port.dists[dd].plot(ax=ax, both=False, lw=1)
+            port.distortions[dd].plot(ax=ax, both=False, lw=1)
             ax.lines[n].set(c=c, label=dd)
             n += 2
         ax.set(title='PH, Wang and Dual')
@@ -1426,7 +1426,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             gprime = {}
             dist_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']
             for dn in dist_list:
-                gprime[dn] = diff(self.gross.dists[dn].g)
+                gprime[dn] = diff(self.gross.distortions[dn].g)
 
             self.diff_g = pd.DataFrame({dn: gprime[dn](1 - ps) for dn in dist_list},
                                        index=bit.index)
@@ -1500,7 +1500,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             gprime = {}
             dist_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']
             for dn in dist_list:
-                gprime[dn] = diff(self.gross.dists[dn].g)
+                gprime[dn] = diff(self.gross.distortions[dn].g)
 
             self.diff_g = pd.DataFrame({dn: gprime[dn](ps) for dn in dist_list},
                                        index=bit0.index)
@@ -1511,7 +1511,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             lbl = 'Gross E[Xi | X]'
             for (k, b), ax in zip(self.exeqa.items(), axs.flat):
                 b.plot(ax=ax)
-                ylim = {'tame': 200, 'cnc': 500, 'hs': 2500}.get(self.case_id, self.gross.limits('range', 'log')[1])
+                ylim = {'tame': 200, 'cnc': 500, 'hs': 2500}.get(self.case_id, self.gross._limits('range', 'log')[1])
                 ax.set(xlim=[1, .5e6], ylim=[0, ylim], xscale='log', ylabel=lbl, xlabel=None)
                 lbl = 'Net E[Xi | X]'
                 ax.legend(loc='upper left')
@@ -1596,7 +1596,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 sim_scale = 100
             else:
                 logger.warning('Check scales are reasonable...')
-                sim_xlim = self.gross.limits()
+                sim_xlim = self.gross._limits()
                 xmax = round_bucket(sim_xlim[1])
                 sim_xlim = [-xmax / 50, xmax]
                 sim_ylim = sim_xlim
@@ -1728,8 +1728,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             p_star = bounds.p_star('total', premium, a)
             bounds.cloud_view(axs=axs, n_resamples=0, alpha=1, pricing=True,
                               title=f'Premium={premium:,.1f}, p={self.reg_p:.1g}\na={a:,.0f}, p*={p_star:.3f}',
-                              distortions=[{k: port.dists[k] for k in ['ccoc', 'tvar']},
-                                           {k: port.dists[k] for k in ['ph', 'wang', 'dual']}])
+                              distortions=[{k: port.distortions[k] for k in ['ccoc', 'tvar']},
+                                           {k: port.distortions[k] for k in ['ph', 'wang', 'dual']}])
             # for ax in axs.flat:
             #     ax.set(aspect='equal')
             # f.suptitle(f'Portfolio {k}', fontsize='x-large')
@@ -1748,11 +1748,11 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             port = self.ports['gross']
             for dn, ls in zip(['ph', 'wang', 'dual'], ['-', '--', ':']):
                 axi = iter(axs.flatten())
-                g_ins_stats(axi, dn, port.dists[dn], ls=ls)
+                g_ins_stats(axi, dn, port.distortions[dn], ls=ls)
 
             for dn, ls in zip(['ccoc', 'tvar', 'blend'], ['-', '--', ':']):
                 axi = iter(axs.flatten()[6:])
-                g_ins_stats(axi, dn, port.dists[dn], ls=ls)
+                g_ins_stats(axi, dn, port.distortions[dn], ls=ls)
 
             caption = f'(O) {self.case_name}, variation in premium, loss ratio, markup (premium to loss), margin, discount rate, and premium to capital leverage for six distortions, shown in two groups of three. Top six plots show proportional hazard, Wang, and dual moment; lower six: CCoC, TVaR, and Blend.'
             self._display_plot('O', f, caption)
@@ -1798,7 +1798,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 xlim = [0, 100]
             else:
                 # TO DO! think about this!
-                xlim = self.gross.limits()
+                xlim = self.gross._limits()
 
             for port, kind, ax in zip([self.gross, self.net], ['Gross', 'Net'], axs.flat):
                 bit = port.augmented_df.filter(regex='M\.Q|F|^S$')
@@ -1812,7 +1812,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                 if ax is ax0:
                     ax.legend()  # loc='lower right')
             # Figure 15.8
-            caption = f"(U) {self.case_name}, capital density for {self.case_name}, with {str(self.ports['gross'].dists[self.dgross])} gross and {str(self.ports['net'].dists[self.dnet])} net distortion."
+            caption = f"(U) {self.case_name}, capital density for {self.case_name}, with {str(self.ports['gross'].distortions[self.dgross])} gross and {str(self.ports['net'].distortions[self.dnet])} net distortion."
             self._display_plot('U', f, caption)
 
             # fig 15.11
@@ -1863,9 +1863,9 @@ recovery with total assets. Third column shows stand-alone limited expected valu
                                    strict='ordered', df=[0, .98])
 
         # f_roe_fix, put pre-computed approx back
-        port.dists['ccoc'] = self.roe_d
+        port.distortions['ccoc'] = self.roe_d
         # and then SET the distortions for net
-        self.ports['net'].dists = self.ports['gross'].dists.copy()
+        self.ports['net'].distortions = self.ports['gross'].distortions.copy()
 
         cp = ClassicalPremium(self.ports, self.pricing_summary.loc['P', 'gross'])
         # set power for Fischer
@@ -1997,18 +1997,18 @@ recovery with total assets. Third column shows stand-alone limited expected valu
 
         # add self.blend_d to list of distortions
         for port in self.ports.values():
-            if 'ccoc' not in port.dists:
-                port.dists['ccoc'] = self.dist_dict['ccoc']
-            if 'blend' not in port.dists and 'blend' in self.dist_dict:
-                port.dists['blend'] = self.dist_dict['blend']
-            elif 'blend' not in port.dists:
+            if 'ccoc' not in port.distortions:
+                port.distortions['ccoc'] = self.dist_dict['ccoc']
+            if 'blend' not in port.distortions and 'blend' in self.dist_dict:
+                port.distortions['blend'] = self.dist_dict['blend']
+            elif 'blend' not in port.distortions:
                 # TODO arbitrary?!
                 k = list(self.blend_distortions.keys())[-1]
-                port.dists['blend'] = self.dist_dict[k]
+                port.distortions['blend'] = self.dist_dict[k]
 
         # Ch. Modern Mono Practice across distortions
         # all using GROSS calibrated distortions:
-        distortions = [self.ports['gross'].dists[dn] for dn in ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']]
+        distortions = [self.ports['gross'].distortions[dn] for dn in ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']]
         bit_apply_gross = []
         for port in self.ports.values():
             temp = stand_alone_pricing(port, distortions, p=self.reg_p, kind='var')
@@ -2035,7 +2035,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         # ad = analyze distortion: combines all pricing methods into one summary data frame 
         # TIME CONSUMING STEP...computed here for all allocations used here and Ch 090 110 for the HUSCS line
         # remember above, we replaced the dists for net with that calibrated on gross
-        # print(self.ports['gross'].dists == self.ports['net'].dists)
+        # print(self.ports['gross'].distortions == self.ports['net'].distortions)
         ad_compss = {}
         for k, port in self.ports.items():
             if k not in ad_compss:
@@ -2505,7 +2505,7 @@ def macro_market_graphs(axi, port, dn, rp):
     :return:
     """
 
-    dist = port.dists[dn]
+    dist = port.distortions[dn]
     g = dist.g
     dn = {'ph': "PH",
           'wang': "Wang",

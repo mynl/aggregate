@@ -330,7 +330,7 @@ def profit_segment_plot(port, ax, p, line_names, dist_name,
                         colors=None, translations=None):
     """Lee diagram for each requested line on a stand-alone basis.
 
-    Risk-adjusted premium uses the named distortion in ``port.dists``.
+    Risk-adjusted premium uses the named distortion in ``port.distortions``.
     Optionally supply per-line ``colors`` (integers → ``C{n}``) and
     ``translations`` (additive y-axis shifts, useful for layering a CAT line
     on top of NC).
@@ -340,7 +340,7 @@ def profit_segment_plot(port, ax, p, line_names, dist_name,
         port.gross.profit_segment_plot(ax, 0.99999,
             ['total', 'CAT', 'NC'], 'wang', [2,0,1])
     """
-    dist = port.dists[dist_name]
+    dist = port.distortions[dist_name]
     if colors is None:
         colors = range(len(line_names))
     if translations is None:
@@ -462,7 +462,7 @@ def twelve_plot(port, fig, axs, p=0.999, p2=0.9999, xmax=0, ymax2=0,
     """Twelve-panel diagnostic plot used in the ASTIN paper and PIR book.
 
     Must run a distortion first, e.g.
-    ``port.apply_distortion(port.dists['ph'], efficient=False)``.
+    ``port.apply_distortion(port.distortions['ph'], efficient=False)``.
 
     Panels (by row × column index in ``axs``):
 

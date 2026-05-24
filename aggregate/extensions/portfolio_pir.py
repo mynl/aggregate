@@ -282,7 +282,13 @@ def accounting_economic_balance_sheet(port, a=0, p=0):
         columns=['Statutory', 'Objective', 'Market', 'Difference'],
     )
     slc = slice(0, len(port.line_names_ex))
-    aebs.iloc[slc, 0] = port.audit_df['Mean'].values
+    # Per-unit + portfolio-total theoretical agg means. Per-unit columns
+    # of stats_df hold each Aggregate's mixed view; the portfolio total
+    # is the ``total`` column.
+    aebs.iloc[slc, 0] = [
+        float(port.stats_df.loc[('agg', 'mean'), name])
+        for name in port.line_names
+    ] + [float(port.stats_df.loc[('agg', 'mean'), 'total'])]
     aebs.iloc[slc, 1] = port._raw_premium_capital.loc['T.L']
     aebs.iloc[slc, 2] = port._raw_premium_capital.loc['T.P']
     aebs.loc['Assets', :] = port._raw_premium_capital.loc['T.A', 'total']
@@ -854,7 +860,14 @@ def stand_alone_pricing_work(port, dist, p, kind, roe, S_calc='cumsum'):
         v = 1 - d
         for l in port.line_names_ex:
             ax = var_dict[l]
-            exa = port.audit_df.at[l, 'EmpMean']
+            # Per-line empirical mean from the FFT marginal. For ``total``
+            # the canonical value lives in ``stats_df['empirical']``; for
+            # per-unit ``l`` compute inline from ``density_df``.
+            if l == 'total':
+                exa = float(port.stats_df.loc[('agg', 'mean'), 'empirical'])
+            else:
+                exa = float(np.sum(port.density_df['loss'] *
+                                   port.density_df[f'p_{l}']))
             prem = v * exa + d * ax
             tidy_and_write(exhibit, ax, exa, prem)
     elif dist == 'traditional':

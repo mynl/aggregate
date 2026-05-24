@@ -28,8 +28,70 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a7 (in progress)
+1.0.0a8 (in progress)
 ----------------------
+
+Portfolio refactor sub-project E — stats consolidation. Six overlapping
+``Portfolio`` stats frames (``statistics_df``, ``statistics``,
+``report_df``, ``report``, ``audit_df``, ``make_audit_df``) collapsed
+into a single canonical ``stats_df``. Public stats surface on
+``Portfolio`` is now exactly three things: ``info``, ``describe``,
+``stats_df`` — same shape as ``Aggregate``.
+
+* **``stats_df``** is a ``DataFrame`` with MultiIndex on
+  ``(component, measure)`` rows (``meta`` + ``freq`` + ``sev`` + ``agg``
+  blocks) and columns one-per-unit + ``total`` + ``empirical`` + ``error``.
+  Per-unit columns hold each ``Aggregate.stats_df['mixed']`` (the
+  unit's own view); ``total`` is the portfolio-aggregate theoretical
+  view (sum of each unit's ``mixed``); ``empirical`` is the post-FFT
+  combined view; ``error = empirical / total - 1``.
+* Column is ``total`` rather than Aggregate's ``mixed``: at the
+  Portfolio level there is no mixed-vs-independent distinction
+  (mixed-vs-independent is an Aggregate-only concept that strips a
+  single agg's freq mixing distribution).
+* **Empirical column is fully populated**:
+
+  - ``('agg', *)`` rows — raw moments ``ex1`` / ``ex2`` / ``ex3`` plus
+    ``mean`` / ``cv`` / ``skew``, computed straight from the
+    portfolio-total FFT density (plain summation, no tail-mass
+    correction — matches the PEG baseline numerics).
+  - ``('sev', *)`` rows — raw moments and central moments,
+    re-aggregated from each unit's empirical sev mean/cv/skew via a
+    fresh ``MomentAggregator``. ``Aggregate.stats_df`` stores only
+    empirical mean/cv/skew for sev, so the raw moments are inverted
+    via ``MomentWrangler`` before being fed to the aggregator.
+  - ``('meta', *)`` rows for ``limit`` / ``attachment`` / ``el`` /
+    ``prem`` / ``lr`` — copied across from ``total`` with implied
+    ``error = 0`` (these are factual or sums of expected values,
+    no FFT analog).
+  - ``('freq', *)`` rows stay ``NaN`` in ``empirical`` — frequency is
+    exact (no convolution operates on it); same convention as
+    ``Aggregate.stats_df``.
+* **Meta totals tightened**:
+
+  - ``total[('meta', 'attachment')]`` = ``0`` when every unit attaches
+    at 0 (previously ``NaN``); ``NaN`` only when units disagree.
+  - ``total[('meta', 'limit')]`` = ``max`` across units (legacy
+    convention preserved).
+  - ``total[('meta', 'lr')]`` = ``el / prem`` when ``prem > 0`` else
+    ``NaN``.
+* **``('agg', 'P99.9e')`` row dropped** — Aggregate dropped the
+  estimated-99.9th-percentile row in Stage 1c+; Portfolio follows
+  suit. Percentile access via ``port.q(p)`` / ``port.var_dict(p)``
+  remains.
+* ``describe`` and the headline ``agg_m`` / ``agg_cv`` / ``agg_skew`` /
+  ``est_m`` / ``est_cv`` / ``est_skew`` now read from ``stats_df``.
+  ``describe`` total row surfaces empirical sev mean/cv/skew (was
+  blank before — sev empirical only existed per-unit).
+* ``extensions.portfolio_pir.accounting_economic_balance_sheet`` and
+  ``extensions.bodoff`` updated to read ``stats_df``. The remaining
+  ``case_studies`` exhibit code keeps its old ``audit_df`` references —
+  those extensions are slated for removal at 1.0 per the master plan.
+* PEG regression baseline unchanged (numbers reproduce bit-identically
+  at ``rtol=1e-10``).
+
+1.0.0a7
+-------
 
 Portfolio refactor sub-project D — distortion-pricing pipeline redesign.
 Six related changes that together collapse ~500 LOC of pricing code into

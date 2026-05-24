@@ -22,13 +22,14 @@ import warnings
 from IPython.display import HTML, display
 
 from .constants import *
-from .distributions import Aggregate, Severity
+from .distributions import Aggregate, Severity, _flat_col_to_stats_index
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
 from .utilities import (ft, ift, html_title,
                         suptitle_and_tight, pprint_ex,
-                        MomentAggregator, subsets, round_bucket,
+                        MomentAggregator, MomentWrangler,
+                        subsets, round_bucket,
                         make_mosaic_figure, iman_conover, approximate_work,
                         make_var_tvar, agg_help, explain_validation,
                         make_comonotonic_allocations as make_comonotonic_allocations_work)
@@ -47,6 +48,27 @@ logger = logging.getLogger(__name__)
 # pricing statistic and is not included here.
 PRICING_STAT_ORDER = ['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE']
 PRICING_STAT_DTYPE = pd.CategoricalDtype(categories=PRICING_STAT_ORDER, ordered=True)
+
+
+# Canonical row MultiIndex for ``Portfolio.stats_df``. Parallels
+# ``aggregate.distributions._STATS_ROW_INDEX`` (meta + freq + sev + agg
+# moment blocks). Kept as its own constant so future Portfolio-only
+# rows (e.g. between-line copula moments) do not bleed into
+# Aggregate's surface.
+_PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
+    [
+        ('meta', 'name'), ('meta', 'limit'), ('meta', 'attachment'),
+        ('meta', 'el'), ('meta', 'prem'), ('meta', 'lr'),
+        ('meta', 'sevcv_param'), ('meta', 'mix_cv'), ('meta', 'wt'),
+        ('freq', 'ex1'), ('freq', 'ex2'), ('freq', 'ex3'),
+        ('freq', 'mean'), ('freq', 'cv'), ('freq', 'skew'),
+        ('sev', 'ex1'), ('sev', 'ex2'), ('sev', 'ex3'),
+        ('sev', 'mean'), ('sev', 'cv'), ('sev', 'skew'),
+        ('agg', 'ex1'), ('agg', 'ex2'), ('agg', 'ex3'),
+        ('agg', 'mean'), ('agg', 'cv'), ('agg', 'skew'),
+    ],
+    names=['component', 'measure'],
+)
 
 
 class Portfolio(object):
@@ -164,22 +186,20 @@ class Portfolio(object):
             # line names cannot equal total
             if n == 'total':
                 raise ValueError('Line names cannot equal total, it is reserved for...total')
-        # make a pandas data frame of all the statistics_df
-        temp_report = pd.concat(
-            [a.stats_df['mixed'].rename(a.name) for a in self.agg_list],
-            axis=1,
-        )
 
-        # max_limit = np.inf # np.max([np.max(a.get('limit', np.inf)) for a in spec_list])
-        temp = pd.DataFrame(ma.stats_series('total', max_limit, 0.999, remix=False))
-        self.statistics_df = pd.concat([temp_report, temp], axis=1)
+        # Canonical ``stats_df``: per-unit columns + ``mixed`` +
+        # ``empirical`` + ``error``. Mirror of ``Aggregate.stats_df``
+        # shape, minus the ``independent`` column (an
+        # Aggregate-frequency-mixing concept with no portfolio-level
+        # analog). ``empirical`` and ``error`` start NaN; ``update``
+        # populates them after the FFT.
+        self._build_stats_df(ma, max_limit)
         # future storage
         self.density_df = None
         self.independent_density_df = None
         self._augmented_dfs: dict[str, pd.DataFrame] = {}
         self._last_applied_distortion_name: str | None = None
-        self.audit_df = None
-        self.independent_audit_df = None
+        self.independent_stats_df = None
         self.padding = 0
         self._var_tvar_function = None
         self._cdf = None
@@ -198,15 +218,14 @@ class Portfolio(object):
         self._tm_renamer = None
         # if created by uw it stores the program here
         self.program = ''
-        self.audit_percentiles = [.9, .95, .99, .996, .999, .9999, 1 - 1e-6]
         self.distortions = None
         self.distortion_df = None
         self.figure = None
 
         # for consistency with Aggregates
-        self.agg_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
-        self.agg_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
-        self.agg_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
+        self.agg_m = self.stats_df.loc[('agg', 'ex1'), 'total']
+        self.agg_cv = self.stats_df.loc[('agg', 'cv'), 'total']
+        self.agg_skew = self.stats_df.loc[('agg', 'skew'), 'total']
         # variance and sd come up in exam questions
         self.agg_sd = self.agg_m * self.agg_cv
         self.agg_var = self.agg_sd * self.agg_sd
@@ -441,19 +460,34 @@ class Portfolio(object):
         # execute switeroo
         logger.info('Creating exa_sample and executing switcheroo')
         port.density_df = port.add_exa_sample(sample_df)
-        # update total stats
+        # update total stats — snapshot the pre-switcheroo stats_df and
+        # recompute the empirical agg-total moments from the new density_df.
         logger.info('Updating total statistics (WARNING: these are now empirical)')
-        port.independent_audit_df = port.audit_df.copy()
-        # just update the total stats
-        port.make_audit_df(['total'], None)
+        port.independent_stats_df = port.stats_df.copy()
+        _t = port.density_df['p_total'] * port.density_df['loss']
+        _ex1 = float(np.sum(_t))
+        _t *= port.density_df['loss']
+        _ex2 = float(np.sum(_t))
+        _t *= port.density_df['loss']
+        _ex3 = float(np.sum(_t))
+        port.est_m, port.est_cv, port.est_skew = (
+            MomentAggregator.static_moments_to_mcvsk(_ex1, _ex2, _ex3)
+        )
+        port.ex = port.est_m
+        port.est_sd = port.est_m * port.est_cv
+        port.est_var = port.est_sd ** 2
+        port._write_empirical_stats(_ex1, _ex2, _ex3)
         # return new created object
         logger.info('Returning new Portfolio object')
         return port
 
     def sample_compare(self, ax=None):
-        """
-        Compare the sample sum to the independent sum of the marginals.
+        """Compare the sample-based portfolio total to the independent
+        marginal sum.
 
+        Compares the ``empirical`` agg-total moments from the
+        post-switcheroo ``stats_df`` against the pre-switcheroo
+        snapshot stored in ``independent_stats_df``.
         """
         if self.independent_density_df is None:
             raise ValueError('No independent_density_df, cannot compare')
@@ -463,9 +497,11 @@ class Portfolio(object):
             ax.plot(self.density_df.index, self.density_df['S'], lw=1, label='sample')
             ax.legend()
 
-        df = pd.concat((self.independent_audit_df.T, self.audit_df.T),
-            keys=['independent', 'sample'], axis=1).xs('total', 1,1, drop_level=False)
-        return df
+        return pd.concat(
+            (self.independent_stats_df[['total', 'empirical']],
+             self.stats_df[['total', 'empirical']]),
+            keys=['independent', 'sample'], axis=1,
+        )
 
     def sample_density_compare(self, fuzz=0):
         """
@@ -645,13 +681,13 @@ class Portfolio(object):
 
     def __str__(self):
         """ Default behavior """
-        if self.audit_df is None:
-            ex = self.statistics_df.loc[('agg', 'mean'), 'total']
+        ex = float(self.stats_df.loc[('agg', 'mean'), 'total'])
+        empex_raw = self.stats_df.loc[('agg', 'mean'), 'empirical']
+        if pd.isna(empex_raw):
             empex = np.nan
             isupdated = False
         else:
-            ex = self.audit_df.loc['total', 'Mean']
-            empex = self.audit_df.loc['total', 'EmpMean']
+            empex = float(empex_raw)
             isupdated = True
 
         s = [f'Portfolio object         {self.name:s}',
@@ -712,14 +748,6 @@ class Portfolio(object):
         return self.agg_list[item]
 
     @property
-    def statistics(self):
-        """
-        Same as statistics df, to be consistent with Aggregate objects
-        :return:
-        """
-        return self.statistics_df
-
-    @property
     def info(self):
         s = []
         s.append(f'portfolio object name    {self.name}')
@@ -737,46 +765,52 @@ class Portfolio(object):
 
     @property
     def describe(self):
-        """
-        Theoretic and empirical stats. Used in _repr_html_.
-        Leverage Aggregate object stats; same format
+        """Theoretic-and-empirical stats. Used in ``_repr_html_``.
 
+        Reads from the canonical ``stats_df``: theoretical moments from
+        the ``total`` column, empirical from ``empirical``, errors from
+        ``error``. The output shape mirrors ``Aggregate.describe`` — one
+        ``Freq``/``Sev``/``Agg`` row block per unit + ``total`` — so
+        callers see the same 3-row × 6-col view they always have.
         """
-        sev_m = self.statistics_df.loc[('sev', 'ex1'), 'total']
-        sev_cv = self.statistics_df.loc[('sev', 'cv'), 'total']
-        sev_skew = self.statistics_df.loc[('sev', 'skew'), 'total']
-        n_m = self.statistics_df.loc[('freq', 'ex1'), 'total']
-        n_cv = self.statistics_df.loc[('freq', 'cv'), 'total']
-        n_skew = self.statistics_df.loc[('freq', 'skew'), 'total']
-        a_m = self.statistics_df.loc[('agg', 'ex1'), 'total']
-        a_cv = self.statistics_df.loc[('agg', 'cv'), 'total']
-        a_skew = self.statistics_df.loc[('agg', 'skew'), 'total']
-        df = pd.DataFrame({'E[X]': [n_m, sev_m, a_m], 'CV(X)': [n_cv, sev_cv, a_cv],
-                           'Skew(X)': [n_skew, sev_skew, a_skew]},
-                          index=['Freq', 'Sev', 'Agg'])
+        _total = self.stats_df['total']
+        df = pd.DataFrame(
+            {
+                'E[X]':    [float(_total[('freq', 'ex1')]),
+                            float(_total[('sev',  'ex1')]),
+                            float(_total[('agg',  'ex1')])],
+                'CV(X)':   [float(_total[('freq', 'cv')]),
+                            float(_total[('sev',  'cv')]),
+                            float(_total[('agg',  'cv')])],
+                'Skew(X)': [float(_total[('freq', 'skew')]),
+                            float(_total[('sev',  'skew')]),
+                            float(_total[('agg',  'skew')])],
+            },
+            index=['Freq', 'Sev', 'Agg'],
+        )
         df.index.name = 'X'
 
-        if self.audit_df is not None:
-            df.loc['Sev', 'Est E[X]'] = np.nan
-            df.loc['Agg', 'Est E[X]'] = self.est_m
+        # Post-update? Empirical agg moments live in stats_df['empirical'].
+        # After the punch-up: portfolio-level sev empirical is also
+        # populated (via MomentAggregator off per-unit empirical sev);
+        # surface it in the describe table too.
+        emp = self.stats_df['empirical']
+        emp_agg_m = emp.get(('agg', 'mean'), np.nan)
+        if pd.notna(emp_agg_m):
+            df.loc['Sev', 'Est E[X]'] = float(emp[('sev', 'mean')])
+            df.loc['Agg', 'Est E[X]'] = float(emp_agg_m)
             df['Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
-            df.loc['Sev', 'Est CV(X)'] = np.nan
-            df.loc['Agg', 'Est CV(X)'] = self.est_cv
+            df.loc['Sev', 'Est CV(X)'] = float(emp[('sev', 'cv')])
+            df.loc['Agg', 'Est CV(X)'] = float(emp[('agg', 'cv')])
             df['Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
-            df.loc['Sev', 'Est Skew(X)'] = np.nan
-            df.loc['Agg', 'Est Skew(X)'] = self.est_skew
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)', 'Skew(X)',
-                     'Est Skew(X)']]
+            df.loc['Sev', 'Est Skew(X)'] = float(emp[('sev', 'skew')])
+            df.loc['Agg', 'Est Skew(X)'] = float(emp[('agg', 'skew')])
+            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)',
+                     'Skew(X)', 'Est Skew(X)']]
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X'])
-        if self.audit_df is not None:
-            # add estimated severity
-            sev_est_m = (df.xs('Sev', axis=0, level=1)['Est E[X]'].iloc[:-1].astype(float) *
-                df.xs('Freq', axis=0, level=1)['E[X]'].iloc[:-1]).sum() / df.loc[('total', 'Freq'), 'E[X]']
-            df.loc[('total', 'Sev'), 'Err E[X]'] = sev_est_m / df.loc[('total', 'Sev'), 'E[X]'] - 1
-            df.loc[('total', 'Sev'), 'Est E[X]'] = sev_est_m
         return df
 
     @property
@@ -1118,14 +1152,17 @@ class Portfolio(object):
             return {kind: self.approximate(kind)
                     for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
 
-        if self.audit_df is None:
-            # not updated
-            m = self.statistics_df.loc[('agg', 'mean'), 'total']
-            cv = self.statistics_df.loc[('agg', 'cv'), 'total']
-            skew = self.statistics_df.loc[('agg', 'skew'), 'total']
+        emp_mean = self.stats_df.loc[('agg', 'mean'), 'empirical']
+        if pd.isna(emp_mean):
+            # not updated — use theoretical moments from the mixed column
+            m = float(self.stats_df.loc[('agg', 'mean'), 'total'])
+            cv = float(self.stats_df.loc[('agg', 'cv'), 'total'])
+            skew = float(self.stats_df.loc[('agg', 'skew'), 'total'])
         else:
-            # use statistics_df matched to computed aggregate_project
-            m, cv, skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
+            # use empirical (post-FFT) moments matched to the computed aggregate
+            m = float(emp_mean)
+            cv = float(self.stats_df.loc[('agg', 'cv'), 'empirical'])
+            skew = float(self.stats_df.loc[('agg', 'skew'), 'empirical'])
 
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
@@ -1306,12 +1343,6 @@ class Portfolio(object):
 
         self.remove_fuzz(log='update')
 
-        # make audit statistics_df df
-        theoretical_stats = self.statistics_df.T.filter(regex='agg')
-        theoretical_stats.columns = ['EX1', 'EX2', 'EX3', 'Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']
-        theoretical_stats = theoretical_stats[['Mean', 'CV', 'Skew', 'Limit', 'P99.9Est']]
-        self.make_audit_df(columns=self.line_names_ex, theoretical_stats=theoretical_stats)
-
         # add exa details
         if add_exa:
             self.add_exa(self.density_df, ft_nots=ft_nots)
@@ -1320,11 +1351,25 @@ class Portfolio(object):
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
 
-        self.ex = self.audit_df.loc['total', 'EmpMean']
-        # pull out estimated stats to match Aggergate
-        self.est_m, self.est_cv, self.est_skew = self.audit_df.loc['total', ['EmpMean', 'EmpCV', 'EmpSkew']]
+        # Empirical portfolio-total agg moments straight from the FFT
+        # output. Drives the canonical ``stats_df['empirical']`` agg
+        # writes and the headline ``est_m`` / ``est_cv`` / ``est_skew``.
+        # Plain summation — no tail-mass correction — to match the
+        # legacy numerics the PEG regression baseline was captured
+        # against.
+        _t = self.density_df['p_total'] * self.density_df['loss']
+        _ex1 = float(np.sum(_t))
+        _t *= self.density_df['loss']
+        _ex2 = float(np.sum(_t))
+        _t *= self.density_df['loss']
+        _ex3 = float(np.sum(_t))
+        self.est_m, self.est_cv, self.est_skew = (
+            MomentAggregator.static_moments_to_mcvsk(_ex1, _ex2, _ex3)
+        )
+        self.ex = self.est_m
         self.est_sd = self.est_m * self.est_cv
         self.est_var = self.est_sd ** 2
+        self._write_empirical_stats(_ex1, _ex2, _ex3)
 
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
@@ -1334,53 +1379,155 @@ class Portfolio(object):
         self._var_tvar_function = None
         self._cdf = None
 
-    def make_audit_df(self, columns, theoretical_stats=None):
-        """
-        Add or update the audit_df.
+    def _build_stats_df(self, ma, max_limit):
+        """Construct ``stats_df`` from the ``MomentAggregator`` after init.
 
+        Adapted from ``Aggregate._init_stats_df`` + post-loop totals
+        block. Per-unit columns hold each ``Aggregate.stats_df['mixed']``
+        (the unit's view of its own theoretical moments); the ``total``
+        column holds portfolio totals from the ``MomentAggregator``
+        (``remix=False`` — the running totals across units).
+
+        Portfolio's column is ``total`` rather than Aggregate's ``mixed``
+        because there is no portfolio-level mixed-vs-independent analog
+        (mixed-vs-independent is an Aggregate-only concept that strips
+        a single agg's freq mixing distribution). Columns are therefore:
+        per-unit + ``total`` + ``empirical`` + ``error``.
+
+        ``empirical`` and ``error`` are left as NaN here; ``update``
+        populates them after the FFT.
         """
-        # these are the values set by the audit
-        column_names = ['Sum probs', 'EmpMean', 'EmpCV', 'EmpSkew', "EmpKurt", 'EmpEX1', 'EmpEX2', 'EmpEX3'] + \
-                        ['P' + str(100 * i) for i in self.audit_percentiles]
-        if self.audit_df is None:
-            self.audit_df = pd.DataFrame(columns=column_names)
-        for col in columns:
-            sump = np.sum(self.density_df[f'p_{col}'])
-            t = self.density_df[f'p_{col}'] * self.density_df['loss']
-            ex1 = np.sum(t)
-            t *= self.density_df['loss']
-            ex2 = np.sum(t)
-            t *= self.density_df['loss']
-            ex3 = np.sum(t)
-            t *= self.density_df['loss']
-            ex4 = np.sum(t)
-            m, cv, s = MomentAggregator.static_moments_to_mcvsk(ex1, ex2, ex3)
-            # empirical kurtosis
-            kurt = (ex4 - 4 * ex3 * ex1 + 6 * ex1 ** 2 * ex2 - 3 * ex1 ** 4) / ((m * cv) ** 4) - 3
-            ps = np.zeros((len(self.audit_percentiles)))
-            temp = self.density_df[f'p_{col}'].cumsum()
-            for i, p in enumerate(self.audit_percentiles):
-                ps[i] = (temp > p).idxmax()
-            newrow = [sump, m, cv, s, kurt, ex1, ex2, ex3] + list(ps)
-            # TODO this is fragile if you request another set of percentiles
-            # add the row, then subset it (when called first time you don't have
-            # the Err columns)
-            self.audit_df.loc[col, column_names] = newrow
-        if theoretical_stats is not None and 'Mean' not in self.audit_df.columns:
-            # merges on the first five columns: mean, cv, sk, limit, p99.9E
-            self.audit_df = pd.concat((theoretical_stats, self.audit_df), axis=1, sort=True)
+        cols = list(self.line_names) + ['total', 'empirical', 'error']
+        self.stats_df = pd.DataFrame(
+            np.nan, index=_PORT_STATS_ROW_INDEX, columns=cols, dtype=object,
+        )
+
+        # Per-unit columns: copy each agg's ``stats_df['mixed']`` into the
+        # matching unit column.
+        for a in self.agg_list:
+            a_mixed = a.stats_df['mixed']
+            for idx, val in a_mixed.items():
+                if idx in self.stats_df.index:
+                    self.stats_df.loc[idx, a.name] = val
+
+        # Portfolio totals: ``total`` = running totals across units
+        # (``remix=False``, preserves each agg's freq mixing).
+        unit_cols = list(self.line_names)
+        _flat_names = MomentAggregator.column_names()
+
+        def _collect(meta_key):
+            return [self.stats_df.loc[('meta', meta_key), unit]
+                    for unit in unit_cols]
+
+        def _safe_sum(vals):
+            out = 0.0
+            for v in vals:
+                try:
+                    out += float(v)
+                except (TypeError, ValueError):
+                    return np.nan
+            return out
+
+        tot_el = _safe_sum(_collect('el'))
+        tot_prem = _safe_sum(_collect('prem'))
+        tot_lr = (tot_el / tot_prem) if tot_prem else np.nan
+        # Attachment: portfolio total only makes sense if all units
+        # share the same attachment (commonly 0); else NaN. Limit at
+        # portfolio level is the max across units (legacy convention).
+        _attaches = _collect('attachment')
         try:
-            self.audit_df['MeanErr'] = self.audit_df['EmpMean'] / self.audit_df['Mean'] - 1
-        except ZeroDivisionError as e:
-            pass
-        try:
-            self.audit_df['CVErr'] = self.audit_df['EmpCV'] / self.audit_df['CV'] - 1
-        except ZeroDivisionError as e:
-            pass
-        try:
-            self.audit_df['SkewErr'] = self.audit_df['EmpSkew'] / self.audit_df['Skew'] - 1
-        except ZeroDivisionError as e:
-            pass
+            _attach_floats = [float(v) for v in _attaches]
+            tot_attach = _attach_floats[0] if (
+                _attach_floats and all(a == _attach_floats[0] for a in _attach_floats)
+            ) else np.nan
+        except (TypeError, ValueError):
+            tot_attach = np.nan
+
+        stats = ma.get_fsa_stats(total=True, remix=False)
+        for flat, val in zip(_flat_names, stats):
+            self.stats_df.loc[_flat_col_to_stats_index(flat), 'total'] = val
+        self.stats_df.loc[('meta', 'name'), 'total'] = self.name
+        self.stats_df.loc[('meta', 'limit'), 'total'] = max_limit
+        self.stats_df.loc[('meta', 'attachment'), 'total'] = tot_attach
+        self.stats_df.loc[('meta', 'el'), 'total'] = tot_el
+        self.stats_df.loc[('meta', 'prem'), 'total'] = tot_prem
+        self.stats_df.loc[('meta', 'lr'), 'total'] = tot_lr
+
+    def _write_empirical_stats(self, agg_ex1, agg_ex2, agg_ex3):
+        """Populate the ``empirical`` and ``error`` columns of ``stats_df``.
+
+        Called from ``update`` (and ``create_from_sample`` after the
+        switcheroo) once the FFT has run. Three sources feed it:
+
+        - ``meta`` rows: limit / attachment / prem / el / lr have no
+          empirical analog at the portfolio level — they are factual
+          (limit, attach) or sums of expected values (prem, el, lr).
+          Copy the ``total`` values across with implied ``error = 0``.
+        - ``sev`` rows: combine each unit's empirical sev moments
+          (``a.stats_df['empirical']``) with the unit's theoretical
+          frequency via a fresh ``MomentAggregator``. Yields portfolio-
+          level empirical sev mean / cv / skew + raw moments.
+        - ``agg`` rows: ``ex1`` / ``ex2`` / ``ex3`` are the raw moments
+          ``agg_ex1`` / ``agg_ex2`` / ``agg_ex3`` already computed from
+          the portfolio-total FFT density; ``mean`` / ``cv`` / ``skew``
+          are ``est_m`` / ``est_cv`` / ``est_skew``.
+
+        ``('freq', *)`` empirical rows stay NaN — frequency is exact (no
+        FFT applies to it) and the Aggregate convention is the same.
+        """
+        # meta: copy from total, error = 0 implicit.
+        for meta_key in ('limit', 'attachment', 'el', 'prem', 'lr'):
+            self.stats_df.loc[('meta', meta_key), 'empirical'] = (
+                self.stats_df.loc[('meta', meta_key), 'total']
+            )
+
+        # sev: re-aggregate per-unit (theoretical freq, empirical sev)
+        # through a fresh MomentAggregator. Aggregate's stats_df only
+        # stores empirical sev mean/cv/skew (not raw moments), so we
+        # invert each unit's (m, cv, sk) back to (ex1, ex2, ex3) via
+        # MomentWrangler before feeding the aggregator. ``get_fsa_stats``
+        # returns 18 entries: freq f1/f2/f3/m/cv/sk, sev s1/s2/s3/m/cv/sk,
+        # agg a1/a2/a3/m/cv/sk; we use the sev block (indices 6..11).
+        ma_emp = MomentAggregator()
+        for a in self.agg_list:
+            mixed = a.stats_df['mixed']
+            emp = a.stats_df['empirical']
+            s_m = float(emp[('sev', 'mean')])
+            s_cv = float(emp[('sev', 'cv')])
+            s_sk = float(emp[('sev', 'skew')])
+            s_sd = s_m * s_cv
+            mw = MomentWrangler()
+            # (mean, variance, third-central-moment) → noncentral raw moments
+            mw.central = (s_m, s_sd * s_sd, s_sk * s_sd ** 3)
+            s_ex1, s_ex2, s_ex3 = mw.noncentral
+            ma_emp.add_fs(
+                float(mixed[('freq', 'ex1')]),
+                float(mixed[('freq', 'ex2')]),
+                float(mixed[('freq', 'ex3')]),
+                s_ex1, s_ex2, s_ex3,
+            )
+        emp_stats = ma_emp.get_fsa_stats(total=True, remix=False)
+        sev_block = [('sev', 'ex1'), ('sev', 'ex2'), ('sev', 'ex3'),
+                     ('sev', 'mean'), ('sev', 'cv'), ('sev', 'skew')]
+        for idx, val in zip(sev_block, emp_stats[6:12]):
+            self.stats_df.loc[idx, 'empirical'] = val
+
+        # agg: raw moments + mean/cv/skew from the FFT density.
+        self.stats_df.loc[('agg', 'ex1'),  'empirical'] = agg_ex1
+        self.stats_df.loc[('agg', 'ex2'),  'empirical'] = agg_ex2
+        self.stats_df.loc[('agg', 'ex3'),  'empirical'] = agg_ex3
+        self.stats_df.loc[('agg', 'mean'), 'empirical'] = self.est_m
+        self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
+        self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
+
+        # error: relative diff vs the ``total`` column. For meta rows
+        # where empirical == total the result is 0 (or NaN where total
+        # is NaN, e.g. attach was inconsistent across units).
+        self.stats_df['error'] = (
+            pd.to_numeric(self.stats_df['empirical'], errors='coerce')
+            / pd.to_numeric(self.stats_df['total'], errors='coerce')
+            - 1
+        )
 
     @property
     def valid(self):
@@ -1495,67 +1642,6 @@ class Portfolio(object):
             self.density_df.filter(regex='^e_|^exi_xlea|^[a-z_]+ημ').columns,
             axis=1
         )
-
-    def report(self, report_list='quick'):
-        """
-
-        :param report_list:
-        :return:
-        """
-        full_report_list = ['statistics', 'quick', 'audit', 'priority_capital', 'priority_analysis']
-        if report_list == 'all':
-            report_list = full_report_list
-        for r in full_report_list:
-            if r in report_list:
-                html_title(f'{r} Report for {self.name}', 1)
-                if r == 'priority_capital':
-                    if self._priority_capital_df is not None:
-                        display(self._priority_capital_df.loc[1e-3:1e-2, :].style)
-                    else:
-                        html_title(f'Report {r} not generated', 2)
-                elif r == 'quick':
-                    if self.audit_df is not None:
-                        df = self.audit_df[['Mean', 'EmpMean', 'MeanErr', 'CV', 'EmpCV', 'CVErr', 'P99.0']]
-                        display(df.style)
-                    else:
-                        html_title(f'Report {r} not generated', 2)
-                else:
-                    df = getattr(self, r + '_df', None)
-                    if df is not None:
-                        try:
-                            display(df.style)
-                        except ValueError:
-                            display(df)
-                    else:
-                        html_title(f'Report {r} not generated', 2)
-
-    @property
-    def report_df(self):
-        if self.audit_df is not None:
-            summary_sl = (slice(None), ['mean', 'cv', 'skew'])
-
-            bit1 = self.statistics_df.loc[summary_sl, :]
-            bit1.index = ['freq_m', 'sev_m', 'agg_m', 'freq_cv', 'sev_cv', 'agg_cv', 'freq_skew', 'sev_skew', 'agg_skew']
-
-
-            bit2 = self.audit_df[['EmpMean', 'EmpCV', 'EmpSkew', 'EmpKurt', 'P99.0', 'P99.6']].T
-            bit2.index = ['agg_emp_m', 'agg_emp_cv', 'agg_emp_skew', 'agg_emp_kurt', 'P99.0_emp', 'P99.6_emp']
-
-            df = pd.concat((bit1, bit2), axis=0)
-            df.loc['agg_m_err', :] = df.loc['agg_emp_m'] / df.loc['agg_m'] - 1
-            df.loc['agg_cv_err', :] = df.loc['agg_emp_cv'] / df.loc['agg_cv'] - 1
-            df.loc['agg_skew_err', :] = df.loc['agg_emp_skew'] / df.loc['agg_skew'] - 1
-            df = df.loc[['freq_m', 'freq_cv', 'freq_skew', 'sev_m', 'sev_cv', 'sev_skew',
-                         'agg_m', 'agg_emp_m', 'agg_m_err',
-                         'agg_cv', 'agg_emp_cv', 'agg_cv_err',
-                         'agg_skew', 'agg_emp_skew', 'agg_skew_err',
-                         'agg_emp_kurt',
-                         'P99.0_emp','P99.6_emp']]
-            df.columns.name = 'unit'
-            df.index.name = 'statistic'
-        else:
-            df = None
-        return df
 
     @property
     def pprogram(self):

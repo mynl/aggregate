@@ -3137,10 +3137,14 @@ class Aggregate:
         sev_ans = []
         total_row = len(self.sevs)
         for i, (s, wt, en, bed) in enumerate(zip(self.sevs, wts, self.en, beds)):
+            # exact theoretical sev mean from the canonical stats_df:
+            # per-component columns are ``comp_<i>``; single-component
+            # arms historically used ``self.name``. After Stage 1c+ the
+            # column is always ``comp_<i>`` regardless.
+            label = f'comp_{i}'
+            m = self.stats_df.loc[('sev', 'ex1'), label]
             if len(self.sevs) == 1:
                 i = self.name
-            # exact
-            m = self.statistics.loc[('sev', 'ex1'), i]
             # estimated
             em, _ = xsden_to_meancv(self.xs, bed)
             sev_ans.append([s.long_name,

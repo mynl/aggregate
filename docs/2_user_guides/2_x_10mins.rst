@@ -1059,7 +1059,7 @@ It applies to the **gross** outcome when there is reinsurance, so the results fo
     with pd.option_context(*oco):
         print(a05g.stats_df)
         print('\n')
-        print(p07.statistics_df)
+        print(p07.stats_df)
 
 .. _10 min report:
 
@@ -1078,7 +1078,7 @@ an expanded version of ``describe``.
     with pd.option_context(*oco):
         print(a05g.stats_df)
         print('\n')
-        print(p07.statistics_df)
+        print(p07.stats_df)
 
 .. _10mins extra info:
 

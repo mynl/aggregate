@@ -16,8 +16,12 @@ def bodoff_exhibit(self, reg_p):
     basic = pd.DataFrame(index=pd.Index(['EX', 'sa VaR', 'sa TVaR', 'pct EX', 'coVaR', 'alt coVaR', 'naive coTVaR', 'coTVaR'], name='method'),
                          columns=self.line_names_ex, dtype=float)
 
-    # mean
-    basic.loc['EX'] = self.audit_df.Mean.values
+    # mean — per-unit theoretical agg means from stats_df, plus the
+    # portfolio total from the ``total`` column
+    basic.loc['EX'] = [
+        float(self.stats_df.loc[('agg', 'mean'), name])
+        for name in self.line_names
+    ] + [float(self.stats_df.loc[('agg', 'mean'), 'total'])]
     # stand alone
     basic.loc['sa VaR'] = self.var_dict(reg_p, 'lower').values()
     basic.loc['sa TVaR'] = self.var_dict(reg_p, 'tvar').values()

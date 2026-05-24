@@ -8,7 +8,7 @@ Mirror Aggregate's Stage 1c+ work on Portfolio: introduce `stats_df` as the sing
 
 ## Pre-conditions
 
-- Sub-projects A, B, C, D landed and committed. Hash: 
+- Sub-projects A, B, C, D landed and committed. Hash: f3a6236702c99be66854e2d266aa7acbd63be80d
 - `Aggregate` already has `stats_df` (Stage 1c+; done in a prior session).
 - 415/415 pytest green.
 

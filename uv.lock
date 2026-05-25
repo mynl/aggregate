@@ -53,6 +53,7 @@ dev = [
     { name = "sphinxcontrib-bibtex" },
 ]
 notebook = [
+    { name = "attrs" },
     { name = "ipywidgets" },
     { name = "jupyterlab" },
     { name = "jupytext" },
@@ -60,6 +61,7 @@ notebook = [
 
 [package.metadata]
 requires-dist = [
+    { name = "attrs", marker = "extra == 'notebook'" },
     { name = "cycler" },
     { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.20,<0.22" },
     { name = "ipykernel" },

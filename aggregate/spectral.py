@@ -36,9 +36,20 @@ except ImportError:
             return lambda f: f
         return func
 
+import hashlib
+
 from .constants import *
 from .random_agg import RANDOM
-from .utilities import short_hash
+
+
+def _short_hash(s):
+    """
+    machine independent hash of a string s
+    """
+    ho = hashlib.md5()
+    ho.update(s.encode('utf-8'))
+    hv = ho.hexdigest()[:8].upper()
+    return hv
 
 
 # Canonical display order for distortion names. Used as a pandas
@@ -551,7 +562,7 @@ class Distortion:
         """Unique ID as a short string, based on constructor arguments."""
         bit = {k: v for k, v in self.__dict__.items()
                if k in ('_name', 'r0', 'df', 'shape', 'col_x', 'col_y')}
-        return short_hash(str(bit))
+        return _short_hash(str(bit))
 
     def __str__(self):
         return self.name

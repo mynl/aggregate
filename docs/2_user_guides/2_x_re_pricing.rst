@@ -600,7 +600,7 @@ Setup the gross portfolio.
 
     import numpy as np
     from aggregate import build, mv, qd, xsden_to_meancvskew, \
-         mu_sigma_from_mean_cv, lognorm_lev
+         lognorm_fit, lognorm_lev
 
     mix_cv = ((1.036-1)/5.154)**.5; mix_cv
 
@@ -645,7 +645,7 @@ Bear and Nemlick use a lognormal approximation to the aggregate.
 .. ipython:: python
     :okwarning:
 
-    mu, sigma = mu_sigma_from_mean_cv(a10.agg_m, a10.agg_cv)
+    mu, sigma = lognorm_fit(a10.agg_m, a10.agg_cv)
     elim_approx = lognorm_lev(mu, sigma, 1, 360)
     a11.agg_m - elim_approx, 1 - elim_approx / a11.agg_m
 
@@ -786,7 +786,7 @@ Compare the results with the lognormal approximation, see Table 1 line 3.
 .. ipython:: python
     :okwarning:
 
-    mu, sigma = mu_sigma_from_mean_cv(1, 0.905)
+    mu, sigma = lognorm_fit(1, 0.905)
     ler = lognorm_lev(mu, sigma, 1, 2) - lognorm_lev(mu, sigma, 1, 1)
     p = a15_lc.est_m * 100 / 70
     bit = pd.DataFrame(
@@ -1030,7 +1030,7 @@ The same quantity can be estimated using a lognormal approximation and numerical
     :okwarning:
 
     import scipy.stats as ss
-    mu, sigma = mu_sigma_from_mean_cv(0.5, 0.485)
+    mu, sigma = lognorm_fit(0.5, 0.485)
     fz = ss.lognorm(sigma, scale=np.exp(mu))
     quad(lambda x: (0.4 - c(x)) * fz.pdf(x), 0, np.inf)
 
@@ -1039,7 +1039,7 @@ Bear and Nemlick use a coarser lognormal approximation to estimate the slide com
 .. ipython:: python
     :okwarning:
 
-    mu, sigma = mu_sigma_from_mean_cv(1, 0.485)
+    mu, sigma = lognorm_fit(1, 0.485)
     lr = 0.5; max_slide = 0.4
     entry_ratios = [1.3, 1.1, 0.7, 0]
     ins_charge = [1 - lognorm_lev(mu, sigma, 1, i) for i in entry_ratios]
@@ -1298,9 +1298,9 @@ Objects created by :meth:`build` in this guide.
     :okwarning:
     :okexcept:
 
-    from aggregate import pprint_ex
+    from aggregate import decl_pprint
     for n, r in build.discover('^(Re):').iterrows():
-        pprint_ex(r.program, split=20)
+        decl_pprint(r.program, split=20)
 
 
 .. ipython:: python

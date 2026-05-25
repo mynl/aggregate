@@ -507,9 +507,9 @@ Here is a summary of all the objects created in this section.
 .. ipython:: python
     :okwarning:
 
-    from aggregate import pprint_ex
+    from aggregate import decl_pprint
     for n, r in build.discover('^Bahn').iterrows():
-        pprint_ex(r.program, split=20)
+        decl_pprint(r.program, split=20)
 
 .. ipython:: python
     :suppress:

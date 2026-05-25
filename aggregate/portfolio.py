@@ -22,23 +22,121 @@ import warnings
 from IPython.display import HTML, display
 
 from .constants import *
-from .distributions import Aggregate, Severity, _flat_col_to_stats_index
+from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
-from .utilities import (ft, ift, html_title,
-                        suptitle_and_tight, pprint_ex,
-                        MomentAggregator, MomentWrangler,
+from .moments import MomentAggregator, MomentWrangler
+from .iman_conover import iman_conover
+from .utilities import (ft, ift, decl_pprint,
                         subsets, round_bucket,
-                        make_mosaic_figure, iman_conover, approximate_work,
-                        make_var_tvar, agg_help, explain_validation,
-                        make_comonotonic_allocations as make_comonotonic_allocations_work)
+                        make_var_tvar, agg_help, explain_validation)
 import aggregate.random_agg as ar
+
+# Optional numba acceleration for ``make_comonotonic_allocations_work``.
+try:
+    from numba import njit
+except ImportError:
+    def njit(func):
+        return func
 
 
 # fontsize : int or float or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
 # matplotlib.rcParams['legend.fontsize'] = 'xx-small'
 logger = logging.getLogger(__name__)
+
+
+@njit
+def make_comonotonic_allocations_work(s_grid: np.ndarray, pdf_s: np.ndarray, kappa: np.ndarray) -> np.ndarray:
+    """
+    Computes a comonotonic convex-order improvement for an allocation matrix.
+
+    Implements the algorithmic convex-order improvement from Theorem 3.1 in
+    Denuit et. al.
+    Uses a majorization approach based on Lorentz and Shimogaki (1968)
+    to flatten monotonicity violations and redistribute mass .
+
+    Reference
+    ---------
+
+    Denuit, Michel, et al. "Comonotonicity and Pareto optimality, with application
+    to collaborative insurance." Insurance: Mathematics and Economics 120 (2025): 1-16.
+
+    Parameters
+    ----------
+    s_grid : np.ndarray
+        1D array of length M representing the discretized aggregate sum $S$.
+    pdf_s : np.ndarray
+        1D array of length M containing the probability mass function of $S$.
+    kappa : np.ndarray
+        2D array of shape (N, M) where N is the number of individual risks and M
+        is the length of s_grid. Represents the initial Conditional Mean
+        Risk-Sharing (CMRS) allocations $X_i^0 = \\mathsf{E}[X_i | S]$.
+
+    Returns
+    -------
+    np.ndarray
+        2D array of shape (N, M) containing the comonotonic allocations $\\tilde{f}_i(S)$.
+    """
+    n, m = kappa.shape
+    kappa_tilde = np.copy(kappa)
+
+    # Sweep forward through the aggregate states S
+    for k in range(1, m):
+        # Calculate local slopes to check for monotonicity
+        diffs = kappa_tilde[:, k] - kappa_tilde[:, k-1]
+
+        # Identify components where the allocation decreases as S increases
+        violators = np.where(diffs < 0)[0]
+
+        if len(violators) > 0:
+            non_violators = np.where(diffs >= 0)[0]
+
+            for i in violators:
+                p = k - 1
+                mass = pdf_s[k]
+                weighted_sum = kappa_tilde[i, k] * mass
+
+                # Scan backward to find the pooling index p that restores monotonicity
+                # by creating an integral average (lambda_val) that bounds the previous steps
+                while p >= 0 and kappa_tilde[i, p] > (weighted_sum / mass if mass > 0 else kappa_tilde[i, k]):
+                    weighted_sum += kappa_tilde[i, p] * pdf_s[p]
+                    mass += pdf_s[p]
+                    p -= 1
+
+                p += 1
+
+                if mass > 0:
+                    lambda_val = weighted_sum / mass
+                else:
+                    lambda_val = kappa_tilde[i, k]
+
+                # delta represents the mass removed from the violator to flatten it
+                delta = kappa_tilde[i, p:k + 1] - lambda_val
+                kappa_tilde[i, p:k + 1] = lambda_val
+
+                if len(non_violators) > 0:
+                    slopes = diffs[non_violators]
+                    sum_slopes = np.sum(slopes)
+
+                    # Compute redistribution weights proportional to positive slopes
+                    # to prevent non-violators from breaking monotonicity
+                    if sum_slopes > 0:
+                        alpha = slopes / sum_slopes
+                    else:
+                        alpha = np.ones(len(non_violators)) / len(non_violators)
+
+                    # Redistribute the removed mass to the non-violating components
+                    for idx, j in enumerate(non_violators):
+                        kappa_tilde[j, p:k + 1] += delta * alpha[idx]
+
+    return kappa_tilde
+
+
+# Public alias for module-level callers (``Portfolio.make_comonotonic_allocations``
+# is the method counterpart and reuses the underscored ``_work`` name internally
+# to avoid clashing).
+make_comonotonic_allocations = make_comonotonic_allocations_work
 
 
 # Canonical column order for pricing exhibits. Used as a pandas
@@ -1167,7 +1265,7 @@ class Portfolio(object):
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
-        return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
+        return approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output)
 
     def percentiles(self, pvalues=None):
         """
@@ -1648,14 +1746,14 @@ class Portfolio(object):
         """
         pretty print the program to html
         """
-        return pprint_ex(self.program, 20)
+        return decl_pprint(self.program, 20, show=False)
 
     @property
     def pprogram_html(self):
         """
         pretty print the program to html
         """
-        return pprint_ex(self.program, 0, html=True)
+        return decl_pprint(self.program, 0, html=True, show=False)
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """
@@ -1711,12 +1809,12 @@ class Portfolio(object):
         Defualt plot of density, survival functions (linear and log)
 
         :param axd: dictionary with plots A and B for density and log density
-        :param figsize: arguments passed to make_mosaic_figure if no axd
+        :param figsize: figure size used by ``plt.subplot_mosaic`` if ``axd`` is not provided
         :return:
         """
 
         if axd is None:
-            self.figure, axd = make_mosaic_figure('AB', figsize=figsize)
+            self.figure, axd = plt.subplot_mosaic('AB', figsize=figsize, layout='constrained')
 
         ax = axd['A']
         xl = self._limits()

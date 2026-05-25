@@ -10,8 +10,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import linprog
 from scipy.sparse import coo_matrix
 
-# from aggregate.utilities import FigureManager
-from . import Portfolio, Aggregate, Distortion, Underwriter, FigureManager
+from . import Portfolio, Aggregate, Distortion, Underwriter
 from . constants import *
 
 logger = logging.getLogger(__name__)
@@ -876,10 +875,7 @@ def similar_risks_example():
     bounds.tvar_cloud('total', prem, a, 128 * 2, 64 * 2, 'interp')
     p_star = bounds.p_star('total', prem, kind='interp')
 
-    smfig = FigureManager(cycle='c', color_mode='color', font_size=10, legend_font='small',
-                          default_figsize=(FIG_W, FIG_H))
-
-    f, axs = smfig(1, 3, (18.0, 6.0), )
+    f, axs = plt.subplots(1, 3, figsize=(18.0, 6.0), layout='constrained')
     ax0, ax1, ax2 = axs.flat
     axi = iter(axs.flat)
     # all with base portfolio

@@ -15,9 +15,50 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import (round_bucket, qd, show_fig, agg_help, parse_note_ex)
+from .utilities import (round_bucket, qd, agg_help)
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_note(txt, log2, bs, recommend_p, kwargs):
+    """
+    Extract build kwargs from a DecL note string and merge with caller-supplied
+    defaults. Recognizes ``bs``, ``log2``, ``padding``, ``normalize``, and
+    ``recommend_p`` in CSS-style ``key=value;`` form. ``bs`` accepts ``1/32``
+    style fractions. ``log2`` and ``bs`` from the note are taken only when the
+    caller's value is ``0`` (i.e. unset); ``recommend_p`` from the note always
+    wins. Remaining keys are merged into ``kwargs``.
+
+    Returns ``(log2, bs, recommend_p, kwargs)`` ready for ``Aggregate``/``Portfolio``
+    update.
+    """
+    stxt = txt.split(';')
+    kw = {}
+    for s in stxt:
+        parts = s.split('=')
+        if len(parts) == 2:
+            k = parts[0].strip()
+            v = parts[1].strip()
+            if re.match('bs|recommend_p', k):
+                if re.match(r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?/(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?', v):
+                    v = eval(v)
+                else:
+                    v = float(v)
+            elif re.match('log2|padding', k):
+                v = int(v)
+            elif 'normalize':
+                v = v == 'True'
+            kw[k] = v
+    if 'log2' in kw and log2 == 0:
+        log2 = kw.pop('log2')
+    if 'bs' in kw and bs == 0:
+        bs = kw.pop('bs')
+    if 'recommend_p' in kw:
+        # always take the recommend_p from the note
+        recommend_p = kw.pop('recommend_p')
+    # rest are passed through
+    kwargs.update(kw)
+    return log2, bs, recommend_p, kwargs
 
 
 def _row_stats(a, summary_cols):
@@ -559,7 +600,7 @@ class Underwriter(object):
                             answer.name, answer.kind)
             elif isinstance(answer.object, Aggregate) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = parse_note_ex(
+                log2, bs, recommend_p, kwargs = _parse_note(
                     d['note'], log2, bs, recommend_p, kwargs)
                 if d['sev_name'] == 'dhistogram' and log2 == 0:
                     bs_ = 1
@@ -595,7 +636,7 @@ class Underwriter(object):
                 pass
             elif isinstance(answer.object, Portfolio) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = parse_note_ex(
+                log2, bs, recommend_p, kwargs = _parse_note(
                     d['note'], log2, bs, recommend_p, kwargs)
                 if log2 == -1:
                     log2_ = 13
@@ -837,9 +878,6 @@ class Underwriter(object):
                 # `figsize` (would forward to ax.plot and crash).
                 a.plot()
                 print()
-                fig = getattr(a, 'figure', None)
-                if fig is not None:
-                    show_fig(fig, format='svg')
             df.loc[n, summary_cols] = _row_stats(a, summary_cols)
 
         if return_objects:

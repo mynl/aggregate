@@ -126,7 +126,7 @@ The following code replicates this calculation in aggregate. The answer relies o
    import pandas as pd
    import scipy.stats as ss
    ps = np.linspace(0.99, 1, 40, endpoint=False)
-   params = {i: agg.mu_sigma_from_mean_cv(10, i) for i in [1,2,3]}
+   params = {i: agg.lognorm_fit(10, i) for i in [1,2,3]}
    df = pd.DataFrame({f'x_{i}': ss.lognorm(params[i][1],
       scale=np.exp(params[i][0])).isf(1-ps)
       for i in [1,2,3]}, index=ps)

@@ -100,15 +100,15 @@ College courses and the early actuarial exams often ask purely technical questio
    2. The expected value of losses limited to 2500
    3. The expected value of losses in excess of 2500
 
-The code below provides all the answers. ``mu_sigma_from_mean_cv`` computes the lognormal parameters---one of the most written macro in actuarial science! Start by applying it to the given severity parameters to answer question 1.
+The code below provides all the answers. ``lognorm_fit`` computes the lognormal parameters---one of the most written macro in actuarial science! Start by applying it to the given severity parameters to answer question 1.
 
 .. ipython:: python
     :okwarning:
 
-    from aggregate import mu_sigma_from_mean_cv
+    from aggregate import lognorm_fit
     import pandas as pd
 
-    print(mu_sigma_from_mean_cv(50, 1.25))
+    print(lognorm_fit(50, 1.25))
 
 The function ``a01.approximate`` parameterizes all the requested matched moment approximations, returning frozen ``scipy.stats`` distribution objects that expose ``cdf`` methods. The :class:`Aggregate` class object ``a`` also has a ``cdf`` method. Using these functions, we can assemble a dataframe to answer question 3.
 
@@ -131,7 +131,7 @@ The function ``lognorm_lev`` computes limited expected values for the lognormal.
 
     from aggregate import lognorm_lev
 
-    mu, sigma = mu_sigma_from_mean_cv(a01.agg_m, a01.agg_cv)
+    mu, sigma = lognorm_fit(a01.agg_m, a01.agg_cv)
     lev = lognorm_lev(mu, sigma, 1, 2500)
     lev_agg = a01.density_df.loc[2500, 'lev']
     default = a01.agg_m - lev
@@ -176,9 +176,9 @@ Objects created by :meth:`build` in this guide.
     :okwarning:
     :okexcept:
 
-    from aggregate import pprint_ex
+    from aggregate import decl_pprint
     for n, r in build.discover('^Actuary:').iterrows():
-        pprint_ex(r.program, split=20)
+        decl_pprint(r.program, split=20)
 
 
 .. ipython:: python

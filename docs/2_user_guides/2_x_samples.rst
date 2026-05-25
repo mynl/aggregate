@@ -385,9 +385,9 @@ Objects created by :meth:`build` in this guide. Objects created directly by clas
     :okwarning:
     :okexcept:
 
-    from aggregate import pprint_ex
+    from aggregate import decl_pprint
     for n, r in build.discover('^Samp:').iterrows():
-        pprint_ex(r.program, split=20)
+        decl_pprint(r.program, split=20)
 
 
 .. ipython:: python

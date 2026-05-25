@@ -18,7 +18,7 @@ from IPython.display import display
 # from numpy import ndarray, dtype
 
 from ..distributions import Aggregate  # noqa
-from ..utilities import MomentWrangler
+from ..moments import MomentWrangler
 from ..underwriter import build
 from .ft import FourierTools
 

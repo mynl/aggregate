@@ -1,6 +1,6 @@
 # code for running test cases, producing HTML, etc.
 
-from .. import pprint_ex
+from .. import decl_pprint
 from .. import build as build_uw
 import logging
 import matplotlib.pyplot as plt
@@ -66,7 +66,7 @@ class TestSuite(object):
         for n in self.build.discover(regex).index:
             a = self.build(n)
             ans.append(a._html_info_blob().replace('h3>', 'h2>'))
-            ans.append(pprint_ex(a.program, 50, True))
+            ans.append(decl_pprint(a.program, 50, True, show=False))
             ans.append(self.style_df(a.describe).to_html())
             ans.append('<br>')
             fn = self.out_dir / f'img/{filename}_tmp_{hash(a):0x}.{fig_format}'

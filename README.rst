@@ -107,6 +107,79 @@ Housekeeping in the same release block:
   and the ``audit_df`` field on ``AnalyzeDistortionResult`` are
   unrelated and unchanged.
 
+Utilities refactor — ``aggregate/utilities.py`` shrinks from 3,753 to
+~700 LOC. The grab-bag module is reduced to a focused set of
+cross-cutting helpers; dead code is removed; themed code moves into
+new modules or back to its only caller.
+
+* **Deletes (~1,300 LOC):**
+
+  - ``frequency_examples`` / ``axiter_factory`` / ``AxisManager``
+    (~530 LOC of pedagogical scaffolding with no consumers).
+  - ``MomentAggregator.stats_series`` (retired by Stage 1c+).
+  - ``test_var_tvar`` (internal scaffold).
+  - Plotting / formatting subsystem: ``FigureManager``,
+    ``make_mosaic_figure``, ``easy_formatter``, ``knobble_fonts``,
+    ``style_df``, ``friendly``, ``GreatFormatter``, ``sEngFormatter``,
+    ``show_fig`` (~630 LOC). ``aggregate`` no longer touches the
+    user's matplotlib settings.
+  - Dead-import / alias cleanup: ``html_title``, ``suptitle_and_tight``,
+    ``ln_fit`` alias.
+  - Dead public helpers: ``mv``, ``qdp``, ``introspect``,
+    ``get_fmts``, ``sensible_jump``, ``GCN`` namedtuple.
+  - Timer cruft and the commented ``knobble_fonts(True)`` call.
+
+* **New modules:**
+
+  - ``aggregate/moments.py`` — ``MomentAggregator``, ``MomentWrangler``,
+    ``xsden_to_meancv``, ``xsden_to_meancvskew``.
+  - ``aggregate/iman_conover.py`` — ``iman_conover`` + ``ic_*``,
+    ``block_iman_conover``, ``make_corr_matrix``,
+    ``random_corr_matrix``, ``rearrangement_algorithm_max_VaR``.
+
+* **Public ``*_fit`` family in ``distributions.py``:** symmetric
+  ``(m, cv[, skew])`` → distribution-parameter cluster, all importable
+  from ``aggregate``: ``lognorm_fit`` (renamed from
+  ``mu_sigma_from_mean_cv``), ``gamma_fit``, ``beta_fit``,
+  ``invgamma_fit``, ``invgauss_fit``, ``sln_fit``, ``sgamma_fit``.
+  Plus ``approximate_from_mcvsk`` (renamed from ``approximate_work``),
+  ``lognorm_approx``, ``lognorm_lev``. The ``ln_fit`` alias is
+  dropped — ``lognorm_fit`` is canonical.
+  ``approximate_from_mcvsk``'s gamma branch now calls
+  ``gamma_fit(m, cv)`` — symmetric with the lognorm branch using
+  ``lognorm_fit``.
+
+* **Private single-module helpers moved + privatised** (no public
+  surface change beyond the underscore): ``_estimate_agg_percentile``,
+  ``_picks_work``, ``_moms_analytic`` + ``_partial_e`` +
+  ``_partial_e_numeric``, ``_integral_by_doubling``,
+  ``_logarithmic_theta`` all moved into ``distributions.py``.
+  ``_parse_note`` (the merge of ``parse_note`` + ``parse_note_ex``)
+  moved into ``underwriter.py``. ``_short_hash`` moved into
+  ``spectral.py``.
+
+* ``make_comonotonic_allocations`` moved to ``portfolio.py`` as a
+  public module-level function (paired with the ``Portfolio``
+  method of the same name). Named locally
+  ``make_comonotonic_allocations_work`` to avoid clashing with the
+  method; re-exported cleanly as ``make_comonotonic_allocations``.
+
+* ``Aggregate.plot`` and the ``bounds.py`` ``FigureManager`` call
+  site rewritten to plain matplotlib (``plt.subplot_mosaic``,
+  ``plt.subplots``). ``extensions/case_studies.py`` mpl call sites
+  converted likewise.
+
+* ``pprint`` renamed to ``decl_pprint`` (the DecL syntax-highlighter
+  helper; avoids stdlib name collision).
+
+* Documentation: ``mu_sigma_from_mean_cv`` → ``lognorm_fit`` updated
+  in ``2_x_actuary_student.rst``, ``2_x_re_pricing.rst``, and
+  ``5_x_rearrangement_algorithm.rst``. Other rst pages pending a
+  full sweep.
+
+* PEG regression baseline unchanged (numbers reproduce bit-identically
+  at ``rtol=1e-10``); 430 pytest cases pass.
+
 1.0.0a7
 -------
 
@@ -746,7 +819,7 @@ Underwriter surface rationalization (breaking changes; v1.0 cleanup):
 
 * Added pygments lexer for decl (called agg, agregate, dec, or decl)
 * Added to the documentation
-* using pygments style in ``pprint_ex`` html mode
+* using pygments style in ``decl_pprint`` html mode
 * removed old setup scripts and files and stack.md
 
 0.14.1 (June 2023)

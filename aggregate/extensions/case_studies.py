@@ -5,7 +5,7 @@
 # Integrates code from common_header, common_scripts, and hack
 
 import aggregate as agg
-from aggregate import Aggregate, round_bucket, make_mosaic_figure, FigureManager, Bounds, plot_max_min
+from aggregate import Aggregate, round_bucket, Bounds, plot_max_min
 from aggregate.extensions.portfolio_pir import (
     calibrate_blends, stand_alone_pricing, twelve_plot,
 )
@@ -241,10 +241,6 @@ class CaseStudy(object):
         # graphics defaults
         self.fw = FIG_W
         self.fh = FIG_H
-        color_mode = 'color'
-        cycle_mode = 'c'
-        self.smfig = FigureManager(cycle=cycle_mode, color_mode=color_mode, font_size=10, legend_font='small',
-                                   default_figsize=(self.fw, self.fh))
         self.colormap = 'viridis'
         self.figure_bg_color = 'aliceblue'
         plt.rcParams["axes.facecolor"] = 'lightsteelblue'
@@ -1042,7 +1038,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
     def get_f_axs(self, nr, nc):
         w = nc * self.fw
         h = nr * self.fh
-        return self.smfig(nr, nc, (w, h))
+        return plt.subplots(nr, nc, figsize=(w, h), layout='constrained', squeeze=False)
 
     @staticmethod
     def get_image_dimensions(image_path):
@@ -1168,7 +1164,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             f'(TG) {self.case_name}, gross twelve plot with {self.dgross} distortion.'
         ]
         for port, nm, caption in zip((self.net, self.gross), ('T_net', 'T_gross'), captions):
-            f, axs = self.smfig(4, 3, (10.8, 12.0))
+            f, axs = plt.subplots(4, 3, figsize=(10.8, 12.0), layout='constrained', squeeze=False)
             # ad comps does not create augmented
             port.apply_distortion(port.distortions['dual'], efficient=False)
             twelve_plot(port, f, axs, xmax=xlim[1], ymax2=xlim[1],
@@ -1196,7 +1192,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         if self.f_discrete:
             return
         # blended distortion
-        f, axs = self.smfig(1, 3, (12.0, 4.0), )
+        f, axs = plt.subplots(1, 3, figsize=(12.0, 4.0), layout='constrained', squeeze=False)
         ax0, ax1, ax2 = axs.flat
 
         ps = np.hstack((np.linspace(0, 0.1, 2000, endpoint=False), np.linspace(0.1, 1, 100)))
@@ -1235,7 +1231,8 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         port = self.ports[kind]
 
         # new style = vertical, but focused on what is shown in the cap_table range
-        f, axs = make_mosaic_figure('AB', w=4, h=6, return_array=True)
+        f, axd = plt.subplot_mosaic('AB', figsize=(8, 6), layout='constrained')
+        axs = np.array(list(axd.values()))
         ax0, ax1 = axs.flat
         for ax in axs.flat:
             if ax is ax0:
@@ -1562,7 +1559,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             # f, axs = self.get_f_axs(2, 2)
             # ax0, ax1, ax2, ax3 = axs.flat
 
-            f, axd = make_mosaic_figure('AB\nCD')
+            f, axd = plt.subplot_mosaic('AB\nCD', layout='constrained')
             axd_top = {'A': axd['A'], 'B': axd['B']}
             axd_bottom = {'A': axd['C'], 'B': axd['D']}
             # order series so total is first
@@ -1619,7 +1616,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             # kappa_estimate = sample.reset_index().groupby('bin')[['loss', 'e_total']].agg(np.mean).set_index('loss')
 
             # make the image
-            f, ax2 = self.smfig(1, 1, (3, 3))
+            f, ax2 = plt.subplots(1, 1, figsize=(3, 3), layout='constrained')
             bit = sample.sample(n=25000 if self.case_id == 'tame' else 250000)
             ax2.scatter(x=bit[ln1], y=bit[ln0], marker='.', s=1, alpha=.1)
             ax2.set(xlim=sim_xlim, ylim=sim_ylim)
@@ -1631,7 +1628,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             del f
 
             # assemble parts
-            f, axs = self.smfig(1, 3, (9, 3))
+            f, axs = plt.subplots(1, 3, figsize=(9, 3), layout='constrained', squeeze=False)
             ax0, ax1, ax2 = axs.flat
             axi = iter(axs.flat)
             bivariate_density_plots(axi, self.ports.values(), xmax=xmax, levels=15, biv_log=True, contour_scale=xmax,
@@ -1721,7 +1718,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
             # fig 11.3, 4, 5
             # warning: quite slow!
             logger.info('Figures 11.3, 11.4, 11.5')
-            f, axs = self.smfig(1, 3, (3 * 3, 1 * 3))
+            f, axs = plt.subplots(1, 3, figsize=(3 * 3, 1 * 3), layout='constrained', squeeze=False)
             bounds = self.boundss['gross']
             port = self.ports['gross']
             premium, a = self.pricing_summary.loc[['P', 'a'], 'gross']
@@ -1743,7 +1740,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         if 11 in chapters or 11.6 in chapters:
             # fig 11.6, 7, 8
             logger.info('Figures 11.6, 11.7, 11.8')
-            f, axs = self.smfig(4, 3, (3 * 2.5, 4 * 2.5))
+            f, axs = plt.subplots(4, 3, figsize=(3 * 2.5, 4 * 2.5), layout='constrained', squeeze=False)
 
             port = self.ports['gross']
             for dn, ls in zip(['ph', 'wang', 'dual'], ['-', '--', ':']):
@@ -1760,7 +1757,7 @@ recovery with total assets. Third column shows stand-alone limited expected valu
         if 11 in chapters or 11.9 in chapters:
             # fig 11.9, 10, 11
             logger.info('Figures 11.9, 11.10, 11.11')
-            f, axs = self.smfig(6, 4, (4 * 2.5, 6 * 2.5))
+            f, axs = plt.subplots(6, 4, figsize=(4 * 2.5, 6 * 2.5), layout='constrained', squeeze=False)
 
             port = self.ports['gross']
             for i, dn in zip(range(6), ['ccoc', 'ph', 'wang', 'dual', 'tvar', 'blend']):

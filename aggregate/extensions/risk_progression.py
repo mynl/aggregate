@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from collections import namedtuple
-from aggregate import make_mosaic_figure
 from IPython.display import display
 
 def ff(n):

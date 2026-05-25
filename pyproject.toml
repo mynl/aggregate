@@ -74,6 +74,7 @@ notebook = [
     "jupyterlab",
     "ipywidgets",
     "jupytext",
+    "attrs",
     # "greater_tables",
 ]
 

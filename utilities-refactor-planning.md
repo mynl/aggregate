@@ -8,6 +8,8 @@ underwriter / portfolio sweeps it's the last load-bearing module
 without a focused cleanup pass. Current state: **3,753 lines, 74
 top-level definitions**.
 
+Start from hash: 25f4ffc6e0272e99f4ff9d62681e7536ec611d0d.
+
 The goal is twofold:
 
 1. **Delete dead code + inline single-call helpers + privatise

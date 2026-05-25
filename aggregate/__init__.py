@@ -1,29 +1,27 @@
 # coding: utf-8 -*-
 
 from .parser import UnderwritingLexer, UnderwritingParser, grammar
-from .utilities import (get_fmts, pprint, pprint_ex, ft,
-                        ift, sln_fit, sgamma_fit, estimate_agg_percentile,
-                        axiter_factory, AxisManager, lognorm_lev, html_title,
-                        sensible_jump, suptitle_and_tight,
-                        MomentAggregator, MomentWrangler, xsden_to_meancv, xsden_to_meancvskew,
-                        frequency_examples, subsets,
+from .moments import (MomentAggregator, MomentWrangler,
+                      xsden_to_meancv, xsden_to_meancvskew)
+from .iman_conover import (iman_conover, block_iman_conover,
+                           rearrangement_algorithm_max_VaR,
+                           make_corr_matrix, random_corr_matrix)
+from .utilities import (decl_pprint,
+                        ft, ift,
+                        subsets,
                         round_bucket,
-                        make_ceder_netter, make_mosaic_figure, nice_multiple,
-                        style_df, friendly,
-                        FigureManager, tweedie_convert, tweedie_density,
-                        iman_conover, rearrangement_algorithm_max_VaR,
-                        mu_sigma_from_mean_cv,
-                        make_corr_matrix, random_corr_matrix,
-                        knobble_fonts, approximate_work,
-                        partial_e, partial_e_numeric, moms_analytic, qd,
-                        sEngFormatter, mv, picks_work, GCN, lognorm_approx,
-                        integral_by_doubling, logarithmic_theta, block_iman_conover,
-                        make_var_tvar, test_var_tvar, kaplan_meier, kaplan_meier_np,
-                        agg_help, parse_note, parse_note_ex, introspect, explain_validation,
-                        beta_fit, invgamma_fit, invgauss_fit)
+                        make_ceder_netter, nice_multiple,
+                        tweedie_convert, tweedie_density,
+                        qd,
+                        make_var_tvar, kaplan_meier, kaplan_meier_np,
+                        agg_help, explain_validation)
 from .spectral import Distortion, approx_ccoc, tvar_weights, consistent_distortions, p_to_parameters
-from .distributions import Frequency, Severity, Aggregate
-from .portfolio import Portfolio, make_awkward
+from .distributions import (Frequency, Severity, Aggregate,
+                            lognorm_fit, sln_fit, sgamma_fit, gamma_fit, beta_fit,
+                            invgamma_fit, invgauss_fit,
+                            lognorm_lev, lognorm_approx,
+                            approximate_from_mcvsk)
+from .portfolio import Portfolio, make_awkward, make_comonotonic_allocations
 from .underwriter import Underwriter, build, build_many, CannotBuild
 from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
@@ -50,8 +48,6 @@ __status__ = "beta"
 from importlib.metadata import version as _pkg_version
 __version__ = _pkg_version("aggregate")
 
-
-# knobble_fonts(True)
 
 # module level doc-string
 __doc__ = """

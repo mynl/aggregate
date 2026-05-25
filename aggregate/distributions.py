@@ -14,21 +14,19 @@ from scipy.integrate import quad
 import scipy.stats as ss
 from scipy import interpolate
 from scipy.optimize import newton
-from scipy.special import kv, gammaln, hyp1f1
+from scipy.special import kv, gammaln, hyp1f1, loggamma, binom
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
 from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import *
-from .utilities import (sln_fit, sgamma_fit, ln_fit, gamma_fit, beta_fit,
-                        invgamma_fit, invgauss_fit, mu_sigma_from_mean_cv,
-                        ft, ift,
-                        estimate_agg_percentile, MomentAggregator,
-                        xsden_to_meancv, round_bucket, make_ceder_netter, MomentWrangler,
-                        make_mosaic_figure, nice_multiple, xsden_to_meancvskew,
-                        pprint_ex, approximate_work, moms_analytic, picks_work,
-                        integral_by_doubling, logarithmic_theta, make_var_tvar,
+from .moments import (MomentAggregator, MomentWrangler,
+                      xsden_to_meancv, xsden_to_meancvskew)
+from .utilities import (ft, ift,
+                        round_bucket, make_ceder_netter,
+                        nice_multiple,
+                        decl_pprint, make_var_tvar,
                         agg_help, explain_validation)
 import aggregate.random_agg as ar
 from .spectral import Distortion
@@ -45,6 +43,630 @@ def max_log2(x):
     if (x + 2 ** -d) - x != 2 ** -d:
         raise ValueError('max_log2 failed')
     return d
+
+
+# ---------------------------------------------------------------------------
+# Method-of-moments fitting cluster.
+#
+# Public, symmetric ``*_fit`` family that recovers distribution parameters
+# from ``(m, cv[, skew])``. Used to seed approximations (e.g. ``approximate``
+# methods, severity initialisation) and to keep moment-matching exhibits in
+# one place. ``approximate_from_mcvsk`` dispatches over the family.
+# ---------------------------------------------------------------------------
+
+
+def lognorm_fit(m, cv):
+    """
+    Lognormal ``(mu, sigma)`` parameters from mean ``m`` and cv ``cv``.
+
+    Notes
+    -----
+    For ``ss.lognorm(sigma, scale=exp(mu))`` matching mean ``m`` and CV ``cv``,
+    :math:`\\sigma^2 = \\log(1 + \\mathrm{cv}^2)` and
+    :math:`\\mu = \\log(m) - \\sigma^2 / 2`.
+    """
+    cv = np.array(cv)
+    m = np.array(m)
+    sigma = np.sqrt(np.log(cv*cv + 1))
+    mu = np.log(m) - sigma**2 / 2
+    return mu, sigma
+
+
+def sln_fit(m, cv, skew):
+    """
+    method of moments shifted lognormal fit matching given mean, cv and skewness
+
+    :param m:
+    :param cv:
+    :param skew:
+    :return:
+    """
+    if skew == 0:
+        return -np.inf, np.inf, 0
+    else:
+        eta = (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3) - (
+                1 / (((np.sqrt(skew ** 2 + 4)) / 2) + (skew / 2)) ** (1 / 3))
+        sigma = np.sqrt(np.log(1 + eta ** 2))
+        shift = m - cv * m / eta
+        if shift > m:
+            logger.log(WL, f'sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
+            shift = m - 1e-6
+        mu = np.log(m - shift) - sigma ** 2 / 2
+        return shift, mu, sigma
+
+
+def sgamma_fit(m, cv, skew):
+    """
+    method of moments shifted gamma fit matching given mean, cv and skewness
+
+    :param m:
+    :param cv:
+    :param skew:
+    :return:
+    """
+    if skew == 0:
+        return np.nan, np.inf, 0
+    else:
+        alpha = 4 / (skew * skew)
+        theta = cv * m * skew / 2
+        shift = m - alpha * theta
+        return shift, alpha, theta
+
+
+def gamma_fit(m, cv):
+    """
+    gamma parameters from mean and cv.
+    """
+    alpha = cv**-2
+    beta = m / alpha
+    return alpha, beta
+
+
+def beta_fit(m, cv):
+    """
+    alpha and beta parameters from mean and cv.
+
+    """
+    v = m * m * cv * cv
+    sev_a = m * (m * (1 - m) / v - 1)
+    sev_b = (1 - m) * (m * (1 - m) / v - 1)
+    return sev_a, sev_b
+
+
+def invgamma_fit(cv):
+    """
+    Inverse gamma shape parameter from cv.
+
+    Notes
+    -----
+    For ``ss.invgamma(a)`` the squared coefficient of variation satisfies
+    :math:`\\mathrm{cv}^2 = 1 / (a - 2)`, giving :math:`a = 1/\\mathrm{cv}^2 + 2`.
+    Valid for :math:`a > 2`, i.e. when the variance exists.
+    """
+    return 1 / cv ** 2 + 2
+
+
+def invgauss_fit(cv):
+    """
+    Inverse Gaussian shape parameter from cv.
+
+    Notes
+    -----
+    For ``ss.invgauss(mu)`` the cv equals :math:`\\sqrt{\\mu}`, so
+    :math:`\\mu = \\mathrm{cv}^2`.
+    """
+    return cv ** 2
+
+
+def lognorm_lev(mu, sigma, n, limit):
+    """
+    return E(min(X, limit)^n) for lognormal using exact calculation
+    currently only for n=1, 2
+
+    :param mu:
+    :param sigma:
+    :param n:
+    :param limit:
+    :return:
+    """
+    if limit == -1:
+        return np.exp(n * mu + n * n * sigma * sigma / 2)
+    else:
+        phi = ss.norm.cdf
+        ll = np.log(limit)
+        sigma2 = sigma * sigma
+        phi_l = phi((ll - mu) / sigma)
+        phi_l2 = phi((ll - mu - n * sigma2) / sigma)
+        unlimited = np.exp(n * mu + n * n * sigma2 / 2)
+        return unlimited * phi_l2 + limit ** n * (1 - phi_l)
+
+
+def lognorm_approx(ser):
+    """
+    Lognormal approximation to series, index = loss values, values = density.
+    """
+    m, cv = xsden_to_meancv(ser.index, ser.values)
+    mu, sigma = lognorm_fit(m, cv)
+    fz = ss.lognorm(sigma, scale=np.exp(mu))
+    return fz
+
+
+def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output):
+    """
+    Dispatch from ``(m, cv, skew)`` to a method-of-moments approximation and
+    return it in the requested form. Backs ``Aggregate.approximate`` and
+    ``Portfolio.approximate``; see their documentation.
+
+    :param output: scipy - frozen scipy.stats continuous rv object; agg_decl
+      sev_decl - DecL program for severity (to substituate into an agg ; no name)
+      sev_kwargs - dictionary of parameters to create Severity
+      agg_decl - Decl program agg T 1 claim sev_decl fixed
+      any other string - created Aggregate object
+    """
+    if approx_type == 'norm':
+        sd = m*cv
+        if output == 'scipy':
+            return ss.norm(loc=m, scale=sd)
+        sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+        decl = f'{sd} @ norm 1 # {m} '
+
+    elif approx_type == 'lognorm':
+        mu, sigma = lognorm_fit(m, cv)
+        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu)}
+        if output == 'scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu))
+        decl = f'{np.exp(mu)} * lognorm {sigma} '
+
+    elif approx_type == 'gamma':
+        shape, scale = gamma_fit(m, cv)
+        if output == 'scipy':
+            return ss.gamma(shape, scale=scale)
+        sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
+        decl = f'{scale} * gamma {shape} '
+
+    elif approx_type == 'slognorm':
+        shift, mu, sigma = sln_fit(m, cv, skew)
+        if output == 'scipy':
+            return ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
+        decl = f'{np.exp(mu)} * lognorm {sigma} + {shift} '
+
+    elif approx_type == 'sgamma':
+        shift, alpha, theta = sgamma_fit(m, cv, skew)
+        if output == 'scipy':
+            return ss.gamma(alpha, loc=shift, scale=theta)
+        sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
+        decl = f'{theta} * gamma {alpha} + {shift} '
+
+    else:
+        raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
+
+    if output == 'agg_decl':
+        agg_str += decl
+        agg_str += ' fixed'
+        return agg_str
+    elif output == 'sev_kwargs':
+        return sev
+    elif output == 'sev_decl':
+        return decl
+    else:
+        return Aggregate(**{'name': name, 'note': note,
+                            'exp_en': 1, **sev, 'freq_name': 'fixed'})
+
+
+def _estimate_agg_percentile(m, cv, skew, p=0.999):
+    """
+    Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
+
+    Updated Nov 2022 with a way to estimate p based on lognormal results. How far in the
+    tail you need to go to get an accurate estimate of the mean. See 2_x_approximation_error
+    in the help.
+
+    Retain p param for backwards compatibility.
+
+    :param m:
+    :param cv:
+    :param skew:
+    :param p: if > 1 converted to 1 - 10**-n
+    :return:
+    """
+
+    # p_estimator = interp1d([0.53294, 0.86894, 1.9418, 7.3211, 22.738, 90.012, 457.14, 2981],
+    #                        [3,       4,       5,      7,      8,      9,      11,     12],
+    #                        assume_sorted=True, bounds_error=False, fill_value=(3, 13))
+    # p = 1 - 10**-p_estimator(cv)
+
+    if np.isinf(cv):
+        raise ValueError('Infinite variance passed to estimate_agg_percentile')
+
+    # make vectorizable
+    p = np.array(p)
+    p = np.where(p > 1, 1 - 10 ** -p, p)
+
+    pn = pl = pg = 0
+    if skew <= 0:
+        # neither sln nor sgamma works, use a normal
+        # for negative skewness the right tail will be thin anyway so normal not outrageous
+        fzn = ss.norm(scale=m * cv, loc=m)
+        pn = fzn.isf(1 - p)
+    elif not np.isinf(skew):
+        shift, mu, sigma = sln_fit(m, cv, skew)
+        fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+        shift, alpha, theta = sgamma_fit(m, cv, skew)
+        fzg = ss.gamma(alpha, scale=theta, loc=shift)
+        pl = fzl.isf(1 - p)
+        pg = fzg.isf(1 - p)
+    else:
+        mu, sigma = lognorm_fit(m, cv)
+        fzl = ss.lognorm(sigma, scale=np.exp(mu))
+        alpha, theta = gamma_fit(m, cv)
+        fzg = ss.gamma(alpha, scale=theta)
+        pl = fzl.isf(1 - p)
+        pg = fzg.isf(1 - p)
+    # throw in a mean + 3 sd approx too...
+    return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
+
+
+# ---------------------------------------------------------------------------
+# Single-module helpers — used only inside distributions.py.
+# ---------------------------------------------------------------------------
+
+
+def _partial_e_numeric(fz, a, n):
+    """
+    Simple numerical integration version of partial_e for auditing purposes.
+
+    """
+    ans = []
+    for k in range(n+1):
+        temp = quad(lambda x: x ** k * fz.pdf(x), 0, a)
+        if temp[1] > 1e-4:
+            logger.warning('Potential convergence issues with numerical integral')
+        ans.append(temp[0])
+    return ans
+
+
+def _partial_e(sev_name, fz, a, n):
+    """
+    Compute the partial expected value of fz. Computing moments is a bottleneck, so you
+    want analytic computation for the most commonly used types.
+
+    Exponential (for mixed exponentials) implemented separate from gamma even though it
+    is a special case.
+
+    .. math:
+
+        \\int_0^a x^k fz.pdf(x)dx
+
+    for k=0,...,n as a np.array
+
+    To do: beta? weibull? Burr? invgamma, etc.
+
+    :param sev_name: scipy.stats name for distribution
+    :param fz: frozen scipy.stats instance
+    :param a: double, limit for integral
+    :param n: int, power
+    :return: partial expected value
+    """
+
+    if sev_name not in ['lognorm', 'gamma', 'pareto', 'expon']:
+        raise NotImplementedError(f'{sev_name} NYI for analytic moments')
+
+    if a == 0:
+        return [0] * (n+1) # for k in range(n+1)]
+
+    if sev_name == 'lognorm':
+        m = fz.stats('m')
+        sigma = fz.args[0]
+        mu = np.log(m) - sigma**2 / 2
+        ans = [np.exp(k * mu + (k * sigma)**2 / 2) *
+               (ss.norm.cdf((np.log(a) - mu - k * sigma**2)/sigma) if a < np.inf else 1.0)
+               for k in range(n+1)]
+        return ans
+
+    elif sev_name == 'expon':
+        # really needed for MEDs
+        # expon is gamma with shape = 1
+        scale = fz.stats('m')
+        shape = 1.
+        lgs = loggamma(shape)
+        ans = [scale ** k * np.exp(loggamma(shape + k) - lgs) *
+               (ss.gamma(shape + k, scale=scale).cdf(a) if a < np.inf else 1.0)
+               for k in range(n + 1)]
+        return ans
+
+    elif sev_name == 'gamma':
+        shape = fz.args[0]
+        scale = fz.stats('m') / shape
+        # magic ingredient is the norming constant
+        # c = lambda sh: 1 / (scale ** sh * gamma(sh))
+        # therefore c(shape)/c(shape+k) = scale**k * gamma(shape + k) / gamma(shape)
+        # = scale ** k * exp(loggamma(shape + k) - loggamma(shape)) to avoid errors
+        ans = [scale ** k * np.exp(loggamma(shape + k) - loggamma(shape)) *
+               (ss.gamma(shape + k, scale=scale).cdf(a) if a < np.inf else 1.0)
+               for k in range(n + 1)]
+        return ans
+
+    elif sev_name == 'pareto':
+        # integrate xf(x) even though nx^n-1 S(x) may be more obvious
+        # former fits into the overall scheme
+        # a Pareto defined by agg is like so: ss.pareto(2.5, scale=1000, loc=-1000)
+        α = fz.args[0]
+        λ = fz.kwds['scale']
+        loc = fz.kwds.get('loc', 0.0)
+        # regular Pareto is scale=lambda, loc=-lambda, so this has no effect
+        # single parameter Pareto is scale=lambda, loc=0
+        # these formulae for regular pareto, hence
+        if λ + loc != 0:
+            logger.log(WL, 'Pareto not shifted to x>0 range...using numeric moments.')
+            return _partial_e_numeric(fz, a, n)
+        ans = []
+        # will return inf if the Pareto does not have the relevant moments
+        # TODO: formula for shape=1,2,3
+        for k in range(n + 1):
+            b = [α * (-1) ** (k - i) * binom(k, i) * λ ** (k + α - i) *
+                 ((λ + a) ** (i - α) - λ ** (i - α)) / (i - α)
+                 for i in range(k + 1)]
+            ans.append(sum(b))
+        return ans
+
+
+def _moms_analytic(fz, limit, attachment, n, analytic=True):
+    """
+    Return moments of :math:`E[(X-attachment)^+ \\wedge limit]^m`
+    for m = 1,2,...,n.
+
+    To check:
+    ::
+
+        # fz = ss.lognorm(1.24)
+        fz = ss.gamma(6.234, scale=100)
+        # fz = ss.pareto(3.4234, scale=100, loc=-100)
+
+        a1 = _moms_analytic(fz, 50, 1234, 3)
+        a2 = _moms_analytic(fz, 50, 1234, 3, False)
+        a1, a2, a1-a2, (a1-a2) / a1
+
+
+    :param fz: frozen scipy.stats instance
+    :param limit: double, limit (layer width)
+    :param attachment: double, limit
+    :param n: int, power
+    :param analytic: if True use analytic formula, else numerical integrals
+    """
+    # easy
+    if limit == 0:
+        return np.array([0.] * n)
+
+    # don't know how robust this will be...
+    sev_name = str(fz.__dict__['dist']).split('.')[-1].split('_')[0]
+
+    # compute and store the partial_e
+    detachment = attachment + limit
+    if analytic is True:
+        pe_attach = _partial_e(sev_name, fz, attachment, n)
+        pe_detach = _partial_e(sev_name, fz, detachment, n)
+    else:
+        pe_attach = _partial_e_numeric(fz, attachment, n)
+        pe_detach = _partial_e_numeric(fz, detachment, n)
+
+    ans1 = np.array([sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * (pe_detach[k] - pe_attach[k])
+                          for k in range(m + 1)])
+                     for m in range(n + 1)])
+
+    if np.isinf(limit):
+        ans2 = np.zeros_like(ans1)
+    else:
+        ans2 = np.array([limit ** m * fz.sf(detachment) for m in range(n+1)])
+
+    ans = ans1 + ans2
+
+    return ans
+
+
+def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, debug=False):
+    """
+    Adjust the layer unconditional expected losses to target. You need int xf(x)dx, but
+    that is fraught when f is a mixed distribution. So we only use the int S version.
+    ``fz`` was initially a frozen continuous distribution; but adjusted to sf function
+    and dropped need for pdf function.
+
+    See notes for how the parts are defined. Notice that::
+
+        np.allclose(p.layers.v - p.layers.f, p.layers.l - p.layers.e)
+
+    is true.
+
+    :param attachments: array of layer attachment points, in ascending order (bottom to top). a[0]>0
+    :param layer_loss_picks: Target means. If ``len(layer_loss_picks)==len(attachments)`` then the bottom layer, 0 to a[0],
+      is added. Can be input as unconditional layer severity (i.e., :math:`\\mathbb{E}[(X-a)^+\\wedge y]`) or as the
+      layer loss pick (i.e., :math:`\\mathbb{E}[(X-a)^+\\wedge y]'times n` where *n* is the number of ground-up (to the
+      insurer) claims. Multiplying and dividing by :math:`S(a)` shows this equals conditional severity in the layer
+      times the number of claims in the layer.) Actuaries usually estimate the loss pick to the layer in pricing. When
+      called from :class:`Aggregate` the number of ground up claims is known.
+    :param en: ground-up expected claims. Target is divided by ``en``.
+    :param xs: x values for discretization
+    :param sev_density: Series of existing severity density from Aggregate.
+    :param sf: cdf function for the severity distribution.
+    :param debug: if True, return debug information (layers, density with adjusted probs, audit
+      of layer expected values.
+    """
+
+    # want xs, attachments, and sev_density to be numpy arrays
+    xs = np.array(xs)
+    attachments = np.array(attachments)
+    # target is the unconditional layer expected loss, E[(X-a)^+ ^ y]
+    target = np.array(layer_loss_picks) / n
+    # print(n, layer_loss_picks, target)
+    sev_density = np.array(sev_density)
+    # figure bucket size
+    bs = xs[1] - xs[0]
+
+    # dataframe of adjusted probabilties, starts here
+    density = pd.DataFrame({'x': xs, 'p': sev_density}).set_index('x', drop=False)
+    fill_value = max(0, 1. - density.p.sum())
+    density['S'] = density.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
+
+    # numerical integrals - these match
+    layers = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'], index=range(1, 1+len(attachments)),
+                          dtype=float)
+    for i, x in enumerate(attachments):
+        ix = density.loc[0:x-bs, 'S'].sum() * bs
+        ix2 = density.loc[0:x-bs, ['x', 'p']].prod(axis=1).sum()
+        layers.loc[i+1, :] = [x, ix, ix2, x * density.loc[x, 'S'] if x < np.inf else 0.0, density.loc[x, 'S']]
+
+    # prob of loss in layer
+    layers['p'] = layers.S.shift(1, fill_value=1) - layers.S
+    # unconditional expected loss in layer
+    layers['l'] = layers.lev - layers.lev.shift(1, fill_value=0)
+    layers.index.name = 'layer'
+    # bottom of layer
+    layers['a_bottom'] = layers.a.shift(1, fill_value=0)
+    # width of layer
+    layers['y'] = layers.a - layers.a_bottom
+    # e = rectangle to right in int S computation
+    layers['e'] = layers.S * layers.y
+    # f = rectangle below attachment in int xf computation
+    layers['f'] = layers.p * layers.a_bottom
+    # these are two versions of m (unconditional)
+    # m-bit: int S - e == int xf - f
+    layers['m'] = layers.l - layers.e
+    # int f dx in layer
+    layers['v'] = layers.f + layers.m
+    # and conditional vertical loss in layer
+    layers['v_c'] = layers.v / layers.p
+    layers = layers[['a_bottom', 'a', 'y', 'lev', 'S', 'p', 'l', 'v', 'v_c', 'm', 'e', 'f']]
+
+    # add weights w and offsets=omega, computed from the top layer down
+    layers['t'] = target
+    layers['w'] = 0.0
+    layers['ω'] = 0.0
+
+    # this computation leaves the tail unchanged and uses the same "adjust the curve" method
+    # in all layers
+    ω = layers.loc[len(layers), 'S']
+    for i in layers.index[::-1]:
+        layers.loc[i, 'w'] = (layers.loc[i, 't'] - ω * layers.loc[i, 'y']) / layers.loc[i, 'm']
+        layers.loc[i, 'ω'] = ω
+        ω += layers.loc[i, 'p'] * layers.loc[i, 'w']
+
+    # adjusted S: bins -> layer number; add in offsets
+    density['bin'] = pd.cut(density.x, np.hstack((0, layers.a.values)), include_lowest=True, right=True)
+    # layer description returned by cut to layer number in layers
+    mapper = {i:j+1 for j, i in enumerate(density.bin.unique())}
+    density['layer'] = density.bin.map(mapper.get)
+
+    density['ω'] = density.layer.map(layers.ω).astype(float)
+    # S(a_n-1)
+    density['Sa'] = density.layer.map(layers.S).astype(float)
+    density['w'] = density.layer.map(layers.w).astype(float)
+
+    density['S_adj'] = np.minimum(1, density.ω + (density.S - density.Sa) * density.w)
+    # no change in the tail
+    density.loc[attachments[-1]:, 'S_adj'] = density.loc[attachments[-1]:, 'S']
+    # adj probs as difference of S
+    density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
+    achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
+    # display(achieved)
+    if abs(achieved.iloc[0] - target[0]) > 1e-3:
+        # issues with hitting 1
+        logger.log(WL, f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
+        # take top right corner off
+        if target[0] > attachments[0]:
+            raise ValueError(f'target[0] = {target[0]} > first attachment[0] = {attachments[0]} which is impossible.')
+        s0 = 2 * (attachments[0] - target[0]) / (1 - layers.loc[1, 'ω'])
+        # snap to index
+        s0 = bs * np.round(s0 / bs, 0)
+        # convert to probability
+        s = attachments[0] - s0
+        density.loc[0:s, 'S_adj'] = 1.0
+        temp = np.array(density.loc[s+bs:attachments[0]].index)
+        wts = (temp - s) / s0
+        density.loc[s+bs:attachments[0], 'S_adj'] = 1 - wts + layers.loc[1, 'ω'] * wts
+        # update
+        density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
+        achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
+        logger.log(WL, f'Revised layer 1 achieved = {achieved.iloc[0]}')
+
+    density['diff S'] = density['S'] - density['Sa']
+
+    if debug is False:
+        return density['p_adj'].values
+
+    # data frame of layer statistics from input density
+    exact = None
+    if sf is not None:
+        logger.log(WL, 'sf passed in; computing exact layer statistics')
+        exact = pd.DataFrame(columns=['a', 'lev', 'aS', 'S'],
+                             index=range(1, 1+len(attachments)), dtype=float)
+        for i, x in enumerate(attachments):
+            ix = quad(sf, 0, x)
+            # check error is small
+            assert ix[1] < 1e-6
+            sf_ = sf(x)
+            exact.loc[i+1, :] = [x, ix[0], x * sf_ if x < np.inf else 0.0, sf_]
+
+    if exact is None:
+        l = layers.l
+        ln = 'layers'
+    else:
+        l = exact.lev - exact.lev.shift(1, fill_value=0)
+        ln = 'exact'
+
+    t = pd.concat((l,
+                   density.groupby(density.layer.shift(-1)).apply(lambda g: g['S'].sum() * bs),
+                   achieved,
+                   ), keys=[ln, 'computed', 'adj'], axis=1)
+    t.loc['sum'] = t.sum()
+    Picks = namedtuple('picks', ['layers', 'exact', 'density', 'audit'])
+    return Picks(layers=layers, exact=exact, density=density, audit=t)
+
+
+def __integral_by_doubling(func, x0, err=1e-8):
+    r"""
+    Compute :math:`\int_{x_0}^\infty f` as the sum
+
+    .. math::
+
+        \int_{x_0}^\infty f = \sum_{n \ge 0} \int_{2^nx_0}^{2^{n+1}x_0} f
+
+    Caller should check the integral actually converges.
+
+    :param func: function to be integrated.
+    :param x0: starting x value
+    :param err: desired accuracy: stop when incremental integral is <= err.
+    """
+    ans = 0.
+    counter = 0
+    # from to
+    f, t = x0, 2 * x0
+    last_int = 10
+    while last_int > err:
+        s = quad(func, f, t)
+        if s[1] > err:
+            raise ValueError(
+                f'Questionable integral numeric convergence, err {s[1]:.4g}\n'
+                f'f={f}, t={t}, x0={x0}, counter={counter}')
+        last_int = s[0]
+        ans += s[0]
+        f, t = t, 2 * t
+        counter += 1
+        if counter > 96:
+            raise ValueError(f'counter = {counter} and error = {err}')
+    return -ans
+
+
+@lru_cache(maxsize=128)
+def _logarithmic_theta(mean):
+    """
+    Solve for theta parameter given mean, see JKK p. 288
+    """
+    f = lambda x: x / (-np.log(1 - x) * (1 - x)) - mean
+    theta = brentq(f, 1e-10, 1-1e-10)
+    if not np.allclose(mean, theta / (-np.log(1 - theta) * (1 - theta))):
+        print('num method failed')
+    else:
+        return theta
 
 
 def validate_discrete_distribution(xs, ps):
@@ -483,7 +1105,7 @@ class FrequencyLogarithmic(Frequency):
     """
     Logarithmic series (``logser``) supported on 1, 2, 3, ... with mean
     ``n``; the parameter ``θ`` is solved numerically by
-    ``utilities.logarithmic_theta``. Supports zero modification (with
+    :func:`_logarithmic_theta`. Supports zero modification (with
     ``prn_eq_0 = 0`` for the unmodified form, so ZM only adds mass at zero).
     """
 
@@ -497,7 +1119,7 @@ class FrequencyLogarithmic(Frequency):
         return 0.
 
     def freq_moms(self, n):
-        theta = logarithmic_theta(n)
+        theta = _logarithmic_theta(n)
         a_logser = -1 / np.log(1 - theta)
         freq_2 = a_logser * theta / (1 - theta) ** 2
         freq_3 = a_logser * theta * (1 + theta) / (1 - theta) ** 3
@@ -505,7 +1127,7 @@ class FrequencyLogarithmic(Frequency):
         return n, freq_2, freq_3
 
     def freq_pgf(self, n, z):
-        theta = logarithmic_theta(n)
+        theta = _logarithmic_theta(n)
         return np.log(1 - theta * z) / np.log(1 - theta)
 
 
@@ -2379,7 +3001,7 @@ class Aggregate:
         # figure bounds from method of moments estimates
         m, cv, skew = self.agg_m, self.agg_cv, self.agg_skew
         sc = self.bs
-        L, R = estimate_agg_percentile(m, cv, skew, p=(p, 1 - p))
+        L, R = _estimate_agg_percentile(m, cv, skew, p=(p, 1 - p))
         # snap to grid in both cases (can't use self.snap because outside index!)
         L = int(np.round(L / sc, 0))
         R = int(np.round(R / sc, 0))
@@ -2451,7 +3073,7 @@ class Aggregate:
     def picks(self, attachments, layer_loss_picks, debug=False):
         """
         Adjust the computed severity to hit picks targets in layers defined by a.
-        Delegates work to ``utilities.picks_work``. See that function for details.
+        Delegates work to :func:`_picks_work`. See that function for details.
 
         """
         # always want to work off gross severity
@@ -2460,7 +3082,7 @@ class Aggregate:
             sd = self.sev_density_gross
         else:
             sd = self.sev_density
-        return picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
+        return _picks_work(attachments, layer_loss_picks, self.xs, sd, n=self.n,
                           sf=self.sev.sf, debug=debug)
 
     def freq_pmf(self, log2):
@@ -2835,11 +3457,11 @@ class Aggregate:
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
                the same scale. Only used on linear scales?
         :param axd:
-        :param kwargs: passed to make_mosaic_figure
+        :param kwargs: passed to ``plt.subplot_mosaic``
         :return:
         """
         if axd is None:
-            self.figure, axd = make_mosaic_figure('ABC', **kwargs)
+            self.figure, axd = plt.subplot_mosaic('ABC', layout='constrained', **kwargs)
         else:
             self.figure = axd['A'].figure
 
@@ -2951,7 +3573,7 @@ class Aggregate:
             # No FFT output yet; estimate the 0.999 quantile from the theoretical
             # mixed-total agg moments.
             try:
-                p999 = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, 0.999)
+                p999 = _estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, 0.999)
             except ValueError:
                 p999 = np.inf
             return f(p999)
@@ -2988,12 +3610,12 @@ class Aggregate:
 
         For the raw input as supplied to ``build`` use ``self.program``.
         """
-        return pprint_ex(self.program, split=0, show=False)
+        return decl_pprint(self.program, split=0, show=False)
 
     @property
     def pprogram_html(self):
         """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        return pprint_ex(self.program, split=0, html=True, show=False)
+        return decl_pprint(self.program, split=0, html=True, show=False)
 
     @property
     def describe(self):
@@ -3054,7 +3676,7 @@ class Aggregate:
             if limit_est == np.inf:
                 limit_est = 0
                 p = max(p, 1 - 10 ** -8)
-            moment_est = estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
+            moment_est = _estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
             logger.debug('Agg.recommend_bucket | %s moment: %s, limit %s',
                          self.name, moment_est, limit_est)
             recommended = max(moment_est, limit_est)
@@ -3183,8 +3805,8 @@ class Aggregate:
         sev_df['abs'] = sev_df['est_mean'] - sev_df['mean']
         sev_df['rel'] = sev_df['abs'] / sev_df['mean']
         sev_df['trunc_error'] = \
-            [integral_by_doubling(s.sf, truncation_point) for s in self.sevs] + \
-            [integral_by_doubling(self.sev.sf, truncation_point)]
+            [_integral_by_doubling(s.sf, truncation_point) for s in self.sevs] + \
+            [_integral_by_doubling(self.sev.sf, truncation_point)]
         sev_df['rel_trunc_error'] = sev_df.trunc_error / sev_df['mean']
         sev_df['h_error'] = self.bs / 2
         sev_df['rel_h_error'] = self.bs / 2 / sev_df['mean']
@@ -3463,7 +4085,7 @@ class Aggregate:
         name = f'{approx_type[0:4]}.{self.name[0:5]}'
         agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
-        return approximate_work(m, cv, skew, name, agg_str, note, approx_type, output)
+        return approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output)
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """
@@ -3949,7 +4571,7 @@ def _cv_to_shape(sev_name, cv, hint=1):
         Returns ``(np.inf, None)`` if the numerical solver fails.
     """
     if sev_name == 'lognorm':
-        _, sigma = mu_sigma_from_mean_cv(1.0, cv)
+        _, sigma = lognorm_fit(1.0, cv)
         return sigma, ss.lognorm(sigma)
     if sev_name == 'gamma':
         alpha, _ = gamma_fit(1.0, cv)
@@ -4414,7 +5036,7 @@ class Severity(ss.rv_continuous):
         overrides ``_pdf`` / ``_cdf`` / ``_sf`` / ``_ppf`` / ``_isf``
         route through these; ``self.fz.<method>`` stays splice-only so
         the numerical-moments integration (:func:`_numerical_moms` and
-        :func:`moms_analytic` in ``utilities.py``) sees the underlying
+        :func:`_moms_analytic`) sees the underlying
         spliced distribution, not the doubly-transformed claim-space view.
 
         This is the right division because there is no such thing as a
@@ -4520,7 +5142,7 @@ class Severity(ss.rv_continuous):
     # (mutated by ``_apply_lb_ub``); layer/attachment lives on
     # ``self._layered_<method>``. The two transforms are kept on different
     # objects so internal moment integration (``_numerical_moms``,
-    # ``moms_analytic``) can see the splice-only distribution via
+    # :func:`_moms_analytic`) can see the splice-only distribution via
     # ``self.fz``, while user-facing scipy calls (``rvs``, ``interval``,
     # ``stats``, etc.) route through these overrides to the fully-layered
     # claim-space view.
@@ -4562,7 +5184,7 @@ class Severity(ss.rv_continuous):
            the trivial ``[0, inf]``, return those values immediately.
         2. **Analytic shortcut.** For ``lognorm``, ``pareto``, ``gamma``,
            and ``expon`` (with no shift/truncation), delegate to
-           :func:`aggregate.utilities.moms_analytic`, which computes layered
+           :func:`_moms_analytic`, which computes layered
            moments in closed form via partial expected values. Defensive
            ``np.inf`` overrides are applied when the underlying moment does
            not formally exist (e.g. pareto shape <= 1).
@@ -4602,7 +5224,7 @@ class Severity(ss.rv_continuous):
                 and self.sev_lb == 0
                 and self.sev_ub == np.inf):
             logger.info('Analytic moments')
-            ma = moms_analytic(self.fz, self.limit, self.attachment, 3)
+            ma = _moms_analytic(self.fz, self.limit, self.attachment, 3)
             ex1a, ex2a, ex3a = ma[1:]
             # Defensive: when there is no upper limit, override with inf
             # for moments that the underlying RV does not have (e.g. pareto

@@ -20,7 +20,7 @@ from aggregate.distributions import Aggregate, Severity
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
-SUITE_PATH = Path(__file__).parent.parent / "aggregate" / "agg" / "test_suite2.agg"
+SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "test_suite2.agg"
 
 # Names of the four cases that describe measure-zero splices — the splice
 # window lies entirely outside the underlying distribution's support, so the

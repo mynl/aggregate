@@ -434,11 +434,11 @@ def xsden_to_meancvskew(xs, den):
     """
     Compute mean, cv and skewness from xs and density
 
-        Consider adding: np.nan_to_num(den)
+    Consider adding: np.nan_to_num(den)
 
-        :param xs:
-        :param den:
-        :return:
+    :param xs:
+    :param den:
+    :return:
         """
     pg = 1 - den.sum()
     xd = xs * den

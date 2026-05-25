@@ -180,6 +180,17 @@ new modules or back to its only caller.
 * PEG regression baseline unchanged (numbers reproduce bit-identically
   at ``rtol=1e-10``); 430 pytest cases pass.
 
+Packaging: src/ layout. The package source moved from
+``aggregate/`` to ``src/aggregate/``. The src layout prevents accidental
+imports from the source tree when CWD is the repo root — the only way
+to ``import aggregate`` is now via the installed (editable) package,
+which makes editable installs behave identically to wheel installs.
+``pyproject.toml`` gains ``package-dir = {"" = "src"}``; ``MANIFEST.in``
+grafts repathed; ``docs/conf.py`` ``sys.path`` insert updated to
+``../src``; four test/capture files repathed to
+``src/aggregate/agg/test_suite{,2}.agg``. No public API change; 430
+pytest cases still pass.
+
 1.0.0a7
 -------
 
@@ -995,6 +1006,73 @@ Install from source
 
     # install the package
     pip install aggregate[dev]
+
+
+Running the tests
+-----------------
+
+All commands assume ``UV_LINK_MODE=copy`` is set (the Claude harness
+sets it automatically via ``.claude/settings.local.json``; in a regular
+shell run ``$env:UV_LINK_MODE = "copy"`` on PowerShell or
+``export UV_LINK_MODE=copy`` on POSIX).
+
+The pytest suite lives in ``tests/``. Each line of
+``src/aggregate/agg/test_suite.agg`` (categories A–O) becomes two
+parametrized cases: ``test_line_parses`` and
+``test_spec_matches_snapshot`` (against
+``tests/data/expected_specs.json``). Splice cases come from
+``test_suite2.agg``.
+
+Whole suite::
+
+    uv run pytest                          # full suite
+    uv run pytest -v                       # verbose
+    uv run pytest -x                       # stop at first failure
+    uv run pytest --lf                     # re-run last failed
+    uv run pytest --ff                     # last failed first, then rest
+
+Single file or single test::
+
+    uv run pytest tests/test_decl_parser.py
+    uv run pytest tests/test_decl_parser.py::test_line_parses
+    uv run pytest "tests/test_decl_parser.py::test_line_parses[A.01]"
+
+Filter by name pattern::
+
+    uv run pytest -k "splice"
+    uv run pytest -k "parses and not snapshot"
+
+Output / debugging::
+
+    uv run pytest -s                       # don't capture stdout
+    uv run pytest --tb=short               # shorter tracebacks
+    uv run pytest -l                       # show local vars on failure
+    uv run pytest --pdb                    # drop into pdb on first failure
+
+The individual test modules::
+
+    uv run pytest tests/test_decl_parser.py             # DecL parser, parametrized
+    uv run pytest tests/test_distortion_calibrate.py    # Distortion calibration
+    uv run pytest tests/test_portfolio_peg_regression.py # Portfolio vs peg_baseline.json
+    uv run pytest tests/test_severity_layer_golden.py   # Severity layer golden
+    uv run pytest tests/test_splice_suite.py            # Spliced severity
+    uv run pytest tests/test_underwriter.py             # Underwriter build/persist
+
+Regenerating golden / baseline files (scripts, not pytest cases —
+only when intentionally updating snapshots)::
+
+    uv run python tests/capture_sly_snapshot.py        # expected_specs.json
+    uv run python tests/capture_peg_baseline.py        # peg_baseline.json
+    uv run python tests/capture_severity_golden.py     # severity_layer_golden.json
+
+Visual / non-pytest check (HTML report with plots, builds every
+``test_suite.agg`` line)::
+
+    uv run python -m aggregate.extensions.test_suite
+
+Tight inner loop: ``uv run pytest -x --tb=short`` — stop fast, readable
+failure. Single area being changed: ``uv run pytest tests/test_<file>.py -v``.
+Pre-commit: plain ``uv run pytest``.
 
 
 License

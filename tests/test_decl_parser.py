@@ -21,7 +21,7 @@ import pytest
 
 from aggregate.parser import UnderwritingLexer
 
-TEST_SUITE_PATH = Path(__file__).parent.parent / "aggregate" / "agg" / "test_suite.agg"
+TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "test_suite.agg"
 SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
 
 VALID_KINDS = {"agg", "sev", "port", "distortion", "expr"}

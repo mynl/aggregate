@@ -11,7 +11,7 @@ import os
 
 # allow RTD to find aggregate
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../'))
+sys.path.insert(0, os.path.abspath('../src'))
 import aggregate as agg
 
 # color graphs

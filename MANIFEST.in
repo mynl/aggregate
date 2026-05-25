@@ -1,3 +1,2 @@
-graft aggregate/agg
-graft aggregate/templates
-
+graft src/aggregate/agg
+graft src/aggregate/templates

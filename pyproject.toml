@@ -80,6 +80,7 @@ notebook = [
 
 [tool.setuptools]
 include-package-data = true
+package-dir = {"" = "src"}
 packages = ["aggregate", "aggregate.extensions"]
 
 [tool.setuptools.package-data]

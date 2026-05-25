@@ -20,7 +20,7 @@ from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
 REPO_ROOT = Path(__file__).parent.parent
-TEST_SUITE = REPO_ROOT / "aggregate" / "agg" / "test_suite.agg"
+TEST_SUITE = REPO_ROOT / "src" / "aggregate" / "agg" / "test_suite.agg"
 OUT = REPO_ROOT / "tests" / "data" / "expected_specs.json"
 
 POS_INF_SENTINEL = "__inf__"

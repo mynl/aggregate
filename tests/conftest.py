@@ -7,7 +7,7 @@ import pytest
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
-TEST_SUITE_PATH = Path(__file__).parent.parent / "aggregate" / "agg" / "test_suite.agg"
+TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "test_suite.agg"
 
 
 @pytest.fixture(scope="session")

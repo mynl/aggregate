@@ -295,7 +295,7 @@ The first example shows how to compute a Poisson distribution with mean of 10280
 
     import scipy.stats as ss
     import matplotlib.pyplot  as plt
-    from aggregate.extensions import FourierTools
+    from aggregate.ft import FourierTools
     en = 10280
     ft_obj = FourierTools(
            chf=lambda t: np.exp(en * (np.exp(1j * t) - 1)),
@@ -339,7 +339,7 @@ The final example shows how to compute a stable distribution with exponent 1.75 
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.ft import make_levy_chf
+    from aggregate.ft import make_levy_chf
     a = 1.75
     b = 0.3
     fz = ss.levy_stable(a, b)
@@ -352,77 +352,6 @@ The final example shows how to compute a stable distribution with exponent 1.75 
     print(ft_obj.describe())
     @savefig numfftnew04.png scale=20
     ft_obj.plot()
-
-
-Older Examples
-"""""""""""""""""
-
-The rest of this section shows some older examples, using ``aggregate.extensions.ft_invert``, but the new ``FourierTools`` class should be used instead.
-
-Invert a gamma distribution from a sample of its characteristic function and compare with the true density. These plots show the inversion is extremely accurate over a very wide range. The top right plot compares the log density, highlighting differences only in the extreme tails.
-
-.. ipython:: python
-    :okwarning:
-
-    from aggregate.extensions import ft_invert
-    import scipy.stats as ss
-    import matplotlib.pyplot  as plt
-    @savefig numfft01.png scale=20
-    df = ft_invert(
-             log2=6,
-             chf=lambda alpha, t: (1 - 1j * t) ** -alpha,
-             frz_generator=ss.gamma,
-             params=[30],
-             loc=0,
-             scale=1,
-             xmax=0,
-             xshift=0,
-             suptitle='Gamma distribution')
-
-
-Invert a Poisson distribution with a very high mean. This is an interesting case, because we do not need space for the whole answer, just the effective range of the answer. We can use periodicity to "move" the answer to the right :math:`x` range.
-This example reproduces a Poisson with mean 10,000. The standard deviation is only 100 and so the effective rate of the distribution (using the normal approximation) will be about 9500 to 10500. Thus a satisfactory approximation can be obtained with only :math:`2^{10}=1024` buckets.
-
-.. ipython:: python
-    :okwarning:
-
-    import aggregate.extensions.ft as ft
-    @savefig numfft02.png scale=20
-    df = ft.ft_invert(
-             log2=10,
-             chf=lambda en, t: np.exp(en * (np.exp(1j * t) - 1)),
-             frz_generator=ss.poisson,
-             params=[10000],
-             loc=0,
-             scale=None, # for freq dists, scaling does not apply
-             xmax=None,  # for freq dists want bs = 1, so xmax=1<<log2
-             xshift=9500,
-             suptitle='Poisson distribution, large mean computed in small space.')
-
-Invert a stable distribution. Here there is more aliasing error because the distribution is so thick tailed. There is also more on the left than right because of the asymmetric beta parameter.
-
-.. ipython:: python
-    :okwarning:
-
-    def levy_chf(alpha, beta, t):
-        Φ = np.tan(np.pi * alpha / 2) if alpha != 1 else -2 / np.pi * np.log(np.abs(t))
-        return np.exp(- np.abs(t) ** alpha * (1 - 1j * beta * np.sign(t) * Φ))
-
-    df = ft.ft_invert(
-             log2=12,
-             chf=levy_chf,
-             frz_generator=ss.levy_stable,
-             params=[1.75, 0.3],  # alpha, beta
-             loc=0,
-             scale=1.,
-             xmax=1<<8,
-             xshift=-(1<<7),
-             suptitle='Stable Levy exponent $\\alpha=7/4$, '
-             'slightly skewed')
-    f = plt.gcf()
-    ax = f.axes[1]
-    @savefig numfft03.png scale=20
-    ax.grid(lw=.25, c='w');
 
 
 .. _num fft:

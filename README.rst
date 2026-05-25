@@ -28,8 +28,48 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a11 (in progress)
+1.0.0a12 (in progress)
 -----------------------
+
+``extensions/`` package removed. Optional/auxiliary code consolidated into
+top-level modules or migrated out:
+
+* New: ``aggregate.pedagogy`` absorbs all doc-cited figure helpers
+  (``adjusting_layer_losses``, ``savings_charge``, ``mixing_convergence``,
+  ``power_variance_family``, ``fig_4_1``, ``fig_4_5``, ``fig_4_6``,
+  ``fig_4_8``, ``fig_9_1``, ``natural_scale``) plus four curated, renamed
+  PIR figures: ``distortion_and_ins_stats`` (was ``fig_10_3``),
+  ``spectral_three_panel`` (was ``fig_10_5``), ``plot_twelve`` (was
+  ``twelve_plot``), ``plot_bivariate`` (was ``biv_contour_plot``). Also
+  ``bodoff_exhibit`` (now takes ``port`` as first arg, not ``self``).
+  ``ClassicalPremium`` pulled in to keep ``fig_9_1`` working.
+* New: ``aggregate.pentagon`` (was ``extensions.pentagon``). Class plus
+  the ``mapper`` / ``make_possible_pentagons`` helpers. Not re-exported
+  from top-level ``aggregate``; reach as
+  ``from aggregate.pentagon import Pentagon``.
+* Deleted: ``basic.py``, ``samples.py``, ``test_suite.py`` (visual
+  reporter; pytest now drives the test_suite.agg coverage),
+  ``bodoff.py``, ``risk_progression.py``, ``case_studies.py``,
+  ``portfolio_pir.py``, ``pir_figures.py`` and ``figures.py``
+  (cherry-picked into ``pedagogy.py``; the rest deleted),
+  ``cnc.py`` / ``discrete.py`` / ``hs.py`` / ``tame.py`` (PIR
+  case-study runner scripts), and the entire ``templates/`` folder
+  (HTML/Markdown scaffolding for the deleted exhibit pipeline; the
+  package-data entry in ``pyproject.toml`` was dropped to match).
+* PIR case-study reproduction: install ``aggregate==0.30.1`` in an
+  isolated environment to get the legacy ``CaseStudy`` workflow. PMIR
+  is a separate forward-looking project and does **not** reproduce PIR
+  exhibits.
+* Doc imports updated to point at ``aggregate.pedagogy`` (technical
+  guides) and ``aggregate.ft`` / ``aggregate.tweedie`` (reference page).
+  Case-studies user-guide page replaced with a redirect note. The stale
+  ``aggregate.extensions.ft_invert`` examples in
+  ``5_x_nm_ft_conv_algo.rst`` were removed.
+* No backwards-compat shim. ``from aggregate.extensions import ...`` is
+  gone; ``from aggregate.pedagogy import ...`` is the new path.
+
+1.0.0a11
+---------
 
 ``Bounds`` redesigned. The IME 2022 pricing-bounds class is now one-shot:
 ``Bounds(obj, premium, *, a=np.inf, line='total', n_p=257, n_s=513)``

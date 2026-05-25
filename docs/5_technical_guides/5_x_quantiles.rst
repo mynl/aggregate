@@ -71,7 +71,7 @@ Here's an example of the problems that can occur.
 .. ipython:: python
    :okwarning:
 
-   from aggregate.extensions.pir_figures import fig_4_1
+   from aggregate.pedagogy import fig_4_1
    @savefig quantiles2.png scale=20
    fig = fig_4_1()
 
@@ -322,7 +322,7 @@ The default aggregate TVaR function ignores this slight non-linearity and just i
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import fig_4_8
+    from aggregate.pedagogy import fig_4_8
     @savefig quan_48.png scale=20
     fig_4_8()
 

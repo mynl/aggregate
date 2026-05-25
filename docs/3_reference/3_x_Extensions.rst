@@ -1,70 +1,37 @@
 
-Extensions
-==========
+Pedagogy and Auxiliary Modules
+==============================
 
+The ``aggregate.extensions`` package was removed at 1.0.0a12. Its contents
+were either promoted to top-level modules, consolidated into
+``aggregate.pedagogy``, or deleted.
+This page documents what remains as top-level auxiliary modules.
 
-.. automodule:: aggregate.extensions
-   :members:
+Pedagogy
+--------
 
-
-Basic
-------
-
-.. automodule:: aggregate.extensions.basic
-   :members:
-   :undoc-members:
-
-Fourier Transform Support
-----------------------------
-
-.. automodule:: aggregate.extensions.ft
-   :members:
-   :undoc-members:
-
-Tweedie Support
---------------------
-
-.. automodule:: aggregate.extensions.tweedie
-   :members:
-   :undoc-members:
-
-Case Study Support
----------------------
-
-.. automodule:: aggregate.extensions.case_studies
+.. automodule:: aggregate.pedagogy
    :members:
 
 
 Pentagon
----------
+--------
 
-.. automodule:: aggregate.extensions.pentagon
+.. automodule:: aggregate.pentagon
    :members:
 
 
-Samples
----------
+Fourier Transform Support
+-------------------------
 
-.. warning::
-   All functionality in ``extensions.samples`` has been moved into the base package.
-
-
-Figures
----------
-
-.. automodule:: aggregate.extensions.figures
+.. automodule:: aggregate.ft
    :members:
+   :undoc-members:
 
 
-PIR Figures
--------------
+Tweedie Support
+---------------
 
-.. automodule:: aggregate.extensions.pir_figures
+.. automodule:: aggregate.tweedie
    :members:
-
-
-Test Suite
------------
-
-.. automodule:: aggregate.extensions.test_suite
-   :members:
+   :undoc-members:

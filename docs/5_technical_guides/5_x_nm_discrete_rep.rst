@@ -29,7 +29,7 @@ First, a discrete approximation, which results in a step-function, piecewise con
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import fig_4_5, fig_4_6
+    from aggregate.pedagogy import fig_4_5, fig_4_6
     @savefig num_discrete_approx.png scale=20
     fig_4_5()
 

@@ -1574,17 +1574,27 @@ The lifted natural allocation (diversified pricing) is given next.
 
 .. _10 min extensions:
 
-Extensions
------------
+Auxiliary Modules
+------------------
 
-The ``extensions`` sub-package contains additional classes and functions that are either peripheral to the main project or still under development (and subject to change). Currently, ``extensions`` includes:
+Peripheral-but-public modules live alongside the core package. Reach them by
+explicit submodule import (no top-level re-export):
 
-* ``case_studies`` for creating and managing PIR case studies (see :doc:`2_x_case_studies`).
-* ``pir_figures`` for creating various exhibits and figures in PIR.
-* ``figures`` for creating various other exhibits and figures.
-* ``samples`` includes functions for working with samples and executing a switcheroo. Eventually, these will be integrated into :class:`Portfolio`.
+* :mod:`aggregate.pedagogy` — figure and exhibit generators cited in the
+  technical-guide docs, papers, and blog posts (``adjusting_layer_losses``,
+  ``fig_4_1``…, ``distortion_and_ins_stats``, ``plot_twelve``,
+  ``bodoff_exhibit``, ``ClassicalPremium``, etc.).
+* :mod:`aggregate.pentagon` — :class:`Pentagon`, algebra over the
+  ``(L, P, M, a, Q, lr, pq, coc)`` accounting identities.
+* :mod:`aggregate.ft` — :class:`FourierTools` for direct characteristic-function
+  inversion.
+* :mod:`aggregate.tweedie` — :class:`Tweedie` plus ``tweedie_convert`` /
+  ``tweedie_density``.
 
-.. test suite is dead...
+PIR case-study reproduction (the legacy ``CaseStudy`` workflow, the
+``Tame``/``CNC``/``HuSCS``/``Discrete`` runners) has been deleted.
+Install ``aggregate==0.30.1`` in an isolated environment
+to reach the published version of that machinery.
 
 .. _10 min summary:
 

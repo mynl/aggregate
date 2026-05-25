@@ -71,7 +71,7 @@ These quantities are illustrated in the next figure.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.figures import adjusting_layer_losses
+    from aggregate.pedagogy import adjusting_layer_losses
     @savefig picks.png scale=20
     adjusting_layer_losses();
 

@@ -202,9 +202,9 @@ ground-up covers can be computed by integrating densities.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import fig_10_3
+    from aggregate.pedagogy import distortion_and_ins_stats
     @savefig dist_g_fig.png scale=20
-    fig_10_3()
+    distortion_and_ins_stats()
 
 For an insured risk, we regard the margin as compensation for
 ambiguity aversion and associated winner’s curse drag. Both of these

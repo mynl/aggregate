@@ -87,7 +87,7 @@ for more details.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.figures import power_variance_family
+    from aggregate.pedagogy import power_variance_family
     @savefig tweedie_powervariance.png scale=20
     power_variance_family()
 

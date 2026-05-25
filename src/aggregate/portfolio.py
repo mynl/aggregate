@@ -2395,8 +2395,7 @@ class Portfolio(object):
         -----
         Replaces both the legacy
         ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, ...)`` and
-        ``calibrate_distortions2(coc, reg_p)``. Single coc, single asset
-        level: that is the only usage pattern PMIR ever exercised.
+        ``calibrate_distortions2(coc, reg_p)``. 
         """
         if (p is None) == (a is None):
             raise ValueError(

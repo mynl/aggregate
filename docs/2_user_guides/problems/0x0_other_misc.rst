@@ -233,7 +233,6 @@ Build the distortion and apply to call options at different strikes. Reproduces 
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions import Formatter
     d1 = build('distortion w25 wang .25')
     ans = []
     strikes = np.arange(1250, 1501, 50)
@@ -245,7 +244,7 @@ Build the distortion and apply to call options at different strikes. Reproduces 
                      columns=['bid', 'el', 'ask'])
     df.index.name = 'strike'
     df['loading'] = (df.ask - df.el) / df.el
-    qd(df.T, float_format=Formatter(dp=2, w=8))
+    qd(df.T, float_format=lambda x: f'{x:8,.2f}')
 
 .. _gerber stop loss:
 

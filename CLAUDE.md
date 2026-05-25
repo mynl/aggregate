@@ -42,12 +42,6 @@ uv run pytest
 ```
 Tests live in `tests/`. Every line of `aggregate/agg/test_suite.agg` is exercised as its own parametrized test case (one assert-parses test and one shape-regression test against a captured SLY snapshot).
 
-**Generate the visual report** (HTML with plots, optional):
-```
-uv run python -m aggregate.extensions.test_suite
-```
-This builds every object in `test_suite.agg`, plots it, and writes an HTML page. Useful for spot-checking the full DecL → build → statistics pipeline.
-
 **Build documentation:**
 ```
 cd docs && uv run make.bat html          # Windows
@@ -91,8 +85,12 @@ Frequency          ← base class for frequency distributions
 | `utilities.py` | FFT helpers, quantile/TVaR functions, plotting, moment utilities |
 | `bounds.py` | `Bounds` — pricing bounds (IME 2022 methodology) |
 | `constants.py` | Global constants and validation flag definitions |
+| `pedagogy.py` | Figure/exhibit generators cited in docs, papers, and blogs (not core API) |
+| `pentagon.py` | `Pentagon` — algebra over the (L, P, M, a, Q, lr, pq, coc) accounting identities |
+| `ft.py` | `FourierTools` — direct chf inversion (post-extensions consolidation) |
+| `tweedie.py` | `Tweedie` — frozen scipy-like distribution; ``tweedie_convert``/``_density`` |
 
-`aggregate/extensions/` contains optional modules (case studies, figures, the visual test-suite reporter, Fourier tools, Tweedie distributions). These are not imported by the core package and are slated for removal at 1.0; anything important moves into the core then.
+The `extensions/` package was removed at 1.0.0a12. Its useful contents either promoted (pentagon, ft, tweedie), absorbed into `pedagogy.py` (figures, bodoff, plot helpers), or migrated to the PMIR companion package (PIR case-study machinery). No top-level re-exports for `Bounds`, `Tweedie`, `FourierTools`, `Pentagon`, or anything in `pedagogy` — submodule access only.
 
 ### DecL — the domain-specific language
 
@@ -136,8 +134,6 @@ The pytest suite at `tests/` is the primary test mechanism — run with `uv run 
 
 The snapshot can be regenerated with `uv run python tests/capture_sly_snapshot.py` IF the SLY parser is restored from git history; otherwise treat it as a frozen reference.
 
-`aggregate/extensions/test_suite.py` is a visual reporter — it builds each object, plots it, writes HTML. It complements pytest but is not an assertion suite.
-
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
 
 ## TODO
@@ -148,8 +144,8 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 
 - **`xsden_to_meancv` vs `xsden_to_meancvskew` tail-mass inconsistency** (`moments.py`). `xsden_to_meancvskew` adds one bucket-width to the tail-mass point (`xsm = xsm + bs` at line 455), `xsden_to_meancv` does not. With `xs[0] = 0` (the typical FFT use), `bs = xs[1]` and the difference is one bucket on the mean correction — small for FFT use, but the two should agree. Decide which convention is correct (likely the meancvskew "place at xs[-1] + bs" form, putting the tail mass at the *next* bucket) and apply to both.
 
-- **`pedagogy.py` consolidation in progress.** `aggregate.pedagogy` exists as of 1.0.0a11 and holds `similar_risks_graphs_sa`, `similar_risks_example`, `plot_max_min`, and `plot_lee` (formerly in `bounds.py`). Outstanding migrations into the same module: `ft.py`'s `poisson_example`, `fft_wrapping_illustration`, `recentering_convolution`, `recentering_convolution_example`; `tweedie.py`'s `tweedie_illustration`; any other paper/blog figure-generators scattered across `extensions/`. Goal: one place for figure-generators when reproducing paper results; keeps `ft.py` / `tweedie.py` focused on the API. For now those helpers stay put.
+- **`pedagogy.py` future migrations.** `aggregate.pedagogy` is the single home for figure/exhibit generators. Outstanding migrations still TODO: `ft.py`'s `poisson_example`, `fft_wrapping_illustration`, `recentering_convolution`, `recentering_convolution_example`; `tweedie.py`'s `tweedie_illustration`. Goal: keep `ft.py` / `tweedie.py` focused on the API, with figure-generation in `pedagogy.py`.
 
 - **`Portfolio.pricing_bounds` pending rewrite.** Raises `NotImplementedError` as of 1.0.0a11. Was wired against the legacy `Bounds.tvar_cloud(...)` API and depended on passing the dense `density_df.S` array as the s-grid (33,977 points for PEG), which produced a matmul shape mismatch downstream. The new `Bounds` uses a fixed 513-point binary `s_grid`; aligning `pricing_bounds` to that grid requires deciding how to interp the cloud's distortion values onto the per-unit `exeqa_*` columns at portfolio resolution. Defer until the design is settled — user wants to think through it.
 
-- **`extensions/case_studies.py` needs API update.** Calls the old `Bounds(port)` / `bounds.tvar_cloud(...)` / `bounds.p_star(line, premium, ...)` / `bounds.weight_image(ax)` / `bounds.cloud_view(...)` / `bounds.tvar_with_bound(...)` surface. Imports are fixed so the module loads, but `show_similar_risks_graphs` and the `boundss` setup block will raise at runtime. Migrate in the next case-studies pass; the module is slated for removal at 1.0 anyway, so the bar is "make it match the API as a reference example" rather than "preserve every behaviour".
+- **PIR case-study reproduction.** The `CaseStudy` machinery (formerly `extensions/case_studies.py`, `portfolio_pir.py`, `risk_progression.py`, and the `cnc`/`discrete`/`hs`/`tame` runner scripts) was deleted at 1.0.0a12. **PMIR is a separate forward-looking project and does NOT reproduce PIR exhibits** — do not point users at it for that purpose. The only path to reproducing the published PIR exhibits is `pip install aggregate==0.30.1` in an isolated environment.

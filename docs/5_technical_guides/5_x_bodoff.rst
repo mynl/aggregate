@@ -225,7 +225,7 @@ objects for each. The Bodoff portfolios are part of the base library and can be 
    import pandas as pd
    from collections import OrderedDict
    from aggregate import build, qd
-   from aggregate.extensions import bodoff_exhibit
+   from aggregate.pedagogy import bodoff_exhibit
    bodoff = list(build.discover('.*Bodoff').program)
    ports = OrderedDict()
    for s in bodoff:

@@ -272,7 +272,7 @@ a fixed time or a combination. Scale indicates cumulative exposure-years.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import fig_9_1
+    from aggregate.pedagogy import fig_9_1
     @savefig pz.png scale=20
     fig_9_1(port)
 
@@ -350,7 +350,7 @@ about 180,000 policies.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.pir_figures import natural_scale
+    from aggregate.pedagogy import natural_scale
     df = natural_scale(port)
     qd(df, float_format=lambda x: f'{x:,.0f}')
 

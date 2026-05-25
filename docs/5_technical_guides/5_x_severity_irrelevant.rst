@@ -90,7 +90,7 @@ shape as expected counts increase.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions import mixing_convergence
+    from aggregate.pedagogy import mixing_convergence
     @savefig tr_prob_convg.png scale=20
     mixing_convergence(0.25, 0.5)
 

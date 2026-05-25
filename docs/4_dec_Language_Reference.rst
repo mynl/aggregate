@@ -124,19 +124,18 @@ Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.x
 Test Suite Programs
 ===================
 
-To run the test suite for HTML output, svg graphics.
+The test suite (``aggregate/agg/test_suite.agg``) is exercised by the pytest
+suite — each line of the file becomes its own parametrized test case (parse
+check + SLY-snapshot shape check). Run::
 
-.. code-block:: python
+    uv run pytest
 
-    from aggregate.extensions.test_suite import TestSuite
-    TestSuite().run('^[A-KNO]', 'All Aggregate Tests', 'svg')
-
+The full ``.agg`` source:
 
 .. literalinclude:: ../aggregate/agg/test_suite.agg
    :language: agg
 
-
-To only parse::
+To only parse the file from Python::
 
     from aggregate import build
     filename = build.default_dir / 'test_suite.agg'

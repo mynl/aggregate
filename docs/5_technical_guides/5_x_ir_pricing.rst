@@ -74,7 +74,7 @@ The graph is the Lee diagram, plotting :math:`x` against :math:`F(x)`.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.extensions.figures import savings_charge
+    from aggregate.pedagogy import savings_charge
     @savefig ir_savings_exp.png scale=20
     savings_charge();
 

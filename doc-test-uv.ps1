@@ -44,6 +44,11 @@
 #   .\doc-test-uv.ps1 -PythonVersion 3.12      # build under a specific Python
 #   .\doc-test-uv.ps1 -Clean                   # wipe doctrees + html first
 #   .\doc-test-uv.ps1 -NoSync                  # skip dependency sync (fast iteration)
+#   .\doc-test-uv.ps1 -Lenient                 # don't abort on Sphinx errors;
+#                                              # let nbsphinx render error cells
+#                                              # instead of failing the build
+#   .\doc-test-uv.ps1 -Clean -Lenient          # typical first-pass after a big
+#                                              # refactor — shows everything
 #   .\doc-test-uv.ps1 -Clean -PythonVersion 3.14
 #
 # When the build finishes, the script prints the command to serve the result
@@ -70,8 +75,16 @@ param(
     # stale doctrees cache is hiding a real problem.
     [switch]$Clean,
 
+    # Don't abort on Sphinx warnings/errors. Passes `--keep-going` to
+    # sphinx-build so it collects every warning instead of stopping at the
+    # first; also sets `nbsphinx_allow_errors=1` so a notebook cell that
+    # raises an exception renders the traceback inline instead of failing
+    # the build. Typical use: first pass after a big refactor when you
+    # expect lots of broken cross-references and stale examples.
+    [switch]$Lenient,
+
     # Port to suggest when printing the local-serve command at the end.
-    [int]$Port = 9800
+    [int]$Port = 19333
 )
 
 $ErrorActionPreference = 'Stop'
@@ -127,11 +140,30 @@ if (-not $NoSync) {
 #
 # `uv run sphinx-build` finds Sphinx in `.doc-venv` and invokes it — no
 # manual activation needed. The same command works on Windows, macOS, Linux.
+#
+# -Lenient prepends `--keep-going` (collect all warnings, don't stop at the
+# first) and `-D nbsphinx_allow_errors=1` (notebook cell exceptions render
+# inline instead of aborting). jupyter-sphinx already renders cell errors
+# inline by default, so nothing extra needed there.
+$sphinxArgs = @('-T', '-b', 'html',
+                '-d', 'docs\_build\doctrees',
+                '-D', 'language=en',
+                'docs', $OutputDir)
+if ($Lenient) {
+    $sphinxArgs = @('--keep-going', '-D', 'nbsphinx_allow_errors=1') + $sphinxArgs
+}
+
 Write-Host "Building HTML documentation..." -ForegroundColor Cyan
-uv run sphinx-build -T -b html -d docs\_build\doctrees -D language=en docs $OutputDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "HTML build failed."
-    exit $LASTEXITCODE
+uv run sphinx-build @sphinxArgs
+$sphinxExit = $LASTEXITCODE
+
+if ($sphinxExit -ne 0) {
+    if ($Lenient) {
+        Write-Warning "Sphinx reported warnings/errors (exit $sphinxExit); continuing because -Lenient is set."
+    } else {
+        Write-Error "HTML build failed."
+        exit $sphinxExit
+    }
 }
 
 # ---- Done -------------------------------------------------------------------

@@ -23,7 +23,7 @@ from scipy.special import loggamma
 from .distributions import Aggregate
 from .moments import MomentWrangler
 from .underwriter import build
-from .extensions.ft import FourierTools
+from .ft import FourierTools
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class Tweedie:
       Gaussian, or gamma distribution, or as an ``Aggregate`` object otherwise.
     * For Tweedie distributions it translates parameters into Poisson frequency and
       gamma severity, the latter as mean and CV or shape and rate.
-    * Create a ``aggregate.extensions.ft.FourierTools`` object for Fourier analysis
+    * Create a ``aggregate.ft.FourierTools`` object for Fourier analysis
       that provides an approximation to the distribution for those without a
       closed form expression (extreme and positive extreme stable, titled Cauchy,
       Tweedie).

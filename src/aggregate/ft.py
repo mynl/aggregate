@@ -1,16 +1,30 @@
+"""Direct numerical inversion of characteristic functions.
+
+Provides :class:`FourierTools`, an object-oriented FFT-based inverter for
+characteristic functions (used internally by :class:`aggregate.tweedie.Tweedie`
+for distributions without closed-form pdfs), plus :func:`make_levy_chf` and
+several paper-figure helpers (``poisson_example``, ``fft_wrapping_illustration``,
+``recentering_convolution[_example]``).
+
+``FourierTools`` is reached as ``from aggregate.ft import FourierTools``;
+nothing here is re-exported at the top-level package namespace.
+"""
+
 import logging
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from scipy.fft import irfft,  rfft, ifft as ift
+from scipy.fft import irfft, rfft, ifft as ift
 from numpy import real, imag, roll
-from .. import build, qd, Aggregate
-from .. constants import FIG_H, FIG_W
 
+from .constants import FIG_H, FIG_W
+from .distributions import Aggregate
+from .underwriter import build
+from .utilities import qd
 
-# get the logger
 logger = logging.getLogger(__name__)
 
 
@@ -147,147 +161,6 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0, cmap='plasm
     ax2.set(ylim=lm)
 
     assert np.allclose(wrapped_from_full.sum(0), wrapped)
-
-
-def ft_invert(log2, chf, frz_generator, params, loc=0, scale=1, xmax=0, xshift=0,
-              suptitle='', wraps=None, disc_calc='density'):
-    """
-    Illustrate "manual" inversion of a characteristic function using irfft, including
-    optional scaling and location shift.
-
-    :param params: a list of shape parameters. loc and scale are handled separately.
-    :param chf: the characteristic function of the distribution, takes args params, loc, scale, t;
-      routine handles conversion to Fourier Transform
-    :param frz_generator: the scipy.stats function to create the underlying distribution.
-      Used to compute the exact answer. If there is not analytic formula, you can pass in
-      a numpy array with the values of the distribution at the points in xs computed by
-      some other means (e.g., for the Tweedie distribution).
-    :param loc: location paramteter
-    :param scale: scale parameter
-    :param xmax: if not zero, used to fix xmax. Otherwise, selected as frz.isf(1e-17) to capture the
-      full range of theunderlying distribution. For thick tailed distributions, you usually input
-      xmax manually. Note bs = xmax / n. If None set equal to n = 1 << log2, for use in
-      discrete distributions (forced bucket size of 1).
-    :param xshift: if not zero, used to shift the x-axis. The minimum x value equals xshift.
-      To center the x-axis, set xshift = -xmax/2. Should be a multiple of bs = xmax / n.
-    :param suptitle: optional suptitle for the figure
-    :param wraps: optional list of wrap values.
-    :param disc_calc: 'density' rescales pdf, 'surival' uses backward differences of sf (to
-      match Aggregate class calculation)
-    """
-
-    # number of buckets
-    n = 1 << log2
-    if xmax is None:
-        xmax = n
-
-    # make frozen object
-    if callable(frz_generator):
-        if scale is None:
-            # freq dists (Poisson) do not allow scaling
-            frz = frz_generator(*params, loc=loc)
-            frz.pdf = frz.pmf
-            # for subsequent use
-            scale = 1
-        else:
-            frz = frz_generator(*params, loc=loc, scale=scale)
-
-    # spatial upto xmax; used to create exact using the scipy stats object
-    # sampling interval (wavelength) = xmax / n
-    if xmax == 0:
-        xmax = frz.isf(1e-17)
-    # sampling domain, for exact and to "label" the Fourier Transform output
-    # xs = np.arange(n) * xmax / n
-    bs = xmax / n
-    xs = np.arange(n) * bs + xshift
-    if callable(frz_generator):
-        if disc_calc == 'density':
-            exact = frz.pdf(xs)
-            exact = exact / exact.sum() * (frz.cdf(xs[-1]) - frz.cdf(xs[0]))
-        else:
-            xs1 = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
-            exact = -np.diff(frz.sf(xs1))
-    else:
-        # pass in values
-        exact = frz_generator
-
-    # convert chf to ft including scale and loc effects
-    def loc_ft(t):
-        nonlocal params, loc, scale
-        # ft(t)= int f(x)exp(-2πi t x)dx
-        # chf(t) = int f(x)exp(i t x)dx
-        t1 = -t * 2 * np.pi
-        ans = chf(*params, t1 * scale)
-        if loc != 0:
-            # for some reason ans *= np.exp(-t1 * loc) does not work
-            ans = ans * np.exp(t1 * loc * 1j)
-        return ans
-
-    # sampling interval = bs = xmax / n [small bs, high sampling rate]
-    # sampling freq is 1 / bs = n / xmax, the highest sampling freq for inverting the FT
-    # note xmax = n * bs, so n / xmax = 1 / bs.
-    # f(x) = int_R fhat(t) exp(2πi tx)dt ≈ int_-f_max_f^max_f ...
-    f_max = n / xmax
-    # sample the FT; using real fft, only need half the range
-    ts = np.arange(n // 2 + 1) * f_max / n   # ts = np.arange(n // 2 + 1) / xmax
-    fx = loc_ft(ts)
-    # for debugging
-    ft_invert.fx = fx
-    ft_invert.ts = ts
-    x = irfft(fx)
-    if xshift != 0:
-        x = np.roll(x, -int(xshift / bs))
-
-    # plotting
-    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True)
-    ax0, ax1, ax2, ax3 = axs.flat
-
-    for ax in axs[0].flat:
-        ax.plot(xs, exact, label='exact', lw=1.5)
-        ax.plot(xs, x, label='xs irfft', ls=':', lw=1.5)
-        ax.legend(fontsize='x-small')
-    ax0.set(title='Density', xlabel='Outcome, x')
-    # mn = min(np.log10(exact).min(), np.log10(x).min())
-    mn0 = np.log10(x).min() * 1.25
-    mn = 10 ** np.floor(mn0)
-    mx = max(np.log10(exact).max(), np.log10(x).max())
-    mx = 10 ** np.ceil(mx)
-    if np.isnan(mn):
-        mn = 1e-17
-    if np.isnan(mx):
-        mx = 1
-    ax1.set(yscale='log', ylim=[mn, mx], title='Log density', xlabel='Outcome, x')
-
-    # amplitude and phase
-    ax2.plot(ts, np.abs(fx), '-', lw=1.5, c='C3')
-    ax2.set(title='Amplitude',
-            ylabel='|ft|', yscale='log', xlabel='frequency')
-    if log2 <= 8:
-        ax3.plot(ts, np.cumsum(np.angle(fx)) / (2 * np.pi), '-', marker='.', ms=3, c='C2')
-    else:
-        ax3.plot(ts, np.cumsum(np.angle(fx)) / (2 * np.pi), c='C2')
-    ax3.set(title='Cumulative phase',
-            ylabel='cumsum(arg(ft)) / $2\\pi$', xlabel='frequency')
-
-    if suptitle != '':
-        fig.suptitle(suptitle)
-
-    if wraps is not None:
-        fig2, ax = plt.subplots(1, 1, figsize=(3.5 * 2, 2.45 * 2), constrained_layout=True)
-        rt = exact.copy()
-        ax.plot(xs, exact, label='exact', lw=1.5)
-        ax.plot(xs, x, label='xs irfft', ls=':', lw=1.5)
-        for b in wraps:
-            xs2 = b * n / f_max + xs
-            adj = frz.pdf(xs2)
-            adj = adj / np.sum(adj) * (frz.cdf((b + 1) * n / f_max) - frz.cdf(b * n / f_max))
-            rt += adj
-            ax.plot(xs, rt, label=f'wrap {b}', lw=.5)
-        ax.set(yscale='log', ylim=[mn, mx], title='Aliasing analysis',
-               xlabel='Outcome, x', ylabel='Log density')
-        ax.legend(fontsize='x-small', ncol=2, loc='upper right')
-
-    return pd.DataFrame({'x': xs, 'p': x, 'p_exact': exact}).set_index('x')
 
 
 def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
@@ -459,22 +332,19 @@ def stats(df):
     return df
 
 
-class FourierTools(object):
+class FourierTools:
     """Manual inversion of a ch. f. using FFTs."""
 
     def __init__(self, chf, fz, scale_mode=True):
         """
         Class version of manual inversion of characteristic function.
 
-        Splits functionality of aggregate.extensions.ft_invert into:
+        Numerical inversion is split across four methods:
 
-        1. Numerical inversion, ``ft_invert``
-        2. Computation of actual density
-        2. Graph to compare densities
-        3. Graph to compute effect of wrapping
-
-        Compared to ``ft_invert`` function, the meaning of x_max and
-        xshift are changed.
+        1. ``invert`` — the FFT inversion itself.
+        2. ``compute_exact`` — exact density via ``fz`` (when available).
+        3. ``plot`` — graph to compare densities.
+        4. ``plot_wraps`` — graph to compute effect of wrapping (aliasing).
 
         For discrete rvs, x_max is always n - 1 and the bucketr size 1.
         For continuous rvs, it is either input or estimated as a quantile.
@@ -489,10 +359,9 @@ class FourierTools(object):
           routine handles conversion to Fourier Transform and adds loc and scale effects.
           Must use same shape parameters as fz.
         :param fz: the scipy.stats frozen distribution object. Used to compute the exact answer.
-          (Note: ft_invert allowed the class, pre-creation or an array. That option no
-          longer allowed.) If fz is 'discrete' or 'continuous' or 'mixed' it is a
-          generic distribution with no closed form cdf/pdf, e.g. Tweeedie. Then you
-          can't compute exact, obviously.
+          If fz is 'discrete' or 'continuous' or 'mixed' it is a generic distribution
+          with no closed form cdf/pdf, e.g. Tweedie. Then you can't compute exact,
+          obviously.
         :param scale_mode: if True, the scale parameter from fz is used in the Fourier
           Transform, otherwise it is unadjusted.
         """
@@ -628,9 +497,6 @@ class FourierTools(object):
         # self._ts = np.arange(n // 2 + 1) * f_max / n
         self._ts = np.linspace(0, 1/2, n // 2 + 1) * f_max
         self._fourier = self.fourier_transform(self._ts)
-        # for debugging
-        # ft_invert.fx = fx
-        # ft_invert.self._ts = self._ts
         probs = irfft(self._fourier)
         if x_min != 0:
             probs = np.roll(probs, -int(x_min / bs))
@@ -720,7 +586,7 @@ class FourierTools(object):
         """
         assert calc in ('survival', 'density'), 'calc must be "survival" or "density"'
         self.exact_calc = calc
-        assert self._df is not None, 'Must recompute first. Run ft_invert().'
+        assert self._df is not None, 'Must recompute first. Run invert().'
         xs = np.array(self._df.index)
         if len(xs) > max_points and not self.discrete:
             # mostly this is an issue for non-discrete distributions
@@ -754,12 +620,12 @@ class FourierTools(object):
 
         :param suptitle: super title for the plot.
         """
-        assert self._df is not None, 'Must recompute first. Run ft_invert() and compute_exact().'
+        assert self._df is not None, 'Must recompute first. Run invert() and compute_exact().'
         has_exact = self._df_exact is not None
         if not has_exact:
             logger.warning('No exact! Maybe run compute_exact().')
 
-        # plot four graphs per ft_invert
+        # plot four graphs per invert()
         if verbose:
             self.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
             ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat

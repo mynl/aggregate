@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a9"
+version = "1.0.0a10"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.rst"
 authors = [

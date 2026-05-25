@@ -28,6 +28,40 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a10 (in progress)
+-----------------------
+
+``ft`` consolidation. ``FourierTools`` and friends promoted from
+``aggregate.extensions.ft`` to top-level ``aggregate.ft``. Reach for
+the class via ``from aggregate.ft import FourierTools`` (submodule
+access only, no top-level re-export — same treatment as ``Tweedie``).
+
+* The legacy procedural ``ft_invert`` function (~140 LOC) deleted.
+  Its functionality is fully covered by the ``FourierTools`` class,
+  which the module's own docstring already documented as the
+  preferred replacement. Docs that reference ``ft_invert`` are stale
+  and will be swept separately.
+* Paper-figure helpers (``poisson_example``, ``fft_wrapping_illustration``,
+  ``recentering_convolution``, ``recentering_convolution_example``)
+  retained in ``aggregate.ft`` for now. A future ``aggregate.pedagogy``
+  module will consolidate figure-generators from across the codebase
+  (see CLAUDE.md TODO).
+* ``make_levy_chf`` retained.
+* Reach-back imports inside ``ft.py`` (``from .. import build, qd, Aggregate``)
+  replaced by direct module imports — eliminates the
+  partially-loaded-package fragility that drove tweedie's load-order
+  dance in 1.0.0a9.
+* ``aggregate.tweedie``'s ``FourierTools`` import repathed
+  (``from .extensions.ft`` → ``from .ft``).
+* Light tidy: ``FourierTools(object)`` → ``FourierTools``; stale
+  ``ft_invert`` references in docstrings / assert messages / dead
+  commented debug lines cleaned up.
+* New ``tests/test_ft.py`` — small in-regression case asserting that
+  ``FourierTools`` against a closed-form distribution
+  (``scipy.stats.norm``) inverts to the analytic pdf.
+* Old ``from aggregate.extensions.ft import ...`` will break — no
+  shim per the no-backcompat policy in ``CLAUDE.md``.
+
 1.0.0a9 (in progress)
 ----------------------
 

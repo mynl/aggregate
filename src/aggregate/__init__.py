@@ -26,8 +26,9 @@ from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *
 from .decl_pygments import *
-# tweedie last: pulls in extensions.ft which reaches back for build/Aggregate,
-# both of which must already be bound on the partially-loaded package.
+# ft + tweedie depend on Aggregate/build/qd already being bound on the package.
+# FourierTools and the Tweedie class are reachable only as submodule imports
+# (`from aggregate.ft import FourierTools`, `from aggregate.tweedie import Tweedie`).
 from .tweedie import tweedie_convert, tweedie_density
 
 import sys

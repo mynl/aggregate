@@ -11,7 +11,6 @@ from .utilities import (decl_pprint,
                         subsets,
                         round_bucket,
                         make_ceder_netter, nice_multiple,
-                        tweedie_convert, tweedie_density,
                         qd,
                         make_var_tvar, kaplan_meier, kaplan_meier_np,
                         agg_help, explain_validation)
@@ -27,6 +26,9 @@ from .bounds import Bounds, plot_max_min, plot_lee
 from .constants import *
 from .random_agg import *
 from .decl_pygments import *
+# tweedie last: pulls in extensions.ft which reaches back for build/Aggregate,
+# both of which must already be bound on the partially-loaded package.
+from .tweedie import tweedie_convert, tweedie_density
 
 import sys
 

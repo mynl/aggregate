@@ -261,7 +261,7 @@ class UnderwritingTransformer(Transformer):
         # notation. The Tweedie -> compound-Poisson(gamma) reparameterization
         # is delegated to ``tweedie_convert`` (imported lazily because this
         # module is also runnable as ``python -m`` for grammar printing).
-        from .utilities import tweedie_convert
+        from .tweedie import tweedie_convert
 
         _, name, _tw, mu, pp, sig2, note = c
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)

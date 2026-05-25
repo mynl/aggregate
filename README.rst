@@ -28,6 +28,36 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a9 (in progress)
+----------------------
+
+Tweedie consolidation. ``Tweedie`` class promoted from
+``aggregate.extensions.tweedie`` to top-level ``aggregate.tweedie``.
+``tweedie_convert`` and ``tweedie_density`` moved out of
+``utilities.py`` into the same module; their public re-exports from
+``aggregate`` are unchanged. Public import path for the class:
+``from aggregate.tweedie import Tweedie``.
+
+* ``Mode``, ``Tweedie``, ``tweedie_illustration`` are NOT re-exported
+  at top level — submodule access is the only path. ``Tweedie`` gets
+  the same treatment as ``Bounds`` (peripheral-but-public).
+* ``make_test_suite`` and ``run_test`` (interactive notebook scaffolds
+  that read a CSV and ``IPython.display`` audit frames) deleted.
+  Replaced by a small in-regression pytest module
+  ``tests/test_tweedie.py`` covering ``tweedie_convert`` round-trip,
+  ``tweedie_density`` at the mass-at-zero point, Tweedie class moments
+  matching V(μ)=disp·μ^p, and the additive↔reproductive duality.
+* Light tidy in the moved file: ``Tweedie(object)`` → ``Tweedie``;
+  dead commented imports / unused ``Path`` / ``IPython.display``
+  removed; ``# noqa`` annotation on ``Aggregate`` import dropped.
+* ``parser.py``'s lazy ``tweedie_convert`` import repathed from
+  ``.utilities`` to ``.tweedie``.
+* Old ``from aggregate.extensions.tweedie import ...`` will break —
+  no shim per the no-backcompat policy in ``CLAUDE.md``.
+* Docs (``docs/2_user_guides/DecL/100_tweedie.rst``, technical guide)
+  still reference the old import path — pending a separate docs
+  sweep.
+
 1.0.0a8 (in progress)
 ----------------------
 

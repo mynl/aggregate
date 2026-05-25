@@ -18,7 +18,6 @@ from . risk_progression import *
 from . bodoff import *
 from . ft import *
 from . pentagon import Pentagon, mapper, make_possible_pentagons
-from . tweedie import *
 
 # set up
 from pathlib import Path

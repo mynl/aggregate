@@ -11,7 +11,6 @@ from pygments.lexers import get_lexer_by_name
 import re
 import scipy.fft as sft
 from scipy.interpolate import interp1d
-from scipy.special import loggamma
 from IPython.display import HTML, Markdown, display
 
 from .constants import *  # noqa: F401,F403  (kept for downstream re-exports)
@@ -259,85 +258,6 @@ def make_ceder_netter(reins_list, debug=False):
         return ceder, netter, xs, ys
     else:
         return ceder, netter
-
-
-
-
-def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
-    """
-    Translate between Tweedie parameters. Input p, μ, σ2 or λ, α, β or  λ, m, cv. Remaining
-    parameters are computed and returned in pandas Series.
-
-    p, μ, σ2 are the reproductive parameters, μ is the mean and the variance equals σ2 μ^p
-    λ, α, β are the additive parameters; λαβ is the mean, λα(α + 1) β^2 is the variance
-    (α is the gamma shape and β is the scale).
-    λ, m, cv specify the compound Poisson with expected claim count λ and gamma with mean m and cv
-
-    In addition, returns p0, the probability mass at 0.
-    """
-
-    if μ is None:
-        if α is None:
-            # λ, m, cv spec directly as compound Poisson
-            assert λ is not None and m is not None and cv is not None
-            α = 1 / cv ** 2
-            β = m / α
-        else:
-            # λ, α, β in additive form
-            assert λ is not None and α is not None and β is not None
-            m = α * β
-            cv = α ** -0.5
-        p = (2 + α) / (1 + α)
-        μ = λ * m
-        σ2 = λ * α * (α + 1) * β ** 2 / μ ** p
-    else:
-        # p, μ, σ2 in reproductive form
-        assert p is not None and μ is not None and σ2 is not None
-        α = (2 - p) / (p - 1)
-        λ = μ**(2-p) / ((2-p) * σ2)
-        β = μ / (λ * α)
-        m = α * β
-        cv = α ** -0.5
-
-    p0 = np.exp(-λ)
-    twcv = np.sqrt(σ2 * μ ** p) / μ
-    ans = pd.Series([μ, p, σ2, λ, α, β, twcv, m, cv, p0],
-                    index=['μ', 'p', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
-    return ans
-
-
-def tweedie_density(x, *, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
-    """
-    Exact density of Tweedie distribution from series expansion.
-    Use any parameterization and convert between them with Tweedie convert.
-    Coded for clarity and flexibility not speed. See ``tweedie_convert``
-    for parameterization.
-
-    """
-    pars = tweedie_convert(p=p, μ=μ, σ2=σ2, λ=λ, α=α, β=β, m=m, cv=cv)
-    λ = pars['λ']
-    α = pars['α']
-    β = pars['β']
-    if x == 0:
-        return np.exp(-λ)
-    # reasonable max n from normal approx to Poisson
-    maxn = λ + 4 * λ ** 0.5
-    logl = np.log(λ)
-    logx = np.log(x)
-    logb = np.log(β)
-    const = -λ - x / β
-    ans = 0.0
-    for n in range(1, 2000):
-        log_term = (const +
-                    + n * logl +
-                    + (n * α - 1) * logx +
-                    - loggamma(n+1) +
-                    - loggamma(n * α) +
-                    - n * α * logb)
-        ans += np.exp(log_term)
-        if n > maxn or (n >λ and log_term < -227):
-            break
-    return ans
 
 
 # Logger configuration is controlled by the user of the package, not the package itself.

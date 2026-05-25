@@ -1,29 +1,108 @@
+"""Tweedie exponential dispersion models.
+
+Provides the :class:`Tweedie` class spanning the full p-parameter range
+(stable / Cauchy / Po-gamma / Poisson / normal / gamma / inverse-Gaussian),
+plus the small parameter-translation helpers :func:`tweedie_convert` and
+the series-expansion density :func:`tweedie_density`. ``Tweedie`` itself
+is *not* re-exported at the top-level ``aggregate`` namespace — reach for
+it via ``from aggregate.tweedie import Tweedie``. The two helpers are
+top-level public.
+"""
+
 from enum import Enum
-try:
-    from jax import grad     # EXTREMELY idle...
-    import jax.numpy as jnp
-except:
-    pass
 import logging
+from typing import Optional, Tuple
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
-from typing import Optional, Tuple  # , Union, Any  # Import necessary types
-from pathlib import Path
+from scipy.special import loggamma
 
-from IPython.display import display
-# from collections import namedtuple
-# from numpy import ndarray, dtype
+from .distributions import Aggregate
+from .moments import MomentWrangler
+from .underwriter import build
+from .extensions.ft import FourierTools
 
-from ..distributions import Aggregate  # noqa
-from ..moments import MomentWrangler
-from ..underwriter import build
-from .ft import FourierTools
-
-# logging
 logger = logging.getLogger(__name__)
+
+
+def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
+    """
+    Translate between Tweedie parameters. Input p, μ, σ2 or λ, α, β or  λ, m, cv. Remaining
+    parameters are computed and returned in pandas Series.
+
+    p, μ, σ2 are the reproductive parameters, μ is the mean and the variance equals σ2 μ^p
+    λ, α, β are the additive parameters; λαβ is the mean, λα(α + 1) β^2 is the variance
+    (α is the gamma shape and β is the scale).
+    λ, m, cv specify the compound Poisson with expected claim count λ and gamma with mean m and cv
+
+    In addition, returns p0, the probability mass at 0.
+    """
+
+    if μ is None:
+        if α is None:
+            # λ, m, cv spec directly as compound Poisson
+            assert λ is not None and m is not None and cv is not None
+            α = 1 / cv ** 2
+            β = m / α
+        else:
+            # λ, α, β in additive form
+            assert λ is not None and α is not None and β is not None
+            m = α * β
+            cv = α ** -0.5
+        p = (2 + α) / (1 + α)
+        μ = λ * m
+        σ2 = λ * α * (α + 1) * β ** 2 / μ ** p
+    else:
+        # p, μ, σ2 in reproductive form
+        assert p is not None and μ is not None and σ2 is not None
+        α = (2 - p) / (p - 1)
+        λ = μ**(2-p) / ((2-p) * σ2)
+        β = μ / (λ * α)
+        m = α * β
+        cv = α ** -0.5
+
+    p0 = np.exp(-λ)
+    twcv = np.sqrt(σ2 * μ ** p) / μ
+    ans = pd.Series([μ, p, σ2, λ, α, β, twcv, m, cv, p0],
+                    index=['μ', 'p', 'σ^2', 'λ', 'α', 'β', 'tw_cv', 'sev_m', 'sev_cv', 'p0'])
+    return ans
+
+
+def tweedie_density(x, *, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
+    """
+    Exact density of Tweedie distribution from series expansion.
+    Use any parameterization and convert between them with Tweedie convert.
+    Coded for clarity and flexibility not speed. See ``tweedie_convert``
+    for parameterization.
+
+    """
+    pars = tweedie_convert(p=p, μ=μ, σ2=σ2, λ=λ, α=α, β=β, m=m, cv=cv)
+    λ = pars['λ']
+    α = pars['α']
+    β = pars['β']
+    if x == 0:
+        return np.exp(-λ)
+    # reasonable max n from normal approx to Poisson
+    maxn = λ + 4 * λ ** 0.5
+    logl = np.log(λ)
+    logx = np.log(x)
+    logb = np.log(β)
+    const = -λ - x / β
+    ans = 0.0
+    for n in range(1, 2000):
+        log_term = (const +
+                    + n * logl +
+                    + (n * α - 1) * logx +
+                    - loggamma(n+1) +
+                    - loggamma(n * α) +
+                    - n * α * logb)
+        ans += np.exp(log_term)
+        if n > maxn or (n >λ and log_term < -227):
+            break
+    return ans
 
 
 class Mode(Enum):
@@ -32,7 +111,7 @@ class Mode(Enum):
     ADDITIVE = 2
 
 
-class Tweedie(object):
+class Tweedie:
     """
     ``Tweedie`` is a class for working with the Tweedie class of
     exponential dispersion models, those with variance function
@@ -303,10 +382,10 @@ class Tweedie(object):
         if 0 < p < 1:
             raise ValueError(f'p cannot be in (0, 1), got {p}')
         if p == 1:
-            return jnp.exp(theta)
+            return np.exp(theta)
         elif np.isinf(p):
             # Cauchy, [2] p. 163
-            return -jnp.log(-theta) if theta < 0 else 0.
+            return -np.log(-theta) if theta < 0 else 0.
         elif p == 0:
             # normal
             return theta
@@ -386,6 +465,31 @@ class Tweedie(object):
                     Tweedie.tau_inverse(p, mean * dispersion ** (1 / (p - 1))),
                     dispersion ** (1 / (1 - p))
                     )
+
+    @staticmethod
+    def tau_dd(p: float, theta: float) -> float:
+        """
+        Second derivative tau''(theta) = kappa'''(theta), the third cumulant of
+        the carrier distribution (since tau = kappa'). Replaces the idle
+        grad(grad(...)) used for skewness. Mirrors the cases in Tweedie.tau;
+        assumes dispersion and index = 1.
+
+        For the general case tau = ((1 - p) theta) ** (alpha - 1) with
+        alpha - 1 = 1 / (1 - p), giving tau'' = p * ((1 - p) theta) ** (alpha - 3).
+        """
+        if p == 1:
+            # Poisson carrier: tau = exp(theta)
+            return np.exp(theta)
+        elif np.isinf(p):
+            # Cauchy/Landau carrier: tau = -log(-theta), theta < 0
+            return 1. / theta ** 2
+        elif p == 0:
+            # normal carrier: tau is linear in theta, so tau'' = 0
+            return 0.
+        else:
+            # gamma / inverse Gaussian / (positive) extreme stable carrier
+            alpha = Tweedie.p_to_alpha(p)
+            return p * ((1 - p) * theta) ** (alpha - 3)
 
     @property
     def reproductive(self)  -> Tuple[float, float, float]:
@@ -617,12 +721,12 @@ class Tweedie(object):
             am = self.mean * self.index
             va = self.index * self.mean ** self.p
         cva = va ** .5 / am
-        # skewness IDLE grad
-        f = lambda x: self.tau(self.p, x)
+        # skewness from tau'' = kappa''' (third cumulant of the carrier)
+        tdd = self.tau_dd(self.p, self.theta)
         if self.mode == Mode.REPRODUCTIVE:
-            ska = grad(grad(f))(self.theta) * self.index ** -2 / self.tw_variance ** 1.5
+            ska = tdd * self.index ** -2 / self.tw_variance ** 1.5
         elif self.mode == Mode.ADDITIVE:
-            ska = grad(grad(f))(self.theta) * self.index / self.tw_variance ** 1.5
+            ska = tdd * self.index / self.tw_variance ** 1.5
         # assemble answer
         actual = 'reproductive' if self.mode == Mode.REPRODUCTIVE else 'additive'
         ans = pd.DataFrame({actual: [am, va, cva, ska], 'fourier': [me, vf, cve, ske], 'frozen': [m, v, cv, sk]},
@@ -675,29 +779,6 @@ class Tweedie(object):
                 return self.K_reproductive(s)
             case Mode.ADDITIVE:
                 return self.K_additive(s)
-
-    # def K_manual(self, s):
-    #     """
-    #     Cumulant function, reflecting theta and in the additive form.
-    #
-    #     K(s) = lambda * (kappa(theta + s) - kappa(theta))
-    #
-    #     Per Jorg [2] p. 132 Eq 4.15. Note special treatment
-    #     of theta = 0, since 4.15 divides by theta.
-    #     Belt 'n braces tester: the same as K!
-    #     """
-    #     if self.theta == 0:
-    #         assert self.p != 2, 'p=2 does not allow theta = 0'
-    #         return self.index * (self.kappa(s) - self.kappa(0))
-    #     assert self.index != 0, 'unexpected, index cannot be 0'
-    #     # functions are now scaled by index
-    #     if self.p == 1:
-    #         return self.index * np.exp(self.theta) * (np.exp(s) - 1)
-    #     elif self.p == 2:
-    #         return -self.index * np.log(1 + s / self.theta)
-    #     else:
-    #         # p != 1, 2
-    #         return self.index * self.kappa(self.theta) * ((1 + s / self.theta) ** self.alpha - 1)
 
     def chf(self, t):
         """Characteristic function."""
@@ -809,63 +890,6 @@ class Tweedie(object):
                 if self.ft.fz is not None:
                     self.ft.df_exact.plot(ax=ax)
             return self.audit()
-
-
-def make_test_suite(mode=Mode.REPRODUCTIVE):
-    """Create a test suite for the Tweedie class."""
-    p = Path(r'C:\Users\steve\S\TELOS\Blog\quarto\ConvexConsiderations\posts\notes\2025-02-06-Tweedie-distributions\test-cases.csv')
-    assert p.exists()
-    tests = pd.read_csv(p)
-    # convert str to list:
-    tests.theta = tests.theta.map(eval)
-    tests['index'] = tests['index'].map(eval)
-    # explode lists
-    tests_ex = tests.explode('theta').explode('index').reset_index(drop=True)
-    tests_ex.index.name = 'n'
-    # convert to floats
-    for c in ['p', 'alpha', 'theta', 'index']:
-        tests_ex[c] = [eval(i) if type(i)==str else float(i)  for i in tests_ex[c]]
-
-    # figure reproductive parameters: tau is not vectorized
-    tests_ex['mu'] = [Tweedie.tau(p, t) for p, t in tests_ex[['p', 'theta']].values]
-    tests_ex['dispersion'] = 1 / tests_ex['index']
-
-    # figure expected repro moments
-    tests_ex['mean_reproductive'] = tests_ex['mu']
-    tests_ex['variance_reproductive'] = tests_ex['mu'] ** tests_ex['p'] * tests_ex['dispersion']
-    tests_ex['sd'] = tests_ex.variance_reproductive ** 0.5
-    tests_ex['cv'] = tests_ex.sd / tests_ex['mean_reproductive']
-    tests_ex = tests_ex.drop(columns=['sd', 'notes'])
-
-    # expected additive moments
-    tests_ex['mean_additive'] = tests_ex['mu'] * tests_ex['index']
-    tests_ex['var_additive'] = tests_ex['index'] * tests_ex['mu'] ** tests_ex['p']
-    tests_ex['cv_additive'] = tests_ex.var_additive ** 0.5 / tests_ex.mean_additive
-    return tests_ex
-
-
-def run_test(p, theta, index, log2=16, bs=None, s=1e-12, **kwargs):
-    """Run a test of the Tweedie class."""
-    # additive
-    ta = Tweedie(p, theta=theta, index=index)
-    print(ta)
-    ans = ta.test(bs=bs, log2=log2, s=s, **kwargs)
-    if 1 < p < 2:
-        f = ta.po_gamma_shape_rate
-        print(f, ta.po_gamma_m_cv, sep='\n')
-        print(np.exp(-f[0]))
-    display(ans)
-    print('='*80)
-    # gamma reproductive ====================================
-    tr = ta.dual()
-    print(tr)
-    ans = tr.test(bs=bs, log2=log2, s=s, **kwargs)
-    if 1 < p < 2:
-        f = tr.po_gamma_shape_rate
-        print(f, tr.po_gamma_m_cv, sep='\n')
-        print(np.exp(-f[0]))
-    display(ans)
-    return ta, tr
 
 
 def tweedie_illustration():

@@ -5,7 +5,8 @@
 # Integrates code from common_header, common_scripts, and hack
 
 import aggregate as agg
-from aggregate import Aggregate, round_bucket, Bounds, plot_max_min
+from aggregate import Aggregate, round_bucket, Bounds
+from aggregate.pedagogy import plot_max_min
 from aggregate.extensions.portfolio_pir import (
     calibrate_blends, stand_alone_pricing, twelve_plot,
 )

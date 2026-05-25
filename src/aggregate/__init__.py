@@ -22,7 +22,7 @@ from .distributions import (Frequency, Severity, Aggregate,
                             approximate_from_mcvsk)
 from .portfolio import Portfolio, make_awkward, make_comonotonic_allocations
 from .underwriter import Underwriter, build, build_many, CannotBuild
-from .bounds import Bounds, plot_max_min, plot_lee
+from .bounds import Bounds
 from .constants import *
 from .random_agg import *
 from .decl_pygments import *

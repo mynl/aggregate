@@ -1,939 +1,528 @@
+"""
+Pricing-bounds analysis (Mildenhall, IME 2022).
+
+The :class:`Bounds` class is constructed in one shot from a distribution and a
+target premium. It computes the bounding pricing distortions consistent with
+the premium, exposes the min/max envelope of that family, and renders the
+three-panel "cloud" figure from the paper.
+
+Naming convention used throughout
+---------------------------------
+
+============  =============  ============================================
+Name          Shape          Meaning
+============  =============  ============================================
+``p_knots``   ``(n_p,)``     TVaR threshold values — the p axis
+``s_grid``    ``(n_s,)``     distortion evaluation points — the s axis
+``tvar_x_p``  ``(n_p,)``     ``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``
+``tvar_hinges`` ``(n_p, n_s)`` ``min(1, s_grid[j] / (1 - p_knots[i]))``
+``cloud_df``  ``(n_s, K)``   each column is a convex combination of two
+                              rows of ``tvar_hinges``; ``K`` = number of
+                              ``(p_lo, p_hi)`` pairs straddling ``p_star``
+============  =============  ============================================
+
+The "hinge family" is the set of TVaR distortions parameterised by p:
+``TVaR_p(s) = min(1, s / (1 - p))``. p indexes the family; s is the
+distortion argument.
+"""
+from functools import cached_property
 from itertools import cycle
 import logging
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from matplotlib.colors import ListedColormap
 import numpy as np
-from numpy.linalg import pinv
 import pandas as pd
 from scipy.interpolate import interp1d
-from scipy.optimize import linprog
-from scipy.sparse import coo_matrix
+from scipy.optimize import brentq
 
-from . import Portfolio, Aggregate, Distortion, Underwriter
-from . constants import *
+from .constants import FIG_W
+from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
 
 
-class Bounds(object):
+def _resolve_obj(obj, line):
     """
-    Implement IME 2022 pricing bounds methodology.
+    Coerce *obj* into ``(tvar_x, F, name)`` where
 
-    Typical usage: First, create a Portfolio or Aggregate object a. Then ::
+    - ``tvar_x(p)`` returns ``TVaR_p(X)`` (unbounded — capping at ``a`` is
+      applied separately in :meth:`Bounds._tvar_x_a`).
+    - ``F(x)`` returns ``P(X <= x)``.
+    - ``name`` is a display string.
 
-        bd = cd.Bounds(a)
-        bd.tvar_cloud('line', premium=, a=, n_tps=, s=, kind=)
-        p_star = bd.p_star('line', premium)
-        bd.cloud_view(axes, ...)
-
-    :param distribution_spec: A Portfolio or Portfolio.density_df dataframe or pd.Series (must have loss as index)
-            If DataFrame or Series values interpreted as desnsity, sum to 1. F, S, exgta all computed using Portfolio
-            methdology
-            If DataFrame line --> p_{line}
+    Accepted obj types: ``Portfolio``, ``Aggregate``, ``pd.Series``,
+    ``pd.DataFrame``. For Series/DataFrame the index is interpreted as outcomes
+    and values as the pmf; for DataFrame the first column is the pmf.
     """
-    # from common_scripts.cs
+    # Local imports to keep this module decoupled at import time.
+    from .distributions import Aggregate
+    from .portfolio import Portfolio
+    from .utilities import make_var_tvar
 
-    def __init__(self, distribution_spec):
-        assert isinstance(distribution_spec, (pd.Series,
-                          pd.DataFrame, Portfolio, Aggregate))
-        self.distribution_spec = distribution_spec
-        # although passed as input to certain functions (tvar with bounds) b is actually fixed
-        self.b = 0
-        self.Fb = 0
-        # change in 0.14.0 with new tvar methodology, got rid of confusingly named tvar_function.
-        # TVaR for X
-        self.tvar_unlimited_function = None
-        # Series of tvar values
-        self.tvars = None
-        self.tps = None
-        self.weight_df = None
-        self.idx = None
-        self.hinges = None
-        self.cloud_df = None
-        # uniform mode
-        self._t_mode = 'u'
-        # data frame with tvar weights and principal extreme distortion weights by method
-        self.pedw_df = None
-        self._tvar_df = None
-        # hack for beta distribution, you want to force 1 to be in tvar ps, but Fp = 1
-        # TODO figure out why p_star grinds to a halt if you input b < inf
-        self.add_one = True
-        # logger.warning('Deprecatation warning. The kind argument is now ignored. Functionality '
-        #                'is equivalent to kind="tail", which was the most accurate method.')
+    if isinstance(obj, Portfolio):
+        if line == 'total':
+            return obj.tvar, obj.cdf, f'{obj.name}.total'
+        if line not in obj.line_names_ex:
+            raise ValueError(f'line {line!r} not in portfolio {obj.name!r}')
+        ag = getattr(obj, line)
+        return ag.tvar, ag.cdf, f'{obj.name}.{line}'
+
+    if isinstance(obj, Aggregate):
+        return obj.tvar, obj.cdf, obj.name
+
+    if isinstance(obj, pd.DataFrame):
+        ser = obj.iloc[:, 0]
+        name = obj.columns[0] if hasattr(obj.columns[0], '__str__') else 'frame'
+    elif isinstance(obj, pd.Series):
+        ser = obj
+        name = ser.name if ser.name is not None else 'series'
+    else:
+        raise TypeError(
+            f'Bounds: unsupported obj type {type(obj).__name__}. '
+            'Accepted: Portfolio, Aggregate, pd.Series, pd.DataFrame.')
+
+    if not ser.index.is_unique:
+        raise ValueError('pmf index must be unique')
+    if not ser.index.is_monotonic_increasing:
+        raise ValueError('pmf index must be monotonic increasing')
+    ser = ser[ser > 0]
+    qf = make_var_tvar(ser)
+    cdf_ser = ser.cumsum()
+
+    def F(x):
+        if x >= cdf_ser.index[-1]:
+            return 1.0
+        if x < cdf_ser.index[0]:
+            return 0.0
+        return float(cdf_ser.loc[:x].iloc[-1])
+
+    return qf.tvar, F, str(name)
+
+
+class Bounds:
+    """
+    Pricing bounds (IME 2022).
+
+    Parameters
+    ----------
+    obj : Portfolio, Aggregate, pd.Series, or pd.DataFrame
+        The risk X.
+    premium : float
+        Target premium. Required: ``E[X] < premium <= a``.
+    a : float, default ``np.inf``
+        Asset cap. The class bounds prices of ``min(X, a)``.
+    line : str, default ``'total'``
+        Only used when ``obj`` is a ``Portfolio``.
+    n_p : int, default ``257``
+        Base p-grid size. Adaptive refinement adds a handful of knots
+        around ``p_star``.
+    n_s : int, default ``513``
+        s-grid size. Binary, ``np.linspace(0, 1, n_s)``.
+
+    Attributes
+    ----------
+    p_star : float
+        TVaR threshold where ``TVaR_{p_star}(min(X, a)) = premium``.
+    p_knots : ndarray, shape (n_p,)
+    s_grid : ndarray, shape (n_s,)
+    tvar_x_p : ndarray, shape (n_p,)
+    tvar_hinges : ndarray, shape (n_p, n_s)
+    weight_df : DataFrame
+        One row per bracketing ``(p_lo, p_hi)`` pair with columns
+        ``t_lower, t_upper, weight``.
+    cloud_df : DataFrame, shape ``(n_s, K)``
+        Columns are MultiIndex ``(p_lo, p_hi)``.
+    min_envelope : :class:`Distortion`
+        Pointwise minimum of the cloud. Min-of-concaves is concave, so this
+        is itself a coherent distortion.
+    max_envelope : callable
+        Pointwise maximum of the cloud, as an ``interp1d`` callable. NOT
+        a Distortion (max of concaves is not concave in general).
+    min_envelope_hinges : DataFrame, shape ``(n_s, 4)``
+        Columns ``s, p_lo, p_hi, weight`` — at each ``s``, the BiTVaR
+        bracket from :attr:`weight_df` that achieves the pointwise
+        minimum, plus that bracket's convex-combo weight.
+    """
+
+    def __init__(self, obj, premium, *, a=np.inf, line='total',
+                 n_p=257, n_s=513):
+        self._obj = obj
+        self.premium = float(premium)
+        self.a = float(a) if not np.isinf(a) else np.inf
+        self.line = line
+        self.n_p = int(n_p)
+        self.n_s = int(n_s)
+
+        tvar_x_unb, F, name = _resolve_obj(obj, line)
+        self._tvar_x_unb = tvar_x_unb
+        self._F = F
+        self.name = name
+        self.Fb = 1.0 if np.isinf(self.a) else float(F(self.a))
+
+        mean = float(tvar_x_unb(0))
+        if self.premium < mean:
+            raise ValueError(
+                f'premium {self.premium} below mean {mean}; pricing bound undefined')
+        if not np.isinf(self.a) and self.premium > self.a:
+            raise ValueError(
+                f'premium {self.premium} exceeds asset cap {self.a}')
+
+    # ------------------------------------------------------------------
+    # Bounded TVaR — TVaR_p(min(X, a))
+    # ------------------------------------------------------------------
+
+    def _tvar_x_a(self, p):
+        """TVaR_p of min(X, a). Scalar or array p."""
+        tvar = self._tvar_x_unb(p)
+        if np.isinf(self.a):
+            return tvar
+        # For p >= F(a) the conditional tail of min(X, a) is exactly a.
+        # For p < F(a), TVaR_p(min(X,a)) = TVaR_p(X) - (1-F(a))(TVaR_{F(a)}(X) - a) / (1-p).
+        gap = (1.0 - self.Fb) * (self._tvar_x_unb(self.Fb) - self.a)
+        return np.where(np.asarray(p) < self.Fb,
+                        tvar - gap / (1.0 - p),
+                        self.a)
+
+    # ------------------------------------------------------------------
+    # p_star — root of TVaR_p(min(X, a)) = premium
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def p_star(self):
+        """The unique p in (0, 1) where ``TVaR_p(min(X, a)) = premium``."""
+        f = lambda p: float(self._tvar_x_a(p)) - self.premium
+        # Coarse bracket on dyadic grid k/256.
+        coarse = np.arange(1, 256) / 256.0
+        vals = np.array([f(p) for p in coarse])
+        sign_changes = np.where(np.diff(np.sign(vals)) != 0)[0]
+        if len(sign_changes) == 0:
+            # Bracket on the open interval as fallback.
+            lo, hi = 2.0 ** -10, 1.0 - 2.0 ** -10
+        else:
+            idx = sign_changes[0]
+            lo, hi = coarse[idx], coarse[idx + 1]
+        return float(brentq(f, lo, hi, xtol=2 ** -17, rtol=2 ** -30))
+
+    # ------------------------------------------------------------------
+    # Grids
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def p_knots(self):
+        """The TVaR-threshold grid, shape ``(n_p,)``-ish (adaptive adds knots)."""
+        base = np.linspace(0.0, 1.0, self.n_p, endpoint=False)
+        # Densification around p_star — dyadic offsets at 2**-8 .. 2**-11.
+        offsets = 2.0 ** -np.arange(8, 12)
+        extras = np.concatenate([self.p_star + offsets, self.p_star - offsets,
+                                 [self.p_star, 1.0]])
+        extras = extras[(extras > 0) & (extras <= 1.0)]
+        knots = np.unique(np.concatenate([base, extras]))
+        return knots
+
+    @cached_property
+    def s_grid(self):
+        """The distortion-evaluation grid, shape ``(n_s,)``."""
+        return np.linspace(0.0, 1.0, self.n_s)
+
+    @cached_property
+    def tvar_x_p(self):
+        """``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``, shape ``(n_p,)``."""
+        return np.asarray(self._tvar_x_a(self.p_knots), dtype=float)
+
+    @cached_property
+    def tvar_hinges(self):
+        """``tvar_hinges[i, j] = min(1, s_grid[j] / (1 - p_knots[i]))``."""
+        with np.errstate(divide='ignore', invalid='ignore'):
+            h = np.minimum(1.0, self.s_grid[None, :] / (1.0 - self.p_knots[:, None]))
+        # p == 1 produces inf; the TVaR-1 distortion is g(s)=1 for s>0, g(0)=0.
+        h = np.where(self.p_knots[:, None] >= 1.0,
+                     (self.s_grid > 0).astype(float)[None, :],
+                     h)
+        return h
+
+    # ------------------------------------------------------------------
+    # Weight table — bracketing (p_lo, p_hi) pairs
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def weight_df(self):
+        """
+        Bracketing-pair weights.
+
+        For each pair ``(p_lo, p_hi)`` with ``p_lo <= p_star < p_hi``, the
+        weight ``w`` satisfies
+        ``(1-w) tvar_x(p_lo) + w tvar_x(p_hi) = premium``.
+
+        Index: MultiIndex ``(p_lo, p_hi)``.
+        Columns: ``t_lower, t_upper, weight``.
+        """
+        ps = self.p_knots
+        tps = self.tvar_x_p
+        lhs = ps <= self.p_star
+        rhs = ps > self.p_star
+        pl, pu = np.meshgrid(ps[lhs], ps[rhs], indexing='ij')
+        tl, tu = np.meshgrid(tps[lhs], tps[rhs], indexing='ij')
+        w = (self.premium - tl) / np.where(tu == tl, 1.0, tu - tl)
+        df = pd.DataFrame({
+            'p_lower': pl.ravel(),
+            'p_upper': pu.ravel(),
+            't_lower': tl.ravel(),
+            't_upper': tu.ravel(),
+            'weight': w.ravel(),
+        }).set_index(['p_lower', 'p_upper'])
+        return df.sort_index()
+
+    @cached_property
+    def cloud_df(self):
+        """
+        The cloud of weighted-TVaR distortions, shape ``(n_s, K)``.
+
+        ``cloud_df[s, (p_lo, p_hi)] = (1-w) min(1, s/(1-p_lo)) + w min(1, s/(1-p_hi))``
+        where ``w`` is the bracket weight from :attr:`weight_df`.
+        """
+        # Build via vectorised gather + linear combo on tvar_hinges.
+        ps = self.p_knots
+        idx_lo = np.searchsorted(ps, self.weight_df.index.get_level_values('p_lower'))
+        idx_hi = np.searchsorted(ps, self.weight_df.index.get_level_values('p_upper'))
+        w = self.weight_df['weight'].values
+        lo_rows = self.tvar_hinges[idx_lo, :]    # (K, n_s)
+        hi_rows = self.tvar_hinges[idx_hi, :]    # (K, n_s)
+        cloud = (1.0 - w[:, None]) * lo_rows + w[:, None] * hi_rows
+        return pd.DataFrame(cloud.T, index=self.s_grid,
+                            columns=self.weight_df.index).rename_axis('s', axis=0)
+
+    # ------------------------------------------------------------------
+    # Envelopes
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def min_envelope(self):
+        """
+        Pointwise minimum of the cloud, as a :class:`Distortion`.
+
+        Min-of-concaves is concave, so this is a coherent distortion. Built
+        through :meth:`Distortion.s_gs_distortion` (convex-envelope kind).
+        """
+        s = self.s_grid
+        g = self.cloud_df.min(axis=1).values
+        return Distortion.s_gs_distortion(
+            s, g, display_name=f'min env({self.name}, prem={self.premium:.4g})')
+
+    @cached_property
+    def max_envelope(self):
+        """
+        Pointwise maximum of the cloud, as a linear-interpolation callable.
+
+        Max-of-concaves is generally not concave, so this is NOT a
+        :class:`Distortion`. Use as a function: ``bd.max_envelope(s)``.
+        """
+        s = self.s_grid
+        g = self.cloud_df.max(axis=1).values
+        return interp1d(s, g, kind='linear', bounds_error=False,
+                        fill_value=(0.0, 1.0))
+
+    @cached_property
+    def min_envelope_hinges(self):
+        """
+        The active bracketing BiTVaR at each ``s`` along the minimum envelope.
+
+        For every ``s`` in :attr:`s_grid`, the minimum envelope's value
+        ``min_envelope.g(s) = cloud_df.loc[s].min()`` is achieved by *one*
+        of the cloud columns — i.e. by exactly one ``(p_lo, p_hi)`` bracket
+        from :attr:`weight_df`. This frame records, for each ``s``, which
+        bracket that is, plus its weight.
+
+        Each row fully specifies the BiTVaR realising the envelope at that
+        ``s``:
+
+            ``g_s(u) = (1 - w) * min(1, u / (1 - p_lo))
+                          + w * min(1, u / (1 - p_hi))``
+
+        evaluated at ``u = s``, where ``w`` is the bracket weight
+        (chosen so that the BiTVaR prices ``min(X, a)`` to ``premium``).
+
+        Returns
+        -------
+        DataFrame
+            shape ``(n_s, 4)`` with columns:
+
+            ============  ==========================================
+            ``s``         the evaluation point (== :attr:`s_grid`)
+            ``p_lo``      lower TVaR threshold of the active bracket
+            ``p_hi``      upper TVaR threshold of the active bracket
+            ``weight``    convex-combo weight on the upper threshold
+            ============  ==========================================
+
+        Notes
+        -----
+        ``p_lo`` and ``p_hi`` are the *labels* of the cloud_df column
+        achieving the minimum at ``s`` — they're values from
+        :attr:`p_knots`, not computed extrema. The weight is looked up in
+        :attr:`weight_df`. To rebuild the active BiTVaR as a
+        :class:`Distortion`, call ``self.distortion(p_lo, p_hi)``.
+
+        Useful as the data artifact behind the "min envelope as a
+        weighted TVaR" paper extension: the envelope is the lower
+        boundary of the set of BiTVaRs pricing to ``premium``, and this
+        table tells you *which* BiTVaR is binding at each point.
+        """
+        argmin = self.cloud_df.idxmin(axis=1)
+        df = pd.DataFrame(argmin.tolist(), columns=['p_lo', 'p_hi'])
+        df.insert(0, 's', argmin.index.values)
+        df['weight'] = self.weight_df.loc[
+            list(zip(df['p_lo'], df['p_hi'])), 'weight'].values
+        return df
+
+    # ------------------------------------------------------------------
+    # Convenience views
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def tvar_df(self):
+        """``DataFrame`` with index ``p_knots`` and column ``tvar``."""
+        return pd.DataFrame({'tvar': self.tvar_x_p}, index=self.p_knots) \
+                 .rename_axis('p')
+
+    def distortion(self, pl, pu):
+        """Return the BiTVaR with knots ``(pl, pu)`` and the matching weight."""
+        if (pl, pu) not in self.weight_df.index:
+            raise KeyError(f'({pl}, {pu}) not in weight_df index — '
+                           'must be one of the bracketing pairs')
+        w = self.weight_df.at[(pl, pu), 'weight']
+        return Distortion('bitvar', w, df=[pl, pu])
 
     def __repr__(self):
+        return (f'Bounds({self.name!r}, premium={self.premium:.6g}, '
+                f'a={self.a}, p_star={self.p_star:.6g})')
+
+    # ------------------------------------------------------------------
+    # Plots
+    # ------------------------------------------------------------------
+
+    def plot_envelope(self, *, axs=None, n_resamples=0, alpha=0.05,
+                      distortions='ordered', title='',
+                      lim=(-0.025, 1.025)):
         """
-        Gets called automatically but so we can tweak.
-        :return:
+        Three-panel envelope figure (formerly ``cloud_view``).
+
+        Panel 1: scatter of sampled cloud columns shaded by weight, plus the
+        min/max envelope band.
+        Panels 2-3: the calibrated distortions overlaid on the envelope band.
+
+        Parameters
+        ----------
+        axs : array of 3 Axes, optional
+            If omitted, a new ``1 x 3`` figure is created.
+        n_resamples : int, default 0
+            If positive, draw this many bracket columns from ``cloud_df``,
+            restricted to ``p_lo == 0`` (pricing distortions, those that pin
+            the mean), and overplot them coloured by weight.
+        alpha : float, default 0.05
+            Opacity of the resampled curves.
+        distortions : ``'ordered'``, list of dict, or ``'space'``
+            What to overlay in panels 2-3. ``'ordered'`` only works for
+            ``Portfolio`` objects with calibrated distortions.
+        title : str, default ``''``
+            Suptitle (applied to all panels).
+        lim : tuple, default ``(-0.025, 1.025)``
+            x and y axis limits.
+
+        Returns
+        -------
+        fig, axs : matplotlib figure and array of three Axes.
         """
-        return 'Bounds Object at ' + super(Bounds, self).__repr__()
-
-    @property
-    def tvar_df(self):
-        if self._tvar_df is None:
-            self._tvar_df = pd.DataFrame(
-                {'p': self.tps, 'tvar': self.tvars}).set_index('p')
-        return self._tvar_df
-
-    @property
-    def t_mode(self):
-        return self._t_mode
-
-    @t_mode.setter
-    def t_mode(self, val):
-        assert val in ['u', 'gl']
-        self._t_mode = val
-
-    def make_tvar_function(self, line, b=np.inf):
-        """
-        Change in 0.14.0 with new tvar methodology, this function reflects the b limit, it is the
-        TVaR of min(X, b)
-
-        Make unlimited TVaR function for line, ``self.tvar_unlimited_function``, and set self.Fb.
-
-        - Portfolio or Aggregate: get from object
-        - DataFrame: make from p_{line} column
-        - Series: make from Series
-
-        In the last two cases, uses aggregate.utilties.make_var_tvar_function.
-
-        Includes determining sup and putting in value for zero.
-        If sup is largest value in index, sup set to inf.
-
-        You generally want to apply with a limit, call ``self.tvar_with_bounds``.
-
-        :param line: only used for portfolio objects, to specify line (or 'total')
-        :param b:  bound on the losses, e.g., to model limited liability insurer
-        :return:
-        """
-
-        self.b = b
-        p_total = None
-
-        # Note Fb calc varies by type
-        if isinstance(self.distribution_spec, Portfolio):
-            assert line in self.distribution_spec.line_names_ex
-            if line == 'total':
-                self.tvar_unlimited_function = self.distribution_spec.tvar
-                self.Fb = self.distribution_spec.cdf(b)
-            else:
-                ag = getattr(self.distribution_spec, line)
-                self.tvar_unlimited_function = ag.tvar
-                self.Fb = ag.cdf(b)
-            if np.isinf(b):
-                self.Fb = 1.0
-
-        elif isinstance(self.distribution_spec, Aggregate):
-            self.tvar_unlimited_function = self.distribution_spec.tvar
-            self.Fb = self.distribution_spec.cdf(b)
-            if np.isinf(b):
-                self.Fb = 1.0
-
-        else:
-            # next two instances fall through
-            if isinstance(self.distribution_spec, pd.DataFrame):
-                assert f'p_{line}' in self.distribution_spec.columns
-                # given a port.density_df
-                p_total = self.distribution_spec[f'p_{line}']
-
-            elif isinstance(self.distribution_spec, pd.Series):
-                logger.info('tvar_array using Series')
-                p_total = self.distribution_spec
-
-            # if here, then p_total is a series, index = loss, values = p_total pmf
-            from .utilities import make_var_tvar
-            # ensure p_total suitable for make_var_tvar
-            assert p_total.index.is_unique, 'Index must be unique'
-            assert p_total.index.is_monotonic_increasing, 'Index must be monotone increasing'
-            # subset to p_total > 0
-            p_total = p_total[p_total > 0]
-            # now can call make_var_tvar and extract the tvar function
-            self.tvar_unlimited_function = make_var_tvar(p_total).tvar
-
-            # set F(b)
-            if np.isinf(b):
-                self.Fb = 0
-            else:
-                F = p_total.cumsum()
-                self.Fb = F[b]
-
-    def make_ps(self, n, mode):
-        """
-        If add_one then you want n = 2**m + 1 to ensure nicely spaced points.
-
-        Mode: making s points (always uniform) or tvar p points (use t_mode).
-        self.t_mode == 'u': make uniform s points against which to evaluate g from 0 to 1
-        self.t_mode == 'gl': make Gauss-Legndre p points at which TVaRs are evaluated from 0 inclusive to 1 exclusive with more around 1
-
-        :param n:
-        :return:
-        """
-        assert mode in ('s', 't')
-
-        if mode == 't' and (self.Fb < 1 or self.add_one):
-            # we will add 1 at the end
-            n -= 1
-
-        # Gauus Legendre points
-        lg = np.polynomial.legendre.leggauss
-
-        if self.t_mode == 'gl':
-            if mode == 's':
-                x, wts = lg(n - 2)
-                ps = np.hstack((0, (x + 1) / 2, 1))
-            elif mode == 't':
-                x, wts = lg(n * 2 + 1)
-                ps = x[n:]
-
-        elif self.t_mode == 'u':
-            if mode == 's':
-                ps = np.linspace(1 / n, 1, n)
-            elif mode == 't':
-                # exclude 1 (sup distortion) at the end; 0=mean
-                ps = np.linspace(0, 1, n, endpoint=False)
-
-        # always ensure that 1  is in ps for t mode when b < inf if Fb < 1
-        if mode == 't' and (self.Fb < 1 or self.add_one):
-            ps = np.hstack((ps, 1))
-
-        return ps
-
-    def tvar_array(self, line, n_tps=257, b=np.inf, kind='interp'):
-        """
-        Compute tvars at n equally spaced points, tps.
-
-
-        :param line:
-        :param n_tps:  number of tvar p points, default 257 (assuming add-one mode)
-        :param b: cap on losses applied before computing TVaRs (e.g., adjust losses for finite assets b).
-               Use np.inf for unlimited losses.
-        :param kind: now ignored.
-        :return:
-        """
-        self.make_tvar_function(line, b)
-        logger.info(f'F(b) = {self.Fb:.5f}')
-        self.tps = self.make_ps(n_tps, 't')
-        self.tvars = self.tvar_with_bound(self.tps, b)
-
-    def p_star(self, line, premium, b=np.inf, kind='interp'):
-        """
-        Compute p* so TVaR @ p* of min(X, b) = premium
-
-        In this case the cap b has an impact (think of integrating q(p) over p to 1, q is impacted by b)
-
-        premium <= b is required (no rip off condition)
-
-        If b < inf then must solve TVaR(p) - (1 - F(b)) / (1 - p)[TVaR(F(b)) - b] = premium
-        Let k = (1 - F(b)) [TVaR(F(b)) - b], so solving
-
-        f(p) = TVaR(p) - k / (1 - p) - premium == 0
-
-        using NR
-
-        :param line:
-        :param premium: target premium
-        :param b:  bound
-        :param kind: now ignored
-        :return:
-        """
-        if premium > b:
-            raise ValueError(
-                f'p_star must have premium ({premium}) <= largest loss bound ({b})')
-
-        self.make_tvar_function(line, b)
-
-        if premium < self.tvar_unlimited_function(0):
-            raise ValueError(
-                f'p_star must have premium ({premium}) >= mean ({self.tvar_unlimited_function(0)})')
-
-        def f(p):
-            return self.tvar_with_bound(p, b, 'tail') - premium
-
-        fp = 100
-        p = 0.5
-        iters = 0
-        delta = 1e-10
-        while abs(fp) > 1e-6 and iters < 20:
-            fp = f(p)
-            fpp = (f(p + delta) - f(p)) / delta
-            pnew = p - fp / fpp
-            if 0 <= pnew <= 1:
-                p = pnew
-            elif pnew < 0:
-                p = p / 2
-            else:
-                #  pnew > 1:
-                p = (1 + p) / 2
-
-        if iters == 20:
-            logger.warning(
-                f'Questionable convergence solving for p_star, last error {fp}.')
-        p_star = p
-        return p_star
-
-    def tvar_with_bound(self, p, b=np.inf, kind='interp'):
-        """
-        Compute tvar taking bound into account.
-        Assumes tvar_unfunction setup.
-
-        Warning: b must equal the b used when calibrated. The issue is computing F
-        which varies with the type of underlying portfolio. This is fragile.
-        Added storing b and checking equal. For backwards comp. need to keep b argument
-
-        :param p:
-        :param b:
-        :param kind: now ignored
-        :return:
-        """
-        assert self.tvar_unlimited_function is not None, 'tvar_unlimited_function is None, must call make_tvar_function first'
-        assert b == self.b, f'b ({b}) must equal b used when calibrated, self.b ({self.b})'
-
-        tvar = self.tvar_unlimited_function(p)
-        if b == np.inf:
-            # no adjustment needed for unlimited losses
-            return tvar
-        tvar = np.where(p < self.Fb,
-                        tvar - (1 - self.Fb) * (self.tvar_unlimited_function(self.Fb) - b) / (1 - p),
-                        b)
-        return tvar
-
-    def compute_weight(self, premium, p0, p1, b=np.inf, kind='interp'):
-        """
-        compute the weight for a single TVaR p0 < p1 value pair
-
-        :param line:
-        :param premium:
-        :param tp:
-        :param b:
-        :return:
-        """
-
-        assert p0 < p1
-        assert self.tvar_unlimited_function is not None
-
-        lhs = self.tvar_with_bound(p0, b, kind)
-        rhs = self.tvar_with_bound(p1, b, kind)
-
-        assert lhs != rhs
-        weight = (premium - lhs) / (rhs - lhs)
-        return weight
-
-    def compute_weights(self, line, premium, n_tps, b=np.inf, kind='interp'):
-        """
-        Compute the weights of the extreme distortions
-
-        Applied to min(line, b)  (allows to work for net)
-
-        Note: independent of the asset level
-
-        :param line: within port, or total
-        :param premium: target premium for the line
-        :param n_tps: number of tvar p points (tps)number of tvar p points (tps)number of tvar p points
-            (tps)number of tvar p points (tps).
-        :param b: loss bound: compute weights for min(line, b); generally used for net losses only.
-        :return:
-        """
-
-        self.tvar_array(line, n_tps, b, kind)
-        # you add zero, so there will be one additional point
-        # n_tps += 1
-        p_star = self.p_star(line, premium, b, kind)
-        logger.info(f'compute weights: p_star {p_star} with premium {premium}, b={b}, and kind={kind}')
-        # if p_star in self.tps:
-        #     logger.critical(f'a Found p_star = {p_star} in tps!!')
-        # else:
-        #     logger.info('p_star not in tps')
-
-        lhs = self.tps[self.tps <= p_star]
-        rhs = self.tps[self.tps > p_star]
-
-        tlhs = self.tvars[self.tps <= p_star]
-        trhs = self.tvars[self.tps > p_star]
-
-        lhs, rhs = np.meshgrid(lhs, rhs)
-        tlhs, trhs = np.meshgrid(tlhs, trhs)
-
-        df = pd.DataFrame({'p_lower': lhs.flat, 'p_upper': rhs.flat,
-                           't_lower': tlhs.flat, 't_upper': trhs.flat,
-                           })
-        # will fail when p_star in self.ps; let's deal with then when it happens
-        df['weight'] = (premium - df.t_lower) / (df.t_upper - df.t_lower)
-
-        df = df.set_index(['p_lower', 'p_upper'], verify_integrity=True)
-        df = df.sort_index()
-
-        if p_star in self.tps:
-            # raise ValueError('Found pstar in ps')
-            logger.critical(f'Found p_star = {p_star} in tps; setting weight to 1.')
-            df.at[(p_star, p_star), 'weight'] = 1.0
-
-        logger.info(f'p_star={p_star:.4f}, len(p<=p*) = {len(df.index.levels[0])}, '
-                    f'len(p>p*) = {len(df.index.levels[1])}; '
-                    f' pstar in ps: {p_star in self.tps}')
-
-        self.weight_df = df
-
-        # index for tp values
-        r = np.arange(n_tps)
-        r_rhs, r_lhs = np.meshgrid(r[self.tps > p_star], r[self.tps <= p_star])
-        self.idx = np.vstack((r_lhs.flat, r_rhs.flat)).reshape((2, r_rhs.size))
-
-    def tvar_hinges(self, s):
-        """
-        make the tvar hinge functions by evaluating each tvar_p(s) = min(1, s/(1-p) for p in tps, at EP points s
-
-        all arguments in [0,1] x [0,1]
-
-        :param s:
-        :return:
-        """
-
-        self.hinges = coo_matrix(np.minimum(1.0, s.reshape(
-            1, len(s)) / (1.0 - self.tps.reshape(len(self.tps), 1))))
-
-    def tvar_cloud(self, line, premium, a, n_tps, s, kind='interp'):
-        """
-        weight down tvar functions to the extremal convex measures
-
-        asset level a acts like an agg stop on what is being priced, i.e. we are working with min(X, a)
-
-        :param line:
-        :param premium:
-        :param a:
-        :param n_tps:
-        :param s:
-        :param b:  bound, applies to min(line, b)
-        :return:
-        """
-
-        self.compute_weights(line, premium, n_tps, a, kind)
-
-        if type(s) == int:
-            # points at which g is evaluated - all OK to include 0 and 1
-            # s = np.linspace(0, 1, s+1, endpoint=True)
-            s = self.make_ps(s, 's')
-
-        self.tvar_hinges(s)
-
-        ml = coo_matrix((1 - self.weight_df.weight, (np.arange(len(self.weight_df)), self.idx[0])),
-                        shape=(len(self.weight_df), len(self.tps)))
-        mr = coo_matrix((self.weight_df.weight, (np.arange(len(self.weight_df)), self.idx[1])),
-                        shape=(len(self.weight_df), len(self.tps)))
-        m = ml + mr
-
-        logger.info(
-            f'm shape = {m.shape}, hinges shape = {self.hinges.shape}, types {type(m)}, {type(self.hinges)}')
-
-        self.cloud_df = pd.DataFrame(
-            (m @ self.hinges).T.toarray(), index=s, columns=self.weight_df.index)
-        self.cloud_df.index.name = 's'
-
-    def cloud_view(self, *, axs=None, n_resamples=0, scale='linear', alpha=0.05, pricing=True, distortions='ordered',
-                   title='', lim=(-0.025, 1.025), check=False, add_average=True):
-        """
-        Visualize the distortion cloud with n_resamples. Execute after computing weights.
-
-        :param axs:
-        :param n_resamples: if random sample
-        :param scale: linear or return
-        :param alpha: opacity
-        :param pricing: restrict to p_max = 0, ensuring g(s)<1 when s<1
-        :param distortions: 'ordered' shows the usual calibrated distortions, else list of dicts name:distortion.
-        :param title: optional title (applied to all plots)
-        :param lim: axis limits
-        :param check:   construct and plot Distortions to check working ; reduces n_resamples to 5
-        :return:
-        """
-        assert scale in ['linear', 'return']
         if axs is None:
-            # include squeeze to make consistent with %%sf cell magic
-            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W), constrained_layout=True, squeeze=False)
+            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W),
+                                    constrained_layout=True, squeeze=False)
             axs = axs[0]
         else:
-            if axs.ndim == 2:
-                axs = axs[0]
+            axs = np.atleast_1d(axs).flatten()
             fig = axs[0].get_figure()
 
-        assert not distortions or (len(axs.flat) > 1)
-
-        if distortions == 'ordered':
-            assert isinstance(self.distribution_spec, Portfolio), \
-                'distortion=ordered only available for Portfolio'
-            distortions = [
-                {k: self.distribution_spec.distortions[k] for k in ['ccoc', 'tvar']},
-                {k: self.distribution_spec.distortions[k] for k in ['ph', 'wang', 'dual']}]
-
-        bit = None
-        if check:
-            n_resamples = min(n_resamples, 5)
         norm = mpl.colors.Normalize(0, 1)
         cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
         mapper = cm.get_cmap()
-        s = np.linspace(0, 1, 1001)
+        s_eval = np.linspace(0, 1, 1001)
 
-        def plot_max_min(ax):
-            ax.fill_between(self.cloud_df.index, self.cloud_df.min(
-                1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-            self.cloud_df.min(1).plot(
-                ax=ax, label='_nolegend_', lw=1, ls='-', c='k')
-            self.cloud_df.max(1).plot(
-                ax=ax, label="_nolegend_", lw=1, ls='-', c='k')
+        def _band(ax):
+            ax.fill_between(self.cloud_df.index, self.cloud_df.min(1),
+                            self.cloud_df.max(1), facecolor='C7', alpha=.15)
+            self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
+            self.cloud_df.max(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
 
-        logger.info('starting cloudview...')
-        if scale == 'linear':
-            ax = axs[0]
-            if n_resamples > 0:
-                if pricing:
-                    bit = self.weight_df.xs(0, drop_level=False).sample(
-                        n=n_resamples, replace=True).reset_index()
-                else:
-                    bit = self.weight_df.sample(
-                        n=n_resamples, replace=True).reset_index()
-                logger.info('cloudview...done 1')
-                # display(bit)
-                for i in bit.index:
-                    pl, pu, tl, tu, w = bit.loc[i]
-                    self.cloud_df[(pl, pu)].plot(
-                        ax=ax, lw=1, c=mapper(w), alpha=alpha, label=None)
-                    if check:
-                        # put in actual for each sample
-                        d = Distortion('wtdtvar', w, df=[pl, pu])
-                        gs = d.g(s)
-                        ax.plot(s, gs, c=mapper(w), lw=2, ls='--',
-                                alpha=.5, label=f'ma ({pl:.3f}, {pu:.3f}) ')
-                ax.get_figure().colorbar(cm, ax=ax, shrink=.5, aspect=16,
-                                         label='Weight to Higher Threshold')
-            else:
-                logger.info('cloudview: no resamples, skipping 1')
-            logger.info('cloudview: start max/min')
-            plot_max_min(ax)
-            logger.info('cloudview: done with max/min')
-            for ln in ax.lines:
-                ln.set(label=None)
-            if check:
-                ax.legend(loc='lower right', fontsize='large')
-            ax.plot([0, 1], [0, 1], c='k', lw=.25, ls='-')
-            ax.set(xlim=lim, ylim=lim, aspect='equal')
+        if distortions == 'ordered':
+            from .portfolio import Portfolio
+            if not isinstance(self._obj, Portfolio):
+                raise ValueError("distortions='ordered' requires a Portfolio")
+            distortions = [
+                {k: self._obj.distortions[k] for k in ['ccoc', 'tvar']},
+                {k: self._obj.distortions[k] for k in ['ph', 'wang', 'dual']},
+            ]
 
-            if type(distortions) == dict:
-                distortions = [distortions]
-            if distortions == 'space':
-                ax = axs[1]
-                plot_max_min(ax)
-                ax.plot([0, 1], [0, 1], c='k', lw=.25,
-                        ls='-', label='_nolegend_')
+        ax = axs[0]
+        if n_resamples > 0:
+            bit = self.weight_df.xs(0, drop_level=False) \
+                                .sample(n=n_resamples, replace=True) \
+                                .reset_index()
+            for _, row in bit.iterrows():
+                pl, pu = row['p_lower'], row['p_upper']
+                w = row['weight']
+                self.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w),
+                                             alpha=alpha, label=None)
+            fig.colorbar(cm, ax=ax, shrink=.5, aspect=16,
+                         label='Weight to upper threshold')
+        _band(ax)
+        ax.plot([0, 1], [0, 1], c='k', lw=.25)
+        ax.set(xlim=lim, ylim=lim, aspect='equal')
+
+        if isinstance(distortions, dict):
+            distortions = [distortions]
+        if isinstance(distortions, list):
+            name_mapper = {'ccoc': 'CCoC', 'tvar': 'TVaR(p*)',
+                           'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
+            ls_cycle = list(mpl.lines.lineStyles.keys())
+            for ax, dist_dict in zip(axs[1:], distortions):
+                lssi = iter(cycle(ls_cycle))
+                for k, d in dist_dict.items():
+                    ax.plot(s_eval, d.g(s_eval), lw=1, ls=next(lssi),
+                            label=name_mapper.get(k, k))
+                _band(ax)
+                ax.plot([0, 1], [0, 1], c='k', lw=.25)
                 ax.legend(loc='lower right', ncol=3, fontsize='large')
                 ax.set(xlim=lim, ylim=lim, aspect='equal')
-            elif type(distortions) == list:
-                logger.info('cloudview: start 4 adding distortions')
-                name_mapper = {
-                    'roe': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
-                lss = list(mpl.lines.lineStyles.keys())
-                for ax, dist_dict in zip(axs[1:], distortions):
-                    lssi = iter(cycle(lss))
-                    for k, d in dist_dict.items():
-                        gs = d.g(s)
-                        k = name_mapper.get(k, k)
-                        ax.plot(s, gs, lw=1, ls=next(lssi), label=k)
-                    plot_max_min(ax)
-                    ax.plot([0, 1], [0, 1], c='k', lw=.25,
-                            ls='-', label='_nolegend_')
-                    ax.legend(loc='lower right', ncol=3, fontsize='large')
-                    ax.set(xlim=lim, ylim=lim, aspect='equal')
-                if add_average:
-                    self.cloud_df.mean(1).plot(ax=ax, c=f'C{len(distortions[-1])}',
-                                               ls='-.', lw=.5, label='Avg extreme')
-            else:
-                # do nothing
-                pass
+            # Average extreme overlay on the last panel
+            self.cloud_df.mean(1).plot(ax=axs[-1], c=f'C{len(distortions[-1])}',
+                                        ls='-.', lw=.5, label='Avg extreme')
 
-        elif scale == 'return':
-            ax = axs[0]
-            bit = self.cloud_df.sample(n=n_resamples, axis=1)
-            bit.index = 1 / bit.index
-            bit = 1 / bit
-            bit.plot(ax=ax, lw=.5, c='C7', alpha=alpha)
-            ax.plot([0, 1000], [0, 1000], c='C0', lw=1)
-            ax.legend().set(visible=False)
-            ax.set(xscale='log', yscale='log')
-            ax.set(xlim=[2000, 1], ylim=[2000, 1])
-
-        if title != '':
+        if title:
             for ax in axs:
-                if bit is not None:
-                    title1 = f'{title}, n={len(bit)} samples'
-                else:
-                    title1 = title
-                ax.set(title=title1)
-        for ax in axs[1:]:
-            ax.legend(ncol=1, loc='lower right')
-        for ax in axs:
-            ax.set(title=None)
+                ax.set(title=title)
+
         return fig, axs
 
-    def weight_image(self, ax, levels=20, colorbar=True):
-        bit = self.weight_df.weight.unstack()
+    def plot_weights(self, ax=None, *, levels=20, colorbar=True):
+        """
+        Contour plot of the bracketing weight as a function of ``(p_lo, p_hi)``.
+
+        Parameters
+        ----------
+        ax : Axes, optional
+            Target axes; created if omitted.
+        levels : int, default 20
+            Contour levels.
+        colorbar : bool, default True
+            Attach a colorbar.
+        """
+        if ax is None:
+            _, ax = plt.subplots(figsize=(FIG_W, FIG_W),
+                                 constrained_layout=True)
+        bit = self.weight_df['weight'].unstack()
         img = ax.contourf(bit.columns, bit.index, bit,
                           cmap='viridis_r', levels=levels)
-        ax.set(xlabel='p1', ylabel='p0', title='Weight for p1', aspect='equal')
+        ax.set(xlabel='p_upper', ylabel='p_lower',
+               title='Weight for p_upper', aspect='equal')
         if colorbar:
-            ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='Weight to p_upper')
-
-    def distortion(self, pl, pu):
-        """
-        Return the BiTVaR with probabilities pl and pu
-        """
-        assert self.weight_df is not None, 'Must create weight_df before running this function'
-
-        tl, tu, w = self.weight_df.loc[(pl, pu)]
-        return Distortion('bitvar', w, df=[pl, pu])
-
-    def quick_price(self, distortion, a):
-        """
-        price total to assets a using distortion
-
-        requires distribution_spec has a density_df dataframe with a p_total or p_total
-
-        TODO: add ability to price other lines
-        :param distortion:
-        :param a:
-        :return:
-        """
-
-        if isinstance(self.distribution_spec, (Portfolio, Aggregate)):
-            df = self.distribution_spec.density_df
-            bs = self.distribution_spec.bs
-        elif isinstance(self.distribution_spec, pd.DataFrame):
-            df = self.distribution_spec
-            bs = df.index[1]
-        else:
-            raise NotImplemented('Must input Aggregate, Portfolio, or DataFrame, '
-                                 f'not type {type(self.distribution_spec)}')
-
-        temp = distortion.g(
-            df.p_total.shift(-1, fill_value=0)[::-1].cumsum())[::-1]
-
-        if isinstance(temp, np.ndarray):
-            # not all g functions return Series (you can't guarantee it is called on something with an index)
-            temp = pd.Series(temp, index=df.index)
-
-        temp = temp.shift(1, fill_value=0).cumsum() * bs
-
-        if np.isinf(a):
-            r = len(temp) - 1
-        else:
-            r = temp.index.get_loc(a)
-
-        return temp.iloc[r] * bs
-
-    def principal_extreme_distortion_analysis(self, gs, pricing=False):
-        """
-        Find the principal extreme distortion analysis to solve for gs = g(s), s=self.cloud_df.index
-
-        Assumes that tvar_cloud has been called and that cloud_df exists
-        len(gs) = len(cloud_df)
-
-        E.g., call
-
-            b = Bounds(port)
-            b.t_mode = 'u'
-            # set premium and asset level a
-            b.tvar_cloud('total', premium, a)
-            # make gs
-            b.principal_extreme_distortion_analysis(gs)
-
-        :param gs: either g(s) evaluated on s = cloud_df.index or the name of a calibrated distortion in
-            distribution_spec.distortions (created by a call to calibrate_distortions)
-        :param pricing: if try, try just using pricing distortions
-        :return:
-        """
-
-        assert self.cloud_df is not None
-
-        if type(gs) == str:
-            s = np.array(self.cloud_df.index)
-            gs = self.distribution_spec.distortions[gs].g(s)
-
-        assert len(gs) == len(self.cloud_df)
-
-        if pricing:
-            _ = self.cloud_df.xs(0, axis=1, level=0, drop_level=False)
-            X = _.to_numpy()
-            idx = _.columns
-        else:
-            _ = self.cloud_df
-            X = _.to_numpy()
-            idx = _.columns
-        n = X.shape[1]
-
-        print(X.shape, self.cloud_df.shape)
-
-        # Moore Penrose solution
-        mp = pinv(X) @ gs
-        logger.info('Moore-Penrose solved...')
-
-        # optimization solutions
-        A = np.hstack((X, np.eye(X.shape[0])))
-        b_eq = gs
-        c = np.hstack((np.zeros(X.shape[1]), np.ones_like(b_eq)))
-
-        lprs = linprog(c, A_eq=A, b_eq=b_eq, method='revised simplex')
-        logger.info(
-            f'Revised simpled solved...\nSum of added variables={np.sum(lprs.x[n:])} (should be zero for exact)')
-        self.lprs = lprs
-
-        lpip = linprog(c, A_eq=A, b_eq=b_eq, method='interior-point')
-        logger.info(
-            f'Interior point solved...\nSum of added variables={np.sum(lpip.x[n:])}')
-        self.lpip = lpip
-
-        print(lprs.x, lpip.x)
-
-        # consolidate answers
-        self.pedw_df = pd.DataFrame(
-            {'w_mp': mp, 'w_rs': lprs.x[:n], 'w_ip': lpip.x[:n]}, index=idx)
-        self.pedw_df['w_upper'] = self.weight_df.weight
-
-        # diagnostics
-        for c in self.pedw_df.columns[:-1]:
-            answer = self.pedw_df[c].values
-            ganswer = answer[answer > 1e-16]
-            logger.info(
-                f'Method {c}\tMinimum parameter {np.min(answer)}\tNumber non-zero {len(ganswer)}')
-
-        return gs
-
-    def ped_distortion(self, n, solver='rs'):
-        """
-        make the approximating distortion from the first n Principal Extreme Distortions (PED)s using rs or ip solutions
-
-        :param n:
-        :return:
-        """
-        assert solver in ['rs', 'ip']
-
-        # the weight column for solver
-        c = f'w_{solver}'
-        # pull off the tvar and PED weights
-        df = self.pedw_df.sort_values(c, ascending=False)
-        bit = df.loc[df.index[:n], [c, 'w_upper']]
-        # re-weight partial (method / lp-solve) weights to 1
-        bit[c] /= bit[c].sum()
-        # multiply lp-solve weights with the weigh_df extreme distortion p_lower/p_upper weights
-        bit['c_lower'] = (1 - bit.w_upper) * bit[c]
-        bit['c_upper'] = bit.w_upper * bit[c]
-        # gather into data frame of p and total weight (labeled c)
-        bit2 = bit.reset_index().drop([c, 'w_upper'], 1)
-        bit2.columns = bit2.columns.str.split('_', expand=True)
-        bit2 = bit2.stack(1).groupby('p')['c'].sum()
-        # bit2 has index = probability points and values = weights for the wtd tvar distortion
-        d = Distortion.wtd_tvar(bit2.index, bit2.values, f'PED({solver}, {n})')
-        return d
-
-
-def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
-    """
-    stand-alone
-    ONLY WORKS FOR BOUNDED PORTFOLIOS (use for beta mixture examples)
-    Updated version in CaseStudy
-    axd from mosaic
-    bounds = Bounds class from port (calibrated to some base)it
-    pnew = new portfolio
-    input new beta(a,b) portfolio, using existing bounds object
-
-    sample: see similar_risks_sample()
-
-    Provenance : from make_port in Examples_2022_post_publish
-    """
-
-    if axd is None:
-        fig = plt.figure(constrained_layout=True, figsize=(12, 6))
-        axd = fig.subplot_mosaic(
-            '''
-            AAAABBFF
-            AAAACCFF
-            AAAADDEE
-            AAAADDEE
-        ''')
-
-    df = bounds.weight_df.copy()
-    df['test'] = df['t_upper'] * df.weight + df.t_lower * (1 - df.weight)
-
-    # HERE IS ISSUE - should really use tvar with bounds and incorporate the bound
-    if p_reg < 1:
-        logger.warning('figuring tvars with bounds')
-        btemp = Bounds(pnew)
-        b = pnew.q(p_reg)
-        btemp.make_tvar_function('total', b=b)
-        tvar1 = {p: btemp.tvar_with_bound(p, b=b) for p in bounds.tps}
-    else:
-        tvar1 = {p: float(pnew.tvar(p)) for p in bounds.tps}
-    df['t1_lower'] = [tvar1[p] for p in df.index.get_level_values(0)]
-    df['t1_upper'] = [tvar1[p] for p in df.index.get_level_values(1)]
-    df['t1'] = df.t1_upper * df.weight + df.t1_lower * (1 - df.weight)
-
-    roe_d = Distortion('roe', roe)
-    tvar_d = Distortion('tvar', bounds.p_star('total', prem))
-    idx = df.index.get_locs(df.idxmax()['t1'])[0]
-    pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
-    # max_d = Distortion('wtdtvar', w, df=[pl, pu])
-    max_d = Distortion('wtdtvar', [pl, pu], df=[1-w, w])
-
-    tmax = float(df.iloc[idx]['t1'])
-    n_ = len(df.query('t1 == @tmax'))
-    logger.warning(f'Ties for max: {n_}')
-    n_ = len(df.query(f't1 >= {tmax} - 1e-4'))
-    logger.warning(f'Near ties for max: {n_}')
-
-    idn = df.index.get_locs(df.idxmin()['t1'])[0]
-    pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
-    # min_d = Distortion('wtdtvar', wn, df=[pln, pun])
-    min_d = Distortion('wtdtvar', [pln, pun], df=[1-wn, wn])
-
-    ax = axd['A']
-    plot_max_min(bounds, ax)
-    n = len(ax.lines)
-    roe_d.plot(ax=ax, both=False)
-    tvar_d.plot(ax=ax, both=False)
-    max_d.plot(ax=ax, both=False)
-    min_d.plot(ax=ax, both=False)
-
-    ax.lines[n + 0].set(label='roe', color='C0', ls='--')
-    ax.lines[n + 2].set(color='C1', label='tvar', ls='-.')
-    ax.lines[n + 4].set(color='C4', label='max', lw=1)
-    ax.lines[n + 6].set(color='C5', label='min', lw=1)
-    # the average
-    bounds.cloud_df.mean(1).plot(ax=ax, c='C3',
-                               ls='-.', lw=1.5, label='Avg extreme')
-    ax.legend(loc='upper left')
-
-    ax.set(title=f'Max ({pl}, {pu}), min ({pln}, {pun})')
-
-    ax = axd['B']
-    bounds.weight_image(ax)
-
-    bit = df['t1'].unstack(1)
-    ax = axd['C']
-    img = ax.contourf(bit.columns, bit.index, bit, cmap='viridis_r', levels=20)
-    ax.set(xlabel='p1', ylabel='p0', title='Pricing on New Risk', aspect='equal')
-    ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16, label='rho(X_new)')
-    ax.plot(pu, pl, '.', c='w')
-    ax.plot(pun, pln, 's', ms=3, c='white')
-
-    ax = axd['D']
-    plot_lee(port, ax, 'C0', lw=1)
-    plot_lee(pnew, ax, 'C1')
-    ax.set(ylim=[0, port.q(0.999)])
-    ax.legend()
-
-    ax = axd['E']
-    try:
-        port.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=port.name)
-    except AttributeError:
-        logger.error('Attribute error...continuing')
-    try:
-        pnew.density_df.p_total.plot(ax=ax, logy=True, lw=1, label=pnew.name)
-    except AttributeError:
-        logger.error('Attribute error...continuing')
-    ax.legend()
-    ax.set(title='Total, log densities')
-
-    ax = axd['F']
-    plot_max_min(bounds, ax)
-    for c, dd in zip(['C0', 'C1', 'C2'], ['ph', 'wang', 'dual']):
-        port.distortions[dd].plot(ax=ax, both=False, lw=1)
-        ax.lines[n].set(c=c, label=dd)
-        n += 2
-    ax.legend(loc='lower right')
-
-    return df
-
-
-def similar_risks_example():
-    """
-    Interesting beta risks and how to use similar_risks_graphs_sa.
-
-
-    :return:
-    """
-    # stand alone hlep from the code; split at program = to run different options
-    uw = Underwriter()
-    p_base = uw.build('''
-    port UNIF
-        agg ONE 1 claim sev 1 * beta 1 1 fixed
-    ''')
-    p_base.update(11, 1 / 1024, remove_fuzz=True)
-    prem = p_base.tvar(0.2, 'interp')
-    a = 1
-    d = (prem - p_base.ex) / (a - p_base.ex)
-    v = 1 - d
-    roe = d / v
-    prem, roe
-    p_base.calibrate_distortions(roe, a=a)
-    bounds = Bounds(p_base)
-    bounds.tvar_cloud('total', prem, a, 128 * 2, 64 * 2, 'interp')
-    p_star = bounds.p_star('total', prem, kind='interp')
-
-    f, axs = plt.subplots(1, 3, figsize=(18.0, 6.0), layout='constrained')
-    ax0, ax1, ax2 = axs.flat
-    axi = iter(axs.flat)
-    # all with base portfolio
-
-    bounds.cloud_view(axs=axs.flatten(), n_resamples=0, alpha=1, pricing=True,
-                      title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={p_star:.3f}',
-                      distortions=[{k: p_base.distortions[k] for k in ['ccoc', 'tvar']},
-                                   {k: p_base.distortions[k] for k in ['ph', 'wang', 'dual']}])
-    for ax in axs.flatten()[1:]:
-            ax.legend(ncol=1, loc='lower right')
-    for ax in axs.flatten():
-        ax.set(title=None)
-
-    program = '''
-    port BETA
-        agg TWO 1 claim sev 1 * beta [200 300 400 500 600 7] [600 500 400 300 200 1] wts=6 fixed
-        # never worked
-        # agg TWO 1 claim sev 1 * beta [1 2000 4000 6000 50] [100 6000 4000 2000 1] wts[0.1875 0.1875 0.1875 0.1875 .25] fixed
-        # interior solution:
-        # agg TWO 1 claim sev 1 * beta [300 400 500 600 35] [500 400 300 200 5] wts[.125 .25 .125 .25 .25] fixed
-        #
-        # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts=3 fixed
-        # agg TWO 1 claim sev 1 * beta [50 30 1] [1 40 10] wts[.375 .375 .25] fixed
-
-    '''
-    p_new = uw.build(program)
-    p_new.update(11, 1 / 1024, remove_fuzz=True)
-
-    p_new.plot(figsize=(6, 4))
-
-    axd = plt.figure(constrained_layout=True, figsize=(16, 8)).subplot_mosaic(
-        '''
-        AAAABBFF
-        AAAACCFF
-        AAAADDEE
-        AAAADDEE
-    '''
-    )
-    df = similar_risks_graphs_sa(axd, bounds, p_base, p_new, roe, prem)
-    return df
-
-
-def plot_max_min(self, ax):
-    """
-    Extracted from bounds, self=Bounds object
-    """
-    ax.fill_between(self.cloud_df.index, self.cloud_df.min(
-        1), self.cloud_df.max(1), facecolor='C7', alpha=.15)
-    self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
-    self.cloud_df.max(1).plot(ax=ax, label="_nolegend_", lw=0.5, ls='-', c='k')
-
-
-def plot_lee(port, ax, c, lw=1):
-    """
-    Lee diagram by hand
-    """
-    p_ = np.linspace(0, 1, 1001)
-    qs = [port.q(p) for p in p_]
-    ax.step(p_, qs, lw=lw, c=c, label=port.name)
-    ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, max(qs) + .05],
-           title=f'{port.name} Lee diagram')
+            ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16,
+                                     label='Weight to p_upper')
+        return ax

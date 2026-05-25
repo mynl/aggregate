@@ -614,22 +614,19 @@ class Portfolio(object):
 
     def pricing_bounds(self, premium, a=0, p=0, n_tps=512, s=512, kind='interp', slow=False, verbose=250):
         """
-        Compute the natural allocation premium ranges by unit consistent with
-        total premium at asset level a or p (one of which must be provided).
+        Natural allocation premium ranges by unit, consistent with total
+        premium at asset level ``a`` or ``p``.
 
-        Unlike typical case with even s values, this is run at the actual S
-        values of the Portfolio.
-
-        Use s<=0 to use S values.
-
-        Visualize::
-
-            from pandas.plotting import scatter_matrix
-            ans = port.pricing_bounds(premium, p=0.98)
-            scatter_matrix(ans.allocs, marker='.', s=5, alpha=1,
-                           figsize=(10, 10), diagonal='kde' )
+        PENDING: this method is currently broken on dense portfolios (matmul
+        shape mismatch when ``s`` defaults to ``port.density_df.S.values``)
+        and was written against the legacy ``Bounds`` API (``tvar_cloud``,
+        ``p_star`` as a method). Pending API alignment with the rewritten
+        ``Bounds`` class. Raises ``NotImplementedError``.
         """
-        from .bounds import Bounds
+        raise NotImplementedError(
+            'Portfolio.pricing_bounds is pending an update for the new '
+            'Bounds API (1.0.0a11). See GitHub issue / CLAUDE.md TODO.')
+        from .bounds import Bounds  # noqa: unreachable
         if a == 0:
             assert p > 0, 'Must provide either a or p'
             a = self.q(p)

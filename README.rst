@@ -28,8 +28,51 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a10 (in progress)
+1.0.0a11 (in progress)
 -----------------------
+
+``Bounds`` redesigned. The IME 2022 pricing-bounds class is now one-shot:
+``Bounds(obj, premium, *, a=np.inf, line='total', n_p=257, n_s=513)``
+runs the full computation at construction. Access ``p_star``, ``min_envelope``
+(a coherent ``Distortion``), ``max_envelope`` (a callable; not a Distortion
+because max-of-concaves isn't concave in general), ``min_envelope_hinges``
+(the active ``(p_lo, p_hi)`` bracket at each ``s``), ``cloud_df``,
+``weight_df`` and ``tvar_df`` as properties.
+
+* Accepted input types broadened: ``Portfolio`` (with ``line=``),
+  ``Aggregate``, ``pd.Series``, ``pd.DataFrame`` (first column = pmf).
+* ``p_star`` solved with ``scipy.optimize.brentq`` after a dyadic coarse
+  bracket on ``k/256``. Adaptive p-knots densify the grid at
+  ``p_star ± 2^{-k}`` for ``k = 8..11`` so the kink between the CCoC
+  and TVaR regimes resolves cleanly.
+* ``cloud_view`` → ``plot_envelope``. ``weight_image`` → ``plot_weights``.
+* Renaming internal arrays to clarify the math:
+  ``p_knots`` (TVaR thresholds, shape ``(n_p,)``),
+  ``s_grid`` (distortion eval points, shape ``(n_s,)``),
+  ``tvar_x_p`` (``TVaR_p(min(X, a))`` at each knot),
+  ``tvar_hinges`` (``min(1, s/(1-p))``, shape ``(n_p, n_s)``).
+* Removed: ``principal_extreme_distortion_analysis``, ``ped_distortion``,
+  ``quick_price`` (uncalled), ``t_mode`` getter/setter and Gauss-Legendre
+  branch, ``add_one`` flag (locked True), ``make_tvar_function`` (folded
+  into the bounded TVaR cache), ``tvar_with_bound`` (ditto).
+* Pedagogy helpers ``similar_risks_graphs_sa``, ``similar_risks_example``,
+  module-level ``plot_max_min``, and ``plot_lee`` moved to a new
+  ``aggregate.pedagogy`` module. Not exported from top-level
+  ``aggregate``. ``plot_max_min`` and ``plot_lee`` previously exported
+  from top-level — those exports dropped per the no-shim policy.
+* ``Portfolio.pricing_bounds`` now raises ``NotImplementedError`` —
+  pending rewrite against the new Bounds API. The matmul-shape bug
+  reported on PEG (33977 vs 512) was a symptom of the legacy
+  ``Bounds.tvar_cloud`` accepting a free-form ``s`` array; the new
+  ``Bounds`` always uses a 513-point binary ``s_grid``.
+* ``tests/test_bounds.py`` (9 cases). Closed-form analytical pins:
+  brackets ``(p_star, p_hi)`` at ``premium = TVaR_{p_star}`` carry
+  weight zero, so the resulting cloud columns equal the
+  ``TVaR_{p_star}`` distortion exactly. Arbitrary bracket reproduces
+  the weighted-combination formula to ``1e-10``.
+
+1.0.0a10
+---------
 
 ``ft`` consolidation. ``FourierTools`` and friends promoted from
 ``aggregate.extensions.ft`` to top-level ``aggregate.ft``. Reach for

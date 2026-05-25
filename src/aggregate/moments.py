@@ -10,7 +10,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-class MomentAggregator(object):
+class MomentAggregator:
     """
     Purely accumulates moments. Used by ``Aggregate`` and ``Portfolio`` to
     feed their ``stats_df``. Not frequency aware.
@@ -63,7 +63,7 @@ class MomentAggregator(object):
         self.sev_2 = s2
         self.sev_3 = s3
 
-        # accumulatge frequency
+        # accumulate frequency
         self.tot_freq_1, self.tot_freq_2, self.tot_freq_3 = \
             self.cumulate_moments(self.tot_freq_1, self.tot_freq_2, self.tot_freq_3, f1, f2, f3)
 
@@ -72,10 +72,10 @@ class MomentAggregator(object):
         self.tot_sev_2 = self.tot_sev_2 + f1 * s2
         self.tot_sev_3 = self.tot_sev_3 + f1 * s3
 
-        # aggregate_project
+        # aggregate
         self.agg_1, self.agg_2, self.agg_3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)
 
-        # finally accumulate the aggregate_project
+        # finally accumulate the aggregate
         self.tot_agg_1, self.tot_agg_2, self.tot_agg_3 = \
             self.cumulate_moments(self.tot_agg_1, self.tot_agg_2, self.tot_agg_3, self.agg_1, self.agg_2, self.agg_3)
 
@@ -153,7 +153,7 @@ class MomentAggregator(object):
     @staticmethod
     def agg_from_fs(f1, f2, f3, s1, s2, s3):
         """
-        aggregate_project moments from freq and sev components
+        aggregate moments from freq and sev components
 
 
         :param f1:
@@ -171,7 +171,7 @@ class MomentAggregator(object):
     @staticmethod
     def agg_from_fs2(f1, vf, s1, vs):
         """
-        aggregate_project moments from freq and sev ex and var x
+        aggregate moments from freq and sev ex and var x
 
 
         :param f1:
@@ -191,7 +191,7 @@ class MomentAggregator(object):
     def moments_to_mcvsk(self, mom_type, total=True):
         """
         convert noncentral moments into mean, cv and skewness
-        type = agg | freq | sev | mix
+        mom_type = agg | freq | sev
         delegates work
 
         :param mom_type:
@@ -306,7 +306,7 @@ class MomentAggregator(object):
                                                     ['_m', '_cv', '_skew'])]
 
 
-class MomentWrangler(object):
+class MomentWrangler:
     """
     Conversion between central, noncentral and factorial moments
 
@@ -439,7 +439,7 @@ def xsden_to_meancvskew(xs, den):
     :param xs:
     :param den:
     :return:
-        """
+    """
     pg = 1 - den.sum()
     xd = xs * den
     if isinstance(xs, np.ndarray):

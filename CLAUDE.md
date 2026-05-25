@@ -143,3 +143,7 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 ## TODO
 
 - **Docs reference SLY-era grammar.** `docs/4_agg_language_reference/` describes the grammar in SLY's `@_` form and may mention shift/reduce conflicts. After the Lark migration both descriptions are stale; the grammar reference should `include` `aggregate/decl.lark` (or call `aggregate.parser.grammar(add_to_doc=True)` which writes `docs/4_agg_language_reference/ref_include.rst`).
+
+- **Docstring style sweep.** `iman_conover.py` and `moments.py` use Sphinx `:param x:` style with many empty parameter slots; the rest of the codebase uses NumPy style (per CLAUDE.md "Documentation and docstrings"). Convert in one sweep across all modules — public surface first, private helpers second. ~25 docstrings in moments + iman_conover alone, plus pockets in other modules. Do as a single dedicated pass, not piecemeal.
+
+- **`xsden_to_meancv` vs `xsden_to_meancvskew` tail-mass inconsistency** (`moments.py`). `xsden_to_meancvskew` adds one bucket-width to the tail-mass point (`xsm = xsm + bs` at line 455), `xsden_to_meancv` does not. With `xs[0] = 0` (the typical FFT use), `bs = xs[1]` and the difference is one bucket on the mean correction — small for FFT use, but the two should agree. Decide which convention is correct (likely the meancvskew "place at xs[-1] + bs" form, putting the tail mass at the *next* bucket) and apply to both.

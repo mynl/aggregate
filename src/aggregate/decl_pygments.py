@@ -22,7 +22,6 @@ class AggLexer(RegexLexer):
     aliases = ['aggregate', 'agg', 'decl', 'dec']
     filenames = ['*.agg', '*.dec', '*.decl']
     url = 'http://www.github.com/mynl/aggregate'
-    version = '0.16.0'
 
     mimetypes = ['text/x-agg', 'text/x-aggregate', 'text/x-decl',
                  'text/x-dec']
@@ -37,7 +36,7 @@ class AggLexer(RegexLexer):
             (r'\}', Name.Type),
             (r'#.*$', Comment),
             ('!', Generic.Heading),
-            # these are for documenation
+            # these are for documentation
             # (r'\<|\>', Generic.Heading),
             # the regex for an ID from parser.py
             (r'mixed ', Operator, 'mixed_freq'),
@@ -76,7 +75,7 @@ class AggLexer(RegexLexer):
             # freq dists
             (words(
                 ('binomial', 'pascal', 'poisson', 'bernoulli', 'geometric',
-                    'fixed', 'neyman' 'neymana', 'neymanA', 'logarithmic',
+                    'fixed', 'neyman', 'neymana', 'neymanA', 'logarithmic',
                     'dfreq', 'negbin'),
                 suffix=r'\b'
             ), Name.Function),

@@ -1,4 +1,8 @@
-# constants
+"""Module-level constants for ``aggregate``: figure-size defaults shared by
+plotting consumers, logging level ``WL``, validation tolerance and
+recommendation probability, the ``Validation`` flag enum used by
+:func:`Aggregate.explain_validation`, and user-data / package-data paths."""
+
 from enum import Flag, auto
 
 
@@ -30,7 +34,18 @@ PACKAGE_DATA_DIR = 'agg'
 # The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR)
 TEST_SUITE_FILENAME = 'test_suite.agg'
 
+
 class Validation(Flag):
+    """Flag set of validation failures surfaced by ``Aggregate.explain_validation``.
+
+    ``NOT_UNREASONABLE`` is the empty (passing) state; the remaining members
+    are individual failure modes that combine via bitwise OR. ``SEV_*`` and
+    ``AGG_*`` flag moment-matching errors (analytic vs empirical mean, CV,
+    skew) above ``VALIDATION_EPS``. ``ALIASING`` flags FFT wrap-around;
+    ``REINSURANCE`` flags reinsurance-induced moment drift; ``NOT_UPDATED``
+    signals the object hasn't been ``update``-d yet.
+    """
+
     NOT_UNREASONABLE = 0
     SEV_MEAN = auto()
     SEV_CV = auto()

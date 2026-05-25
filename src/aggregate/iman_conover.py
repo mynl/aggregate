@@ -153,7 +153,7 @@ def iman_conover(marginals, desired_correlation, dof=0, add_total=True):
     R = ic_rank(N)
 
     # re order
-    if type(marginals) == np.ndarray:
+    if isinstance(marginals, np.ndarray):
         shuffled_marginals = ic_reorder(R, marginals)
         df = pd.DataFrame(shuffled_marginals)
     else:
@@ -188,54 +188,13 @@ def block_iman_conover(unit_losses, intra_unit_corrs, inter_unit_corr, as_frame=
 
     ``if as_frame`` then a dataframe version returned, for auditing.
 
-    Here is some tester code, using great.test_df to make random unit losses. Vary num_units and
-    num_sims as required.
+    Example usage::
 
-    ::
-
-        def bic_tester(num_units=3, num_sims=10000):
-            from aggregate import random_corr_matrix
-            # from great import test_df
-
-            # create samples
-            R = range(num_units)
-            unit_losses = [test_df(num_sims, 3 + i) for i in R]
-            totals = [u.sum(1) for u in unit_losses]
-
-            # manual dataframe to check against
-            manual = pd.concat(unit_losses + totals, keys=[f'Unit_{i}' for i in R] + ['Total' for i in R], axis=1)
-
-            # for input to method
-            unit_losses = [i.to_numpy() for i in unit_losses]
-            totals = [i.to_numpy() for i in totals]
-
-            # make corrs
-            intra_unit_corrs = [random_corr_matrix(i.shape[1], p=.5, positive=True) for i in unit_losses]
-            inter_unit_corr = random_corr_matrix(len(totals), p=1, positive=True)
-
-            # apply method
-            bic = block_iman_conover(unit_losses, intra_unit_corrs, inter_unit_corr, True)
-
-            # extract frame answer, put col names back
-            bic.frame.columns = manual.columns
-            dm = bic.frame
-
-            # achieved corr
-            for i, target in zip(dm.columns.levels[0], intra_unit_corrs + [inter_unit_corr]):
-                print(i)
-                print((dm[i].corr() - target).abs().max().max())
-                # print(dm[i].corr() - target)
-
-            # total corr across subunits
-            display(dm.drop(columns=['Total']).corr())
-
-            # total corr across subunits
-            display(dm.drop(columns=['Total']).corr())
-
-            return manual, bic, intra_unit_corrs, inter_unit_corr
-
-        manual, bic, intra, inter = bic_tester(3, 10000)
-
+        unit_losses = [np.array(...), np.array(...)]    # one per unit
+        intra = [random_corr_matrix(u.shape[1]) for u in unit_losses]
+        inter = random_corr_matrix(len(unit_losses))
+        bic = block_iman_conover(unit_losses, intra, inter, as_frame=True)
+        # bic.totals, bic.combined, bic.frame
     """
 
     if isinstance(unit_losses, dict):
@@ -445,9 +404,9 @@ def make_corr_matrix(vine_spec):
 
     """
 
-    A = np.matrix(vine_spec)
+    A = np.asarray(vine_spec, dtype=float).copy()
     n, m = A.shape
-    assert n==m
+    assert n == m
 
     for i in range(n - 2, 0, -1):
         for j in range(i + 1, n):

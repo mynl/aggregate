@@ -693,7 +693,7 @@ class Portfolio(object):
             i = 0
             for _, r in bounds.weight_df.reset_index().iterrows():
                 pl, pu, tl, tu, w = r.values
-                d = Distortion('bitvar', w, df=[pl, pu])
+                d = Distortion('bitvar', p0=pl, p1=pu, w1=w)
                 # pricing kernel, this in-lines the function rap (that was in extensions.sample)
                 gS = np.array(d.g(S))
                 z = -np.diff(gS[:-1], prepend=1, append=0)
@@ -2349,8 +2349,19 @@ class Portfolio(object):
         if subclass is None or subclass._calibration_init_shape is None:
             raise ValueError(
                 f'calibrate_distortion not implemented for {name}')
-        dist = Distortion(name=name, shape=subclass._calibration_init_shape,
-                          r0=r0, df=df)
+        init_shape = subclass._calibration_init_shape
+        # natural-kwarg construction; the calibration loop then mutates
+        # ``self.shape`` in place via ``_newton_iterate``.
+        if lookup == 'ccoc':
+            dist = Distortion('ccoc', r=init_shape)
+        elif lookup in ('cll', 'clin', 'lep', 'ly'):
+            pn = subclass.param_name or {
+                'cll': 'b', 'clin': 'slope', 'lep': 'r', 'ly': 'r',
+            }[lookup]
+            dist = Distortion(name=lookup, r0=r0, **{pn: init_shape})
+        else:
+            pn = subclass.param_name
+            dist = Distortion(name=lookup, **{pn: init_shape})
         dist.calibrate(S=S, bs=self.bs, premium_target=premium_target,
                        ess_sup=ess_sup, assets=assets, el=el)
         return dist

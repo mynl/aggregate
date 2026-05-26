@@ -44,7 +44,11 @@ def test_calibrate_no_r0(synthetic_S, kind):
     prem = el * 1.20
 
     subclass = Distortion._registry[kind]
-    d = Distortion(name=kind, shape=subclass._calibration_init_shape, r0=0.0)
+    init = subclass._calibration_init_shape
+    if kind == 'cll':
+        d = Distortion(name=kind, r0=0.0, b=init)
+    else:
+        d = Distortion(name=kind, **{subclass.param_name: init})
     d.calibrate(S=S, bs=bs, premium_target=prem)
 
     assert abs(d.error) < 1e-4, \
@@ -68,7 +72,9 @@ def test_calibrate_with_r0(synthetic_S, kind, r0):
     prem = el * 1.20 + 0.5  # leave room above EL + mass
 
     subclass = Distortion._registry[kind]
-    d = Distortion(name=kind, shape=subclass._calibration_init_shape, r0=r0)
+    init = subclass._calibration_init_shape
+    pn = {'ly': 'r', 'clin': 'slope', 'lep': 'r'}[kind]
+    d = Distortion(name=kind, r0=r0, **{pn: init})
     d.calibrate(S=S, bs=bs, premium_target=prem, ess_sup=ess_sup)
 
     assert abs(d.error) < 1e-4
@@ -85,13 +91,13 @@ def test_calibrate_ccoc(synthetic_S):
     assets = 15.0
     prem = el * 1.20
 
-    d = Distortion(name='ccoc', shape=0.25, r0=0.5)  # r0 should be ignored
+    d = Distortion(name='ccoc', r=0.25)
     d.calibrate(S=S, bs=bs, premium_target=prem, assets=assets, el=el)
 
     expected = (prem - el) / (assets - prem)
     assert d.shape == pytest.approx(expected)
+    assert d.r == pytest.approx(expected)
     assert d.error == 0.0
-    assert d.r0 == 0.0
     assert d.assets == assets
 
 
@@ -100,7 +106,7 @@ def test_calibrate_roe_aliases_ccoc():
     subclass = Distortion._registry.get('ccoc')
     assert Distortion._registry.get('roe') is None  # not registered
     # but Distortion(name='roe') still works via __new__ alias
-    d = Distortion(name='roe', shape=0.25)
+    d = Distortion(name='roe', r=0.25)
     assert type(d) is subclass
 
 

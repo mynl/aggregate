@@ -28,8 +28,55 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a12 (in progress)
+1.0.0a13 (in progress)
 -----------------------
+
+``Distortion`` constructors take natural, kind-specific parameter names
+instead of the generic ``(name, shape, r0, df, col_x, col_y)`` slots.
+
+* New signature per kind (positional or kwarg):
+
+  * ``Distortion('ph', a=)``, ``Distortion('wang', lam=)``,
+    ``Distortion('dual', b=)``, ``Distortion('tvar', p=)``.
+  * ``Distortion('ccoc', d=)`` *or* ``Distortion('ccoc', r=)`` —
+    keyword-only; passing exactly one of ``d`` or ``r`` is required;
+    positional ``Distortion('ccoc', x)`` raises ``TypeError`` (explicit
+    over implicit). ``Distortion.ccoc(d)`` static factory unchanged.
+  * ``Distortion('bitvar', p0=, p1=, w1=)`` — ``w1`` is the weight on the
+    upper threshold ``p1``.
+  * ``Distortion('wtdtvar', ps=, wts=)`` — ``ps`` and ``wts`` are equal
+    length; ``wts`` summing close to 1 is normalised silently, otherwise
+    ``ValueError``.
+  * ``Distortion('cll', r0=, b=)``, ``Distortion('clin', r0=, slope=)``,
+    ``Distortion('lep', r0=, r=)``, ``Distortion('ly', r0=, r=)``.
+  * ``Distortion('beta', a=, b=)``, ``Distortion('power', x0=, x1=, alpha=)``.
+  * ``Distortion('minimum', distortions=)``,
+    ``Distortion('mixture', distortions=, wts=)``.
+* Each scalar-shape subclass exposes its natural name as a read/write
+  property (e.g. ``d.a``, ``d.p``); the writer re-runs ``_build`` so
+  downstream cached state stays consistent.
+* DecL grammar unchanged; ``parser.py`` translates the legacy
+  ``kind shape [df]`` tuple to natural kwargs via a new
+  ``_distortion_spec`` helper. Existing ``distortion d1 ph 0.5``,
+  ``distortion d2 bitvar 0.5 [0.95 0.99]``, etc. all still parse.
+* ``ConvexDistortion`` removed (it was a constructor, not a kind).
+  Replaced by module-level ``aggregate.spectral.convex_distortion(s, gs,
+  *, display_name='')`` that takes two raw arrays and returns a
+  ``WtdTVaRDistortion`` whose piecewise-linear ``g`` matches the upper
+  convex envelope. Companions ``bagged_distortion`` and
+  ``convex_example`` are likewise module-level (not staticmethods).
+* Removed: ``Distortion.average_distortion``,
+  ``Distortion.bagged_distortion``, ``Distortion.s_gs_distortion``,
+  ``Distortion.convex_example`` staticmethods; ``_plot_decorations``
+  hook (presentation concern, not core behaviour).
+* ``power`` is no longer calibratable through ``Portfolio.calibrate_distortion``
+  (``_calibration_init_shape`` dropped; ``strict_pricing=False``).
+* Snapshot regression: ``tests/data/distortion_g_snapshot.csv`` pins
+  ``g`` and ``g_inv`` at canonical parameter sets for every documented
+  kind to ``rtol=1e-10``.
+
+1.0.0a12
+---------
 
 ``extensions/`` package removed. Optional/auxiliary code consolidated into
 top-level modules or migrated out:

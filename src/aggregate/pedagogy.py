@@ -158,11 +158,11 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     df['t1_upper'] = [tvar1[p] for p in df.index.get_level_values(1)]
     df['t1'] = df.t1_upper * df.weight + df.t1_lower * (1 - df.weight)
 
-    roe_d = Distortion('roe', roe)
-    tvar_d = Distortion('tvar', bounds.p_star)
+    roe_d = Distortion('ccoc', r=roe)
+    tvar_d = Distortion('tvar', p=bounds.p_star)
     idx = df.index.get_locs(df.idxmax()['t1'])[0]
     pl, pu, tl, tu, w = df.reset_index().iloc[idx, :-4]
-    max_d = Distortion('wtdtvar', [pl, pu], df=[1 - w, w])
+    max_d = Distortion('wtdtvar', ps=[pl, pu], wts=[1 - w, w])
 
     tmax = float(df.iloc[idx]['t1'])
     n_ = len(df.query('t1 == @tmax'))
@@ -172,7 +172,7 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
 
     idn = df.index.get_locs(df.idxmin()['t1'])[0]
     pln, pun, tl, tu, wn = df.reset_index().iloc[idn, :-4]
-    min_d = Distortion('wtdtvar', [pln, pun], df=[1 - wn, wn])
+    min_d = Distortion('wtdtvar', ps=[pln, pun], wts=[1 - wn, wn])
 
     ax = axd['A']
     plot_max_min(bounds, ax)
@@ -1042,7 +1042,7 @@ def distortion_and_ins_stats(dist=None, s=0.3):
     """
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W), constrained_layout=True)
     if dist is None:
-        dist = Distortion('ph', 0.4)
+        dist = Distortion('ph', a=0.4)
 
     g = dist.g
     N = 1000

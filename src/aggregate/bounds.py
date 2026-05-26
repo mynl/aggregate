@@ -302,11 +302,13 @@ class Bounds:
         Pointwise minimum of the cloud, as a :class:`Distortion`.
 
         Min-of-concaves is concave, so this is a coherent distortion. Built
-        through :meth:`Distortion.s_gs_distortion` (convex-envelope kind).
+        through :func:`aggregate.spectral.convex_distortion`, which fits a
+        piecewise-linear weighted-TVaR to the (s, gs) sample points.
         """
+        from .spectral import convex_distortion
         s = self.s_grid
         g = self.cloud_df.min(axis=1).values
-        return Distortion.s_gs_distortion(
+        return convex_distortion(
             s, g, display_name=f'min env({self.name}, prem={self.premium:.4g})')
 
     @cached_property
@@ -390,7 +392,7 @@ class Bounds:
             raise KeyError(f'({pl}, {pu}) not in weight_df index — '
                            'must be one of the bracketing pairs')
         w = self.weight_df.at[(pl, pu), 'weight']
-        return Distortion('bitvar', w, df=[pl, pu])
+        return Distortion('bitvar', p0=pl, p1=pu, w1=w)
 
     def __repr__(self):
         return (f'Bounds({self.name!r}, premium={self.premium:.6g}, '

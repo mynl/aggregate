@@ -339,6 +339,11 @@ class Distortion:
     # shape parameter, no mass at zero, calibratable from a single number.
     strict_pricing: bool = False
     has_mass_default: bool = False
+    # natural name of the scalar shape parameter, used by the base
+    # ``__init__`` to accept ``Kind(name, a=0.7)`` in addition to the
+    # positional form. ``None`` for multi-parameter kinds, which override
+    # ``__init__`` entirely.
+    param_name: str | None = None
 
     # legacy attribute aliases preserved for back-compat with callers
     # that read class-level lists directly.
@@ -368,42 +373,65 @@ class Distortion:
                 f"available: {sorted(cls._registry)}")
         return object.__new__(subclass)
 
-    def __init__(self, name, shape, r0=0.0, df=None, col_x='', col_y='',
-                 display_name=''):
+    def __init__(self, name=None, shape=None, *, display_name='', **natural):
         """
-        Create a distortion.
+        Scalar-shape constructor used by ``ph``, ``wang``, ``dual``, ``tvar``.
 
-        :param name: name of an available distortion. Call
-            ``Distortion.available_distortions()`` for a list.
-        :param shape: float or sequence; meaning is kind-specific.
-        :param r0: risk-free or rental rate of interest (used by kinds
-            with a mass at zero).
-        :param df: kind-specific second parameter — a number, list,
-            or DataFrame.
-        :param col_x: column of ``df`` used for x values (``convex``).
-        :param col_y: column of ``df`` used for y values (``convex``).
-        :param display_name: override label; ``str(d)`` returns this if
-            set, else the kind name.
+        Multi-parameter kinds (bitvar, wtdtvar, beta, power, minimum,
+        mixture) and mass-at-zero kinds (ccoc, cll, clin, ly, lep) override
+        ``__init__`` entirely; see their classes for the natural-kwarg
+        signatures.
+
+        Parameters
+        ----------
+        name : str, optional
+            Distortion kind, e.g. ``'ph'``. ``'roe'`` is accepted as a
+            legacy alias for ``'ccoc'`` (handled by ``__new__``). When
+            constructing a subclass directly (``PHDistortion(a=0.7)``)
+            ``name`` defaults to the subclass's ``kind`` attribute.
+        shape : float, optional
+            Positional shape parameter. May also be passed by its natural
+            name (e.g. ``a=0.7`` for ph); passing both raises ``TypeError``.
+        display_name : str, optional
+            Override label; ``str(d)`` returns this if set, else the kind
+            name.
+        **natural : float
+            Accept the kind's natural parameter name (``a``, ``lam``, ``b``,
+            ``p``) as a keyword. Unknown kwargs raise ``TypeError``.
         """
+        if name is None:
+            name = type(self).kind
         if name == 'roe':
             name = 'ccoc'
+        pn = type(self).param_name
+        if pn is not None and pn in natural:
+            if shape is not None:
+                raise TypeError(
+                    f'Pass {pn}= or positional shape, not both')
+            shape = natural.pop(pn)
+        if natural:
+            raise TypeError(
+                f'{type(self).__name__}: unexpected keyword arguments '
+                f'{list(natural)}')
         self._name = name
         self.shape = shape
-        self.r0 = r0
-        self.df = df
-        self.col_x = col_x
-        self.col_y = col_y
         self.display_name = display_name
+        self._common_init()
+        self._build()
 
-        # common defaults; subclass _build can override
+    def _common_init(self):
+        """Initialise the audit/state fields shared by every subclass.
+
+        Called from every ``__init__`` before ``_build``. Subclass
+        ``_build`` may then overwrite ``has_mass`` / ``mass`` /
+        ``standard_shape``.
+        """
         self.has_mass = False
         self.mass = 0.0
         self.standard_shape = np.nan
         self.error = 0.0
         self.premium_target = 0.0
         self.assets = 0.0
-
-        self._build()
 
     # ------------------------------------------------------------------
     # Subclass hook
@@ -558,11 +586,20 @@ class Distortion:
         each ``x``. Returns ``None`` for other kinds."""
         return None
 
+    def _id_fields(self):
+        """Tuple of identifying attribute values used by ``id()``.
+
+        The default returns ``(_name, shape, display_name)`` — appropriate
+        for scalar-shape kinds. Subclasses with extra structural state
+        (``r0``, multi-parameter kinds, list-of-distortions kinds) override
+        this method.
+        """
+        return (self._name, self.shape, self.display_name)
+
     def id(self):
-        """Unique ID as a short string, based on constructor arguments."""
-        bit = {k: v for k, v in self.__dict__.items()
-               if k in ('_name', 'r0', 'df', 'shape', 'col_x', 'col_y')}
-        return _short_hash(str(bit))
+        """Unique ID as a short string, based on the structural fields
+        returned by :meth:`_id_fields`."""
+        return _short_hash(str(self._id_fields()))
 
     def __str__(self):
         return self.name
@@ -632,8 +669,6 @@ class Distortion:
                    xlim=[1 / 5_000, 1], ylim=[1 / 5_000, 1])
             ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
 
-        self._plot_decorations(ax, xs, c, scale, plot_points)
-
         ax.set(title=self.name, aspect='equal')
         if scale == 'linear':
             ax.set(xticks=np.linspace(0, 1, 6),
@@ -642,56 +677,51 @@ class Distortion:
             ax.legend(loc='upper left', fontsize='x-small')
         return ax
 
-    def _plot_decorations(self, ax, xs, c, scale, plot_points):
-        """Hook for kind-specific plot adornments. Overridden by
-        ``ConvexDistortion`` to scatter calibration points."""
-        return None
-
     # ------------------------------------------------------------------
     # Static factory shortcuts
     # ------------------------------------------------------------------
 
     @staticmethod
     def tvar(p):
-        """Construct a TVaR distortion at level p."""
-        return Distortion('tvar', p, display_name=f'TVaR({p:.3g})')
+        """Construct a TVaR distortion at level ``p``."""
+        return Distortion('tvar', p=p, display_name=f'TVaR({p:.3g})')
 
     @staticmethod
     def max():
-        """TVaR at p=1 (the max)."""
-        return Distortion('tvar', 1.0, display_name='max')
+        """TVaR at ``p=1`` (the max)."""
+        return Distortion('tvar', p=1.0, display_name='max')
 
     @staticmethod
     def mean():
-        """TVaR at p=0 (the mean)."""
-        return Distortion('tvar', 0.0, display_name='mean')
+        """TVaR at ``p=0`` (the mean)."""
+        return Distortion('tvar', p=0.0, display_name='mean')
 
     @staticmethod
-    def wang(shape):
-        """Construct a Wang distortion."""
-        return Distortion('wang', shape, display_name=f'Wang({shape:.3g})')
+    def wang(lam):
+        """Construct a Wang distortion with parameter ``lam``."""
+        return Distortion('wang', lam=lam, display_name=f'Wang({lam:.3g})')
 
     @staticmethod
-    def ph(shape):
-        """Construct a proportional-hazard distortion."""
-        return Distortion('ph', shape, display_name=f'PH({shape:.3g})')
+    def ph(a):
+        """Construct a proportional-hazard distortion with parameter ``a``."""
+        return Distortion('ph', a=a, display_name=f'PH({a:.3g})')
 
     @staticmethod
-    def dual(shape):
-        """Construct a dual-moment distortion."""
-        return Distortion('dual', shape, display_name=f'dual({shape:.3g})')
+    def dual(b):
+        """Construct a dual-moment distortion with parameter ``b``."""
+        return Distortion('dual', b=b, display_name=f'dual({b:.3g})')
 
     @staticmethod
     def bitvar(p0, p1, w=0.5):
         """
-        Construct a BiTVaR with :math:`p_0 < p_1` and weight ``w`` on ``p1``.
+        Construct a BiTVaR with :math:`p_0 < p_1` and weight ``w`` on ``p_1``.
         Degenerate combinations collapse to a TVaR.
         """
         if p0 == p1 or w == 0:
             return Distortion.tvar(p0)
         if w == 1:
             return Distortion.tvar(p1)
-        return Distortion('bitvar', w, df=[p0, p1],
+        return Distortion('bitvar', p0=p0, p1=p1, w1=w,
                           display_name=f'bitvar({p0:.3g}, {p1:.3g}; {w:.3g})')
 
     @staticmethod
@@ -701,30 +731,31 @@ class Distortion:
         default constructor takes return ``r`` instead; ``d = r / (1 + r)``.
         """
         r = d / (1. - d)
-        return Distortion('ccoc', r, display_name=f'ccoc({r:.3g})')
+        return Distortion('ccoc', r=r, display_name=f'ccoc({r:.3g})')
 
     @staticmethod
     def minimum(distortion_list):
         """Construct a Distortion that is the pointwise minimum of others."""
-        return Distortion('minimum', distortion_list,
+        return Distortion('minimum', distortions=distortion_list,
                           display_name=f'minimum({len(distortion_list)})')
 
     @staticmethod
     def mixture(distortion_list, weights=None):
         """Construct a weighted mixture of distortions."""
-        return Distortion('mixture', distortion_list, df=weights,
+        return Distortion('mixture', distortions=distortion_list,
+                          wts=weights,
                           display_name=f'mixture({len(distortion_list)})')
 
     @staticmethod
     def beta(a, b):
-        """Construct a beta distortion."""
-        return Distortion('beta', [a, b],
+        """Construct a beta distortion with parameters ``a`` and ``b``."""
+        return Distortion('beta', a=a, b=b,
                           display_name=f'beta({a:.3f}, {b:.3f})')
 
     @staticmethod
     def power(alpha, x0, x1):
-        """Construct a power distortion."""
-        return Distortion('power', alpha, df=[x0, x1],
+        """Construct a power distortion with ``x0 < x1`` and exponent ``alpha``."""
+        return Distortion('power', x0=x0, x1=x1, alpha=alpha,
                           display_name=f'power({alpha:.3f}, {x0:.3f}, {x1:.3f})')
 
     @staticmethod
@@ -733,119 +764,41 @@ class Distortion:
         """
         Construct a dict of distortions from a calibration parameter table.
 
-        ``params`` is a DataFrame indexed by (something, kind) with a
-        ``param`` column; one entry per available distortion kind. Called
-        by ``Portfolio.calibrate_distortions``.
+        Parameters
+        ----------
+        params : pandas.DataFrame
+            Indexed by ``(group, kind)`` with a ``param`` column;
+            one entry per available distortion kind. Called by
+            ``Portfolio.calibrate_distortions``.
+        index : hashable
+            Group index used to slice ``params``.
+        r0 : float, optional
+            ``r0`` parameter for mass-at-zero kinds (cll, clin, lep, ly).
+        df : float, optional
+            Reserved for future kinds with a second-parameter slot.
+        pricing, strict : bool
+            Forwarded to :meth:`available_distortions`.
+
+        Returns
+        -------
+        dict[str, Distortion]
         """
         temp = params.loc[index, :]
         dists = {}
         for dn in Distortion.available_distortions(pricing=pricing, strict=strict):
             param = float(temp.loc[dn, 'param'])
-            dists[dn] = Distortion(name=dn, shape=param, r0=r0, df=df)
+            if dn in ('ccoc',):
+                dists[dn] = Distortion(dn, r=param)
+            elif dn in ('cll', 'clin', 'lep', 'ly'):
+                kw = {'r0': r0}
+                # the natural shape kwarg name varies by kind
+                pn = Distortion._registry[dn].param_name
+                kw[pn] = param
+                dists[dn] = Distortion(dn, **kw)
+            else:
+                pn = Distortion._registry[dn].param_name
+                dists[dn] = Distortion(dn, **{pn: param})
         return dists
-
-    @staticmethod
-    def convex_example(source='bond'):
-        """
-        Example convex distortion using yield-curve or cat-bond data.
-
-        :param source: ``'bond'`` (BIS yield curve) or ``'cat'`` (cat bond
-            ROL vs EL).
-        """
-        if source == 'bond':
-            yield_curve = '''
-            AAAA    0.000000  0.000000
-            AAA     0.000018  0.006386
-            AA      0.000144  0.007122
-            A       0.000278  0.010291
-            BBB     0.002012  0.017089
-            BB      0.012674  0.036455
-            B       0.040052  0.069181
-            Z       1.000000  1.000000'''
-            df = pd.read_fwf(StringIO(yield_curve))
-            df.columns = ['Rating', 'EL', 'Yield']
-            return Distortion('convex', 'Yield Curve', df=df,
-                              col_x='EL', col_y='Yield')
-
-        elif source.lower() == 'cat':
-            cat_bond = '''EL,ROL
-            0.116196,0.32613
-            0.088113,0.2452
-            0.074811,0.22769
-            0.056385,0.17131
-            0.046923,0.15326
-            0.032961,0.12222
-            0.02807,0.11037
-            0.024205,0.1022
-            0.011564,0.07284
-            0.005813,0.06004
-            0,0
-            1,1'''
-            df = pd.read_csv(StringIO(cat_bond))
-            return Distortion('convex', 'Cat Bond', df=df,
-                              col_x='EL', col_y='ROL')
-
-        else:
-            raise ValueError(
-                f'Inadmissible value {source} passed to convex_example, '
-                f'expected bond or cat')
-
-    @staticmethod
-    def bagged_distortion(data, proportion, samples, display_name=""):
-        """
-        Bootstrap-aggregated convex distortion: resample ``data``, take
-        the convex envelope of each, average. ``data`` has two columns
-        EL and Spread.
-        """
-        df = pd.DataFrame(index=np.linspace(0, 1, 10001), dtype=float)
-        for i in range(samples):
-            rebit = data.sample(frac=proportion, replace=False, random_state=RANDOM)
-            rebit.loc[-1] = [0, 0]
-            rebit.loc[max(rebit.index) + 1] = [1, 1]
-            d = Distortion('convex', 0, df=rebit, col_x='EL', col_y='Spread')
-            df[i] = d.g(df.index)
-
-        df['avg'] = df.mean(axis=1)
-        df2 = df['avg'].copy()
-        df2.index.name = 's'
-        df2 = df2.reset_index(drop=False)
-        return Distortion('convex', 0, df=df2,
-                          col_x='s', col_y='avg', display_name=display_name)
-
-    @staticmethod
-    def average_distortion(data, display_name, n=201,
-                           el_col='EL', spread_col='Spread'):
-        """
-        Average distortion from (s, g(s)) pairs. Each (EL, Spread) row
-        defines a wtdTVaR with knots at ``p=EL`` and ``p=1``.
-        """
-        els = data[el_col]
-        spreads = data[spread_col]
-        max_el = els.max()
-        s = np.hstack((np.linspace(0, max_el, n), 1))
-        ans = np.zeros((len(s), len(data)))
-        for i, el, spread in zip(range(len(data)), els, spreads):
-            p = 1 - el
-            w = (spread - el) / (1 - el)
-            d = Distortion('wtdtvar', w, df=[0, p])
-            ans[:, i] = d.g(s)
-        df = pd.DataFrame({'s': s, 'gs': np.mean(ans, 1)})
-        return Distortion('convex', None, df=df,
-                          col_x='s', col_y='gs', display_name=display_name)
-
-    @staticmethod
-    def s_gs_distortion(s, gs, display_name=''):
-        """
-        Convex envelope distortion built from {s, g(s)} sample points.
-
-        Currently passes ``shape=0`` (no mass at zero) even if the
-        provided (s, gs) imply one.
-        """
-        s = np.array(s)
-        gs = np.array(gs)
-        return Distortion('convex', 0,
-                          df=pd.DataFrame({'s': s.flat, 'gs': gs.flat}),
-                          col_x='s', col_y='gs', display_name=display_name)
 
     @staticmethod
     def random_distortion_ex(n=1, random_state=None):
@@ -911,7 +864,7 @@ class Distortion:
             ps = np.insert(ps, 0, 0)
             wts = np.insert(wts, 0, mean)
             mn = f', mn={mean:.3f}'
-        return Distortion('wtdtvar', ps, df=wts,
+        return Distortion('wtdtvar', ps=ps, wts=wts,
                           display_name=name or f'Rnd {n_knots} knots{mn}{ma}')
 
     # ------------------------------------------------------------------
@@ -1145,10 +1098,11 @@ class Distortion:
 
 class CCoCDistortion(Distortion):
     """
-    Constant cost-of-capital distortion. Shape is the target return r;
-    the equivalent linear form has slope :math:`v = 1/(1+r)` and intercept
-    :math:`d = r/(1+r)`. The legacy alias ``'roe'`` maps to this kind via
-    :meth:`Distortion.__new__`.
+    Constant cost-of-capital distortion. Parameterised by either the
+    target return ``r`` or the discount intercept ``d = r/(1+r)``; the
+    linear form is :math:`g(x) = \\min(1, d + v\\,x)` with
+    :math:`v = 1/(1+r) = 1-d`. The legacy alias ``'roe'`` maps to this
+    kind via :meth:`Distortion.__new__`.
     """
     kind = 'ccoc'
     med_name = 'Const CoC'
@@ -1158,53 +1112,112 @@ class CCoCDistortion(Distortion):
     strict_pricing = True
     _calibration_init_shape = 0.25
 
+    def __init__(self, name='ccoc', *, d=None, r=None, display_name=''):
+        """
+        Construct a CCoC distortion. Pass exactly one of ``d`` or ``r``.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind (``'ccoc'``). Present only because the factory
+            ``Distortion('ccoc', ...)`` always passes the name.
+        d : float, optional
+            Discount intercept ``d = r/(1+r)``.
+        r : float, optional
+            Target return ``r``. Newton calibration iterates on this.
+        display_name : str, optional
+            Override label.
+
+        Raises
+        ------
+        TypeError
+            If neither or both of ``d`` and ``r`` are provided. (CCoC
+            takes natural parameters as keyword-only to keep the meaning
+            of a positional float explicit at the call site.)
+        """
+        if (d is None) == (r is None):
+            raise TypeError(
+                "CCoCDistortion requires exactly one of d= (discount) "
+                "or r= (return); got "
+                f"d={d!r}, r={r!r}")
+        if r is None:
+            r = d / (1.0 - d)
+        else:
+            d = r / (1.0 + r)
+        self._name = 'ccoc' if name == 'roe' else name
+        self.r = r
+        self.d = d
+        self.v = 1.0 - d
+        self.shape = r
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
     def _build(self):
         r = self.shape
-        v = 1 / (1 + r)
-        d = 1 - v
-        self._v = v
-        self._d = d
-        self.has_mass = (d > 0)
-        self.mass = d
-        self.standard_shape = r / (1 + r)
+        # keep r/d/v in sync after calibration writes self.shape
+        self.r = r
+        self.d = r / (1.0 + r)
+        self.v = 1.0 - self.d
+        self.has_mass = (self.d > 0)
+        self.mass = self.d
+        self.standard_shape = self.d
+
+    def _id_fields(self):
+        return (self._name, self.r, self.d, self.display_name)
 
     def g(self, x):
-        d = self._d
-        v = self._v
+        d, v = self.d, self.v
         return np.where(x == 0, 0, np.minimum(1, d + v * x))
 
     def g_inv(self, x):
-        d = self._d
-        v = self._v
+        d, v = self.d, self.v
         return np.where(x <= d, 0, (x - d) / v)
 
     def g_prime(self, x):
-        return self._v
+        return self.v
 
     def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """
         Closed-form calibration: ``r = (premium - el) / (assets - premium)``.
 
-        No iteration; ``r0`` is forced to zero on the returned distortion.
+        Notes
+        -----
+        No iteration. Mutates ``self.shape`` (and ``self.r`` /
+        ``self.d`` / ``self.v`` via ``_build``) in place.
         """
         assert el is not None and premium_target, \
             'CCoC calibration requires el and a non-zero premium_target'
         r = (premium_target - el) / (assets - premium_target)
-        self.r0 = 0.0
         self._finalize_calibration(r, 0.0, premium_target, assets)
         return self
 
 
 class PHDistortion(Distortion):
-    """Proportional-hazard distortion: :math:`g(x) = x^\\rho`."""
+    """Proportional-hazard distortion: :math:`g(x) = x^a`.
+
+    The natural parameter is ``a`` (was historically also called ``rho``).
+    ``Distortion('ph', a=0.7)`` and ``Distortion('ph', 0.7)`` are equivalent.
+    """
     kind = 'ph'
     med_name = 'Prop Hzrd'
     long_name = 'Proportional Hazard'
     documented = True
     pricing_ok = True
     strict_pricing = True
+    param_name = 'a'
     _calibration_init_shape = 0.95
+
+    @property
+    def a(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @a.setter
+    def a(self, value):
+        self.shape = value
+        self._build()
 
     def _build(self):
         self.standard_shape = (1 - self.shape) / (1 + self.shape)
@@ -1236,14 +1249,28 @@ class PHDistortion(Distortion):
 
 
 class WangDistortion(Distortion):
-    """Wang distortion: :math:`g(x) = \\Phi(\\Phi^{-1}(x) + \\lambda)`."""
+    """Wang distortion: :math:`g(x) = \\Phi(\\Phi^{-1}(x) + \\lambda)`.
+
+    The natural parameter is ``lam`` (ASCII; matches scipy convention).
+    """
     kind = 'wang'
     med_name = 'Wang'
     long_name = 'Wang-normal'
     documented = True
     pricing_ok = True
     strict_pricing = True
+    param_name = 'lam'
     _calibration_init_shape = 0.95
+
+    @property
+    def lam(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @lam.setter
+    def lam(self, value):
+        self.shape = value
+        self._build()
 
     def _build(self):
         n = ss.norm()
@@ -1280,14 +1307,28 @@ class WangDistortion(Distortion):
 
 
 class DualDistortion(Distortion):
-    """Dual-moment distortion: :math:`g(x) = 1 - (1-x)^p`."""
+    """Dual-moment distortion: :math:`g(x) = 1 - (1-x)^b`.
+
+    The natural parameter is ``b`` (gives ``a`` / ``b`` symmetry with PH).
+    """
     kind = 'dual'
     med_name = 'Dual Mom'
     long_name = 'Dual Moment'
     documented = True
     pricing_ok = True
     strict_pricing = True
+    param_name = 'b'
     _calibration_init_shape = 2.0
+
+    @property
+    def b(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @b.setter
+    def b(self, value):
+        self.shape = value
+        self._build()
 
     def _build(self):
         self.standard_shape = (self.shape - 1) / (self.shape + 1)
@@ -1340,7 +1381,18 @@ class TVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
     strict_pricing = True
+    param_name = 'p'
     _calibration_init_shape = 0.9
+
+    @property
+    def p(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @p.setter
+    def p(self, value):
+        self.shape = value
+        self._build()
 
     def _build(self):
         p = self.shape
@@ -1407,7 +1459,7 @@ class TVaRDistortion(Distortion):
 class BiTVaRDistortion(Distortion):
     """
     Convex combination of two TVaR distortions at ``p0 < p1`` with weight
-    ``w`` on ``p1``. Stored as ``shape=w``, ``df=[p0, p1]``.
+    ``w1`` on ``p1``.
     """
     kind = 'bitvar'
     med_name = 'BiTVaR'
@@ -1415,19 +1467,50 @@ class BiTVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
 
-    def _build(self):
-        if (not isinstance(self.df, (list, tuple))
-                or len(self.df) != 2):
-            raise ValueError(
-                'Inadmissible parameters to Distortion for bitvar. '
-                'Pass shape=wt for p1 and df=[p0, p1]')
-        p0, p1 = self.df
+    def __init__(self, name='bitvar', *, p0, p1, w1, display_name=''):
+        """
+        Construct a BiTVaR distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'bitvar'``).
+        p0, p1 : float
+            TVaR thresholds; require ``p0 < p1``.
+        w1 : float
+            Weight on the upper TVaR at ``p1``; ``1 - w1`` is the weight on
+            ``p0``. ``self.shape`` is set to ``w1`` so calibration code
+            (which iterates on shape) targets the upper weight.
+        display_name : str, optional
+            Override label.
+        """
         if not (p0 < p1):
             raise ValueError(f'bitvar requires p0 < p1, got {p0=}, {p1=}')
-        w = self.shape
+        self._name = 'bitvar' if name == 'roe' else name
         self._p0 = p0
         self._p1 = p1
-        self._w = w
+        self._w1 = w1
+        self.shape = w1
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def p0(self):
+        return self._p0
+
+    @property
+    def p1(self):
+        return self._p1
+
+    @property
+    def w1(self):
+        return self._w1
+
+    def _build(self):
+        # keep ``_w1`` in sync if a caller has mutated ``shape`` directly
+        self._w1 = self.shape
+        p0, p1, w = self._p0, self._p1, self._w1
         self.has_mass = (p1 == 1)
         self.mass = w if p1 == 1 else 0
         pt = (1 - p1) / (1 - p0) * (1 - w) + w
@@ -1439,26 +1522,29 @@ class BiTVaRDistortion(Distortion):
             self._alpha = 1 / (1 - p0)
             # the 1e-50 wedge avoids a singularity at the corner; without
             # it interp1d collapses the segment to zero. Wasted two days.
-            s = np.array([0.,   1e-50, 1 - p0, 1.])
-            gs = np.array([0.,     pt, 1.,     1.])
+            s = np.array([0., 1e-50, 1 - p0, 1.])
+            gs = np.array([0., pt, 1., 1.])
             self.g_inv = interp1d(gs, s, kind='linear',
                                   bounds_error=False, fill_value=(0, 1))
         else:
-            s = np.array([0.,  1 - p1, 1 - p0, 1.])
-            gs = np.array([0.,     pt, 1.,     1.])
+            s = np.array([0., 1 - p1, 1 - p0, 1.])
+            gs = np.array([0., pt, 1., 1.])
             self.g = interp1d(s, gs, kind='linear',
                               bounds_error=False, fill_value=(0, 1))
             self.g_inv = interp1d(gs, s, kind='linear',
                                   bounds_error=False, fill_value=(0, 1))
 
+    def _id_fields(self):
+        return (self._name, self._p0, self._p1, self._w1, self.display_name)
+
     def g(self, x):
         # only reached when p1 == 1
-        w = self._w
+        w = self._w1
         alpha = self._alpha
         return w * np.where(x <= 0, 0, 1) + (1 - w) * np.minimum(alpha * x, 1)
 
     def g_prime(self, x):
-        p0, p1, w = self._p0, self._p1, self._w
+        p0, p1, w = self._p0, self._p1, self._w1
         if p1 < 1:
             return np.where(x > 1 - p0, 0,
                             np.where(x < 1 - p1,
@@ -1467,25 +1553,22 @@ class BiTVaRDistortion(Distortion):
         return np.where(x > 1 - p0, 0, (1 - w) / (1 - p0))
 
     def quick_gS(self, den):
-        p0, p1 = self.df
-        w = self.shape
         if isinstance(den, pd.Series):
-            return bitvar_gS(den.values, p0, p1, w)
-        return bitvar_gS(den, p0, p1, w)
+            return bitvar_gS(den.values, self._p0, self._p1, self._w1)
+        return bitvar_gS(den, self._p0, self._p1, self._w1)
 
     def quick_ra(self, den, x=None):
-        p0, p1 = self.df
-        w = self.shape
         if isinstance(den, pd.Series):
-            return bitvar_ra(den.values, np.array(den.index), p0, p1, w)
-        return bitvar_ra(den, x, p0, p1, w)
+            return bitvar_ra(den.values, np.array(den.index),
+                             self._p0, self._p1, self._w1)
+        return bitvar_ra(den, x, self._p0, self._p1, self._w1)
 
 
 class WtdTVaRDistortion(Distortion):
     """
-    Weighted TVaR: ``shape`` is a sorted array of p values, ``df`` is the
-    matching weights. A mass at p=1 (max term) is supported. ``g`` is
-    piecewise linear; ``g_prime`` is exact.
+    Weighted TVaR: distortion as a weighted average of TVaRs at sorted
+    thresholds ``ps`` with weights ``wts``. A mass at ``p=1`` (max term)
+    is supported. ``g`` is piecewise linear; ``g_prime`` is exact.
     """
     kind = 'wtdtvar'
     med_name = 'WtdTVaR'
@@ -1493,9 +1576,56 @@ class WtdTVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
 
+    def __init__(self, name='wtdtvar', *, ps, wts, display_name=''):
+        """
+        Construct a weighted-TVaR distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'wtdtvar'``).
+        ps : array_like
+            Sorted ascending TVaR thresholds.
+        wts : array_like
+            Weights on the corresponding TVaR components. Must be the
+            same length as ``ps``. If ``np.isclose(sum(wts), 1)`` the
+            weights are normalised silently to clean up FP noise;
+            otherwise a ``ValueError`` is raised.
+        display_name : str, optional
+            Override label.
+        """
+        ps_arr = np.asarray(ps, dtype=float)
+        wts_arr = np.asarray(wts, dtype=float)
+        if len(ps_arr) != len(wts_arr):
+            raise ValueError(
+                f'wtdtvar: ps and wts must have the same length, got '
+                f'{len(ps_arr)} and {len(wts_arr)}')
+        s = wts_arr.sum()
+        if not np.isclose(s, 1.0):
+            raise ValueError(
+                f'wtdtvar: wts must sum to 1, got sum={s:.6g}')
+        wts_arr = wts_arr / s  # silent normalise of FP noise
+        self._name = 'wtdtvar' if name == 'roe' else name
+        self._ps = ps_arr
+        self._wts = wts_arr
+        # shape is set to ps for compatibility with code that reads
+        # ``self.shape`` to recover the threshold vector.
+        self.shape = ps_arr
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def ps(self):
+        return self._ps
+
+    @property
+    def wts(self):
+        return self._wts
+
     def _build(self):
-        ps = np.array(self.shape)
-        wts = np.array(self.df)
+        ps = np.array(self._ps)
+        wts = np.array(self._wts)
         if 1 in ps and wts[-1] > 0:
             self.has_mass = True
             self.mass = wts[-1]
@@ -1548,9 +1678,13 @@ class WtdTVaRDistortion(Distortion):
         grad[is_cusp] = np.nan
         return grad
 
+    def _id_fields(self):
+        return (self._name, tuple(self._ps), tuple(self._wts),
+                self.display_name)
+
     def tvar_info_df(self):
-        p = np.array(self.shape)
-        wts = np.array(self.df)
+        p = np.array(self._ps)
+        wts = np.array(self._wts)
         if 0 not in p:
             p = np.hstack((0, p))
             wts = np.hstack((0, wts))
@@ -1600,155 +1734,137 @@ class WtdTVaRDistortion(Distortion):
         return ax
 
 
-class ConvexDistortion(Distortion):
-    """
-    Convex envelope / piecewise-linear interpolated distortion. ``df`` is
-    a DataFrame with columns ``col_x`` and ``col_y``; if more than two
-    rows, the convex hull determines the knots.
-    """
-    kind = 'convex'
-    med_name = 'Convex Env'
-    long_name = 'Convex Envelope'
-    documented = True
-    pricing_ok = False
-
-    def _build(self):
-        # legacy: shape > 0 indicates mass at zero
-        if isinstance(self.shape, (int, float)) and self.shape and self.shape > 0:
-            self.has_mass = True
-            self.mass = self.shape
-        else:
-            self.has_mass = False
-            self.mass = 0.0
-
-        if self.display_name == '':
-            self.display_name = f'Convex on {len(self.df):d} points'
-
-        if not (0 in self.df[self.col_x].values
-                and 1 in self.df[self.col_x].values):
-            self.df = self.df[[self.col_x, self.col_y]].copy().reset_index(drop=True)
-            self.df.loc[len(self.df)] = (0, 0)
-            self.df.loc[len(self.df)] = (1, 1)
-            self.df = self.df.sort_values(self.col_x)
-
-        if len(self.df) > 2:
-            hull = ConvexHull(self.df[[self.col_x, self.col_y]])
-            knots = list(set(hull.simplices.flatten()))
-            self.g = interp1d(
-                self.df.iloc[knots, self.df.columns.get_loc(self.col_x)],
-                self.df.iloc[knots, self.df.columns.get_loc(self.col_y)],
-                kind='linear', bounds_error=False, fill_value=(0, 1))
-            self.g_inv = interp1d(
-                self.df.iloc[knots, self.df.columns.get_loc(self.col_y)],
-                self.df.iloc[knots, self.df.columns.get_loc(self.col_x)],
-                kind='linear', bounds_error=False, fill_value=(0, 1))
-        else:
-            self.df = self.df.sort_values(self.col_x)
-            self.g = interp1d(self.df[self.col_x], self.df[self.col_y],
-                              kind='linear', bounds_error=False,
-                              fill_value=(0, 1))
-            self.g_inv = interp1d(self.df[self.col_y], self.df[self.col_x],
-                                  kind='linear', bounds_error=False,
-                                  fill_value=(0, 1))
-
-    def _plot_decorations(self, ax, xs, c, scale, plot_points):
-        if not plot_points:
-            return
-        if len(self.df) > 50:
-            alpha = 0.35
-        elif len(self.df) > 20:
-            alpha = 0.6
-        else:
-            alpha = 1
-        if c is None:
-            c = 'C4'
-        if scale == 'linear':
-            ax.scatter(x=self.df[self.col_x], y=self.df[self.col_y],
-                       marker='.', s=15, color=c, alpha=alpha)
-        elif scale == 'return':
-            ax.scatter(x=1 / self.df[self.col_x],
-                       y=1 / self.df[self.col_y],
-                       marker='.', s=15, color=c, alpha=alpha)
-
-
 class MinimumDistortion(Distortion):
-    """Pointwise minimum of several distortions. ``shape`` is the list."""
+    """Pointwise minimum of several distortions.
+
+    Parameters
+    ----------
+    distortions : list[Distortion]
+        Constituent distortions.
+    """
     kind = 'minimum'
     med_name = 'Minimum'
     long_name = 'Minimum'
     documented = False
     pricing_ok = False
 
+    def __init__(self, name='minimum', *, distortions, display_name=''):
+        self._name = 'minimum' if name == 'roe' else name
+        self._distortions = list(distortions)
+        self.shape = self._distortions  # back-compat: legacy code reads .shape
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def distortions(self):
+        return self._distortions
+
     def _build(self):
-        dists = self.shape
+        dists = self._distortions
         self.has_mass = bool(np.all([d.has_mass for d in dists]))
         self.mass = float(np.min([d.mass for d in dists])) if self.has_mass else 0
         if self.display_name == '':
             self.display_name = f'Minimum of {len(dists):d} distortions'
 
+    def _id_fields(self):
+        return (self._name,
+                tuple(d.id() for d in self._distortions),
+                self.display_name)
+
     def min_index(self, x):
-        g_values = np.array([gi.g(x) for gi in self.shape])
+        g_values = np.array([gi.g(x) for gi in self._distortions])
         return np.argmin(g_values, axis=0)
 
     def g(self, x):
-        g_values = np.array([gi.g(x) for gi in self.shape])
+        g_values = np.array([gi.g(x) for gi in self._distortions])
         return np.min(g_values, axis=0)
 
     def g_prime(self, x):
         # the slope at x is the slope of whichever member achieves the min.
         # nudge x=1 slightly inside so argmin is unambiguous.
         x = np.where(x == 1, 1 - 1e-15, x)
-        g_values = np.array([gi.g(x) for gi in self.shape])
+        g_values = np.array([gi.g(x) for gi in self._distortions])
         min_idx = np.argmin(g_values, axis=0)
         if np.isscalar(min_idx):
-            return self.shape[min_idx].g_prime(x)
+            return self._distortions[min_idx].g_prime(x)
         if np.isscalar(x):
-            return np.array([self.shape[i].g_prime(x) for i in min_idx])
-        return np.array([self.shape[i].g_prime(xi)
+            return np.array([self._distortions[i].g_prime(x) for i in min_idx])
+        return np.array([self._distortions[i].g_prime(xi)
                          for i, xi in zip(min_idx, x)])
 
     def g_inv(self, y):
         # inverse of a pointwise min is the pointwise max of inverses.
-        inv_values = np.array([gi.g_inv(y) for gi in self.shape])
+        inv_values = np.array([gi.g_inv(y) for gi in self._distortions])
         return np.max(inv_values, axis=0)
 
 
 class MixtureDistortion(Distortion):
-    """Weighted mixture of distortions. ``shape`` is the list, ``df`` the
-    weights (defaults to uniform)."""
+    """Weighted mixture of distortions.
+
+    Parameters
+    ----------
+    distortions : list[Distortion]
+        Constituent distortions.
+    wts : array_like, optional
+        Mixing weights; defaults to uniform.
+    """
     kind = 'mixture'
     med_name = 'Mixture'
     long_name = 'Mixture'
     documented = False
     pricing_ok = False
 
+    def __init__(self, name='mixture', *, distortions, wts=None,
+                 display_name=''):
+        self._name = 'mixture' if name == 'roe' else name
+        self._distortions = list(distortions)
+        if wts is None:
+            wts = np.array([1 / len(self._distortions)] * len(self._distortions))
+        self._wts = np.asarray(wts, dtype=float)
+        self.shape = self._distortions  # back-compat: legacy code reads .shape
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def distortions(self):
+        return self._distortions
+
+    @property
+    def wts(self):
+        return self._wts
+
     def _build(self):
-        dists = list(self.shape)
+        dists = self._distortions
         self.has_mass = bool(np.any([d.has_mass for d in dists]))
         if self.has_mass:
             self.mass = float(np.sum([d.mass * w
-                                      for d, w in zip(dists, self.df)]))
+                                      for d, w in zip(dists, self._wts)]))
         else:
             self.mass = 0
         if self.display_name == '':
             self.display_name = f'Mixture of {len(dists):d} distortions'
-        if self.df is None:
-            self.df = np.array([1 / len(dists)] * len(dists))
-        self._weights = np.array(self.df.copy() if hasattr(self.df, 'copy')
-                                 else self.df)
+        self._weights = np.asarray(self._wts, dtype=float)
+
+    def _id_fields(self):
+        return (self._name,
+                tuple(d.id() for d in self._distortions),
+                tuple(self._wts),
+                self.display_name)
 
     def _combine(self, values):
         w = self._weights
         if values.ndim > 2:
-            flat = values.reshape(len(self.shape), -1)
+            flat = values.reshape(len(self._distortions), -1)
             return (w @ flat).reshape(values.shape[1], values.shape[2])
         return w @ values
 
     def g(self, x):
-        return self._combine(np.array([gi.g(x) for gi in self.shape]))
+        return self._combine(np.array([gi.g(x) for gi in self._distortions]))
 
     def g_prime(self, x):
-        return self._combine(np.array([gi.g_prime(x) for gi in self.shape]))
+        return self._combine(np.array([gi.g_prime(x) for gi in self._distortions]))
 
     def g_inv(self, y):
         raise NotImplementedError('Inverse of mixture not implemented')
@@ -1759,9 +1875,13 @@ class BetaDistortion(Distortion):
     Beta distortion: :math:`g(x) = F_{a,b}(x)` for a Beta(a, b) CDF.
 
     Constraints: ``0 < a <= 1`` and ``b >= 1``. ``b=1`` is PH with
-    :math:`\\rho = 1/a`; ``a=1`` is dual with :math:`\\rho = b`.
-    Reference: Wirch and Hardy, "A synthesis of risk measures for
-    capital adequacy" (IME 1999).
+    :math:`\\rho = 1/a`; ``a=1`` is dual with :math:`\\rho = b`. Not
+    calibratable through ``Portfolio.calibrate_distortion``.
+
+    References
+    ----------
+    Wirch and Hardy, "A synthesis of risk measures for capital
+    adequacy" (IME 1999).
     """
     kind = 'beta'
     med_name = 'Beta'
@@ -1769,11 +1889,44 @@ class BetaDistortion(Distortion):
     documented = True
     pricing_ok = False
 
-    def _build(self):
-        a, b = self.shape
+    def __init__(self, name='beta', *, a, b, display_name=''):
+        """
+        Construct a beta distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'beta'``).
+        a : float
+            First shape parameter; must satisfy ``0 < a <= 1``.
+        b : float
+            Second shape parameter; must satisfy ``b >= 1``.
+        display_name : str, optional
+            Override label.
+        """
         assert 0 < a <= 1, f'a parameter must be in (0, 1], not {a}'
         assert b >= 1, f'b parameter must be >= 1, not {b}'
-        self._fz = ss.beta(a, b)
+        self._name = 'beta' if name == 'roe' else name
+        self._a = a
+        self._b = b
+        self.shape = [a, b]
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def a(self):
+        return self._a
+
+    @property
+    def b(self):
+        return self._b
+
+    def _build(self):
+        self._fz = ss.beta(self._a, self._b)
+
+    def _id_fields(self):
+        return (self._name, self._a, self._b, self.display_name)
 
     def g(self, x):
         return self._fz.cdf(x)
@@ -1789,7 +1942,7 @@ class PowerDistortion(Distortion):
     """
     Power distortion built from part of a power-function distribution.
     Compare with the Bernegger approach. Allows controlled slopes at 0
-    and 1. ``shape = alpha``, ``df = [x0, x1]`` with ``x0 < x1``.
+    and 1. NOT calibratable through ``Portfolio.calibrate_distortion``.
     """
     kind = 'power'
     med_name = 'Power'
@@ -1797,19 +1950,56 @@ class PowerDistortion(Distortion):
     documented = False
     pricing_ok = False
 
-    def _build(self):
-        x0, x1 = self.df
+    def __init__(self, name='power', *, x0, x1, alpha, display_name=''):
+        """
+        Construct a power distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'power'``).
+        x0, x1 : float
+            Slope-defining endpoints; require ``x0 < x1``.
+        alpha : float
+            Exponent. ``self.shape`` is set to ``alpha`` for legacy
+            code that reads ``shape``; calibration is NOT supported.
+        display_name : str, optional
+            Override label.
+        """
         assert x0 < x1, 'x0 must be less than x1'
-        alpha = float(self.shape)
-        self._alpha = alpha
+        self._name = 'power' if name == 'roe' else name
         self._x0 = x0
         self._x1 = x1
+        self.shape = float(alpha)
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def x0(self):
+        return self._x0
+
+    @property
+    def x1(self):
+        return self._x1
+
+    @property
+    def alpha(self):
+        return self.shape
+
+    def _build(self):
+        alpha = float(self.shape)
+        self._alpha = alpha
+        x0, x1 = self._x0, self._x1
         if alpha != 1:
             self._bl = np.power(x1, -alpha + 1)
             self._br = np.power(x0, -alpha + 1)
         else:
             self._bl = np.log(x1)
             self._br = np.log(x0)
+
+    def _id_fields(self):
+        return (self._name, self._x0, self._x1, self.shape, self.display_name)
 
     def g(self, s):
         alpha = self._alpha
@@ -1841,7 +2031,11 @@ class PowerDistortion(Distortion):
 
 
 class CLLDistortion(Distortion):
-    """Capped log-linear distortion: :math:`g(x) = \\min(1, e^{r_0} x^b)`."""
+    """Capped log-linear distortion: :math:`g(x) = \\min(1, e^{r_0} x^b)`.
+
+    The shape (Newton-iterated) parameter is ``b``; ``r0`` is the
+    mass-at-zero intercept.
+    """
     kind = 'cll'
     med_name = 'Capd Loglin'
     long_name = 'Capped Loglinear'
@@ -1849,6 +2043,41 @@ class CLLDistortion(Distortion):
     pricing_ok = True
     strict_pricing = True
     _calibration_init_shape = 0.95
+
+    def __init__(self, name='cll', *, r0=0.0, b, display_name=''):
+        """
+        Construct a capped log-linear distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'cll'``).
+        r0 : float, optional
+            Mass-at-zero intercept (default 0).
+        b : float
+            Power-law exponent; Newton calibration iterates on this.
+        display_name : str, optional
+            Override label.
+        """
+        self._name = 'cll' if name == 'roe' else name
+        self.r0 = r0
+        self.shape = b
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def b(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @b.setter
+    def b(self, value):
+        self.shape = value
+        self._build()
+
+    def _id_fields(self):
+        return (self._name, self.shape, self.r0, self.display_name)
 
     def _build(self):
         self._ea = np.exp(self.r0)
@@ -1887,7 +2116,11 @@ class CLLDistortion(Distortion):
 
 
 class CLinDistortion(Distortion):
-    """Capped linear distortion: needs shape >= 1 - r0."""
+    """Capped linear distortion: :math:`g(x) = \\min(1, r_0 + s\\,x)`.
+
+    The shape (slope) parameter is ``slope``; ``r0`` is the mass-at-zero
+    intercept. Requires ``slope >= 1 - r0``.
+    """
     kind = 'clin'
     med_name = 'Capped Linear'
     long_name = 'Capped Linear'
@@ -1896,6 +2129,41 @@ class CLinDistortion(Distortion):
     strict_pricing = True
     has_mass_default = True
     _calibration_init_shape = 1.0
+
+    def __init__(self, name='clin', *, r0=0.0, slope, display_name=''):
+        """
+        Construct a capped linear distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'clin'``).
+        r0 : float, optional
+            Mass-at-zero intercept (default 0).
+        slope : float
+            Linear slope; Newton calibration iterates on this.
+        display_name : str, optional
+            Override label.
+        """
+        self._name = 'clin' if name == 'roe' else name
+        self.r0 = r0
+        self.shape = slope
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def slope(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @slope.setter
+    def slope(self, value):
+        self.shape = value
+        self._build()
+
+    def _id_fields(self):
+        return (self._name, self.shape, self.r0, self.display_name)
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -1930,7 +2198,11 @@ class CLinDistortion(Distortion):
 
 
 class LEPDistortion(Distortion):
-    """Leverage-equivalent pricing distortion."""
+    """Leverage-equivalent pricing distortion.
+
+    Parameterised by the target return ``r`` (shape) and rental rate
+    ``r0`` (mass intercept).
+    """
     kind = 'lep'
     med_name = 'Lev Equiv'
     long_name = 'Leverage Equivalent Pricing'
@@ -1939,6 +2211,41 @@ class LEPDistortion(Distortion):
     strict_pricing = True
     has_mass_default = True
     _calibration_init_shape = 0.25
+
+    def __init__(self, name='lep', *, r0=0.0, r, display_name=''):
+        """
+        Construct a leverage-equivalent pricing distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'lep'``).
+        r0 : float, optional
+            Rental rate (mass-at-zero intercept; default 0).
+        r : float
+            Target return; Newton calibration iterates on this.
+        display_name : str, optional
+            Override label.
+        """
+        self._name = 'lep' if name == 'roe' else name
+        self.r0 = r0
+        self.shape = r
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def r(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @r.setter
+    def r(self, value):
+        self.shape = value
+        self._build()
+
+    def _id_fields(self):
+        return (self._name, self.shape, self.r0, self.display_name)
 
     def _build(self):
         r = self.shape
@@ -1993,7 +2300,18 @@ class LEPDistortion(Distortion):
 
 
 class LYDistortion(Distortion):
-    """Linear yield distortion: ``r_0`` = occupancy, shape = consumption."""
+    """Linear yield distortion.
+
+    The shape parameter ``r`` is the consumption rate; ``r0`` is the
+    occupancy (the mass-at-zero intercept). The name and the
+    occupancy / consumption framing are due to Don Mango (the rental
+    analogy for capital pricing).
+
+    Notes
+    -----
+    The minimum rate-on-line is ``r0 / (1 + r0)``; the mass at zero is
+    ``ess_sup * r0 / (1 + r0)``.
+    """
     kind = 'ly'
     med_name = 'Lin Yield'
     long_name = 'Linear Yield'
@@ -2002,6 +2320,41 @@ class LYDistortion(Distortion):
     strict_pricing = True
     has_mass_default = True
     _calibration_init_shape = 1.25
+
+    def __init__(self, name='ly', *, r0=0.0, r, display_name=''):
+        """
+        Construct a linear-yield distortion.
+
+        Parameters
+        ----------
+        name : str
+            Distortion kind name (``'ly'``).
+        r0 : float, optional
+            Occupancy rate (mass-at-zero intercept; default 0).
+        r : float
+            Consumption rate; Newton calibration iterates on this.
+        display_name : str, optional
+            Override label.
+        """
+        self._name = 'ly' if name == 'roe' else name
+        self.r0 = r0
+        self.shape = r
+        self.display_name = display_name
+        self._common_init()
+        self._build()
+
+    @property
+    def r(self):
+        """Natural alias for ``self.shape`` (the consumption rate)."""
+        return self.shape
+
+    @r.setter
+    def r(self, value):
+        self.shape = value
+        self._build()
+
+    def _id_fields(self):
+        return (self._name, self.shape, self.r0, self.display_name)
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -2048,11 +2401,13 @@ class LYDistortion(Distortion):
 
 def approx_ccoc(roe, eps=1e-14, display_name=None):
     """
-    Continuous approximation to the CCoC distortion at given ROE. Useful
-    when a smooth distortion is needed in place of a CCoC with its mass
-    at zero.
+    Continuous approximation to the CCoC distortion at given ROE.
+
+    Useful when a smooth distortion is needed in place of a CCoC with
+    its mass at zero. Built as a BiTVaR with ``p0=0``, ``p1=1-eps``,
+    ``w1 = roe / (1 + roe)``.
     """
-    return Distortion('bitvar', roe / (1 + roe), df=[0, 1 - eps],
+    return Distortion('bitvar', p0=0, p1=1 - eps, w1=roe / (1 + roe),
                       display_name=(f'aCCoC {roe:.2%}'
                                     if display_name is None
                                     else display_name))
@@ -2113,9 +2468,193 @@ def consistent_distortions(p):
     params = p_to_parameters(p)
     ans = {}
     for k, sh in params.items():
-        # Distortion.ccoc takes discount, but Distortion('ccoc', shape)
-        # takes return
         if k == 'ccoc':
-            sh = sh / (1 - sh)
-        ans[k] = Distortion(k, sh)
+            # p_to_parameters returns the discount d for ccoc; convert to
+            # return r so the natural-kwarg constructor takes r directly.
+            ans[k] = Distortion('ccoc', r=sh / (1 - sh))
+        else:
+            pn = Distortion._registry[k].param_name
+            ans[k] = Distortion(k, **{pn: sh})
     return ans
+
+
+# ===========================================================================
+# Distortion construction helpers
+# ===========================================================================
+# These functions BUILD a Distortion from sample data; they are not
+# distortion kinds themselves. Kept at module level so the ``Distortion``
+# namespace stays focused on actual kinds; each returns a
+# ``WtdTVaRDistortion`` instance with knots taken from the upper convex
+# hull of the supplied (s, g(s)) data.
+
+
+def convex_distortion(s, gs, *, display_name=''):
+    """
+    Build a distortion as the upper convex envelope of ``(s, g(s))`` points.
+
+    Returns a :class:`WtdTVaRDistortion` whose piecewise-linear ``g``
+    interpolates the convex hull of the supplied points. The caller is
+    expected to handle any DataFrame / column-name extraction pre-call;
+    this function takes two raw arrays.
+
+    Parameters
+    ----------
+    s : array_like
+        x-coordinates (probabilities). 0 and 1 are added if absent.
+    gs : array_like
+        Matching ``g(s)`` values, same length as ``s``. The points
+        ``(0, 0)`` and ``(1, 1)`` are added if missing.
+    display_name : str, optional
+        Override label.
+
+    Returns
+    -------
+    WtdTVaRDistortion
+        Equivalent piecewise-linear weighted-TVaR distortion.
+
+    Notes
+    -----
+    For ordered hull knots ``(s_0=0, gs_0=0), …, (s_K=1, gs_K=1)`` with
+    slopes ``m_i = (gs_{i+1} - gs_i) / (s_{i+1} - s_i)`` (non-increasing
+    by concavity), the corresponding TVaR weights solve a small linear
+    system via :meth:`Distortion.tvar_terms`.
+    """
+    s = np.asarray(s, dtype=float).ravel()
+    gs = np.asarray(gs, dtype=float).ravel()
+    if len(s) != len(gs):
+        raise ValueError(
+            f'convex_distortion: s and gs must have the same length, '
+            f'got {len(s)} and {len(gs)}')
+
+    # ensure 0 and 1 are present so the hull touches both corners.
+    if 0.0 not in s:
+        s = np.concatenate([[0.0], s])
+        gs = np.concatenate([[0.0], gs])
+    if 1.0 not in s:
+        s = np.concatenate([s, [1.0]])
+        gs = np.concatenate([gs, [1.0]])
+
+    pts = np.column_stack([s, gs])
+    if len(pts) >= 3:
+        hull = ConvexHull(pts)
+        knot_idx = sorted(set(hull.simplices.flatten()))
+    else:
+        knot_idx = list(range(len(pts)))
+
+    s_h = s[knot_idx]
+    gs_h = gs[knot_idx]
+    order = np.argsort(s_h)
+    s_h = s_h[order]
+    gs_h = gs_h[order]
+    # remove duplicate s values (the hull may double-count corners)
+    keep = np.concatenate([[True], np.diff(s_h) > 0])
+    s_h = s_h[keep]
+    gs_h = gs_h[keep]
+
+    # solve gs_h = wts @ tvar_terms(ps) on the (ascending) hull knots.
+    # ps are derived from the hull's x-coordinates: ps = 1 - s_h[::-1].
+    ps = (1 - s_h[::-1]).astype(float)
+    M = Distortion.tvar_terms(ps)
+    # tvar_terms returns an (n, n) matrix mapping wts -> gs evaluated at
+    # the reversed s values; solve in least-squares for stability.
+    wts, *_ = np.linalg.lstsq(M.T, gs_h, rcond=None)
+    wts = np.clip(wts, 0.0, None)
+    if wts.sum() <= 0:
+        # degenerate input: fall back to uniform weighting
+        wts = np.ones_like(ps) / len(ps)
+    wts = wts / wts.sum()
+    return WtdTVaRDistortion('wtdtvar', ps=ps, wts=wts,
+                             display_name=display_name)
+
+
+def bagged_distortion(data, proportion, samples, *,
+                      el_col='EL', spread_col='Spread', display_name=''):
+    """
+    Bootstrap-aggregated convex distortion from tabular ``(EL, Spread)`` data.
+
+    Resamples ``data`` ``samples`` times at the given ``proportion``,
+    builds the upper convex envelope of each sample with
+    :func:`convex_distortion`, averages ``g(s)`` across samples on a
+    uniform grid, and returns the averaged distortion.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Must contain columns named by ``el_col`` and ``spread_col``.
+    proportion : float
+        Fraction of rows to sample without replacement on each draw.
+    samples : int
+        Number of bootstrap iterations.
+    el_col, spread_col : str, optional
+        Column names. Default ``'EL'`` and ``'Spread'``.
+    display_name : str, optional
+        Override label.
+
+    Returns
+    -------
+    WtdTVaRDistortion
+    """
+    s_grid = np.linspace(0, 1, 10001)
+    accum = np.zeros_like(s_grid)
+    for _ in range(samples):
+        rebit = data.sample(frac=proportion, replace=False,
+                            random_state=RANDOM)
+        s_pts = np.concatenate([rebit[el_col].values, [0.0, 1.0]])
+        gs_pts = np.concatenate([rebit[spread_col].values, [0.0, 1.0]])
+        d = convex_distortion(s_pts, gs_pts)
+        accum += np.asarray(d.g(s_grid), dtype=float)
+    accum /= samples
+    return convex_distortion(s_grid, accum, display_name=display_name)
+
+
+def convex_example(source='bond'):
+    """
+    Example convex distortion using bundled yield-curve or cat-bond data.
+
+    Parameters
+    ----------
+    source : {'bond', 'cat'}
+        ``'bond'`` uses a BIS-style corporate yield curve (rating → EL,
+        yield); ``'cat'`` uses ROL vs EL pairs from cat bonds.
+
+    Returns
+    -------
+    WtdTVaRDistortion
+    """
+    if source == 'bond':
+        yield_curve = '''
+        AAAA    0.000000  0.000000
+        AAA     0.000018  0.006386
+        AA      0.000144  0.007122
+        A       0.000278  0.010291
+        BBB     0.002012  0.017089
+        BB      0.012674  0.036455
+        B       0.040052  0.069181
+        Z       1.000000  1.000000'''
+        df = pd.read_fwf(StringIO(yield_curve))
+        df.columns = ['Rating', 'EL', 'Yield']
+        return convex_distortion(df['EL'].values, df['Yield'].values,
+                                 display_name='Yield Curve')
+
+    elif source.lower() == 'cat':
+        cat_bond = '''EL,ROL
+        0.116196,0.32613
+        0.088113,0.2452
+        0.074811,0.22769
+        0.056385,0.17131
+        0.046923,0.15326
+        0.032961,0.12222
+        0.02807,0.11037
+        0.024205,0.1022
+        0.011564,0.07284
+        0.005813,0.06004
+        0,0
+        1,1'''
+        df = pd.read_csv(StringIO(cat_bond))
+        return convex_distortion(df['EL'].values, df['ROL'].values,
+                                 display_name='Cat Bond')
+
+    else:
+        raise ValueError(
+            f'Inadmissible value {source} passed to convex_example, '
+            f'expected bond or cat')

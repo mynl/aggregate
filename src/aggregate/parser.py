@@ -55,6 +55,84 @@ logger = logging.getLogger(__name__)
 GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 
 
+def _distortion_spec(kind_id, shape, df=None):
+    """
+    Translate a DecL ``(kind, shape, df?)`` triple into a natural-kwarg
+    spec dict ready for ``Distortion(**spec)``.
+
+    Each distortion kind has its own natural parameter names (post the
+    1.0.0a13 reform); the DecL grammar still parses the legacy
+    ``kind shape [df]`` form, so this helper sits between the parser and
+    the constructor and dispatches on the kind id.
+
+    Parameters
+    ----------
+    kind_id : str
+        The kind identifier parsed from DecL.
+    shape : object
+        The parsed ``shape`` token (float or list, per the kind).
+    df : object, optional
+        The optional second slot, used by ``bitvar`` and ``wtdtvar``.
+
+    Returns
+    -------
+    dict
+        ``{'name': kind_id, **natural_kwargs}`` to be unpacked into
+        ``Distortion(**spec)``.
+
+    Raises
+    ------
+    ValueError
+        If ``df`` is missing for kinds that require it, or the kind id
+        is unknown.
+    """
+    spec = {'name': kind_id}
+    if kind_id == 'ph':
+        spec['a'] = shape
+    elif kind_id == 'wang':
+        spec['lam'] = shape
+    elif kind_id == 'dual':
+        spec['b'] = shape
+    elif kind_id == 'tvar':
+        spec['p'] = shape
+    elif kind_id in ('ccoc', 'roe'):
+        # DSL semantics: positional shape is the return r.
+        spec['name'] = 'ccoc'
+        spec['r'] = shape
+    elif kind_id == 'bitvar':
+        if df is None or len(df) != 2:
+            raise ValueError(
+                f'DecL bitvar requires [p0 p1]; got df={df!r}')
+        spec['p0'], spec['p1'] = df[0], df[1]
+        spec['w1'] = shape
+    elif kind_id == 'wtdtvar':
+        if df is None:
+            raise ValueError(
+                f'DecL wtdtvar requires [wts]; got df={df!r}')
+        spec['ps'] = shape
+        spec['wts'] = df
+    elif kind_id == 'cll':
+        spec['b'] = shape
+    elif kind_id == 'clin':
+        spec['slope'] = shape
+    elif kind_id == 'lep':
+        spec['r'] = shape
+    elif kind_id == 'ly':
+        spec['r'] = shape
+    elif kind_id == 'beta':
+        # DSL form: shape is [a, b]
+        spec['a'], spec['b'] = shape[0], shape[1]
+    elif kind_id == 'power':
+        if df is None or len(df) != 2:
+            raise ValueError(
+                f'DecL power requires [x0 x1]; got df={df!r}')
+        spec['x0'], spec['x1'] = df[0], df[1]
+        spec['alpha'] = shape
+    else:
+        raise ValueError(f'DecL: unknown distortion kind {kind_id!r}')
+    return spec
+
+
 # ======================================================================
 # Lexer
 # ======================================================================
@@ -208,11 +286,13 @@ class UnderwritingTransformer(Transformer):
     # ----- distortion ------------------------------------------------
     def distortion_out_short(self, c):
         _, name, kind_id, shape = c
-        return ("distortion", name, {"name": kind_id, "shape": shape})
+        spec = _distortion_spec(kind_id, shape)
+        return ("distortion", name, spec)
 
     def distortion_out_long(self, c):
         _, name, kind_id, shape, df = c
-        return ("distortion", name, {"name": kind_id, "shape": shape, "df": df})
+        spec = _distortion_spec(kind_id, shape, df)
+        return ("distortion", name, spec)
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):

@@ -1,34 +1,45 @@
-# Plan C — apiweb backend
+# Plan C — api backend
 
 **Status:** ready to execute after Plans A and B (uses both).
 **Depends on:** Plan A (`aggregate.style.context()`), Plan B (`aggregate.parser_errors.format_error()`).
-**Unblocks:** Plan D (frontend has a real API to talk to), API-only consumers (downstream pricing servers).
+**Unblocks:** Plan D (web SPA needs a real API), API-only consumers (downstream pricing servers).
 
 ## Goal
 
-Stand up a FastAPI service at `src/aggregate/apiweb/` that exposes the aggregate library over HTTP/JSON. Two consumers:
+Stand up a FastAPI service at `src/aggregate/api/` that exposes the aggregate library over HTTP/JSON. Two consumers:
 
-1. The web frontend (Plan D).
-2. Any downstream Python or non-Python pricing system that wants to call `build()` and read back `info`, `description`, `stats_df`, `density_df`, plots, and `pricing_at` over a versioned, schema-stable API.
+1. The Bootstrap SPA in `web/` (Plan D), served either by this backend's `StaticFiles` mount or independently.
+2. Any downstream Python or non-Python pricing system that wants to call `build()` and read back `info`, `description`, `stats_df`, `density_df`, plots, `kappa`, `pricing_at` over a versioned, schema-stable API.
 
-KISS shape: single uvicorn worker, in-memory LRU object cache (Option X), SQLite audit log, content-hash object IDs, log2 ceiling, build timeout.
+KISS shape: single uvicorn worker, in-memory LRU object cache (Option X), SQLite audit log, content-hash object IDs, log2 ceiling, build timeout, CORS middleware for split-origin deploys.
+
+## Naming changes from earlier draft
+
+Previous draft used the umbrella name `apiweb`. With Plan D now living at top-level `web/`, this plan covers only the backend, so:
+
+- Folder: `src/aggregate/apiweb/` → **`src/aggregate/api/`**.
+- Console script: `aggregate-server` → **`aggregate-api`**.
+- Optional-deps group: `[apiweb]` → **`[api]`**.
+- Env-var prefix: `AGGWEB_` → **`AGGAPI_`**.
+- Docs page filename: `2_x_apiweb.rst` → **`2_x_api.rst`** (Plan E).
 
 ## Deliverables
 
-New tree under `src/aggregate/apiweb/`:
+New tree under `src/aggregate/api/`:
 
 ```
-src/aggregate/apiweb/
+src/aggregate/api/
     __init__.py            # exposes create_app(), __version__
-    __main__.py            # python -m aggregate.apiweb → uvicorn run
-    app.py                 # FastAPI app factory, route mounts
+    __main__.py            # python -m aggregate.api → uvicorn run
+    app.py                 # FastAPI app factory, route mounts, CORS, static
     config.py              # env-var driven settings
     cache.py               # single LRU object cache
     audit.py               # SQLite audit log
+    cors.py                # CORSMiddleware setup helper
     models.py              # Pydantic schemas (requests + responses)
     examples.py            # test_suite.agg loader/grouper
     completion.py          # Lark interactive-parser-driven completions
-    plotting.py            # style.context() wrapper + plot dispatch
+    plotting.py            # style.context() wrapper + plot dispatch (PNG + SVG)
     pricing.py             # pricing_at / price_ccoc dispatch
     serializers.py         # DataFrame → records, info dict normalization
     routes/
@@ -37,11 +48,12 @@ src/aggregate/apiweb/
         decl.py            # /v1/decl/*
         examples.py        # /v1/examples
         meta.py            # /v1/health, /v1/meta, /v1/grammar (alias)
+    static/                # populated by Plan D's web build (gitignored)
 ```
 
 Plus:
-- New: `tests/apiweb/` with `conftest.py`, `test_objects.py`, `test_decl.py`, `test_examples.py`, `test_audit.py`.
-- Modified: `pyproject.toml` — add `[project.optional-dependencies]` group `apiweb` (FastAPI, uvicorn, pydantic, python-multipart), and a console script.
+- New: `tests/api/` with `conftest.py`, `test_objects.py`, `test_decl.py`, `test_examples.py`, `test_audit.py`, `test_cors.py`.
+- Modified: `pyproject.toml` — add `[project.optional-dependencies] api`, `[project.scripts] aggregate-api`.
 
 No changes to existing `aggregate.*` modules apart from the optional-dependency block.
 
@@ -53,13 +65,19 @@ All paths under `/v1/`. Response media type is JSON unless noted.
 
 | Method | Path | Body / params | Response |
 |---|---|---|---|
-| POST   | `/v1/objects` | `{decl, log2?, bs?}` | `{id, kind, name, info, description, stats, warnings, elapsed_ms}` |
+| POST   | `/v1/objects` | `{decl, log2?, bs?}` | `{id, kind, name, cached, elapsed_ms, warnings}` (slim — heavier panes are fetched explicitly) |
 | GET    | `/v1/objects` | — | `[{id, kind, name, ts}]` — cache contents |
-| GET    | `/v1/objects/{id}` | — | manifest (same shape as POST minus elapsed_ms) |
+| GET    | `/v1/objects/{id}` | — | manifest `{id, kind, name, decl, log2, bs, created_at}` |
 | DELETE | `/v1/objects/{id}` | — | `{ok: true}` |
-| GET    | `/v1/objects/{id}/density_df` | `?cols=&start=&stop=&downsample=&view=` | `{columns: [...], rows: [...]}` |
-| GET    | `/v1/objects/{id}/plot` | `?kind=density\|cdf\|qq\|kappa&width=&height=&dpi=` | `image/png` bytes |
-| POST   | `/v1/objects/{id}/pricing_at` | `{p?, a?, ccoc?, distortion?}` | `{rows: [...]}` |
+| GET    | `/v1/objects/{id}/info` | — | `{info: {...}}` |
+| GET    | `/v1/objects/{id}/description` | — | `{columns, rows}` from `obj.describe` |
+| GET    | `/v1/objects/{id}/stats_df` | — | `{columns, rows}` from `obj.stats_df` |
+| GET    | `/v1/objects/{id}/density_df` | `?cols=&start=&stop=&downsample=` | `{columns, rows}` |
+| GET    | `/v1/objects/{id}/kappa` | `?downsample=` | `{columns, rows}` — Portfolio only; the `exeqa_*` slice of density_df |
+| GET    | `/v1/objects/{id}/plot` | `?kind=density\|cdf\|qq\|kappa&format=svg\|png&width=&height=&dpi=` | `image/svg+xml` (default) or `image/png` |
+| POST   | `/v1/objects/{id}/pricing_at` | `{p?, a?, ccoc?, distortion?}` | `{rows: [...], assets, premium, equity, ...}` |
+
+Per-button-fetch UX: the SPA's action buttons (`info`, `describe`, `stats_df`, `density_df`, `plot`, kappa, pricing) each hit their own endpoint. The cache makes second hits effectively O(1) because the object is already built. Build itself returns only `{id, kind, name, ...}` so the post-build page doesn't pay for data nobody clicked through.
 
 ### DecL
 
@@ -80,9 +98,43 @@ All paths under `/v1/`. Response media type is JSON unless noted.
 | Method | Path | Response |
 |---|---|---|
 | GET    | `/v1/health` | `{ok: true, version}` |
-| GET    | `/v1/meta` | `{version, log2_cap, log2_default, build_timeout_s, cache_max}` |
+| GET    | `/v1/meta` | `{version, log2_cap, log2_default, build_timeout_s, cache_max, plot_default_format}` |
 
 OpenAPI is auto-generated by FastAPI at `/openapi.json`; Swagger UI at `/docs`.
+
+## SVG vs PNG plot output
+
+Default response format is `image/svg+xml`. Rationale:
+
+- Aggregate plots are smooth line/curve plots (densities, CDFs, kappas). Matplotlib's default `path.simplify=True` keeps SVG payloads in the 30–150 KB range for typical 2^16 grids.
+- SVG is resolution-independent — crisp on retina/4K without us shipping 2× rasters.
+- Users can save SVG and embed in PDFs/LaTeX cleanly.
+
+PNG is the alternative for raster use cases (paste into Word/Slack), selected via `?format=png`. Both formats go through the same `aggregate.style.context(**WEB_OVERRIDES)` so visually identical.
+
+Implementation note: matplotlib SVG embeds glyphs by default — adds a few KB but immunizes against missing-font rendering on the client. Leave as default.
+
+## CORS
+
+The web SPA (Plan D) can be deployed at the same origin (FastAPI `StaticFiles` mount) or at a different origin (e.g. `mynl.com/aggregate/` calling `api.mynl.com`). For the second case the backend needs CORS.
+
+`cors.py`:
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+def install_cors(app, allowed_origins: list[str]) -> None:
+    if not allowed_origins:
+        return
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type"],
+    )
+```
+
+`config.py` carries `cors_origins: list[str] = []`, parsed from `AGGAPI_CORS_ORIGINS` as comma-separated. Empty → middleware skipped (same-origin deploys don't pay for it).
 
 ## Object IDs — content-hash
 
@@ -120,7 +172,7 @@ class ObjectCache:
     def __contains__(self, oid: str) -> bool: ...
 ```
 
-Eviction policy is plain LRU bounded by entry count (default 50, configurable). Plots and `density_df` pages are *not* cached separately — they're recomputed from the live cached object on demand.
+Eviction policy is plain LRU bounded by entry count (default 50, configurable). Plots, `density_df` pages, kappa frames, pricing results are *not* cached separately — they're recomputed from the live cached object on demand.
 
 ## Audit log (SQLite)
 
@@ -157,7 +209,7 @@ class AuditLog:
     def by_ip(self, ip: str, n: int = 100) -> list[dict]: ...
 ```
 
-Connection uses `sqlite3` (stdlib) with `journal_mode=WAL` and `synchronous=NORMAL`. WAL is fine on both Windows and Linux. Path is configurable; default `~/.aggregate/apiweb/audit.db` (created if missing).
+Connection uses `sqlite3` (stdlib) with `journal_mode=WAL` and `synchronous=NORMAL`. Path is configurable; default `~/.aggregate/api/audit.db` (created if missing).
 
 No DB endpoint in v1 — audit log is read by SQL CLI or a future admin route. The user just wants the data captured.
 
@@ -171,10 +223,9 @@ def build_endpoint(req: BuildRequest, client_ip: str) -> BuildResponse:
 
     oid = object_id(canonicalize(req.decl), req.log2, req.bs)
     if oid in cache:
-        # Cache hit — still log the call.
         entry = cache.get(oid)
         audit.record_build(..., status='ok', object_id=oid, ...)
-        return manifest(entry, cached=True)
+        return BuildResponse(id=oid, kind=entry.kind, name=entry.name, cached=True, ...)
 
     with build_semaphore, timeout(settings.build_timeout_s):
         try:
@@ -192,12 +243,12 @@ def build_endpoint(req: BuildRequest, client_ip: str) -> BuildResponse:
 
     cache.put(oid, CacheEntry(obj=obj, ...))
     audit.record_build(..., status='ok', object_id=oid, ...)
-    return manifest(...)
+    return BuildResponse(id=oid, kind=..., name=..., cached=False, ...)
 ```
 
-`build_semaphore` is a `threading.Semaphore(1)` — at most one heavy build in flight at a time. Reads (density_df, plot, pricing_at) don't acquire it.
+`build_semaphore` is a `threading.Semaphore(1)` — at most one heavy build in flight. Reads don't acquire it.
 
-Timeout is implemented via `concurrent.futures.ThreadPoolExecutor` + `future.result(timeout=...)`. FastAPI runs sync endpoints in a threadpool already; the future-with-timeout pattern wraps the heavy call so we can kill it. Note: Python can't truly cancel a CPU-bound thread; the timeout returns to the caller but the thread continues until the FFT/loop exits. Acceptable for v0 given the trusted-team threat model; document the caveat.
+Timeout via `concurrent.futures.ThreadPoolExecutor` + `future.result(timeout=...)`. Python can't truly cancel a CPU-bound thread; documented caveat.
 
 ## Plotting
 
@@ -208,22 +259,21 @@ WEB_OVERRIDES = {
     "savefig.dpi": 100,
 }
 
-def render_plot(obj, kind: str, **kwargs) -> bytes:
+def render_plot(obj, kind: str, fmt: str = "svg", **kwargs) -> tuple[bytes, str]:
     buf = io.BytesIO()
     with aggregate.style.context(**WEB_OVERRIDES, **kwargs.pop("rc", {})):
         fig = _dispatch(obj, kind, **kwargs)
-        fig.savefig(buf, format="png")
+        fig.savefig(buf, format=fmt)
         plt.close(fig)
-    return buf.getvalue()
+    media_type = "image/svg+xml" if fmt == "svg" else "image/png"
+    return buf.getvalue(), media_type
 ```
 
 Plot kinds (v1):
 - `density` — PMF / PDF over loss support.
 - `cdf` — F over loss.
-- `qq` — quantile-quantile vs normal (existing on `Aggregate`/`Portfolio`).
+- `qq` — quantile-quantile vs normal.
 - `kappa` — Portfolio only; line plot of `exeqa_*` columns vs `loss`.
-
-Each kind is a thin function in `plotting.py` that drives the existing `obj.plot(...)` or builds a matplotlib figure manually for `kappa` (which isn't a built-in plot kind today).
 
 ## DecL completions
 
@@ -239,13 +289,13 @@ def complete(decl: str, cursor: int) -> list[Completion]:
     return [_to_completion(t) for t in sorted(accepted)]
 ```
 
-Reuses Plan B's `_TERMINAL_LABELS` for human-readable labels. Identifier completions (severity names, frequency names from the knowledge base) are a v1.1 enhancement — list flagged as an open knob below.
+Reuses Plan B's `_TERMINAL_LABELS` for human-readable labels. Identifier completions (severity names, frequency names from the knowledge base) are a v1.1 enhancement.
 
 ## Examples loader
 
-Parses `src/aggregate/agg/test_suite.agg` once on startup. Recognizes the contents block (`# A. Title ...`) and then section headers (`# A. Title` followed by a `# ====` underline). For each non-comment, non-blank line in a section, emit `{name, decl, note}` where `note` is extracted from a trailing `note{...}` if present.
+Parses `src/aggregate/agg/test_suite.agg` once on startup. Recognizes the contents block (`# A. Title ...`) and section headers (`# A. Title` followed by `# ====` underline). For each non-comment, non-blank line in a section, emit `{name, decl, note}` where `note` is extracted from a trailing `note{...}` if present.
 
-Cached as a module-level dict; reloaded only on server restart. Mostly static.
+Cached as a module-level dict; reloaded only on server restart.
 
 ## Pydantic models
 
@@ -254,23 +304,23 @@ Pydantic v2. Field names `snake_case`. All response models have `model_config = 
 ```python
 class BuildRequest(BaseModel):
     decl: str = Field(..., min_length=1)
-    log2: int | None = Field(None, ge=4)         # validated against cap server-side
+    log2: int | None = Field(None, ge=4)
     bs: float | None = Field(None, gt=0)
-
-class StatsRecord(BaseModel):
-    name: str
-    value: float | int | str | None
 
 class BuildResponse(BaseModel):
     id: str
     kind: Literal["agg", "port"]
     name: str
-    info: dict
-    description: list[dict]      # rows of obj.describe
-    stats: list[StatsRecord]
     warnings: list[str]
     cached: bool
     elapsed_ms: int
+
+class FrameResponse(BaseModel):
+    columns: list[str]
+    rows: list[list]                 # list-of-lists, not list-of-dicts (smaller)
+
+class InfoResponse(BaseModel):
+    info: dict
 
 class DeclCompleteRequest(BaseModel):
     decl: str
@@ -285,32 +335,42 @@ class PricingRequest(BaseModel):
     p: float | None = None
     a: float | None = None
     ccoc: float | None = None
-    distortion: str | None = None       # name of a calibrated distortion or distortion spec
-```
+    distortion: str | None = None
 
-(Exact field set will be refined during execution against the real `info` / `describe` / `stats_df` shapes.)
+class PricingResponse(BaseModel):
+    p: float | None
+    a: float
+    ccoc: float | None
+    premium: float
+    equity: float
+    expected_loss: float
+    rows: list[dict]                 # per-unit breakdown for Portfolios
+```
 
 ## Config
 
-`config.py` uses `pydantic-settings` (or a hand-rolled env reader if pulling another dep feels heavy — flag below). Env vars prefixed `AGGWEB_`:
+`config.py` uses `pydantic-settings`. Env vars prefixed `AGGAPI_`:
 
 | Var | Default | Meaning |
 |---|---|---|
-| `AGGWEB_HOST` | `127.0.0.1` | uvicorn bind |
-| `AGGWEB_PORT` | `8000` | uvicorn port |
-| `AGGWEB_LOG2_DEFAULT` | `16` | default if request omits |
-| `AGGWEB_LOG2_CAP` | `18` | hard cap |
-| `AGGWEB_BUILD_TIMEOUT_S` | `10` | per-request timeout |
-| `AGGWEB_CACHE_MAX` | `50` | LRU entries |
-| `AGGWEB_AUDIT_DB` | `~/.aggregate/apiweb/audit.db` | SQLite path |
-| `AGGWEB_KNOWLEDGE_BASE` | `default` | knowledge base name or path |
+| `AGGAPI_HOST` | `127.0.0.1` | uvicorn bind |
+| `AGGAPI_PORT` | `8000` | uvicorn port |
+| `AGGAPI_LOG2_DEFAULT` | `16` | default if request omits |
+| `AGGAPI_LOG2_CAP` | `18` | hard cap |
+| `AGGAPI_BUILD_TIMEOUT_S` | `10` | per-request timeout |
+| `AGGAPI_CACHE_MAX` | `50` | LRU entries |
+| `AGGAPI_AUDIT_DB` | `~/.aggregate/api/audit.db` | SQLite path |
+| `AGGAPI_KNOWLEDGE_BASE` | `default` | knowledge base name or path |
+| `AGGAPI_CORS_ORIGINS` | `` | comma-separated list; empty = no CORS middleware |
+| `AGGAPI_PLOT_DEFAULT_FORMAT` | `svg` | `svg` or `png` |
+| `AGGAPI_STATIC_DIR` | (auto: `<pkg>/api/static`) | override path to SPA bundle |
 
 ## Console script + module entry
 
 `pyproject.toml`:
 ```toml
 [project.optional-dependencies]
-apiweb = [
+api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.7",
@@ -318,7 +378,7 @@ apiweb = [
 ]
 
 [project.scripts]
-aggregate-server = "aggregate.apiweb.__main__:main"
+aggregate-api = "aggregate.api.__main__:main"
 ```
 
 `__main__.py`:
@@ -332,7 +392,7 @@ def main():
     args = p.parse_args()
     from .config import settings
     uvicorn.run(
-        "aggregate.apiweb.app:create_app",
+        "aggregate.api.app:create_app",
         factory=True,
         host=args.host or settings.host,
         port=args.port or settings.port,
@@ -343,37 +403,58 @@ if __name__ == "__main__":
     main()
 ```
 
+## Static-files mount (same-origin deploy)
+
+`app.py`:
+```python
+from fastapi.staticfiles import StaticFiles
+from importlib.resources import files
+
+def create_app():
+    app = FastAPI(...)
+    install_cors(app, settings.cors_origins)
+    register_routes(app)
+    static_dir = settings.static_dir or files("aggregate.api").joinpath("static")
+    if Path(static_dir).exists():
+        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    return app
+```
+
+`html=True` makes `/` serve `index.html` and falls back to `index.html` for unknown paths (SPA-style). If `static_dir` doesn't exist (no web build present), the mount is skipped and the server is API-only.
+
 ## Verification steps
 
-1. `uv sync --extra apiweb` — pulls FastAPI + uvicorn.
-2. `uv run pytest tests/apiweb/ -v` — backend test suite green.
-3. `uv run aggregate-server --port 8001` then in another shell:
+1. `uv sync --extra api` — pulls FastAPI + uvicorn.
+2. `uv run pytest tests/api/ -v` — backend test suite green.
+3. `uv run aggregate-api --port 8001` then in another shell:
    ```
    curl -s -X POST http://127.0.0.1:8001/v1/objects \
         -H "Content-Type: application/json" \
-        -d '{"decl":"agg Dice dfreq [3] dsev [1:6]"}' | jq
+        -d '{"decl":"agg Dice dfreq [3] dsev [1:6]"}'
    ```
-   → returns id + manifest.
-4. Open `http://127.0.0.1:8001/docs` — Swagger UI renders all routes.
-5. Build a Portfolio, hit `/plot?kind=kappa`, save the PNG, eyeball it.
-6. Force a parse error, confirm the response body is Plan B's `ErrorReport` JSON.
-7. Inspect `audit.db` via `sqlite3 audit.db "SELECT ts, ip, status, decl FROM builds ORDER BY ts DESC LIMIT 5"`.
+   → `{"id": "...", "kind": "agg", "name": "Dice", "cached": false, ...}`.
+4. `curl http://127.0.0.1:8001/v1/objects/{id}/info` → `{"info": {...}}`.
+5. `curl "http://127.0.0.1:8001/v1/objects/{id}/plot?kind=density" -o density.svg` → opens cleanly in browser.
+6. Open `http://127.0.0.1:8001/docs` — Swagger UI renders all routes.
+7. Force a parse error, confirm the response body is Plan B's `ErrorReport` JSON.
+8. CORS smoke: with `AGGAPI_CORS_ORIGINS=http://localhost:5173` set, `curl -i -H 'Origin: http://localhost:5173' http://127.0.0.1:8001/v1/health` includes `access-control-allow-origin`.
+9. Inspect `audit.db` via `sqlite3 audit.db "SELECT ts, ip, status, decl FROM builds ORDER BY ts DESC LIMIT 5"`.
 
-## Test sketch (`tests/apiweb/`)
+## Test sketch (`tests/api/`)
 
 ```python
-# tests/apiweb/conftest.py
+# tests/api/conftest.py
 import pytest
 from fastapi.testclient import TestClient
-from aggregate.apiweb.app import create_app
+from aggregate.api.app import create_app
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGGWEB_AUDIT_DB", str(tmp_path / "audit.db"))
-    monkeypatch.setenv("AGGWEB_LOG2_CAP", "20")
+    monkeypatch.setenv("AGGAPI_AUDIT_DB", str(tmp_path / "audit.db"))
+    monkeypatch.setenv("AGGAPI_LOG2_CAP", "20")
     return TestClient(create_app())
 
-# tests/apiweb/test_objects.py
+# tests/api/test_objects.py
 def test_build_dice(client):
     r = client.post("/v1/objects", json={"decl": "agg Dice dfreq [3] dsev [1:6]"})
     assert r.status_code == 200
@@ -389,16 +470,11 @@ def test_build_is_idempotent(client):
     assert r1.json()["id"] == r2.json()["id"]
     assert r2.json()["cached"] is True
 
-def test_log2_cap_enforced(client):
-    r = client.post("/v1/objects", json={"decl": "agg X dfreq [3] dsev [1:6]", "log2": 99})
-    assert r.status_code == 422
-
-def test_parse_error_returns_report(client):
-    r = client.post("/v1/objects", json={"decl": "agg X 100 claims mixedd poisson"})
-    assert r.status_code == 422
-    detail = r.json()["detail"]
-    assert "line" in detail
-    assert detail["got"] is not None
+def test_info_endpoint(client):
+    r = client.post("/v1/objects", json={"decl": "agg Dice dfreq [3] dsev [1:6]"})
+    oid = r.json()["id"]
+    r2 = client.get(f"/v1/objects/{oid}/info")
+    assert "info" in r2.json()
 
 def test_density_df_paginated(client):
     r = client.post("/v1/objects", json={"decl": "agg X dfreq [3] dsev [1:6]"})
@@ -408,34 +484,51 @@ def test_density_df_paginated(client):
     assert body["columns"] == ["loss", "p_total"]
     assert len(body["rows"]) <= 20
 
-def test_plot_png(client):
+def test_plot_svg_default(client):
     r = client.post("/v1/objects", json={"decl": "agg X dfreq [3] dsev [1:6]"})
     oid = r.json()["id"]
     r2 = client.get(f"/v1/objects/{oid}/plot", params={"kind": "density"})
     assert r2.status_code == 200
+    assert r2.headers["content-type"].startswith("image/svg+xml")
+    assert r2.content.lstrip().startswith(b"<?xml") or r2.content.lstrip().startswith(b"<svg")
+
+def test_plot_png_explicit(client):
+    r = client.post("/v1/objects", json={"decl": "agg X dfreq [3] dsev [1:6]"})
+    oid = r.json()["id"]
+    r2 = client.get(f"/v1/objects/{oid}/plot", params={"kind": "density", "format": "png"})
     assert r2.headers["content-type"] == "image/png"
     assert r2.content[:8] == b"\x89PNG\r\n\x1a\n"
 
-# tests/apiweb/test_decl.py
-def test_complete_returns_keywords(client):
-    r = client.post("/v1/decl/complete", json={"decl": "agg X 100 ", "cursor": 10})
-    assert r.status_code == 200
-    labels = [c["label"] for c in r.json()["completions"]]
-    assert any("claims" in lab for lab in labels)
+def test_parse_error_returns_report(client):
+    r = client.post("/v1/objects", json={"decl": "agg X 100 claims mixedd poisson"})
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert "line" in detail
 
+# tests/api/test_cors.py
+def test_cors_headers_present(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGGAPI_AUDIT_DB", str(tmp_path / "audit.db"))
+    monkeypatch.setenv("AGGAPI_CORS_ORIGINS", "http://localhost:5173")
+    from aggregate.api.app import create_app
+    from fastapi.testclient import TestClient
+    client = TestClient(create_app())
+    r = client.get("/v1/health", headers={"Origin": "http://localhost:5173"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+# tests/api/test_decl.py
 def test_grammar_serves_lark(client):
     r = client.get("/v1/decl/grammar")
     assert r.status_code == 200
     assert "start:" in r.text or "%import" in r.text
 
-# tests/apiweb/test_examples.py
+# tests/api/test_examples.py
 def test_examples_grouped_by_category(client):
     r = client.get("/v1/examples")
     cats = r.json()["categories"]
     letters = {c["letter"] for c in cats}
     assert "A" in letters and "B" in letters
 
-# tests/apiweb/test_audit.py
+# tests/api/test_audit.py
 def test_audit_row_written(client, tmp_path):
     client.post("/v1/objects", json={"decl": "agg X dfreq [3] dsev [1:6]"})
     import sqlite3
@@ -446,43 +539,43 @@ def test_audit_row_written(client, tmp_path):
 
 ## Open knobs for execution
 
-- **DecL canonicalization for hashing.** Plan C's `object_id` strips comments and trailing whitespace. Stronger normalization (whitespace-insensitive via tree round-trip) would catch more dedup opportunities but adds parser cost on every build. Default to "strip comments and trim" unless you want the stronger form.
-- **Identifier completions.** Plan C ships keyword/terminal completions only. Pulling in knowledge-base names (severities, agg references) needs a list-knowledge-base accessor and a "did you mean an existing sev?" join. Flagged as v1.1.
-- **`pydantic-settings` as a dependency.** Optional; if you'd rather avoid, swap for a 10-line hand-rolled env reader. Saves one dep at cost of slightly more code.
-- **Plot `kind=kappa` rendering.** Builds a fresh matplotlib figure from `density_df[['loss', 'exeqa_*']]`. Confirm the style (line plot, single axis, log-x?) — I'd default to linear-x, color cycle for lines, legend on right.
-- **Pricing endpoint surface.** I've sketched `pricing_at` (distortion-based) and `price_ccoc` (constant CoC). The request body fields are union'd; the server picks the right method based on which fields are present. Confirm or split into two endpoints.
-- **Build cancellation.** The threading.Semaphore + timeout pattern can't truly cancel CPU-bound work. Acceptable for trusted team but documented. If you want hard cancellation, the upgrade path is subprocess-per-build — significantly more complex.
+- **DecL canonicalization for hashing.** Default to "strip comments and trim". Stronger normalization (whitespace-insensitive via tree round-trip) is a future enhancement.
+- **Identifier completions.** Plan C ships keyword/terminal completions only. Knowledge-base identifier completions deferred to v1.1.
+- **Plot `kind=kappa` rendering.** Builds a fresh matplotlib figure from `density_df[['loss', 'exeqa_*']]`. Default: linear-x, color cycle for lines, legend on right.
+- **Pricing endpoint surface.** `pricing_at` (distortion-based) and `price_ccoc` (constant CoC) union'd into one request; server picks based on which fields are present.
+- **Build cancellation.** Threading + timeout can't truly cancel CPU-bound work. Acceptable for trusted team. Hard cancellation requires subprocess-per-build (out of scope).
+- **SVG glyph embedding.** Default-on, slightly larger payload but no font surprises. Switch off via `mpl.rcParams['svg.fonttype'] = 'none'` if file size becomes a concern.
 
 ## Out of scope
 
-- Authentication / authorization. The team-install gets `caddy reverse_proxy` + basic auth; built-in auth deferred.
+- Authentication / authorization. The team-install gets `caddy reverse_proxy` + basic auth.
 - Multi-tenant cache isolation.
 - Redis or disk-backed cache.
-- Plot JSON delivery (deferred per "scope creep" call in earlier turn).
+- Plot JSON delivery.
 - WebSocket / streaming endpoints.
-- An admin route for the audit log (read via SQL CLI for now).
+- An admin route for the audit log.
 - Bulk build endpoint.
-- "Open in Jupyter" affordance.
 
 ## File-by-file checklist (for execution)
 
-1. Add `[project.optional-dependencies] apiweb` and `[project.scripts] aggregate-server` to `pyproject.toml`.
-2. `uv sync --extra apiweb` — pull deps.
-3. Create the file skeleton under `src/aggregate/apiweb/` (empty stubs).
-4. Implement `config.py` and `cache.py` — pure data, easy to test in isolation.
-5. Implement `audit.py` — SQLite schema + insert + simple read.
-6. Implement `models.py` — Pydantic request/response shapes.
-7. Implement `serializers.py` — DataFrame → records, info dict cleanup.
-8. Implement `examples.py` — parse test_suite.agg.
-9. Implement `completion.py` — Lark interactive parser wrapping.
-10. Implement `plotting.py` — kind dispatch + `style.context()` integration.
-11. Implement `pricing.py` — `pricing_at` / `price_ccoc` dispatch.
-12. Implement `routes/objects.py`, `routes/decl.py`, `routes/examples.py`, `routes/meta.py`.
-13. Implement `app.py` — `create_app()` factory, route mounts, exception handlers.
-14. Implement `__main__.py` — uvicorn launcher.
-15. Author tests under `tests/apiweb/`. Run `uv run pytest tests/apiweb/ -v`.
-16. Manual smoke test per "Verification steps" 3–7.
+1. Add `[project.optional-dependencies] api` and `[project.scripts] aggregate-api` to `pyproject.toml`.
+2. `uv sync --extra api` — pull deps.
+3. Create the file skeleton under `src/aggregate/api/`.
+4. Implement `config.py` and `cache.py`.
+5. Implement `audit.py`.
+6. Implement `cors.py`.
+7. Implement `models.py`.
+8. Implement `serializers.py`.
+9. Implement `examples.py`.
+10. Implement `completion.py`.
+11. Implement `plotting.py` (SVG + PNG paths).
+12. Implement `pricing.py`.
+13. Implement `routes/objects.py`, `routes/decl.py`, `routes/examples.py`, `routes/meta.py`.
+14. Implement `app.py` — `create_app()` factory, CORS, static mount (conditional), exception handlers.
+15. Implement `__main__.py` — uvicorn launcher.
+16. Tests under `tests/api/`. `uv run pytest tests/api/ -v`.
+17. Manual smoke test per "Verification steps".
 
 ## Recovery / rollback
 
-`src/aggregate/apiweb/` and `tests/apiweb/` are net-new and can be deleted wholesale. The only edit to existing code is the `pyproject.toml` block; revert that to restore the prior state. No changes to library modules.
+`src/aggregate/api/` and `tests/api/` are net-new and can be deleted wholesale. The only edit to existing code is the `pyproject.toml` block; revert that to restore the prior state. No changes to library modules.

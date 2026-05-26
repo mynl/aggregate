@@ -50,6 +50,13 @@
 #   .\doc-test-uv.ps1 -Clean -Lenient          # typical first-pass after a big
 #                                              # refactor — shows everything
 #   .\doc-test-uv.ps1 -Clean -PythonVersion 3.14
+#   .\doc-test-uv.ps1 -Text                    # plain-text build, output to
+#                                              # docs\_build\text (handy for
+#                                              # cross-branch numerical diffs)
+#   .\doc-test-uv.ps1 -Text -Lenient `
+#       -OutputDir T:\doc-diff\agg-doc-diff\text
+#                                              # text build into a custom dir,
+#                                              # warnings non-fatal
 #
 # When the build finishes, the script prints the command to serve the result
 # locally — just copy-paste.
@@ -83,11 +90,36 @@ param(
     # expect lots of broken cross-references and stale examples.
     [switch]$Lenient,
 
+    # Build the plain-text builder (``sphinx-build -b text``) instead of
+    # HTML. Useful for diffing the rendered docs across branches: text
+    # output is one .txt per page, no styling/IDs, so cross-version diffs
+    # surface real numerical / content changes without HTML noise. If
+    # -OutputDir isn't passed explicitly, defaults to ``docs\_build\text``
+    # (parallel to the HTML default).
+    [switch]$Text,
+
     # Port to suggest when printing the local-serve command at the end.
     [int]$Port = 19333
 )
 
 $ErrorActionPreference = 'Stop'
+
+# ---- Builder selection ------------------------------------------------------
+# Pick the Sphinx builder and the build-output / doctrees-cache directories.
+# When -Text is passed and the caller did NOT also pass -OutputDir, switch
+# the default output dir to ``docs\_build\text`` so a text build doesn't
+# overwrite the HTML build's directory. Doctrees caches are kept separate
+# per builder for the same reason (no cross-builder contamination).
+if ($Text) {
+    $builder = 'text'
+    if (-not $PSBoundParameters.ContainsKey('OutputDir')) {
+        $OutputDir = "docs\_build\text"
+    }
+    $doctreesDir = "docs\_build\doctrees-text"
+} else {
+    $builder = 'html'
+    $doctreesDir = "docs\_build\doctrees"
+}
 
 # ---- uv environment knobs ---------------------------------------------------
 # Per CLAUDE.md: the repo lives on a path where uv's default hardlink mode
@@ -103,7 +135,7 @@ $env:UV_PROJECT_ENVIRONMENT = ".doc-venv"
 # ---- Optional clean --------------------------------------------------------
 if ($Clean) {
     Write-Host "Cleaning build artifacts..." -ForegroundColor Cyan
-    foreach ($p in @($OutputDir, "docs\_build\doctrees")) {
+    foreach ($p in @($OutputDir, $doctreesDir)) {
         if (Test-Path $p) {
             Remove-Item -Path $p -Recurse -Force
             Write-Host "  removed $p"
@@ -150,8 +182,8 @@ if (-not $NoSync) {
 # the directive has no global ``okexcept`` config knob. jupyter-sphinx
 # already renders cell errors inline by default, so nothing extra needed
 # there.
-$sphinxArgs = @('-T', '-b', 'html',
-                '-d', 'docs\_build\doctrees',
+$sphinxArgs = @('-T', '-b', $builder,
+                '-d', $doctreesDir,
                 '-D', 'language=en',
                 'docs', $OutputDir)
 if ($Lenient) {
@@ -159,7 +191,8 @@ if ($Lenient) {
     $env:AGG_DOCS_LENIENT = "1"
 }
 
-Write-Host "Building HTML documentation..." -ForegroundColor Cyan
+$builderLabel = if ($Text) { "text" } else { "HTML" }
+Write-Host "Building $builderLabel documentation..." -ForegroundColor Cyan
 uv run sphinx-build @sphinxArgs
 $sphinxExit = $LASTEXITCODE
 
@@ -167,16 +200,18 @@ if ($sphinxExit -ne 0) {
     if ($Lenient) {
         Write-Warning "Sphinx reported warnings/errors (exit $sphinxExit); continuing because -Lenient is set."
     } else {
-        Write-Error "HTML build failed."
+        Write-Error "$builderLabel build failed."
         exit $sphinxExit
     }
 }
 
 # ---- Done -------------------------------------------------------------------
-Write-Host "`nHTML documentation built successfully in: $OutputDir" -ForegroundColor Green
-Write-Host ""
-Write-Host "To serve locally and open in a browser:" -ForegroundColor Cyan
-Write-Host "  uv run python -m http.server $Port --directory $OutputDir"
-Write-Host "  Start-Process http://localhost:$Port"
-Write-Host ""
-Write-Host "(Ctrl-C in the serving terminal to stop the server.)"
+Write-Host "`n$builderLabel documentation built successfully in: $OutputDir" -ForegroundColor Green
+if (-not $Text) {
+    Write-Host ""
+    Write-Host "To serve locally and open in a browser:" -ForegroundColor Cyan
+    Write-Host "  uv run python -m http.server $Port --directory $OutputDir"
+    Write-Host "  Start-Process http://localhost:$Port"
+    Write-Host ""
+    Write-Host "(Ctrl-C in the serving terminal to stop the server.)"
+}

@@ -184,7 +184,7 @@ def test_power():
     _check_endpoints(d)
 
 
-def test_minimum():
+def test_minimum_kwarg():
     d1 = Distortion.ph(0.5)
     d2 = Distortion.wang(0.3)
     d = Distortion('minimum', distortions=[d1, d2])
@@ -192,12 +192,31 @@ def test_minimum():
     _check_endpoints(d)
 
 
-def test_mixture():
+def test_minimum_positional():
+    """The distortions list may also be passed positionally."""
+    d1 = Distortion.ph(0.5)
+    d2 = Distortion.wang(0.3)
+    d = Distortion('minimum', [d1, d2])
+    assert len(d.distortions) == 2
+    _check_endpoints(d)
+
+
+def test_mixture_kwarg():
     d1 = Distortion.ph(0.5)
     d2 = Distortion.wang(0.3)
     d = Distortion('mixture', distortions=[d1, d2], wts=[0.5, 0.5])
     assert len(d.distortions) == 2
     assert np.allclose(d.wts, [0.5, 0.5])
+    _check_endpoints(d)
+
+
+def test_mixture_positional():
+    """The distortions list may be positional; ``wts`` is keyword-only."""
+    d1 = Distortion.ph(0.5)
+    d2 = Distortion.wang(0.3)
+    d = Distortion('mixture', [d1, d2], wts=[0.6, 0.4])
+    assert len(d.distortions) == 2
+    assert np.allclose(d.wts, [0.6, 0.4])
     _check_endpoints(d)
 
 
@@ -244,6 +263,67 @@ def test_both_positional_and_natural_kwarg():
 def test_roe_aliases_ccoc():
     d = Distortion('roe', r=0.1)
     assert isinstance(d, CCoCDistortion)
+
+
+# --- DecL combo distortions (minimum / mixture via dist.X references) -----
+
+def test_decl_minimum_combo():
+    """DecL: ``dist MIN minimum dist.A dist.B`` resolves children via the
+    knowledge base and builds a MinimumDistortion."""
+    from aggregate import build
+    build('dist tcc ccoc .25')
+    build('dist tdu dual 2.5')
+    m = build('dist tMIN minimum dist.tcc dist.tdu')
+    from aggregate.spectral import MinimumDistortion
+    assert isinstance(m, MinimumDistortion)
+    assert len(m.distortions) == 2
+
+
+def test_decl_mixture_combo_with_weights():
+    """DecL: ``dist MIX mixture dist.A dist.B wts [w1 w2]``."""
+    from aggregate import build
+    build('dist tcc2 ccoc .25')
+    build('dist tdu2 dual 2.5')
+    mx = build('dist tMIX mixture dist.tcc2 dist.tdu2 wts [0.6 0.4]')
+    from aggregate.spectral import MixtureDistortion
+    assert isinstance(mx, MixtureDistortion)
+    assert np.allclose(mx.wts, [0.6, 0.4])
+
+
+def test_decl_mixture_combo_uniform_default():
+    """DecL: omitting the ``wts`` clause yields uniform weighting."""
+    from aggregate import build
+    build('dist tcc3 ccoc .25')
+    build('dist tdu3 dual 2.5')
+    build('dist tph3 ph 0.7')
+    mx = build('dist tMIX3 mixture dist.tcc3 dist.tdu3 dist.tph3')
+    from aggregate.spectral import MixtureDistortion
+    assert isinstance(mx, MixtureDistortion)
+    assert len(mx.distortions) == 3
+    assert np.allclose(mx.wts, [1/3, 1/3, 1/3])
+
+
+def test_decl_combo_full_prefix():
+    """The full ``distortion.`` prefix also works alongside the short ``dist.``."""
+    from aggregate import build
+    build('dist tcc4 ccoc .25')
+    build('dist tdu4 dual 2.5')
+    m = build('dist tMIN4 minimum distortion.tcc4 distortion.tdu4')
+    from aggregate.spectral import MinimumDistortion
+    assert isinstance(m, MinimumDistortion)
+
+
+def test_decl_combo_parsed_program_has_object():
+    """Regression: ParsedProgram.object is set for combo distortions
+    just like for the scalar forms."""
+    from aggregate import build
+    build('dist tcc5 ccoc .25')
+    build('dist tdu5 dual 2.5')
+    out = build.build_many('dist tMIN5 minimum dist.tcc5 dist.tdu5')
+    assert len(out) == 1
+    assert out[0].object is not None
+    from aggregate.spectral import MinimumDistortion
+    assert isinstance(out[0].object, MinimumDistortion)
 
 
 # --- property setters re-trigger _build ------------------------------------

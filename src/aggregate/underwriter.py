@@ -312,16 +312,37 @@ class Underwriter(object):
 
     def __getitem__(self, item):
         """
-        handles self[item]
+        Look up a parsed program in the knowledge base.
 
-        item = 'Name' for all objects called Name
-        item = ("kind", "name") for object of kind kind called name
+        Pure lookup: returns the stored :class:`ParsedProgram` recipe.
+        **The ``object`` field is always ``None`` on the returned
+        ParsedProgram** — :meth:`__getitem__` does not construct the
+        object. Use :meth:`__call__` / :meth:`build` /
+        :meth:`build_many` (which run :meth:`_factory` after the lookup)
+        when you want a live Aggregate / Severity / Portfolio /
+        Distortion instance.
 
-        subscriptable: try user portfolios, b/in portfolios, line, severity
-        to access specifically use severity or line methods
+        Parameters
+        ----------
+        item : str or tuple
+            ``'name'`` looks up by name across all kinds (must be unique
+            across kinds, else ``KeyError``). ``(kind, name)`` is the
+            unambiguous form.
 
-        :param item:
-        :return:
+        Returns
+        -------
+        ParsedProgram
+            With ``kind`` / ``name`` / ``spec`` / ``program`` populated
+            from the knowledge frame and ``object=None``.
+
+        Raises
+        ------
+        KeyError
+            If the lookup matches zero or more than one entry.
+
+        See Also
+        --------
+        __call__ : the user-facing entry that also constructs the object.
         """
         # much less fancy version:
         if not isinstance(item, (str, tuple)):
@@ -702,6 +723,76 @@ class Underwriter(object):
         return answer.object
 
     def __call__(self, *args, **kwargs):
+        """
+        Build an object from a DecL program or a known name.
+
+        Convenience alias for :meth:`build`: ``build(program)`` is the
+        canonical way to turn a DecL string into a single live
+        Aggregate / Severity / Portfolio / Distortion. ``program`` can
+        be either:
+
+        * a DecL source string (parsed, added to the knowledge base,
+          constructed); or
+        * the bare name of an entry already in the knowledge base
+          (looked up, constructed; the original DecL source is *not*
+          re-parsed).
+
+        The lookup branch and the parse branch both end by calling
+        :meth:`_factory` on each :class:`ParsedProgram`, so the
+        returned object is always live (never ``None``).
+
+        Three access patterns, contrasted
+        ---------------------------------
+
+        Given::
+
+            from aggregate import build
+            build('dist cc1 ccoc .25')        # registers cc1 in knowledge
+
+        1. **Build by program text** — parse, register, construct,
+           return the object::
+
+                cc1 = build('dist cc1m ccoc .25')
+                assert cc1 is not None                # the Distortion
+
+        2. **Knowledge lookup, no construction** — returns the recipe
+           only; ``object`` is ``None`` because :meth:`__getitem__`
+           does not run the factory::
+
+                entry = build['cc1m']                 # ParsedProgram
+                assert entry.object is None           # *by design*
+                assert entry.spec == {'name': 'ccoc', 'r': 0.25}
+
+        3. **Build by name** — lookup in the knowledge **and**
+           construct, just like (1) but with no parsing::
+
+                cc1 = build('cc1')                    # the Distortion
+                assert cc1 is not None
+
+        :meth:`build_many` is the batched form of (1) / (3); it returns
+        a list of :class:`ParsedProgram` and *does* populate
+        ``object`` on each (factory runs as part of the build).
+
+        Rationale
+        ---------
+
+        The knowledge base stores DecL specs (small, picklable), not
+        live objects. Objects are constructed on demand for two
+        reasons: (a) Portfolios need an :class:`Underwriter` reference
+        which may differ between sessions, and (b) each ``build('cc1')``
+        returns a *fresh* instance so calibration / ``update()``
+        mutations don't bleed across callers.
+
+        Parameters
+        ----------
+        *args, **kwargs
+            Forwarded to :meth:`build`.
+
+        Returns
+        -------
+        Aggregate, Severity, Portfolio, or Distortion
+            The single constructed object.
+        """
         return self.build(*args, **kwargs)
 
     def interpret_file(self, filename=None, *, where=''):

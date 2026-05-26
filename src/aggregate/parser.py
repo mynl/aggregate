@@ -263,6 +263,15 @@ class UnderwritingTransformer(Transformer):
     def BUILTIN_SEV(self, tok):
         return str(tok)
 
+    def BUILTIN_DIST(self, tok):
+        """Normalise ``dist.X`` and ``distortion.X`` to ``distortion.X``
+        so :meth:`Underwriter._safe_lookup` finds the entry under its
+        canonical kind."""
+        s = str(tok)
+        if s.startswith('dist.'):
+            s = 'distortion.' + s[len('dist.'):]
+        return s
+
     def FREQ(self, tok):
         return str(tok)
 
@@ -293,6 +302,48 @@ class UnderwritingTransformer(Transformer):
         _, name, kind_id, shape, df = c
         spec = _distortion_spec(kind_id, shape, df)
         return ("distortion", name, spec)
+
+    def buildin_dist_list_one(self, c):
+        return [c[0]]
+
+    def buildin_dist_list_cons(self, c):
+        lst, tok = c
+        lst.append(tok)
+        return lst
+
+    def _resolve_combo_children(self, ids):
+        """Resolve a list of ``distortion.X`` ids to actual Distortion
+        instances by looking each up in the knowledge and constructing it
+        from its stored spec."""
+        # Local import: spectral imports nothing parser-related, but the
+        # parser is imported during aggregate package init before
+        # ``Distortion`` is bound at module level. Inline is safe.
+        from .spectral import Distortion
+        children = []
+        for buildinid in ids:
+            spec = self.safe_lookup(buildinid)
+            children.append(Distortion(**spec))
+        return children
+
+    def distortion_out_combo(self, c):
+        _, name, kind_id, child_ids = c
+        if kind_id not in ('minimum', 'mixture'):
+            raise ValueError(
+                f"DecL: '{kind_id}' does not take a list of distortion "
+                f"references; only 'minimum' and 'mixture' do")
+        children = self._resolve_combo_children(child_ids)
+        return ("distortion", name,
+                {"name": kind_id, "distortions": children})
+
+    def distortion_out_combo_wtd(self, c):
+        _, name, kind_id, child_ids, _wts_kw, wts = c
+        if kind_id != 'mixture':
+            raise ValueError(
+                f"DecL: weights are only meaningful for 'mixture', not "
+                f"{kind_id!r}")
+        children = self._resolve_combo_children(child_ids)
+        return ("distortion", name,
+                {"name": kind_id, "distortions": children, "wts": wts})
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):

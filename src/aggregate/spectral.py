@@ -1748,7 +1748,10 @@ class MinimumDistortion(Distortion):
     documented = False
     pricing_ok = False
 
-    def __init__(self, name='minimum', *, distortions, display_name=''):
+    def __init__(self, name='minimum', distortions=None, *, display_name=''):
+        if distortions is None:
+            raise TypeError(
+                'MinimumDistortion requires a non-empty `distortions` list')
         self._name = 'minimum' if name == 'roe' else name
         self._distortions = list(distortions)
         self.shape = self._distortions  # back-compat: legacy code reads .shape
@@ -1815,8 +1818,11 @@ class MixtureDistortion(Distortion):
     documented = False
     pricing_ok = False
 
-    def __init__(self, name='mixture', *, distortions, wts=None,
+    def __init__(self, name='mixture', distortions=None, *, wts=None,
                  display_name=''):
+        if distortions is None:
+            raise TypeError(
+                'MixtureDistortion requires a non-empty `distortions` list')
         self._name = 'mixture' if name == 'roe' else name
         self._distortions = list(distortions)
         if wts is None:

@@ -29,6 +29,11 @@ answer: sev_out          -> answer_sev
 
 distortion_out: DISTORTION name ID expr                       -> distortion_out_short
               | DISTORTION name ID expr "[" numberl "]"       -> distortion_out_long
+              | DISTORTION name ID buildin_dist_list                                  -> distortion_out_combo
+              | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]"          -> distortion_out_combo_wtd
+
+buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
+                 | BUILTIN_DIST                      -> buildin_dist_list_one
 
 // ======================================================================
 // Portfolio
@@ -268,11 +273,12 @@ DISTORTION.2: "distortion" | "dist"
 FREQ.2: "binomial" | "pascal" | "poisson" | "bernoulli" | "geometric"
       | "fixed" | "neymanA" | "neymana" | "neyman" | "logarithmic" | "negbin"
 
-// agg.X / sev.X / note{...} — priority 3 outranks the AGG / SEV / ID
-// alternatives that share their prefix.
-BUILTIN_AGG.3: /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
-BUILTIN_SEV.3: /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
-NOTE.3:        /note\{[^}]*\}/
+// agg.X / sev.X / dist(ortion).X / note{...} — priority 3 outranks the
+// AGG / SEV / DISTORTION / ID alternatives that share their prefix.
+BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+NOTE.3:         /note\{[^}]*\}/
 
 // NUMBER absorbs an optional leading minus so `-3` is one token rather than
 // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
@@ -281,8 +287,10 @@ NUMBER.2: /-?(\d+\.?\d*|\d*\.\d+)([eE][+\-]?\d+)?%?|-?inf/
 // ID is the catch-all identifier — priority 1 (default).
 // Two negative lookaheads at the start of the match make the grammar
 // unambiguous:
-//   1. (?!agg\.|sev\.)         — anything starting with agg. or sev. is
-//                                BUILTIN_AGG / BUILTIN_SEV territory.
+//   1. (?!agg\.|sev\.|dist(ortion)?\.) — anything starting with agg.,
+//                                sev., dist. or distortion. is
+//                                BUILTIN_AGG / BUILTIN_SEV / BUILTIN_DIST
+//                                territory.
 //   2. (?!keyword(?![namechar])) — reject a keyword standing alone (i.e.,
 //                                followed by a non-name character or end
 //                                of input). Names containing a keyword as
@@ -294,7 +302,7 @@ NUMBER.2: /-?(\d+\.?\d*|\d*\.\d+)([eE][+\-]?\d+)?%?|-?inf/
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|po|poisson|port|prem|premium|rate|sev|so|splice|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|po|poisson|port|prem|premium|rate|sev|so|splice|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

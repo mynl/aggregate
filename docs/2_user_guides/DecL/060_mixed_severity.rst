@@ -51,7 +51,7 @@ The weights adjust claim counts for each mixture component when exposures are gi
                 'cv [0.75 1.0 1.25 1.5 2] '
                 'wts [0.4, 0.25, 0.15, 0.1, 0.1] '
                 'poisson'
-                , bs=1/2, approximation='exact')
+                , bs=1/2)
     qd(a01)
 
 Mixed severity with Poisson frequency is the same as the sum of five independent components. The ``report_df`` shows the mixture details.
@@ -73,7 +73,7 @@ This aggregate can also be built as a :class:`Portfolio`.
             'agg Unit3 15 loss 5000 xs 0 sev lognorm 50 cv 1.25 poisson '
             'agg Unit4 10 loss 5000 xs 0 sev lognorm 75 cv 1.50 poisson '
             'agg Unit5 10 loss 5000 xs 0 sev lognorm 100 cv 2.00 poisson '
-        , bs=1/2, approximation='exact')
+        , bs=1/2)
     qd(a02)
 
 Actual frequency equals total frequency times weight. Setting ``wts=5`` results in equal weights, here 0.2.
@@ -88,7 +88,7 @@ Actual frequency equals total frequency times weight. Setting ``wts=5`` results 
                 'cv [0.75 1.0 1.25 1.5 2] '
                 ' wts=5 '
                 'poisson'
-                , bs=1/2, approximation='exact')
+                , bs=1/2)
     qd(a03)
 
 Missing weights are set to 1, resulting in five times loss. This behavior is generally not what you want!
@@ -102,7 +102,7 @@ Missing weights are set to 1, resulting in five times loss. This behavior is gen
                 'sev lognorm [10 20 50 75 100] '
                 'cv [0.75 1.0 1.25 1.5 2] '
                 'poisson'
-                , bs=1, approximation='exact')
+                , bs=1)
     qd(a04)
 
 
@@ -118,7 +118,7 @@ If exposures are determined via losses (directly or using premium and loss ratio
                  'cv [0.75 1.0 1.25 1.5 2] '
                  'wts [0.4, 0.25, 0.15, 0.1, 0.1] '
                  'poisson'
-                 , bs=1/2, approximation='exact')
+                 , bs=1/2)
     qd(a01e)
     qd(a01e.stats_df.drop(columns=['mixed', 'empirical', 'error']))
 
@@ -285,12 +285,12 @@ uncertainty CV around 25%. Building with
                 '500 claims '
                 '500000 xs 0 sev sev.COMMAUTO '
                 'poisson'
-                , approximation='exact')
+                )
     a09 = build('agg DecL:09 '
                 '500 claims '
                 '500000 xs 0 sev sev.COMMAUTO '
                 'mixed gamma 0.25'
-                , approximation='exact')
+                )
     qd(a08)
     qd(a09)
 

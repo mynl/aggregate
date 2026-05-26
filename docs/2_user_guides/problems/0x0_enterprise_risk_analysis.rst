@@ -86,7 +86,7 @@ The 250-year cat PML is printed last, to compare with the 25M program.
              'agg PropertyC 2.0 premium at 63% lr '
                  '150 xs 0 '
                  'sev 3 * pareto 2.375 - 3 '
-                 'poisson ', bs=1/128, approximation='exact')
+                 'poisson ', bs=1/128)
     qd(abcd)
     mv(abcd)
     print(abcd['PropertyC'].q(0.996))
@@ -112,7 +112,7 @@ Net Portfolio
                  '150 xs 0 '
                  'sev 3 * pareto 2.375 - 3 '
                  'occurrence net of 24 xs 1 '
-                 'poisson ', bs=1/128, approximation='exact')
+                 'poisson ', bs=1/128)
     qd(abcd_net)
     qd(abcd_net.est_sd)
 
@@ -137,7 +137,7 @@ Ceded Portfolio
                  '150 xs 0 '
                  'sev 3 * pareto 2.375 - 3 '
                  'occurrence ceded to 24 xs 1 '
-                 'poisson ', bs=1/128, approximation='exact')
+                 'poisson ', bs=1/128)
     qd(abcd_ceded)
     qd(abcd_ceded.est_sd)
 
@@ -145,6 +145,7 @@ Reinsurance Summary
 """"""""""""""""""""""
 
 The bottom table shows expected losses, counts, severity, loss ratios and margins
+implicit in the given reinsurance structure, pricing, and the gross stochastic model.
 implicit in the given reinsurance structure, pricing, and the gross stochastic model.
 The non-cat property reinsurance has the highest ceded loss ratio and the cat program
 the lowest.

@@ -5,17 +5,80 @@
 # containing dir.
 #
 
-import matplotlib.pyplot as plt
 import sys
 import os
+# for knobble fonts
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import pandas as pd
 
 # allow RTD to find aggregate
-sys.path.insert(0, os.path.abspath('.'))
+# sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../src'))
 import aggregate as agg
 
+# manual version from Agg.0.30.1
 # color graphs
-agg.knobble_fonts(True)
+FIG_W = 3.5
+FIG_H = 2.45
+FONT_SIZE = 9
+LEGEND_FONT = 'x-small'
+# see https://matplotlib.org/stable/gallery/color/named_colors.html
+PLOT_FACE_COLOR = 'lightsteelblue'
+FIGURE_BG_COLOR = 'aliceblue'
+VALIDATION_EPS = 1e-4
+RECOMMEND_P = 0.99999
+def knobble_fonts(color=False):
+    # reset everything
+    plt.rcdefaults()
+
+    # this sets a much smaller base fontsize
+    # everything scales off font size
+    plt.rcParams['font.size'] = FONT_SIZE
+
+    # mpl default is medium
+    plt.rcParams['legend.fontsize'] = LEGEND_FONT
+
+    # color set up
+    if color:
+        plt.rcParams["axes.facecolor"] = PLOT_FACE_COLOR
+        # note plt.rc lets you set multiple related properties at once:
+        plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
+        plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
+        # smaller figures
+        plt.rcParams['figure.dpi'] = 100
+    else:
+        # graphics defaults - better res graphics
+        plt.rcParams['figure.dpi'] = 300
+        plt.rc('legend', fc="white", ec="white")
+        default_colors = [(0,0,0)]
+        default_ls = ['solid', 'dashed', 'dotted', 'dashdot']
+        props = []
+        cc = [i[1] for i in product(default_ls, default_colors)]
+        lsc = [i[0] for i in product(default_ls, default_colors)]
+        props.append(cycler('color', cc))
+        props.append(cycler('linestyle', lsc))
+        # combine all cyclers
+        cprops = props[0]
+        for c in props[1:]:
+            cprops += c
+        mpl.rcParams['axes.prop_cycle'] = cycler(cprops)
+
+    # fonts: add some better fonts as earlier defaults
+    mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif']
+    # 'Nirmala UI' has poor glyph coverage, removed as an option
+    mpl.rcParams['font.sans-serif'] = ['Myriad Pro', 'Segoe UI', 'DejaVu Sans']
+    mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono']
+    mpl.rcParams['font.family'] = 'serif'
+    # this matches html output better
+    # mpl.rcParams['font.family'] = 'sans-serif'
+    # much nicer math font, default is dejavusans
+    mpl.rcParams['mathtext.fontset'] = 'stixsans'
+    pd.options.display.width = 120
+
+# actually run
+knobble_fonts(True)
+
 
 # graphics defaults - better res graphics
 plt.rcParams['figure.dpi'] = 300
@@ -28,6 +91,25 @@ author = agg.__author__
 # generally want True, so warning to be an error
 # helpful in debugging to set equal to False
 ipython_warning_is_error = True
+
+# Lenient build mode: when AGG_DOCS_LENIENT is set in the environment
+# (doc-test-uv.ps1 -Lenient does this), make the IPython sphinx directive
+# permissive — exceptions in ``.. ipython::`` blocks render as inline
+# tracebacks rather than aborting the build, and warnings stop being
+# promoted to errors. This is the IPython-directive analogue of
+# nbsphinx_allow_errors=True (which -Lenient also passes via -D).
+if os.environ.get('AGG_DOCS_LENIENT'):
+    ipython_warning_is_error = False
+    try:
+        from IPython.sphinxext.ipython_directive import IPythonDirective
+        _orig_ipython_run = IPythonDirective.run
+        def _lenient_ipython_run(self):
+            self.options['okexcept'] = True
+            self.options['okwarning'] = True
+            return _orig_ipython_run(self)
+        IPythonDirective.run = _lenient_ipython_run
+    except ImportError:
+        pass
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

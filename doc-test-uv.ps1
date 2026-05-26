@@ -143,14 +143,20 @@ if (-not $NoSync) {
 #
 # -Lenient prepends `--keep-going` (collect all warnings, don't stop at the
 # first) and `-D nbsphinx_allow_errors=1` (notebook cell exceptions render
-# inline instead of aborting). jupyter-sphinx already renders cell errors
-# inline by default, so nothing extra needed there.
+# inline instead of aborting). It also sets the AGG_DOCS_LENIENT env var,
+# which docs/conf.py reads to monkey-patch the IPython sphinx directive
+# (``.. ipython::`` blocks) into permissive mode — exceptions in those
+# blocks render as inline tracebacks instead of aborting the build, since
+# the directive has no global ``okexcept`` config knob. jupyter-sphinx
+# already renders cell errors inline by default, so nothing extra needed
+# there.
 $sphinxArgs = @('-T', '-b', 'html',
                 '-d', 'docs\_build\doctrees',
                 '-D', 'language=en',
                 'docs', $OutputDir)
 if ($Lenient) {
     $sphinxArgs = @('--keep-going', '-D', 'nbsphinx_allow_errors=1') + $sphinxArgs
+    $env:AGG_DOCS_LENIENT = "1"
 }
 
 Write-Host "Building HTML documentation..." -ForegroundColor Cyan

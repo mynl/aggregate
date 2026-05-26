@@ -1752,6 +1752,8 @@ class MixtureDistortion(Distortion):
 
     def g_inv(self, y):
         raise NotImplementedError('Inverse of mixture not implemented')
+
+
 class BetaDistortion(Distortion):
     """
     Beta distortion: :math:`g(x) = F_{a,b}(x)` for a Beta(a, b) CDF.
@@ -1781,7 +1783,6 @@ class BetaDistortion(Distortion):
 
     def g_prime(self, x):
         return self._fz.pdf(x)
-
 
 
 class PowerDistortion(Distortion):

@@ -298,11 +298,11 @@ A typical XOL tower up to 10M is created by specifying the layer break points in
                 'sev lognorm 50 cv 10 '
                 'occurrence ceded to tower [0 250 500 1000 2000 5000 10000] '
                 'poisson '
-                , approximation='exact', log2=18, bs=1/2)
+                , log2=18, bs=1/2)
     qd(a07)
 
 
-There are special options in ``build`` because the claim count is high: 292.7. To force a convolution use ``approximation='exact'``. Reviewing the default ``bs=1/2`` and ``log2=16`` shows a moderate error. Looking at the density via::
+There are special options in ``build`` because the claim count is high: 292.7. Reviewing the default ``bs=1/2`` and ``log2=16`` shows a moderate error. Looking at the density via::
 
     a07.density_df.p_total.plot(logy=True)
 

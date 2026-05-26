@@ -113,7 +113,7 @@ limit in the extreme right tail.
 .. ipython:: python
     :okwarning:
 
-    a01.update(approximation='exact', log2=19, bs=1/4, normalize=False)
+    a01.update(log2=19, bs=1/4, normalize=False)
     qd(a01)
     @savefig ir_base.png
     a01.plot()
@@ -141,7 +141,7 @@ answer is returned in a ``namedtuple``.
                     f'{occ_limit} xs 0 '
                      'sev sev.IR:WC '
                      'mixed gamma 0.25 '
-                    , approximation='exact', log2=19, bs=1/4, normalize=False)
+                    ,log2=19, bs=1/4, normalize=False)
         er_table = np.linspace(.1, 2., 20)
         df = a01.density_df
         ix = df.index.get_indexer(er_table * a01.est_m, method='nearest')

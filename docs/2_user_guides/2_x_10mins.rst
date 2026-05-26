@@ -799,7 +799,7 @@ Here is a three-unit portfolio built using a DecL program. The line breaks and h
                     '1e5 xs 0 '
                     'sev 500 * pareto 1.8 - 500 '
                     'poisson'
-               , approximation='exact', padding=2)
+               , padding=2)
     qd(p07)
 
 The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p07.describe``, which concatenates each unit's ``describe`` and adds the same statistics for the total.

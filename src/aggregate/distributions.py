@@ -622,7 +622,7 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
     return Picks(layers=layers, exact=exact, density=density, audit=t)
 
 
-def __integral_by_doubling(func, x0, err=1e-8):
+def _integral_by_doubling(func, x0, err=1e-8):
     r"""
     Compute :math:`\int_{x_0}^\infty f` as the sum
 

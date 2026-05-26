@@ -123,6 +123,37 @@ exception via ``__cause__``. Intended consumer is the forthcoming
 ``aggregate.api`` error pane; reusable from any CLI / REPL that calls
 the parser.
 
+aggregate.api: FastAPI service over build, plotting, and pricing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+New ``aggregate.api`` subpackage stands up an HTTP/JSON wrapper around
+the library. Install with ``pip install 'aggregate[api]'`` and launch
+with ``aggregate-api --port 8001``. Routes live under ``/v1`` and
+cover the full object lifecycle: ``POST /v1/objects`` to build (or
+fetch from cache), then per-button GETs for ``info``, ``description``,
+``stats_df``, ``density_df``, ``plot`` (SVG by default, PNG on
+``?format=png``), ``kappa`` (Portfolio only), and
+``POST /v1/objects/{id}/pricing_at`` for distortion / constant-CoC
+pricing. DecL helpers (``/v1/decl/complete``, ``/v1/decl/lex``,
+``/v1/decl/grammar``) and a categorized example library
+(``/v1/examples`` from ``test_suite.agg``) round out the surface.
+Swagger UI is at ``/docs``, OpenAPI at ``/openapi.json``.
+
+Implementation: single uvicorn worker, in-memory LRU object cache
+keyed by content hash of ``(decl, log2, bs)`` so identical builds
+dedupe, build semaphore + wall-clock timeout (default 10 s), SQLite
+audit log (one row per build attempt), CORS middleware for
+split-origin deploys (``AGGAPI_CORS_ORIGINS`` env var). Plot output
+goes through ``aggregate.style.context(...)`` so the api's screen-sized
+overrides don't leak into interactive sessions. Parse failures
+respond ``HTTP 422`` with Plan B's ``ErrorReport`` dict as the body,
+preserving line/column/caret/suggestions for the SPA's error pane.
+
+The intended consumer is the forthcoming Bootstrap SPA (Plan D), but
+the api is usable standalone -- any downstream pricing system that
+wants ``build()`` over the wire can hit ``/v1/objects`` and pull
+back the resulting density / pricing tables in JSON.
+
 1.0.0a15
 ---------
 

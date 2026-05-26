@@ -77,11 +77,22 @@ notebook = [
     "attrs",
     # "greater_tables",
 ]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    # used by tests/api (TestClient) and is a soft FastAPI dep
+    "httpx>=0.27",
+]
+
+[project.scripts]
+aggregate-api = "aggregate.api.__main__:main"
 
 [tool.setuptools]
 include-package-data = true
 package-dir = {"" = "src"}
-packages = ["aggregate"]
+packages = ["aggregate", "aggregate.api", "aggregate.api.routes"]
 
 [tool.setuptools.package-data]
 aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle"]

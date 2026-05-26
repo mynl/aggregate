@@ -106,6 +106,23 @@ The four remaining ``from .constants import *`` lines (in
 replaced with explicit imports listing only the constants each module
 actually uses.
 
+aggregate.parser_errors: structured DecL parse-error reports
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+New ``aggregate.parser_errors`` module turns Lark's terse parse
+exceptions into structured ``ErrorReport`` dataclasses with line and
+column, source-line echo, caret marker, friendly terminal labels, and
+"did you mean..." suggestions via ``difflib.get_close_matches``. With
+Earley + dynamic lexer, almost every DecL parse failure surfaces as
+``UnexpectedCharacters``; the formatter recovers the full mistyped word
+by scanning forward through the DecL identifier character class, then
+compares it against the parser-state's allowed terminal set. The
+existing ``UnderwritingParser.parse`` ``ValueError(SimpleNamespace)``
+wrapping path is untouched -- the formatter unwraps the wrapped Lark
+exception via ``__cause__``. Intended consumer is the forthcoming
+``aggregate.api`` error pane; reusable from any CLI / REPL that calls
+the parser.
+
 1.0.0a15
 ---------
 

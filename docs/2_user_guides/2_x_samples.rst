@@ -341,7 +341,7 @@ Most :class:`Portfolio` spectral functions depend only on marginal conditional e
 .. ipython:: python
     :okwarning:
 
-    p03sw.calibrate_distortions(ROEs=[0.15], Ps=[1], strict='ordered');
+    p03sw.calibrate_distortions(coc=0.15, p=1);
     qd(p03sw.distortion_df)
 
 Apply the PH and dual to the independent and dependent portfolios. Asset level 45 is the 0.861 percentile of the independent.
@@ -349,7 +349,7 @@ Apply the PH and dual to the independent and dependent portfolios. Asset level 4
 .. ipython:: python
     :okwarning:
 
-    d1 = p03sw.dists['ph']; d2 = p03sw.dists['dual']
+    d1 = p03sw.distortions['ph']; d2 = p03sw.distortions['dual']
     for d in [d1, d2]:
         print(d.name)
         print('='*74)

@@ -13,10 +13,39 @@ import scipy.fft as sft
 from scipy.interpolate import interp1d
 from IPython.display import HTML, Markdown, display
 
-from .constants import *  # noqa: F401,F403  (kept for downstream re-exports)
+from .constants import Validation
 
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    'decl_pprint',
+    'ft', 'ift',
+    'subsets',
+    'round_bucket',
+    'make_ceder_netter', 'nice_multiple',
+    'qd', 'mv',
+    'make_var_tvar', 'kaplan_meier', 'kaplan_meier_np',
+    'agg_help', 'explain_validation',
+    'silence_warnings',
+]
+
+
+def silence_warnings():
+    """Suppress Python warnings globally in the current process.
+
+    Convenience for notebook / REPL users who'd rather not see scipy /
+    numpy deprecation chatter while exploring. Equivalent to::
+
+        import warnings
+        warnings.simplefilter('ignore')
+
+    This affects ALL warnings in the current Python process, not just
+    those originating in :mod:`aggregate`. Do not call from library
+    code -- it's an explicit, end-user-only convenience.
+    """
+    import warnings
+    warnings.simplefilter('ignore')
 
 
 def decl_pprint(txt, split=0, html=False, show=True):
@@ -363,6 +392,29 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             print(ff(x))
         else:
             print(x)
+
+
+def mv(x, y=None):
+    """
+    Nice display of mean and variance for Aggregate or Portfolios or
+    entered values.
+
+    R style function, no return value.
+
+    :param x: Aggregate or Portfolio or float
+    :param y: float, if x is a float
+    :return: None
+    """
+    from .distributions import Aggregate
+    from .portfolio import Portfolio
+    if y is None and isinstance(x, (Aggregate, Portfolio)):
+        print(f'mean     = {x.agg_m:.6g}')
+        print(f'variance = {x.agg_var:.7g}')
+        print(f'std dev  = {x.agg_sd:.6g}')
+    else:
+        print(f'mean     = {x:.6g}')
+        print(f'variance = {y:.7g}')
+        print(f'std dev  = {y**.5:.6g}')
 
 
 def make_var_tvar(ser):

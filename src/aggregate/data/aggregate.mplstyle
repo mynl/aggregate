@@ -20,9 +20,9 @@ axes.facecolor:      lightsteelblue
 figure.facecolor:    aliceblue
 axes.edgecolor:      black
 axes.linewidth:      0.6
-axes.grid:           False
+axes.grid:           True
 grid.color:          white
-grid.linewidth:      0.5
+grid.linewidth:      0.25
 grid.alpha:          0.8
 
 # --- figure sizing & resolution (docs canonical; apiweb overrides at render time) ---

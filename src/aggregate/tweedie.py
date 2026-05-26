@@ -23,6 +23,11 @@ from scipy.special import loggamma
 from .distributions import Aggregate
 from .moments import MomentWrangler
 from .underwriter import build
+
+# ``Tweedie`` class deliberately NOT in ``__all__`` -- reach it via
+# ``from aggregate.tweedie import Tweedie``. Only the parameter-translation
+# helpers are part of the top-level public surface.
+__all__ = ['tweedie_convert', 'tweedie_density']
 from .ft import FourierTools
 
 logger = logging.getLogger(__name__)

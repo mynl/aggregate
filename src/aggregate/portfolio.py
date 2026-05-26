@@ -21,8 +21,11 @@ from textwrap import fill
 import warnings
 from IPython.display import HTML, display
 
-from .constants import *
+from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
+                        Validation, WL)
 from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
+
+__all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
@@ -2255,7 +2258,7 @@ class Portfolio(object):
             # EPD interpolation functions removed in the refactor; EPD-based
             # allocation and priority code went with them (Sub-project A).
 
-    def calibrate_distortion(self, name, r0=0.0, df=[0.0, .9], premium_target=0.0,
+    def calibrate_distortion(self, name, r0=0.05, premium_target=0.0,
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
                              S_calc='cumsum'):
         """
@@ -2275,10 +2278,8 @@ class Portfolio(object):
             Distortion kind (``ph``, ``wang``, ``dual``, ``tvar``,
             ``ccoc`` / ``roe``, ``ly``, ``clin``, ``lep``, ``cll``).
         r0 : float, optional
-            Fixed parameter for mass-at-zero kinds.
-        df : list, optional
-            Kind-specific second parameter (kept on the returned
-            distortion for audit; unused by the migrated kinds).
+            Mass-at-zero intercept for ``cll``, ``clin``, ``lep``, ``ly``.
+            Ignored by the other kinds. Default 0.05.
         premium_target : float, optional
             Target premium. If 0, derived from ``roe`` and ``assets``.
         roe : float, optional
@@ -2366,8 +2367,7 @@ class Portfolio(object):
                        ess_sup=ess_sup, assets=assets, el=el)
         return dist
 
-    def calibrate_distortions(self, coc, *, p=None, a=None,
-                              r0=0.03, df=5.5, kind='lower'):
+    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
         """
         Calibrate the standard pricing distortion set to a cost-of-capital target.
 
@@ -2382,11 +2382,6 @@ class Portfolio(object):
         a : float, optional
             Asset level; snapped to the index. Exactly one of ``p`` or ``a``
             must be provided.
-        r0 : float, optional
-            ``r0`` parameter for distortions with a minimum rate-on-line
-            (``ly``, ``clin``, ``lep``). Default 0.03.
-        df : float, optional
-            Degrees-of-freedom for ``tt``. Default 5.5.
         kind : {'lower', 'upper'}, optional
             VaR kind when ``p`` is provided. Default ``'lower'``.
 
@@ -2429,7 +2424,7 @@ class Portfolio(object):
         distortions = {}
         for dname in d_list:
             dist = self.calibrate_distortion(
-                name=dname, r0=r0, df=df, premium_target=P, assets=a)
+                name=dname, premium_target=P, assets=a)
             distortions[dname] = dist
             rows.append(
                 [S, exa, P, P / K, K, profit / K,

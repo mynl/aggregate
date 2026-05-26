@@ -363,7 +363,7 @@ matches the technical premium.
 .. ipython:: python
     :okwarning:
 
-    abcd.calibrate_distortions(ROEs=[coc], Ps=[.995], strict='ordered');
+    abcd.calibrate_distortions(coc=coc, p=.995);
     qd(abcd.distortion_df)
 
 The plot show this effect: COC is fattest on the left for small exceedance
@@ -373,7 +373,7 @@ probabilities (high losses), whereas TVaR is fattest on the right.
     :okwarning:
 
     fig, axs = plt.subplots(1, 5, figsize=(10.0, 2.1), constrained_layout=True)
-    for ax, (k, v) in zip(axs.flat, abcd.dists.items()):
+    for ax, (k, v) in zip(axs.flat, abcd.distortions.items()):
         v.plot(ax=ax)
     @savefig gc_dist.png
     fig.suptitle('Comparison of distortion functions giving current market premium in total')
@@ -390,7 +390,7 @@ market reinsurance pricing.
 .. ipython:: python
     :okwarning:
 
-    abcd_net.dists = abcd.dists
+    abcd_net.distortions = abcd.distortions
     ansn = abcd_net.analyze_distortions(p=0.996, add_comps=False); \
     ans = abcd.analyze_distortions(p=0.996, add_comps=False); \
     bit = pd.concat((ans.comp_df.xs('P', 0, 1), ansn.comp_df.xs('P', 0, 1),
@@ -472,7 +472,7 @@ the answer.
     epd = 1 - net_el_stoploss / net_el_stoploss_unlim; \
     qd(pd.Series([net_el_stoploss_unlim, net_el_stoploss, epd], index=['unlimited net loss', 'net loss limited by assets', 'epd']));
     pricer = S1.to_frame().sort_index();
-    for nm, dist in abcd.dists.items():
+    for nm, dist in abcd.distortions.items():
         pricer[f'{nm}_exa'] = pricer['S'].shift(1, fill_value=0).cumsum() * abcd.bs
         pricer[f'{nm}_gS'] = dist.g(pricer.S)
         pricer[f'{nm}_exag'] = pricer[f'{nm}_gS'].shift(1, fill_value=0).cumsum() * abcd.bs

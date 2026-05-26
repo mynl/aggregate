@@ -427,7 +427,7 @@ Calibrate pricing distortions to required return.
 .. ipython:: python
    :okwarning:
 
-   port.calibrate_distortions(ROEs=[roe], Ps=[reg_p], strict='ordered');
+   port.calibrate_distortions(coc=roe, p=reg_p);
    qd(port.distortion_df)
 
 Allocate premium plus equity to each unit across different pricing methods. All methods

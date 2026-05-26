@@ -40,7 +40,7 @@ except ImportError:
 
 import hashlib
 
-from .constants import *
+from .constants import FIG_H, FIG_W
 from .random_agg import RANDOM
 
 
@@ -67,6 +67,20 @@ DISTORTION_DTYPE = pd.CategoricalDtype(categories=DISTORTION_ORDER, ordered=True
 # Default grid resolution for ``density_df`` / trapezoidal moment integrals.
 # Each Distortion instance can override with ``self._density_n_points``.
 _DISTORTION_DENSITY_N = 101
+
+
+# Public surface for ``from aggregate.spectral import *``. Distortion subclasses
+# (PHDistortion, WangDistortion, ...) are deliberately NOT listed -- the
+# factory ``Distortion('ph', a=0.7)`` is the primary API; direct subclass
+# construction (``PHDistortion(a=0.7)``) is still supported via explicit
+# import: ``from aggregate.spectral import PHDistortion``.
+__all__ = [
+    'Distortion',
+    'approx_ccoc',
+    'tvar_weights',
+    'p_to_parameters', 'consistent_distortions',
+    'convex_distortion', 'bagged_distortion', 'convex_example',
+]
 
 
 # ---------------------------------------------------------------------------

@@ -202,9 +202,9 @@ ground-up covers can be computed by integrating densities.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.pedagogy import distortion_and_ins_stats
+    from aggregate.pedagogy import plot_distortion_and_ins_stats
     @savefig dist_g_fig.png scale=20
-    distortion_and_ins_stats()
+    plot_distortion_and_ins_stats()
 
 For an insured risk, we regard the margin as compensation for
 ambiguity aversion and associated winner’s curse drag. Both of these
@@ -278,8 +278,8 @@ Determine distortion parameters to achieve a 10% return at 99 percentile capital
 .. ipython:: python
    :okwarning:
 
-   pa.calibrate_distortions(ROEs=[0.1], Ps=[0.99], strict='ordered');
-   d = pa.dists['dual']
+   pa.calibrate_distortions(coc=0.1, p=0.99);
+   d = pa.distortions['dual']
    qd(pa.distortion_df)
    f"Exact premium {pa.distortion_df.iloc[0, 2]:.15f}"
 

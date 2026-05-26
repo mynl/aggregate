@@ -41,6 +41,8 @@ from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['Bounds']
+
 
 def _resolve_obj(obj, line):
     """

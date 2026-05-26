@@ -14,6 +14,12 @@ import aggregate.random_agg as ar
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    'iman_conover', 'block_iman_conover',
+    'rearrangement_algorithm_max_VaR',
+    'make_corr_matrix', 'random_corr_matrix',
+]
+
 
 @lru_cache()
 def ic_noise(n, d):

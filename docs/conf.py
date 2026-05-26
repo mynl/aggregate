@@ -21,6 +21,16 @@ RECOMMEND_P = 0.99999
 # apply the aggregate house style (formerly inline knobble_fonts)
 aggregate.style.use()
 
+
+# silence warnings throughout
+ipython_execlines = [
+    'import aggregate',
+    'aggregate.silence_warnings()',
+    # other notebook prelude you might want, e.g.
+    # 'import aggregate.style; aggregate.style.use()',
+]
+
+
 # -- Project information -----------------------------------------------------
 project = agg.__project__
 copyright = agg.__copyright__

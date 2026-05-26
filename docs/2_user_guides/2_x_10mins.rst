@@ -943,9 +943,7 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 - ``density_df`` a dataframe containing estimated probability distributions and other expected value information.
 
-- The :attr:`statistics` dataframe shows analytically computed mean, variance, CV, and sknewness for each unit and in total.
-
-- ``report_df`` are dataframe with information to test if the numerical approximations appear valid. Numerically estimated statistics are prefaced ``est_`` or ``empirical``.
+- The :attr:`stats_df` dataframe shows analytically and FFT-estimated computed mean, variance, CV, and sknewness for each unit and in total. It helps to test if the numerical approximations appear valid.
 
 - ``log2`` and ``bs`` hyper-parameters that control numerical calculations.
 
@@ -1039,14 +1037,17 @@ The :class:`Portfolio` version is more exhaustive. It includes a variety of colu
 
 .. _10 min stats:
 
-The ``statistics`` Series and Dataframe
+The ``stats_df`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``statistics`` dataframe shows analytically computed mean, variance, CV, and sknewness. It is indexed by
+The ``stats_df`` dataframe shows analytically and FFT computed mean, variance, CV, and sknewness. It is the single source of truth for an Aggregate's
+moments — theoretical and (after ``update``) empirical. It has a MultiIndex on
+``(component, measure)`` rows and one column per mixture component plus
+``mixed``, ``independent``, ``empirical``, and ``error`` (relative). It is
+an expanded version of ``describe``.
 
-- severity name, limit and attachment,
-- ``freq1, freq2, freq3`` non-central frequency moments,
-- ``sev1, sev2, sev3`` non-central severity moments, and
+- component (``meta``, ``freq``, ``sev`` or ``agg``) and measure
+- ``ex1, ex2, ex3`` non-central frequency moments, and
 - the mean, cv and skew(ness).
 
 It applies to the **gross** outcome when there is reinsurance, so the results for ``a05g`` and ``a05no`` are the same.
@@ -1056,25 +1057,6 @@ It applies to the **gross** outcome when there is reinsurance, so the results fo
 
     oco = ['display.width', 150, 'display.max_columns', 15,
             'display.float_format', lambda x: f'{x:.5g}']
-    with pd.option_context(*oco):
-        print(a05g.stats_df)
-        print('\n')
-        print(p07.stats_df)
-
-.. _10 min report:
-
-The ``stats_df`` Dataframe
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The ``stats_df`` dataframe is the single source of truth for an Aggregate's
-moments — theoretical and (after ``update``) empirical. It has a MultiIndex on
-``(component, measure)`` rows and one column per mixture component plus
-``mixed``, ``independent``, ``empirical``, and ``error`` (relative). It is
-an expanded version of ``describe``.
-
-.. ipython:: python
-    :okwarning:
-
     with pd.option_context(*oco):
         print(a05g.stats_df)
         print('\n')
@@ -1348,18 +1330,18 @@ The :meth:`calibrate_distortions` method calibrates distortions to achieve reque
 .. ipython:: python
     :okwarning:
 
-    p07.calibrate_distortions(Ps=[0.996], ROEs=[0.15], strict='ordered');
+    p07.calibrate_distortions(coc=0.15, p=0.996);
     qd(p07.distortion_df)
-    pprint(p07.dists)
+    pprint(p07.distortions)
 
-The answer is returned in the ``dist_ans`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.dists`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
+The answer is returned in the ``distortion_df`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.distortions`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
 
 .. _10 min analyze distortions:
 
 Analyze Distortions
 ~~~~~~~~~~~~~~~~~~~~
 
-The :meth:`analyze_distortions` method applies the distortions in ``p07.dists`` at a given capital level and summarizes the implied (lifted) natural allocations across units. Optionally, it applies a number of traditional (bullshit) pricing methods. The answer dataframe includes premium, margin, expected loss, return, loss ratio and leverage statistics for each unit and method. Here is a snippet, again at the 99.6% capital level.
+The :meth:`analyze_distortions` method applies the distortions in ``p07.distortions`` at a given capital level and summarizes the implied (lifted) natural allocations across units. Optionally, it applies a number of traditional (bullshit) pricing methods. The answer dataframe includes premium, margin, expected loss, return, loss ratio and leverage statistics for each unit and method. Here is a snippet, again at the 99.6% capital level.
 
 
 .. ipython:: python
@@ -1388,7 +1370,7 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
                  , bs=1/1024)
     qd(p09)
     print(f'Asset P value {p09.cdf(12.5):.5g}')
-    p09.calibrate_distortions(ROEs=[0.1], As=[12.5], strict='ordered');
+    p09.calibrate_distortions(coc=0.1, a=12.5);
     qd(p09.distortion_df)
     p09.apply_distortion('dual', efficient=False);
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
@@ -1507,7 +1489,7 @@ Applying the same distortion on a stand-alone basis produces:
 .. ipython:: python
     :okwarning:
 
-    a = p09.stand_alone_pricing(p09.dists['dual'], p=p09.cdf(12.5))
+    a = p09.stand_alone_pricing(p09.distortions['dual'], p=p09.cdf(12.5))
     print(a.iloc[:8])
 
 The lifted natural allocation (diversified pricing) is given next. These numbers
@@ -1540,7 +1522,7 @@ The second portfolio has been selected with two thick tailed units. A appears ri
                      'poisson'
                 , bs=1)
     qd(p10)
-    p10.calibrate_distortions(ROEs=[0.15], Ps=[0.996], strict='ordered');
+    p10.calibrate_distortions(coc=0.15, p=0.996);
     qd(p10.distortion_df)
 
 Apply the dual distortion and then create the twelve plot.
@@ -1560,7 +1542,7 @@ Applying the same distortion on a stand-alone basis produces:
     :okwarning:
 
     assets = p10.q(0.996)
-    a = p10.stand_alone_pricing(p10.dists['dual'], p=p10.cdf(assets))
+    a = p10.stand_alone_pricing(p10.distortions['dual'], p=p10.cdf(assets))
     print(a.iloc[:8])
 
 The lifted natural allocation (diversified pricing) is given next.
@@ -1582,7 +1564,7 @@ explicit submodule import (no top-level re-export):
 
 * :mod:`aggregate.pedagogy` — figure and exhibit generators cited in the
   technical-guide docs, papers, and blog posts (``adjusting_layer_losses``,
-  ``fig_4_1``…, ``distortion_and_ins_stats``, ``plot_twelve``,
+  ``fig_4_1``…, ``plot_distortion_and_ins_stats``, ``plot_twelve``,
   ``bodoff_exhibit``, ``ClassicalPremium``, etc.).
 * :mod:`aggregate.pentagon` — :class:`Pentagon`, algebra over the
   ``(L, P, M, a, Q, lr, pq, coc)`` accounting identities.

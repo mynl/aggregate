@@ -67,11 +67,13 @@ knowledge using :meth:`build`. The parameters are selected judgmentally.
 .. ipython:: python
     :okwarning:
 
-    from aggregate import build, qd
+    from aggregate import build, build_many, qd
     mu, sigma, shape, scale, wt = \
         -0.204573975,  1.409431871, 1.633490596, 57.96737143, 0.742942461
     mean = wt * np.exp(mu + sigma**2 / 2) + (1 - wt) * scale / (shape - 1)
-    build(f'sev IR:WC '
+    # build_many because a mixture cannot be built standalone (wrap it in
+    # an Aggregate, or use build_many() to receive the ParsedProgram).
+    build_many(f'sev IR:WC '
           f'[exp({mu}) {scale}] * [lognorm pareto] [{sigma} {shape}] '
           f'+ [0 {-scale}] wts [{wt} {1-wt}]');
     print(f'Mean = {mean:.1f} in 000s')

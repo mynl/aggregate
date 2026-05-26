@@ -20,9 +20,18 @@ from scipy.optimize import NoConvergence  # noqa
 from scipy.interpolate import interp1d
 from textwrap import fill
 
-from .constants import *
+from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
+                        Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_meancv, xsden_to_meancvskew)
+
+__all__ = [
+    'Frequency', 'Severity', 'Aggregate',
+    'lognorm_fit', 'sln_fit', 'sgamma_fit', 'gamma_fit', 'beta_fit',
+    'invgamma_fit', 'invgauss_fit',
+    'lognorm_lev', 'lognorm_approx',
+    'approximate_from_mcvsk',
+]
 from .utilities import (ft, ift,
                         round_bucket, make_ceder_netter,
                         nice_multiple,
@@ -3461,6 +3470,8 @@ class Aggregate:
         :return:
         """
         if axd is None:
+            if 'figsize' not in kwargs:
+                kwargs['figsize'] = (3 * FIG_W, FIG_H)
             self.figure, axd = plt.subplot_mosaic('ABC', layout='constrained', **kwargs)
         else:
             self.figure = axd['A'].figure

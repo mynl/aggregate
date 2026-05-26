@@ -1,58 +1,44 @@
 # coding: utf-8 -*-
+"""Top-level package for ``aggregate``.
 
-from .parser import UnderwritingLexer, UnderwritingParser, grammar
-from .moments import (MomentAggregator, MomentWrangler,
-                      xsden_to_meancv, xsden_to_meancvskew)
-from .iman_conover import (iman_conover, block_iman_conover,
-                           rearrangement_algorithm_max_VaR,
-                           make_corr_matrix, random_corr_matrix)
-from .utilities import (decl_pprint,
-                        ft, ift,
-                        subsets,
-                        round_bucket,
-                        make_ceder_netter, nice_multiple,
-                        qd,
-                        make_var_tvar, kaplan_meier, kaplan_meier_np,
-                        agg_help, explain_validation)
-from .spectral import Distortion, approx_ccoc, tvar_weights, consistent_distortions, p_to_parameters
-from .distributions import (Frequency, Severity, Aggregate,
-                            lognorm_fit, sln_fit, sgamma_fit, gamma_fit, beta_fit,
-                            invgamma_fit, invgauss_fit,
-                            lognorm_lev, lognorm_approx,
-                            approximate_from_mcvsk)
-from .portfolio import Portfolio, make_awkward, make_comonotonic_allocations
-from .underwriter import Underwriter, build, build_many, CannotBuild
-from .bounds import Bounds
-from .constants import *
-from .random_agg import *
-from .decl_pygments import *
-# ft + tweedie depend on Aggregate/build/qd already being bound on the package.
-# FourierTools and the Tweedie class are reachable only as submodule imports
-# (`from aggregate.ft import FourierTools`, `from aggregate.tweedie import Tweedie`).
-from .tweedie import tweedie_convert, tweedie_density
+Each submodule declares its own public surface in ``__all__``; this file
+just re-exports those via ``from .module import *``. To change what's
+public at the top level, edit ``__all__`` in the source module -- not
+this file.
 
-import sys
+``Tweedie``, ``FourierTools``, ``Pentagon``, and anything in
+``pedagogy`` are intentionally NOT re-exported here -- reach them via
+submodule import (``from aggregate.tweedie import Tweedie``, etc.).
+"""
 
-
-# knobble warnings
-# https://docs.python.org/3/library/warnings.html#temporarily-suppressing-warnings
-if not sys.warnoptions:
-    import warnings
-    warnings.simplefilter("ignore")
+from .parser        import *  # noqa: F401,F403
+from .moments       import *  # noqa: F401,F403
+from .iman_conover  import *  # noqa: F401,F403
+from .utilities     import *  # noqa: F401,F403
+from .spectral      import *  # noqa: F401,F403
+from .distributions import *  # noqa: F401,F403
+from .portfolio     import *  # noqa: F401,F403
+from .underwriter   import *  # noqa: F401,F403
+from .bounds        import *  # noqa: F401,F403
+from .constants     import *  # noqa: F401,F403
+from .random_agg    import *  # noqa: F401,F403
+from .decl_pygments import *  # noqa: F401,F403
+# tweedie depends on Aggregate / build / qd already being bound on the
+# package, so import last.
+from .tweedie       import *  # noqa: F401,F403
 
 
 __docformat__ = 'restructuredtext'
-__project__ = 'aggregate'
-__author__ = "Stephen J. Mildenhall"
+__project__   = 'aggregate'
+__author__    = "Stephen J. Mildenhall"
 __copyright__ = "2018-2026, Stephen J Mildenhall"
-__license__ = "BSD 3-Clause New License"
-__email__ = "stephen.j.mildenhall@gmail.com"
-__status__ = "beta"
+__license__   = "BSD 3-Clause New License"
+__email__     = "stephen.j.mildenhall@gmail.com"
+__status__    = "beta"
 from importlib.metadata import version as _pkg_version
 __version__ = _pkg_version("aggregate")
 
 
-# module level doc-string
 __doc__ = """
 :mod:`aggregate` solves insurance, risk management, and actuarial problems using realistic models that
 reflect underlying frequency and severity. It makes working with an aggregate (compound) probability

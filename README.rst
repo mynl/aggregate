@@ -28,8 +28,86 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a15 (in progress)
+1.0.0a16 (in progress)
 -----------------------
+
+Distortion: atom-row stats_df, Kusuoka summary in describe
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``describe`` now ends with three Kusuoka-summary rows for every kind:
+``mean_mass`` (atom of :math:`\mu` at ``p=0``), ``max_mass`` (atom at
+``p=1``), and ``interior_atoms`` (boolean). The unambiguous names
+replace the earlier ``mass_at_0`` / ``mass_at_1`` labelling.
+
+``stats_df`` drops those three rows and instead carries a variable-length
+**atoms section** -- one row per Dirac atom of :math:`\mu`, indexed
+``mu_<p:.3f>``. The ``closed_form`` column holds the ``p`` value;
+``D_g`` holds the atom mass.
+
+``MixtureDistortion._kusuoka_atoms`` merges duplicate ``p`` across
+members. ``MinimumDistortion._kusuoka_atoms`` detects atoms via two
+sources: ``brentq``-refined active-member transitions (mass via the
+slope-jump identity :math:`m = s^* (g_i'(s^*) - g_j'(s^*))`) and
+boundary atoms inherited from the member active near ``s = 0`` /
+``s = 1``.
+
+Portfolio.calibrate_distortion(s) cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* ``calibrate_distortion``: dropped the unused ``df`` parameter; default
+  ``r0`` changed ``0.0 → 0.05``. Docstring clarifies that ``r0`` is
+  consumed only by the mass-at-zero kinds (``cll``, ``clin``, ``lep``,
+  ``ly``) and ignored otherwise.
+* ``calibrate_distortions``: dropped ``r0`` and ``df`` -- both were
+  dead, since the calibrated-kind list is fixed to
+  ``[ccoc, ph, wang, dual, tvar]`` (none take ``r0``; the legacy ``tt``
+  kind that consumed ``df`` was removed earlier).
+* Updated 7 ``.rst`` doc call sites from the legacy
+  ``calibrate_distortions(ROEs=[r], Ps=[p], strict='ordered')`` to the
+  current ``calibrate_distortions(coc=r, p=p)``. Also fixed
+  ``port.dists[…]`` → ``port.distortions[…]`` and ``dist_ans`` →
+  ``distortion_df`` in the 10-min walkthrough prose.
+
+plot_twelve self-warming and bound-method fix
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``pedagogy.plot_twelve`` was silently relying on two preconditions the
+user had to set up by hand. Now self-sufficient:
+
+* Detects when the cached ``augmented_df`` is the lean
+  (``efficient=True``) build (no per-line ``M.M_<line>`` columns), pops
+  the cache entry, warms the eta-mu derivatives via
+  ``add_exa_details(eta_mu=True)`` if needed, and rebuilds with
+  ``apply_distortion(distortion_name, efficient=False)``.
+* Two stale ``port.augmented_df.loc`` / ``.query`` accesses (treating
+  ``augmented_df`` as a property -- it's been a method since the
+  ``apply_distortion`` refactor) now use the local ``aug_df`` variable.
+
+Package surface housekeeping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each submodule declares its own ``__all__``; the package ``__init__.py``
+is now a stack of ``from .module import *`` lines. Single source of
+truth -- change what's public at the top level by editing the source
+module, not ``__init__``.
+
+The ``warnings.simplefilter('ignore')`` block formerly run on package
+import is gone. Library code should not mutate global state at import
+time. The replacement is an explicit, opt-in helper:
+
+.. code-block:: python
+
+    from aggregate import silence_warnings
+    silence_warnings()    # mute warnings globally; user choice, not the
+                          # library's
+
+The four remaining ``from .constants import *`` lines (in
+``distributions``, ``utilities``, ``spectral``, ``portfolio``) were
+replaced with explicit imports listing only the constants each module
+actually uses.
+
+1.0.0a15
+---------
 
 ``Distortion`` info / describe / stats_df / density_df quartet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

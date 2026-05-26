@@ -46,7 +46,7 @@ The code below shows the three Tweedie representations, starting with the easies
 .. ipython:: python
     :okwarning:
 
-    from aggregate import tweedie_convert
+    from aggregate import tweedie_convert, build_many
     import pandas as pd
 
     p = 1.005; μ = 1; σ2 = 0.1;                    \
@@ -75,7 +75,7 @@ Three different ways of specifying the same Tweedie distribution.
     agg DecL:17 {λ} claims sev {β:.4g} * gamma {α:.4g} poisson
     agg DecL:18 tweedie {μ} {p} {σ2}
     '''
-    tweedies = build(program)
+    tweedies = build_many(program)
     for a in tweedies:
         print(a.program)
         qd(a.object.describe)

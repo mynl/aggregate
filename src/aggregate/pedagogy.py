@@ -915,7 +915,7 @@ def _get_ax_size(fig, ax):
 
 def _curly_brace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='',
                  int_line_num=2, fontdict=None, **kwargs):
-    """Plot a curly bracket on ``ax``. Helper for :func:`distortion_and_ins_stats`.
+    """Plot a curly bracket on ``ax``. Helper for :func:`plot_distortion_and_ins_stats`.
 
     ``k_r`` controls bracket curvature; ``bool_auto=True`` rescales coordinates
     for non-equal aspect axes. Original credit: Dr. GAO Siyu (MATLAB Central).
@@ -1035,7 +1035,7 @@ def _curly_brace(ax, p1, p2, k_r=0.1, bool_auto=True, str_text='',
                 rotation=rotation, fontdict=fontdict)
 
 
-def distortion_and_ins_stats(dist=None, s=0.3):
+def plot_distortion_and_ins_stats(dist=None, s=0.3):
     """Two-panel distortion figure: ``(s, g(s))`` with split loss/premium/margin/capital.
 
     Provenance: PIR Figure 10.3. Originally ``fig_10_3``.
@@ -1101,7 +1101,7 @@ def distortion_and_ins_stats(dist=None, s=0.3):
                ylabel='Price of layer $1_{U<s}$', aspect='equal')
 
 
-def spectral_three_panel(port=None, dist=None, s=0.3, x=None,
+def plot_spectral_three_panel(port=None, dist=None, s=0.3, x=None,
                          return_period_max=100):
     """Three-panel distortion picture: layer view, filled view, traditional bar.
 
@@ -1397,7 +1397,21 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     a21.set(xlim=[0, xmax], ylim=[0, xmax], aspect='equal')
     a21.legend(loc='upper left')
 
+    # plot_twelve needs the M.* (marginal-margin) columns produced only
+    # when ``efficient=False``. Those in turn rely on the full set of
+    # eta-mu columns on ``density_df`` -- not just the basic ``ημ_<line>``
+    # densities produced by ``add_eta_mu()`` but also the ``exeqa_ημ_*``
+    # derivatives, which require ``add_exa_details(eta_mu=True)``.
+    # ``augmented_df()`` uses the default (``efficient=True``); if a lean
+    # version is cached, drop it and rebuild the full version (warming
+    # the eta-mu derivatives first if not already present).
     aug_df = port.augmented_df(distortion_name)
+    first_line = port.line_names[0]
+    if f'M.M_{first_line}' not in aug_df.columns:
+        if f'exeqa_ημ_{first_line}' not in port.density_df.columns:
+            port.add_exa_details(port.density_df, eta_mu=True)
+        port._augmented_dfs.pop(distortion_name, None)
+        aug_df = port.apply_distortion(distortion_name, efficient=False)
     aug_df.filter(regex=f'exi_xgta_({port.line_name_pipe})'). \
         rename(columns=_short_renamer(port, 'exi_xgta')). \
         sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a22, lw=1)
@@ -1425,7 +1439,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         sort_index(axis=1).iloc[:, sort_order].plot(ax=a42, lw=1)
     a42.set(xlim=[0, xmax], title=r'Margin $\bar M_i(x)$')
 
-    adf = port.augmented_df.loc[:xmax]
+    adf = aug_df.loc[:xmax]
     if kind == 'two':
         zipper = zip(range(2), sorted(port.line_names), [a31, a41])
     else:
@@ -1463,7 +1477,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         a33.legend(loc='upper left')
 
     lw, up = port.q(1 - p2), ymax
-    bit = port.augmented_df.query(f' {lw} <= loss <= {up} ')
+    bit = aug_df.query(f' {lw} <= loss <= {up} ')
     F = bit['F']
     gF = bit['gF']
     for cn, ln in enumerate(sort_order):

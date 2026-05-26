@@ -28,8 +28,63 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a13 (in progress)
+1.0.0a14 (in progress)
 -----------------------
+
+``aggregate`` matplotlib house-style
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+New ``aggregate.style`` module — single source of truth for plot styling,
+shared by the docs build and any forthcoming server / notebook use. The
+underlying style is shipped as ``aggregate/data/aggregate.mplstyle``
+(color, serif, ``figure.figsize = 3.5, 2.45``, ``figure.dpi = 300``,
+constrained layout).
+
+To use the style in JupyterLab, at the top of any notebook::
+
+    import aggregate.style
+    aggregate.style.use()
+
+That mutates ``matplotlib.rcParams`` globally for the kernel and also
+sets ``pd.options.display.width = 120``. Any plots from that point on
+use the house style.
+
+Variants::
+
+    # leave pandas alone (e.g. you've already configured display.width):
+    aggregate.style.use(pandas=False)
+
+    # scoped — only for one figure, restores prior rcParams on exit:
+    with aggregate.style.context():
+        fig, ax = plt.subplots()
+        ax.plot(x, y)
+        plt.show()
+
+    # scoped with overrides — bigger figure for a screen demo:
+    with aggregate.style.context(**{"figure.figsize": (7, 4),
+                                    "figure.dpi": 100}):
+        fig, ax = plt.subplots()
+
+**One gotcha:** matplotlib's inline backend in Jupyter has its own
+``figure.dpi`` / ``figure.figsize`` defaults that it applies *after*
+import. If cells imported ``matplotlib`` before you called ``use()``,
+the inline backend's defaults can sneak back. Safest pattern is to put
+``import aggregate.style`` / ``aggregate.style.use()`` as the **first**
+matplotlib-touching lines in the notebook.
+
+If figures still look wrong after that, force the inline backend's own
+dpi explicitly::
+
+    %config InlineBackend.figure_format = 'retina'   # or 'png'
+    %config InlineBackend.rc = {'figure.dpi': 100}   # override for screen
+
+Replaces ``knobble_fonts`` (formerly inlined in ``docs/conf.py``); the
+docs build now calls ``aggregate.style.use()``. The B&W branch is
+dropped (paperless commitment). ``rc_params()`` exposes the parsed
+style as a dict for inspection / composition.
+
+1.0.0a13
+---------
 
 ``Distortion`` constructors take natural, kind-specific parameter names
 instead of the generic ``(name, shape, r0, df, col_x, col_y)`` slots.

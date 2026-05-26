@@ -1,0 +1,48 @@
+# aggregate house style - color, screen/PDF rendering
+# Source of truth used by docs build and aggregate.apiweb.
+
+# --- fonts ---
+font.size:           9
+font.family:         serif
+font.serif:          STIX Two Text, Times New Roman, DejaVu Serif
+font.sans-serif:     Myriad Pro, Segoe UI, DejaVu Sans
+font.monospace:      Ubuntu Mono, Cascadia Mono, DejaVu Sans Mono
+mathtext.fontset:    stixsans
+
+# --- legend ---
+legend.fontsize:     x-small
+legend.facecolor:    lightsteelblue
+legend.edgecolor:    lightsteelblue
+legend.frameon:      True
+
+# --- axes / figure background ---
+axes.facecolor:      lightsteelblue
+figure.facecolor:    aliceblue
+axes.edgecolor:      black
+axes.linewidth:      0.6
+axes.grid:           False
+grid.color:          white
+grid.linewidth:      0.5
+grid.alpha:          0.8
+
+# --- figure sizing & resolution (docs canonical; apiweb overrides at render time) ---
+figure.figsize:      3.5, 2.45
+figure.dpi:          300
+figure.constrained_layout.use: True
+
+# --- savefig ---
+savefig.dpi:         300
+savefig.bbox:        tight
+savefig.pad_inches:  0.05
+savefig.facecolor:   auto
+savefig.transparent: False
+
+# --- lines ---
+lines.linewidth:     1.2
+lines.markersize:    4
+
+# --- ticks ---
+xtick.direction:     out
+ytick.direction:     out
+xtick.labelsize:     small
+ytick.labelsize:     small

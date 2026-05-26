@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a13"
+version = "1.0.0a14"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.rst"
 authors = [
@@ -84,7 +84,7 @@ package-dir = {"" = "src"}
 packages = ["aggregate"]
 
 [tool.setuptools.package-data]
-aggregate = ["*.lark", "agg/*.agg"]
+aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

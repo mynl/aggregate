@@ -7,81 +7,19 @@
 
 import sys
 import os
-# for knobble fonts
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import pandas as pd
 
 # allow RTD to find aggregate
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../src'))
 import aggregate as agg
+import aggregate.style
 
-# manual version from Agg.0.30.1
-# color graphs
-FIG_W = 3.5
-FIG_H = 2.45
-FONT_SIZE = 9
-LEGEND_FONT = 'x-small'
-# see https://matplotlib.org/stable/gallery/color/named_colors.html
-PLOT_FACE_COLOR = 'lightsteelblue'
-FIGURE_BG_COLOR = 'aliceblue'
+# constants preserved for any ipython blocks / extensions that import them
 VALIDATION_EPS = 1e-4
 RECOMMEND_P = 0.99999
-def knobble_fonts(color=False):
-    # reset everything
-    plt.rcdefaults()
 
-    # this sets a much smaller base fontsize
-    # everything scales off font size
-    plt.rcParams['font.size'] = FONT_SIZE
-
-    # mpl default is medium
-    plt.rcParams['legend.fontsize'] = LEGEND_FONT
-
-    # color set up
-    if color:
-        plt.rcParams["axes.facecolor"] = PLOT_FACE_COLOR
-        # note plt.rc lets you set multiple related properties at once:
-        plt.rc('legend', fc=PLOT_FACE_COLOR, ec=PLOT_FACE_COLOR)
-        plt.rcParams['figure.facecolor'] = FIGURE_BG_COLOR
-        # smaller figures
-        plt.rcParams['figure.dpi'] = 100
-    else:
-        # graphics defaults - better res graphics
-        plt.rcParams['figure.dpi'] = 300
-        plt.rc('legend', fc="white", ec="white")
-        default_colors = [(0,0,0)]
-        default_ls = ['solid', 'dashed', 'dotted', 'dashdot']
-        props = []
-        cc = [i[1] for i in product(default_ls, default_colors)]
-        lsc = [i[0] for i in product(default_ls, default_colors)]
-        props.append(cycler('color', cc))
-        props.append(cycler('linestyle', lsc))
-        # combine all cyclers
-        cprops = props[0]
-        for c in props[1:]:
-            cprops += c
-        mpl.rcParams['axes.prop_cycle'] = cycler(cprops)
-
-    # fonts: add some better fonts as earlier defaults
-    mpl.rcParams['font.serif'] = ['STIX Two Text', 'Times New Roman', 'DejaVu Serif']
-    # 'Nirmala UI' has poor glyph coverage, removed as an option
-    mpl.rcParams['font.sans-serif'] = ['Myriad Pro', 'Segoe UI', 'DejaVu Sans']
-    mpl.rcParams['font.monospace'] = ['Ubuntu Mono', 'QuickType II Mono', 'Cascadia Mono', 'DejaVu Sans Mono']
-    mpl.rcParams['font.family'] = 'serif'
-    # this matches html output better
-    # mpl.rcParams['font.family'] = 'sans-serif'
-    # much nicer math font, default is dejavusans
-    mpl.rcParams['mathtext.fontset'] = 'stixsans'
-    pd.options.display.width = 120
-
-# actually run
-knobble_fonts(True)
-
-
-# graphics defaults - better res graphics
-plt.rcParams['figure.dpi'] = 300
+# apply the aggregate house style (formerly inline knobble_fonts)
+aggregate.style.use()
 
 # -- Project information -----------------------------------------------------
 project = agg.__project__

@@ -10,6 +10,7 @@ instance of the appropriate subclass; existing call sites are unchanged.
 """
 from collections import namedtuple
 from collections.abc import Iterable
+from functools import cached_property
 from io import StringIO
 import logging
 
@@ -19,6 +20,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as ss
 from scipy.interpolate import interp1d
+from scipy.optimize import brentq
 from scipy.spatial import ConvexHull
 from scipy.stats import norm
 
@@ -60,6 +62,11 @@ DISTORTION_ORDER = [
     'lep', 'ly', 'clin', 'tt', 'cll', 'bitvar', 'blend',
 ]
 DISTORTION_DTYPE = pd.CategoricalDtype(categories=DISTORTION_ORDER, ordered=True)
+
+
+# Default grid resolution for ``density_df`` / trapezoidal moment integrals.
+# Each Distortion instance can override with ``self._density_n_points``.
+_DISTORTION_DENSITY_N = 101
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +362,20 @@ class Distortion:
         super().__init_subclass__(**kwargs)
         if cls.kind:
             Distortion._registry[cls.kind] = cls
+        # Auto-wrap subclass ``_build`` so the quartet cache is invalidated
+        # after every reconfiguration (construction, property setter,
+        # calibration finalisation all route through ``_build``).
+        if '_build' in cls.__dict__:
+            user_build = cls.__dict__['_build']
+
+            def _wrapped_build(self, _orig=user_build):
+                _orig(self)
+                self._invalidate_cache()
+
+            _wrapped_build.__name__ = '_build'
+            _wrapped_build.__qualname__ = f'{cls.__qualname__}._build'
+            _wrapped_build.__doc__ = user_build.__doc__
+            cls._build = _wrapped_build
 
     def __new__(cls, name=None, *args, **kwargs):
         """Factory dispatch: ``Distortion('ph', 0.9)`` → ``PHDistortion``.
@@ -616,6 +637,463 @@ class Distortion:
         self._name = value
 
     # ------------------------------------------------------------------
+    # Quartet: info / describe / stats_df / density_df
+    # ------------------------------------------------------------------
+    #
+    # Each is a lazy ``cached_property``. The cached value lands in
+    # ``self.__dict__[name]``; ``_invalidate_cache()`` pops the keys. The base
+    # ``_build()`` (subclass hook) calls ``_invalidate_cache()`` at the end,
+    # so calibrate-then-read returns fresh tables (property setters and
+    # ``_finalize_calibration`` both route through ``_build``).
+    #
+    # Conceptual setup: ``g : [0,1] -> [0,1]`` with ``g(0)=0``, ``g(1)=1``,
+    # monotone non-decreasing is structurally a CDF, so ``g`` and ``g_inv``
+    # induce two natural distributions ``D_g`` and ``D_g_inv``. Moments are
+    # computed via tail-integral form ``E[X] = 1 - int_0^1 g(x) dx`` which
+    # is robust at kinks (no ``g'`` evaluation on the grid).
+
+    _density_n_points = _DISTORTION_DENSITY_N
+
+    @cached_property
+    def info(self):
+        """Multi-line string summarising the distortion (lazy)."""
+        return self._compute_info()
+
+    @cached_property
+    def describe(self):
+        """Compact pair-column DataFrame (D_g, D_g_inv) plus checks (lazy)."""
+        return self._compute_describe()
+
+    @cached_property
+    def stats_df(self):
+        """Single-column DataFrame of D_g statistics with closed-form column
+        and error column where analytics exist (lazy)."""
+        return self._compute_stats_df()
+
+    @cached_property
+    def density_df(self):
+        """Grid DataFrame: x, g, g_inv, g_dual, g_dual_inv, g_prime,
+        g_dual_prime, kusuoka. Grid is ``_density_n_points`` uniform points
+        on [0,1] with subclass-supplied knots spliced in (lazy)."""
+        return self._compute_density_df()
+
+    def _invalidate_cache(self):
+        """Drop cached quartet values; called by ``_build``."""
+        for k in ('info', 'describe', 'stats_df', 'density_df',
+                  '_grid_moments'):
+            self.__dict__.pop(k, None)
+
+    # --- subclass hooks (defaults return empty / no overrides) -----------
+
+    def _density_knots(self):
+        """Subclass hook: extra x-values to splice into the uniform grid.
+
+        Override for kinds with kinks in ``g`` (TVaR at ``1-p``, BiTVaR at
+        ``{1-p0, 1-p1}``, WtdTVaR at each ``1-p``, etc.) so ``g_prime`` near
+        the kink and the kusuoka column land on grid points.
+        """
+        return []
+
+    def _describe_closed_form(self):
+        """Subclass hook: dict mapping row name -> analytic moment value.
+
+        Keys may include ``'mean'``, ``'var'``, ``'std'``, ``'cv'``,
+        ``'skew'``. Missing keys show as ``NaN`` in the closed-form column.
+        Multi-knot kinds (bitvar, wtdtvar, minimum, mixture) return ``{}``.
+        """
+        return {}
+
+    def _kusuoka_summary(self):
+        """Subclass hook: ``(mu_atom_0, mu_atom_1, has_interior_atoms)``.
+
+        ``mu_atom_0`` is the atom of the Kusuoka spectral measure :math:`\\mu`
+        at ``p=0`` (the mean-component weight). ``mu_atom_1`` is the atom at
+        ``p=1`` (the max/ess-sup component weight); this equals the existing
+        ``self.mass`` (i.e. the jump of ``g`` at ``x=0``). The bool indicates
+        whether ``\\mu`` has any atoms in ``(0, 1)``. Default: continuous
+        ``\\mu`` apart from the existing ``self.mass`` atom at ``p=1``.
+        """
+        return (0.0, float(getattr(self, 'mass', 0.0) or 0.0), False)
+
+    def _kusuoka_atoms(self):
+        """Subclass hook: list of ``(p_atom, mass)`` pairs for atoms of
+        the Kusuoka measure :math:`\\mu` on ``[0, 1]``. Default derives
+        boundary atoms from :meth:`_kusuoka_summary`; subclasses with
+        interior atoms (TVaR, BiTVaR, WtdTVaR, CCoC, combos) override.
+        """
+        mu0, mu1, _ = self._kusuoka_summary()
+        atoms = []
+        if mu0 > 0.0:
+            atoms.append((0.0, float(mu0)))
+        if mu1 > 0.0:
+            atoms.append((1.0, float(mu1)))
+        return atoms
+
+    def _kusuoka_density(self, p):
+        """Subclass hook: continuous density of :math:`\\mu` at ``p``.
+
+        Default: numerical via the identity
+        :math:`\\mu_\\text{density}(p) = -(1-p)\\,g''(1-p)`. The continuous
+        density covers what's left after the atoms in
+        :meth:`_kusuoka_atoms`. Returns ``np.zeros_like(p)`` if numerical
+        differentiation produces NaN/inf values (e.g. at endpoints).
+        """
+        p = np.asarray(p, dtype=float)
+        s = 1.0 - p
+        eps = 1e-6
+        # central difference for g''; clamp to [eps, 1-eps] to keep finite
+        s_clip = np.clip(s, eps, 1.0 - eps)
+        gpp = (self._broadcast(self.g_prime(s_clip + eps), s_clip)
+               - self._broadcast(self.g_prime(s_clip - eps), s_clip)) / (2 * eps)
+        out = -(1.0 - p) * gpp
+        return np.where(np.isfinite(out) & (out > 0), out, 0.0)
+
+    # --- compute methods ------------------------------------------------
+
+    def _build_grid(self):
+        """Sorted unique grid: uniform ``_density_n_points`` on [0,1] plus
+        ``_density_knots()`` and the endpoints 0 and 1. Each interior knot
+        is wrapped by ``(knot - eps, knot, knot + eps)`` so a piecewise-
+        linear kink is visible in ``g_prime`` on either side. If ``g`` has
+        an atom at ``x=0`` (``self.mass > 0``, equivalently the Kusuoka
+        atom at ``p=1`` > 0), splice in a tiny right-neighbour so
+        trapezoidal integration sees the jump immediately."""
+        n = self._density_n_points
+        base = np.linspace(0.0, 1.0, n)
+        eps = 1e-12
+        extra = []
+        for k in self._density_knots():
+            k = float(k)
+            if 0.0 < k < 1.0:
+                extra.extend([max(0.0, k - eps), k, min(1.0, k + eps)])
+            elif 0.0 <= k <= 1.0:
+                extra.append(k)
+        # Atom at x=0: ensure a knot at eps so trapz captures the jump.
+        if float(getattr(self, 'mass', 0.0) or 0.0) > 0.0:
+            extra.append(eps)
+        # Symmetric boundary at x=1: g_inv may jump at y=1 (whenever g
+        # reaches 1 before s=1, e.g. TVaR/BiTVaR/WtdTVaR with any p>0).
+        # Splice 1-eps so trapezoidal integration of g_inv doesn't
+        # over-count a linear ramp on the last bin.
+        extra.append(1.0 - eps)
+        merged = np.unique(np.concatenate([base, np.asarray(extra)]))
+        return merged
+
+    @staticmethod
+    def _broadcast(values, x):
+        """Cast a (possibly scalar) g/g_prime return to a 1-d array of
+        the same length as ``x``. Some kinds return a constant from
+        ``g_prime`` (CCoC) which would otherwise fail to reshape."""
+        arr = np.asarray(values, dtype=float)
+        if arr.shape == () or arr.size == 1:
+            return np.full(x.shape, float(arr))
+        return arr.reshape(x.shape)
+
+    def _compute_density_df(self):
+        """Build ``density_df`` on the spliced grid."""
+        x = self._build_grid()
+        # g and g_inv may be interp1d objects (bitvar/wtdtvar) returning
+        # 0-d arrays; cast to 1-d.
+        g = self._broadcast(self.g(x), x)
+        try:
+            g_inv = self._broadcast(self.g_inv(x), x)
+        except NotImplementedError:
+            # MixtureDistortion: numerical inverse on the grid via brentq.
+            g_inv = self._numerical_g_inv(x, g)
+        g_dual = 1.0 - self._broadcast(self.g(1.0 - x), x)
+        try:
+            g_dual_inv = 1.0 - self._broadcast(self.g_inv(1.0 - x), x)
+        except NotImplementedError:
+            g_dual_inv = 1.0 - self._numerical_g_inv(1.0 - x, 1.0 - g_dual)
+        g_prime = self._broadcast(self.g_prime(x), x)
+        # g_dual_prime(x) = g_prime(1 - x). Name order matters: this is the
+        # derivative of the dual, NOT (g_prime) made dual.
+        g_dual_prime = self._broadcast(self.g_prime(1.0 - x), x)
+        kusuoka = self._kusuoka_masses(x)
+        return pd.DataFrame({
+            'g': g,
+            'g_inv': g_inv,
+            'g_dual': g_dual,
+            'g_dual_inv': g_dual_inv,
+            'g_prime': g_prime,
+            'g_dual_prime': g_dual_prime,
+            'kusuoka': kusuoka,
+        }, index=pd.Index(x, name='x'))
+
+    def _numerical_g_inv(self, qs, gs):
+        """Fallback inverse via brentq on ``g``; used when ``self.g_inv``
+        raises ``NotImplementedError`` (e.g. ``MixtureDistortion``). Solves
+        ``g(u) = q`` for each ``q`` in ``qs``."""
+        def g_scalar(u):
+            v = self.g(u)
+            v = np.asarray(v).ravel()
+            return float(v[0]) if v.size else 0.0
+        out = np.empty_like(qs, dtype=float)
+        for i, q in enumerate(qs):
+            if q <= 0.0:
+                out[i] = 0.0
+            elif q >= 1.0:
+                out[i] = 1.0
+            else:
+                try:
+                    out[i] = brentq(lambda u, q=q: g_scalar(u) - q,
+                                    0.0, 1.0, xtol=1e-10)
+                except (ValueError, RuntimeError):
+                    out[i] = np.nan
+        return out
+
+    def _kusuoka_masses(self, x):
+        """Bucket masses of the Kusuoka spectral measure :math:`\\mu` on
+        ``[0, 1]``, expressed on the ``x = 1 - p`` grid.
+
+        For each grid point ``x_i``, the entry is :math:`\\mu([p_{i-},
+        p_{i+}])` where ``p_{i\\pm} = 1 - (x_i \\pm b/2)`` are the bucket
+        edges in ``p``-space (with ``b`` the local bucket width). Atoms in
+        :math:`\\mu` (TVaR's Dirac at ``p``, CCoC's Diracs at 0 and 1,
+        WtdTVaR's discrete weights, PH's atom at ``p=0``, etc.) land in
+        the bucket containing the corresponding ``x = 1 - p_atom``.
+
+        The continuous part is integrated via the midpoint rule using
+        :meth:`_kusuoka_density`. Atoms come from :meth:`_kusuoka_atoms`.
+
+        The continuous portion of the column is renormalised so that the
+        total (atoms + continuous) sums to ``1``. Atom values are
+        preserved exactly; the continuous-part bucket masses are scaled
+        uniformly. This means kinds with singular density (Wang, Beta,
+        PH near ``p=1``) still produce a column that sums to 1 even
+        though the bucket-by-bucket relative weights may be off by a few
+        percent near the singularity.
+        """
+        x = np.asarray(x, dtype=float)
+        # bucket edges in x-space
+        x_edges_lo = np.empty_like(x)
+        x_edges_hi = np.empty_like(x)
+        x_edges_lo[0] = 0.0
+        x_edges_hi[-1] = 1.0
+        mids = (x[:-1] + x[1:]) / 2.0
+        x_edges_hi[:-1] = mids
+        x_edges_lo[1:] = mids
+        bucket_widths = x_edges_hi - x_edges_lo
+        # continuous part: density at x_i * bucket width (midpoint rule)
+        p = 1.0 - x
+        density = self._kusuoka_density(p)
+        cont = density * bucket_widths
+        # Sanitise the continuous part: drop NaN / negatives.
+        cont = np.where(np.isfinite(cont) & (cont >= 0), cont, 0.0)
+        # Atom contributions: collected separately so the renormalisation
+        # below leaves them exact.
+        atom_mass = np.zeros_like(x)
+        atom_total = 0.0
+        for p_atom, w in self._kusuoka_atoms():
+            x_atom = 1.0 - float(p_atom)
+            idx = int(np.argmin(np.abs(x - x_atom)))
+            atom_mass[idx] += float(w)
+            atom_total += float(w)
+        # Renormalise continuous bucket masses so total (atoms+cont) = 1.
+        cont_total = cont.sum()
+        target_cont = max(0.0, 1.0 - atom_total)
+        if cont_total > 0 and target_cont > 0:
+            cont = cont * (target_cont / cont_total)
+        return atom_mass + cont
+
+    def _ensure_grid_moments(self):
+        """Compute and cache the trapezoidal integrals used by both
+        ``describe`` and ``stats_df``. One pass over ``density_df``."""
+        if '_grid_moments' in self.__dict__:
+            return self.__dict__['_grid_moments']
+        df = self.density_df
+        x = df.index.to_numpy(dtype=float)
+        g = df['g'].to_numpy()
+        g_inv = df['g_inv'].to_numpy()
+        # E[X] = 1 - int g  (X is a CDF on [0,1])
+        int_g = float(np.trapezoid(g, x))
+        int_g_inv = float(np.trapezoid(g_inv, x))
+        mean_g = 1.0 - int_g
+        mean_g_inv = 1.0 - int_g_inv
+        # E[X^2] = int 2x (1 - g) dx for X with CDF g on [0,1]
+        ex2_g = float(np.trapezoid(2.0 * x * (1.0 - g), x))
+        ex2_g_inv = float(np.trapezoid(2.0 * x * (1.0 - g_inv), x))
+        # E[X^3] = int 3 x^2 (1 - g) dx
+        ex3_g = float(np.trapezoid(3.0 * x * x * (1.0 - g), x))
+        ex3_g_inv = float(np.trapezoid(3.0 * x * x * (1.0 - g_inv), x))
+        var_g = max(ex2_g - mean_g ** 2, 0.0)
+        var_g_inv = max(ex2_g_inv - mean_g_inv ** 2, 0.0)
+        std_g = var_g ** 0.5
+        std_g_inv = var_g_inv ** 0.5
+        cv_g = std_g / mean_g if mean_g > 0 else np.nan
+        cv_g_inv = std_g_inv / mean_g_inv if mean_g_inv > 0 else np.nan
+        # third central moment, then skewness
+        m3_g = ex3_g - 3.0 * mean_g * ex2_g + 2.0 * mean_g ** 3
+        m3_g_inv = ex3_g_inv - 3.0 * mean_g_inv * ex2_g_inv + 2.0 * mean_g_inv ** 3
+        skew_g = m3_g / std_g ** 3 if std_g > 0 else np.nan
+        skew_g_inv = m3_g_inv / std_g_inv ** 3 if std_g_inv > 0 else np.nan
+        moments = {
+            'int_g': int_g, 'int_g_inv': int_g_inv,
+            'mean_g': mean_g, 'mean_g_inv': mean_g_inv,
+            'var_g': var_g, 'var_g_inv': var_g_inv,
+            'std_g': std_g, 'std_g_inv': std_g_inv,
+            'cv_g': cv_g, 'cv_g_inv': cv_g_inv,
+            'skew_g': skew_g, 'skew_g_inv': skew_g_inv,
+            'p_equiv': 2.0 * int_g - 1.0,
+            'loading': int_g - 0.5,
+        }
+        self.__dict__['_grid_moments'] = moments
+        return moments
+
+    def _compute_stats_df(self):
+        """Single-column ``D_g`` statistics + closed-form / error columns.
+
+        Notes
+        -----
+        ``gini`` and ``p_equiv`` are numerically identical (both equal
+        ``2 * int_0^1 g(x) dx - 1``) but actuaries read them differently:
+        ``gini`` is the *positive concavity* of ``g`` (how much load above
+        the actuarial price the distortion adds to a U[0,1] risk);
+        ``p_equiv`` is the *TVaR level* whose pricing of U[0,1] matches
+        ``g`` (inversion of :func:`p_to_parameters`). Both rows are kept.
+        """
+        m = self._ensure_grid_moments()
+        cf = self._describe_closed_form()
+        rows = [
+            ('mean',    m['mean_g'],   cf.get('mean',   np.nan)),
+            ('var',     m['var_g'],    cf.get('var',    np.nan)),
+            ('std',     m['std_g'],    cf.get('std',    np.nan)),
+            ('cv',      m['cv_g'],     cf.get('cv',     np.nan)),
+            ('skew',    m['skew_g'],   cf.get('skew',   np.nan)),
+            ('gini',    m['p_equiv'],  cf.get('p_equiv', np.nan)),
+            ('p_equiv', m['p_equiv'],  cf.get('p_equiv', np.nan)),
+            ('loading', m['loading'],  cf.get('loading', np.nan)),
+        ]
+        df = pd.DataFrame(rows, columns=['stat', 'D_g', 'closed_form'])
+        df['error'] = df['D_g'] - df['closed_form']
+        df = df.set_index('stat')
+        # Atoms section: one row per Dirac atom of the Kusuoka measure mu.
+        # Index labels are ``mu_<p:.3f>``; closed_form holds the p value
+        # itself (so the column carries useful information even though
+        # "closed-form moment" doesn't quite apply); error is NaN.
+        atoms = self._kusuoka_atoms()
+        if atoms:
+            # Sort by p ascending so mu_0.000 (mean) comes before mu_1.000 (max).
+            atoms_sorted = sorted(atoms, key=lambda pw: pw[0])
+            atom_idx = [f'mu_{p:.3f}' for p, _ in atoms_sorted]
+            atom_df = pd.DataFrame({
+                'D_g': [float(w) for _, w in atoms_sorted],
+                'closed_form': [float(p) for p, _ in atoms_sorted],
+                'error': [np.nan] * len(atoms_sorted),
+            }, index=pd.Index(atom_idx, name='stat'))
+            df = pd.concat([df, atom_df])
+        # TODO: entropy. Deferred in v1 -- mass-at-zero kinds diverge;
+        # piecewise-linear kinds require per-kind exact summation.
+        return df
+
+    def _compute_describe(self):
+        """Pair-column ``(D_g, D_g_inv)`` table plus checks block.
+
+        The checks block at the bottom reports three approximate identities
+        a user can read at a glance:
+
+        * ``E[D_g] + E[D_g_inv] = 1`` -- the two means partition the unit
+          square; large error here means the trapezoidal grid mis-sized the
+          atoms of ``D_g`` / ``D_g_inv``.
+        * ``g(g_inv(0.5)) = 0.5`` -- round-trip sanity check: ``g`` and
+          ``g_inv`` are mutual inverses (within the grid resolution). For
+          ``MixtureDistortion`` where ``g_inv`` is not in closed form, the
+          numerical brentq fallback drives this check.
+        * ``g(0) = 0, g(1) = 1`` -- the endpoint contract every distortion
+          must satisfy.
+        """
+        m = self._ensure_grid_moments()
+        cf = self._describe_closed_form()
+        rows = [
+            ('mean', m['mean_g'], m['mean_g_inv'],
+             cf.get('mean', np.nan)),
+            ('std',  m['std_g'],  m['std_g_inv'],
+             cf.get('std',  np.nan)),
+            ('cv',   m['cv_g'],   m['cv_g_inv'],
+             cf.get('cv',   np.nan)),
+            ('skew', m['skew_g'], m['skew_g_inv'],
+             cf.get('skew', np.nan)),
+            ('gini', m['p_equiv'], -m['p_equiv'],
+             cf.get('p_equiv', np.nan)),
+        ]
+        moments = pd.DataFrame(
+            rows, columns=['stat', 'D_g', 'D_g_inv', 'closed_form'])
+        moments['error'] = moments['D_g'] - moments['closed_form']
+        moments = moments.set_index('stat')
+        # Kusuoka summary block: mean-component / max-component atoms of mu
+        # and the interior-atoms flag. Same shape for every kind.
+        mu0, mu1, interior = self._kusuoka_summary()
+        kusuoka_summary = pd.DataFrame({
+            'D_g': [float(mu0), float(mu1), bool(interior)],
+            'D_g_inv': [np.nan, np.nan, np.nan],
+            'closed_form': [np.nan, np.nan, np.nan],
+            'error': [np.nan, np.nan, np.nan],
+        }, index=pd.Index(
+            ['mean_mass', 'max_mass', 'interior_atoms'], name='stat'))
+        # Checks block. Each row reports the realised value; the user reads
+        # them as approximate-identity tests against the target.
+        try:
+            g_inv_half = float(self.g_inv(0.5))
+            g_round = float(self.g(g_inv_half))
+        except NotImplementedError:
+            g_round = np.nan
+        sum_means = m['mean_g'] + m['mean_g_inv']
+        checks = pd.DataFrame({
+            'D_g': [sum_means, g_round, float(np.asarray(self.g(0.0)).ravel()[0])],
+            'D_g_inv': [np.nan, np.nan, float(np.asarray(self.g(1.0)).ravel()[0])],
+            'closed_form': [1.0, 0.5, 0.0],
+            'error': [sum_means - 1.0, g_round - 0.5,
+                      float(np.asarray(self.g(0.0)).ravel()[0])],
+        }, index=pd.Index(
+            ['E[D_g]+E[D_g_inv]', 'g(g_inv(0.5))', 'g(0), g(1)'], name='stat'))
+        return pd.concat([moments, kusuoka_summary, checks])
+
+    def _compute_info(self):
+        """Multi-line summary string mirroring Aggregate/Portfolio.info."""
+        lines = [f'Distortion: {self.name}']
+        kind = self._name
+        long = getattr(type(self), 'long_name', kind)
+        lines.append(f'  kind:           {kind}  ({long})')
+        if self.display_name:
+            lines.append(f'  display:        {self.display_name}')
+        pn = getattr(type(self), 'param_name', None)
+        if pn is not None:
+            try:
+                val = getattr(self, pn)
+                lines.append(f'  {pn:<15s} {float(val):.4g}')
+            except (AttributeError, TypeError):
+                pass
+        # Multi-param / composite kinds: surface their structural state.
+        for attr in ('r', 'd', 'p0', 'p1', 'w1', 'r0', 'slope',
+                     'a', 'b', 'x0', 'x1', 'alpha'):
+            if pn == attr:
+                continue
+            if hasattr(self, attr):
+                v = getattr(self, attr)
+                if isinstance(v, (int, float, np.floating)) and not callable(v):
+                    lines.append(f'  {attr:<15s} {float(v):.4g}')
+        if hasattr(self, '_ps') and hasattr(self, '_wts'):
+            lines.append(f'  ps              [{len(self._ps)} knots] '
+                         f'min={self._ps.min():.3g}, '
+                         f'max={self._ps.max():.3g}')
+            lines.append(f'  wts             sum={self._wts.sum():.4g}')
+            lines.append('  (see stats_df / tvar_info_df for per-knot detail)')
+        if hasattr(self, '_distortions'):
+            n = len(self._distortions)
+            members = ', '.join(d.name for d in self._distortions)
+            lines.append(f'  members         [{n}] {members}')
+            if hasattr(self, '_wts') and self._wts is not None:
+                wts_str = ', '.join(f'{w:.3g}' for w in self._wts)
+                lines.append(f'  wts             [{wts_str}]')
+        mu0, mu1, interior = self._kusuoka_summary()
+        lines.append(f'  mu({{0}})         {mu0:.4g}')
+        lines.append(f'  mu({{1}})         {mu1:.4g}')
+        lines.append(f'  interior atoms  {interior}')
+        lines.append(f'  strict-pricing  {getattr(type(self), "strict_pricing", False)}')
+        lines.append(f'  id              {self.id()}')
+        return '\n'.join(lines)
+
+    # ------------------------------------------------------------------
     # Plotting
     # ------------------------------------------------------------------
 
@@ -624,24 +1102,48 @@ class Distortion:
         """
         Plot the distortion.
 
-        :param xs: x values; defaults to a grid of length ``n``.
-        :param n: number of points if ``xs`` is None.
-        :param both: also plot ``g_dual``.
-        :param ax: existing Axes; if None, a new figure is created.
-        :param plot_points: for ``convex``, scatter the calibration points.
-        :param scale: ``'linear'`` or ``'return'`` (log-log return scale).
-        :param size: ``'small'``, ``'large'``, or a numeric figure side.
-        :param kwargs: forwarded to ``ax.plot``.
+        Parameters
+        ----------
+        xs : array_like, optional
+            x values; defaults to ``density_df.index`` (linear) or a
+            log-spaced grid (return scale).
+        n : int
+            Grid size for ``scale='return'`` (ignored on linear scale, which
+            uses the cached ``density_df`` grid).
+        both : bool
+            Also plot ``g_dual``.
+        ax : matplotlib.axes.Axes, optional
+            Existing Axes; if ``None`` a new figure is created.
+        plot_points : bool
+            Legacy flag (was used by the removed ``ConvexDistortion``).
+        scale : {'linear', 'return'}
+            Linear plot on ``[0, 1]^2`` or log-log return-period scale.
+        size : str or float
+            ``'small'`` / ``'large'`` figure preset or a numeric side length.
+        **kwargs
+            Forwarded to ``ax.plot``.
+
+        Notes
+        -----
+        On linear scale the curve is read straight from ``density_df`` so the
+        knot splicing (TVaR kink, BiTVaR/WtdTVaR knots, mass-at-0 epsilon)
+        is reflected directly in the plot.
         """
         assert scale in ['linear', 'return']
 
         if scale == 'return':
             xs = 10 ** np.linspace(-10, 0, n)
-        elif xs is None:
-            xs = np.hstack((0, np.linspace(1e-10, 1, n)))
-
-        y1 = self.g(xs)
-        y2 = self.g_dual(xs) if both else None
+            y1 = self.g(xs)
+            y2 = self.g_dual(xs) if both else None
+        else:
+            if xs is None:
+                df = self.density_df
+                xs = df.index.to_numpy()
+                y1 = df['g'].to_numpy()
+                y2 = df['g_dual'].to_numpy() if both else None
+            else:
+                y1 = self.g(xs)
+                y2 = self.g_dual(xs) if both else None
 
         if ax is None:
             if size == 'small':
@@ -1193,6 +1695,38 @@ class CCoCDistortion(Distortion):
         self._finalize_calibration(r, 0.0, premium_target, assets)
         return self
 
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for ``g(x) = d + (1-d)x`` on ``(0,1]``
+        with atom of size ``d`` at ``x=0``.
+
+        Tail-integral form ``int_0^1 (1-g) dx`` handles the atom cleanly:
+        ``E[X^k] = (1-d) / (k+1)``.
+        """
+        d = float(self.d)
+        c = 1.0 - d
+        m1 = c / 2.0
+        m2 = c / 3.0
+        m3 = c / 4.0
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': d, 'loading': d / 2.0}
+
+    def _kusuoka_summary(self):
+        # CCoC: rho(X) = (1-d)*E(X) + d*ess_sup(X). mu = (1-d) delta_0 + d delta_1.
+        d = float(self.d)
+        return (1.0 - d, d, False)
+
+    def _kusuoka_atoms(self):
+        d = float(self.d)
+        return [(0.0, 1.0 - d), (1.0, d)]
+
+    def _kusuoka_density(self, p):
+        return np.zeros_like(np.asarray(p, dtype=float))
+
 
 class PHDistortion(Distortion):
     """Proportional-hazard distortion: :math:`g(x) = x^a`.
@@ -1246,6 +1780,41 @@ class PHDistortion(Distortion):
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for g(x)=x^a.
+
+        ``E[X^k] = a/(a+k)`` (tail-integral with ``1-g = 1-x^a``).
+        """
+        a = float(self.shape)
+        m1 = a / (a + 1.0)
+        m2 = a / (a + 2.0)
+        m3 = a / (a + 3.0)
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        p_eq = (1.0 - a) / (1.0 + a)
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': p_eq,
+                'loading': 1.0 / (a + 1.0) - 0.5}
+
+    def _kusuoka_summary(self):
+        # mu = atom of size a at p=0 plus continuous density a(1-a)(1-p)^(a-1)
+        # on [0,1). int density = 1-a, total mass 1.
+        a = float(self.shape)
+        return (a, 0.0, False)
+
+    def _kusuoka_atoms(self):
+        return [(0.0, float(self.shape))]
+
+    def _kusuoka_density(self, p):
+        a = float(self.shape)
+        p = np.asarray(p, dtype=float)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            out = a * (1.0 - a) * np.power(1.0 - p, a - 1.0)
+        return np.where(np.isfinite(out) & (out > 0), out, 0.0)
 
 
 class WangDistortion(Distortion):
@@ -1304,6 +1873,25 @@ class WangDistortion(Distortion):
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Mean and ``p_equiv`` of D_g for Wang(``λ``).
+
+        ``int g(x) dx = P(W - Z <= λ) = Φ(λ/√2)`` for ``W, Z ~ N(0,1)``
+        independent. Higher moments require the bivariate normal CDF and
+        are left as ``NaN`` in the table (numeric column is exact within
+        grid resolution).
+        """
+        lam = float(self.shape)
+        int_g = float(norm.cdf(lam / 2 ** 0.5))
+        return {'mean': 1.0 - int_g, 'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
+
+    def _kusuoka_atoms(self):
+        # Wang's Kusuoka measure is continuous; no atoms. The density has
+        # integrable singularities at p=0 and p=1, so we let the base
+        # numerical density + renormalization handle it.
+        return []
 
 
 class DualDistortion(Distortion):
@@ -1367,6 +1955,37 @@ class DualDistortion(Distortion):
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for g(x) = 1 - (1-x)^b.
+
+        ``E[X^k] = k * B(k, b+1) = k! b! / (b+k)!`` (tail-integral form).
+        """
+        b = float(self.shape)
+        m1 = 1.0 / (b + 1.0)
+        m2 = 2.0 / ((b + 1.0) * (b + 2.0))
+        m3 = 6.0 / ((b + 1.0) * (b + 2.0) * (b + 3.0))
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        int_g = b / (b + 1.0)
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
+
+    def _kusuoka_atoms(self):
+        # Dual has no atoms in mu; the density b(b-1)(1-p)p^(b-2)
+        # integrates to 1.
+        return []
+
+    def _kusuoka_density(self, p):
+        b = float(self.shape)
+        p = np.asarray(p, dtype=float)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            out = b * (b - 1.0) * (1.0 - p) * np.power(p, b - 2.0)
+        return np.where(np.isfinite(out) & (out > 0), out, 0.0)
 
 
 class TVaRDistortion(Distortion):
@@ -1454,6 +2073,49 @@ class TVaRDistortion(Distortion):
             f, self._calibration_init_shape, max_iter=200)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for the piecewise-linear TVaR.
+
+        For ``p in (0,1)``: ``g`` is linear on ``[0, 1-p]`` with slope
+        ``1/(1-p)`` and constant 1 on ``[1-p, 1]``. Tail integrals give
+        ``E[X^k] = (1-p)^k / (k+1)``. ``p=1`` is a degenerate point mass at
+        0 (all moments 0); ``p=0`` is the identity (mean 0.5, var 1/12).
+        """
+        p = float(self.shape)
+        if p == 1:
+            return {'mean': 0.0, 'var': 0.0, 'std': 0.0,
+                    'cv': np.nan, 'skew': np.nan,
+                    'p_equiv': 1.0, 'loading': 0.5}
+        q = 1.0 - p
+        m1 = q / 2.0
+        m2 = q * q / 3.0
+        m3 = q ** 3 / 4.0
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': p, 'loading': p / 2.0}
+
+    def _density_knots(self):
+        p = float(self.shape)
+        # Kink at s = 1 - p (where g transitions from linear to constant).
+        return [1.0 - p] if 0.0 < p < 1.0 else []
+
+    def _kusuoka_summary(self):
+        p = float(self.shape)
+        mu0 = 1.0 if p == 0 else 0.0
+        mu1 = 1.0 if p == 1 else 0.0
+        interior = 0.0 < p < 1.0
+        return (mu0, mu1, interior)
+
+    def _kusuoka_atoms(self):
+        return [(float(self.shape), 1.0)]
+
+    def _kusuoka_density(self, p):
+        return np.zeros_like(np.asarray(p, dtype=float))
 
 
 class BiTVaRDistortion(Distortion):
@@ -1562,6 +2224,51 @@ class BiTVaRDistortion(Distortion):
             return bitvar_ra(den.values, np.array(den.index),
                              self._p0, self._p1, self._w1)
         return bitvar_ra(den, x, self._p0, self._p1, self._w1)
+
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for the BiTVaR linear combo.
+
+        Since ``D_g`` is the mixture ``(1-w1) D_{tvar(p0)} + w1 D_{tvar(p1)}``
+        on the CDF side, raw moments combine linearly. ``p1==1`` gives a
+        point-mass component at 0 with all moments 0.
+        """
+        p0, p1, w = float(self._p0), float(self._p1), float(self._w1)
+        def tvar_moments(p):
+            if p == 1:
+                return (0.0, 0.0, 0.0)
+            q = 1.0 - p
+            return (q / 2.0, q * q / 3.0, q ** 3 / 4.0)
+        m1a, m2a, m3a = tvar_moments(p0)
+        m1b, m2b, m3b = tvar_moments(p1)
+        m1 = (1.0 - w) * m1a + w * m1b
+        m2 = (1.0 - w) * m2a + w * m2b
+        m3 = (1.0 - w) * m3a + w * m3b
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        p_eq = (1.0 - w) * p0 + w * p1
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': p_eq, 'loading': p_eq / 2.0}
+
+    def _density_knots(self):
+        p0, p1 = float(self._p0), float(self._p1)
+        return [k for k in (1.0 - p0, 1.0 - p1) if 0.0 < k < 1.0]
+
+    def _kusuoka_summary(self):
+        p0, p1, w = float(self._p0), float(self._p1), float(self._w1)
+        mu0 = (1.0 - w) if p0 == 0 else 0.0
+        mu1 = w if p1 == 1 else 0.0
+        interior = (0.0 < p0 < 1.0) or (0.0 < p1 < 1.0)
+        return (mu0, mu1, interior)
+
+    def _kusuoka_atoms(self):
+        return [(float(self._p0), 1.0 - float(self._w1)),
+                (float(self._p1), float(self._w1))]
+
+    def _kusuoka_density(self, p):
+        return np.zeros_like(np.asarray(p, dtype=float))
 
 
 class WtdTVaRDistortion(Distortion):
@@ -1713,6 +2420,47 @@ class WtdTVaRDistortion(Distortion):
         df['eta+'] = eta((df.s + df.s.shift(-1)) / 2)
         return df
 
+    def _describe_closed_form(self):
+        """Closed-form moments of D_g for a weighted-TVaR mixture.
+
+        Raw moments of D_g combine linearly across TVaR components:
+        ``E[X^k] = sum_i w_i * q_i^k / (k+1)`` where ``q_i = 1 - p_i``
+        (zero contribution from any ``p_i == 1`` component).
+        """
+        ps = np.asarray(self._ps, dtype=float)
+        wts = np.asarray(self._wts, dtype=float)
+        q = np.where(ps < 1.0, 1.0 - ps, 0.0)
+        m1 = float(np.sum(wts * q / 2.0))
+        m2 = float(np.sum(wts * q * q / 3.0))
+        m3 = float(np.sum(wts * q ** 3 / 4.0))
+        var = m2 - m1 * m1
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        p_eq = float(np.sum(wts * ps))
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': p_eq, 'loading': p_eq / 2.0}
+
+    def _density_knots(self):
+        ps = np.asarray(self._ps, dtype=float)
+        return [float(1.0 - p) for p in ps if 0.0 < p < 1.0]
+
+    def _kusuoka_summary(self):
+        ps = np.asarray(self._ps, dtype=float)
+        wts = np.asarray(self._wts, dtype=float)
+        mu0 = float(wts[ps == 0].sum())
+        mu1 = float(wts[ps == 1].sum())
+        interior = bool(np.any((ps > 0) & (ps < 1)))
+        return (mu0, mu1, interior)
+
+    def _kusuoka_atoms(self):
+        return [(float(p), float(w))
+                for p, w in zip(self._ps, self._wts) if w > 0]
+
+    def _kusuoka_density(self, p):
+        return np.zeros_like(np.asarray(p, dtype=float))
+
     def plot_affine(self, ax=None, n_pts=101,
                     cmap_name='viridis', alpha=1.,
                     marker='o', marker_size=4):
@@ -1801,6 +2549,133 @@ class MinimumDistortion(Distortion):
         inv_values = np.array([gi.g_inv(y) for gi in self._distortions])
         return np.max(inv_values, axis=0)
 
+    def _density_knots(self):
+        knots = []
+        for d in self._distortions:
+            knots.extend(d._density_knots())
+        return knots
+
+    def _active_at(self, s):
+        """Return the index of the active (= achieves min) member at ``s``."""
+        s = float(s)
+        # Avoid the s==1 tie that ``g_prime`` handles by nudging inward.
+        s_eval = s if s < 1.0 else 1.0 - 1e-15
+        vals = np.array([float(np.asarray(d.g(s_eval)).ravel()[0])
+                         for d in self._distortions])
+        return int(np.argmin(vals))
+
+    def _slope_at(self, member, s, side='right'):
+        """One-sided slope of ``member.g`` at ``s``. Used to compute the
+        atom mass on a kink. ``side`` only matters when ``s`` is at a
+        member knot; we offset by ``1e-8`` in the requested direction."""
+        eps = 1e-8
+        s_eval = s + eps if side == 'right' else s - eps
+        s_eval = float(np.clip(s_eval, eps, 1.0 - eps))
+        v = member.g_prime(s_eval)
+        v = float(np.asarray(v).ravel()[0])
+        return v
+
+    def _kusuoka_atoms(self):
+        """Atoms of mu_min, found via slope discontinuities in g_min.
+
+        Two sources:
+
+        * **active-transition atoms** — at the s* where the min switches
+          from member i to member j. brentq refines the location;
+          ``mass = s* * (g_i'(s*) - g_j'(s*))``.
+        * **inherited member atoms** — at member knots / member atom
+          locations where the *same* member is active just to either side
+          of the knot. Mass equals the member's own atom mass (the slope
+          jump in g_min equals the slope jump in the active member's g).
+
+        Boundary atoms (p=0 = "mean", p=1 = "max") are inherited from
+        whichever member is active near ``s=1`` / ``s=0`` respectively.
+        """
+        # Build a sorted candidate list of interior s* values.
+        knots = set()
+        for d in self._distortions:
+            for k in d._density_knots():
+                k = float(k)
+                if 0.0 < k < 1.0:
+                    knots.add(k)
+            for p_atom, _ in d._kusuoka_atoms():
+                s_atom = 1.0 - float(p_atom)
+                if 0.0 < s_atom < 1.0:
+                    knots.add(s_atom)
+        # Active-transition s* values: walk a moderately fine grid, locate
+        # consecutive pairs where ``_active_at`` differs, brentq-refine.
+        grid = np.unique(np.concatenate([
+            np.linspace(1e-6, 1 - 1e-6, 1001),
+            np.asarray(sorted(knots)),
+        ]))
+        active_idx = np.array([self._active_at(s) for s in grid])
+        transitions = np.where(np.diff(active_idx) != 0)[0]
+        atoms = []
+        for ti in transitions:
+            s_lo, s_hi = grid[ti], grid[ti + 1]
+            i, j = int(active_idx[ti]), int(active_idx[ti + 1])
+            d_i = self._distortions[i]
+            d_j = self._distortions[j]
+            # Brentq for where d_i.g and d_j.g cross.
+            def diff(s, d_i=d_i, d_j=d_j):
+                return (float(np.asarray(d_i.g(s)).ravel()[0])
+                        - float(np.asarray(d_j.g(s)).ravel()[0]))
+            try:
+                s_star = brentq(diff, s_lo, s_hi, xtol=1e-12)
+            except (ValueError, RuntimeError):
+                s_star = 0.5 * (s_lo + s_hi)
+            slope_left = self._slope_at(d_i, s_star, side='left')
+            slope_right = self._slope_at(d_j, s_star, side='right')
+            mass = s_star * (slope_left - slope_right)
+            if mass > 1e-10:
+                atoms.append((1.0 - s_star, mass))
+        # Inherited interior atoms: for each member knot, if the SAME
+        # member is active on both sides, the slope jump in g_min equals
+        # the slope jump in that member's g and contributes its own atom.
+        # Already-handled active transitions are skipped via near-equality.
+        transition_s = {grid[ti] for ti in transitions} | {
+            (grid[ti] + grid[ti + 1]) / 2 for ti in transitions}
+        for s in knots:
+            # Skip if this knot coincides with an active transition.
+            if any(abs(s - t) < 1e-3 for t in transition_s):
+                continue
+            i_left = self._active_at(s - 1e-6) if s > 1e-6 else self._active_at(1e-6)
+            i_right = self._active_at(s + 1e-6) if s < 1 - 1e-6 else self._active_at(1 - 1e-6)
+            if i_left != i_right:
+                continue  # active transition; would be double-counting
+            d_active = self._distortions[i_left]
+            slope_left = self._slope_at(d_active, s, side='left')
+            slope_right = self._slope_at(d_active, s, side='right')
+            mass = s * (slope_left - slope_right)
+            if mass > 1e-10:
+                atoms.append((1.0 - s, mass))
+        # Boundary atoms: which member is active near s=0 and s=1.
+        i_near_0 = self._active_at(1e-6)
+        i_near_1 = self._active_at(1.0 - 1e-6)
+        for p_atom, w in self._distortions[i_near_0]._kusuoka_atoms():
+            if float(p_atom) == 1.0 and float(w) > 0:
+                atoms.append((1.0, float(w)))
+        for p_atom, w in self._distortions[i_near_1]._kusuoka_atoms():
+            if float(p_atom) == 0.0 and float(w) > 0:
+                atoms.append((0.0, float(w)))
+        # Merge atoms at the same p so duplicate locations collapse.
+        merged = {}
+        for p, w in atoms:
+            key = round(float(p), 9)
+            merged[key] = merged.get(key, 0.0) + float(w)
+        return [(p, w) for p, w in merged.items() if w > 0]
+
+    def _kusuoka_summary(self):
+        # Boundary masses are inherited from whichever member is active
+        # at the corresponding boundary. interior is True if any active
+        # transition lies in (0, 1) or if an inherited interior atom is
+        # present.
+        atoms = self._kusuoka_atoms()
+        mean_mass = sum(w for p, w in atoms if p == 0.0)
+        max_mass = sum(w for p, w in atoms if p == 1.0)
+        interior = any(0.0 < p < 1.0 for p, _ in atoms)
+        return (float(mean_mass), float(max_mass), bool(interior))
+
 
 class MixtureDistortion(Distortion):
     """Weighted mixture of distortions.
@@ -1866,14 +2741,69 @@ class MixtureDistortion(Distortion):
             return (w @ flat).reshape(values.shape[1], values.shape[2])
         return w @ values
 
+    def _stack_components(self, fn, x):
+        """Stack ``[fn(d, x) for d in members]`` after broadcasting any
+        scalar return (CCoC's ``g_prime`` returns ``self.v``) to the
+        shape of ``x``. Returns the stacked array and a flag indicating
+        whether the input ``x`` was scalar (so the caller can collapse
+        the output back to scalar)."""
+        x_arr = np.atleast_1d(np.asarray(x))
+        rows = []
+        for gi in self._distortions:
+            v = np.asarray(fn(gi, x), dtype=float)
+            if v.shape == () or v.size == 1:
+                v = np.full(x_arr.shape, float(v))
+            rows.append(v.reshape(x_arr.shape))
+        return np.stack(rows), np.asarray(x).ndim == 0
+
     def g(self, x):
-        return self._combine(np.array([gi.g(x) for gi in self._distortions]))
+        stacked, was_scalar = self._stack_components(lambda d, x: d.g(x), x)
+        out = self._combine(stacked)
+        return float(out[0]) if was_scalar else out
 
     def g_prime(self, x):
-        return self._combine(np.array([gi.g_prime(x) for gi in self._distortions]))
+        stacked, was_scalar = self._stack_components(
+            lambda d, x: d.g_prime(x), x)
+        out = self._combine(stacked)
+        return float(out[0]) if was_scalar else out
 
     def g_inv(self, y):
         raise NotImplementedError('Inverse of mixture not implemented')
+
+    def _density_knots(self):
+        knots = []
+        for d in self._distortions:
+            knots.extend(d._density_knots())
+        return knots
+
+    def _kusuoka_summary(self):
+        wts = self._wts
+        mu0 = 0.0
+        mu1 = 0.0
+        interior = False
+        for d, w in zip(self._distortions, wts):
+            m0, m1, ia = d._kusuoka_summary()
+            mu0 += float(w) * m0
+            mu1 += float(w) * m1
+            interior = interior or ia
+        return (mu0, mu1, interior)
+
+    def _kusuoka_atoms(self):
+        # mu_mix = sum_i w_i * mu_i, so member atoms aggregate with weights.
+        # Merge atoms at the same p so duplicate locations collapse to one
+        # row (e.g. two CCoCs in the mix both contribute at p=0 and p=1).
+        merged = {}
+        for d, w in zip(self._distortions, self._wts):
+            for p_atom, mass in d._kusuoka_atoms():
+                p_key = round(float(p_atom), 12)
+                merged[p_key] = merged.get(p_key, 0.0) + float(w) * float(mass)
+        return [(p, m) for p, m in merged.items() if m > 0]
+
+    def _kusuoka_density(self, p):
+        out = np.zeros_like(np.asarray(p, dtype=float))
+        for d, w in zip(self._distortions, self._wts):
+            out = out + float(w) * d._kusuoka_density(p)
+        return out
 
 
 class BetaDistortion(Distortion):
@@ -1942,6 +2872,28 @@ class BetaDistortion(Distortion):
 
     def g_prime(self, x):
         return self._fz.pdf(x)
+
+    def _describe_closed_form(self):
+        """``D_g`` for a Beta distortion IS the underlying Beta(a, b);
+        moments come straight from scipy."""
+        z = self._fz
+        m1, var, skew, _ = z.stats(moments='mvsk')
+        m1 = float(m1)
+        var = float(var)
+        std = var ** 0.5
+        cv = std / m1 if m1 > 0 else np.nan
+        # int g(x) dx = 1 - mean of Beta(a, b) = b / (a + b)
+        int_g = float(self._b) / (float(self._a) + float(self._b))
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': float(skew),
+                'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
+
+    def _kusuoka_atoms(self):
+        # Beta's Kusuoka measure is continuous; analytic density has
+        # boundary singularities depending on (a, b). Let base numerical
+        # density + renormalization handle it.
+        return []
 
 
 class PowerDistortion(Distortion):
@@ -2035,6 +2987,10 @@ class PowerDistortion(Distortion):
             return (t1 - x0) / (x1 - x0)
         return (np.exp(s * (bl - br) + br) - x0) / (x1 - x0)
 
+    def _density_knots(self):
+        x0, x1 = float(self._x0), float(self._x1)
+        return [k for k in (x0, x1) if 0.0 < k < 1.0]
+
 
 class CLLDistortion(Distortion):
     """Capped log-linear distortion: :math:`g(x) = \\min(1, e^{r_0} x^b)`.
@@ -2120,6 +3076,35 @@ class CLLDistortion(Distortion):
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
 
+    def _describe_closed_form(self):
+        """Closed-form mean of D_g for ``g(x) = min(1, e^{r0} x^b)``.
+
+        With ``x_cap = e^{-r0/b}``: if ``x_cap >= 1`` (i.e. ``r0 <= 0``) the
+        cap is inactive and ``g(x) = e^{r0} x^b``; ``int g = e^{r0}/(b+1)``,
+        so ``E[X] = 1 - e^{r0}/(b+1)``. Otherwise the cap is active and
+        ``int g = 1 - x_cap b/(b+1)`` so ``E[X] = x_cap b/(b+1)``. Higher
+        moments are tractable but tedious; leave as ``NaN`` in v1.
+        """
+        b = float(self.shape)
+        r0 = float(self.r0)
+        ea = np.exp(r0)
+        if r0 <= 0:
+            int_g = ea / (b + 1.0)
+        else:
+            x_cap = float(np.exp(-r0 / b))
+            int_g = 1.0 - x_cap * b / (b + 1.0)
+        m1 = 1.0 - int_g
+        return {'mean': m1, 'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
+
+    def _density_knots(self):
+        b = float(self.shape)
+        r0 = float(self.r0)
+        if r0 <= 0:
+            return []
+        x_cap = float(np.exp(-r0 / b))
+        return [x_cap] if 0.0 < x_cap < 1.0 else []
+
 
 class CLinDistortion(Distortion):
     """Capped linear distortion: :math:`g(x) = \\min(1, r_0 + s\\,x)`.
@@ -2201,6 +3186,34 @@ class CLinDistortion(Distortion):
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Closed-form mean of D_g for ``g(x) = min(1, r0 + s x)``.
+
+        With ``x_cap = (1 - r0)/s``: if ``x_cap >= 1`` (no effective cap)
+        ``int g = r0 + s/2`` so ``E[X] = 1 - r0 - s/2``. Otherwise
+        ``int g = 1 - (1-r0)^2/(2s)`` so ``E[X] = (1-r0)^2/(2s)``.
+        """
+        sl = float(self.shape)
+        r0 = float(self.r0)
+        if sl <= 0:
+            return {}
+        x_cap = (1.0 - r0) / sl
+        if x_cap >= 1.0:
+            int_g = r0 + sl / 2.0
+        else:
+            int_g = 1.0 - (1.0 - r0) ** 2 / (2.0 * sl)
+        m1 = 1.0 - int_g
+        return {'mean': m1, 'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
+
+    def _density_knots(self):
+        sl = float(self.shape)
+        r0 = float(self.r0)
+        if sl <= 0:
+            return []
+        x_cap = (1.0 - r0) / sl
+        return [x_cap] if 0.0 < x_cap < 1.0 else []
 
 
 class LEPDistortion(Distortion):
@@ -2303,6 +3316,31 @@ class LEPDistortion(Distortion):
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
         self._finalize_calibration(shape, fx, premium_target, assets)
         return self
+
+    def _describe_closed_form(self):
+        """Closed-form mean and variance of D_g for the LEP distortion.
+
+        ``int sqrt(x(1-x)) dx = pi/8`` (Beta(3/2, 3/2) normalisation) and
+        ``int x sqrt(x(1-x)) dx = pi/16``, so for ``g(x) = d + (1-d)x +
+        spread sqrt(x(1-x))``:
+        ``int g = d + (1-d)/2 + spread*pi/8``,
+        ``E[X^2] = (1-d)/3 - spread*pi/8``.
+        Higher moments require ``int x^2 sqrt(x(1-x)) dx = 5*pi/128``
+        and are left as ``NaN`` in v1.
+        """
+        d = float(self._d)
+        spread = float(self._spread)
+        int_g = d + (1.0 - d) / 2.0 + spread * np.pi / 8.0
+        m1 = 1.0 - int_g
+        m2 = (1.0 - d) / 3.0 - spread * np.pi / 8.0
+        var = m2 - m1 * m1
+        if var < 0:
+            var = np.nan
+        std = var ** 0.5 if not np.isnan(var) else np.nan
+        cv = std / m1 if (m1 > 0 and not np.isnan(std)) else np.nan
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'p_equiv': 2.0 * int_g - 1.0,
+                'loading': int_g - 0.5}
 
 
 class LYDistortion(Distortion):

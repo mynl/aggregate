@@ -28,8 +28,45 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a14 (in progress)
+1.0.0a15 (in progress)
 -----------------------
+
+``Distortion`` info / describe / stats_df / density_df quartet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``Distortion`` now exposes the same four-property quartet as ``Aggregate``
+and ``Portfolio``: ``info`` (multi-line summary string), ``describe``
+(small ``(D_g, D_g_inv)`` DataFrame with checks block), ``stats_df``
+(single-column ``D_g`` table with closed-form and error columns), and
+``density_df`` (full grid: ``g, g_inv, g_dual, g_dual_inv, g_prime,
+g_dual_prime, kusuoka``).
+
+All four are lazy ``cached_property`` — zero cost if never accessed.
+Parameter setters (``d.a = 0.5``) and calibration (``_finalize_calibration``)
+both route through ``_build()`` which invalidates the cache, so
+calibrate-then-read returns fresh tables. The cache survives pickling.
+
+Closed-form moments are surfaced where available: ``ph``, ``wang``,
+``dual``, ``tvar``, ``ccoc``, ``beta``, ``bitvar``, ``wtdtvar``, ``cll``,
+``clin``, ``lep``. Multi-knot kinds (``minimum``, ``mixture``) and the
+remaining kinds (``power``, ``ly``) leave the ``closed_form`` column as
+``NaN`` and rely on numeric values. The ``error`` column gives an
+instant readout of trapezoidal-grid accuracy.
+
+A new ``_density_knots()`` hook is overridden on kinked kinds so the
+grid splices in TVaR/BiTVaR/WtdTVaR kinks (and the cap points for
+CLL/CLin); ``Distortion.plot()`` now reads from ``density_df``, so
+the plotted curve is consistent with the tables and benefits from
+the same knot splicing.
+
+A ``_kusuoka_summary()`` hook returns three rows surfaced in
+``stats_df`` — the atoms of the Kusuoka spectral measure :math:`\mu`
+at ``p=0`` and ``p=1``, and a boolean flag for interior atoms in
+``\mu`` (True for ``tvar``, ``bitvar``, ``wtdtvar``, and combinations
+of these).
+
+1.0.0a14
+---------
 
 ``aggregate`` matplotlib house-style
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,8 +177,8 @@ top-level modules or migrated out:
   (``adjusting_layer_losses``, ``savings_charge``, ``mixing_convergence``,
   ``power_variance_family``, ``fig_4_1``, ``fig_4_5``, ``fig_4_6``,
   ``fig_4_8``, ``fig_9_1``, ``natural_scale``) plus four curated, renamed
-  PIR figures: ``distortion_and_ins_stats`` (was ``fig_10_3``),
-  ``spectral_three_panel`` (was ``fig_10_5``), ``plot_twelve`` (was
+  PIR figures: ``plot_distortion_and_ins_stats`` (was ``fig_10_3``),
+  ``plot_spectral_three_panel`` (was ``fig_10_5``), ``plot_twelve`` (was
   ``twelve_plot``), ``plot_bivariate`` (was ``biv_contour_plot``). Also
   ``bodoff_exhibit`` (now takes ``port`` as first arg, not ``self``).
   ``ClassicalPremium`` pulled in to keep ``fig_9_1`` working.

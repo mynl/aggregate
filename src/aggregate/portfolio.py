@@ -502,19 +502,29 @@ class Portfolio(object):
             df['exgta_' + col] = (df['e_' + col] - temp) / df.S
 
             # E[X_i / X | X > a]  (note=a is trivial!)
-            temp = df.loss.iloc[0]  # loss=0, should always be zero
-            df.loss.iloc[0] = 1  # avoid divide by zero
-            # unconditional E[X_i/X]
-            df['exi_x_' + col] = np.sum(
-                df['exeqa_' + col] * df.p_total / df.loss)
-            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
+            # temp = df.loss.iloc[0]  # loss=0, should always be zero
+            # df.loss.iloc[0] = 1  # avoid divide by zero
+            # # unconditional E[X_i/X]
+            # df['exi_x_' + col] = np.sum(
+            #     df['exeqa_' + col] * df.p_total / df.loss)
+            # temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
+            # df['exi_xlea_' + col] = temp_xi_x / df.F
+            # df.loc[0, 'exi_xlea_' + col] = 0  # selection, 0/0 problem
+            # # more generally F=0 error:                      V
+            # # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
+            # # ?? not an issue for samples; don't have exlea_total anyway??
+            # # put value back
+            # df.loss.iloc[0] = temp
+            #
+            # above code generates a chained assignment error
+            denom = df['loss'].copy()
+            denom.iat[0] = 1.0  # avoid divide-by-zero; df['loss'][0] is known to be 0
+
+            df['exi_x_' + col] = np.sum(df['exeqa_' + col] * df.p_total / denom)
+            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / denom)
             df['exi_xlea_' + col] = temp_xi_x / df.F
             df.loc[0, 'exi_xlea_' + col] = 0  # selection, 0/0 problem
-            # more generally F=0 error:                      V
-            # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-            # ?? not an issue for samples; don't have exlea_total anyway??
-            # put value back
-            df.loss.iloc[0] = temp
+
 
             fill_value = np.nan
 
@@ -2033,19 +2043,31 @@ class Portfolio(object):
             df['exgta_' + col] = (df['e_' + col] - temp) / df.S
 
             # E{X_i / X | X > a}  (note=a is trivial!)
-            temp = df.loss.iloc[0]  # loss
-            df.loss.iloc[0] = 1  # avoid divide by zero
+            # temp = df.loss.iloc[0]  # loss
+            # df.loss.iloc[0] = 1  # avoid divide by zero
+            # # unconditional E(X_i/X)
+            # df['exi_x_' + col] = np.sum(
+            #     df['exeqa_' + col] * df.p_total / df.loss)
+            # temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
+            # df['exi_xlea_' + col] = temp_xi_x / df.F
+            # df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
+            # # more generally F=0 error:                      V
+            # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
+
+            # # put value back
+            # df.loss.iloc[0] = temp
+            # no cow issues
+            denom = df['loss'].copy()
+            denom.iat[0] = 1.0  # avoid divide-by-zero; df['loss'][0] is known to be 0
+
             # unconditional E(X_i/X)
-            df['exi_x_' + col] = np.sum(
-                df['exeqa_' + col] * df.p_total / df.loss)
-            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
+            df['exi_x_' + col] = np.sum(df['exeqa_' + col] * df.p_total / denom)
+            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / denom)
             df['exi_xlea_' + col] = temp_xi_x / df.F
             df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
-            # more generally F=0 error:                      V
+            # more generally F=0 error:
             df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-
-            # put value back
-            df.loss.iloc[0] = temp
+            
             # this is so important we will calculate it directly rather than the old:
             # df['exi_xgta_' + col] = (df['exi_x_' + col] - temp_xi_x) / df.S
             # the last value is undefined because we know nothing about what happens beyond our array

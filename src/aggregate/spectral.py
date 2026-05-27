@@ -1397,9 +1397,19 @@ class Distortion:
         (DataFrame return); strictly preferred in new code.
 
         ``S_calculation='backwards'`` computes
-        ``S = p_total[::-1].cumsum()[::-1].shift(-1, fill_value=0)``,
-        which is more reliable than the forward form for thin-tailed
-        risks. The forward form remains available.
+        ``S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]``
+        and ``S_calculation='forwards'`` computes
+        ``S = 1 - ser.cumsum()``.
+
+        If ``ser.sum() < 1``, the backwards survival calculation drops
+        the missing probability mass entirely. The forwards calculation
+        instead carries the missing mass in the tail, equivalent for dx
+        pricing to placing it at the largest observed ``x``.
+        If ``ser` is normalized if these methods should agree. If ``ser``
+        is not normalized look in the mirror and ask yourself what
+        you are doing. Backwards is more reliable than the forward form
+        for thin-tailed risks because the tail details are lost by the
+        ``1 - cumsum`` calculation.
 
         ``method='dx'`` computes ``∫ gS dx`` (fewer diffs);
         ``method='ds'`` computes ``∫ x d(gS)``. Neither requires a

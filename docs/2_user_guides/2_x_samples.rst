@@ -91,7 +91,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
   .. ipython:: python
     :okwarning:
 
-    from aggregate.utilities import qdp
+    from aggregate.utilities import qd
     from pandas.plotting import scatter_matrix
     p02 = build('port Samp:02 '
             'agg A 1 claim sev lognorm 10 cv .2 fixed '
@@ -108,12 +108,12 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
     df = p02.sample(10**4)
     qd(df.head(), float_format=fc)
 
-  :meth:`qdp` prints the pandas ``describe`` statistics dataframe for a dataframe, and adds the CV.
+  :meth:`qd` prints the pandas ``describe`` statistics dataframe for a dataframe, and adds the CV.
 
   .. ipython:: python
     :okwarning:
 
-    qdp(df)
+    qd(df)
 
   The sample is independent, with correlations close to zero, as expected.
 
@@ -164,12 +164,12 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
         hist_kwds={'density': True, 'bins': 25, 'lw': .25, 'ec': 'w'},
         s=1, marker='.');
 
-  The sample uses a different random state and produces a different draw. Comparing ``qdp`` output is one way to see if 10000 simulations is adequate. In this case there is good agreement.
+  The sample uses a different random state and produces a different draw. Comparing ``qd`` output is one way to see if 10000 simulations is adequate. In this case there is good agreement.
 
   .. ipython:: python
     :okwarning:
 
-    qdp(df2)
+    qd(df2)
 
 
 .. _samp ic:
@@ -283,7 +283,7 @@ The univariate statistics for each marginal are the same as the sample input, bu
     :okwarning:
 
     sample['total'] = sample.sum(1)
-    qdp(sample)
+    qd(sample)
 
 The :class:`Portfolio` total is a convolution of the input marginals and includes all possible combinations added independently. The figure plots the distribution functions.
 

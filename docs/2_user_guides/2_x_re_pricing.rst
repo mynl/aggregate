@@ -1141,7 +1141,7 @@ The ``stats_df`` dataframe shows the theoretic and empirical (i.e., modeled) sta
 .. ipython:: python
     :okwarning:
 
-    qd(a19.stats_df.loc[:, ['comp_0', 'comp_1', 'comp_2', 'comp_3', 'comp_4', 'empirical']])
+    qd(a19.stats_df.loc[:, ['comp_0', 'comp_1', 'comp_2', 'comp_3', 'independent', 'empirical']])
 
 
 Mata et al. pay careful attention to the implied severity in each ceded layer, accounting for probability masses. They do this by considering losses in small intervals and weighting the underlying severity curves. ``aggregate`` automatically performs the same calculations to estimate the total layer severity. In this example, it uses a smaller bucket size of 0.5K compared to 2.5K in the original paper. The next plots reproduce [TODO Differences?!] Figures 2 and 3. The masses (spikes in density; jumps in distribution) occur when the lower limit unit has only limit losses.

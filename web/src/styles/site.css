@@ -1,0 +1,105 @@
+/* Site CSS overlay for the aggregate SPA.
+ *
+ * Brings the mynl.com visual language to Bootstrap 5: STIX Two Text
+ * serif body, Inter for major headings, Helvetica for minor
+ * headings, Cascadia Mono for code -- and the aliceblue / steel-blue
+ * accent palette from aggregate.style. Loaded *after* Bootstrap so
+ * the cascade resolves in our favor.
+ */
+
+:root {
+    --agg-code:  #a81313;            /* mynl code red */
+    --agg-rule:  #1a1a1a;            /* table rules */
+    --agg-accent: #4682b4;           /* steelblue */
+    --agg-soft:  #f0f6fb;            /* aliceblue-ish */
+}
+
+html { font-size: 16.5px; }
+
+body {
+    font-family: "STIX Two Text", "Calisto MT", Georgia, serif;
+    color: #1c1c1c;
+    background-color: #fdfdfd;
+}
+
+h1, h2 {
+    font-family: Inter, "Helvetica Neue", Helvetica, sans-serif;
+    font-weight: 600;
+}
+h3, h4, h5, h6,
+.navbar-brand, .dropdown-header,
+.btn, .form-label, .badge {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+code, pre, .font-monospace {
+    font-family: "Cascadia Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+code { color: var(--agg-code); }
+
+/* ---- Navbar ---- */
+.navbar-brand img { vertical-align: middle; border-radius: 4px; }
+.navbar-brand     { font-weight: 600; letter-spacing: 0.01em; }
+
+/* ---- Tables ---- */
+.agg-table {
+    border-top: 1px solid var(--agg-rule);
+    border-bottom: 1px solid var(--agg-rule);
+}
+.agg-table thead th {
+    border-bottom: 1px solid var(--agg-rule);
+    font-family: "Helvetica Neue", Helvetica, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+}
+.agg-table tbody td { vertical-align: top; }
+.agg-table tbody tr:hover { background-color: var(--agg-soft); }
+
+/* ---- Editor host ---- */
+#editor-host {
+    background-color: #fbfcfe;
+}
+#editor-host .cm-editor { border-radius: inherit; }
+
+/* ---- Info pane ---- */
+.agg-info-pane {
+    white-space: pre;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+/* ---- Build banner ---- */
+.agg-build-banner {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* ---- Output ---- */
+.output-pane {
+    min-height: 200px;
+    padding-top: 0.5rem;
+}
+
+/* ---- Error pane ---- */
+.agg-error-pane {
+    border-left: 4px solid #d4a017;
+}
+.agg-error-source {
+    background-color: #fff;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 0;
+    font-family: "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 0.875rem;
+    line-height: 1.35;
+}
+.agg-error-caret {
+    color: var(--agg-code);
+    font-weight: bold;
+    white-space: pre;
+}
+
+/* ---- Plot pane ---- */
+.agg-plot-pane img { max-height: 70vh; }

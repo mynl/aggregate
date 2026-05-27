@@ -154,6 +154,49 @@ the api is usable standalone -- any downstream pricing system that
 wants ``build()`` over the wire can hit ``/v1/objects`` and pull
 back the resulting density / pricing tables in JSON.
 
+aggregate web SPA: Bootstrap 5 + CodeMirror 6 DecL playground
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+New top-level ``web/`` directory carries a vanilla-JS single-page
+application that talks to ``aggregate.api``. The build (``npm run build``
+inside ``web/``, wrapped by ``scripts/build-web.{ps1,sh}``) drops the
+bundle into ``src/aggregate/api/static/``; the FastAPI ``StaticFiles``
+mount in ``app.py`` serves it at ``/`` whenever it's present, so a
+single ``aggregate-api`` process delivers the UI and the ``/v1``
+endpoints same-origin.
+
+Layout: navbar (logo, version, docs/github links), a header row with
+the ``Examples`` and ``Options`` dropdowns plus the ``Build`` button,
+a CodeMirror 6 editor (DecL ``StreamLanguage`` mode -- keywords from
+``decl.lark`` highlighted in steelblue, distortion atoms in violet,
+numbers copper, strings forest green, comments grey italic), an
+action-button toolbar (``info``, ``describe``, ``stats_df``,
+``density_df``, ``plot``, ``cdf``, ``qq``, plus a ``more`` dropdown
+for ``kappa`` and ``pricing at…``), and a single ``#output`` region
+that each action replaces.
+
+Editor extras: ``Ctrl-Enter`` builds the program, ``Ctrl-↑/↓``
+walks a 20-entry localStorage history of successful builds,
+autocomplete posts to ``/v1/decl/complete`` (debounced) with a
+client-side keyword pool as offline fallback, ``Tab`` accepts the
+current completion. Parse errors render with caret + "Did you mean…"
+in a yellow alert. Portfolio-only actions (kappa, pricing) are
+disabled when the current object is an Aggregate. Plotting fetches
+SVG by default and renders inline (``<img class="img-fluid">``);
+the api ships ``?format=png`` for raster on demand.
+
+Visual styling overlays Bootstrap with the mynl site palette: STIX
+Two Text serif body, Inter for major headings, Cascadia Mono code in
+``#a81313``. Same-origin deploys need no configuration; split-origin
+deploys build with ``VITE_API_BASE_URL=https://api.host npm run build``
+and the backend serves CORS via ``AGGAPI_CORS_ORIGINS``.
+
+Tech stack: Vite 5 (build), Bootstrap 5.3 (CSS + dropdowns), CodeMirror
+6 (editor), no framework dependency. The bundle gzips to ~180 kB
+combined CSS + JS. ``web/node_modules/`` and the built ``static/``
+contents are gitignored; Plan E packaging will rebuild before
+``uv build``.
+
 1.0.0a15
 ---------
 

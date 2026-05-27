@@ -906,10 +906,13 @@ class UnderwritingParser:
         Raises
         ------
         ValueError
-            On parse error. ``args[0]`` is a ``SimpleNamespace`` with
-            ``.type``, ``.value``, and ``.index`` attributes (matching the
-            historic SLY token shape) so callers can highlight the position
-            of the bad token.
+            On parse error. ``args[0]`` is a one-line human-readable
+            summary (location, unexpected token, "did you mean"
+            suggestion). The structured form, with line/column,
+            caret-annotated source line, and the full expected-terminal
+            set, is attached as ``err.report`` (an
+            :class:`~aggregate.parser_errors.ErrorReport`).
+            ``err.report.render()`` gives the multi-line text form.
         """
         if isinstance(source, str):
             text = source
@@ -919,30 +922,11 @@ class UnderwritingParser:
             )
         try:
             tree = _PARSER.parse(text)
-        except UnexpectedToken as e:
-            tok = e.token
-            err = ValueError(
-                SimpleNamespace(
-                    type=getattr(tok, "type", "?"),
-                    value=str(tok),
-                    index=getattr(tok, "start_pos", 0) or 0,
-                )
-            )
-            err.report = format_error(text, e)
-            raise err from e
-        except UnexpectedCharacters as e:
-            pos = getattr(e, "pos_in_stream", None)
-            if pos is None:
-                pos = max(0, getattr(e, "column", 1) - 1)
-            err = ValueError(
-                SimpleNamespace(type="?", value=text[pos : pos + 1], index=pos)
-            )
-            err.report = format_error(text, e)
-            raise err from e
-        except UnexpectedInput as e:
-            err = ValueError(SimpleNamespace(type="?", value=str(e), index=0))
-            err.report = format_error(text, e)
-            raise err from e
+        except (UnexpectedToken, UnexpectedCharacters, UnexpectedInput) as e:
+            report = format_error(text, e)
+            err = ValueError(report.summary)
+            err.report = report
+            raise err from None
         return UnderwritingTransformer(self.safe_lookup, self.debug).transform(tree)
 
 

@@ -180,24 +180,47 @@ class ErrorReport:
         """JSON-serializable dict form (for tooling, logging, or transport)."""
         return asdict(self)
 
-    def render(self) -> str:
-        """Multi-line text rendering for terminals / REPL."""
-        lines = [
-            f"DecL parse error at line {self.line}, column {self.column}:",
-            "",
-            f"  {self.source_line}",
-            f"  {self.caret}",
-            "",
-            self.message,
-        ]
+    @property
+    def summary(self) -> str:
+        """One-line summary: location + message + suggestion (no caret block).
+
+        Used as ``args[0]`` of the wrapping :class:`ValueError`, so
+        ``str(e)`` and the default Python traceback footer carry the
+        useful single-line form.
+        """
+        head = (
+            f"DecL parse error at line {self.line}, "
+            f"column {self.column}: {self.message}"
+        )
         if self.suggestions:
-            lines.append("")
-            lines.append("Did you mean: " + ", ".join(self.suggestions) + "?")
+            head += " Did you mean: " + ", ".join(self.suggestions) + "?"
+        return head
+
+    def render(self) -> str:
+        """Multi-line text rendering for terminals / REPL.
+
+        Tight layout: the "Did you mean" suggestion appends to the message
+        line (no blank break between them), and the "Expected" list sits
+        on the same line (no blank break before it). Long source lines are
+        windowed around the caret so the marker stays visible on one
+        terminal row.
+        """
+        message = self.message
+        if self.suggestions:
+            message += " Did you mean: " + ", ".join(self.suggestions) + "?"
         if self.expected:
             shown = self.expected[:_EXPECTED_RENDER_CAP]
             tail = "..." if len(self.expected) > _EXPECTED_RENDER_CAP else ""
-            lines.append("")
-            lines.append("Expected: " + ", ".join(shown) + tail)
+            message += " Expected: " + ", ".join(shown) + tail
+        display_line, display_caret = _window_source(self.source_line, self.caret)
+        lines = [
+            f"DecL parse error at line {self.line}, column {self.column}:",
+            "",
+            f"  {display_line}",
+            f"  {display_caret}",
+            "",
+            message,
+        ]
         return "\n".join(lines)
 
 
@@ -228,9 +251,16 @@ def format_error(source: str, exc: BaseException) -> ErrorReport:
     -------
     ErrorReport
         Structured report. For non-parse exceptions (anything that is
-        not an ``UnexpectedInput`` and has no ``UnexpectedInput`` in its
-        ``__cause__`` chain), a minimal fallback report is returned.
+        not an ``UnexpectedInput``, has no ``UnexpectedInput`` in its
+        ``__cause__`` chain, and carries no pre-computed ``.report``
+        attribute), a minimal fallback report is returned.
     """
+    # Fast path: ``UnderwritingParser.parse`` attaches the report at the
+    # failure site so the rich form survives even when the cause chain
+    # is suppressed with ``raise ... from None``. Honour it.
+    cached = getattr(exc, "report", None)
+    if isinstance(cached, ErrorReport):
+        return cached
     exc = _unwrap(exc)
     if isinstance(exc, UnexpectedToken):
         return _from_token(source, exc)
@@ -403,6 +433,61 @@ def _source_line(source: str, line: int) -> str:
 def _caret(column: int, width: int) -> str:
     """Build a caret line for column ``column`` (1-indexed), ``width`` cols wide."""
     return " " * max(0, column - 1) + "^" * max(1, width)
+
+
+# Default visible width for the windowed source line. 76 leaves room for
+# the 2-space indent in ``render()`` and a small margin below an 80-col
+# terminal. The "snap budget" is how many characters of window we're
+# willing to give up to land the cut on a word boundary.
+_WINDOW_WIDTH = 76
+_SNAP_BUDGET = 15
+
+
+def _window_source(line: str, caret: str, width: int = _WINDOW_WIDTH) -> tuple[str, str]:
+    """Truncate a long ``line`` to a window of ``width`` chars around the caret.
+
+    Returns a ``(line, caret)`` pair where the line fits in ``width``
+    characters (plus possible ellipsis markers) and the caret is
+    re-aligned to point at the same token. Truncation points snap to
+    word boundaries (spaces) when possible so tokens stay intact;
+    ``"... "`` / ``" ..."`` markers indicate where the line was cut.
+
+    Short lines are returned unchanged.
+    """
+    if len(line) <= width:
+        return line, caret
+    n_carets = caret.count("^")
+    caret_start = len(caret) - len(caret.lstrip(" "))
+    caret_end = caret_start + n_carets
+    # Center the window on the caret span, then redistribute any leftover
+    # budget if we bump up against the left or right edge of the line.
+    slack = max(0, width - n_carets)
+    left = slack // 2
+    start = caret_start - left
+    end = start + width
+    if start < 0:
+        end -= start
+        start = 0
+    if end > len(line):
+        start -= end - len(line)
+        end = len(line)
+    start = max(0, start)
+    # Word-boundary snap. Don't snap if it would cost more than
+    # ``_SNAP_BUDGET`` chars of context, or push the cut into the caret.
+    if start > 0:
+        sp = line.find(" ", start, min(start + _SNAP_BUDGET, caret_start))
+        if sp != -1:
+            start = sp + 1
+    if end < len(line):
+        sp = line.rfind(" ", max(end - _SNAP_BUDGET, caret_end), end)
+        if sp != -1:
+            end = sp
+    prefix = "... " if start > 0 else ""
+    suffix = " ..." if end < len(line) else ""
+    windowed_line = prefix + line[start:end] + suffix
+    new_caret_start = max(0, (caret_start - start) + len(prefix))
+    windowed_caret = " " * new_caret_start + "^" * n_carets
+    return windowed_line, windowed_caret
 
 
 def _label(terminal: str | None) -> str:

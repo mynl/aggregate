@@ -235,43 +235,49 @@ atom: NUMBER                    -> atom_number
 // ======================================================================
 
 // Keywords — priority 2 so they outrank the catch-all ID terminal.
-OCCURRENCE.2: "occurrence"
-AGGREGATE.2:  "aggregate"
-EXPOSURE.2:   "exposure"
-TWEEDIE.2:    "tweedie"
-PREMIUM.2:    "premium" | "prem"
-TOWER.2:      "tower"
-MIXED.2:      "mixed"
-PICKS.2:      "picks"
-CLAIMS.2:     "claims" | "claim"
-SPLICE.2:     "splice"
-CEDED.2:      "ceded"
-DFREQ.2:      "dfreq"
-DSEV.2:       "dsev"
-LOSS.2:       "loss"
-PORT.2:       "port"
-RATE.2:       "rate"
-NET.2:        "net"
-SEV.2:        "sev"
-AGG.2:        "agg"
-XPS.2:        "xps"
-WEIGHTS.2:    "wts"
-AND.2:        "and"
-EXP.2:        "exp"
-AT.2:         "at"
-CV.2:         "cv"
-LR.2:         "lr"
-XS.2:         "xs"
-OF.2:         "of"
-TO.2:         "to"
-PART_OF.2:    "po"
-SHARE_OF.2:   "so"
-ZM.2:         "zm"
-ZT.2:         "zt"
-DISTORTION.2: "distortion" | "dist"
+//
+// Each keyword carries a negative lookahead `(?![a-zA-Z0-9._:~\-])` matching
+// the ID-continuation character class. Without it, Lark's dynamic lexer would
+// happily peel `agg` off the front of a typo like `aggx`, letting the parse
+// progress into the wrong rule and surface the error at the wrong column.
+// The lookahead forces keywords to match only on word boundaries — same trick
+// Python's tokenizer uses to distinguish `def` from `define`.
+OCCURRENCE.2: /occurrence(?![a-zA-Z0-9._:~\-])/
+AGGREGATE.2:  /aggregate(?![a-zA-Z0-9._:~\-])/
+EXPOSURE.2:   /exposure(?![a-zA-Z0-9._:~\-])/
+TWEEDIE.2:    /tweedie(?![a-zA-Z0-9._:~\-])/
+PREMIUM.2:    /(?:premium|prem)(?![a-zA-Z0-9._:~\-])/
+TOWER.2:      /tower(?![a-zA-Z0-9._:~\-])/
+MIXED.2:      /mixed(?![a-zA-Z0-9._:~\-])/
+PICKS.2:      /picks(?![a-zA-Z0-9._:~\-])/
+CLAIMS.2:     /(?:claims|claim)(?![a-zA-Z0-9._:~\-])/
+SPLICE.2:     /splice(?![a-zA-Z0-9._:~\-])/
+CEDED.2:      /ceded(?![a-zA-Z0-9._:~\-])/
+DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
+DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
+LOSS.2:       /loss(?![a-zA-Z0-9._:~\-])/
+PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
+RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
+NET.2:        /net(?![a-zA-Z0-9._:~\-])/
+SEV.2:        /sev(?![a-zA-Z0-9._:~\-])/
+AGG.2:        /agg(?![a-zA-Z0-9._:~\-])/
+XPS.2:        /xps(?![a-zA-Z0-9._:~\-])/
+WEIGHTS.2:    /wts(?![a-zA-Z0-9._:~\-])/
+AND.2:        /and(?![a-zA-Z0-9._:~\-])/
+EXP.2:        /exp(?![a-zA-Z0-9._:~\-])/
+AT.2:         /at(?![a-zA-Z0-9._:~\-])/
+CV.2:         /cv(?![a-zA-Z0-9._:~\-])/
+LR.2:         /lr(?![a-zA-Z0-9._:~\-])/
+XS.2:         /xs(?![a-zA-Z0-9._:~\-])/
+OF.2:         /of(?![a-zA-Z0-9._:~\-])/
+TO.2:         /to(?![a-zA-Z0-9._:~\-])/
+PART_OF.2:    /po(?![a-zA-Z0-9._:~\-])/
+SHARE_OF.2:   /so(?![a-zA-Z0-9._:~\-])/
+ZM.2:         /zm(?![a-zA-Z0-9._:~\-])/
+ZT.2:         /zt(?![a-zA-Z0-9._:~\-])/
+DISTORTION.2: /(?:distortion|dist)(?![a-zA-Z0-9._:~\-])/
 
-FREQ.2: "binomial" | "pascal" | "poisson" | "bernoulli" | "geometric"
-      | "fixed" | "neymanA" | "neymana" | "neyman" | "logarithmic" | "negbin"
+FREQ.2: /(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|neyman|logarithmic|negbin)(?![a-zA-Z0-9._:~\-])/
 
 // agg.X / sev.X / dist(ortion).X / note{...} — priority 3 outranks the
 // AGG / SEV / DISTORTION / ID alternatives that share their prefix.

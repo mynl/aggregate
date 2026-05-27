@@ -118,15 +118,41 @@ Earley + dynamic lexer, almost every DecL parse failure surfaces as
 by scanning forward through the DecL identifier character class, then
 compares it against the parser-state's allowed terminal set.
 
-The report is now attached to every ``build()`` parse failure as
-``e.report`` and rendered into the ``aggregate.underwriter`` logger at
-``ERROR``. ``str(e)`` and ``e.args[0]`` (the legacy
-``SimpleNamespace`` with ``.type``/``.value``/``.index``) are unchanged
-— the rich form is **opt-in** to keep downstream consumers that catch
-``ValueError`` and inspect ``str(e)`` undisturbed. Three opt-in
-recipes (notebook print-then-raise, programmatic suggestion read,
-IPython traceback hook) are documented in the "Reading Parse Errors"
-section of the DecL language reference.
+The report is attached to every ``build()`` parse failure as
+``e.report`` (and ``e.report.render()`` gives the multi-line text
+form). The wrapping ``ValueError``'s ``args[0]`` is now a one-line
+human-readable summary, so ``str(e)`` at the traceback tail reads
+e.g. ``DecL parse error at line 1, column 9: Unexpected 'cliams'.
+Did you mean: claims?`` rather than the historical
+``namespace(type='?', value='c', index=8)``. The Lark cause chain is
+suppressed (``raise … from None``) so notebook tracebacks don't dump
+Lark's internal ``UnexpectedCharacters`` frame; ``e.report`` carries
+forward everything users actually need from it. Three opt-in recipes
+(notebook print-then-raise, programmatic suggestion read, IPython
+traceback hook) are documented in the "Reading Parse Errors" section
+of the DecL language reference.
+
+Long source lines are windowed around the caret with word-boundary
+snap and ellipsis markers (``... `` / `` ...``) so the marker stays
+visible on a single terminal row. The rendered block uses a tight
+layout: the "Did you mean" suggestion and the "Expected" list both
+appear inline on the same line as the "Unexpected ..." message, with
+no blank breaks.
+
+decl.lark: keyword terminals now require word boundaries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every DecL keyword terminal (``AGG``, ``SEV``, ``PORT``, ``CLAIMS``,
+``MIXED``, ``DISTORTION``, ``FREQ``, …) now carries a negative
+lookahead ``(?![a-zA-Z0-9._:~\-])`` mirroring the ID-continuation
+character class. Without this, Lark's dynamic lexer would peel a
+keyword off the front of a typo like ``aggx`` and continue parsing as
+if the user had written ``agg x``, surfacing the error several tokens
+downstream at the wrong column. The lookahead forces keywords to
+match only on word boundaries — same trick Python's tokenizer uses
+for ``def`` vs ``define``. Typos like ``aggx Re:MFV41 …`` now report
+``Unexpected 'aggx'. Did you mean: agg?`` at column 1 instead of a
+misleading column-6 error about ``Re:MFV41``.
 
 1.0.0a15
 ---------

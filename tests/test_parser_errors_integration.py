@@ -5,7 +5,8 @@ These cover the wiring added in ``parser.py`` and ``underwriter.py``:
 - ``UnderwritingParser.parse`` attaches ``.report`` (an
   :class:`~aggregate.parser_errors.ErrorReport`) to the wrapping
   :class:`ValueError` on every parse failure path.
-- The legacy ``args[0]`` SimpleNamespace shape is preserved.
+- ``args[0]`` of the wrapping ``ValueError`` is the human-readable
+  one-line summary (so ``str(e)`` is useful at the traceback tail).
 - ``Underwriter._interpret_program`` logs the rendered report.
 - Successful builds are untouched.
 
@@ -73,17 +74,18 @@ def test_report_attached_on_unexpected_eof(parser):
 # Legacy back-compat surface unchanged
 # ----------------------------------------------------------------------
 
-def test_legacy_args_shape_preserved(parser):
-    """``e.args[0]`` is still the SimpleNamespace with .type/.value/.index."""
+def test_str_is_human_readable_summary(parser):
+    """``str(e)`` and ``e.args[0]`` carry the one-line summary."""
     with pytest.raises(ValueError) as info:
         parser.parse(_TYPO)
-    ns = info.value.args[0]
-    assert hasattr(ns, "type")
-    assert hasattr(ns, "value")
-    assert hasattr(ns, "index")
-    # str(e) is the legacy SimpleNamespace repr -- unchanged.
     s = str(info.value)
-    assert "namespace" in s or "type=" in s
+    # No legacy SimpleNamespace repr -- a plain human-readable line.
+    assert "namespace" not in s
+    assert "DecL parse error" in s
+    assert "mixd" in s
+    assert "Did you mean: mixed" in s
+    # args[0] is the same string.
+    assert info.value.args[0] == s
 
 
 # ----------------------------------------------------------------------

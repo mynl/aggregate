@@ -538,22 +538,13 @@ class Underwriter(object):
             try:
                 kind, name, spec = self.parser.parse(self.lexer.tokenize(program_line))
             except ValueError as e:
-                if isinstance(e.args[0], str):
-                    logger.error(e)
-                    raise
                 report = getattr(e, "report", None)
                 if report is not None:
-                    logger.error("DecL parse error:\n%s", report.render())
+                    # render() starts with "DecL parse error at ..." -- no prefix needed.
+                    logger.error("%s", report.render())
                 else:
-                    # Legacy fallback: a ValueError that didn't come through
-                    # the parser wrapping. Shouldn't happen in practice but
-                    # kept so external test doubles still work.
-                    t = e.args[0].type
-                    v = e.args[0].value
-                    i = e.args[0].index
-                    txt2 = program_line[0:i] + '>>>' + program_line[i:]
-                    logger.error('Parse error in input "%s"\nValue %s of type %s not expected',
-                                 txt2, v, t)
+                    # Some other ValueError (e.g. from the transformer) -- log as-is.
+                    logger.error(e)
                 raise
             else:
                 logger.info('answer out: %s object %s parsed successfully...adding to knowledge',
@@ -866,21 +857,14 @@ class Underwriter(object):
                     kind = line.split()[0]
                     report = getattr(e, 'report', None)
                     if report is not None:
-                        # report.column is 1-indexed
+                        # report.column is 1-indexed; insert >>> at the offending position.
                         i = max(0, report.column - 1)
                         spec = line[0:i] + '>>>' + line[i:]
                         name = 'parse error'
                     else:
-                        ea = getattr(e, 'args', None)
-                        if ea is not None:
-                            i = getattr(ea[0], 'index', 0)
-                            if not isinstance(i, int):
-                                i = 0
-                            spec = line[0:i] + '>>>' + line[i:]
-                            name = 'parse error'
-                        else:
-                            spec = str(e)
-                            name = 'other error'
+                        # Non-parse error (e.g. transformer-level ValueError).
+                        spec = str(e)
+                        name = 'other error'
                 ans[test_name] = [kind, err, name, spec, line, _changed(line, program_in)]
             elif len(preprocessed) > 1:
                 logger.info('%s preprocesses to %d lines; not processing.',

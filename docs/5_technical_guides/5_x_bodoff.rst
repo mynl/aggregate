@@ -368,7 +368,8 @@ It shows the percent allocation of capital to each unit across different methods
 Breakeven percentile equals the percentile equal to expected losses. Bodoff's
 calculation uses 10,000 simulations. The table shown here uses FFTs to obtain a close-to exact
 answer. The exponential distribution is borderline thick tailed, and so is quite hard
-to work with for both simulation methods and FFT methods.
+to work with for both simulation methods and FFT methods. The ``cotvar`` method is no
+longer available.
 
 
 .. ipython:: python
@@ -379,9 +380,9 @@ to work with for both simulation methods and FFT methods.
    tv = p4.var_dict(.99, 'tvar')
    df91.loc['sa TVaR 0.99'] = np.array(list(tv.values())[:-1]) / sum(list(tv.values())[:-1])
    pbe = float(p4.cdf(p4.ex))
-   for p in [.99, .95, .9, pbe]:
-       tv = p4.cotvar(p)
-       df91.loc[f'naive TVaR {p:.3g}'] = tv[:-1] / tv[-1]
+   # for p in [.99, .95, .9, pbe]:
+   #     tv = p4.cotvar(p)
+   #     df91.loc[f'naive TVaR {p:.3g}'] = tv[:-1] / tv[-1]
    v = ((p4.density_df.filter(regex='exi_xgta_[abc]').
                        shift(1).cumsum() * p4.bs).loc[p4.q(.99)]).values
    df91.loc['plc'] = v / v.sum()
@@ -441,10 +442,10 @@ to unit ``a`` the least skewed; ``c`` is the most skewed.
 .. ipython:: python
    :okwarning:
 
-   ad_ans = port.analyze_distortions(p=reg_p, kind='lower')
+   ad_ans = port.analyze_distortions(p=reg_p)
    basic = bodoff_exhibit(port, reg_p)
    qd(basic, col_space=10)
-   ans = pd.concat((ad_ans.comp_df.xs('P', 0, 1) + ad_ans.comp_df.xs('Q', 0, 1),
+   ans = pd.concat((ad_ans.pricing_df.xs('P', 0, 1) + ad_ans.pricing_df.xs('Q', 0, 1),
                     basic.rename(columns=dict(X='total')).iloc[3:]), keys=('agg', 'bod'))
    if port.name[-1] in list('123'):
        ans = ans.sort_values('X1')
@@ -466,10 +467,10 @@ Very considerable differences are evident across the methods.
    port.density_df.filter(regex='exa_[abct]').loc[a].rename(index=lambda x: x.replace('exa_', ''))
    premium_df = basic.drop(index=['EX', 'sa TVaR', 'coTVaR'])
    premium_df = premium_df.loc['EXa'] * v + d * premium_df
-   ans = pd.concat((ad_ans.comp_df.xs('P', 0, 1), premium_df),
+   ans = pd.concat((ad_ans.pricing_df.xs('P', 0, 1), premium_df),
       keys=('agg', 'bod')).sort_values('a')
    bit = ans.query(' abs(total - @premium) < 1e-2 and abs(a + b + c - total) < 1e-2 ')
-   bit.index.names =['approach', 'method']
+   bit.index.names = ['approach', 'method']
    qd(bit, col_space=10, sparsify=False)
 
 Corresponding loss ratios (remember, these are cat lines).

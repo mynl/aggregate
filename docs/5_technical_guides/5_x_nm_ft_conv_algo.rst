@@ -452,8 +452,9 @@ Here is a simple example of wrapping, using a compound Poisson distribution with
 .. ipython:: python
     :okwarning:
 
+    from aggregate.ft import fft_wrapping_illustration
     @savefig numfft04.png
-    ft.fft_wrapping_illustration(ez=10, en=2)
+    fft_wrapping_illustration(ez=10, en=2)
 
 The next figure illustrates more extreme FFT wrapping. It shows an attempt to model a compound Poisson distribution with a mean of 80 using only 32 buckets. The result is the straight line on the left. The middle plot shows the true distribution and the vertical slices of width 32 that are combined to get the total. These are shown shifted on the left. The right plot zooms into the rate ``0:32``, and shows how the wrapped components sum to the result on the left. This is a good example of how FFT methods can fail and can appear to give inexplicable results.
 
@@ -461,7 +462,7 @@ The next figure illustrates more extreme FFT wrapping. It shows an attempt to mo
     :okwarning:
 
     @savefig numfft05.png
-    ft.fft_wrapping_illustration(ez=10, en=8)
+    fft_wrapping_illustration(ez=10, en=8)
 
 
 It is not necessary to understand the details of FTs to use ``aggregate`` although they are fascinating, see for example :cite:t:`Korner2022`. In probability, the moment generating functions and characteristic function are based on FTs. They are discussed in any serious probability text.

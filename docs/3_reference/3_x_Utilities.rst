@@ -5,7 +5,7 @@ Utilities
 Moment Aggregator Class
 -----------------------
 
-.. autoclass:: aggregate.utilities.MomentAggregator
+.. autoclass:: aggregate.moments.MomentAggregator
    :special-members: __init__
    :members:
    :private-members:
@@ -20,22 +20,10 @@ Moment Wrangler Class
    :private-members:
 
 
-
-Axis Manager Class
-------------------
-
-.. autoclass:: aggregate.utilities.AxisManager
-   :special-members: __init__
-   :members:
-   :private-members:
-
-
-
 Utilities Module
 ----------------
 
 .. automodule:: aggregate.utilities
-   :exclude-members: AxisManager, MomentAggregator, MomentWrangler
    :special-members: __init__
    :members:
    :private-members:

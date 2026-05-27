@@ -147,6 +147,92 @@ To only parse the file from Python::
     df.query('error != 0')
 
 
+Reading Parse Errors
+=====================
+
+When ``build()`` fails on a DecL typo, the wrapping :class:`ValueError`
+carries a structured :class:`~aggregate.parser_errors.ErrorReport` on
+its ``.report`` attribute. The report has 1-indexed line and column,
+the source line (windowed to the caret on long inputs), a caret
+marker, friendly "expected" labels, and ``difflib``-derived "did you
+mean" suggestions.
+
+``str(e)`` is the one-line summary — ``DecL parse error at line L,
+column C: Unexpected '...'. Did you mean: ...?`` — so the default
+Python / Jupyter traceback footer is already useful without any
+opt-in. ``e.report.render()`` returns the multi-line block with the
+caret-annotated source line; the ``aggregate.underwriter`` logger
+emits this automatically at ``ERROR`` level on every failed
+``build()``. The three patterns below cover the common use-cases.
+
+**1. Notebook / REPL — show the formatted error before the traceback.**
+
+.. code-block:: python
+
+    try:
+        build('agg X 100 claims sev lognorm 100 cv 2 mixd poisson 0.5')
+    except ValueError as e:
+        print(e.report.render())     # caret + "Did you mean..."
+        raise                        # re-raise to keep the traceback
+
+The rendered output looks like::
+
+    DecL parse error at line 1, column 39:
+
+      agg X 100 claims sev lognorm 100 cv 2 mixd poisson 0.5
+                                            ^^^^
+
+    Unexpected 'mixd'. Did you mean: mixed? Expected: 'mixed', 'occurrence', '/', '+', '-', ...
+
+For long programs (longer than ~80 characters) the source line is
+windowed around the caret with ``... `` / `` ...`` markers and
+word-boundary snapping, so the caret stays on a single terminal row.
+
+**2. Script that wants the suggestion programmatically.**
+
+.. code-block:: python
+
+    try:
+        build(text)
+    except ValueError as e:
+        if getattr(e, 'report', None) and e.report.suggestions:
+            print(f"Did you mean: {e.report.suggestions[0]}?")
+        raise
+
+The ``getattr`` guard makes the snippet robust against non-parse
+``ValueError`` (e.g. semantic validation failures from the transformer)
+which don't carry a ``.report``.
+
+**3. IPython traceback hook — auto-format every parse error in a session.**
+
+For users who want the report rendered automatically in every Jupyter
+cell, install a one-shot traceback hook (typically in
+``~/.ipython/profile_default/startup/decl_errors.py``):
+
+.. code-block:: python
+
+    from IPython import get_ipython
+
+    def _showtb(self, etype, evalue, tb, **kw):
+        report = getattr(evalue, 'report', None)
+        if report is not None:
+            print(report.render())
+        return self._showtraceback_original(etype, evalue, tb, **kw)
+
+    ip = get_ipython()
+    ip._showtraceback_original = ip.showtraceback
+    ip.showtraceback = _showtb.__get__(ip)
+
+The library deliberately does **not** install this hook on import —
+recipe (3) is shown here for power users who want it, and is easy to
+undo.
+
+The same report is also written via the ``aggregate.underwriter``
+logger at ``ERROR`` level on every failed ``build()``, so a notebook
+with logging configured will see the rendered text adjacent to the
+traceback without any opt-in.
+
+
 Parser Implementation
 =======================
 

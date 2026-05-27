@@ -1353,10 +1353,10 @@ The :meth:`analyze_distortions` method applies the distortions in ``p07.distorti
 
 .. _10 min twelve plot:
 
-Twelve Plot
+Plot Twelve
 ~~~~~~~~~~~~~
 
-The :meth:`twelve_plot` method produces a detailed analysis of the behavior of a two unit portfolio. To run it, build the portfolio and calibrate some distortions. Then apply one of the distortions (to compute an augmented version of ``density_df`` with pricing information). We give two examples.
+The :meth:`plot_twelve` method produces a detailed analysis of the behavior of a two unit portfolio. To run it, build the portfolio and calibrate some distortions. Then apply one of the distortions (to compute an augmented version of ``density_df`` with pricing information). We give two examples.
 
 First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5.  The argument ``efficient=False`` in :meth:`apply_distortion` includes extra columns in ``density_df`` that are needed to compute the plot.
 
@@ -1364,6 +1364,7 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
 .. ipython:: python
     :okwarning:
 
+    from aggregate.pedagogy import plot_twelve
     p09 = build('port TenM:09 '
                   'agg X1 1 claim sev gamma 1 cv 0.25 fixed '
                   'agg X2 1 claim sev 0.7 * lognorm 1 cv 1.25 + 0.3 fixed'
@@ -1375,7 +1376,7 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
     p09.apply_distortion('dual', efficient=False);
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10mins_twelve_p09.png
-    p09.twelve_plot(fig, axs, p=0.999, p2=0.999)
+    plot_twelve(p09, fig, axs, p=0.999, p2=0.999)
 
 
 There is a lot of information here. We refer to the charts as
@@ -1500,7 +1501,7 @@ by X2 and so X2 receives a disproportionate share of the assets in default.
 .. ipython:: python
     :okwarning:
 
-    a2 = p09.analyze_distortion('dual', ROE=0.1, p=p09.cdf(12.5))
+    a2 = p09.analyze_distortion('dual', a=12.5)
     print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
 
 The second portfolio has been selected with two thick tailed units. A appears riskier at lower return periods and B at higher. Pricing is calibrated to a 15% ROE at a 99.6% capital level.
@@ -1550,7 +1551,7 @@ The lifted natural allocation (diversified pricing) is given next.
 .. ipython:: python
     :okwarning:
 
-    a2 = p10.analyze_distortion('dual', ROE=0.1, p=p10.cdf(assets))
+    a2 = p10.analyze_distortion('dual', a=assets)
     print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
 
 

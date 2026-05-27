@@ -317,13 +317,13 @@ Execute a variety of updates and assemble answer. Compare :cite:t:`Schaller2008`
    import time
    import pandas as pd
    updates = {
-       'a': dict(log2=17, bs=100, normalize=True, padding=0 , tilt_vector=None),
-       'b': dict(log2=17, bs=100, normalize=False, padding=0, tilt_vector=None),
-       'c': dict(log2=17, bs=100, normalize=False, padding=1, tilt_vector=None),
-       'd': dict(log2=17, bs=100, normalize=False, padding=2, tilt_vector=None),
-       'e': dict(log2=20, bs=25, normalize=True, padding=1 , tilt_vector=None),
-       'f': dict(log2=20, bs=25, normalize=False, padding=1 , tilt_vector=None),
-       'g': dict(log2=17, bs=100, normalize=False, padding=0, tilt_vector=20 / (1<<17))
+       'a': dict(log2=17, bs=100, normalize=True, padding=0),
+       'b': dict(log2=17, bs=100, normalize=False, padding=0),
+       'c': dict(log2=17, bs=100, normalize=False, padding=1),
+       'd': dict(log2=17, bs=100, normalize=False, padding=2),
+       'e': dict(log2=20, bs=25, normalize=True, padding=1),
+       'f': dict(log2=20, bs=25, normalize=False, padding=1),
+       # 'g': dict(log2=17, bs=100, normalize=False, padding=0, tilt_vector=20 / (1<<17))
        }
    ans = {}
    for k, v in updates.items():

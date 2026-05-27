@@ -236,7 +236,7 @@ notably:
 
 #. :class:`Aggregate`: ``price``, ``apply_distortion``
 #. :class:`Portfolio`: ``price``, ``apply_distortion``,  (called by ``analyze distortion``)
-#. :class:`Distortion`: ``price``, ``price2``
+#. :class:`Distortion`: ``price``
 #. Working by hand using ``density_df.p_total``.
 
 All of these methods use the same approach, the integral is approximated as a left Riemann sum:
@@ -294,20 +294,19 @@ Compute pricing in the four ways described above.
    bit['aS'] = 1 - bit.p_total.cumsum()
    bit['gS'] = d.g(bit.S)
    bit['gaS'] = d.g(bit.aS)
-   test = pd.Series((d.price(bit.loc[:a.q(0.99), 'p_total'], kind='both')[-1],
+   test = pd.Series((d.price(bit['p_total'], a=a.q(0.99), kind='both')[-1],
                      d.price(a.density_df.p_total, a.q(0.99), kind='both')[-1],
-                     d.price2(bit.p_total).loc[a.q(0.99)].ask, \
-                     d.price2(bit.p_total, a.q(0.99)).ask.iloc[0],
+                     d.price(a.density_df.p_total, a.q(0.99),
+                              S_calculation='forwards', kind='both')[-1],
                      a.price(0.99, d).iloc[0, 1],
-                     dm.price,
+                     pa.price(.99, d).price,
                      bit.loc[:a.q(0.99)-a.bs, 'gS'].sum() * a.bs,
                      bit.loc[:a.q(0.99)-a.bs, 'gS'].cumsum().iloc[-1] * a.bs,
                      bit.loc[:a.q(0.99)-a.bs, 'gaS'].sum() * a.bs,
                      bit.loc[:a.q(0.99)-a.bs, 'gaS'].cumsum().iloc[-1] * a.bs),
-             index=['distortion.price',
-                    'distortion.price with a',
-                    'distortion.price2, find a',
-                    'distortion.price2(a)',
+             index=['distortion.price bit',
+                    'distortion.price a density_df',
+                    'distortion.price forwards',
                     'Aggregate.price',
                     'Portfolio.price',
                     'bit sum',
@@ -326,7 +325,9 @@ Display the results and the relative difference to the largest price.
    qd(test.sort_values() / test.sort_values().iloc[-1] - 1,
       float_format=lambda x: f'{x:.6e}')
 
-
+If the input series is not normalized there is a difference between the
+forward and backward calculation, as explained in the Distortion price
+method doc string. That applies in this case.
 
 The Equal Priority Default Rule
 ----------------------------------

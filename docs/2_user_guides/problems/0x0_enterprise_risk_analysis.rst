@@ -383,7 +383,7 @@ Analyze Implied Pricing
 
 Apply the distortions to the net portfolio and analyze the resulting pricing
 using :meth:`analyze_distortions`, which includes a by-unit margin
-allocation. The dataframe ``ans.comp_df`` contains a wealth of other
+allocation. The dataframe ``ans.pricing_df`` contains a wealth of other
 information; we just focus on the premium. The last row, ``Technical``, shows
 market reinsurance pricing.
 
@@ -391,10 +391,10 @@ market reinsurance pricing.
     :okwarning:
 
     abcd_net.distortions = abcd.distortions
-    ansn = abcd_net.analyze_distortions(p=0.996, add_comps=False); \
-    ans = abcd.analyze_distortions(p=0.996, add_comps=False); \
-    bit = pd.concat((ans.comp_df.xs('P', 0, 1), ansn.comp_df.xs('P', 0, 1),
-                    ans.comp_df.xs('P', 0, 1) - ansn.comp_df.xs('P', 0, 1)),
+    ansn = abcd_net.analyze_distortions(p=0.996); \
+    ans = abcd.analyze_distortions(p=0.996); \
+    bit = pd.concat((ans.pricing_df.xs('P', 0, 1), ansn.pricing_df.xs('P', 0, 1),
+                    ans.pricing_df.xs('P', 0, 1) - ansn.pricing_df.xs('P', 0, 1)),
                     axis=1, keys=['gross', 'net', 'ceded']); \
     bit = bit.iloc[[0, 2,-1, 1, -2]]; \
     bit.loc['Technical'] = 0.0; \

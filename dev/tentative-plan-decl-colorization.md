@@ -1,6 +1,23 @@
 # Plan — unified DecL colorization
 
-**Status:** ready to execute after `plan-parser-errors-promotion`.
+**Status:** DEFERRED 2026-05-27. Plan is complete and ready to execute,
+but parked pending a concrete pull. The headline payoff most readers
+assume — colorized errors in JupyterLab cell tracebacks — does not
+happen automatically: IPython's traceback formatter calls
+``__str__`` on the exception, not ``_repr_html_``. The real wins are
+(a) Sphinx docs DecL code blocks picking up the project palette, and
+(b) ANSI-colored ``e.report.render()`` in a TTY. Both are aesthetic
+rather than load-bearing. Resurrect when the docs identity becomes
+a stated priority or a user explicitly asks for the Jupyter HTML box.
+
+**Drift to fix on resurrection:** ``ErrorReport.render()`` was rewritten
+in the parser-errors-promotion work to use a single concatenated
+message line (message + "Did you mean…" + "Expected…"). The
+``render(color=...)`` sketch in §"Renderer 2 — ANSI terminal" still
+shows the old multi-``lines.append`` form. Color the three
+sub-strings individually before concatenating, then assemble the
+``lines`` list — do not restructure the tight layout.
+
 **Depends on:** parser_errors promotion (so there's a Jupyter HTML
 consumer to motivate the HTML renderer; not strictly required).
 **Unblocks:** consistent DecL visual identity across docs (Sphinx

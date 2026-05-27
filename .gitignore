@@ -59,11 +59,3 @@ cheat-sheets/preamble.fmt
 # Local scratch (ad-hoc throwaway files)
 scratch_*
 hacks
-
-# web SPA build artifacts (Plan D)
-web/node_modules/
-web/dist/
-# The built SPA lands in src/aggregate/api/static/. Output of
-# `npm run build`; not committed. Plan E rebuilds before packaging.
-src/aggregate/api/static/assets/
-src/aggregate/api/static/index.html

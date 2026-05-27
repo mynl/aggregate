@@ -10,13 +10,16 @@ one-liners. This module converts them into :class:`ErrorReport` objects
 suitable for IDE-style display: caret-annotated source line, friendly
 terminal labels, and "did you mean" suggestions.
 
-The intended consumer is :mod:`aggregate.api` (the FastAPI service in
-Plan C), but the formatter is pure: it accepts a Lark exception (or a
-:class:`ValueError` wrapping one) and returns a dataclass. Any caller
-that needs a richer DecL error story can use it directly.
+The intended consumer is the default :class:`UnderwritingParser.parse`
+error path (every ``build(...)`` call hitting a DecL typo), plus any
+CLI / REPL / debugger that wants a richer DecL error story. The
+formatter is pure: it accepts a Lark exception (or a
+:class:`ValueError` wrapping one) and returns a dataclass.
 
-The legacy ``UnderwritingParser.parse`` ValueError wrapping path is
-untouched -- this module reads from it via ``__cause__``.
+``UnderwritingParser.parse`` attaches an :class:`ErrorReport` to the
+wrapping :class:`ValueError` as ``.report``; this module's
+:func:`format_error` also unwraps the Lark exception via
+``__cause__`` if a raw ``ValueError`` is passed in.
 """
 
 from __future__ import annotations
@@ -174,7 +177,7 @@ class ErrorReport:
     message: str
 
     def to_dict(self) -> dict:
-        """JSON-serializable form for the api response body."""
+        """JSON-serializable dict form (for tooling, logging, or transport)."""
         return asdict(self)
 
     def render(self) -> str:

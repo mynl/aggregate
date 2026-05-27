@@ -116,12 +116,17 @@ column, source-line echo, caret marker, friendly terminal labels, and
 Earley + dynamic lexer, almost every DecL parse failure surfaces as
 ``UnexpectedCharacters``; the formatter recovers the full mistyped word
 by scanning forward through the DecL identifier character class, then
-compares it against the parser-state's allowed terminal set. The
-existing ``UnderwritingParser.parse`` ``ValueError(SimpleNamespace)``
-wrapping path is untouched -- the formatter unwraps the wrapped Lark
-exception via ``__cause__``. Standalone module; promotion into the
-default ``build()`` error path is pending (see
-``dev/plan-parser-errors-promotion.md``).
+compares it against the parser-state's allowed terminal set.
+
+The report is now attached to every ``build()`` parse failure as
+``e.report`` and rendered into the ``aggregate.underwriter`` logger at
+``ERROR``. ``str(e)`` and ``e.args[0]`` (the legacy
+``SimpleNamespace`` with ``.type``/``.value``/``.index``) are unchanged
+— the rich form is **opt-in** to keep downstream consumers that catch
+``ValueError`` and inspect ``str(e)`` undisturbed. Three opt-in
+recipes (notebook print-then-raise, programmatic suggestion read,
+IPython traceback hook) are documented in the "Reading Parse Errors"
+section of the DecL language reference.
 
 1.0.0a15
 ---------

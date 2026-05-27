@@ -50,6 +50,8 @@ import numpy as np
 from lark import Lark, Transformer
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
+from .parser_errors import format_error
+
 logger = logging.getLogger(__name__)
 
 __all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar']
@@ -919,22 +921,28 @@ class UnderwritingParser:
             tree = _PARSER.parse(text)
         except UnexpectedToken as e:
             tok = e.token
-            raise ValueError(
+            err = ValueError(
                 SimpleNamespace(
                     type=getattr(tok, "type", "?"),
                     value=str(tok),
                     index=getattr(tok, "start_pos", 0) or 0,
                 )
-            ) from e
+            )
+            err.report = format_error(text, e)
+            raise err from e
         except UnexpectedCharacters as e:
             pos = getattr(e, "pos_in_stream", None)
             if pos is None:
                 pos = max(0, getattr(e, "column", 1) - 1)
-            raise ValueError(
+            err = ValueError(
                 SimpleNamespace(type="?", value=text[pos : pos + 1], index=pos)
-            ) from e
+            )
+            err.report = format_error(text, e)
+            raise err from e
         except UnexpectedInput as e:
-            raise ValueError(SimpleNamespace(type="?", value=str(e), index=0)) from e
+            err = ValueError(SimpleNamespace(type="?", value=str(e), index=0))
+            err.report = format_error(text, e)
+            raise err from e
         return UnderwritingTransformer(self.safe_lookup, self.debug).transform(tree)
 
 

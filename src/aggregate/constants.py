@@ -8,7 +8,7 @@ from enum import Flag, auto
 
 __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
-           'RECOMMEND_P', 'Validation',
+           'VALIDATION_NOISE', 'RECOMMEND_P', 'Validation',
            'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
 FIG_W = 3.5
@@ -25,6 +25,14 @@ LEGEND_FONT = 'x-small'
 PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
 VALIDATION_EPS = 1e-4
+# Absolute floor below which a quantity is treated as exact zero / pure
+# numerical noise. aggregate's FFT arithmetic is essentially exact, so
+# genuine dust lives around 1e-14--1e-15 (e.g. the skewness of a symmetric
+# distribution); 1e-12 clears it with headroom while sitting ~3 orders above
+# numpy pairwise-summation roundoff and 8 orders below VALIDATION_EPS. Used
+# for defective-distribution detection and for the near-zero (absolute vs
+# relative) error fallback in validation and the describe/stats_df displays.
+VALIDATION_NOISE = 1e-12
 RECOMMEND_P = 0.99999
 
 # User-local data directory (under Path.home())

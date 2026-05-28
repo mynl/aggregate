@@ -31,21 +31,40 @@ __all__ = [
 ]
 
 
-def silence_warnings():
-    """Suppress Python warnings globally in the current process.
+def silence_warnings(category=Warning, message='', module=''):
+    """Suppress matching warnings in the current process.
 
-    Convenience for notebook / REPL users who'd rather not see scipy /
-    numpy deprecation chatter while exploring. Equivalent to::
+    Convenience for notebook / REPL users who'd rather not see numpy / scipy
+    chatter while exploring. With no arguments it silences *all* warnings;
+    narrow it by passing a ``category``, a ``message`` regex, or a ``module``
+    regex. For example, the benign boundary-evaluation noise from the
+    distortion g-functions is all :class:`RuntimeWarning`::
 
-        import warnings
-        warnings.simplefilter('ignore')
+        from aggregate.utilities import silence_warnings
+        silence_warnings(RuntimeWarning)                  # just those
+        silence_warnings(message='divide by zero')        # even narrower
+        silence_warnings()                                # everything
 
-    This affects ALL warnings in the current Python process, not just
-    those originating in :mod:`aggregate`. Do not call from library
-    code -- it's an explicit, end-user-only convenience.
+    Parameters
+    ----------
+    category : type[Warning], default :class:`Warning`
+        Warning class to ignore. The default :class:`Warning` matches every
+        category; pass e.g. ``RuntimeWarning`` or ``DeprecationWarning`` to
+        scope it.
+    message : str, default ''
+        Regex matched against the *start* of the warning text; '' matches all.
+    module : str, default ''
+        Regex matched against the issuing module's ``__name__``; '' matches all.
+
+    Notes
+    -----
+    Appends an ``ignore`` rule via :func:`warnings.filterwarnings`. Unlike the
+    blunter ``warnings.simplefilter('ignore')`` it does **not** discard
+    existing filters. The effect is process-wide and is an explicit
+    end-user-only convenience -- never call it from library code.
     """
     import warnings
-    warnings.simplefilter('ignore')
+    warnings.filterwarnings('ignore', message=message, category=category, module=module)
 
 
 def decl_pprint(txt, split=0, html=False, show=True):

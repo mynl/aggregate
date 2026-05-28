@@ -22,14 +22,15 @@ import warnings
 from IPython.display import HTML, display
 
 from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
-                        Validation, WL)
+                        VALIDATION_NOISE, Validation, WL)
 from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
 
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
-from .moments import MomentAggregator, MomentWrangler
+from .moments import (MomentAggregator, MomentWrangler,
+                      _noise_aware_rel_error, _snap_noise)
 from .iman_conover import iman_conover
 from .utilities import (ft, ift, decl_pprint,
                         subsets, round_bucket,
@@ -907,14 +908,19 @@ class Portfolio(object):
         if pd.notna(emp_agg_m):
             df.loc['Sev', 'Est E[X]'] = float(emp[('sev', 'mean')])
             df.loc['Agg', 'Est E[X]'] = float(emp_agg_m)
-            df['Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
+            df['Err E[X]'] = _noise_aware_rel_error(df['Est E[X]'], df['E[X]'])
             df.loc['Sev', 'Est CV(X)'] = float(emp[('sev', 'cv')])
             df.loc['Agg', 'Est CV(X)'] = float(emp[('agg', 'cv')])
-            df['Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
+            df['Err CV(X)'] = _noise_aware_rel_error(df['Est CV(X)'], df['CV(X)'])
             df.loc['Sev', 'Est Skew(X)'] = float(emp[('sev', 'skew')])
             df.loc['Agg', 'Est Skew(X)'] = float(emp[('agg', 'skew')])
             df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)',
                      'Skew(X)', 'Est Skew(X)']]
+        # snap floating-point dust to 0 in the moment-value columns for
+        # display (e.g. the skew of a symmetric unit); NaN preserved.
+        for c in ['E[X]', 'Est E[X]', 'CV(X)', 'Est CV(X)', 'Skew(X)', 'Est Skew(X)']:
+            if c in df.columns:
+                df[c] = _snap_noise(df[c])
 
         t1 = [a.describe for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
@@ -1628,14 +1634,12 @@ class Portfolio(object):
         self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
         self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
 
-        # error: relative diff vs the ``total`` column. For meta rows
-        # where empirical == total the result is 0 (or NaN where total
-        # is NaN, e.g. attach was inconsistent across units).
-        self.stats_df['error'] = (
-            pd.to_numeric(self.stats_df['empirical'], errors='coerce')
-            / pd.to_numeric(self.stats_df['total'], errors='coerce')
-            - 1
-        )
+        # error: noise-aware diff vs the ``total`` column — relative error,
+        # falling back to absolute where the theoretical value is ~0 (e.g.
+        # the skew of a symmetric unit). For meta rows where empirical ==
+        # total the result is 0 (or NaN where total is NaN).
+        self.stats_df['error'] = _noise_aware_rel_error(
+            self.stats_df['empirical'], self.stats_df['total'])
 
     @property
     def valid(self):
@@ -1658,7 +1662,13 @@ class Portfolio(object):
 
         eps = 1e-3 by default; change in ``validation_eps`` attribute.
 
-        Test only applied for CV and skewness when they are > 0.
+        The CV and skew tests are applied only when the theoretical value is
+        finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
+        theoretically-zero skew (symmetric total) or CV is skipped, because
+        the FFT's empirical estimate of a zero higher moment is grid-
+        dependent noise with no meaningful relative error. When the test
+        applies, ``np.isclose`` with relative tolerance ``10*eps`` (CV) /
+        ``100*eps`` (skew) measures agreement.
 
         :return: True if all tests are passed, else False.
 
@@ -1688,12 +1698,6 @@ class Portfolio(object):
 
         # apply validation to the Portfolio total
         df = self.describe.xs('total', level=0, axis=0).abs()
-        try:
-            df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
-        except ZeroDivisionError:
-            df['Err Skew(X)'] = np.nan
-        except TypeError:
-            df['Err Skew(X)'] = np.nan
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
             logger.info('FAIL: Portfolio Sev mean error > eps')
@@ -1707,25 +1711,28 @@ class Portfolio(object):
             logger.info('FAIL: Agg mean error > 10 * sev error')
             rv |= Validation.ALIASING
 
-        try:
-            if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Portfolio Sev CV error > eps')
-                rv |= Validation.SEV_CV
-
-            if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Portfolio Agg CV error > eps')
-                rv |= Validation.AGG_CV
-
-            if np.inf > df.loc['Sev', 'Skew(X)'] > 0 and df.loc['Sev', 'Err Skew(X)'] > 100 * eps:
-                logger.info('FAIL: Portfolio Sev skew error > eps')
-                rv |= Validation.SEV_SKEW
-
-            if np.inf > df.loc['Agg', 'Skew(X)'] > 0 and df.loc['Agg', 'Err Skew(X)'] > 100 * eps:
-                logger.info('FAIL: Portfolio Agg skew error > eps')
-                rv |= Validation.AGG_SKEW
-
-        except (TypeError, ZeroDivisionError):
-            pass
+        # CV and skew: tested only when the theoretical value is meaningfully
+        # non-zero (abs(theo) > VALIDATION_NOISE); a theoretically-zero skew
+        # (symmetric total) or CV cannot be validated against the FFT's
+        # empirical estimate, whose noise floor is grid-dependent. See
+        # Aggregate.valid. Read theoretical (``total``) and empirical from the
+        # canonical stats_df; isfinite skips undefined moments.
+        total = self.stats_df['total']
+        emp = self.stats_df['empirical']
+        for comp, flag in (('sev', Validation.SEV_CV), ('agg', Validation.AGG_CV)):
+            theo = float(total[(comp, 'cv')])
+            est = float(emp[(comp, 'cv')])
+            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                    and not np.isclose(est, theo, rtol=10 * eps, atol=VALIDATION_NOISE)):
+                logger.info('FAIL: Portfolio %s CV error > eps', comp)
+                rv |= flag
+        for comp, flag in (('sev', Validation.SEV_SKEW), ('agg', Validation.AGG_SKEW)):
+            theo = float(total[(comp, 'skew')])
+            est = float(emp[(comp, 'skew')])
+            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                    and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
+                logger.info('FAIL: Portfolio %s skew error > eps', comp)
+                rv |= flag
 
         if rv == Validation.NOT_UNREASONABLE:
             logger.info('Portfolio does not fail any validation: not unreasonable')

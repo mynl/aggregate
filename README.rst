@@ -28,8 +28,45 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
-1.0.0a16 (in progress)
------------------------
+1.0.0a17
+---------
+
+Noise-aware validation, denoised ``describe``, empirical raw moments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Aggregate.valid`` / ``Portfolio.valid`` now test CV and skewness with
+  ``np.isclose`` against a definite noise floor (``VALIDATION_NOISE =
+  1e-12``) instead of a relative error guarded only by ``> 0``. This fixes
+  spurious skew/CV failures for symmetric or low-skew distributions whose
+  analytic value is exactly 0 but computes as floating-point dust -- e.g.
+  ``dsev [1:6]`` (a fair die) no longer reports ``fails sev skew, agg skew``.
+- ``describe`` no longer displays floating-point dust: near-zero moment
+  cells are snapped to 0, and the error columns fall back to absolute error
+  where the theoretical value is ~0.
+- ``stats_df['error']`` is now noise-aware (same fallback). The raw
+  ``empirical`` and ``mixed`` / ``total`` columns retain their exact values.
+- Empirical raw moments ``ex1`` / ``ex2`` / ``ex3`` are now populated in
+  ``Aggregate.stats_df['empirical']`` for the ``sev`` and ``agg`` rows
+  (``Portfolio`` already did this).
+- Empirical aggregate moments are now computed from a de-fuzzed *copy* of
+  the FFT density (sub-machine-epsilon fp noise zeroed, the same
+  ``remove_fuzz`` threshold ``density_df`` uses), so the stored higher
+  moments -- notably skew -- are clean and grid-independent instead of
+  picking up ``x**3``-amplified far-tail noise. ``agg_density`` itself is
+  left untouched as the raw FFT output.
+- New ``moments.ser_to_mwrangler(ser)`` builds a ``MomentWrangler`` from a
+  Series whose index is the support (e.g. ``density_df.p_total``).
+- ``utilities.silence_warnings`` now takes optional ``category`` / ``message``
+  / ``module`` arguments to scope what is suppressed.
+- The ``xsden_to_*`` moment helpers now share a single public entry point
+  ``xsden_to_mwrangler`` (returns a ``MomentWrangler``), resolving the
+  previous ``meancv`` / ``meancvskew`` tail-mass inconsistency and avoiding
+  redundant moment passes where both raw and standardized moments are
+  needed; a definitely defective distribution
+  (``sum(p) < 1 - VALIDATION_NOISE``) is now logged at INFO.
+
+1.0.0a16 
+---------
 
 Distortion: atom-row stats_df, Kusuoka summary in describe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

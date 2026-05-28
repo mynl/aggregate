@@ -34,7 +34,9 @@
       "Bash(curl.exe -s -o /tmp/fav.ico -w \"status=%{http_code}\\\\ntype=%{content_type}\\\\nsize=%{size_download}\\\\n\" http://127.0.0.1:8765/favicon.ico)",
       "Bash(curl.exe -s -o /tmp/logo.png -w \"status=%{http_code}\\\\ntype=%{content_type}\\\\nsize=%{size_download}\\\\n\" http://127.0.0.1:8765/logo.png)",
       "Bash(curl.exe -s -X POST http://127.0.0.1:8765/v1/objects -H \"Content-Type: application/json\" -d '{\"decl\":\"agg Dice dfreq [3] dsev [1:6]\"}')",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([c['letter']+'.'+c['title'] for c in d['categories']]\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([c['letter']+'.'+c['title'] for c in d['categories']]\\)\")",
+      "Bash(rg *)",
+      "Bash(git ls-tree *)"
     ]
   }
 }

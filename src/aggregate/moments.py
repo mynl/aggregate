@@ -7,11 +7,14 @@ import logging
 import numpy as np
 import pandas as pd
 
+from .constants import VALIDATION_NOISE
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'MomentAggregator', 'MomentWrangler',
-    'xsden_to_meancv', 'xsden_to_meancvskew',
+    'xsden_to_mwrangler', 'ser_to_mwrangler',
+    'xsden_to_meancv', 'xsden_to_meancvskew', 'xsden_to_noncentral',
 ]
 
 
@@ -404,49 +407,48 @@ class MomentWrangler:
         self._factorial = (ex1, ex2 - ex1, ex3 - 3 * ex2 + 2 * ex1)
 
 
-def xsden_to_meancv(xs, den):
+def xsden_to_mwrangler(xs, den):
     """
-    Compute mean and cv from xs and density.
+    Build a :class:`MomentWrangler` from a discretized density.
 
-    Consider adding: np.nan_to_num(den)
+    The single entry point for turning ``(xs, den)`` into moments: it
+    populates a :class:`MomentWrangler` with the non-central moments, from
+    which the caller reads ``.noncentral`` (raw moments), ``.mcvsk`` (mean,
+    CV, skew), ``.central``, or ``.factorial`` as needed -- computing the
+    sums only once. The convenience wrappers :func:`xsden_to_meancv`,
+    :func:`xsden_to_meancvskew`, and :func:`xsden_to_noncentral` all route
+    through here, so every caller treats the tail mass identically. Prefer
+    this directly when more than one view of the moments is needed.
 
-    Note: cannot rely on pd.Series[-1] to work... it depends on the index.
-    xs could be an index
-    :param xs:
-    :param den:
-    :return:
+    Parameters
+    ----------
+    xs : numpy.ndarray, pandas.Series, or iterable
+        Bucket left-endpoints of the discretized support, evenly spaced with
+        bucket width ``bs = xs[1] - xs[0]``.
+    den : array-like
+        Probability mass on each bucket of ``xs``. For a proper distribution
+        ``den.sum() == 1``.
+
+    Returns
+    -------
+    MomentWrangler
+        Populated with the non-central moments ``(E[X], E[X^2], E[X^3])``;
+        the caller selects ``.mcvsk`` or ``.noncentral``.
+
+    Notes
+    -----
+    Defective distributions (``den.sum() < 1``) are tolerated: the missing
+    mass ``pg = 1 - den.sum()`` is placed at the *implied maximum loss*
+    ``xsm + bs`` (the right edge of the final bucket), contributing
+    ``pg * (xsm + bs)**k`` to the k-th non-central moment. For a proper
+    distribution ``pg = 0`` and these terms vanish, so the result is
+    unaffected. A genuine deficit (``pg > VALIDATION_NOISE``) is reported at
+    INFO level; deficits at the floating-point noise floor are ignored.
     """
+    # allow for defective distributions
     pg = 1 - den.sum()
     xd = xs * den
-    if isinstance(xs, np.ndarray):
-        xsm = xs[-1]
-    elif isinstance(xs, pd.Series):
-        xsm = xs.iloc[-1]
-    else:
-        xsm = np.array(xs)[-1]
-    ex1 = np.sum(xd) + pg * xsm
-    # logger.log(WL, f'tail mass mean adjustment {pg * xsm}')
-    ex2 = np.sum(xd * xs) + pg * xsm ** 2
-    sd = np.sqrt(ex2 - ex1 ** 2)
-    if ex1 != 0:
-        cv = sd / ex1
-    else:
-        cv = np.nan
-    return ex1, cv
-
-
-def xsden_to_meancvskew(xs, den):
-    """
-    Compute mean, cv and skewness from xs and density
-
-    Consider adding: np.nan_to_num(den)
-
-    :param xs:
-    :param den:
-    :return:
-    """
-    pg = 1 - den.sum()
-    xd = xs * den
+    # figure the max observed x for defective distribution adjustment
     if isinstance(xs, np.ndarray):
         xsm = xs[-1]
         bs = xs[1] - xs[0]
@@ -457,12 +459,196 @@ def xsden_to_meancvskew(xs, den):
         _ = np.array(xs)
         xsm = _[-1]
         bs = _[1] - _[0]
+    # the implied max loss is the end of the last bucket, ie xsm + bs
     xsm = xsm + bs
+    if pg > VALIDATION_NOISE:
+        logger.info(
+            'Defective distribution: probabilities sum to %.15g (deficit %.3g); '
+            'missing mass placed at implied max loss %.6g.',
+            1 - pg, pg, xsm)
+    # pg * xsm adds defective > max adjustment
     ex1 = np.sum(xd) + pg * xsm
-    # logger.log(WL, f'tail mass mean adjustment {pg * xsm}')
     xd *= xs
     ex2 = np.sum(xd) + pg * xsm ** 2
     ex3 = np.sum(xd * xs) + pg * xsm ** 3
     mw = MomentWrangler()
     mw.noncentral = ex1, ex2, ex3
+    return mw
+
+
+def xsden_to_meancv(xs, den):
+    """
+    Compute the mean and CV from a discretized density.
+
+    Parameters
+    ----------
+    xs : array-like
+        Bucket left-endpoints of the discretized support.
+    den : array-like
+        Probability mass on each bucket of ``xs``.
+
+    Returns
+    -------
+    tuple
+        ``(mean, cv)``. ``cv`` is ``nan`` when the mean is zero.
+
+    Notes
+    -----
+    Delegates to :func:`xsden_to_mwrangler`; see its Notes for the defective
+    distribution (``den.sum() < 1``) tail-mass convention.
+    """
+    mw = xsden_to_mwrangler(xs, den)
+    m, cv, _ = mw.mcvsk
+    return m, cv
+
+
+def xsden_to_meancvskew(xs, den):
+    """
+    Compute the mean, CV, and skewness from a discretized density.
+
+    Parameters
+    ----------
+    xs : array-like
+        Bucket left-endpoints of the discretized support.
+    den : array-like
+        Probability mass on each bucket of ``xs``.
+
+    Returns
+    -------
+    tuple
+        ``(mean, cv, skew)``. ``cv`` is ``nan`` when the mean is zero and
+        ``skew`` is ``nan`` when the standard deviation is zero.
+
+    Notes
+    -----
+    Delegates to :func:`xsden_to_mwrangler`; see its Notes for the defective
+    distribution (``den.sum() < 1``) tail-mass convention.
+    """
+    mw = xsden_to_mwrangler(xs, den)
     return mw.mcvsk
+
+
+def xsden_to_noncentral(xs, den):
+    """
+    Compute the first three non-central moments from a discretized density.
+
+    Parameters
+    ----------
+    xs : array-like
+        Bucket left-endpoints of the discretized support.
+    den : array-like
+        Probability mass on each bucket of ``xs``.
+
+    Returns
+    -------
+    tuple
+        The non-central (raw) moments ``(E[X], E[X^2], E[X^3])``.
+
+    Notes
+    -----
+    Delegates to :func:`xsden_to_mwrangler`; see its Notes for the defective
+    distribution (``den.sum() < 1``) tail-mass convention.
+    """
+    mw = xsden_to_mwrangler(xs, den)
+    return mw.noncentral
+
+
+def ser_to_mwrangler(ser):
+    """
+    Build a :class:`MomentWrangler` from a Series indexed by its support.
+
+    Convenience wrapper around :func:`xsden_to_mwrangler` for the common case
+    where the x values are the Series index and the probability mass is the
+    Series values (e.g. ``density_df.p_total``), so callers need not unpack
+    ``ser.index`` / ``ser.values`` by hand.
+
+    Parameters
+    ----------
+    ser : pandas.Series
+        Probability mass indexed by the (evenly spaced) support points.
+
+    Returns
+    -------
+    MomentWrangler
+        See :func:`xsden_to_mwrangler` for what it carries and the defective
+        distribution (``ser.sum() < 1``) tail-mass convention.
+    """
+    return xsden_to_mwrangler(ser.index.to_numpy(), ser.to_numpy())
+
+
+def _noise_aware_rel_error(est, ref):
+    """
+    Relative error that degrades to absolute error when the reference is ~0.
+
+    The usual relative error ``est / ref - 1`` is undefined (or explodes)
+    when ``ref`` is genuinely zero. aggregate produces values that are
+    exactly zero in theory but appear as floating-point dust (e.g. the
+    skewness of a symmetric distribution); a naive relative error against
+    that dust is meaningless. Where ``|ref|`` is at or below
+    :data:`~aggregate.constants.VALIDATION_NOISE` the absolute error
+    ``est - ref`` is returned instead.
+
+    Parameters
+    ----------
+    est : float, numpy.ndarray, or pandas.Series
+        Estimated (empirical) value(s).
+    ref : float, numpy.ndarray, or pandas.Series
+        Reference (theoretical) value(s).
+
+    Returns
+    -------
+    Same shape/type as the inputs
+        Relative error where ``|ref| > VALIDATION_NOISE``, absolute error
+        otherwise. ``nan`` inputs propagate as ``nan``.
+    """
+    def _one(e, r):
+        # per-element so heterogeneous object columns (e.g. the meta string
+        # rows of stats_df) coerce to nan instead of raising.
+        try:
+            rf = float(r)
+            ef = float(e)
+        except (TypeError, ValueError):
+            return np.nan
+        if abs(rf) > VALIDATION_NOISE:
+            return ef / rf - 1
+        return ef - rf
+
+    if isinstance(est, pd.Series) or isinstance(ref, pd.Series):
+        idx = est.index if isinstance(est, pd.Series) else ref.index
+        n = len(idx)
+        est_v = est.to_numpy() if isinstance(est, pd.Series) else np.broadcast_to(est, (n,))
+        ref_v = ref.to_numpy() if isinstance(ref, pd.Series) else np.broadcast_to(ref, (n,))
+        return pd.Series([_one(e, r) for e, r in zip(est_v, ref_v)], index=idx)
+
+    est_a = np.asarray(est, dtype=float)
+    ref_a = np.asarray(ref, dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        rel = est_a / ref_a - 1
+    out = np.where(np.abs(ref_a) > VALIDATION_NOISE, rel, est_a - ref_a)
+    return out[()] if out.ndim == 0 else out
+
+
+def _snap_noise(x):
+    """
+    Snap values indistinguishable from zero to exactly zero (display only).
+
+    Used to keep floating-point dust (e.g. ``1.7e-14`` for the skewness of a
+    symmetric distribution) out of rendered tables. Values with magnitude at
+    or below :data:`~aggregate.constants.VALIDATION_NOISE` become ``0.0``;
+    ``nan`` is preserved.
+
+    Parameters
+    ----------
+    x : float, numpy.ndarray, or pandas.Series
+        Value(s) to snap.
+
+    Returns
+    -------
+    Same shape/type as the input
+        ``x`` with near-zero entries replaced by ``0.0``.
+    """
+    arr = np.asarray(x, dtype=float)
+    snapped = np.where(np.abs(arr) <= VALIDATION_NOISE, 0.0, arr)
+    if isinstance(x, pd.Series):
+        return pd.Series(snapped, index=x.index)
+    return snapped[()] if snapped.ndim == 0 else snapped

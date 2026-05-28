@@ -21,9 +21,11 @@ from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
-                        Validation, WL)
+                        VALIDATION_NOISE, Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
-                      xsden_to_meancv, xsden_to_meancvskew)
+                      xsden_to_mwrangler,
+                      xsden_to_meancv, xsden_to_meancvskew,
+                      _noise_aware_rel_error, _snap_noise)
 
 __all__ = [
     'Frequency', 'Severity', 'Aggregate',
@@ -1811,7 +1813,7 @@ class Aggregate:
     def reinsurance_occ_layer_df(self):
         """
         How losses are layered by the occurrence reinsurance. Expected loss,
-        CV layer loss, and expected counts to layers. 
+        CV layer loss, and expected counts to layers.
         """
         if self.occ_reins is None:
             return None
@@ -2024,12 +2026,12 @@ class Aggregate:
     # Construction: __init__ and its component-recording helper
     # ================================================================
 
-    def __init__(self, name, exp_el=0, exp_premium=0, exp_lr=0, exp_en=0, exp_attachment=None, exp_limit=np.inf,
-                 sev_name='', sev_a=np.nan, sev_b=0, sev_mean=0, sev_cv=0, sev_loc=0, sev_scale=0,
-                 sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf, sev_conditional=True,
+    def __init__(self, name, exp_el=0.0, exp_premium=0.0, exp_lr=0.0, exp_en=0.0, exp_attachment=None, exp_limit=np.inf,
+                 sev_name='', sev_a=np.nan, sev_b=0.0, sev_mean=0.0, sev_cv=0.0, sev_loc=0.0, sev_scale=0.0,
+                 sev_xs=None, sev_ps=None, sev_wt=1.0, sev_lb=0.0, sev_ub=np.inf, sev_conditional=True,
                  sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='',
-                 freq_name='', freq_a=0, freq_b=0, freq_zm=False, freq_p0=np.nan,
+                 freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
                  note=''):
         """
@@ -2735,9 +2737,6 @@ class Aggregate:
         xs = np.arange(0, 1 << log2, dtype=float) * bs
         return self.update_work(xs, debug=debug, **kwargs)
 
-    # for backwards compatibility
-    easy_update = update
-
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False, debug=False):
         """
@@ -2745,6 +2744,19 @@ class Aggregate:
 
         See discretize for sev_calc, discretization_calc and normalize.
 
+        Empirical-moment note: the aggregate raw moments -- and hence the
+        empirical CV/skew shown in ``stats_df`` and ``describe`` -- are taken
+        from a de-fuzzed *copy* of the FFT density (values below machine
+        epsilon zeroed). Without this, sub-eps floating-point fuzz in far-tail
+        buckets is amplified by ``x**3`` in the third moment and corrupts the
+        empirical skew on wide grids: a symmetric distribution's skew can
+        drift from ~1e-15 to ~1e-4 as log2 grows, purely from buckets the
+        distribution never reaches. The fuzz is safe to drop because the FFT
+        is exact up to rounding and the exact aggregate has no negative density
+        even under aliasing, so any stray value is small. ``self.agg_density``
+        is deliberately left as the raw FFT output (consistent with
+        ``ftagg_density``); only the moment computation sees the cleaned copy.
+        See the inline comment at the moment computation for full detail.
 
         Quick simple test with log2=13 update took 5.69 ms and _eff took 2.11 ms. So quicker
         but not an issue unless you are doing many buckets or aggs.
@@ -2801,18 +2813,21 @@ class Aggregate:
                 self.sev_density = self.sev_density_gross
             self.apply_occ_reins(debug)
 
-        if self.n > 100:
-            logger.info('Claim count %s is high; consider increasing log2/buckets', self.n)
         self._freq_sev_convolution(padding)
         if self.n > 0:
             # zero-risk case has no aggregate to reinsure
             self.apply_agg_reins(debug)
 
         # Empirical severity moments from the discretised distribution.
+        # Compute the raw moments once and derive (mean, cv, skew) from the
+        # same MomentWrangler, so the ex123 rows and the mcvsk values are
+        # mutually consistent.
         if self.sev_density is not None:
-            self.est_sev_m, self.est_sev_cv, self.est_sev_skew = \
-                xsden_to_meancvskew(self.xs, self.sev_density)
+            _mw = xsden_to_mwrangler(self.xs, self.sev_density)
+            sev_ex1, sev_ex2, sev_ex3 = _mw.noncentral
+            self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _mw.mcvsk
         else:
+            sev_ex1 = sev_ex2 = sev_ex3 = np.nan
             self.est_sev_m = np.nan
             self.est_sev_cv = np.nan
             self.est_sev_skew = np.nan
@@ -2820,21 +2835,50 @@ class Aggregate:
         self.est_sev_var = self.est_sev_sd * self.est_sev_sd
 
         # Empirical aggregate moments from the FFT output.
-        self.est_m, self.est_cv, self.est_skew = \
-            xsden_to_meancvskew(self.xs, self.agg_density)
+        #
+        # WHY a de-fuzzed *copy*: the raw inverse-FFT density carries
+        # sub-machine-epsilon "fuzz" (tiny +/- values) in essentially every
+        # bucket. In the plain mass sum this cancels (mass is conserved), but
+        # the raw moments weight each bucket by ``x**k``, so on a wide grid the
+        # far-tail fuzz at large ``x`` is amplified by ``x**3`` and corrupts
+        # the empirical skew -- e.g. a symmetric die's skew drifts from ~1e-15
+        # to ~1e-4 as log2 grows, purely from fuzz at buckets the distribution
+        # never reaches. The fuzz is genuine fp noise: the FFT is exact up to
+        # rounding and the exact aggregate has no negative density even under
+        # aliasing (aliasing only wraps *positive* mass), so every stray value
+        # is small and zeroing ``|x| < eps`` is safe and lossless. We do this
+        # on a throwaway copy and deliberately leave ``self.agg_density`` as
+        # the raw output (kept consistent with ``ftagg_density``); the curated
+        # view ``density_df.p_total`` applies the identical ``remove_fuzz``
+        # separately. (We cannot source the moments from ``density_df.p_total``
+        # here: building ``density_df`` needs ``est_m``, computed just below.)
+        agg_clean = np.where(
+            np.abs(self.agg_density) < np.finfo(float).eps, 0.0, self.agg_density)
+        _mw = xsden_to_mwrangler(self.xs, agg_clean)
+        agg_ex1, agg_ex2, agg_ex3 = _mw.noncentral
+        self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         self.est_sd = self.est_m * self.est_cv
         self.est_var = self.est_sd ** 2
 
         # Write empirical and error columns into the canonical stats_df.
         # This is the validation showpiece of Mildenhall 2024, §4.7:
         # theoretical (``mixed`` column) vs. empirical (FFT output).
+        self.stats_df.loc[('sev', 'ex1'),  'empirical'] = sev_ex1
+        self.stats_df.loc[('sev', 'ex2'),  'empirical'] = sev_ex2
+        self.stats_df.loc[('sev', 'ex3'),  'empirical'] = sev_ex3
         self.stats_df.loc[('sev', 'mean'), 'empirical'] = self.est_sev_m
         self.stats_df.loc[('sev', 'cv'),   'empirical'] = self.est_sev_cv
         self.stats_df.loc[('sev', 'skew'), 'empirical'] = self.est_sev_skew
+        self.stats_df.loc[('agg', 'ex1'),  'empirical'] = agg_ex1
+        self.stats_df.loc[('agg', 'ex2'),  'empirical'] = agg_ex2
+        self.stats_df.loc[('agg', 'ex3'),  'empirical'] = agg_ex3
         self.stats_df.loc[('agg', 'mean'), 'empirical'] = self.est_m
         self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
         self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
-        self.stats_df['error'] = self.stats_df['empirical'] / self.stats_df['mixed'] - 1
+        # noise-aware: relative error, falling back to absolute where the
+        # theoretical value is ~0 (e.g. skew of a symmetric severity).
+        self.stats_df['error'] = _noise_aware_rel_error(
+            self.stats_df['empirical'], self.stats_df['mixed'])
 
         # invalidate stored functions
         self._cdf = None
@@ -2921,7 +2965,14 @@ class Aggregate:
         The default uses eps = 1e-4 relative error. This can be changed by setting the validation_eps
         variable.
 
-        Test only applied for CV and skewness when they are > 0.
+        The CV and skew tests are applied only when the theoretical value is
+        finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
+        theoretically-zero skew (symmetric severity) or CV (deterministic
+        severity) is skipped, because the FFT's empirical estimate of a zero
+        higher moment is grid-dependent noise with no meaningful relative
+        error. When the test applies, ``np.isclose`` with relative tolerance
+        ``10*eps`` (CV) / ``100*eps`` (skew, harder to estimate) measures
+        agreement.
 
         Run with logger level 20 (info) for more information on failures.
 
@@ -2939,17 +2990,11 @@ class Aggregate:
             # cannot validate when there is reinsurance
             # could possibly add manually
             return Validation.REINSURANCE
-        df = self.describe.abs()
-        try:
-            df['Err Skew(X)'] = df['Est Skew(X)'] / df['Skew(X)'] - 1
-        except ZeroDivisionError:
-            df['Err Skew(X)'] = np.nan
-        except TypeError:
-            df['Err Skew(X)'] = np.nan
-        except KeyError:
-            # not updated
+        # Not yet updated → no empirical moments to validate against.
+        if pd.isna(self.stats_df['empirical'].get(('agg', 'mean'), np.nan)):
             self._valid = Validation.NOT_UPDATED
             return Validation.NOT_UPDATED
+        df = self.describe.abs()
         eps = self.validation_eps
         if df.loc['Sev', 'Err E[X]'] > eps:
             logger.info('FAIL: Sev mean error > eps')
@@ -2968,27 +3013,36 @@ class Aggregate:
             logger.info('FAIL: Agg mean error > 10 * sev error')
             rv |= Validation.ALIASING
 
-        try:
-            if np.inf > df.loc['Sev', 'CV(X)'] > 0 and df.loc['Sev', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Sev CV error > eps')
-                rv |= Validation.SEV_CV
+        # CV and skew: compare empirical vs theoretical directly from the
+        # canonical stats_df. The test is applied only when the *theoretical*
+        # value is meaningfully non-zero (``abs(theo) > VALIDATION_NOISE``):
+        # a theoretically-zero skew (symmetric severity) or CV (deterministic
+        # severity) cannot be validated against the FFT's empirical estimate,
+        # whose noise floor is grid-dependent and unbounded (it can be far
+        # larger than the analytic dust). The old ``> 0`` guard intended this
+        # but was defeated by fp dust making the analytic value tiny-but-
+        # nonzero. ``isfinite`` skips an undefined moment (e.g. infinite CV
+        # with no second moment, or a NaN empirical estimate). When the test
+        # does apply, ``np.isclose`` with rtol 10*eps / 100*eps (skewness is
+        # harder to estimate, hence looser) measures relative agreement.
+        mixed = self.stats_df['mixed']
+        emp = self.stats_df['empirical']
+        for comp, flag in (('sev', Validation.SEV_CV), ('agg', Validation.AGG_CV)):
+            theo = float(mixed[(comp, 'cv')])
+            est = float(emp[(comp, 'cv')])
+            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                    and not np.isclose(est, theo, rtol=10 * eps, atol=VALIDATION_NOISE)):
+                logger.info('FAIL: %s CV error > eps', comp)
+                rv |= flag
+        for comp, flag in (('sev', Validation.SEV_SKEW), ('agg', Validation.AGG_SKEW)):
+            theo = float(mixed[(comp, 'skew')])
+            est = float(emp[(comp, 'skew')])
+            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                    and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
+                logger.info('FAIL: %s skew error > eps', comp)
+                rv |= flag
 
-            if np.inf > df.loc['Agg', 'CV(X)'] > 0 and df.loc['Agg', 'Err CV(X)'] > 10 * eps:
-                logger.info('FAIL: Agg CV error > eps')
-                rv |= Validation.AGG_CV
-
-            if np.inf > np.abs(df.loc['Sev', 'Skew(X)']) > 0 and np.abs(df.loc['Sev', 'Err Skew(X)']) > 100 * eps:
-                logger.info('FAIL: Sev skew error > eps')
-                rv |= Validation.SEV_SKEW
-
-            if np.inf > np.abs(df.loc['Agg', 'Skew(X)']) > 0 and np.abs(df.loc['Agg', 'Err Skew(X)']) > 100 * eps:
-                logger.info('FAIL: Agg skew error > eps')
-                rv |= Validation.AGG_SKEW
-
-        except (TypeError, ZeroDivisionError):
-            logger.info('Caution: not all validation tests applied')
-            pass
-        if rv != Validation.NOT_UNREASONABLE:
+        if rv == Validation.NOT_UNREASONABLE:
             logger.info('Aggregate %s does not fail any validation: not unreasonable', self.name)
         self._valid = rv
         return rv
@@ -3655,16 +3709,21 @@ class Aggregate:
         if pd.notna(emp.get(('agg', 'mean'), np.nan)):
             df.loc['Sev', 'Est E[X]'] = emp[('sev', 'mean')]
             df.loc['Agg', 'Est E[X]'] = emp[('agg', 'mean')]
-            df.loc[:, 'Err E[X]'] = df['Est E[X]'] / df['E[X]'] - 1
+            df.loc[:, 'Err E[X]'] = _noise_aware_rel_error(df['Est E[X]'], df['E[X]'])
             df.loc['Sev', 'Est CV(X)'] = emp[('sev', 'cv')]
             df.loc['Agg', 'Est CV(X)'] = emp[('agg', 'cv')]
-            df.loc[:, 'Err CV(X)'] = df['Est CV(X)'] / df['CV(X)'] - 1
+            df.loc[:, 'Err CV(X)'] = _noise_aware_rel_error(df['Est CV(X)'], df['CV(X)'])
             df['Est Skew(X)'] = np.nan
             df.loc['Sev', 'Est Skew(X)'] = emp[('sev', 'skew')]
             df.loc['Agg', 'Est Skew(X)'] = emp[('agg', 'skew')]
             df = df[['E[X]', 'Est E[X]', 'Err E[X]',
                      'CV(X)', 'Est CV(X)', 'Err CV(X)',
                      'Skew(X)', 'Est Skew(X)']]
+        # snap floating-point dust to 0 in the moment-value columns for
+        # display (e.g. the skew of a symmetric severity); NaN preserved.
+        for c in ['E[X]', 'Est E[X]', 'CV(X)', 'Est CV(X)', 'Skew(X)', 'Est Skew(X)']:
+            if c in df.columns:
+                df[c] = _snap_noise(df[c])
         return df
 
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):

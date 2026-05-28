@@ -224,12 +224,13 @@ We can save the MED severity in the knowledge and then refer to it by name.
 
 .. ipython:: python
     :okwarning:
+
     from aggregate import build_many
     build_many('sev COMMAUTO [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * '
           ' expon 1 wts [0.824796 0.159065 0.014444 0.001624, 0.000071]');
 
     a05 = build('agg DecL:05 [20 8 4 2] claims [1e6, 2e6 5e6 10e6] xs 0 '
-                      'sev sev.COMMAUTO fixed',
+                      'sev.COMMAUTO fixed',
                       log2=18, bs=500)
 
     qd(a05)

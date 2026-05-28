@@ -116,7 +116,7 @@ def plot_lee(port, ax, c, lw=1):
            title=f'{port.name} Lee diagram')
 
 
-def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
+def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     """
     Stand-alone version of the similar-risks figure used in the bounded-beta
     case studies. ONLY WORKS FOR BOUNDED PORTFOLIOS.
@@ -131,6 +131,7 @@ def similar_risks_graphs_sa(axd, bounds, port, pnew, roe, prem, p_reg=1):
     - ``p_reg``      regulatory probability (1 == unbounded)
 
     Provenance: ``make_port`` in ``Examples_2022_post_publish``.
+    fka similar_risks_graphs_sa
     """
     if axd is None:
         fig = plt.figure(constrained_layout=True, figsize=(12, 6))
@@ -253,7 +254,7 @@ def similar_risks_example():
     bounds = Bounds(p_base, premium=prem, a=a)
 
     f, axs = plt.subplots(1, 3, figsize=(18.0, 6.0), layout='constrained')
-    bounds.plot_envelope(axs=axs.flatten(), n_resamples=0, alpha=1, pricing=True,
+    bounds.plot_envelope(axs=axs.flatten(), n_resamples=0, alpha=1,
                          title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={bounds.p_star:.3f}',
                          distortions=[{k: p_base.distortions[k] for k in ['ccoc', 'tvar']},
                                       {k: p_base.distortions[k] for k in ['ph', 'wang', 'dual']}])
@@ -278,7 +279,7 @@ def similar_risks_example():
         AAAADDEE
     """
     )
-    df = similar_risks_graphs_sa(axd, bounds, p_base, p_new, roe, prem)
+    df = plot_similar_risks_graphs(axd, bounds, p_base, p_new, roe, prem)
     return df
 
 
@@ -289,22 +290,6 @@ def similar_risks_example():
 # in ``docs/5_technical_guides``. Original names retained so existing doc
 # imports keep working. They were consolidated here from
 # ``extensions/figures.py`` and ``extensions/pir_figures.py`` at 1.0.0a12.
-
-def ex49():
-    """Shared discrete sample (PIR Example 4.9): ten equiprobable atoms with ties.
-
-    Returns ``(ps, cps, xs, df)`` used by :func:`fig_4_5`, :func:`fig_4_6`,
-    :func:`fig_4_8`.
-    """
-    ps = np.ones(10) / 10
-    cps = np.hstack((0, np.cumsum(ps)))
-    xs = np.array([0, 0, 1, 1, 1, 2, 3, 4, 8, 12, 25])
-    df = pd.DataFrame({'x': xs[1:], 'p': ps})
-    df = pd.DataFrame(df.groupby('x').p.sum())
-    df['F'] = df.p.cumsum()
-    df = df.reset_index(drop=False)
-    return ps, cps, xs, df
-
 
 def prob_format(axis):
     """Axis formatter that prints probabilities tidily (0, 0.25, 0.5, ..., 1)."""
@@ -524,12 +509,28 @@ def fig_4_1():
     return fig
 
 
+def _discrete_example():
+    """Shared discrete sample (PIR Example 4.9): ten equiprobable atoms with ties.
+
+    Returns ``(ps, cps, xs, df)`` used by :func:`fig_4_5`, :func:`fig_4_6`,
+    :func:`fig_4_8`.
+    """
+    ps = np.ones(10) / 10
+    cps = np.hstack((0, np.cumsum(ps)))
+    xs = np.array([0, 0, 1, 1, 1, 2, 3, 4, 8, 12, 25])
+    df = pd.DataFrame({'x': xs[1:], 'p': ps})
+    df = pd.DataFrame(df.groupby('x').p.sum())
+    df['F'] = df.p.cumsum()
+    df = df.reset_index(drop=False)
+    return ps, cps, xs, df
+
+
 def fig_4_5():
     """PIR Figure 4.5: distribution function and lower-quantile VaR (discrete).
 
     Used by ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
-    ps, cps, xs, df = ex49()
+    ps, cps, xs, df = _discrete_example()
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
     ax0, ax1 = axs.flat
     ax = ax0
@@ -564,7 +565,7 @@ def fig_4_6():
 
     Used by ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
-    ps, cps, xs, df = ex49()
+    ps, cps, xs, df = _discrete_example()
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
     ax0, ax1 = axs.flat
     ax = ax0
@@ -601,7 +602,7 @@ def fig_4_8():
 
     Used by ``docs/5_technical_guides/5_x_quantiles.rst``.
     """
-    ps, cps, xs, df = ex49()
+    ps, cps, xs, df = _discrete_example()
     ad = build(f'agg Empirical 1 claim sev dhistogram xps {df.x.values} {df.p.values} fixed', bs=1)
     xv = np.hstack((1e-10, df.x.values))
     adc = build(f'agg Empirical 1 claim sev chistogram xps {xv} {df.p.values} fixed', bs=1 / 128)

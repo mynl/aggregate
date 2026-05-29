@@ -218,9 +218,9 @@ deferred with rationale.
 
 | Step | Status | Commit / note |
 |------|--------|---------------|
-| meta.0 pre-flight | ready | — |
-| meta.1 harness baseline | ready | gates everything else |
-| meta.2 CoW switch | ready | library-wide, one shot |
+| meta.0 pre-flight | **done** | 2026-05-29; agg 1.0.0a17, numpy 2.4.5, scipy 1.17.1, pandas 3.0.3, py 3.14.3 |
+| meta.1 harness baseline | **done** | `e2d5390`; 10 cases, 65 parquets, manifest pinned at `cfcd6ae`. Pandas 3.0 already has CoW on by default — meta.2 mostly explicit-switch + sanity. |
+| meta.2 CoW switch | ready | library-wide, one shot; pandas 3.0 default so likely no fallout |
 | meta.3 shared stats hygiene | ready | baseline moves (Portfolio convention) |
 | meta.4 aggregate reins reporting | ready | baseline gains columns |
 | meta.5 aggregate cleanups + S unification | ready | baseline moves (`Def.Pareto` under D17) |

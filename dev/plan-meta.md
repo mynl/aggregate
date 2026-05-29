@@ -227,7 +227,7 @@ deferred with rationale.
 | meta.0 pre-flight | **done** | 2026-05-29; agg 1.0.0a17, numpy 2.4.5, scipy 1.17.1, pandas 3.0.3, py 3.14.3 |
 | meta.1 harness baseline | **done** | `e2d5390`; 10 cases, 65 parquets, manifest pinned at `cfcd6ae`. Pandas 3.0 already has CoW on by default — meta.2 mostly explicit-switch + sanity. |
 | meta.2 CoW switch | **done** | conditional switch in `__init__.py` (no-op on pandas 3.0+ which already has CoW on); 693 pytest pass, no CoW warnings |
-| meta.3 shared stats hygiene | ready | baseline moves (Portfolio convention) |
+| meta.3 shared stats hygiene | **done** | 2026-05-29; D3+D5+D7+D16 (agg) + D4+D5+D10+D11-named-constants (port); baseline + PEG regenerated; 693 pytest pass. The Portfolio `mult ∈ {1,10,100}` structural cleanup (D11 second half) deferred to a later step — it's a number-mover that wants its own commit. |
 | meta.4 aggregate reins reporting | ready | baseline gains columns |
 | meta.5 aggregate cleanups + S unification | ready | baseline moves (`Def.Pareto` under D17) |
 | meta.6 portfolio pricing/allocation | ready | baseline moves (ROE-fallback fix) |

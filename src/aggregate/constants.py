@@ -8,7 +8,8 @@ from enum import Flag, auto
 
 __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
-           'VALIDATION_NOISE', 'RECOMMEND_P', 'Validation',
+           'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
+           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'Validation',
            'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
 FIG_W = 3.5
@@ -33,6 +34,21 @@ VALIDATION_EPS = 1e-4
 # for defective-distribution detection and for the near-zero (absolute vs
 # relative) error fallback in validation and the describe/stats_df displays.
 VALIDATION_NOISE = 1e-12
+# Aliasing test ratio. The ALIASING flag fires when the relative error on the
+# aggregate mean exceeds ALIASING_RATIO times the relative error on the
+# severity mean: aliasing inflates the agg-mean error far above the sev-mean
+# error, while a clean discretisation keeps them comparable. 10 has carried
+# through the suite as the practical threshold.
+ALIASING_RATIO = 10
+# Floor on the per-bucket ``exeqa_err`` (``Σ exeqa_i − loss``) below which a
+# bucket's conditional decomposition is treated as numerically resolved, used
+# in the ``add_exa_details`` truncation that decides where exeqa-derived
+# quantities become unreliable.
+EXEQA_NOISE_FLOOR = 1e-4
+# Floor on ``|ft_line_density|`` below which the "build up the product"
+# branch is preferred over division in the per-line FT decomposition (avoids
+# divide-by-near-zero).
+FT_NOISE_FLOOR = 1e-10
 RECOMMEND_P = 0.99999
 
 # User-local data directory (under Path.home())

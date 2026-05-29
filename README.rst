@@ -46,6 +46,41 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Shared stats hygiene across Aggregate and Portfolio
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``stats_df`` is now an all-``float64`` frame on both ``Aggregate`` and
+  ``Portfolio``; the legacy ``('meta','name')`` string row has been removed
+  (the name lives on ``self.name``). All the ``.astype(float)`` casts at
+  consumer sites are gone.
+- Per-component columns are renamed from flat ``comp_<i>`` to the 2-D
+  ``e{e}.m{m}`` form (exposure component × severity-mixture component).
+  The limit-profile arm uses ``m=0``; the mixture-product arm carries both
+  indices.
+- ``stats_df`` gains scaffold columns for the upcoming reinsurance
+  reporting redesign: ``after_occ``, ``occ_impact``, ``agg_impact``,
+  ``gross_empirical`` (NaN-filled for now, populated when reinsurance
+  reporting lands).
+- ``Aggregate.valid`` and ``Portfolio.valid`` now read mean / aliasing
+  signals straight off ``stats_df['error']`` -- single source of truth, no
+  detour through ``describe``. The hard-coded ``eps**3`` floor and ``10×``
+  aliasing ratio are replaced with named constants ``VALIDATION_NOISE`` and
+  ``ALIASING_RATIO`` in ``aggregate.constants``.
+- ``Portfolio.update`` and ``Portfolio.create_from_sample`` now compute
+  empirical aggregate moments via the de-fuzzed ``xsden_to_mwrangler``
+  worker -- the same convention ``Aggregate.update_work`` already uses
+  (small absolute shift in ``est_m``/``est_cv``/``est_skew`` and downstream
+  pricing -- the PEG / harness baselines move at ~1e-9 relative and are
+  recaptured in this iteration).
+- ``Portfolio._write_empirical_stats`` no longer inverts each unit's
+  empirical severity ``(mean, cv, skew)`` back into raw moments via
+  ``MomentWrangler``; it reads ``Aggregate.stats_df['empirical']`` raw
+  moments directly.
+- Two new floor constants in ``aggregate.constants`` replace the bare
+  numerics in ``add_exa`` / ``add_exa_details``: ``EXEQA_NOISE_FLOOR``
+  (the ``exeqa`` decomposition-error truncation threshold, was ``1e-4``)
+  and ``FT_NOISE_FLOOR`` (the "build up the product" guard, was ``1e-10``).
+
 Noise-aware validation, denoised ``describe``, empirical raw moments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

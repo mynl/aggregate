@@ -20,8 +20,8 @@ from scipy.optimize import NoConvergence  # noqa
 from scipy.interpolate import interp1d
 from textwrap import fill
 
-from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
-                        VALIDATION_NOISE, Validation, WL)
+from .constants import (ALIASING_RATIO, FIG_H, FIG_W, RECOMMEND_P,
+                        VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
                       xsden_to_meancv, xsden_to_meancvskew,
@@ -1559,9 +1559,11 @@ def _flat_col_to_stats_index(col):
 # Canonical row MultiIndex for ``stats_df`` — written directly in __init__
 # (component columns) and the post-loop totals block (``mixed`` /
 # ``independent``). All ``meta`` rows up top, then freq/sev/agg moment blocks.
+# The frame is all-float: ``self.name`` is already an attribute, no need for
+# a ``('meta','name')`` string row that would force ``dtype=object``.
 _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
     [
-        ('meta', 'name'), ('meta', 'limit'), ('meta', 'attachment'),
+        ('meta', 'limit'), ('meta', 'attachment'),
         ('meta', 'el'), ('meta', 'prem'), ('meta', 'lr'),
         ('meta', 'sevcv_param'), ('meta', 'mix_cv'), ('meta', 'wt'),
         ('freq', 'ex1'), ('freq', 'ex2'), ('freq', 'ex3'),
@@ -2213,7 +2215,10 @@ class Aggregate:
             logger.debug('Aggregate.__init__ | Broadcast/align: exposures + severity = %d exp = '
                          '%d sevs = %d componets', len(exp_el), len(sev_a), n_components)
             self.sevs = np.empty(n_components, dtype=type(Severity))
-            self._init_stats_df(n_components)
+            # limit-profile arm: weights all 1, single severity per exposure
+            # row → mixture component ``m`` is trivially 0; ``e`` indexes the
+            # broadcast exposure rows.
+            self._init_stats_df([f'e{e_idx}.m0' for e_idx in range(n_components)])
 
             # perform looping creation of severity distribution
             # in this case wts are all 1, so no need to broadcast
@@ -2249,7 +2254,8 @@ class Aggregate:
                 # _lr *= _swt  ?? seems wrong
                 _en *= _swt
 
-                self._record_component(r, ma, _at, _y, _scv, _en, _el, _pr, _lr,
+                self._record_component(self._comp_cols[r], ma, _at, _y, _scv,
+                                       _en, _el, _pr, _lr,
                                        mix_cv, sev1, sev2, sev3)
                 r += 1
 
@@ -2276,7 +2282,15 @@ class Aggregate:
                 f'Aggregate.__init__ | Broadcast/product: exposures x severity = {len(exp_el)} x {len(sev_name)} '
                 f'=  {n_components}')
             self.sevs = np.empty(n_components, dtype=type(Severity))
-            self._init_stats_df(n_components)
+            # mixture-product arm: outer exposure × inner severity-mixture
+            # gives a 2-D component grid; labels carry both indices.
+            _n_exp = len(exp_el)
+            _n_mix = len(sev_name)
+            self._init_stats_df([
+                f'e{e_idx}.m{m_idx}'
+                for e_idx in range(_n_exp)
+                for m_idx in range(_n_mix)
+            ])
 
             # WARNING: note sev_xs and sev_ps are NOT broadcast
             # In this case, there is only one ground up severity, but it is a mixture. We need to
@@ -2289,7 +2303,7 @@ class Aggregate:
                                          _swt, _slb, _sub, sev_conditional))
 
             # perform looping creation of severity distribution
-            for _el, _pr, _lr, _en, _at, _y, in zip(*exp_arrays):
+            for e_idx, (_el, _pr, _lr, _en, _at, _y) in enumerate(zip(*exp_arrays)):
                 # adjust weights for excess coverage
                 sev_wt0 = sev_wt.copy()
                 # attachment can be None, and that needs to percolate through to Severity
@@ -2327,8 +2341,8 @@ class Aggregate:
 
                 # break up the total claim count into parts and add sevs to self.sevs
                 # need the first variables for sev statistics
-                for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, s, _swt, (sev1, sev2, sev3) in \
-                        zip(*sev_arrays, actual_sevs, sev_wt0, moms):
+                for m_idx, (_sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, s, _swt, (sev1, sev2, sev3)) in \
+                        enumerate(zip(*sev_arrays, actual_sevs, sev_wt0, moms)):
 
                     # store the severity
                     if np.isnan(sev1):
@@ -2374,7 +2388,8 @@ class Aggregate:
                     _el0 = _el * _swt
                     _en0 = _en * _swt
 
-                    self._record_component(r, ma, _at, _y, _scv, _en0, _el0, _pr0, _lr,
+                    self._record_component(f'e{e_idx}.m{m_idx}', ma, _at, _y, _scv,
+                                           _en0, _el0, _pr0, _lr,
                                            mix_cv, sev1, sev2, sev3)
 
                     self.en[r] = _en0
@@ -2385,17 +2400,18 @@ class Aggregate:
 
         # average exp_limit and exp_attachment — weighted by per-component
         # frequency mean. Sourced from the stats_df columns populated by the
-        # broadcast loop above.
-        _comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
-        _comp_limit = self.stats_df.loc[('meta', 'limit'), _comp_cols].astype(float)
-        _comp_attach = self.stats_df.loc[('meta', 'attachment'), _comp_cols].astype(float)
-        _comp_freq = self.stats_df.loc[('freq', 'ex1'), _comp_cols].astype(float)
+        # broadcast loop above. ``stats_df`` is now all-float, so the casts
+        # that this block used to need are gone.
+        _comp_cols = self._comp_cols
+        _comp_limit = self.stats_df.loc[('meta', 'limit'), _comp_cols]
+        _comp_attach = self.stats_df.loc[('meta', 'attachment'), _comp_cols]
+        _comp_freq = self.stats_df.loc[('freq', 'ex1'), _comp_cols]
         avg_limit = float(np.sum(_comp_limit * _comp_freq) / ma.tot_freq_1)
         avg_attach = float(np.sum(_comp_attach * _comp_freq) / ma.tot_freq_1)
 
         # store answer for total
-        tot_prem = float(self.stats_df.loc[('meta', 'prem'), _comp_cols].astype(float).sum())
-        tot_loss = float(self.stats_df.loc[('meta', 'el'), _comp_cols].astype(float).sum())
+        tot_prem = float(self.stats_df.loc[('meta', 'prem'), _comp_cols].sum())
+        tot_loss = float(self.stats_df.loc[('meta', 'el'), _comp_cols].sum())
         if tot_prem > 0:
             lr = tot_loss / tot_prem
         else:
@@ -2404,25 +2420,25 @@ class Aggregate:
         # Write the post-loop totals directly into ``stats_df``: per-component
         # weights, then ``mixed`` and ``independent`` columns (theoretical
         # moments + meta).
-        comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
-        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float)
-        self.stats_df.loc[('meta', 'wt'), comp_cols] = (freq_ex1 / ma.tot_freq_1).values
+        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), _comp_cols]
+        self.stats_df.loc[('meta', 'wt'), _comp_cols] = (freq_ex1 / ma.tot_freq_1).values
         # mixed and independent totals
         _flat_names = MomentAggregator.column_names()
         for _col, _remix in (('mixed', True), ('independent', False)):
             for _flat, _val in zip(_flat_names, ma.get_fsa_stats(total=True, remix=_remix)):
                 self.stats_df.loc[_flat_col_to_stats_index(_flat), _col] = _val
-            self.stats_df.loc[('meta', 'name'), _col] = self.name
             self.stats_df.loc[('meta', 'limit'), _col] = avg_limit
             self.stats_df.loc[('meta', 'attachment'), _col] = avg_attach
             self.stats_df.loc[('meta', 'sevcv_param'), _col] = 0
             self.stats_df.loc[('meta', 'el'), _col] = tot_loss
             self.stats_df.loc[('meta', 'prem'), _col] = tot_prem
             self.stats_df.loc[('meta', 'lr'), _col] = lr
-            self.stats_df.loc[('meta', 'mix_cv'), _col] = mix_cv
-            self.stats_df.loc[('meta', 'wt'), _col] = self.stats_df.loc[
-                ('meta', 'wt'), comp_cols
-            ].astype(float).sum()
+            self.stats_df.loc[('meta', 'mix_cv'), _col] = (
+                float(mix_cv) if np.isscalar(mix_cv) else np.nan
+            )
+            self.stats_df.loc[('meta', 'wt'), _col] = float(
+                self.stats_df.loc[('meta', 'wt'), _comp_cols].sum()
+            )
 
         self.n = ma.tot_freq_1
         # Pull the headline moments off the canonical stats_df mixed column.
@@ -2440,42 +2456,61 @@ class Aggregate:
         self.sev_sd = self.sev_m * self.sev_cv
         self.sev_var = self.sev_sd * self.sev_sd
 
-    def _init_stats_df(self, n_components):
+    def _init_stats_df(self, comp_cols):
         """Pre-create the empty ``stats_df`` (NaN-filled).
 
-        Called from each broadcasting arm of ``__init__`` once ``n_components``
-        is known. Columns: one ``comp_<i>`` per broadcast component plus
-        ``mixed``, ``independent``, ``empirical``, ``error``. Rows: the
-        canonical ``_STATS_ROW_INDEX`` (meta + freq + sev + agg measures).
+        Called from each broadcasting arm of ``__init__`` once the per-
+        component column labels are known. Columns are:
 
-        ``_record_component`` writes each ``comp_<i>`` column inside the
-        broadcast loop; the post-loop block writes ``mixed`` and
+        * the broadcast components, named ``e{e}.m{m}`` where ``e`` is the
+          exposure component (one per ``(claims|premium, limit xs attach)``
+          row) and ``m`` is the severity-mixture component (one per weighted
+          severity); the limit-profile arm always uses ``m=0``.
+        * ``mixed`` / ``independent``: theoretical (subject / gross) totals.
+        * ``empirical``: post-FFT empirical moments (the final, possibly
+          after-reinsurance object).
+        * ``after_occ``: empirical moments after the occurrence-reinsurance
+          stage (populated in meta.4; scaffold here, NaN-filled).
+        * ``occ_impact`` / ``agg_impact``: ``after_occ / mixed`` and
+          ``empirical / after_occ`` ratios (scaffold).
+        * ``gross_empirical``: subject empirical (the reinsurance validation
+          hook from §1.3 of the plan; scaffold).
+        * ``error``: noise-aware relative error of ``empirical`` vs
+          ``mixed``.
+
+        ``_record_component`` writes each component column inside the
+        broadcast loop; the post-loop block writes ``mixed`` /
         ``independent``; ``update_work`` writes ``empirical`` and ``error``
-        after the FFT.
+        after the FFT; ``after_occ`` / ``occ_impact`` / ``agg_impact`` /
+        ``gross_empirical`` are populated in meta.4 (reins reporting).
+
+        ``stats_df`` is now an all-``float64`` frame: ``self.name`` lives on
+        the attribute, so no string row is needed.
         """
-        cols = [f'comp_{i}' for i in range(n_components)] + [
-            'mixed', 'independent', 'empirical', 'error',
+        self._comp_cols = list(comp_cols)
+        cols = self._comp_cols + [
+            'mixed', 'independent', 'after_occ', 'empirical',
+            'occ_impact', 'agg_impact', 'gross_empirical', 'error',
         ]
-        # dtype=object so we can hold meta strings (name) alongside floats.
         self.stats_df = pd.DataFrame(
-            np.nan, index=_STATS_ROW_INDEX, columns=cols, dtype=object,
+            np.nan, index=_STATS_ROW_INDEX, columns=cols, dtype=float,
         )
 
-    def _record_component(self, r, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
+    def _record_component(self, col, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
                           sev1, sev2, sev3):
         """Accumulate this component into ``ma`` and write its ``stats_df`` column.
 
         Called once per component from each of the two broadcasting arms of
         ``__init__``: the limit-profile arm (all weights == 1) and the
         mixture-product arm. Centralises which ``stats_df`` per-component
-        column (``comp_<r>``) gets written so the two arms cannot drift
-        apart.
+        column gets written so the two arms cannot drift apart.
 
         Parameters
         ----------
-        r : int
-            Index of the per-component column in ``stats_df`` — written as
-            ``comp_<r>`` and matching the component slot in ``self.sevs``.
+        col : str
+            Per-component column label in ``stats_df``, of the form
+            ``e{e}.m{m}`` (exposure × severity-mixture). Limit-profile arm
+            uses ``m=0``.
         ma : MomentAggregator
             Accumulator collecting freq, sev, agg moments across all components.
         attach, layer : float
@@ -2496,15 +2531,17 @@ class Aggregate:
         # column. Maps MA's flat moment names to the ``(component, measure)``
         # MultiIndex via ``_flat_col_to_stats_index``. ``('meta', 'wt')`` is
         # filled in by the post-loop block (it depends on total frequency).
-        col = f'comp_{r}'
-        self.stats_df.loc[('meta', 'name'), col] = self.name
+        # ``mix_cv`` is only meaningful for true mixed-Poisson frequencies; for
+        # ``dfreq`` (where ``freq_a`` is the discrete pmf array) it is NaN.
         self.stats_df.loc[('meta', 'limit'), col] = layer
         self.stats_df.loc[('meta', 'attachment'), col] = attach
         self.stats_df.loc[('meta', 'el'), col] = el
         self.stats_df.loc[('meta', 'prem'), col] = prem
         self.stats_df.loc[('meta', 'lr'), col] = lr
         self.stats_df.loc[('meta', 'sevcv_param'), col] = scv
-        self.stats_df.loc[('meta', 'mix_cv'), col] = mix_cv
+        self.stats_df.loc[('meta', 'mix_cv'), col] = (
+            float(mix_cv) if np.isscalar(mix_cv) else np.nan
+        )
         for flat, val in zip(MomentAggregator.column_names(), moments):
             self.stats_df.loc[_flat_col_to_stats_index(flat), col] = val
 
@@ -2786,8 +2823,7 @@ class Aggregate:
         self.log2 = int(np.log2(len(xs)))
 
         # claim-count weighted severity vector (always computed; FFT is the only path)
-        comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
-        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
+        freq_ex1 = self.stats_df.loc[('freq', 'ex1'), self._comp_cols].values
         wts = freq_ex1 / freq_ex1.sum()
         if self.en.sum() == 0:
             self.en = freq_ex1
@@ -2952,18 +2988,22 @@ class Aggregate:
         in a statistical test).
         Called and reported automatically by qd for Aggregate objects.
 
-        Checks the relative errors (from ``self.describe``) for:
+        Checks the relative errors (from the canonical ``stats_df``) for:
 
         * severity mean < eps
         * severity cv < 10 * eps
         * severity skew < 100 * eps (skewness is more difficult to estimate)
-        * aggregate mean < eps and < 2 * severity mean relative error (larger values
-          indicate possibility of aliasing and that ``bs`` is too small).
+        * aggregate mean < eps and < ``ALIASING_RATIO`` * severity mean
+          relative error (larger values indicate possible aliasing — i.e.
+          that ``bs`` is too small).
         * aggregate cv < 10 * eps
         * aggregate skew < 100 * esp
 
-        The default uses eps = 1e-4 relative error. This can be changed by setting the validation_eps
-        variable.
+        The default uses eps = 1e-4 relative error. This can be changed by
+        setting the ``validation_eps`` variable.
+
+        All reads come from ``stats_df`` -- the single source of truth -- not
+        ``describe`` (display).
 
         The CV and skew tests are applied only when the theoretical value is
         finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
@@ -2973,6 +3013,11 @@ class Aggregate:
         error. When the test applies, ``np.isclose`` with relative tolerance
         ``10*eps`` (CV) / ``100*eps`` (skew, harder to estimate) measures
         agreement.
+
+        The ALIASING test silences itself when the agg-mean relative error
+        is itself below ``VALIDATION_NOISE`` (genuine numerical dust, not
+        aliasing) -- this replaces the old ``eps ** 3`` floor that was fitted
+        to the default ``eps`` value.
 
         Run with logger level 20 (info) for more information on failures.
 
@@ -2994,23 +3039,30 @@ class Aggregate:
         if pd.isna(self.stats_df['empirical'].get(('agg', 'mean'), np.nan)):
             self._valid = Validation.NOT_UPDATED
             return Validation.NOT_UPDATED
-        df = self.describe.abs()
+        # Mean / aliasing reads come straight off ``stats_df['error']`` -- the
+        # canonical noise-aware relative error of ``empirical`` vs ``mixed``,
+        # the same computation ``describe`` displays. SSoT, no detour through
+        # the display frame.
+        err = self.stats_df['error'].abs()
         eps = self.validation_eps
-        if df.loc['Sev', 'Err E[X]'] > eps:
+        sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
+        agg_err_mean = float(err.get(('agg', 'mean'), 0.0))
+        if sev_err_mean > eps:
             logger.info('FAIL: Sev mean error > eps')
             rv |= Validation.SEV_MEAN
 
-        if df.loc['Agg', 'Err E[X]'] > eps:
+        if agg_err_mean > eps:
             logger.info('FAIL: Agg mean error > eps')
             rv |= Validation.AGG_MEAN
 
-        # first line stops failing validation when the agg rel error is very very small
-        # default eps is 1e-4, so this is 1e-12. there were examples in the documentation
-        # which failed with errors around 1e-14.
-        if (abs(df.loc['Agg', 'Err E[X]']) > eps ** 3 and
-                abs(df.loc['Sev', 'Err E[X]']) > 0 and
-                abs(df.loc['Agg', 'Err E[X]']) > 10 * abs(df.loc['Sev', 'Err E[X]'])):
-            logger.info('FAIL: Agg mean error > 10 * sev error')
+        # Aliasing fingerprint: the agg-mean error sits well above the sev-
+        # mean error (the FFT amplifies sev-discretisation error during
+        # convolution when ``bs`` is too small). Silenced under the
+        # ``VALIDATION_NOISE`` floor where the agg error is genuine dust.
+        if (agg_err_mean > VALIDATION_NOISE
+                and sev_err_mean > 0
+                and agg_err_mean > ALIASING_RATIO * sev_err_mean):
+            logger.info('FAIL: Agg mean error > %d * sev error', ALIASING_RATIO)
             rv |= Validation.ALIASING
 
         # CV and skew: compare empirical vs theoretical directly from the
@@ -3019,11 +3071,9 @@ class Aggregate:
         # a theoretically-zero skew (symmetric severity) or CV (deterministic
         # severity) cannot be validated against the FFT's empirical estimate,
         # whose noise floor is grid-dependent and unbounded (it can be far
-        # larger than the analytic dust). The old ``> 0`` guard intended this
-        # but was defeated by fp dust making the analytic value tiny-but-
-        # nonzero. ``isfinite`` skips an undefined moment (e.g. infinite CV
-        # with no second moment, or a NaN empirical estimate). When the test
-        # does apply, ``np.isclose`` with rtol 10*eps / 100*eps (skewness is
+        # larger than the analytic dust). ``isfinite`` skips an undefined
+        # moment (e.g. infinite CV with no second moment). When the test
+        # applies, ``np.isclose`` with rtol 10*eps / 100*eps (skewness is
         # harder to estimate, hence looser) measures relative agreement.
         mixed = self.stats_df['mixed']
         emp = self.stats_df['empirical']
@@ -3828,11 +3878,10 @@ class Aggregate:
         sev_ans = []
         total_row = len(self.sevs)
         for i, (s, wt, en, bed) in enumerate(zip(self.sevs, wts, self.en, beds)):
-            # exact theoretical sev mean from the canonical stats_df:
-            # per-component columns are ``comp_<i>``; single-component
-            # arms historically used ``self.name``. After Stage 1c+ the
-            # column is always ``comp_<i>`` regardless.
-            label = f'comp_{i}'
+            # exact theoretical sev mean from the canonical stats_df: the
+            # per-component column label is ``e{e}.m{m}`` (exposure × sev-
+            # mixture), enumerated in order by both broadcasting arms.
+            label = self._comp_cols[i]
             m = self.stats_df.loc[('sev', 'ex1'), label]
             if len(self.sevs) == 1:
                 i = self.name
@@ -4045,8 +4094,7 @@ class Aggregate:
                 wts = np.array([i.sev_wt for i in self.sevs])
                 # for non-broadcast weights the sum is n = number of components; rescale
                 if wts.sum() == len(self.sevs):
-                    comp_cols = [c for c in self.stats_df.columns if c.startswith('comp_')]
-                    wts = self.stats_df.loc[('freq', 'ex1'), comp_cols].astype(float).values
+                    wts = self.stats_df.loc[('freq', 'ex1'), self._comp_cols].values
                 wts = wts / wts.sum()
 
                 # tried a couple of different approaches here and this is as fast as any

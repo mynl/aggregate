@@ -21,7 +21,8 @@ from textwrap import fill
 import warnings
 from IPython.display import HTML, display
 
-from .constants import (FIG_H, FIG_W, RECOMMEND_P, VALIDATION_EPS,
+from .constants import (ALIASING_RATIO, EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
+                        FT_NOISE_FLOOR, RECOMMEND_P, VALIDATION_EPS,
                         VALIDATION_NOISE, Validation, WL)
 from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
 
@@ -30,6 +31,7 @@ from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
 from .moments import (MomentAggregator, MomentWrangler,
+                      xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from .iman_conover import iman_conover
 from .utilities import (ft, ift, decl_pprint,
@@ -156,10 +158,10 @@ PRICING_STAT_DTYPE = pd.CategoricalDtype(categories=PRICING_STAT_ORDER, ordered=
 # ``aggregate.distributions._STATS_ROW_INDEX`` (meta + freq + sev + agg
 # moment blocks). Kept as its own constant so future Portfolio-only
 # rows (e.g. between-line copula moments) do not bleed into
-# Aggregate's surface.
+# Aggregate's surface. All-float: ``self.name`` lives on the attribute.
 _PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
     [
-        ('meta', 'name'), ('meta', 'limit'), ('meta', 'attachment'),
+        ('meta', 'limit'), ('meta', 'attachment'),
         ('meta', 'el'), ('meta', 'prem'), ('meta', 'lr'),
         ('meta', 'sevcv_param'), ('meta', 'mix_cv'), ('meta', 'wt'),
         ('freq', 'ex1'), ('freq', 'ex2'), ('freq', 'ex3'),
@@ -576,15 +578,14 @@ class Portfolio(object):
         # recompute the empirical agg-total moments from the new density_df.
         logger.info('Updating total statistics (WARNING: these are now empirical)')
         port.independent_stats_df = port.stats_df.copy()
-        _t = port.density_df['p_total'] * port.density_df['loss']
-        _ex1 = float(np.sum(_t))
-        _t *= port.density_df['loss']
-        _ex2 = float(np.sum(_t))
-        _t *= port.density_df['loss']
-        _ex3 = float(np.sum(_t))
-        port.est_m, port.est_cv, port.est_skew = (
-            MomentAggregator.static_moments_to_mcvsk(_ex1, _ex2, _ex3)
-        )
+        # Same de-fuzzed ``xsden_to_mwrangler`` convention as
+        # ``Portfolio.update`` and ``Aggregate.update_work``.
+        _xs = port.density_df['loss'].values
+        _p = port.density_df['p_total'].values
+        _p_clean = np.where(np.abs(_p) < np.finfo(float).eps, 0.0, _p)
+        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _ex1, _ex2, _ex3 = _mw.noncentral
+        port.est_m, port.est_cv, port.est_skew = _mw.mcvsk
         port.ex = port.est_m
         port.est_sd = port.est_m * port.est_cv
         port.est_var = port.est_sd ** 2
@@ -1465,21 +1466,18 @@ class Portfolio(object):
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
 
-        # Empirical portfolio-total agg moments straight from the FFT
-        # output. Drives the canonical ``stats_df['empirical']`` agg
-        # writes and the headline ``est_m`` / ``est_cv`` / ``est_skew``.
-        # Plain summation — no tail-mass correction — to match the
-        # legacy numerics the PEG regression baseline was captured
-        # against.
-        _t = self.density_df['p_total'] * self.density_df['loss']
-        _ex1 = float(np.sum(_t))
-        _t *= self.density_df['loss']
-        _ex2 = float(np.sum(_t))
-        _t *= self.density_df['loss']
-        _ex3 = float(np.sum(_t))
-        self.est_m, self.est_cv, self.est_skew = (
-            MomentAggregator.static_moments_to_mcvsk(_ex1, _ex2, _ex3)
-        )
+        # Empirical portfolio-total agg moments from the FFT output, via
+        # ``xsden_to_mwrangler`` on a de-fuzzed copy -- mirrors
+        # ``Aggregate.update_work`` so both modules share one moment
+        # convention (meta.3 D4/D8). The de-fuzz zeroes |p| < eps before the
+        # ``x**k`` weighting, otherwise far-tail fp noise gets amplified to
+        # spurious skew on wide grids.
+        _xs = self.density_df['loss'].values
+        _p = self.density_df['p_total'].values
+        _p_clean = np.where(np.abs(_p) < np.finfo(float).eps, 0.0, _p)
+        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _ex1, _ex2, _ex3 = _mw.noncentral
+        self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         self.ex = self.est_m
         self.est_sd = self.est_m * self.est_cv
         self.est_var = self.est_sd ** 2
@@ -1511,13 +1509,18 @@ class Portfolio(object):
         ``empirical`` and ``error`` are left as NaN here; ``update``
         populates them after the FFT.
         """
-        cols = list(self.line_names) + ['total', 'empirical', 'error']
+        cols = list(self.line_names) + [
+            'total', 'after_occ', 'empirical',
+            'occ_impact', 'agg_impact', 'gross_empirical', 'error',
+        ]
         self.stats_df = pd.DataFrame(
-            np.nan, index=_PORT_STATS_ROW_INDEX, columns=cols, dtype=object,
+            np.nan, index=_PORT_STATS_ROW_INDEX, columns=cols, dtype=float,
         )
 
         # Per-unit columns: copy each agg's ``stats_df['mixed']`` into the
-        # matching unit column.
+        # matching unit column. (Both frames are now all-float; the legacy
+        # ``meta/name`` row that was excluded by the ``in self.stats_df.index``
+        # guard is gone, but the guard is harmless.)
         for a in self.agg_list:
             a_mixed = a.stats_df['mixed']
             for idx, val in a_mixed.items():
@@ -1530,37 +1533,23 @@ class Portfolio(object):
         _flat_names = MomentAggregator.column_names()
 
         def _collect(meta_key):
-            return [self.stats_df.loc[('meta', meta_key), unit]
-                    for unit in unit_cols]
+            return self.stats_df.loc[('meta', meta_key), unit_cols]
 
-        def _safe_sum(vals):
-            out = 0.0
-            for v in vals:
-                try:
-                    out += float(v)
-                except (TypeError, ValueError):
-                    return np.nan
-            return out
-
-        tot_el = _safe_sum(_collect('el'))
-        tot_prem = _safe_sum(_collect('prem'))
+        tot_el = float(_collect('el').sum())
+        tot_prem = float(_collect('prem').sum())
         tot_lr = (tot_el / tot_prem) if tot_prem else np.nan
         # Attachment: portfolio total only makes sense if all units
         # share the same attachment (commonly 0); else NaN. Limit at
         # portfolio level is the max across units (legacy convention).
-        _attaches = _collect('attachment')
-        try:
-            _attach_floats = [float(v) for v in _attaches]
-            tot_attach = _attach_floats[0] if (
-                _attach_floats and all(a == _attach_floats[0] for a in _attach_floats)
-            ) else np.nan
-        except (TypeError, ValueError):
+        _attaches = _collect('attachment').values
+        if len(_attaches) and np.all(_attaches == _attaches[0]):
+            tot_attach = float(_attaches[0])
+        else:
             tot_attach = np.nan
 
         stats = ma.get_fsa_stats(total=True, remix=False)
         for flat, val in zip(_flat_names, stats):
             self.stats_df.loc[_flat_col_to_stats_index(flat), 'total'] = val
-        self.stats_df.loc[('meta', 'name'), 'total'] = self.name
         self.stats_df.loc[('meta', 'limit'), 'total'] = max_limit
         self.stats_df.loc[('meta', 'attachment'), 'total'] = tot_attach
         self.stats_df.loc[('meta', 'el'), 'total'] = tot_el
@@ -1596,29 +1585,24 @@ class Portfolio(object):
             )
 
         # sev: re-aggregate per-unit (theoretical freq, empirical sev)
-        # through a fresh MomentAggregator. Aggregate's stats_df only
-        # stores empirical sev mean/cv/skew (not raw moments), so we
-        # invert each unit's (m, cv, sk) back to (ex1, ex2, ex3) via
-        # MomentWrangler before feeding the aggregator. ``get_fsa_stats``
-        # returns 18 entries: freq f1/f2/f3/m/cv/sk, sev s1/s2/s3/m/cv/sk,
-        # agg a1/a2/a3/m/cv/sk; we use the sev block (indices 6..11).
+        # through a fresh MomentAggregator. Aggregate stores empirical sev
+        # raw moments directly (``a.stats_df['empirical']`` rows
+        # ``('sev','ex1'..'ex3')``), so we read them straight in -- no
+        # (mean, cv, skew) → (ex1, ex2, ex3) inversion needed.
+        # ``get_fsa_stats`` returns 18 entries: freq f1/f2/f3/m/cv/sk, sev
+        # s1/s2/s3/m/cv/sk, agg a1/a2/a3/m/cv/sk; we use the sev block
+        # (indices 6..11).
         ma_emp = MomentAggregator()
         for a in self.agg_list:
             mixed = a.stats_df['mixed']
             emp = a.stats_df['empirical']
-            s_m = float(emp[('sev', 'mean')])
-            s_cv = float(emp[('sev', 'cv')])
-            s_sk = float(emp[('sev', 'skew')])
-            s_sd = s_m * s_cv
-            mw = MomentWrangler()
-            # (mean, variance, third-central-moment) → noncentral raw moments
-            mw.central = (s_m, s_sd * s_sd, s_sk * s_sd ** 3)
-            s_ex1, s_ex2, s_ex3 = mw.noncentral
             ma_emp.add_fs(
                 float(mixed[('freq', 'ex1')]),
                 float(mixed[('freq', 'ex2')]),
                 float(mixed[('freq', 'ex3')]),
-                s_ex1, s_ex2, s_ex3,
+                float(emp[('sev', 'ex1')]),
+                float(emp[('sev', 'ex2')]),
+                float(emp[('sev', 'ex3')]),
             )
         emp_stats = ma_emp.get_fsa_stats(total=True, remix=False)
         sev_block = [('sev', 'ex1'), ('sev', 'ex2'), ('sev', 'ex3'),
@@ -1696,19 +1680,27 @@ class Portfolio(object):
         else:
             logger.info('No Aggregate object fails validation')
 
-        # apply validation to the Portfolio total
-        df = self.describe.xs('total', level=0, axis=0).abs()
+        # apply validation to the Portfolio total. SSoT: relative errors
+        # come straight off ``stats_df['error']`` (noise-aware diff of
+        # ``empirical`` vs ``total``) -- no detour through ``describe``.
+        err = self.stats_df['error'].abs()
         eps = self.validation_eps
-        if df.loc['Sev', 'Err E[X]'] > eps:
+        sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
+        agg_err_mean = float(err.get(('agg', 'mean'), 0.0))
+        if sev_err_mean > eps:
             logger.info('FAIL: Portfolio Sev mean error > eps')
             rv |= Validation.SEV_MEAN
 
-        if df.loc['Agg', 'Err E[X]'] > eps:
+        if agg_err_mean > eps:
             logger.info('FAIL: Portfolio Agg mean error > eps')
             rv |= Validation.AGG_MEAN
 
-        if abs(df.loc['Sev', 'Err E[X]']) > 0 and df.loc['Agg', 'Err E[X]'] > 10 * df.loc['Sev', 'Err E[X]']:
-            logger.info('FAIL: Agg mean error > 10 * sev error')
+        # Aliasing fingerprint: agg error >> sev error. Silenced under
+        # ``VALIDATION_NOISE`` where both are dust.
+        if (agg_err_mean > VALIDATION_NOISE
+                and sev_err_mean > 0
+                and agg_err_mean > ALIASING_RATIO * sev_err_mean):
+            logger.info('FAIL: Portfolio Agg mean error > %d * sev error', ALIASING_RATIO)
             rv |= Validation.ALIASING
 
         # CV and skew: tested only when the theoretical value is meaningfully
@@ -2198,7 +2190,7 @@ class Portfolio(object):
                 # this fails because the ft can contain very small quantites
                 # if np.any(ft_line_density[line] == 0):
                 # more robust test (tried 2 * np.finfo(float).eps but that failed)
-                if np.abs(ft_line_density[line]).min() < 1e-10:
+                if np.abs(ft_line_density[line]).min() < FT_NOISE_FLOOR:
                     # have to build up
                     for not_line in self.line_names:
                         if not_line != line:
@@ -2680,11 +2672,11 @@ class Portfolio(object):
         exeqa_err.iloc[0] = 0
         # print(exeqa_err)
         # +1 because when you iloc you lose the last element (two code lines down)
-        idx = int(exeqa_err[exeqa_err < 1e-4].index[-1] / self.bs + 1)
-        # idx = np.argmax(exeqa_err > 1e-4)
+        idx = int(exeqa_err[exeqa_err < EXEQA_NOISE_FLOOR].index[-1] / self.bs + 1)
+        # idx = np.argmax(exeqa_err > EXEQA_NOISE_FLOOR)
         logger.debug(f'index of max reliable value = {idx}')
         if idx:
-            # if exeqa_err > 1e-4 is empty, np.argmax returns zero...do not want to truncate at zero in that case
+            # if exeqa_err > EXEQA_NOISE_FLOOR is empty, np.argmax returns zero...do not want to truncate at zero in that case
             df = df.iloc[:idx]
         # where gS==0, which should be empty set
         gSeq0 = (df.gS == 0)

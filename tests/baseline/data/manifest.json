@@ -6,7 +6,7 @@
     "pandas": "3.0.3",
     "python": "3.14.3"
   },
-  "commit": "a9713258ec646679ef60989446758b90ca525158",
+  "commit": "4f729126a5cf5032bb350009f4d657eb1939ae34",
   "tolerance": {
     "rtol": 1e-12,
     "atol": 1e-14

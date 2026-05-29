@@ -1,10 +1,12 @@
 # Plan: before/after baseline consistency harness
 
-> Status: **draft for review.** No code yet. The companion narrative is in
-> `dev/pipeline-portfolio.rst` (Proposal — before/after consistency harness);
-> the aggregate and portfolio refactor plans both sequence "harness first" and
-> point here. **The thing to review is the DecL corpus in §3** — grids are a
-> first guess and want the author's eye.
+> Status: **ready to execute** (2026-05-29). All §9 open items closed by the
+> author (grids reviewed in `hacks/harness.ipynb`; no switcheroo or
+> `calibrate_distortions` snapshot for now; `Def.*` form chosen). The companion
+> narrative is in `dev/pipeline-portfolio.rst` (Proposal — before/after
+> consistency harness); the aggregate and portfolio refactor plans both
+> sequence "harness first" and point here. Sequencing of the full refactor
+> sits in `dev/plan-meta.md`.
 
 ---
 
@@ -56,8 +58,9 @@ index lookup.
 ## 3. The corpus  *(review me — grids are first-guess)*
 
 Small on purpose: max-digit precision of a deterministic pipeline needs coverage
-of code *paths*, not statistical breadth. **5 aggregates + 3 portfolios.** Written
-as the `corpus.py` that the capture script will consume.
+of code *paths*, not statistical breadth. **6 aggregates + 3 portfolios.**
+Grids reviewed against `hacks/harness.ipynb` (2026-05-29). Written as the
+`corpus.py` that the capture script will consume.
 
 ```python
 # tests/baseline/corpus.py  — THESE LOOK REASONABLE AS A START
@@ -91,10 +94,11 @@ AGG_CASES = {
          "aggregate net of 2000 xs 3000",
          dict(log2=16, bs=1/4, padding=2, normalize=True)),
 
-    # 5: defective — heavy tail truncated, normalize=False so sum(p) < 1.
-    #    (Alt to also hit the no-2nd-moment path: sev 100 * pareto 1.5.)
+    # 5: defective + no-2nd-moment — pareto α=1.5, normalize=False so sum(p) < 1.
+    #    Exercises both the defective path (forwards/backwards S diverge by the
+    #    deficit) and the no-finite-2nd-moment path.
     "Def.Pareto":
-        ("agg Def.LN 1 claim sev 1000 * pareto 1.5 - 1000 fixed",
+        ("agg Def.Pareto 1 claim sev 1000 * pareto 1.5 - 1000 fixed",
          dict(log2=16, bs=3125/8192, padding=1, normalize=False)),
 
     # 6: bounded mixture
@@ -135,19 +139,16 @@ PORT_CASES = {
 }
 ```
 
-Notes / to confirm:
+Notes:
 
-* **Grids** (`log2`, `bs`) for `Tail.LN`, `Re.Both`, `Def.LN` are guesses sized
-  off the mean — please sanity-check they contain the distribution (and, for
-  `Def.LN`, that the deficit is the *intended* small one, not a too-small grid).
+* **Grids** (`log2`, `bs`) reviewed against `hacks/harness.ipynb` (2026-05-29).
+  All sizes confirmed OK.
 * **`Re.Both` clause order** follows the test-suite convention: `occurrence net
   of … <freq>` (occ before frequency) and `aggregate net of …` after frequency.
-* **`Def.LN`** uses a very high-CV lognormal + `normalize=False` to force
-  `Σp<1`; swap to `sev 100 * pareto 1.5` if you also want the genuinely
-  no-second-moment path (then `recommend_bucket` would raise — fine, we pin `bs`).
-* **`Port.Sample`** needs a small fixed multivariate sample DataFrame committed
-  alongside (e.g. a few hundred rows for two lines) so the switcheroo is
-  reproducible.
+* **`Def.Pareto`** is the no-2nd-moment Pareto α=1.5 form + `normalize=False`;
+  `recommend_bucket` would raise on it but `bs` is pinned. Tests defective and
+  no-2nd-moment in one case.
+* **No switcheroo case** in v1 of the harness — added later, see §9.
 
 ---
 
@@ -194,12 +195,28 @@ Exclude volatile fields: `last_update`, object `repr`s, timestamps.
   initial goal: very, very close). Only *introduce* a looser tier where a genuine
   `interp1d` / reinsurance step / distortion root-solve forces it — do not start
   loose.
-* On failure, report the **first** divergent `(case, frame, column, index)` with
-  the max abs and rel diff — a targeted signal, not a wall of numbers. (A small
-  helper that returns the worst-offending cell.)
 * Object/meta rows (e.g. `('meta','name')` while it still exists) compared as
   equality, not `allclose`. (After the planned all-float `stats_df` change this
   simplifies.)
+
+**Failure protocol — run every case, then report once.**
+
+* **Do not stop at the first failure.** Loop through every `(case, frame,
+  column)`, collect every divergence into a list, and only after the full sweep
+  emit a single summary. A wall of numbers is useless; one line per failing
+  column with a hint is what triage needs.
+* The summary header: `Harness: X of Y cases failed.` Then per failing
+  `(case, frame, column)`:
+  - max absolute diff and the index where it occurred,
+  - max relative diff (where defined),
+  - a one-line **observation** if anything obvious jumps out — e.g.
+    "tail-only (above `loss = …`)", "all buckets", "off-by-one shift",
+    "agrees up to the defective deficit".
+* **Stop and report to the author — do not auto-regenerate the baseline.**
+  Regeneration is reserved for changes the refactor *intended* to make.
+
+A small helper `_worst_offender(actual, expected, rtol, atol)` returning
+`(max_abs, max_rel, idx, observation)` keeps the loop body short.
 
 ---
 
@@ -225,20 +242,18 @@ tests/
     data/            # committed baselines
       manifest.json
       <case>__<frame>.parquet …
-      sample_switcheroo.parquet     # fixed sample for Port.Sample
   test_baseline.py   # §6 — load data/, rebuild, compare
 ```
 
 ---
 
-## 9. Open / to confirm
+## 9. Closed items (2026-05-29)
 
-1. **The DecL specs and grids in §3** — the main review item.
-2. Include the no-second-moment `pareto` variant for `Def.LN`, or keep the
-   lognormal-cv-6 form only?
-3. Switcheroo: hand-build the fixed sample, or derive it once from a *seeded*
-   `Port.CNC.sample(...)` and commit the result (still reproducible because
-   committed)?
-4. Do we want a **separate, looser-tolerance** snapshot that exercises
-   `calibrate_distortions` (Newton solve), or keep calibration out of the
-   baseline entirely?
+1. **Grids in §3** — reviewed in `hacks/harness.ipynb`; all OK.
+2. **`Def.*` form** — **Pareto α=1.5** (no-2nd-moment + defective in one case);
+   replaces the LN-cv6 form. Corpus key is `Def.Pareto`.
+3. **Switcheroo** — **not** in v1 of the harness. Add later (parked; flag the
+   author when Portfolio sample work next surfaces).
+4. **`calibrate_distortions` snapshot** — **not added.** Newton solve has been
+   in production use for years and is trusted; the baseline stays
+   root-solve-free.

@@ -86,7 +86,8 @@ restores intended behaviour.
 | D14 | **Leave `update` / `update_work` as-is** — the `xs` argument exists so `Portfolio.update` can drive every unit onto one shared grid | **decided** (was O4) |
 | D15 | `xsden_to_meancv` / `meancvskew` tail-mass — **closed**, resolved by the `moments.py` consolidation onto the shared `xsden_to_mwrangler` worker | **done** (was O6) |
 | D16 | **Name `stats_df` component columns `e{e}.m{m}`** (exposure component × severity-mixture component), replacing the flat `comp_n` | **decided** (wire in during the `__init__` refactor) |
-| O5 | Reconcile forwards/backwards `S` conventions (incl. `Distortion.price` backwards) | **open (investigate)** |
+| D17 | **Forwards `S` is the default everywhere; both options offered everywhere.** Under a genuine deficit (`Σp < 1 − VALIDATION_NOISE`) forwards and backwards `S` legitimately diverge by the deficit (forwards plateaus at the deficit; backwards reaches zero) — emit a `DefectiveDistributionWarning` (subclass of `UserWarning`) so the user reliably sees it. `Distortion.price` flips from backwards to forwards default | **decided** (was O5) |
+| D18 | **Adopt pandas Copy-on-Write** library-wide via `pd.options.mode.copy_on_write = True` in `aggregate/__init__.py` (single switch). Coordinate with portfolio D13 | **decided** |
 
 ---
 
@@ -226,11 +227,33 @@ The `est_*` assignments **inside** `apply_occ_reins` / `apply_agg_reins` are
 Nothing reads `est_*` between the reins call and the recompute. **Delete them.**
 Low risk.
 
-**3.4 Forwards/backwards `S`. [OPEN — O5, investigate]**
-`density_df` and `_build_augmented` use forwards `S = 1 − cumsum`; `add_exa_sample`
-offers both; **`Distortion.price` uses backwards (per user)**. Reconcile to one
-canonical `S` (or document why a given site needs backwards). Investigate
-`spectral.py:Distortion.price` first.
+**3.4 Forwards/backwards `S`. [D17 — decided]**
+Forwards (`S = 1 − cumsum`) is the default at every site; backwards remains
+available as a uniform `S_calculation='forwards'|'backwards'` kwarg. The four
+sites — `density_df` / `add_exa` (forwards already), `_build_augmented`
+(forwards already), `add_exa_sample` (already offers both), and
+`spectral.Distortion.price` (currently defaults *backwards* — flip) — converge
+on the same convention.
+
+**Defective-distribution warning.** Under a genuine deficit
+(`Σp < 1 − VALIDATION_NOISE`, not fp dust) forwards and backwards `S` differ by
+the deficit (forwards plateaus at it; backwards reaches zero). This is *not* a
+bug — it is the math. Emit a single warning at the point the deficit is
+detected (likely `update_work` once empirical moments are written), using a
+dedicated `DefectiveDistributionWarning(UserWarning)` so it shows by Python's
+default warning filter (not the logger, which is silent by default). Message
+form:
+
+```
+Σp = 0.987432 < 1 (deficit 1.257e-02);
+forwards and backwards S diverge by the deficit (forwards > backwards).
+```
+
+Use `stacklevel=2` so the warning fires at the user's call site.
+
+Files: `spectral.Distortion.price` (default flip + docstring rewrite),
+`add_exa_sample` (confirm forwards default), `constants.py` (the warning
+class), `update_work` (the deficit detection + warning).
 
 **3.5 Double Severity construction in the mixture arm. [perf, low priority]**
 In the mixture-product arm of `__init__` (weights ≠ 1), Severity objects are
@@ -302,20 +325,27 @@ deliberately, in the same commit, called out.
 
 ## 5. Suggested sequencing
 
+> Full cross-module sequencing is in `dev/plan-meta.md`. The order below is the
+> aggregate-internal view.
+
 1. **Harness first** — capture golden baseline (so everything below is safe).
-2. **2.3 / 1.2 schema (+ 3.8 component renaming)** — drop the name row, make
+2. **CoW (D18)** — flip `pd.options.mode.copy_on_write = True` in
+   `aggregate/__init__.py`; fix the fallout once, library-wide.
+3. **2.3 / 1.2 schema (+ 3.8 component renaming)** — drop the name row, make
    `stats_df` all-float, add the staged-column scaffold (NaN-filled), and rename
    the component columns `e{e}.m{m}`. Mechanical; unblocks the rest.
-3. **2.1 / 2.2 valid** — route `valid` through `stats_df` only; name the magic
+4. **2.1 / 2.2 valid** — route `valid` through `stats_df` only; name the magic
    constants. Small, high-confidence.
-4. **3.2 FFT helper + 3.6 / 3.7 deletions** — local cleanups.
-5. **1.1 describe + 1.2 staged empirical writes** — the visible reins-reporting
+5. **3.2 FFT helper + 3.6 / 3.7 deletions** — local cleanups.
+6. **1.1 describe + 1.2 staged empirical writes** — the visible reins-reporting
    payoff (Subject / Net-or-Ceded-or-After / Change, denser `EX` headings).
-6. **1.3 validate-subject** — reuses the 3.2 FFT helper.
-7. **2.4 Portfolio convention** — coordinated with a deliberate baseline update.
-8. **Group 4 (so/po)** — independent; can be done any time, ideally with its own
-   baseline cases.
-9. **List items** (O5 forwards/backwards, 3.5 perf) — as capacity allows.
+7. **1.3 validate-subject** — reuses the 3.2 FFT helper.
+8. **2.4 Portfolio convention** — coordinated with a deliberate baseline update.
+9. **3.4 forwards/backwards (D17)** — flip `Distortion.price` default to
+   forwards; add the `DefectiveDistributionWarning`; uniform kwarg everywhere.
+10. **Group 4 (so/po)** — independent; can be done any time, ideally with its
+    own baseline cases.
+11. **3.5 perf** — as capacity allows.
 
 ---
 

@@ -76,12 +76,12 @@ an unbounded + mass case is **refused** rather than returned unstable.
 | D5 | Delete the `_write_empirical_stats` **sev-block inversion** — read `stats_df['empirical'][('sev','ex1..3')]` from each unit directly | **decided** |
 | D6 | `pricing_at` → **pentagon** order `L M P Q a \| LR PQ ROE` (include `a`); this row *is* the canonical `PricingResult` | **decided** |
 | D7 | **`allocation_method` member** (`'linear'`\|`'lifted'`, default `linear`) drives `pricing_at`/`price`/`apply_distortion`/`augmented_df`; a **property setter invalidates the `augmented_df` cache** on change; shown in `info`. **Delete `price`** if then redundant (check consistency first!) | **decided** |
-| D8 | **`S` forwards by default** everywhere, **offer `backwards`** consistently (it genuinely helps thin tails) | **decided** |
-| D9 | **`Distortion.price`** (spectral.py) → return a **`PricingResult`** + default **forwards** + docstring update (keep backwards reachable) | **decided** |
+| D8 | **`S` forwards by default** everywhere, **offer `backwards`** consistently. Under a genuine deficit (`Σp<1`) the two legitimately diverge by the deficit — emit `DefectiveDistributionWarning` (subclass of `UserWarning`). See aggregate plan D17 | **decided** |
+| D9 | **`Distortion.price`** (spectral.py) → return a **`PricingResult`** + default **forwards** + docstring update (keep backwards reachable). Folds into the D17 cross-module flip | **decided** |
 | D10 | `valid` reads **only** from `stats_df` (single source of truth), mean/aliasing included | **decided** |
 | D11 | **No magic numbers** — name/share `eps**3`, `10×`, `exeqa_err<1e-4`, `\|ft\|<1e-10`; **root out** the `loss_max` length-bucketed `mult∈{1,10,100}` machinery for a principled rule | **decided** |
 | D12 | **`_build_augmented`**: compute the total-level block **once** with the correct `gprime1 = 1/g'(1) − 1`; `efficient` gates only the extra `M.*`/η-μ columns | **decided** (verify ROE-fallback against a mass distortion first) |
-| D13 | **Adopt pandas Copy-on-Write** (`pd.options.mode.copy_on_write`); library-wide, coordinate with aggregate | **decided** |
+| D13 | **Adopt pandas Copy-on-Write** — single switch `pd.options.mode.copy_on_write = True` in `aggregate/__init__.py`; fix the fallout once, library-wide. Cross-ref aggregate plan D18 | **decided** |
 | D14 | **Drop unneeded `augmented_df` columns** (intermediate `M.*` the readouts never consume) | **decided** |
 | D15 | **`add_exa_details`/`add_eta_mu`/EPD/η-μ**: slim to *exactly* what `plot_twelve` consumes (not everything), move to / gate behind `pedagogy` | **decided** (need the exact column audit) |
 | D16 | **Hoist** the distortion-independent `exp_loss` out of the linear-allocation distortion loop | **decided** |

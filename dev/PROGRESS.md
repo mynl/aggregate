@@ -5,7 +5,7 @@
 > lives in the plan docs; this file is the resume point if the conversation is
 > lost. **Update after each completed phase.**
 >
-> **Last updated: 2026-05-28.**
+> **Last updated: 2026-05-29.**
 > **Ground truth for code state is `git log`, not this file** — the author
 > commits frequently in their own terminal (379 commits on `REFACTOR`, 53 since
 > 2026-05-17). When resuming, run `git log --oneline -20` to see what actually
@@ -15,10 +15,12 @@
 
 ## Phase
 
-**Planning: complete. Execution: just beginning (author-driven).**
+**Planning: complete. All decisions closed. Execution: ready to start at meta.1
+(harness baseline).**
 
-The full read + design discussion is done and written down. A few plan items
-have already been started in the author's own commits (e.g.
+The full read + design discussion is done and written down. The cross-module
+sequencing for execution lives in `plan-meta.md` — use that as the resume point.
+A few plan items have already been started in the author's own commits (e.g.
 `Distortion.price` forwards/backwards comment + a pandas-CoW fix in portfolio —
 commit `401c0c5`). The bulk of the coding is not yet done.
 
@@ -30,9 +32,10 @@ commit `401c0c5`). The bulk of the coding is not yet done.
 |---|---|
 | `pipeline-aggregate.rst` | Aggregate current-state description + recommendations (→ docs) |
 | `pipeline-portfolio.rst` | Portfolio current-state description + recommendations (→ docs) |
-| `plan-aggregate-refactor.md` | Aggregate decisions (D1–D15; **O5 open**) + grouped work items + sequencing + Future Ideas |
-| `plan-portfolio-refactor.md` | Portfolio decisions (D1–D17) + grouped work items + sequencing + Future Ideas |
-| `plan-baseline-harness.md` | Before/after harness + **the concrete DecL corpus** (§3 grids to confirm; §9 open Qs) |
+| `plan-aggregate-refactor.md` | Aggregate decisions (D1–D18; all closed) + grouped work items + sequencing + Future Ideas |
+| `plan-portfolio-refactor.md` | Portfolio decisions (D1–D17; all closed) + grouped work items + sequencing + Future Ideas |
+| `plan-baseline-harness.md` | Before/after harness + concrete DecL corpus + failure protocol (§9 all closed) |
+| `plan-meta.md` | Cross-module sequencing — the **resume point** for execution |
 | `PROGRESS.md` | This file |
 
 Completed-plan convention: move a plan to `dev/done/` when its work is finished.
@@ -52,39 +55,25 @@ Completed-plan convention: move a plan to `dev/done/` when its work is finished.
 
 ---
 
-## Next steps (combined sequencing from the two plans)
+## Next steps
 
-1. **Harness first** — execute `plan-baseline-harness.md`: confirm the §3 DecL
-   corpus + grids, then capture the deterministic golden baseline from current
-   `REFACTOR` HEAD (covers both modules). Nothing else should start until this
-   exists.
-2. **Library-wide, do once:** adopt **pandas Copy-on-Write** (aggregate D-/
-   portfolio D13) — coordinate across both modules; the author has already begun.
-3. **Stats / validation hygiene (both modules together):** all-float `stats_df`
-   (drop the `name` row), `valid` reads only from `stats_df`, name the magic
-   numbers, and adopt the de-fuzzed `xsden_to_mwrangler` moment convention in
-   Portfolio (this **moves the baseline** — regenerate deliberately).
-4. **Aggregate reins reporting** (plan-aggregate Group 1): `describe`
-   Subject/Net-or-Ceded-or-After/Change; staged `stats_df`; validate-subject.
-5. **Portfolio pricing/allocation** (plan-portfolio Group 1): `_build_augmented`
-   de-dup + ROE fix (verify against a mass distortion under the harness);
-   pentagon `pricing_at`; `allocation_method` member; linear default + refuse
-   lifted-on-unbounded+mass; `Distortion.price` → PricingResult + forwards.
-6. **Cleanup:** `add_exa_details` slim→pedagogy, `swap_density_df`→function,
-   S-convention unification, delete journey comments, delete `aggregate_keys`.
+See **`dev/plan-meta.md`** for the full cross-module sequencing (meta.1 …
+meta.7). The plan-meta doc references the per-module plans by step ID, so the
+resume point is always "run the next meta.* that isn't done."
 
-(Full per-item detail + file lists are in the plan docs — do not duplicate here.)
+Headline order: **harness → CoW → shared stats hygiene → aggregate reins
+reporting → portfolio pricing/allocation → cleanup → parser (so/po) + perf.**
 
 ---
 
 ## Open decisions
 
-- **Aggregate O5** — reconcile forwards/backwards `S` across `density_df`,
-  `_build_augmented`, `add_exa_sample`, `Distortion.price`. *Investigate.*
-- **Harness §3** — confirm grids for `Tail.LN` / `Re.Both` / `Def.LN`.
-- **Harness §9** — pareto vs lognorm-cv6 for the no-2nd-moment path;
-  hand-built vs seeded-then-committed switcheroo sample; whether to add a
-  separate looser-tolerance `calibrate_distortions` snapshot.
+None. All design decisions closed as of 2026-05-29:
+
+- **Aggregate O5** → **D17** (decided): forwards default everywhere; emit
+  `DefectiveDistributionWarning` when `Σp<1`; both options offered uniformly.
+- **Harness §3 / §9** → all closed (grids reviewed in `hacks/harness.ipynb`;
+  `Def.Pareto` α=1.5 form chosen; no switcheroo or calibration snapshot in v1).
 
 ## Future ideas (parked)
 
@@ -94,3 +83,6 @@ Completed-plan convention: move a plan to `dev/done/` when its work is finished.
 - Integrated aliasing / movable window of interest — aggregate `plan §6 FI-2`.
 - `Portfolio.pricing_bounds` rewrite (currently `NotImplementedError`) — portfolio
   `plan §6 FI-1`. **Author asked to be reminded about this one.**
+- **Switcheroo harness case** — parked at harness §9.3 (2026-05-29). Add a
+  `Port.Sample` case (hand-built or seeded sample) to the baseline once
+  Portfolio sample work next surfaces. Remind the author at that time.

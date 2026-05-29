@@ -457,10 +457,12 @@ Aggregate Quick Diagnostics
 
 The quick display reports a set of quick diagnostics, showing
 
-* Exact ``E[X]`` and estimated ``Est E[X]`` frequency, severity, and aggregate statistics.
-* Relative errors ``Err E[X]`` for the means.
-* Coefficient of variation ``CV(X)`` and estimated CV, ``Est CV(X)``
-* Skewness ``Skew(X)`` and estimated skewness, ``Est Skew(X)``
+* Exact ``EX`` and estimated ``Est EX`` frequency, severity, and aggregate statistics.
+* Relative errors ``Err EX`` for the means.
+* Coefficient of variation ``CV`` and estimated CV, ``Est CV``.
+* Skewness ``Sk`` and estimated skewness, ``Est Sk``.
+
+(Under reinsurance the headings switch to the economic view: ``Subject`` / ``Net`` (or ``Ceded`` / ``After``) / ``Change``, with the same column arithmetic.)
 
 The line below the table shows the (log to base 2) of the number of buckets used, ``log2`` and the bucket size ``bs`` used in discretization.
 
@@ -714,7 +716,7 @@ Apply 3 xs 7 occurrence reinsurance to cap individual losses at 7. ``a05no`` is 
 
 .. warning::
 
-   The ``describe`` dataframe always reports gross analytic statistics (``E[X]``, ``CV(X)``, ``Skew(X)``) and the requested net or ceded estimated statistics (``Est E[X]``, ``Est CV(X)``, ``Est Skew(X)``). Look at the gross portfolio first to check computational accuracy. Net and ceded "error" report the difference to analytic gross.
+   Under reinsurance the ``describe`` dataframe shows the gross theoretical (``Subject EX``, ``Subject CV``, ``Subject Sk``) alongside the requested net / ceded / after view (``Net EX`` / ``Ceded EX`` / ``After EX`` depending on the cession kinds, similarly for CV / Sk) and a ``Change`` column reading ``(after - subject) / subject``. With no reinsurance the headings stay ``EX`` / ``Est EX`` / ``Err EX`` (and similarly for CV / Sk); the column arithmetic is identical to ``Change`` so the validation eyeball degenerates cleanly. Look at the gross object first to check computational accuracy; the ``Change`` (or ``Err``) column under reinsurance reports the cession impact, not numerical error.
 
 Add an aggregate 4 xs 8 reinsurance cover on the net of occurrence distribution. ``a05n`` is the final net distribution.
 

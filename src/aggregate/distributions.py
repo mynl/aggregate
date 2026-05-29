@@ -2640,10 +2640,11 @@ class Aggregate:
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
         if self.agg_density is not None:
             r = self.valid
-            if r & Validation.REINSURANCE:
-                s.append(f'<p>Validation: reinsurance, n/a.</p>')
-            elif r == Validation.NOT_UNREASONABLE:
+            if r == Validation.NOT_UNREASONABLE:
                 s.append('<p>Validation: not unreasonable.</p>')
+            elif r == Validation.REINSURANCE:
+                # Reins present, subject validated cleanly.
+                s.append('<p>Validation: reinsurance; subject not unreasonable.</p>')
             else:
                 s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
                          f'{self.explain_validation()}</pre></p>')
@@ -2911,13 +2912,154 @@ class Aggregate:
         self.stats_df.loc[('agg', 'mean'), 'empirical'] = self.est_m
         self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
         self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
-        # noise-aware: relative error, falling back to absolute where the
-        # theoretical value is ~0 (e.g. skew of a symmetric severity).
+
+        # Staged reinsurance reporting -- §1.2 of the aggregate refactor plan.
+        #
+        # ``empirical`` above is the final (after-occ + after-agg) realised
+        # view. To express the Subject -> after-occ -> after-agg progression
+        # we also need the subject (gross) empirical moments and -- when
+        # reinsurance is present -- the intermediate after-occ moments.
+        # Validation continues to use the subject vs theoretical comparison,
+        # which is the only apples-to-apples check available under reins.
+        has_occ = self.occ_reins is not None
+        has_agg = self.agg_reins is not None
+
+        # Subject severity density: when occ-reins applied, the pre-reins
+        # severity is preserved on ``sev_density_gross``; otherwise the
+        # current ``sev_density`` IS gross.
+        subject_sev = self.sev_density_gross if has_occ else self.sev_density
+        # After-occ severity is whatever the occ stage passed along
+        # (= ``sev_density`` post ``apply_occ_reins``); identical to subject
+        # severity when there is no occ stage.
+        after_occ_sev = self.sev_density
+
+        # Subject aggregate: with occ-reins we need one extra FFT of the
+        # gross severity (the "validate the subject" hook in §1.3); with no
+        # occ-reins the pre-agg-reins density already encodes gross
+        # (``agg_density_gross`` when has_agg, else the final
+        # ``agg_density``).
+        if has_occ:
+            subject_agg = self._convolve_gross_severity(subject_sev, padding)
+        elif has_agg:
+            subject_agg = self.agg_density_gross
+        else:
+            subject_agg = self.agg_density
+
+        # After-occ aggregate (pre-agg-reins): when an agg stage exists,
+        # ``apply_agg_reins`` stored the pre-stage density in
+        # ``agg_density_gross``; with only occ-reins the final
+        # ``agg_density`` IS the after-occ density; with no reins there is
+        # no separate stage to report.
+        if has_agg:
+            after_occ_agg = self.agg_density_gross
+        elif has_occ:
+            after_occ_agg = self.agg_density
+        else:
+            after_occ_agg = None
+
+        # De-fuzzed moment helper: same |x| < eps zeroing the main
+        # empirical block uses (see WHY comment above), wrapped so we can
+        # reuse it on subject / after-occ densities.
+        _floor = np.finfo(float).eps
+        def _moments(arr):
+            if arr is None:
+                return (np.nan,) * 6
+            clean = np.where(np.abs(arr) < _floor, 0.0, arr)
+            mw = xsden_to_mwrangler(self.xs, clean)
+            return (*mw.noncentral, *mw.mcvsk)
+
+        sub_sev_mom = _moments(subject_sev)
+        sub_agg_mom = _moments(subject_agg)
+        self._write_stage_moments('gross_empirical', sub_sev_mom, sub_agg_mom,
+                                  copy_freq_from='empirical')
+
+        if has_occ or has_agg:
+            aft_sev_mom = _moments(after_occ_sev)
+            aft_agg_mom = _moments(after_occ_agg)
+            self._write_stage_moments('after_occ', aft_sev_mom, aft_agg_mom,
+                                      copy_freq_from='empirical')
+
+        # Per-stage impact ratios (after / before). 1.0 means no impact;
+        # written only when the corresponding stage exists, so consumers can
+        # detect "stage absent" by NaN.
+        if has_occ:
+            self.stats_df['occ_impact'] = (
+                self.stats_df['after_occ'] / self.stats_df['mixed'])
+        if has_agg:
+            self.stats_df['agg_impact'] = (
+                self.stats_df['empirical'] / self.stats_df['after_occ'])
+
+        # ``error`` is the SUBJECT validation: gross_empirical vs mixed.
+        # With no reinsurance gross_empirical == empirical and this is
+        # exactly the legacy theoretical-vs-empirical column. With reins it
+        # is the only apples-to-apples check (the after-reins object has no
+        # independent theoretical to validate against).
         self.stats_df['error'] = _noise_aware_rel_error(
-            self.stats_df['empirical'], self.stats_df['mixed'])
+            self.stats_df['gross_empirical'], self.stats_df['mixed'])
 
         # invalidate stored functions
         self._cdf = None
+
+    def _convolve_gross_severity(self, sev_density_gross, padding):
+        """One FFT pass: subject (gross) severity -> subject aggregate density.
+
+        Mirrors the core of ``_freq_sev_convolution`` (FFT -> PGF -> iFFT)
+        but does not touch ``self.agg_density`` / ``self.ftagg_density``.
+        Used by ``update_work`` to compute the subject aggregate when
+        per-occurrence reinsurance has been applied -- the inputs to the
+        main FFT are post-reinsurance, so the subject view needs a
+        dedicated pass on the preserved ``sev_density_gross``.
+
+        Parameters
+        ----------
+        sev_density_gross : np.ndarray
+            Discretised subject (pre-occ-reins) severity on ``self.xs``.
+        padding : int
+            FFT padding factor (matches the main convolution).
+
+        Returns
+        -------
+        np.ndarray
+            Subject aggregate density on ``self.xs``. Handles the zero-risk
+            and fixed-1 shortcuts in lockstep with ``_freq_sev_convolution``.
+        """
+        if self.n == 0:
+            out = np.zeros_like(self.xs)
+            out[0] = 1.0
+            return out
+        z = ft(sev_density_gross, padding)
+        ftz = self.frequency.freq_pgf(self.n, z)
+        if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
+            return sev_density_gross.copy()
+        return np.real(ift(ftz, padding))
+
+    def _write_stage_moments(self, col, sev_mom, agg_mom, copy_freq_from=None):
+        """Write a moment tuple into a single ``stats_df`` column.
+
+        Helper to keep the staged-empirical writes in ``update_work`` tidy.
+        Each moment tuple is the six values ``(ex1, ex2, ex3, mean, cv,
+        skew)`` returned by ``xsden_to_mwrangler``.
+
+        Parameters
+        ----------
+        col : str
+            Destination column label (``empirical``, ``after_occ``,
+            ``gross_empirical``, ...).
+        sev_mom, agg_mom : tuple of float
+            Six-tuple raw + central moments for the sev and agg rows.
+        copy_freq_from : str or None
+            If set, mirror the freq mean/cv/skew rows from another column
+            (freq is unchanged by either reinsurance stage).
+        """
+        _measures = ('ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew')
+        for measure, value in zip(_measures, sev_mom):
+            self.stats_df.loc[('sev', measure), col] = value
+        for measure, value in zip(_measures, agg_mom):
+            self.stats_df.loc[('agg', measure), col] = value
+        if copy_freq_from is not None:
+            src = self.stats_df[copy_freq_from]
+            for measure in ('mean', 'cv', 'skew'):
+                self.stats_df.loc[('freq', measure), col] = src[('freq', measure)]
 
     def _freq_sev_convolution(self, padding):
         """Compute the aggregate density by FFT convolution (Mildenhall 2024, §2.2).
@@ -3031,18 +3173,16 @@ class Aggregate:
 
         # logger.warning(f'{self.name} CALLING AGG VALID')
         rv = Validation.NOT_UNREASONABLE
-        if self.reinsurance_kinds() != "None":
-            # cannot validate when there is reinsurance
-            # could possibly add manually
-            return Validation.REINSURANCE
         # Not yet updated → no empirical moments to validate against.
         if pd.isna(self.stats_df['empirical'].get(('agg', 'mean'), np.nan)):
             self._valid = Validation.NOT_UPDATED
             return Validation.NOT_UPDATED
-        # Mean / aliasing reads come straight off ``stats_df['error']`` -- the
-        # canonical noise-aware relative error of ``empirical`` vs ``mixed``,
-        # the same computation ``describe`` displays. SSoT, no detour through
-        # the display frame.
+        # Mean / aliasing reads come straight off ``stats_df['error']`` --
+        # the canonical noise-aware relative error of ``gross_empirical``
+        # vs ``mixed``. Under no reinsurance ``gross_empirical ==
+        # empirical`` and this is the classical theoretical-vs-empirical
+        # check; under reinsurance it is the subject-validation hook from
+        # §1.3 of the plan, the only apples-to-apples check available.
         err = self.stats_df['error'].abs()
         eps = self.validation_eps
         sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
@@ -3065,18 +3205,19 @@ class Aggregate:
             logger.info('FAIL: Agg mean error > %d * sev error', ALIASING_RATIO)
             rv |= Validation.ALIASING
 
-        # CV and skew: compare empirical vs theoretical directly from the
-        # canonical stats_df. The test is applied only when the *theoretical*
-        # value is meaningfully non-zero (``abs(theo) > VALIDATION_NOISE``):
-        # a theoretically-zero skew (symmetric severity) or CV (deterministic
-        # severity) cannot be validated against the FFT's empirical estimate,
-        # whose noise floor is grid-dependent and unbounded (it can be far
-        # larger than the analytic dust). ``isfinite`` skips an undefined
-        # moment (e.g. infinite CV with no second moment). When the test
-        # applies, ``np.isclose`` with rtol 10*eps / 100*eps (skewness is
-        # harder to estimate, hence looser) measures relative agreement.
+        # CV and skew: compare subject empirical vs theoretical directly
+        # from the canonical stats_df. The test is applied only when the
+        # *theoretical* value is meaningfully non-zero (``abs(theo) >
+        # VALIDATION_NOISE``): a theoretically-zero skew (symmetric
+        # severity) or CV (deterministic severity) cannot be validated
+        # against the FFT's empirical estimate, whose noise floor is grid-
+        # dependent and unbounded (it can be far larger than the analytic
+        # dust). ``isfinite`` skips an undefined moment (e.g. infinite CV
+        # with no second moment). When the test applies, ``np.isclose``
+        # with rtol 10*eps / 100*eps (skewness is harder to estimate, hence
+        # looser) measures relative agreement.
         mixed = self.stats_df['mixed']
-        emp = self.stats_df['empirical']
+        emp = self.stats_df['gross_empirical']
         for comp, flag in (('sev', Validation.SEV_CV), ('agg', Validation.AGG_CV)):
             theo = float(mixed[(comp, 'cv')])
             est = float(emp[(comp, 'cv')])
@@ -3091,6 +3232,14 @@ class Aggregate:
                     and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
                 logger.info('FAIL: %s skew error > eps', comp)
                 rv |= flag
+
+        # Reinsurance: the realised (after-reins) object has no independent
+        # theoretical, so its sev/agg moments cannot be validated. The
+        # checks above ran against the SUBJECT moments and remain
+        # meaningful; mark the result with REINSURANCE so callers know the
+        # public surface (``agg_density`` etc.) is the after-reins view.
+        if self.reinsurance_kinds() != 'None':
+            rv |= Validation.REINSURANCE
 
         if rv == Validation.NOT_UNREASONABLE:
             logger.info('Aggregate %s does not fail any validation: not unreasonable', self.name)
@@ -3734,47 +3883,104 @@ class Aggregate:
 
     @property
     def describe(self):
-        """Theoretical-vs-empirical moment table for Freq / Sev / Agg.
+        """Moment table for Freq / Sev / Agg, dense ``EX``/``CV``/``Sk`` headings.
 
         The daily-driver display used by ``qd(agg)`` and ``_repr_html_``.
-        Three-row Freq / Sev / Agg frame; columns are theoretical
-        ``E[X] / CV(X) / Skew(X)`` and — if ``update`` has run — the
-        empirical estimates and relative errors.
+        Three-row Freq / Sev / Agg frame.
 
-        Sources from the canonical ``self.stats_df`` (``mixed`` and
-        ``empirical`` columns).
+        Two display modes, same 8-column shape and same column arithmetic:
+
+        * **No reinsurance** -- validation view. Columns are theoretical
+          ``EX | Est EX | Err EX | CV | Est CV | Err CV | Sk | Est Sk``.
+          ``Err`` is the noise-aware relative error of empirical vs
+          theoretical.
+        * **With reinsurance** -- economic view (Subject is the
+          reinsurance term for the book a treaty applies to). Columns
+          become ``Subject EX | <label> EX | Change EX | Subject CV |
+          <label> CV | Change CV | Subject Sk | <label> Sk``, where
+          ``<label>`` is ``Net`` / ``Ceded`` / ``After`` depending on
+          how the cession is composed. ``Change = (after - subject) /
+          subject`` -- arithmetically the same column as ``Err`` (so the
+          eyeball degenerates cleanly to the validation view when reins
+          is absent), but now read as the % change driven by the
+          cession.
+
+        Sources from the canonical ``self.stats_df``: ``mixed`` for
+        Subject, ``empirical`` for the realised (after-reinsurance)
+        view.
         """
         st = self.stats_df['mixed']
+        rlabel = self._reins_after_label()
         df = pd.DataFrame(
             {
-                'E[X]':    [st[('freq', 'mean')], st[('sev', 'mean')], st[('agg', 'mean')]],
-                'CV(X)':   [st[('freq', 'cv')],   st[('sev', 'cv')],   st[('agg', 'cv')]],
-                'Skew(X)': [st[('freq', 'skew')], st[('sev', 'skew')], st[('agg', 'skew')]],
+                'EX': [st[('freq', 'mean')], st[('sev', 'mean')], st[('agg', 'mean')]],
+                'CV': [st[('freq', 'cv')],   st[('sev', 'cv')],   st[('agg', 'cv')]],
+                'Sk': [st[('freq', 'skew')], st[('sev', 'skew')], st[('agg', 'skew')]],
             },
             index=['Freq', 'Sev', 'Agg'],
         )
         df.index.name = 'X'
         emp = self.stats_df['empirical']
-        # ``emp[('agg','mean')]`` is non-NaN iff ``update_work`` has run.
-        if pd.notna(emp.get(('agg', 'mean'), np.nan)):
-            df.loc['Sev', 'Est E[X]'] = emp[('sev', 'mean')]
-            df.loc['Agg', 'Est E[X]'] = emp[('agg', 'mean')]
-            df.loc[:, 'Err E[X]'] = _noise_aware_rel_error(df['Est E[X]'], df['E[X]'])
-            df.loc['Sev', 'Est CV(X)'] = emp[('sev', 'cv')]
-            df.loc['Agg', 'Est CV(X)'] = emp[('agg', 'cv')]
-            df.loc[:, 'Err CV(X)'] = _noise_aware_rel_error(df['Est CV(X)'], df['CV(X)'])
-            df['Est Skew(X)'] = np.nan
-            df.loc['Sev', 'Est Skew(X)'] = emp[('sev', 'skew')]
-            df.loc['Agg', 'Est Skew(X)'] = emp[('agg', 'skew')]
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]',
-                     'CV(X)', 'Est CV(X)', 'Err CV(X)',
-                     'Skew(X)', 'Est Skew(X)']]
-        # snap floating-point dust to 0 in the moment-value columns for
+        post_update = pd.notna(emp.get(('agg', 'mean'), np.nan))
+        if post_update:
+            # Realised (after-reins, or = subject if no reins) middle column.
+            mid_label = rlabel or 'Est'
+            df.loc['Sev', f'{mid_label} EX'] = emp[('sev', 'mean')]
+            df.loc['Agg', f'{mid_label} EX'] = emp[('agg', 'mean')]
+            change_label = 'Change' if rlabel else 'Err'
+            df.loc[:, f'{change_label} EX'] = _noise_aware_rel_error(
+                df[f'{mid_label} EX'], df['EX'])
+            df.loc['Sev', f'{mid_label} CV'] = emp[('sev', 'cv')]
+            df.loc['Agg', f'{mid_label} CV'] = emp[('agg', 'cv')]
+            df.loc[:, f'{change_label} CV'] = _noise_aware_rel_error(
+                df[f'{mid_label} CV'], df['CV'])
+            df[f'{mid_label} Sk'] = np.nan
+            df.loc['Sev', f'{mid_label} Sk'] = emp[('sev', 'skew')]
+            df.loc['Agg', f'{mid_label} Sk'] = emp[('agg', 'skew')]
+            ordered = [
+                'EX', f'{mid_label} EX', f'{change_label} EX',
+                'CV', f'{mid_label} CV', f'{change_label} CV',
+                'Sk', f'{mid_label} Sk',
+            ]
+            df = df[ordered]
+        # Subject-column label: under reinsurance the gross theoretical is
+        # the "Subject" view; without reins keep the legacy ``EX``/``CV``/
+        # ``Sk`` headings (no rename necessary).
+        if rlabel:
+            df = df.rename(columns={
+                'EX': 'Subject EX', 'CV': 'Subject CV', 'Sk': 'Subject Sk'})
+        # snap floating-point dust to 0 in moment-value columns for
         # display (e.g. the skew of a symmetric severity); NaN preserved.
-        for c in ['E[X]', 'Est E[X]', 'CV(X)', 'Est CV(X)', 'Skew(X)', 'Est Skew(X)']:
-            if c in df.columns:
-                df[c] = _snap_noise(df[c])
+        # Change/Err columns retain their numeric dust (they are the
+        # validation eyeball).
+        for c in df.columns:
+            if ' EX' in c or ' CV' in c or ' Sk' in c or c in ('EX', 'CV', 'Sk'):
+                if not (c.startswith('Err ') or c.startswith('Change ')):
+                    df[c] = _snap_noise(df[c])
         return df
+
+    def _reins_after_label(self):
+        """Heading for the after-reins column in ``describe``.
+
+        ``Net`` when every cession passes the net; ``Ceded`` when every
+        cession passes the ceded; ``After`` when occ and agg pass
+        different kinds (e.g. ``net of occ then ceded to agg``). Returns
+        ``None`` when no reinsurance is configured (legacy
+        validation-view headings apply).
+        """
+        kinds = []
+        if self.occ_reins is not None:
+            kinds.append(self.occ_kind)
+        if self.agg_reins is not None:
+            kinds.append(self.agg_kind)
+        if not kinds:
+            return None
+        uniq = set(kinds)
+        if uniq == {'net of'}:
+            return 'Net'
+        if uniq == {'ceded to'}:
+            return 'Ceded'
+        return 'After'
 
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
         """

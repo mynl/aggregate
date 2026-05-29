@@ -228,7 +228,7 @@ deferred with rationale.
 | meta.1 harness baseline | **done** | `e2d5390`; 10 cases, 65 parquets, manifest pinned at `cfcd6ae`. Pandas 3.0 already has CoW on by default — meta.2 mostly explicit-switch + sanity. |
 | meta.2 CoW switch | **done** | conditional switch in `__init__.py` (no-op on pandas 3.0+ which already has CoW on); 693 pytest pass, no CoW warnings |
 | meta.3 shared stats hygiene | **done** | 2026-05-29; D3+D5+D7+D16 (agg) + D4+D5+D10+D11-named-constants (port); baseline + PEG regenerated; 693 pytest pass. The Portfolio `mult ∈ {1,10,100}` structural cleanup (D11 second half) deferred to a later step — it's a number-mover that wants its own commit. |
-| meta.4 aggregate reins reporting | ready | baseline gains columns |
+| meta.4 aggregate reins reporting | **done** | 2026-05-29; describe relabel (Subject / Net-Ceded-After / Change, denser EX/CV/Sk); 1.2 staged stats_df writes (after_occ + occ_impact/agg_impact + gross_empirical populated); 1.3 validate-subject (`stats_df['error']` is gross_empirical vs mixed; `valid` ORs REINSURANCE + subject flags; `explain_validation` surfaces "reinsurance; subject ..."); baseline regenerated (Re.Both case carries the new column layout); 693 pytest pass. |
 | meta.5 aggregate cleanups + S unification | ready | baseline moves (`Def.Pareto` under D17) |
 | meta.6 portfolio pricing/allocation | ready | baseline moves (ROE-fallback fix) |
 | meta.7 portfolio cleanup | ready | no number movement expected |

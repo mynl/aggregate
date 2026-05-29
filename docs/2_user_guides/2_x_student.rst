@@ -113,8 +113,8 @@ Use ``qd`` to print a dataframe of statistics that answer the first three questi
 
     qd(a01)
 
-The columns ``E[X]``, ``CV(X)``, and ``Skew(X)`` report the mean, CV, and skewness for each component computed analytically or very accurately with numerical integration.
-The columns ``Est E[X]``, ``Est CV(X)``, and ``Est Skew(X)`` are computed numerically by ``aggregate``. For discrete models they equal the analytic answer because the only errors introduced by ``aggregate`` come from discretizing the severity distribution. That is also why there are no estimates for frequency. ``Err E[X]`` shows the  error (difference, not relative error) in the mean. This handy dataframe can be accessed directly via the property ``a01.describe``. The note ``log2 = 5, bs = 1`` describe the inner workings, discussed in REF.
+The columns ``EX``, ``CV``, and ``Sk`` report the mean, CV, and skewness for each component computed analytically or very accurately with numerical integration.
+The columns ``Est EX``, ``Est CV``, and ``Est Sk`` are computed numerically by ``aggregate``. For discrete models they equal the analytic answer because the only errors introduced by ``aggregate`` come from discretizing the severity distribution. That is also why there are no estimates for frequency. ``Err EX`` shows the  error (difference, not relative error) in the mean. This handy dataframe can be accessed directly via the property ``a01.describe``. The note ``log2 = 5, bs = 1`` describe the inner workings, discussed in REF.
 
 It remains to give the aggregate probability mass function. It is available in the dataframe ``a01.density_df``. Here are the probability masses, and distribution and survival functions evaluated for all possible aggregate outcomes.
 

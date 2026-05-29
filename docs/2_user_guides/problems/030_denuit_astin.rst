@@ -56,7 +56,7 @@ Proportion of expected loss by unit.
 
 .. ipython:: python
 
-    bb = p.describe.xs('Agg', axis=0, level=1)[['E[X]']]
+    bb = p.describe.xs('Agg', axis=0, level=1)[['EX']]
     qd(bb / bb.iloc[-1,0])
 
 
@@ -80,7 +80,7 @@ Reproducing Figure 4.5.
              , bs=1, log2=8)
 
     audit = pd.concat([i.describe for i in ports.values()], keys=ports.keys(), names=['n', 'unit', 'X'])
-    qd(audit.xs('Agg', axis=0, level=2)['E[X]'].unstack(1))
+    qd(audit.xs('Agg', axis=0, level=2)['EX'].unstack(1))
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 3.5), constrained_layout=True, squeeze=True)
     for ax, (n, port), mx, t in zip(axs.flat, ports.items(), [20, 25, 40, 60], [2, 5, 10, 10]):
         lm = [-1, mx]

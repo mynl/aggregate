@@ -886,15 +886,15 @@ class Portfolio(object):
         _total = self.stats_df['total']
         df = pd.DataFrame(
             {
-                'E[X]':    [float(_total[('freq', 'ex1')]),
-                            float(_total[('sev',  'ex1')]),
-                            float(_total[('agg',  'ex1')])],
-                'CV(X)':   [float(_total[('freq', 'cv')]),
-                            float(_total[('sev',  'cv')]),
-                            float(_total[('agg',  'cv')])],
-                'Skew(X)': [float(_total[('freq', 'skew')]),
-                            float(_total[('sev',  'skew')]),
-                            float(_total[('agg',  'skew')])],
+                'EX': [float(_total[('freq', 'ex1')]),
+                       float(_total[('sev',  'ex1')]),
+                       float(_total[('agg',  'ex1')])],
+                'CV': [float(_total[('freq', 'cv')]),
+                       float(_total[('sev',  'cv')]),
+                       float(_total[('agg',  'cv')])],
+                'Sk': [float(_total[('freq', 'skew')]),
+                       float(_total[('sev',  'skew')]),
+                       float(_total[('agg',  'skew')])],
             },
             index=['Freq', 'Sev', 'Agg'],
         )
@@ -907,19 +907,19 @@ class Portfolio(object):
         emp = self.stats_df['empirical']
         emp_agg_m = emp.get(('agg', 'mean'), np.nan)
         if pd.notna(emp_agg_m):
-            df.loc['Sev', 'Est E[X]'] = float(emp[('sev', 'mean')])
-            df.loc['Agg', 'Est E[X]'] = float(emp_agg_m)
-            df['Err E[X]'] = _noise_aware_rel_error(df['Est E[X]'], df['E[X]'])
-            df.loc['Sev', 'Est CV(X)'] = float(emp[('sev', 'cv')])
-            df.loc['Agg', 'Est CV(X)'] = float(emp[('agg', 'cv')])
-            df['Err CV(X)'] = _noise_aware_rel_error(df['Est CV(X)'], df['CV(X)'])
-            df.loc['Sev', 'Est Skew(X)'] = float(emp[('sev', 'skew')])
-            df.loc['Agg', 'Est Skew(X)'] = float(emp[('agg', 'skew')])
-            df = df[['E[X]', 'Est E[X]', 'Err E[X]', 'CV(X)', 'Est CV(X)', 'Err CV(X)',
-                     'Skew(X)', 'Est Skew(X)']]
+            df.loc['Sev', 'Est EX'] = float(emp[('sev', 'mean')])
+            df.loc['Agg', 'Est EX'] = float(emp_agg_m)
+            df['Err EX'] = _noise_aware_rel_error(df['Est EX'], df['EX'])
+            df.loc['Sev', 'Est CV'] = float(emp[('sev', 'cv')])
+            df.loc['Agg', 'Est CV'] = float(emp[('agg', 'cv')])
+            df['Err CV'] = _noise_aware_rel_error(df['Est CV'], df['CV'])
+            df.loc['Sev', 'Est Sk'] = float(emp[('sev', 'skew')])
+            df.loc['Agg', 'Est Sk'] = float(emp[('agg', 'skew')])
+            df = df[['EX', 'Est EX', 'Err EX', 'CV', 'Est CV', 'Err CV',
+                     'Sk', 'Est Sk']]
         # snap floating-point dust to 0 in the moment-value columns for
         # display (e.g. the skew of a symmetric unit); NaN preserved.
-        for c in ['E[X]', 'Est E[X]', 'CV(X)', 'Est CV(X)', 'Skew(X)', 'Est Skew(X)']:
+        for c in ['EX', 'Est EX', 'CV', 'Est CV', 'Sk', 'Est Sk']:
             if c in df.columns:
                 df[c] = _snap_noise(df[c])
 

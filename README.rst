@@ -46,6 +46,38 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Aggregate reinsurance reporting (Subject / Net / Change)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Aggregate.describe`` becomes an economic view under reinsurance:
+  columns are ``Subject EX | <label> EX | Change EX | Subject CV |
+  <label> CV | Change CV | Subject Sk | <label> Sk``, where ``<label>``
+  is ``Net`` (every cession passes the net), ``Ceded`` (every cession
+  passes the ceded), or ``After`` (occ and agg pass different kinds).
+  ``Change = (after − subject) / subject`` is the same column arithmetic
+  as the legacy ``Err`` and reads either as the validation eyeball (no
+  reins) or as the cession impact (under reins).
+- Headings switch to the denser ``EX`` / ``CV`` / ``Sk`` form on both
+  ``Aggregate.describe`` and ``Portfolio.describe`` (legacy
+  ``E[X]`` / ``CV(X)`` / ``Skew(X)`` retired).
+- The scaffold ``stats_df`` columns from the previous iteration are now
+  populated: ``after_occ`` (post-occ-reins moments, pre-agg-reins),
+  ``occ_impact`` (after_occ / mixed), ``agg_impact`` (empirical /
+  after_occ), and ``gross_empirical`` (subject empirical, via one extra
+  FFT of ``sev_density_gross`` when occ-reins is present, free
+  otherwise).
+- ``stats_df['error']`` is now the subject-validation column:
+  ``gross_empirical`` vs ``mixed``. Under no reinsurance
+  ``gross_empirical == empirical`` and this is exactly the legacy
+  theoretical-vs-empirical column. Under reinsurance it is the only
+  apples-to-apples check available (the after-reins object has no
+  independent theoretical to validate against).
+- ``Aggregate.valid`` now validates the SUBJECT under the hood and ORs
+  in ``Validation.REINSURANCE`` when reins is present. ``info`` /
+  ``explain_validation`` surface this as ``reinsurance; subject not
+  unreasonable`` (or ``reinsurance; subject fails ...``) so the user
+  can tell whether the gross object is sound.
+
 Shared stats hygiene across Aggregate and Portfolio
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

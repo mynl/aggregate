@@ -477,7 +477,7 @@ The covered layer is 18 xs 6, in which the insured pays 25% because of the coins
     kpw_9_14.plot()
 
 
-``describe`` returns gross under ``E[X]`` and the requested net or ceded under ``Est E[X]``. The print statement computes net variance from the product of estimated mean and cv. The spikes on the density corresponds to the possibility of only limit claims.
+Under reinsurance ``describe`` returns gross under ``Subject EX`` and the requested net or ceded under ``Net EX`` (or ``Ceded EX`` / ``After EX``). The print statement computes net variance from the product of estimated mean and cv. The spikes on the density corresponds to the possibility of only limit claims.
 
 .. **TODO** harmonize with their answer for probabilities.
 

@@ -414,7 +414,8 @@ First, we compute all the aggregates.
                , bs=50, log2=18,
                normalize=False,
               )
-    qd(pd.concat([i.describe[['E[X]', 'CV(X)', 'Skew(X)']] for i in b.values()],
+    qd(pd.concat([i.describe[['Subject EX', 'Subject CV', 'Subject Sk']]
+                  for i in b.values()],
         keys=b.keys(), names=['Occ limit', 'X']),
         accuracy=4)
 

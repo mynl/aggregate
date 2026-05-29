@@ -36,10 +36,10 @@ def test_describe_snaps_skew_dust_to_zero():
     """``describe`` shows exactly 0 for the (symmetric) skew, not fp dust."""
     a = build("agg Die dfreq [1] dsev [1:6]")
     d = a.describe
-    assert d.loc["Sev", "Skew(X)"] == 0.0
-    assert d.loc["Agg", "Skew(X)"] == 0.0
-    assert d.loc["Sev", "Est Skew(X)"] == 0.0
-    assert d.loc["Agg", "Est Skew(X)"] == 0.0
+    assert d.loc["Sev", "Sk"] == 0.0
+    assert d.loc["Agg", "Sk"] == 0.0
+    assert d.loc["Sev", "Est Sk"] == 0.0
+    assert d.loc["Agg", "Est Sk"] == 0.0
 
 
 def test_empirical_raw_moments_populated():
@@ -89,4 +89,4 @@ def test_skewed_model_still_validates_and_keeps_skew():
     b = build("agg LN 25 claims sev lognorm 50 cv 0.75 poisson")
     assert b.valid == Validation.NOT_UNREASONABLE
     # real, non-trivial skew preserved (guards against over-snapping)
-    assert float(b.describe.loc["Agg", "Skew(X)"]) > 0.1
+    assert float(b.describe.loc["Agg", "Sk"]) > 0.1

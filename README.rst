@@ -31,6 +31,21 @@ Version History
 1.0.0a17
 ---------
 
+Refactor harness + Copy-on-Write opt-in
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``tests/baseline/`` characterisation harness for the v1.0 core-compute
+  refactor: 10 deterministic cases (7 aggregates, 3 portfolios) snapshot
+  ``stats_df`` / ``describe`` / ``density_df`` plus per-distortion
+  ``augmented_df`` / ``pricing_at`` / ``price()`` to parquet at
+  ``rtol=1e-12``, with a pinned manifest recording versions + commit SHA.
+  ``tests/test_baseline.py`` runs every case before reporting, collecting
+  all divergences into one summary (see ``dev/plan-baseline-harness.md``).
+  Adds ``pyarrow>=15`` to dev extras.
+- Pandas Copy-on-Write is now opted in at package import for pandas 2.x
+  (pandas >= 3.0 has CoW on as the default, so the option-setter is a
+  conditional no-op there to avoid the deprecated-option warning).
+
 Noise-aware validation, denoised ``describe``, empirical raw moments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

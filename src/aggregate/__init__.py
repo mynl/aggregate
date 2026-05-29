@@ -11,6 +11,15 @@ this file.
 submodule import (``from aggregate.tweedie import Tweedie``, etc.).
 """
 
+# Pandas Copy-on-Write: enabled unconditionally for the library. On
+# pandas >= 3.0 CoW is the unchangeable default and the option is a
+# deprecated no-op (setting it emits a Pandas4Warning), so we only flip
+# the switch on the 2.x line where it is a meaningful opt-in.
+import pandas as _pd
+if int(_pd.__version__.split(".", 1)[0]) < 3:
+    _pd.options.mode.copy_on_write = True
+del _pd
+
 from .parser        import *  # noqa: F401,F403
 from .moments       import *  # noqa: F401,F403
 from .iman_conover  import *  # noqa: F401,F403

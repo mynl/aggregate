@@ -53,18 +53,24 @@ captured snapshot (the trivial pass), committed.
 
 **Plan refs.** Aggregate **D18**, Portfolio **D13**.
 
-**The switch.** Add to `aggregate/__init__.py` (near the top, before any frame
-is built):
+**The switch.** Pandas 3.0 has CoW on as an unchangeable default — and the
+option `pd.options.mode.copy_on_write` is a deprecated no-op there
+(emits `Pandas4Warning`, removed in pandas 4.0). The library minimum is
+pandas 2.1, so we still need to opt in on the 2.x line. Conditional:
 
 ```python
-import pandas as pd
-pd.options.mode.copy_on_write = True
+import pandas as _pd
+if int(_pd.__version__.split(".", 1)[0]) < 3:
+    _pd.options.mode.copy_on_write = True
+del _pd
 ```
 
-**The fallout.** Run the existing pytest suite. Expect ChainedAssignment errors
-in any code path that mutated a view (slice-then-assign, `inplace=True` on a
-slice, `astype(float)` on a borrowed column). Fix each at the source — these
-are the cases CoW is designed to surface.
+Goes at the top of `src/aggregate/__init__.py`, before any submodule import.
+
+**The fallout.** With pandas 3.0 already in use during meta.1 capture, the
+fallout has already been quietly absorbed by recent commits (e.g.
+`401c0c5 Distortion.price ... CoW pandas issue in portfolio`). Full pytest
+sweep after the switch: **693 passed, no CoW-related warnings**.
 
 **Done when.** Harness passes (no number should move from CoW alone); test
 suite clean of CoW-related warnings.
@@ -220,7 +226,7 @@ deferred with rationale.
 |------|--------|---------------|
 | meta.0 pre-flight | **done** | 2026-05-29; agg 1.0.0a17, numpy 2.4.5, scipy 1.17.1, pandas 3.0.3, py 3.14.3 |
 | meta.1 harness baseline | **done** | `e2d5390`; 10 cases, 65 parquets, manifest pinned at `cfcd6ae`. Pandas 3.0 already has CoW on by default — meta.2 mostly explicit-switch + sanity. |
-| meta.2 CoW switch | ready | library-wide, one shot; pandas 3.0 default so likely no fallout |
+| meta.2 CoW switch | **done** | conditional switch in `__init__.py` (no-op on pandas 3.0+ which already has CoW on); 693 pytest pass, no CoW warnings |
 | meta.3 shared stats hygiene | ready | baseline moves (Portfolio convention) |
 | meta.4 aggregate reins reporting | ready | baseline gains columns |
 | meta.5 aggregate cleanups + S unification | ready | baseline moves (`Def.Pareto` under D17) |

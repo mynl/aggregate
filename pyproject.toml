@@ -69,6 +69,7 @@ dev = [
     "sphinx-multitoc-numbering",
     "sphinx-design",
     "pytest>=7",
+    "pyarrow>=15",
 ]
 notebook = [
     "jupyterlab",

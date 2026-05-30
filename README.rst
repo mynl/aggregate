@@ -46,6 +46,55 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Portfolio pricing & allocation (pentagon, linear default, ROE fix)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Portfolio.price`` default flips to ``allocation='linear'`` (was
+  ``'lifted'``). Lifted natural allocation reads from the risk-adjusted
+  ``augmented_df`` and is unstable on the right edge for a mass
+  distortion on an unbounded support — essentially all the distortion
+  weight lands on the last bucket. Linear collapses tail states with
+  objective probabilities and stays bounded.
+- New ``Portfolio.allocation_method`` member (``'linear'`` /
+  ``'lifted'``) is the source of truth; the setter clears the
+  ``augmented_df`` cache so the next ``apply_distortion`` rebuilds.
+  Shown in ``info``. ``price(allocation=…)`` still overrides on a
+  one-off basis.
+- New ``Aggregate.bounded`` / ``Portfolio.bounded`` property: ``True``
+  iff the frequency *and* every severity component is bounded
+  (``fixed`` / ``bernoulli`` / ``binomial`` / ``empirical`` frequencies
+  and finite-support / layer-capped / splice-capped severities).
+  Conservative — defaults to ``False`` whenever it cannot be proved
+  ``True``. Certify with ``obj.bounded = True`` (escape hatch for
+  cases the heuristic misses).
+- ``Portfolio.price(allocation='lifted')`` now **refuses** when the
+  portfolio is unbounded and any requested distortion carries a mass
+  (e.g. CCoC on Port.CNC); the error points the caller at
+  ``allocation='linear'`` or the ``bounded`` override. Bounded
+  portfolios (Bodoff, beta mixtures) still take lifted+CCoC unchanged.
+- ``Portfolio._build_augmented`` de-duplicated: the total-level block
+  (``exag_total``, ``M.M_total``, ``M.Q_total``, ``M.ROE_total``,
+  ``roe_zero``) is now computed once with the correct L'Hôpital ROE
+  fallback ``ROE(1) = 1/g'(1) − 1``. Previously the ``efficient=True``
+  branch (the default) used ``g'(1)`` and disagreed with the
+  ``efficient=False`` branch on the right edge — surfaces as numerical
+  shifts on mass-distortion + tail cells (the baseline harness moves on
+  Port.Bounded and PEG CCoC; non-mass distortions are unaffected).
+  When ``g'(1) = 0`` (TVaR beyond the threshold) the limit is ``+∞``
+  and ``M.Q_{line}/∞ = 0`` falls through cleanly.
+- ``pricing_at`` returns the pentagon order ``L M P Q a | LR PQ ROE``
+  (amounts then ratios; ``a = P + Q`` is now a first-class column,
+  not a post-hoc decoration in ``analyze_distortions``). The lifted
+  and linear branches of ``price`` emit the same column shape.
+  ``PRICING_STAT_ORDER`` / ``PRICING_STAT_DTYPE`` updated to match.
+- Linear-branch ``price``: the distortion-independent ``exp_loss``
+  integral (and the tail-collapse on ``exeqa``) is hoisted out of the
+  per-distortion loop. With *k* distortions the per-call cost drops
+  from *k* full reverse-cumsum sweeps to one.
+- Journey-of-discovery comments in ``_build_augmented`` and the linear
+  ``price`` branch deleted; the surviving comments are short, current,
+  and point at the equation numbers in PIR §14 where useful.
+
 Aggregate cleanups + forwards-S unification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

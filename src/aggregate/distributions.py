@@ -1579,6 +1579,18 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
+# Frequencies with bounded support — used by ``Aggregate.bounded``.
+_BOUNDED_FREQS = frozenset({'fixed', 'bernoulli', 'binomial', 'empirical'})
+
+# scipy.stats families with bounded support — used by ``Severity.bounded``.
+# Conservative: only the standard finite-support members.
+_BOUNDED_SCIPY_SEVS = frozenset({
+    'beta', 'uniform', 'arcsine', 'rdist', 'triang', 'trapezoid',
+    'semicircular', 'truncnorm', 'truncexpon', 'truncpareto',
+    'truncweibull_min', 'cosine', 'anglit', 'wrapcauchy', 'kstwo',
+})
+
+
 class Aggregate:
     """Compound (aggregate) probability distribution.
 
@@ -1663,6 +1675,35 @@ class Aggregate:
         """
         return {'type': type(self), 'spec': self.spec, 'bs': self.bs, 'log2': self.log2,
                 'sevs': len(self.sevs)}
+
+    @property
+    def bounded(self) -> bool:
+        """Whether the aggregate has bounded support.
+
+        ``True`` iff the frequency *and* every severity component is
+        bounded. Frequencies in :data:`_BOUNDED_FREQS` (``fixed``,
+        ``bernoulli``, ``binomial``, ``empirical``) are bounded; mixed
+        Poisson / negbin / etc. are not. A severity is bounded when it
+        is a histogram, a fixed atom, a bounded scipy family, or carries
+        a finite layer ``exp_limit`` or splice ``sev_ub``. Conservative:
+        defaults to ``False`` whenever it cannot be proved ``True`` from
+        the spec. Set ``self.bounded = True`` to certify (e.g. a fat-
+        tailed scipy severity with a large layer cap that the heuristic
+        misses).
+        """
+        if getattr(self, '_certified_bounded', False):
+            return True
+        if self.frequency.freq_name not in _BOUNDED_FREQS:
+            return False
+        if not self.sevs:
+            return False
+        return all(s.bounded for s in self.sevs)
+
+    @bounded.setter
+    def bounded(self, value: bool) -> None:
+        if value is not True and value is not False:
+            raise ValueError('bounded must be True (certify) or False (reset)')
+        self._certified_bounded = bool(value)
 
     @property
     def density_df(self):
@@ -5266,6 +5307,31 @@ class Severity(ss.rv_continuous):
             f'Severity._build not implemented for type {type(self).__name__!r} '
             f'(sev_name={self.sev_name!r}). Registered kinds: {sorted(Severity._registry)}'
         )
+
+    @property
+    def bounded(self) -> bool:
+        """Whether the (post-layer, post-splice) severity has bounded support.
+
+        ``True`` for ``fixed``/``dhistogram``/``chistogram`` (finite by
+        construction), for ``scipy`` families in
+        :data:`_BOUNDED_SCIPY_SEVS`, or when a finite layer ``exp_limit``
+        or splice ``sev_ub`` was imposed. ``meta``/``copy`` defer to the
+        wrapped object's ``bounded``.
+        """
+        if self.sev_kind in ('fixed', 'dhistogram', 'chistogram'):
+            return True
+        if self.sev_kind in ('meta', 'copy'):
+            inner = self.sev_name
+            return bool(getattr(inner, 'bounded', False))
+        # scipy: bounded if the family is bounded, or if a finite layer
+        # / splice ub caps it.
+        if np.isfinite(self.limit):
+            return True
+        if np.isfinite(self.sev_ub):
+            return True
+        if isinstance(self.sev_name, str) and self.sev_name in _BOUNDED_SCIPY_SEVS:
+            return True
+        return False
 
     def _apply_lb_ub(self):
         """Wrap ``self.fz`` methods with truncation decorators for ``[lb, ub]``.

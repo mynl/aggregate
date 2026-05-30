@@ -1398,19 +1398,13 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     a21.set(xlim=[0, xmax], ylim=[0, xmax], aspect='equal')
     a21.legend(loc='upper left')
 
-    # plot_twelve needs the M.* (marginal-margin) columns produced only
-    # when ``efficient=False``. Those in turn rely on the full set of
-    # eta-mu columns on ``density_df`` -- not just the basic ``ημ_<line>``
-    # densities produced by ``add_eta_mu()`` but also the ``exeqa_ημ_*``
-    # derivatives, which require ``add_exa_details(eta_mu=True)``.
-    # ``augmented_df()`` uses the default (``efficient=True``); if a lean
-    # version is cached, drop it and rebuild the full version (warming
-    # the eta-mu derivatives first if not already present).
+    # plot_twelve needs the M.* (marginal-margin) per-line columns produced
+    # only when ``efficient=False``. ``augmented_df()`` uses the default
+    # (``efficient=True``); if a lean version is cached, drop it and
+    # rebuild the full version.
     aug_df = port.augmented_df(distortion_name)
     first_line = port.line_names[0]
     if f'M.M_{first_line}' not in aug_df.columns:
-        if f'exeqa_ημ_{first_line}' not in port.density_df.columns:
-            port.add_exa_details(port.density_df, eta_mu=True)
         port._augmented_dfs.pop(distortion_name, None)
         aug_df = port.apply_distortion(distortion_name, efficient=False)
     aug_df.filter(regex=f'exi_xgta_({port.line_name_pipe})'). \

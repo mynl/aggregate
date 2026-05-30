@@ -26,7 +26,8 @@ from .constants import (ALIASING_RATIO, EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
                         VALIDATION_NOISE, Validation, WL)
 from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
 
-__all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations']
+__all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
+           'swap_density_df']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
@@ -507,24 +508,9 @@ class Portfolio(object):
             # E[X_i | X>a]
             df['exgta_' + col] = (df['e_' + col] - temp) / df.S
 
-            # E[X_i / X | X > a]  (note=a is trivial!)
-            # temp = df.loss.iloc[0]  # loss=0, should always be zero
-            # df.loss.iloc[0] = 1  # avoid divide by zero
-            # # unconditional E[X_i/X]
-            # df['exi_x_' + col] = np.sum(
-            #     df['exeqa_' + col] * df.p_total / df.loss)
-            # temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
-            # df['exi_xlea_' + col] = temp_xi_x / df.F
-            # df.loc[0, 'exi_xlea_' + col] = 0  # selection, 0/0 problem
-            # # more generally F=0 error:                      V
-            # # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-            # # ?? not an issue for samples; don't have exlea_total anyway??
-            # # put value back
-            # df.loss.iloc[0] = temp
-            #
-            # above code generates a chained assignment error
+            # E[X_i / X | X > a]; guard loss[0]=0 with a patched copy.
             denom = df['loss'].copy()
-            denom.iat[0] = 1.0  # avoid divide-by-zero; df['loss'][0] is known to be 0
+            denom.iat[0] = 1.0
 
             df['exi_x_' + col] = np.sum(df['exeqa_' + col] * df.p_total / denom)
             temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / denom)
@@ -1454,52 +1440,40 @@ class Portfolio(object):
         self._last_applied_distortion_name = None
 
         ft_line_density = {}
-        # line_density = {}
-        # not_line_density = {}
 
-        # add the densities
-        # num buckets and max loss from bucket size
+        # Build the grid and the per-line densities, accumulating their
+        # product in Fourier space to get ``p_total``.
         N = 1 << log2
         MAXL = N * bs
         xs = np.linspace(0, MAXL, N, endpoint=False)
-        # make all the single line aggs
-        # note: looks like duplication but will all be references
-        # easier for add_exa to have as part of the portfolio module
-
-        # where the answer will live
         self.density_df = pd.DataFrame(index=xs)
         self.density_df['loss'] = xs
         ft_all = None
         for agg in self.agg_list:
             raw_nm = agg.name
-            nm = f'p_{agg.name}'
-            # agg.update_work handles the reinsurance too
             agg.update_work(xs, self.padding, sev_calc, discretization_calc,
                             normalize, force_severity, debug)
-
             ft_line_density[raw_nm] = agg.ftagg_density
-            self.density_df[nm] = agg.agg_density
+            self.density_df[f'p_{raw_nm}'] = agg.agg_density
             if ft_all is None:
                 ft_all = np.copy(ft_line_density[raw_nm])
             else:
                 ft_all *= ft_line_density[raw_nm]
         self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
-        # ft_line_density['total'] = ft_all
 
-        # make the not self.line_density = sum of all but the given line
-        # have the issue here that if you divide and the dist
-        # is symmetric then you get a div zero...
+        # ``ft_nots[i]`` = FFT of the sum of all lines except ``i`` —
+        # needed for ``exeqa_{i}`` in ``add_exa``. The direct division
+        # path is faster but unsafe if any FFT bin is exactly zero
+        # (symmetric distributions); fall back to building the product.
         ft_nots = {}
         for line in self.line_names:
             ft_not = np.ones_like(ft_all)
             if np.any(ft_line_density[line] == 0):
-                # have to build up
                 for not_line in self.line_names:
                     if not_line != line:
                         ft_not *= ft_line_density[not_line]
-            else:
-                if len(self.line_names) > 1:
-                    ft_not = ft_all / ft_line_density[line]
+            elif len(self.line_names) > 1:
+                ft_not = ft_all / ft_line_density[line]
             ft_nots[line] = ft_not
 
         self.remove_fuzz(log='update')
@@ -1905,108 +1879,56 @@ class Portfolio(object):
                             figsize=(10, 10), diagonal='kde', **kwargs)
         return ax
 
-    def add_exa(self, df, ft_nots=None):
-        r"""
-        Use fft to add exeqa_XXX = E(X_i | X=a) to each dist
+    def add_exa(self, df, ft_nots):
+        r"""Add the conditional-expectation columns to ``df``.
 
-        also add exlea = E(X_i | X <= a) = sum_{x<=a} exa(x)*f(x) where f is for the total
-        ie. self.density_df['exlea_attrit'] = np.cumsum( self.density_df.exa_attrit *
-        self.density_df.p_total) / self.density_df.F
+        Per-line and total: ``exeqa_*`` = ``E[X_i | X=a]``, ``exlea_*`` =
+        ``E[X_i | X≤a]``, ``exgta_*`` = ``E[X_i | X>a]``, ``exi_x_*`` =
+        ``E[X_i / X | X=a]``, ``exi_xlea_*`` / ``exi_xgta_*`` =
+        conditional-share variants, ``e_*`` = unconditional mean,
+        ``lev_*`` = ``E[X_i ∧ a]``, ``exa_*`` = portfolio-allocated
+        expected loss to line ``i``. Also writes ``F``, ``S``,
+        ``exa_total``, ``lev_total``.
 
-        and add exgta = E(X_i | X>a) since E(X) = E(X | X<= a)F(a) + E(X | X>a)S(a) we have
-        exgta = (ex - exlea F) / S
+        Names with a leading ``t`` clash with the ``total`` regex
+        anchors — do not use them.
 
-        and add the actual expected losses (not theoretical) the empirical amount:
-        self.density_df['e_attrit'] =  np.sum( self.density_df.p_attrit * self.density_df.loss)
-
-        Mid point adjustment is handled by the example creation routines
-        self.density_df.loss = self.density_df.loss - bs/2
-
-        **YOU CANNOT HAVE A LINE with a name starting t!!!**
-
-        See LCA_Examples for original code
-
-        Alternative approach to exa: use UC=unconditional versions of exlea and exi_xgta:
-
-        * exleaUC = np.cumsum(port.density_df['exeqa\_' + col] * port.density_df.p_total)  # unconditional
-        * exixgtaUC =np.cumsum(  self.density_df.loc[::-1, 'exeqa\_' + col] / self.density_df.loc[::-1, 'loss']
-          * self.density_df.loc[::-1, 'p_total'] )
-        * exa = exleaUC + exixgtaUC * self.density_df.loss
-
-        :param df: data frame to add to. Initially add_exa was only called by update and wrote to self.density_df. But now
-            it is called by gradient too which writes to gradient_df, so we need to pass in this argument
-        :param ft_nots: FFTs of the not lines (computed in gradients) so you don't round trip an FFT; gradients needs
-            to recompute all the not lines each time around and it is stilly to do that twice
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Frame to extend in place. ``update`` passes
+            ``self.density_df``; ``gradient`` and ``swap_density_df``
+            pass their own frames.
+        ft_nots : dict[str, np.ndarray]
+            FFTs of the "not-line" densities, one per line — used by
+            ``exeqa_{line} = ift(ft(loss · p_i) · ft_nots[i]) / p_total``.
+            Always pre-computed by the caller.
         """
-
-        # eps is used NOT to do silly things when x is so small F(x)< eps
-        # below this percentile you do not try to condition on the event!
-        # np.finfo(np.float).eps = 2.2204460492503131e-16
         cut_eps = np.finfo(float).eps
+        bs = self.bs
 
-        # get this done
-        # defuzz(self.density_df, cut_eps)
-
-        # bucket size
-        bs = self.bs  # self.density_df['loss'].iloc[1] - self.density_df['loss'].iloc[0]
-        # index has already been reset
-
-        # sum of p_total is so important...we will rescale it...
         if not np.all(df.p_total >= 0):
-            # have negative densities...get rid of them
-            first_neg = df.query(f'p_total < {-cut_eps}')
-            logger.log(WL,
-                # f'Portfolio.add_exa | p_total has a negative value starting at {first_neg.head()}; NOT setting to zero...')
-                f'p_total has {len(first_neg)} negative values; NOT setting to zero...')
+            n_neg = (df.p_total < -cut_eps).sum()
+            logger.log(WL, f'p_total has {n_neg} negative values; NOT setting to zero...')
         sum_p_total = df.p_total.sum()
         logger.info(f'{self.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')
-        # df.p_total /= sum_p_total
         df['F'] = np.cumsum(df.p_total)
-        # this method is terrible because you lose precision for very small values of S
-        # df['S'] = 1 - df.F
-        # old method
-        # df['S'] = np.hstack((df.p_total.to_numpy()[:0:-1].cumsum()[::-1],
-        #                      min(df.p_total.iloc[-1],
-        #                          max(0, 1. - (df.p_total.sum())))))
-        # which was ugly and not quite right because the it ended  ... pn plast  vs  pn+plast, plast
-        # Dec 2020
-        # TODO: fix and rationalize with Aggregate.density_df; this can't be right, can it?
-        #  Fill value is just S(last point)
-        #df['S'] =  \
-        #    df.p_total.shift(-1, fill_value=min(df.p_total.iloc[-1], max(0, 1. - (df.p_total.sum()))))[::-1].cumsum()[::-1]
-
-        # Jan 2023 update: use the same method as Aggregate.density_df
-        # And the end of all our exploring
-        # Will be to arrive where we started
-        # And know the place for the first time.
-        # T.S. Eliot
-        # The loss of accuracy is not germaine in portfolio where you have gone through
-        # FFTs
         df['S'] = 1 - df.F
 
-        # get rounding errors, S may not go below zero
         logger.info(
             f'Portfolio.add_exa | {self.name}: S <= 0 values has length {len(np.argwhere((df.S <= 0).to_numpy()))}')
 
-        # E(min(X, a))
-        # needs to be shifted down by one for the partial integrals....
-        # temp = np.hstack((0, np.array(df.iloc[:-1, :].loc[:, 'S'].cumsum())))
-        # df['exa_total'] = temp * bs
-        # df['exa_total'] = self.cumintegral(df['S'])
         df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
         df['lev_total'] = df['exa_total']
 
-        # $E(X\wedge a)=\int_0^a tf(t)dt + aS(a)$ therefore exlea
-        # (EXpected $X$ given Less than or Equal to **a**)
-        # $$=E(X \mid X\le a)=\frac{E(X\wedge a)-aS(a)}{F(a)}$$
-        df['exlea_total'] = \
-            (df.exa_total - df.loss * df.S) / df.F
-        # fix very small values
-        # don't pretend you know values!
-        # find the largest value where exlea_total > loss, which has to be an error
-        # 100 bs is a hack, move a little beyond last problem observation
-        # from observation looks about right with 1<<16 buckets
-        # TODO What is this crap?
+        # exlea_total = (E[X∧a] - a·S(a)) / F(a)
+        df['exlea_total'] = (df.exa_total - df.loss * df.S) / df.F
+        # Blank ``exlea_total`` where ``exlea > loss`` (numerical noise
+        # at the small-F end of the grid), plus a small ``mult·bs``
+        # safety buffer that scales with grid size. The bucketing
+        # ``mult ∈ {1, 10, 100}`` is a heuristic carried over from
+        # earlier code; replacement with a principled ``F < k·eps``
+        # rule is tracked separately.
         n_ = df.shape[0]
         if n_ < 1100:
             mult = 1
@@ -2019,137 +1941,58 @@ class Portfolio(object):
             loss_max = 0
         else:
             loss_max += mult * bs
-        # try nan in place of 0             V
         df.loc[0:loss_max, 'exlea_total'] = np.nan
-        # df.loc[df.F < 2 * cut_eps, 'exlea_total'] = df.loc[
-        #     df.F < 2*cut_eps, 'loss']
 
-        # if F(x)<very small then E(X | X<x) = x, you are certain to be above the threshold
-        # this is more stable than dividing by the very small F(x)
         df['e_total'] = np.sum(df.p_total * df.loss)
-
         df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
-        df['exeqa_total'] = df.loss  # E(X | X=a) = a(!) included for symmetry was exa
+        df['exeqa_total'] = df.loss  # E[X | X=a] = a
 
-        # where is S=0
         Seq0 = (df.S == 0)
 
         for col in self.line_names:
-            # ### Additional Variables
-            #
-            # * exeqa_line = $E(X_i \mid X=a)$
-            # * exlea_line = $E(X_i \mid X\le a)$
-            # * e_line = $E(X_i)$
-            # * exgta_line = $E(X_i \mid X \ge a)$
-            # * exi_x_line = $E(X_i / X \mid X = a)$
-            # * and similar for le and gt a
-            # * exa_line = $E(X_i(a))$
-            # * Price based on same constant ROE formula (later we will do $g$s)
+            # exeqa_{line} via FFT: E[X_i | X=a] = E[X_i 1_{X=a}] / P(X=a)
+            # = ift( ft(loss · p_i) · ft_nots[i] ) / p_total
+            df[f'exeqa_{col}'] = (
+                np.real(self.ift(self.ft(df.loss * df[f'p_{col}']) *
+                                 ft_nots[col])) / df.p_total)
+            # p_total ≈ 0 ⇒ exeqa is unreliable; zero it.
+            df.loc[df.p_total < cut_eps, f'exeqa_{col}'] = 0
 
-            #
-            #
-            # THE MONEY CALCULATION
-            # EX_i | X=a, E(xi eq a)
-            #
-            #
-            #
-            #
-            if ft_nots is None:
-                df['exeqa_' + col] = \
-                    np.real(self.ift(self.ft(df.loss * df['p_' + col]) *
-                                    self.ft(df['ημ_' + col]))) / df.p_total
-            else:
-                df['exeqa_' + col] = \
-                    np.real(self.ift(self.ft(df.loss * df['p_' + col]) *
-                                    ft_nots[col])) / df.p_total
-            # these are unreliable estimates because p_total=0
-            # JUNE 25: this makes a difference!
-            df.loc[df.p_total < cut_eps, 'exeqa_' + col] = 0
+            stemp = 1 - df[f'p_{col}'].cumsum()
+            df[f'lev_{col}'] = stemp.shift(1, fill_value=0).cumsum() * self.bs
 
-            # E(X_{i, 2nd priority}(a))
-            # need the stand alone LEV calc
-            # E(min(Xi, a)
-            # needs to be shifted down by one for the partial integrals....
-            stemp = 1 - df['p_' + col].cumsum()
-            # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
-            # df['lev_' + col] = temp * bs
-            df['lev_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+            temp = np.cumsum(df[f'exeqa_{col}'] * df.p_total)
+            df[f'exlea_{col}'] = temp / df.F
+            df.loc[0:loss_max, f'exlea_{col}'] = 0
 
-            # EX_i | X<= a; temp is used in le and gt calcs
-            temp = np.cumsum(df['exeqa_' + col] * df.p_total)
-            df['exlea_' + col] = temp / df.F
-            # revised version for small losses: do not know this value
-            df.loc[0:loss_max, 'exlea_' + col] = 0  # df.loc[0:loss_max, 'loss']
+            df[f'e_{col}'] = np.sum(df[f'p_{col}'] * df.loss)
+            df[f'exgta_{col}'] = (df[f'e_{col}'] - temp) / df.S
 
-            # constant value, helpful in calculations
-            df['e_' + col] = np.sum(df['p_' + col] * df.loss)
-
-            # EX_i | X>a
-            df['exgta_' + col] = (df['e_' + col] - temp) / df.S
-
-            # E{X_i / X | X > a}  (note=a is trivial!)
-            # temp = df.loss.iloc[0]  # loss
-            # df.loss.iloc[0] = 1  # avoid divide by zero
-            # # unconditional E(X_i/X)
-            # df['exi_x_' + col] = np.sum(
-            #     df['exeqa_' + col] * df.p_total / df.loss)
-            # temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / df.loss)
-            # df['exi_xlea_' + col] = temp_xi_x / df.F
-            # df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
-            # # more generally F=0 error:                      V
-            # df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-
-            # # put value back
-            # df.loss.iloc[0] = temp
-            # no cow issues
+            # exi_x_{col}: guard loss[0]=0 by copying and patching.
             denom = df['loss'].copy()
-            denom.iat[0] = 1.0  # avoid divide-by-zero; df['loss'][0] is known to be 0
+            denom.iat[0] = 1.0
+            df[f'exi_x_{col}'] = np.sum(df[f'exeqa_{col}'] * df.p_total / denom)
+            temp_xi_x = np.cumsum(df[f'exeqa_{col}'] * df.p_total / denom)
+            df[f'exi_xlea_{col}'] = temp_xi_x / df.F
+            df.loc[0, f'exi_xlea_{col}'] = 0
+            df.loc[df.exlea_total == 0, f'exi_xlea_{col}'] = 0
 
-            # unconditional E(X_i/X)
-            df['exi_x_' + col] = np.sum(df['exeqa_' + col] * df.p_total / denom)
-            temp_xi_x = np.cumsum(df['exeqa_' + col] * df.p_total / denom)
-            df['exi_xlea_' + col] = temp_xi_x / df.F
-            df.loc[0, 'exi_xlea_' + col] = 0  # df.F=0 at zero
-            # more generally F=0 error:
-            df.loc[df.exlea_total == 0, 'exi_xlea_' + col] = 0
-            
-            # this is so important we will calculate it directly rather than the old:
-            # df['exi_xgta_' + col] = (df['exi_x_' + col] - temp_xi_x) / df.S
-            # the last value is undefined because we know nothing about what happens beyond our array
-            # above that we need a shift: > second to last value will only involve the last row (the John Major problem)
-            # hence
-            # Nov 2020, consider added fill values using same approach as exi_xgtag_[CHANGE NOT MADE, investigate]
-            # fill_value = df[f'exeqa_{col}'].iloc[-1] / df.loss.iloc[-1] * df.S.iloc[-1]
-            fill_value = np.nan
-            # logger.info(f'exi_xgta_ fill_value = {fill_value}')
-            df['exi_xgta_' + col] = ((df[f'exeqa_{col}'] / df.loss *
-                                      df.p_total).shift(-1, fill_value=fill_value)[
-                                     ::-1].cumsum()) / df.S
-            # print(df['exi_xgta_' + col].tail())
-            # need this NOT to be nan otherwise exa won't come out correctly
-            df.loc[Seq0, 'exi_xgta_' + col] = 0.
-            # df['exi_xgta_ημ_' + col] = \
-            #     (df['exi_x_ημ_' + col] - temp_xi_x_not) / df.S
-            # as for line
-            # fill_value = df[f'exeqa_ημ_{col}'].iloc[-1] / df.loss.iloc[-1] * df.S.iloc[-1]
+            # exi_xgta_{col}: tail-reverse-cumsum of (exeqa_i/loss · p_total),
+            # normalised by S. Last value is undefined (we have no information
+            # past the grid), so we fill with NaN and zero out the S==0 rows
+            # to avoid NaN propagation into exa.
+            df[f'exi_xgta_{col}'] = (
+                (df[f'exeqa_{col}'] / df.loss * df.p_total)
+                .shift(-1, fill_value=np.nan)[::-1].cumsum()) / df.S
+            df.loc[Seq0, f'exi_xgta_{col}'] = 0.
 
-            df['exi_xeqa_' + col] = df['exeqa_' + col] / df['loss']
-            df.loc[0, 'exi_xeqa_' + col] = 0
+            df[f'exi_xeqa_{col}'] = df[f'exeqa_{col}'] / df['loss']
+            df.loc[0, f'exi_xeqa_{col}'] = 0
 
-            # need the loss cost with equal priority rule
-            # exa_ = E(X_i(a)) = E(X_i | X<= a)F(a) + E(X_i / X| X>a) a S(a)
-            #   = exlea F(a) + exixgta * a * S(a)
-            # and hence get loss cost for line i
-            # df['exa_' + col] = \
-            #     df['exlea_' + col] * df.F + df.loss * \
-            #     df.S * df['exi_xgta_' + col]
-            # df['exa_ημ_' + col] = \
-            #     df['exlea_ημ_' + col] * df.F + df.loss * \
-            #     df.S * df['exi_xgta_ημ_' + col]
-            # alt calc using S: validated the same, going with this as a more direct calc
-            df[f'exa_{col}'] = (df.S * df['exi_xgta_' + col]).shift(1, fill_value=0).cumsum() * self.bs
+            # exa_{col} = ∫₀ᵃ S(x)·exi_xgta_{col}(x) dx (PIR-style).
+            df[f'exa_{col}'] = (df.S * df[f'exi_xgta_{col}']).shift(1, fill_value=0).cumsum() * self.bs
 
-        # put in totals for the ratios... this is very handy in later use
+        # Sum-of-shares check columns.
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
             df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
@@ -2165,165 +2008,33 @@ class Portfolio(object):
         """
         return ift(x, self.padding)
 
-    def add_eta_mu(self):
-        """ convenience function to just add the eta-mus. """
-        self.add_exa_details(self.density_df, eta_mu='only')
+    def add_exa_details(self, df):
+        """Add EPD (expected policyholder deficit) and reimbursement columns.
 
-    def add_exa_details(self, df, eta_mu=False):
+        Adds, in-place on ``df``:
+
+        - ``epd_0_total`` and ``epd_0_{line}`` — ``max(0, E[X]-LEV(a))/E[X]``
+          (pure stand-alone EPD on the unmodified loss).
+        - ``epd_1_{line}`` — ``max(0, E[X]-E[X∧a;X≤a])/E[X]`` using
+          ``exa_{line}`` (the in-portfolio allocation of expected loss).
+        - ``e1xi_1gta_total`` / ``e1xi_1gta_{line}`` — ``E[1/X · 1_{X>a}]``
+          (reimbursement-effectiveness diagnostic).
+
+        Pure diagnostic columns; no core surface consumes them. The
+        legacy ``eta_mu`` second-priority / EPD-interpolation branch
+        (and the companion ``add_eta_mu`` method) was retired in the
+        v1.0 refactor — there are no callers left.
         """
-        From add_exa, details for epd functions and eta_mu flavors.
-
-        Note ``eta_mu=True`` is required for ``epd_2`` functions.
-
-        """
-        cut_eps = np.finfo(float).eps
-        bs = self.bs
-        # epds for total on a standalone basis (all that makes sense)
-        df['epd_0_total'] = \
-            np.maximum(0, (df['e_total'] - df['lev_total'])) / \
-            df['e_total']        # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
-        # Nov 2020 tweaks
         index_inv = 1.0 / df.loss
+        df['epd_0_total'] = \
+            np.maximum(0, df['e_total'] - df['lev_total']) / df['e_total']
         df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
-
-        # TODO What is this crap?
-        n_ = df.shape[0]
-        if n_ < 1100:
-            mult = 1
-        elif n_ < 15000:
-            mult = 10
-        else:
-            mult = 100
-        loss_max = df[['loss', 'exlea_total']].query(' exlea_total>loss ').loss.max()
-        if np.isnan(loss_max):
-            loss_max = 0
-        else:
-            loss_max += mult * bs
-        # where is S=0
-        Seq0 = (df.S == 0)
-
-        # will need two decorators for epd functions: these handle swapping the arguments and
-        # protecting against value errors
-        def minus_arg_wrapper(a_func):
-            def new_fun(x):
-                try:
-                    x = a_func(-x)
-                except ValueError:
-                    x = 999
-                return x
-
-            return new_fun
-
-        def minus_ans_wrapper(a_func):
-            def new_fun(x):
-                try:
-                    x = -a_func(x)
-                except ValueError:
-                    x = 999
-                return x
-
-            return new_fun
-
-        if eta_mu:
-            # recrecate the ημ columns (NO padding!)
-            ft_line_density = {}
-            ft_all = ft(self.density_df.p_total, self.padding)
-            for line in self.line_names:
-                # create all for inner loop below
-                ft_line_density[line] = ft(self.density_df[f'p_{line}'], self.padding)
-            for line in self.line_names:
-                ft_not = np.ones_like(ft_all)
-                # this fails because the ft can contain very small quantites
-                # if np.any(ft_line_density[line] == 0):
-                # more robust test (tried 2 * np.finfo(float).eps but that failed)
-                if np.abs(ft_line_density[line]).min() < FT_NOISE_FLOOR:
-                    # have to build up
-                    for not_line in self.line_names:
-                        if not_line != line:
-                            ft_not *= ft_line_density[not_line]
-                else:
-                    if len(self.line_names) > 1:
-                        ft_not = ft_all / ft_line_density[line]
-                self.density_df[f'ημ_{line}'] = np.real(ift(ft_not, self.padding))
-
-        if eta_mu == 'only':
-            return
-
         for col in self.line_names:
-            # fill in ημ
-            if eta_mu:
-                # rarely if ever ussed; not greatly tested
-                df['exeqa_ημ_' + col] = \
-                    np.real(self.ift(self.ft(df.loss * df['ημ_' + col]) *
-                                    self.ft(df['p_' + col]))) / df.p_total
-                # these are unreliable estimates because p_total=0 JUNE 25: this makes a difference!
-                df.loc[df.p_total < cut_eps, 'exeqa_ημ_' + col] = 0
-
-                df['e2pri_' + col] = \
-                    np.real(self.ift(self.ft(df['lev_' + col]) * self.ft(df['ημ_' + col])))
-
-                stemp = 1 - df['ημ_' + col].cumsum()
-                # temp = np.hstack((0, stemp.iloc[:-1].cumsum()))
-                # df['lev_ημ_' + col] = temp * bs
-                df['lev_ημ_' + col] = stemp.shift(1, fill_value=0).cumsum() * self.bs
-
-                temp_not = np.cumsum(df['exeqa_ημ_' + col] * df.p_total)
-                df['exlea_ημ_' + col] = temp_not / df.F
-                # revised version for small losses: do not know this value
-                df.loc[0:loss_max, 'exlea_ημ_' + col] = 0  # df.loc[0:loss_max, 'loss']
-
-                df['e_ημ_' + col] = np.sum(df['ημ_' + col] * df.loss)
-
-                # not version
-                df['exi_x_ημ_' + col] = np.sum(
-                    df['exeqa_ημ_' + col] * df.p_total / df.loss)
-                # as above
-                temp_xi_x_not = np.cumsum(
-                    df['exeqa_ημ_' + col] * df.p_total / df.loss)
-                df['exi_xlea_ημ_' + col] = temp_xi_x_not / df.F
-                df.loc[0, 'exi_xlea_ημ_' + col] = 0  # df.F=0 at zero
-                # more generally F=0 error:
-                df.loc[df.exlea_total == 0, 'exi_xlea_ημ_' + col] = 0
-
-                # per about line 2052 above
-                fill_value = np.nan
-                df['exi_xgta_ημ_' + col] = ((df[f'exeqa_ημ_{col}'] / df.loss *
-                                         df.p_total).shift(-1, fill_value=fill_value)[
-                                        ::-1].cumsum()) / df.S
-                df.loc[Seq0, 'exi_xgta_ημ_' + col] = 0.
-
-                df['exi_xeqa_ημ_' + col] = df['exeqa_ημ_' + col] / df['loss']
-                df.loc[0, 'exi_xeqa_ημ_' + col] = 0
-
-                df['exa_ημ_' + col] = (df.S * df['exi_xgta_ημ_' + col]).shift(1, fill_value=0).cumsum() * self.bs
-
-            # E[1/X 1_{X>a}] used for reimbursement effectiveness graph
-            # Nov 2020
-            # df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
             df[f'e1xi_1gta_{col}'] = (df[f'p_{col}'] * index_inv).shift(-1)[::-1].cumsum()
-
-            # epds
-            df['epd_0_' + col] = \
-                np.maximum(0, (df['e_' + col] - df['lev_' + col])) / \
-                df['e_' + col]
-            df['epd_1_' + col] = \
-                np.maximum(0, (df['e_' + col] - df['exa_' + col])) / \
-                df['e_' + col]
-
-            if eta_mu:
-                df['epd_2_' + col] = \
-                    np.maximum(0, (df['e_' + col] - df['e2pri_' + col])) / \
-                    df['e_' + col]
-                df['epd_0_ημ_' + col] = \
-                    np.maximum(0, (df['e_ημ_' + col] - df['lev_ημ_' + col])) / \
-                    df['e_ημ_' + col]
-                df['epd_1_ημ_' + col] = \
-                    np.maximum(0, (df['e_ημ_' + col] -
-                               df['exa_ημ_' + col])) / \
-                    df['e_ημ_' + col]
-
-            # EPD interpolation functions removed in the refactor; EPD-based
-            # allocation and priority code went with them (Sub-project A).
+            df[f'epd_0_{col}'] = \
+                np.maximum(0, df[f'e_{col}'] - df[f'lev_{col}']) / df[f'e_{col}']
+            df[f'epd_1_{col}'] = \
+                np.maximum(0, df[f'e_{col}'] - df[f'exa_{col}']) / df[f'e_{col}']
 
     def calibrate_distortion(self, name, r0=0.05, premium_target=0.0,
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
@@ -2724,14 +2435,6 @@ class Portfolio(object):
             df.loc[gSeq0, f'exi_xgtag_{line}'] = 0.0
             df[f'exag_{line}'] = (
                 df[f'exi_xgtag_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs
-            if not efficient:
-                last_x_eta = df[f'exeqa_ημ_{line}'].iloc[-1] / df.loss.iloc[-1] * last_gS
-                df[f'exi_xgtag_ημ_{line}'] = (
-                    (df[f'exeqa_ημ_{line}'] / df.loss * df.gp_total)
-                    .shift(-1, fill_value=last_x_eta)[::-1].cumsum()) / df.gS
-                df.loc[gSeq0, f'exi_xgtag_ημ_{line}'] = 0.0
-                df[f'exag_ημ_{line}'] = (
-                    df[f'exi_xgtag_ημ_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs
 
         # ---- Total-level block (single source of truth, both branches) ----
         df['exag_total'] = df.gS.shift(1, fill_value=0).cumsum() * self.bs
@@ -3302,62 +3005,97 @@ class Portfolio(object):
         return dfnew
 
     def swap_density_df(self, new_df, padding=1):
+        """Thin shim around :func:`swap_density_df` (module-level function).
+
+        Kept for callers that already use the method form; new code
+        should call the standalone function so the dependency on a
+        pre-existing Portfolio object is explicit.
         """
-        EXPERIMENTAL FUNCTION
-        TODO: Deal with stats? Create as a stand alone function and create the container portfolio too?
-        TODO: is this actually worth doing; are empirical distributions really that slow?
-        Swap out density_df for a new density_df created from direct input of line densities.
-        This sidesteps all Aggregate object creation. The resulting object has invalid stats.
-        USE WITH CAUTION. ``self`` must have the right line names.
+        swap_density_df(self, new_df, padding=padding)
 
-        Intended use case: you know the marginal densities as numerical distributions and
-        want to compute the sums, exas etc. Generally best to create the object ``port0`` as
-        a trivial object with the correct line names and then swap out. Example::
+def swap_density_df(port, new_df, padding=1):
+    """Swap a Portfolio's ``density_df`` for one with new marginal densities.
 
-            port0 = build('port Test agg A dfreq [1] dsev[1] agg B dfreq [1] dsev [1]')
-            port1 = build('port T2 agg A 1 claim sev lognorm 100 cv .3 fixed agg B 1 claim sev gamma 100 cv .3 fixed')
-            new_df = port1.density_df.filter(regex=port1.line_name_pipe + '|loss').drop(columns='p_total')
-            port0.swap_density_df(new_df)
+    Recombine the per-line densities (``p_{line}`` columns) by FFT,
+    recompute the ``add_exa`` derivatives, and refresh the empirical
+    rows of ``port.stats_df`` via :func:`xsden_to_mwrangler`. The
+    swapped object has **no** ``mixed`` / ``independent`` columns —
+    those describe a frequency-times-severity decomposition that the
+    new densities do not carry — so those entries are blanked.
 
-        port0 now has the same ``density_df`` as ``port1``.
-        """
+    Intended use: you have marginal numerical distributions (sample-
+    derived, scenario-modelled, or hand-built) and want the Portfolio
+    surface (sums, ``exa``, ``exeqa``, distortion pricing) without
+    going through the FFT-from-spec path. Typical recipe::
 
-        from aggregate.utilities import ft, ift
+        port0 = build('port Tmpl agg A dfreq[1] dsev[1] agg B dfreq[1] dsev[1]')
+        new_df = ...  # frame with index = loss grid and columns p_A, p_B
+        swap_density_df(port0, new_df)
+        port0.apply_distortion(d)
 
-        # swap out marginals
-        self.density_df = new_df
-        self.log2 = int(np.log2(len(new_df)))
-        self.padding = padding
+    Parameters
+    ----------
+    port : Portfolio
+        Target object. ``port.agg_list`` and ``port.line_names`` set
+        which ``p_{line}`` columns are read from ``new_df``.
+    new_df : pandas.DataFrame
+        Indexed by the loss grid; carries ``loss`` and one ``p_{line}``
+        column per unit. ``p_total`` is recomputed by FFT convolution.
+    padding : int
+        FFT padding for the recombination (default 1).
+    """
+    port.density_df = new_df
+    port.log2 = int(np.log2(len(new_df)))
+    port.padding = padding
+    port.bs = float(new_df['loss'].iloc[1] - new_df['loss'].iloc[0])
 
-        # recompute sums
-        ft_all = None
-        ft_line_density = {}
-        for agg in self.agg_list:
-            raw_nm = agg.name
-            nm = f'p_{agg.name}'
-            ft_line_density[raw_nm] = ft(self.density_df[nm], padding)
-            if ft_all is None:
-                ft_all = np.copy(ft_line_density[raw_nm])
-            else:
-                ft_all *= ft_line_density[raw_nm]
-        self.density_df['p_total'] = np.real(ift(ft_all, padding))
-        ft_nots = {}
-        for line in self.line_names:
-            ft_not = np.ones_like(ft_all)
-            if np.any(ft_line_density[line] == 0):
-                # have to build up
-                for not_line in self.line_names:
-                    if not_line != line:
-                        ft_not *= ft_line_density[not_line]
-            else:
-                if len(self.line_names) > 1:
-                    ft_not = ft_all / ft_line_density[line]
-            ft_nots[line] = ft_not
+    # Recombine via FFT — same logic as ``Portfolio.update``'s
+    # ``ft_nots`` block; reuse the recipe so the two stay aligned.
+    ft_all = None
+    ft_line_density = {}
+    for agg in port.agg_list:
+        raw_nm = agg.name
+        ft_line_density[raw_nm] = ft(port.density_df[f'p_{raw_nm}'], padding)
+        if ft_all is None:
+            ft_all = np.copy(ft_line_density[raw_nm])
+        else:
+            ft_all *= ft_line_density[raw_nm]
+    port.density_df['p_total'] = np.real(ift(ft_all, padding))
+    ft_nots = {}
+    for line in port.line_names:
+        ft_not = np.ones_like(ft_all)
+        if np.any(ft_line_density[line] == 0):
+            for not_line in port.line_names:
+                if not_line != line:
+                    ft_not *= ft_line_density[not_line]
+        elif len(port.line_names) > 1:
+            ft_not = ft_all / ft_line_density[line]
+        ft_nots[line] = ft_not
 
-        # do add_exa calculation
-        self.add_exa(self.density_df, ft_nots)
+    port.add_exa(port.density_df, ft_nots)
+    port._augmented_dfs.clear()
 
-        # done!
+    # Refresh empirical rows of stats_df from the swapped densities.
+    # No mixed/independent decomposition exists here — leave those
+    # columns at NaN. xsden_to_mwrangler tolerates a deficit if the
+    # marginals don't sum to 1.
+    xs = port.density_df['loss'].to_numpy()
+    for line in port.line_names:
+        mw = xsden_to_mwrangler(xs, port.density_df[f'p_{line}'].to_numpy())
+        ex1, ex2, ex3 = mw.noncentral
+        m, cv, skew = mw.mcvsk
+        for measure, value in [('ex1', ex1), ('ex2', ex2), ('ex3', ex3),
+                               ('mean', m), ('cv', cv), ('skew', skew)]:
+            port.stats_df.loc[('agg', measure), line] = value
+            port.stats_df.loc[('agg', measure), 'empirical'] = np.nan  # no longer valid
+    mw_total = xsden_to_mwrangler(xs, port.density_df['p_total'].to_numpy())
+    ex1, ex2, ex3 = mw_total.noncentral
+    m, cv, skew = mw_total.mcvsk
+    for measure, value in [('ex1', ex1), ('ex2', ex2), ('ex3', ex3),
+                           ('mean', m), ('cv', cv), ('skew', skew)]:
+        port.stats_df.loc[('agg', measure), 'empirical'] = value
+        port.stats_df.loc[('agg', measure), 'total'] = value
+
 
 def check01(s):
     """ add 0 1 at start end """

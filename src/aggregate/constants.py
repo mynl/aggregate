@@ -43,8 +43,8 @@ VALIDATION_NOISE = 1e-12
 ALIASING_RATIO = 10
 # Floor on the per-bucket ``exeqa_err`` (``Σ exeqa_i − loss``) below which a
 # bucket's conditional decomposition is treated as numerically resolved, used
-# in the ``add_exa_details`` truncation that decides where exeqa-derived
-# quantities become unreliable.
+# in ``Portfolio._build_augmented`` to truncate the augmented frame where
+# exeqa-derived quantities become unreliable.
 EXEQA_NOISE_FLOOR = 1e-4
 # Floor on ``|ft_line_density|`` below which the "build up the product"
 # branch is preferred over division in the per-line FT decomposition (avoids

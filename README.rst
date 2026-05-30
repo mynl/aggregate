@@ -46,6 +46,34 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Portfolio cleanup (add_exa_details slim, swap_density_df, comments)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Portfolio.add_exa_details`` slimmed to the still-meaningful EPD +
+  reimbursement diagnostic columns (``epd_0_total``, ``epd_0_{line}``,
+  ``epd_1_{line}``, ``e1xi_1gta_*``). The legacy eta-mu /
+  second-priority surface (``ημ_*``, ``exeqa_ημ_*``, ``e2pri_*``,
+  ``lev_ημ_*``, ``exlea_ημ_*``, ``exi_xgta_ημ_*``, ``exa_ημ_*``,
+  ``epd_2_*``, ``epd_0_ημ_*``, ``epd_1_ημ_*``) and the
+  ``add_eta_mu()`` companion method removed — they were
+  ``plot_twelve``-only defensive scaffolding, and ``plot_twelve``
+  doesn't actually read them.
+- ``Portfolio._build_augmented(efficient=False)`` no longer computes
+  ``exi_xgtag_ημ_*`` / ``exag_ημ_*`` (no consumers). ``pedagogy.plot_twelve``
+  no longer warms ``add_exa_details(eta_mu=True)``.
+- ``swap_density_df`` promoted from experimental method to standalone
+  function in ``aggregate.portfolio`` (the method is now a thin shim).
+  The function recomputes empirical stats via ``xsden_to_mwrangler``;
+  a swapped portfolio has no ``mixed``/``independent`` decomposition
+  so those stats_df columns are left blank by design.
+- ``Portfolio.add_exa`` / ``Portfolio.update`` journey-of-discovery
+  comments scrubbed: commented-out alternative implementations,
+  T.S. Eliot quote, ``# TODO What is this crap?`` markers, ``Doh``
+  asides, and dead chained-assignment-workaround blocks gone.
+  The ``ft_nots`` argument of ``add_exa`` is now required (the
+  ``None``/``ημ_<line>``-fallback branch was dead since the eta-mu
+  removal).
+
 Portfolio pricing & allocation (pentagon, linear default, ROE fix)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

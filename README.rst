@@ -46,6 +46,28 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Parser so/po disambiguation + mixture-arm perf guard
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``so`` (share-of) and ``po`` (part-of) reinsurance keywords are now
+  true synonyms; the **number** sets the meaning. A literal percentage
+  (``50% so 200 xs 100``, ``50% po 200 xs 100``) is the share directly;
+  a bare number (``5 so 10 xs 0``, ``5 po 10 xs 0``) is an absolute
+  amount and the share is ``amount / limit``. Previously ``50% po``
+  divided the percentage by the limit (silent factor-of-200 error)
+  and ``5 so`` returned the bare value as the share (out-of-range).
+  Implementation: parser tracks the ``%`` suffix through a tiny
+  ``_PercentNumber`` float subclass; arithmetic strips it, so an
+  expression like ``25 * 2`` falls through as an absolute amount.
+- New corpus cases ``J.Re18a``..``J.Re18d`` cover all four
+  (keyword, percent-or-absolute) combinations and assert they collapse
+  to the same ``(share, limit, attach)`` tuple.
+- Mixture-arm ``Aggregate.__init__`` skips the ground-up-mixture
+  ``Severity`` constructions when no exposure row carries a positive
+  attachment — saves one Severity per mixture component on the common
+  no-excess path. They were only needed for the ``sf(attach)``
+  re-weighting under excess covers.
+
 Portfolio cleanup (add_exa_details slim, swap_density_df, comments)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

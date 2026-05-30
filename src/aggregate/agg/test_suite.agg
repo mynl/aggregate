@@ -191,6 +191,12 @@ agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv [.2 .35 .5] wts=3 occurrence ce
 agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 xs 1 and 2.5 po 5 xs 5 and 25% so 30 xs 20 and inf xs 100 poisson          aggregate net of 10 xs 15
 agg J.Re16 5 claims dsev [0:100] occurrence ceded to tower [10:50:10] poisson
 agg J.Re17 5 claims dsev [0:100] poisson aggregate ceded to tower [200:500:100]
+# so/po disambiguation: both keywords accept either form (% = pro-rata share, bare = absolute amount).
+# All four below yield identical (share=0.5, limit=10, attach=0); verifies the percent-marker branch.
+agg J.Re18a 1 claim dsev [10] occurrence net of 50% so 10 xs 0 fixed
+agg J.Re18b 1 claim dsev [10] occurrence net of 50% po 10 xs 0 fixed
+agg J.Re18c 1 claim dsev [10] occurrence net of 5 so 10 xs 0 fixed
+agg J.Re18d 1 claim dsev [10] occurrence net of 5 po 10 xs 0 fixed
 
 # Tweedie distributions
 # =====================

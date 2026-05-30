@@ -4407,6 +4407,106 @@
       "note": ""
     }
   },
+  "agg J.Re18a 1 claim dsev  [10]  occurrence net of 50% so 10 xs 0 fixed": {
+    "kind": "agg",
+    "name": "J.Re18a",
+    "spec": {
+      "name": "J.Re18a",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        10.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          10.0,
+          0.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg J.Re18b 1 claim dsev  [10]  occurrence net of 50% po 10 xs 0 fixed": {
+    "kind": "agg",
+    "name": "J.Re18b",
+    "spec": {
+      "name": "J.Re18b",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        10.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          10.0,
+          0.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg J.Re18c 1 claim dsev  [10]  occurrence net of 5 so 10 xs 0 fixed": {
+    "kind": "agg",
+    "name": "J.Re18c",
+    "spec": {
+      "name": "J.Re18c",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        10.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          10.0,
+          0.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
+  "agg J.Re18d 1 claim dsev  [10]  occurrence net of 5 po 10 xs 0 fixed": {
+    "kind": "agg",
+    "name": "J.Re18d",
+    "spec": {
+      "name": "J.Re18d",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        10.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "occ_reins": [
+        [
+          0.5,
+          10.0,
+          0.0
+        ]
+      ],
+      "occ_kind": "net of",
+      "freq_name": "fixed",
+      "note": ""
+    }
+  },
   "agg K.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv}": {
     "kind": "agg",
     "name": "K.Tweedie0",

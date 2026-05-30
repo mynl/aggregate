@@ -232,9 +232,22 @@ def _check_vectorizable(value):
     return np.array(value)
 
 
+class _PercentNumber(float):
+    """Float that remembers it was written with a trailing ``%``.
+
+    Used by ``reins_clause_share`` / ``reins_clause_part`` to
+    distinguish a percentage share (``50%``) from an absolute amount
+    (``5``) in ``so`` / ``po`` reinsurance clauses. Arithmetic on a
+    ``_PercentNumber`` produces a plain ``float`` (the % marker only
+    survives literal use), so an expression like ``25 * 2 %`` doesn't
+    sneak through as a percentage.
+    """
+    __slots__ = ()
+
+
 def _number_to_float(s: str):
     if s.endswith("%"):
-        return float(s[:-1]) / 100
+        return _PercentNumber(float(s[:-1]) / 100)
     if s == "inf":
         return np.inf
     if s == "-inf":
@@ -522,17 +535,28 @@ class UnderwritingTransformer(Transformer):
         return (1.0, limit, attach)
 
     def reins_clause_share(self, c):
-        share, _so, limit, _xs, attach = c
-        return (share, limit, attach)
+        # ``so`` and ``po`` are synonyms; meaning is set by the leading
+        # quantity: a literal percentage (``50%``) is the share
+        # directly, a bare number is an absolute amount and the share
+        # is ``amount / limit``. The ``_PercentNumber`` carries the
+        # ``%``-suffix marker through the parse so this branch can
+        # decide. The canonical / PIR usage is ``%`` with ``so`` and
+        # absolute with ``po`` — both forms now work either way.
+        n, _so, limit, _xs, attach = c
+        if isinstance(n, _PercentNumber):
+            return (float(n), limit, attach)
+        return (n / limit, limit, attach)
 
     def reins_clause_part(self, c):
-        amount, _po, limit, _xs, attach = c
-        if amount / limit < 0.05:
+        n, _po, limit, _xs, attach = c
+        if isinstance(n, _PercentNumber):
+            return (float(n), limit, attach)
+        if n / limit < 0.05:
             logger.warning(
-                f"Part of clause with proportion {amount / limit} is "
+                f"Part of clause with proportion {n / limit} is "
                 "suspiciously small. Did you mean share of?"
             )
-        return (amount / limit, limit, attach)
+        return (n / limit, limit, attach)
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):

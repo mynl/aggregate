@@ -2325,15 +2325,19 @@ class Aggregate:
                 for m_idx in range(_n_mix)
             ])
 
-            # WARNING: note sev_xs and sev_ps are NOT broadcast
-            # In this case, there is only one ground up severity, but it is a mixture. We need to
-            # create it ground up to determine new weights, hence we get layer severity,
-            # and from that we can deduce layer claim counts and so forth.
-            # remember, the weights are irrelvant to Severity EXCEPT for the sev property.
+            # Ground-up mixture components are needed only to reweight the
+            # mixture under an excess-of attachment (the ``sf(_at)`` call
+            # below). Skip the constructions entirely when no exposure row
+            # carries a positive attachment — saves one ``Severity`` per
+            # mixture component on the common no-excess path.
+            need_gup = any(
+                _at is not None and _at > 0 for _at in attachment
+            )
             gup_sevs = []
-            for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, _swt in zip(*sev_arrays, sev_wt):
-                gup_sevs.append(Severity(_sn, 0, np.inf, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                         _swt, _slb, _sub, sev_conditional))
+            if need_gup:
+                for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, _swt in zip(*sev_arrays, sev_wt):
+                    gup_sevs.append(Severity(_sn, 0, np.inf, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
+                                             _swt, _slb, _sub, sev_conditional))
 
             # perform looping creation of severity distribution
             for e_idx, (_el, _pr, _lr, _en, _at, _y) in enumerate(zip(*exp_arrays)):

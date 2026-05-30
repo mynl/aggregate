@@ -5,6 +5,7 @@ import json
 import inspect
 import itertools
 import logging
+import warnings
 import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
 import numpy as np
@@ -20,7 +21,8 @@ from scipy.optimize import NoConvergence  # noqa
 from scipy.interpolate import interp1d
 from textwrap import fill
 
-from .constants import (ALIASING_RATIO, FIG_H, FIG_W, RECOMMEND_P,
+from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
+                        FIG_H, FIG_W, RECOMMEND_P,
                         VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
@@ -1638,11 +1640,6 @@ class Aggregate:
     instead.
     """
 
-    aggregate_keys = ['name', 'exp_el', 'exp_premium', 'exp_lr', 'exp_en', 'exp_attachment', 'exp_limit', 'sev_name',
-                      'sev_a', 'sev_b', 'sev_mean', 'sev_cv', 'sev_loc', 'sev_scale', 'sev_xs', 'sev_ps',
-                      'sev_wt', 'occ_kind', 'occ_reins', 'freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
-                      'agg_kind', 'agg_reins', 'note']
-
     # ================================================================
     # Public read-only properties: spec, density frame, reinsurance frames
     # ================================================================
@@ -1791,12 +1788,7 @@ class Aggregate:
                 logger.info('Computing aggregates with gcn severities')
                 for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
                                    [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
-                    z = ft(sv, self.padding)
-                    ftz = self.frequency.freq_pgf(self.n, z)
-                    if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-                        ad = sv.copy()
-                    else:
-                        ad = np.real(ift(ftz, self.padding))
+                    ad, _ = self._fft_aggregate(sv, self.padding)
                     self._reinsurance_df[gcn] = ad
             if self.agg_density_gross is None:
                 # no agg program
@@ -2554,7 +2546,6 @@ class Aggregate:
         String version of _repr_html_
         :return:
         """
-        # [ORIGINALLY] wrap default with name
         return f'{self.name}, {super(Aggregate, self).__repr__()}'
 
     def __str__(self):
@@ -2843,10 +2834,10 @@ class Aggregate:
             return
 
         # deal with per occ reinsurance
-        # reinsurance converts sev_density to a Series from np.array
         if self.occ_reins is not None:
             if self.sev_density_gross is not None:
-                # make the function an involution...
+                # re-applying reins on an already-updated object: restore
+                # gross sev so apply_occ_reins is idempotent
                 self.sev_density = self.sev_density_gross
             self.apply_occ_reins(debug)
 
@@ -2913,6 +2904,20 @@ class Aggregate:
         self.stats_df.loc[('agg', 'cv'),   'empirical'] = self.est_cv
         self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
 
+        # Defective-distribution check. The aggregate FFT loses mass off the
+        # right end of the grid when log2 is too small. A genuine deficit
+        # (above VALIDATION_NOISE, well clear of fp dust) makes forwards and
+        # backwards S diverge by exactly the deficit in Distortion.price,
+        # so surface it loudly at construction time rather than have one
+        # answer silently differ from another downstream.
+        deficit = 1.0 - float(np.sum(self.agg_density))
+        if deficit > VALIDATION_NOISE:
+            warnings.warn(
+                f'{self.name}: aggregate PMF deficit {deficit:.3e} '
+                f'(Σp = 1 − {deficit:.3e} < 1); forwards and backwards '
+                f'S diverge by the deficit (forwards > backwards).',
+                DefectiveDistributionWarning, stacklevel=2)
+
         # Staged reinsurance reporting -- §1.2 of the aggregate refactor plan.
         #
         # ``empirical`` above is the final (after-occ + after-agg) realised
@@ -2939,7 +2944,7 @@ class Aggregate:
         # (``agg_density_gross`` when has_agg, else the final
         # ``agg_density``).
         if has_occ:
-            subject_agg = self._convolve_gross_severity(subject_sev, padding)
+            subject_agg, _ = self._fft_aggregate(subject_sev, padding)
         elif has_agg:
             subject_agg = self.agg_density_gross
         else:
@@ -3000,38 +3005,40 @@ class Aggregate:
         # invalidate stored functions
         self._cdf = None
 
-    def _convolve_gross_severity(self, sev_density_gross, padding):
-        """One FFT pass: subject (gross) severity -> subject aggregate density.
+    def _fft_aggregate(self, sev_density, padding):
+        """Run one FFT convolution: severity density -> aggregate density.
 
-        Mirrors the core of ``_freq_sev_convolution`` (FFT -> PGF -> iFFT)
-        but does not touch ``self.agg_density`` / ``self.ftagg_density``.
-        Used by ``update_work`` to compute the subject aggregate when
-        per-occurrence reinsurance has been applied -- the inputs to the
-        main FFT are post-reinsurance, so the subject view needs a
-        dedicated pass on the preserved ``sev_density_gross``.
+        Single source of truth for the FFT-PGF-iFFT core (Mildenhall 2024,
+        §2.2). Used by ``_freq_sev_convolution`` (the main per-update path),
+        by ``update_work`` for the subject (gross) aggregate when occ-reins
+        is present, and by ``reinsurance_df`` to compute gross/ceded/net
+        aggregates from the corresponding severities. The zero-risk and
+        fixed-1 shortcuts live here so every caller sees them consistently.
 
         Parameters
         ----------
-        sev_density_gross : np.ndarray
-            Discretised subject (pre-occ-reins) severity on ``self.xs``.
+        sev_density : np.ndarray
+            Discretised severity on ``self.xs`` (gross, net, or ceded).
         padding : int
-            FFT padding factor (matches the main convolution).
+            FFT padding factor passed to ``ft`` / ``ift``.
 
         Returns
         -------
-        np.ndarray
-            Subject aggregate density on ``self.xs``. Handles the zero-risk
-            and fixed-1 shortcuts in lockstep with ``_freq_sev_convolution``.
+        agg_density : np.ndarray
+            Aggregate density on ``self.xs``.
+        ftagg_density : np.ndarray
+            FT of the aggregate (padded length). Callers that don't need
+            this (e.g. ``reinsurance_df``) discard it.
         """
         if self.n == 0:
             out = np.zeros_like(self.xs)
             out[0] = 1.0
-            return out
-        z = ft(sev_density_gross, padding)
-        ftz = self.frequency.freq_pgf(self.n, z)
+            return out, ft(out, padding)
+        z = ft(sev_density, padding)
+        ftagg = self.frequency.freq_pgf(self.n, z)
         if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-            return sev_density_gross.copy()
-        return np.real(ift(ftz, padding))
+            return sev_density.copy(), ftagg
+        return np.real(ift(ftagg, padding)), ftagg
 
     def _write_stage_moments(self, col, sev_mom, agg_mom, copy_freq_from=None):
         """Write a moment tuple into a single ``stats_df`` column.
@@ -3064,25 +3071,10 @@ class Aggregate:
     def _freq_sev_convolution(self, padding):
         """Compute the aggregate density by FFT convolution (Mildenhall 2024, §2.2).
 
-        Implements the four-step FFT-based algorithm for compound distributions:
-
-        1. Discretize the severity CDF to obtain :math:`p_Y` (already done by
-           the caller — see ``self.sev_density``).
-        2. Apply the FFT to approximate the severity characteristic function
-           :math:`\\phi_Y(t)`.
-        3. Apply the frequency PGF element-wise to obtain the aggregate
-           characteristic function
-           :math:`\\phi_A(t) = \\mathcal{P}_N(\\phi_Y(t))`.
-        4. Inverse FFT to recover the discretized aggregate mass function
-           :math:`p_A`.
-
-        Sets ``self.ftagg_density`` (the FT of the aggregate, used by Portfolio
-        for copula combination) and ``self.agg_density`` (the empirical PMF on
-        the bucket grid). Two shortcuts apply:
-
-        - ``self.n == 0``: zero-risk case. Returns unit mass at zero; FFT only
-          for shape/type consistency.
-        - Fixed frequency of 1: aggregate IS severity. Skips the inverse FFT.
+        Thin wrapper that routes the (post-occ-reins) ``sev_density`` through
+        ``_fft_aggregate`` and writes ``self.agg_density`` /
+        ``self.ftagg_density``. The FFT core, zero-risk and fixed-1 shortcuts
+        all live in ``_fft_aggregate``.
 
         Parameters
         ----------
@@ -3096,26 +3088,8 @@ class Aggregate:
         method is called; aggregate reinsurance is applied to ``agg_density``
         *after*. The FFT here is unaware of either.
         """
-        if self.n == 0:
-            # zero risk: unit mass at zero. FFT only to give ftagg_density the
-            # right shape and dtype (needed when agg is part of a portfolio).
-            self.agg_density = np.zeros_like(self.xs)
-            self.agg_density[0] = 1
-            self.ftagg_density = ft(self.agg_density, padding)
-            return
-
-        # Steps 2-3: FT of severity, then apply frequency PGF element-wise.
-        z = ft(self.sev_density, padding)
-        self.ftagg_density = self.frequency.freq_pgf(self.n, z)
-
-        if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-            # Fixed frequency of 1: aggregate IS severity. Skip the inverse FFT
-            # to preserve accuracy and time.
-            logger.info('FIXED 1: skipping FFT calculation')
-            self.agg_density = self.sev_density.copy()
-        else:
-            # Step 4: inverse FFT to recover p_A.
-            self.agg_density = np.real(ift(self.ftagg_density, padding))
+        self.agg_density, self.ftagg_density = self._fft_aggregate(
+            self.sev_density, padding)
 
     # ================================================================
     # Validation (paper §4.7), unwrap, picks, freq_pmf
@@ -3171,7 +3145,6 @@ class Aggregate:
         if self._valid is not None:
             return self._valid
 
-        # logger.warning(f'{self.name} CALLING AGG VALID')
         rv = Validation.NOT_UNREASONABLE
         # Not yet updated → no empirical moments to validate against.
         if pd.isna(self.stats_df['empirical'].get(('agg', 'mean'), np.nan)):
@@ -3494,22 +3467,20 @@ class Aggregate:
             self.sev_density = self.sev_density_net
         else:
             raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
-
-        # see impact on severity moments
-        _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.sev_density)
-        self.est_sev_m = _m2
-        self.est_sev_cv = _cv2
-        self.est_sev_sd = _m2 * _cv2
-        self.est_sev_var = self.est_sev_sd ** 2
-        self.est_sev_skew = _sk2
+        # ``est_sev_*`` is written by ``update_work`` from the post-reins
+        # severity (the same density set above) using ``xsden_to_mwrangler``
+        # -- no intermediate write needed here.
 
     def apply_agg_reins(self, debug=False, padding=1):
         """
         Apply the entire agg reins structure and save output.
         For by layer detail create reins_audit_df.
-        Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
+        Makes agg_density_gross, agg_density_net and agg_density_ceded, and
+        updates agg_density to the requested view.
 
-        Not reflected in statistics df.
+        Not reflected in statistics df: the post-reins empirical moments
+        (``est_*`` and the ``stats_df['empirical']`` column) are written by
+        ``update_work`` from the same density updated here.
 
         :return:
         """
@@ -3517,13 +3488,8 @@ class Aggregate:
         if self.agg_reins is None:
             return
         logger.info('Applying aggregate reinsurance for %s', self.name)
-        # aggregate moments (lose f x sev view) are computed after this step, so no adjustment needed there
-        # agg: no way to make total = f x sev
-        # initial empirical moments
-        _m, _cv = xsden_to_meancv(self.xs, self.agg_density)
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-        logger.info('running apply_agg_reins')
         # store stuff
         self.agg_ceder = agg_ceder
         self.agg_netter = agg_netter
@@ -3540,18 +3506,6 @@ class Aggregate:
 
         # update ft of agg
         self.ftagg_density = ft(self.agg_density, padding)
-
-        # see impact on moments
-        _m2, _cv2, _sk2 = xsden_to_meancvskew(self.xs, self.agg_density)
-        self.est_m = _m2
-        self.est_cv = _cv2
-        self.est_sd = _m2 * _cv2
-        self.est_var = self.est_sd ** 2
-        self.est_skew = _sk2
-
-        logger.info('Applying agg reins to %s\tOld mean and cv= %.3f\t%.3f\n'
-                    'New mean and cv = %.3f\t%.3f',
-                    self.name, _m, _m, _m2, _cv2)
 
     def reinsurance_description(self, kind='both', width=0):
         """
@@ -4171,7 +4125,6 @@ class Aggregate:
         """
 
         if kind == 'middle' and getattr(self, 'middle_warning', 0) == 0:
-            # logger.warning(f'kind=middle is deprecated, replacing with kind=lower')
             self.middle_warning = 1
 
         if kind == 'middle':
@@ -4555,8 +4508,6 @@ class Aggregate:
         df['LR'] = df.L / df.P
         df['PQ'] = df.P / df.Q
         df['ROE'] = df.M / df.Q
-        # ap = namedtuple('AggregatePricing', ['df', 'distortion'])
-        # return ap(df, g)  # kinda dumb...
         return df
 
 

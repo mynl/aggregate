@@ -46,6 +46,33 @@ Refactor harness + Copy-on-Write opt-in
   (pandas >= 3.0 has CoW on as the default, so the option-setter is a
   conditional no-op there to avoid the deprecated-option warning).
 
+Aggregate cleanups + forwards-S unification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Distortion.price`` now defaults to ``S_calculation='forwards'``
+  (``S = 1 − cumsum``). Backwards is still available via the same kwarg.
+  Forwards is the conservative, mass-preserving choice: under a genuine
+  PMF deficit it carries the missing mass as a tail blob rather than
+  silently dropping it. Aligns ``Distortion.price`` with the four other
+  sites (``add_exa``, ``_build_augmented``, ``add_exa_sample``,
+  ``density_df.S``) that already use forwards by default.
+- New ``DefectiveDistributionWarning(UserWarning)`` in
+  ``aggregate.constants``, emitted once per ``update_work`` when the
+  aggregate PMF deficit ``1 − Σp_agg`` exceeds ``VALIDATION_NOISE``
+  (forwards and backwards ``S`` diverge by exactly the deficit, so the
+  warning advertises the divergence at construction time rather than
+  letting it surface silently in downstream pricing).
+- New private ``Aggregate._fft_aggregate`` helper is now the single source
+  of truth for the FFT-PGF-iFFT core. ``_freq_sev_convolution``,
+  ``reinsurance_df``, and the subject-aggregate hook in ``update_work``
+  all delegate to it; the zero-risk and fixed-1 shortcuts live in one
+  place.
+- Redundant ``est_*`` moment writes inside ``apply_occ_reins`` and
+  ``apply_agg_reins`` removed: ``update_work`` overwrites those fields
+  immediately from the same densities using the de-fuzzed
+  ``xsden_to_mwrangler`` worker. The unused
+  ``Aggregate.aggregate_keys`` class attribute is also gone.
+
 Aggregate reinsurance reporting (Subject / Net / Change)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

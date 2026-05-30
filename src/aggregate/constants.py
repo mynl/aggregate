@@ -10,6 +10,7 @@ __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
            'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
            'FT_NOISE_FLOOR', 'RECOMMEND_P', 'Validation',
+           'DefectiveDistributionWarning',
            'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
 FIG_W = 3.5
@@ -80,4 +81,20 @@ class Validation(Flag):
     ALIASING = auto()
     REINSURANCE = auto()
     NOT_UPDATED = auto()
+
+
+class DefectiveDistributionWarning(UserWarning):
+    """Emitted when an aggregate empirical PMF carries a genuine deficit.
+
+    The aggregate FFT loses mass off the right end of the grid when ``log2``
+    is too small for the support. A deficit `1 - Σp_agg > VALIDATION_NOISE`
+    is real, not numerical dust: forwards `S = 1 - cumsum` plateaus at the
+    deficit (carries it as a tail blob) while backwards `S` reaches zero
+    (drops the deficit silently). The two pricing answers therefore differ
+    by exactly the deficit. Surface the deficit at construction time so the
+    divergence in `Distortion.price` is never silent.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
 

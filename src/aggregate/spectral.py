@@ -1388,7 +1388,7 @@ class Distortion:
     # ------------------------------------------------------------------
 
     def price(self, ser, a=np.inf, kind='ask', method='dx',
-              S_calculation='backwards', as_frame=False):
+              S_calculation='forwards', as_frame=False):
         """
         Compute distorted (ask/bid/both) prices of the distribution
         described by ``ser`` with asset limit ``a``.
@@ -1396,20 +1396,22 @@ class Distortion:
         Replaces the older ``price`` (tuple return) and ``price2``
         (DataFrame return); strictly preferred in new code.
 
-        ``S_calculation='backwards'`` computes
-        ``S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]``
-        and ``S_calculation='forwards'`` computes
-        ``S = 1 - ser.cumsum()``.
+        ``S_calculation='forwards'`` (the default) computes
+        ``S = 1 - ser.cumsum()``; ``S_calculation='backwards'`` computes
+        ``S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]``.
 
-        If ``ser.sum() < 1``, the backwards survival calculation drops
-        the missing probability mass entirely. The forwards calculation
-        instead carries the missing mass in the tail, equivalent for dx
-        pricing to placing it at the largest observed ``x``.
-        If ``ser` is normalized if these methods should agree. If ``ser``
-        is not normalized look in the mirror and ask yourself what
-        you are doing. Backwards is more reliable than the forward form
-        for thin-tailed risks because the tail details are lost by the
-        ``1 - cumsum`` calculation.
+        With a normalised ``ser`` (``Σp == 1`` up to numerical noise) the
+        two are equivalent. Under a *genuine* deficit
+        (``Σp < 1 − VALIDATION_NOISE``) they diverge by exactly the
+        deficit: forwards plateaus at the deficit (carries the missing
+        mass in the tail, equivalent under ``dx`` pricing to placing it
+        at the largest observed ``x``), backwards reaches zero (drops
+        the missing mass entirely). Forwards is the library default
+        because it is the conservative, mass-preserving choice; the
+        :class:`DefectiveDistributionWarning` emitted by
+        :meth:`Aggregate.update_work` (or
+        :meth:`Portfolio.update`) advertises the deficit at construction
+        time so divergence here is never silent.
 
         ``method='dx'`` computes ``∫ gS dx`` (fewer diffs);
         ``method='ds'`` computes ``∫ x d(gS)``. Neither requires a
@@ -1422,7 +1424,7 @@ class Distortion:
         :param a: asset level (truncation point).
         :param kind: ``'ask'``, ``'bid'``, or ``'both'``.
         :param method: ``'dx'`` or ``'ds'``.
-        :param S_calculation: ``'forwards'`` or ``'backwards'``.
+        :param S_calculation: ``'forwards'`` (default) or ``'backwards'``.
         :param as_frame: return a DataFrame instead of a namedtuple.
         """
         assert kind in ['bid', 'ask', 'both'], \
@@ -1444,8 +1446,6 @@ class Distortion:
             if a == np.inf:
                 S.iloc[-1] = 0
         else:
-            if not np.allclose(ser.sum(), 1):
-                print(f'WARNING: ser.sum() = {ser.sum()} is not 1.')
             S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]
             S = np.minimum(1, S)
             if a < np.inf:

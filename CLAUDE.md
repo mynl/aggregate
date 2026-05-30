@@ -138,14 +138,9 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 
 ## TODO
 
-- **Docs reference SLY-era grammar.** `docs/4_agg_language_reference/` describes the grammar in SLY's `@_` form and may mention shift/reduce conflicts. After the Lark migration both descriptions are stale; the grammar reference should `include` `aggregate/decl.lark` (or call `aggregate.parser.grammar(add_to_doc=True)` which writes `docs/4_agg_language_reference/ref_include.rst`).
-
-- **Docstring style sweep.** `iman_conover.py` and `moments.py` use Sphinx `:param x:` style with many empty parameter slots; the rest of the codebase uses NumPy style (per CLAUDE.md "Documentation and docstrings"). Convert in one sweep across all modules — public surface first, private helpers second. ~25 docstrings in moments + iman_conover alone, plus pockets in other modules. Do as a single dedicated pass, not piecemeal.
-
-- **`xsden_to_meancv` vs `xsden_to_meancvskew` tail-mass inconsistency** (`moments.py`). `xsden_to_meancvskew` adds one bucket-width to the tail-mass point (`xsm = xsm + bs` at line 455), `xsden_to_meancv` does not. With `xs[0] = 0` (the typical FFT use), `bs = xs[1]` and the difference is one bucket on the mean correction — small for FFT use, but the two should agree. Decide which convention is correct (likely the meancvskew "place at xs[-1] + bs" form, putting the tail mass at the *next* bucket) and apply to both.
-
-- **`pedagogy.py` future migrations.** `aggregate.pedagogy` is the single home for figure/exhibit generators. Outstanding migrations still TODO: `ft.py`'s `poisson_example`, `fft_wrapping_illustration`, `recentering_convolution`, `recentering_convolution_example`; `tweedie.py`'s `tweedie_illustration`. Goal: keep `ft.py` / `tweedie.py` focused on the API, with figure-generation in `pedagogy.py`.
-
-- **`Portfolio.pricing_bounds` pending rewrite.** Raises `NotImplementedError` as of 1.0.0a11. Was wired against the legacy `Bounds.tvar_cloud(...)` API and depended on passing the dense `density_df.S` array as the s-grid (33,977 points for PEG), which produced a matmul shape mismatch downstream. The new `Bounds` uses a fixed 513-point binary `s_grid`; aligning `pricing_bounds` to that grid requires deciding how to interp the cloud's distortion values onto the per-unit `exeqa_*` columns at portfolio resolution. Defer until the design is settled — user wants to think through it.
+The full pending list — parked refactor items, docs/packaging follow-ups, and
+deep-dive intentions — lives in **`dev/TODO-Remember.md`**. Check there before
+proposing structural changes so you don't reinvent something already scoped (or
+already deferred for a reason).
 
 - **PIR case-study reproduction.** The `CaseStudy` machinery (formerly `extensions/case_studies.py`, `portfolio_pir.py`, `risk_progression.py`, and the `cnc`/`discrete`/`hs`/`tame` runner scripts) was deleted at 1.0.0a12. **PMIR is a separate forward-looking project and does NOT reproduce PIR exhibits** — do not point users at it for that purpose. The only path to reproducing the published PIR exhibits is `pip install aggregate==0.30.1` in an isolated environment.

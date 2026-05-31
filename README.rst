@@ -186,6 +186,19 @@ Aggregate reinsurance reporting (Subject / Net / Change)
 - Headings switch to the denser ``EX`` / ``CV`` / ``Sk`` form on both
   ``Aggregate.describe`` and ``Portfolio.describe`` (legacy
   ``E[X]`` / ``CV(X)`` / ``Skew(X)`` retired).
+- ``Portfolio.describe`` now picks its column layout at the **portfolio**
+  level so the unit blocks and the ``total`` block always agree. If
+  **any** unit carries reinsurance the whole table flips to the economic
+  Subject / ``<label>`` / Change view (the ``total`` Subject is the gross
+  theoretical, ``<label>`` the realised after-reins); units with no
+  cession are rendered in that layout too. With no reinsurance anywhere
+  the table keeps the plain theory/empirical validation view. Previously
+  the ``total`` block stayed in validation headings while ceding units
+  used economic headings, so the columns misaligned under ``pd.concat``.
+  New ``Portfolio._reins_after_label`` aggregates the per-unit labels
+  (one kind → that label, mixed → ``After``); ``Aggregate.describe`` is
+  refactored onto ``Aggregate._describe(force_reins_label=...)`` so the
+  portfolio can impose one shared label on every unit.
 - The scaffold ``stats_df`` columns from the previous iteration are now
   populated: ``after_occ`` (post-occ-reins moments, pre-agg-reins),
   ``occ_impact`` (after_occ / mixed), ``agg_impact`` (empirical /

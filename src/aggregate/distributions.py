@@ -3908,8 +3908,34 @@ class Aggregate:
         Subject, ``empirical`` for the realised (after-reinsurance)
         view.
         """
+        return self._describe()
+
+    def _describe(self, force_reins_label=None):
+        """Build the ``describe`` frame, optionally forced into reins view.
+
+        Parameters
+        ----------
+        force_reins_label : str or None
+            When ``None`` (the default, used by the ``describe`` property)
+            the column format is chosen from this unit's own reinsurance:
+            the economic Subject/Net/Ceded/After view if a treaty is
+            present, else the plain theory/empirical validation view.
+
+            When a non-``None`` label is supplied, the economic view is
+            forced and that label is used for the after-reins column,
+            regardless of this unit's own cession. ``Portfolio.describe``
+            passes a portfolio-wide label here so that every unit block —
+            including units with no reinsurance — shares one column
+            layout and aligns with the ``total`` block.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Three-row Freq / Sev / Agg frame; see :meth:`describe`.
+        """
         st = self.stats_df['mixed']
-        rlabel = self._reins_after_label()
+        rlabel = force_reins_label if force_reins_label is not None \
+            else self._reins_after_label()
         df = pd.DataFrame(
             {
                 'EX': [st[('freq', 'mean')], st[('sev', 'mean')], st[('agg', 'mean')]],

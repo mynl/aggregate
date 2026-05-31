@@ -905,6 +905,25 @@ class Portfolio(object):
             s.append(f'hash                     {self.hash_rep_at_last_update:x}')
         return '\n'.join(s)
 
+    def _reins_after_label(self):
+        """Portfolio-wide heading for the after-reins column in ``describe``.
+
+        Aggregates the per-unit :meth:`Aggregate._reins_after_label`
+        across the book. Returns ``None`` when **no** unit carries
+        reinsurance (the legacy theory/empirical validation view
+        applies). When exactly one cession kind appears across all
+        ceding units returns that label (``Net`` / ``Ceded``);
+        otherwise returns ``After`` — the umbrella label — so the whole
+        table can share one column layout.
+        """
+        labels = {lbl for a in self
+                  if (lbl := a._reins_after_label()) is not None}
+        if not labels:
+            return None
+        if len(labels) == 1:
+            return labels.pop()
+        return 'After'
+
     @property
     def describe(self):
         """Theoretic-and-empirical stats. Used in ``_repr_html_``.
@@ -912,10 +931,21 @@ class Portfolio(object):
         Reads from the canonical ``stats_df``: theoretical moments from
         the ``total`` column, empirical from ``empirical``, errors from
         ``error``. The output shape mirrors ``Aggregate.describe`` — one
-        ``Freq``/``Sev``/``Agg`` row block per unit + ``total`` — so
-        callers see the same 3-row × 6-col view they always have.
+        ``Freq``/``Sev``/``Agg`` row block per unit + ``total``.
+
+        Two display modes, chosen at the **portfolio** level so the unit
+        blocks and the ``total`` block always share one column layout:
+
+        * **No unit has reinsurance** -- validation view, columns
+          ``EX | Est EX | Err EX | CV | Est CV | Err CV | Sk | Est Sk``.
+        * **Any unit has reinsurance** -- economic view, columns
+          ``Subject EX | <label> EX | Change EX | ...`` where ``<label>``
+          is the portfolio-wide :meth:`_reins_after_label`. Every unit —
+          including those with no cession — is rendered in this layout
+          (forced via ``Aggregate._describe``) so the table aligns.
         """
         _total = self.stats_df['total']
+        rlabel = self._reins_after_label()
         df = pd.DataFrame(
             {
                 'EX': [float(_total[('freq', 'ex1')]),
@@ -935,27 +965,45 @@ class Portfolio(object):
         # Post-update? Empirical agg moments live in stats_df['empirical'].
         # After the punch-up: portfolio-level sev empirical is also
         # populated (via MomentAggregator off per-unit empirical sev);
-        # surface it in the describe table too.
+        # surface it in the describe table too. Under reinsurance the
+        # ``total`` column is the (gross) Subject view and ``empirical``
+        # the realised after-reins view, exactly mirroring Aggregate.
         emp = self.stats_df['empirical']
         emp_agg_m = emp.get(('agg', 'mean'), np.nan)
         if pd.notna(emp_agg_m):
-            df.loc['Sev', 'Est EX'] = float(emp[('sev', 'mean')])
-            df.loc['Agg', 'Est EX'] = float(emp_agg_m)
-            df['Err EX'] = _noise_aware_rel_error(df['Est EX'], df['EX'])
-            df.loc['Sev', 'Est CV'] = float(emp[('sev', 'cv')])
-            df.loc['Agg', 'Est CV'] = float(emp[('agg', 'cv')])
-            df['Err CV'] = _noise_aware_rel_error(df['Est CV'], df['CV'])
-            df.loc['Sev', 'Est Sk'] = float(emp[('sev', 'skew')])
-            df.loc['Agg', 'Est Sk'] = float(emp[('agg', 'skew')])
-            df = df[['EX', 'Est EX', 'Err EX', 'CV', 'Est CV', 'Err CV',
-                     'Sk', 'Est Sk']]
+            mid_label = rlabel or 'Est'
+            change_label = 'Change' if rlabel else 'Err'
+            df.loc['Sev', f'{mid_label} EX'] = float(emp[('sev', 'mean')])
+            df.loc['Agg', f'{mid_label} EX'] = float(emp_agg_m)
+            df[f'{change_label} EX'] = _noise_aware_rel_error(
+                df[f'{mid_label} EX'], df['EX'])
+            df.loc['Sev', f'{mid_label} CV'] = float(emp[('sev', 'cv')])
+            df.loc['Agg', f'{mid_label} CV'] = float(emp[('agg', 'cv')])
+            df[f'{change_label} CV'] = _noise_aware_rel_error(
+                df[f'{mid_label} CV'], df['CV'])
+            df[f'{mid_label} Sk'] = np.nan
+            df.loc['Sev', f'{mid_label} Sk'] = float(emp[('sev', 'skew')])
+            df.loc['Agg', f'{mid_label} Sk'] = float(emp[('agg', 'skew')])
+            df = df[['EX', f'{mid_label} EX', f'{change_label} EX',
+                     'CV', f'{mid_label} CV', f'{change_label} CV',
+                     'Sk', f'{mid_label} Sk']]
+        # Subject-column label under reinsurance; plain headings otherwise.
+        if rlabel:
+            df = df.rename(columns={
+                'EX': 'Subject EX', 'CV': 'Subject CV', 'Sk': 'Subject Sk'})
         # snap floating-point dust to 0 in the moment-value columns for
         # display (e.g. the skew of a symmetric unit); NaN preserved.
-        for c in ['EX', 'Est EX', 'CV', 'Est CV', 'Sk', 'Est Sk']:
-            if c in df.columns:
+        # Change/Err columns retain their numeric dust.
+        for c in df.columns:
+            if (' EX' in c or ' CV' in c or ' Sk' in c
+                    or c in ('EX', 'CV', 'Sk')) \
+                    and not (c.startswith('Err ') or c.startswith('Change ')):
                 df[c] = _snap_noise(df[c])
 
-        t1 = [a.describe for a in self] + [df]
+        # Force every unit block into the portfolio-wide layout so the
+        # concat aligns (units with no cession render in reins view too
+        # when ``rlabel`` is set).
+        t1 = [a._describe(force_reins_label=rlabel) for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X'])
         return df

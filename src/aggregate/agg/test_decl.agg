@@ -1,0 +1,154 @@
+# Test DecL — programs harvested from the pytest suite
+# =====================================================
+
+# This file extracts every DecL program embedded in the ``tests/`` tree so
+# the language coverage exercised by pytest is also available as a flat,
+# greppable corpus. It complements ``test_suite.agg`` (broad language
+# walkthrough) and ``test_suite2.agg`` (mixed/spliced severities). The
+# canonical source of each program is its Python module — this file is a
+# reference extraction, not the runtime contract.
+#
+# Numbering uses fresh letter prefixes (P..X) that do not collide with
+# anything in test_suite.agg (A..O) or test_suite2.agg (G splice
+# extension). The three files are intended to be combined into a single
+# ``test_suite.agg`` at v1.0 release, so the numbering is contiguous.
+#
+# DecL syntax reminders honoured here:
+#   * ``port`` definitions are single-line (sub-agg clauses inlined).
+#   * ``note{...}`` is only legal on ``agg`` and ``sev`` lines; for
+#     ``dist`` / ``distortion`` we use ``#`` end-of-line comments instead.
+
+# Contents
+#
+# P. Baseline harness — Aggregate regression cases   (tests/baseline/corpus.py)
+# Q. Baseline harness — Portfolio regression cases   (tests/baseline/corpus.py)
+# R. PEG regression — two-unit lognorm + gamma mix   (tests/peg.py)
+# S. Bounds regression — bounded BDD portfolio       (tests/test_bounds.py)
+# T. Splice / layered-severity regressions           (tests/test_splice_suite.py)
+# U. Validation regressions — symmetric & low-skew   (tests/test_validation.py)
+# V. Underwriter / build smoke fixtures              (tests/test_underwriter.py)
+# W. Distortion DecL constructors                    (tests/test_distortion_construction.py)
+# X. Parser-error fixtures (intentional typos)       (tests/test_parser_errors_integration.py)
+
+
+# P. Baseline harness — Aggregate regression cases
+# ================================================
+# Pinned grids and snapshots in tests/baseline/data/. Each case targets a
+# specific path through the FFT pipeline; together they fence the v1.0
+# core-compute refactor. See tests/baseline/corpus.py for the grids
+# (log2/bs/padding/normalize) bound to each program.
+agg P.Base.FixedOne 1 claim sev lognorm 100 cv 0.5 fixed                                                                 note{fixed-1 shortcut path}
+agg P.Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5                                                                     note{full-FFT path equivalent to FixedOne}
+agg P.Sym.Dice     dfreq [1] dsev [1:6]                                                                                  note{symmetric discrete; skew dust regression}
+agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid}
+agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance}
+agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment; normalize=False}
+agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
+
+
+# Q. Baseline harness — Portfolio regression cases
+# ================================================
+# Three portfolios cover (i) unbounded gamma/lognorm with fixed-1 frequency,
+# (ii) bounded beta mixture, (iii) bounded discrete (Bodoff). Used to pin
+# linear/lifted allocation and the bounded-detection refusal of
+# ``allocation='lifted'`` on unbounded + mass distortions.
+port Q.Port.CNC     agg CNC.NonCat 25 claim sev gamma 80 cv 0.15 mixed gamma .2 agg CNC.Cat 5 claim 200 xs 0 sev lognorm 40 cv 1.50 mixed ig .2
+port Q.Port.Bounded agg A dfreq [1:3] sev 500 * beta 5 2 agg B dfreq [1:5] sev 800 * beta 7 2
+port Q.Port.Bodoff  agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
+
+
+# R. PEG regression — two-unit portfolio
+# ======================================
+# The calibrate-distortions / pricing-pipeline regression fixture
+# (tests/peg.py). Exercises a limit-and-attachment severity, a three-component
+# lognorm mixture per unit, and different mixing CVs (0.25 vs 0.35) for the
+# mixed-vs-independent correlation case. Five calibrated distortions follow
+# (ccoc / ph / wang / dual / tvar). The DecL is the contract — do not change
+# without re-capturing ``tests/data/peg_baseline.json``.
+port R.PEG agg A 100 claims 50 xs 0 sev lognorm [30 50 100] cv [0.1 .6 1.8] wts [.5 .25 .25] mixed gamma .25 agg B 150 claims 100 xs 0 sev lognorm [30 50 100] cv [0.1 .6 1.8] wts [.5 .25 .25] mixed gamma .35
+
+
+# S. Bounds regression — BDD portfolio
+# ====================================
+# Bounded beta severities, fixed-1 frequency: a finite-support portfolio
+# where the closed-form anchor (premium = TVaR_0.5(total) → p_star = 0.5)
+# lets the ``Bounds`` cloud columns collapse to a known distortion. See
+# tests/test_bounds.py.
+port S.BDD agg A 1 claim sev 10 * beta 2 3 fixed agg B 1 claim sev 15 * beta 4 2 fixed
+
+
+# T. Splice / layered-severity regressions
+# ========================================
+# Pins the analytical moments for spliced + layered compositions
+# (tests/test_splice_suite.py). T.Splice01/02 are bare spliced severities;
+# T.SpliceLayer01/02 wrap them in layer-and-attachment policies whose
+# conditional moments are computable by hand.
+sev T.Splice01      lognorm 10 cv .5 splice [20 30]                                           note{single-segment splice; mean and moms finite}
+sev T.Splice02 10 * uniform + 5 splice [8 12]                                                 note{shift+scale splice; fz.sf(9) ~ 0.75 splice-only survival}
+agg T.SpliceLayer01 1 claim 5 xs 3 sev 10 * uniform + 5 splice [8 12] fixed                   note{full-limit; E[claim^k] = 5^k}
+agg T.SpliceLayer02 1 claim 2 xs 8 sev 10 * uniform + 5 splice [8 12] fixed                   note{proper excess; E[claim] = 1.5, E[claim^2] = 8/3, E[claim^3] = 5}
+
+
+# U. Validation regressions — symmetric & low-skew
+# ================================================
+# Symmetric distributions whose analytic skew is exactly 0. The validation
+# code must not flag empirical skew dust as a CV/skew failure
+# (tests/test_validation.py).
+agg U.Die     dfreq [1] dsev [1:6]                                                            note{fair die; analytic skew = 0}
+agg U.LN     25 claims sev lognorm 50 cv 0.75 poisson                                         note{genuinely skewed; skew > 0.1 preserved}
+port U.TestSym agg A dfreq [1] dsev [1:6] agg B dfreq [1] dsev [1:6]
+
+
+# V. Underwriter / build smoke fixtures
+# =====================================
+# Single-output / multi-output / kind-dispatch coverage for ``build()`` and
+# the knowledge base (tests/test_underwriter.py). PhaseZero: names match
+# the pre-refactor pin so renaming is detectable.
+agg V.PhaseZero:Dice  dfreq [3] dsev [1:6]                                                    note{build() returns Aggregate}
+sev V.PhaseZero:S     lognorm 100 cv 1                                                        note{build() returns Severity}
+port V.PhaseZero:P agg A1 1 claim sev lognorm 10 cv 1 fixed agg A2 1 claim sev lognorm 20 cv 1 fixed
+distortion V.PhaseZero:D ph 0.5                                       # build() returns Distortion
+agg V.PhaseZero:IP    1 claim sev lognorm 10 cv 1 fixed                                       note{_interpret_program: knowledge filled, object None}
+# Multi-output: build() raises ValueError, build_many returns the list.
+agg V.PhaseZero:Multi1 1 claim sev lognorm 10 cv 1 fixed
+agg V.PhaseZero:Multi2 1 claim sev lognorm 20 cv 1 fixed
+# discover()/describe()/plot() smoke fixtures — exercise the kind-dispatch
+# in Underwriter.discover for sev and distortion.
+sev        V.DiscSevTest   lognorm 100 cv 1
+distortion V.DiscDistTest  ph 0.3
+sev        V.DiscPlotSev   lognorm 100 cv 1
+distortion V.DiscPlotDist  ph 0.3
+
+
+# W. Distortion DecL constructors
+# ===============================
+# Combo distortions (minimum, mixture) reference child distortions by name
+# via ``dist.X`` / ``distortion.X`` (tests/test_distortion_construction.py).
+# Both prefixes resolve through the knowledge base.
+#
+# Leaf distortions are live and validated by interpret_file. The four combo
+# lines below are commented out because interpret_file() parses each line
+# with a fresh, empty knowledge base — combo lookups need the children
+# already registered, which only happens through read_database (sequential
+# load). They are listed verbatim for reference; uncomment when loading
+# via read_database.
+dist W.tcc       ccoc .25
+dist W.tdu       dual 2.5
+dist W.tph       ph   0.7
+# dist W.tMIN      minimum dist.W.tcc dist.W.tdu                            # MinimumDistortion of two
+# dist W.tMIX      mixture dist.W.tcc dist.W.tdu wts [0.6 0.4]              # explicit weights
+# dist W.tMIX3     mixture dist.W.tcc dist.W.tdu dist.W.tph                 # uniform default weights (3 children)
+# dist W.tMIN.full minimum distortion.W.tcc distortion.W.tdu                # full ``distortion.`` prefix also works
+
+
+# X. Parser-error fixtures (intentional typos)
+# ============================================
+# These lines DO NOT parse — they exercise the error-report pipeline
+# (tests/test_parser_errors_integration.py, tests/test_parser_errors.py).
+# Excluded from the read-database loaders (they would log a parse error).
+# Listed for reference only; commented so test_suite parsers skip them.
+#
+# agg X.Typo01 100 claims sev lognorm 100 cv 2 mixd poisson 0.5     note{"mixd" -> "mixed"; UnexpectedCharacters; suggestion in report}
+# agg X.Typo02 100 claims sev lognorm 100 cv 2 + +                  note{stray punctuation; UnexpectedToken}
+# agg X.Typo03 100 claims sev lognorm                               note{truncated; UnexpectedEOF}
+# agg X.Typo04 100 claims sev lognorm 100 cv 2 ?                    note{unknown character; no suggestions}

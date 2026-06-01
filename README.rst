@@ -28,6 +28,38 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a18
+---------
+
+Reinsurance rebucketing switch + layer-order validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``Aggregate.reins_bucket`` switch (``'linear'`` default, or
+  ``'nearest'``) controls how net/ceded distributions are rebucketed onto
+  the model grid. ``'linear'`` splits each off-grid value's mass across its
+  two bracketing buckets, preserving the first moment **exactly**;
+  ``'nearest'`` rounds to the closest bucket (≤ ``bs/2`` positional bias).
+  Property + validating setter mirror ``Portfolio.allocation_method`` (clears
+  cached reins frames on change); a new module constant
+  ``REINS_BUCKET_DEFAULT`` and an ``update``/``update_work``
+  ``reins_bucket=`` kwarg thread it through. Reinsurance is baked in at
+  ``update``, so a post-build change needs a re-``update()``.
+- ``Aggregate._apply_reins_work`` rebucket core rewritten: the old
+  ``groupby`` → ``interp1d`` CDF-interpolation → ``np.diff`` scheme (an
+  undocumented third method that did not cleanly preserve the mean, plus two
+  ``len(...)==1`` special cases) is replaced by a vectorized ``np.add.at``
+  scatter (new ``_rebucket_to_grid`` helper). Same ``reins_df`` columns; the
+  degenerate "all ceded → net is 0" case falls out naturally. Top-of-grid
+  overflow piles into the last bucket (same mode as an aggregate deficit).
+- ``make_ceder_netter`` now hard-errors on out-of-order or overlapping
+  reinsurance layers via a new ``_validate_reins_layers`` check at its single
+  choke point: attachments must be non-decreasing and layers must not overlap.
+  Gaps are allowed — express one with a zero-share layer ``0 po L xs A``.
+- Baseline ``Re.Both`` snapshots regenerated (the only case affected; drift
+  ~1e-5 relative, reflecting the more accurate mass-preserving rebucket).
+  New ``tests/test_reins_buckets.py``; DecL case ``ReBucket`` added to
+  ``test_decl.agg``.
+
 1.0.0a17
 ---------
 

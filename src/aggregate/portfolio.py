@@ -1500,7 +1500,7 @@ class Portfolio(object):
         for agg in self.agg_list:
             raw_nm = agg.name
             agg.update_work(xs, self.padding, sev_calc, discretization_calc,
-                            normalize, force_severity, debug)
+                            normalize, force_severity, debug=debug)
             ft_line_density[raw_nm] = agg.ftagg_density
             self.density_df[f'p_{raw_nm}'] = agg.agg_density
             if ft_all is None:

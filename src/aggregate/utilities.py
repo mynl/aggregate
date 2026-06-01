@@ -221,6 +221,58 @@ def round_bucket(bs):
         return 1./ x
 
 
+def _validate_reins_layers(reins_list, tol=1e-9):
+    """
+    Validate that a reinsurance program is entered bottom-up and non-overlapping.
+
+    ``make_ceder_netter`` builds the ceder by walking layers in list order and
+    tracking a running height; out-of-order or overlapping layers silently
+    produce wrong cessions. Enforce the contract with a hard error here, at the
+    single choke point used by every reinsurance path.
+
+    Parameters
+    ----------
+    reins_list : list of (share, limit, attach)
+        Layer tuples; ``limit`` may be ``np.inf`` for an unlimited top layer.
+    tol : float
+        Tolerance for the non-overlap comparison (absorbs float noise).
+
+    Raises
+    ------
+    ValueError
+        If attachments are not non-decreasing, or two layers overlap.
+
+    Notes
+    -----
+    Rules over ``[(share, limit, attach), ...]``:
+
+    - attachments must be **non-decreasing**;
+    - layers must **not overlap**: ``attach_{i+1} >= attach_i + limit_i - tol``.
+
+    Gaps between layers are allowed -- represent a gap with a zero-share layer
+    ``0 po L xs A``. Zero-share entries still must respect ordering. Single-layer
+    programs are trivially valid.
+    """
+    prev_attach = None
+    prev_top = None
+    for (share, limit, attach) in reins_list:
+        if prev_attach is not None:
+            if attach < prev_attach - tol:
+                raise ValueError(
+                    'Reinsurance layers must be entered bottom-up (lowest '
+                    f'attachment first); got attachment {attach} after '
+                    f'{prev_attach}. Enter layers in ascending order and use '
+                    '"0 po L xs A" to represent a gap.')
+            if attach < prev_top - tol:
+                raise ValueError(
+                    f'Reinsurance layers overlap: layer attaching at {attach} '
+                    f'starts below the top ({prev_top}) of the preceding layer. '
+                    'Layers must be non-overlapping; use "0 po L xs A" to '
+                    'represent a gap.')
+        prev_attach = attach
+        prev_top = attach + (0 if np.isinf(limit) else limit)
+
+
 def make_ceder_netter(reins_list, debug=False):
     """
     Build the netter and ceder functions. It is applied to occ_reins and agg_reins,
@@ -274,6 +326,8 @@ def make_ceder_netter(reins_list, debug=False):
     :param debug: if True, return layer function xs and ys in addition to the interpolation functions.
     :return: netter and ceder functions; optionally debug information.
     """
+    # hard error on out-of-order / overlapping layers (single choke point)
+    _validate_reins_layers(reins_list)
     # poor mans inf
     INF = 1e99
     h = 0

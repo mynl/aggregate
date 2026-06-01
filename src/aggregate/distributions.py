@@ -22,7 +22,7 @@ from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
-                        FIG_H, FIG_W, RECOMMEND_P,
+                        FIG_H, FIG_W, RECOMMEND_P, REINS_BUCKET_DEFAULT,
                         VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
@@ -1706,6 +1706,32 @@ class Aggregate:
         self._certified_bounded = bool(value)
 
     @property
+    def reins_bucket(self) -> str:
+        """Rebucketing scheme for reinsurance net/ceded distributions.
+
+        ``'linear'`` (default) splits each off-grid net/ceded value's mass
+        across its two bracketing grid buckets, preserving the first moment
+        exactly; ``'nearest'`` rounds to the closest bucket (≤ ``bs/2``
+        positional bias). Mirrors :meth:`Portfolio.allocation_method`.
+
+        Reinsurance is baked in during :meth:`update`, so a change after
+        ``build`` requires a re-``update()`` to take effect. The setter
+        clears the cached reinsurance frames so they rebuild on next access.
+        """
+        return self._reins_bucket
+
+    @reins_bucket.setter
+    def reins_bucket(self, value: str) -> None:
+        if value not in ('linear', 'nearest'):
+            raise ValueError(
+                f"reins_bucket must be 'linear' or 'nearest', not {value!r}")
+        if value != getattr(self, '_reins_bucket', None):
+            self._reins_bucket = value
+            self._reinsurance_df = None
+            self._reinsurance_audit_df = None
+            self._reinsurance_report_df = None
+
+    @property
     def density_df(self):
         """Per-bucket density / distribution / risk-measure frame.
 
@@ -2068,6 +2094,7 @@ class Aggregate:
                  occ_reins=None, occ_kind='',
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
+                 reins_bucket=None,
                  note=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -2206,6 +2233,12 @@ class Aggregate:
         self._reinsurance_audit_df = None
         self._reinsurance_report_df = None
         self._reinsurance_df = None
+        # rebucketing scheme for reins net/ceded distributions; set the backing
+        # field directly (the setter clears the caches just initialised above)
+        self._reins_bucket = reins_bucket if reins_bucket is not None else REINS_BUCKET_DEFAULT
+        if self._reins_bucket not in ('linear', 'nearest'):
+            raise ValueError(
+                f"reins_bucket must be 'linear' or 'nearest', not {self._reins_bucket!r}")
 
         # ``stats_df`` is pre-created inside each broadcasting arm below once
         # ``n_components`` is known; see ``_init_stats_df``.
@@ -2812,7 +2845,8 @@ class Aggregate:
         return self.update_work(xs, debug=debug, **kwargs)
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
-                    discretization_calc='survival', normalize=True, force_severity=False, debug=False):
+                    discretization_calc='survival', normalize=True, force_severity=False,
+                    reins_bucket=None, debug=False):
         """
         Compute a discrete approximation to the aggregate density via FFT.
 
@@ -2844,6 +2878,8 @@ class Aggregate:
         :param normalize: if True, normalize the severity so sum probs = 1. This is generally what you want; but
                when dealing with thick tailed distributions it can be helpful to turn it off.
         :param force_severity: make severities for plotting even when only the aggregate is requested
+        :param reins_bucket: optional override of the net/ceded rebucketing scheme
+               ('linear' or 'nearest'); defaults to the current ``self.reins_bucket``.
         :param debug: run reinsurance in debug model if True.
         :return:
         """
@@ -2855,6 +2891,9 @@ class Aggregate:
         self.discretization_calc = discretization_calc
         self.normalize = normalize
         self.padding = padding
+        if reins_bucket is not None:
+            # validating setter; takes effect for the reins applied below
+            self.reins_bucket = reins_bucket
         self.xs = xs
         self.bs = xs[1]
         self.log2 = int(np.log2(len(xs)))
@@ -3388,6 +3427,58 @@ class Aggregate:
     # Reinsurance application: occ pre-FFT, agg post-FFT
     # ================================================================
 
+    def _rebucket_to_grid(self, values, mass):
+        """Scatter off-grid ``mass`` at target ``values`` onto the model grid.
+
+        The model grid is ``self.xs == bs * arange`` with ``xs[0] == 0``, so
+        the (fractional) grid index of a value ``v`` is ``v / bs``. Used to
+        place reinsurance net/ceded values back on the grid after the cession
+        map moves them off it.
+
+        Parameters
+        ----------
+        values : ndarray
+            Target loss values (net or ceded), one per subject grid point.
+        mass : ndarray
+            Subject probability mass to redistribute, aligned with ``values``.
+
+        Returns
+        -------
+        ndarray
+            Probability vector on ``self.xs`` (length ``self.n``).
+
+        Notes
+        -----
+        Two schemes, selected by :attr:`reins_bucket`:
+
+        - ``'nearest'`` rounds each value to its closest bucket. Full mass
+          lands in one bucket, with up to ``bs/2`` positional bias.
+        - ``'linear'`` splits each value's mass between its two bracketing
+          buckets ``k`` and ``k+1`` with weights ``1-f`` and ``f`` where
+          ``f = v/bs - k``. Because ``(1-f)·k·bs + f·(k+1)·bs == v``, the
+          first moment is preserved **exactly**; both schemes preserve total
+          mass (``Σp == Σmass``).
+
+        Values at or beyond the top of the grid (``xs[-1]``) pile into the
+        last bucket -- the same overflow mode as an aggregate deficit, and
+        surfaced the same way. Negative targets (should not occur for valid
+        cessions) clip into bucket 0.
+        """
+        bs = self.bs
+        n = len(self.xs)
+        scaled = np.asarray(values, dtype=float) / bs
+        out = np.zeros(n)
+        if self.reins_bucket == 'nearest':
+            idx = np.clip(np.round(scaled).astype(int), 0, n - 1)
+            np.add.at(out, idx, mass)
+        else:  # 'linear' -- mass split preserves E[X] exactly
+            k = np.clip(np.floor(scaled).astype(int), 0, n - 1)
+            f = np.clip(scaled - k, 0.0, 1.0)
+            kp1 = np.clip(k + 1, 0, n - 1)
+            np.add.at(out, k, mass * (1 - f))
+            np.add.at(out, kp1, mass * f)
+        return out
+
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
         Actually do the work. Called by apply_reins and reins_audit_df.
@@ -3411,33 +3502,19 @@ class Aggregate:
                                  'F_subject': base_density.cumsum()}).set_index('loss', drop=False)
         reins_df['loss_net'] = netter(reins_df.loss)
         reins_df['loss_ceded'] = ceder(reins_df.loss)
-        # summarized n and c
-        sn = reins_df.groupby('loss_net').p_subject.sum()
-        sc = reins_df.groupby('loss_ceded').p_subject.sum()
-        # It can be that sn or sc has one row. For example, if the reinsurance cedes everything
-        # then net is 0. That case must be handled separately.
-        # -100: this value should never appear. use big value to make it obvious
-        if len(sn) == 1:
-            # net is a fixed value, need a step function
-            loss = sn.index[0]
-            value = sn.iloc[0]
-            logger.info('Only one net value at %s with prob = %s', loss, value)
-            reins_df['F_net'] = 0.0
-            reins_df.loc[loss:, 'F_net'] = value
-        else:
-            netter_interp = interp1d(sn.index, sn.cumsum(), fill_value=(-100, 1), bounds_error=False)
-            reins_df['F_net'] = netter_interp(reins_df.loss)
-        if len(sc) == 1:
-            loss = sc.index[0]
-            value = sc.iloc[0]
-            logger.info('Only one net value at %s with prob = %s', loss, value)
-            reins_df['F_ceded'] = 0.0
-            reins_df.loc[loss:, 'F_ceded'] = value
-        else:
-            ceder_interp = interp1d(sc.index, sc.cumsum(), fill_value=(-100, 1), bounds_error=False)
-            reins_df['F_ceded'] = ceder_interp(reins_df.loss)
-        reins_df['p_net'] = np.diff(reins_df.F_net, prepend=0)
-        reins_df['p_ceded'] = np.diff(reins_df.F_ceded, prepend=0)
+        # Rebucket the off-grid net/ceded values back onto the uniform model
+        # grid (self.xs == bs * arange, xs[0] == 0) via the selected
+        # ``reins_bucket`` scheme. See _rebucket_to_grid for the mass identity.
+        p_subject = np.asarray(base_density, dtype=float)
+        p_net = self._rebucket_to_grid(reins_df['loss_net'].to_numpy(), p_subject)
+        p_ceded = self._rebucket_to_grid(reins_df['loss_ceded'].to_numpy(), p_subject)
+        reins_df['p_net'] = p_net
+        reins_df['p_ceded'] = p_ceded
+        reins_df['F_net'] = p_net.cumsum()
+        reins_df['F_ceded'] = p_ceded.cumsum()
+        # restore the historical column order (F_* before p_*)
+        reins_df = reins_df[['loss', 'p_subject', 'F_subject', 'loss_net',
+                             'loss_ceded', 'F_net', 'F_ceded', 'p_net', 'p_ceded']]
 
         if debug is False:
             return ceder, netter, reins_df
@@ -3470,8 +3547,6 @@ class Aggregate:
                title=f'Subject and net\nMax net loss {n[-1]:,.1f}')
 
         ax = axd['C']
-        sn.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='net')
-        sc.cumsum().plot(ax=ax, lw=4, alpha=0.3, label='ceded')
         reins_df.filter(regex='F').plot(xlim=xlim, ax=ax)
         ax.set(title=f'Subject, net and ceded\ndistributions')
         ax.legend()

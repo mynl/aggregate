@@ -42,6 +42,7 @@ agg P.Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5                            
 agg P.Sym.Dice     dfreq [1] dsev [1:6]                                                                                  note{symmetric discrete; skew dust regression}
 agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid}
 agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance}
+agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing}
 agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment; normalize=False}
 agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
 

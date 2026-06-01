@@ -9,7 +9,7 @@ from enum import Flag, auto
 __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
            'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
-           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'Validation',
+           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'REINS_BUCKET_DEFAULT', 'Validation',
            'DefectiveDistributionWarning',
            'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
@@ -51,6 +51,14 @@ EXEQA_NOISE_FLOOR = 1e-4
 # divide-by-near-zero).
 FT_NOISE_FLOOR = 1e-10
 RECOMMEND_P = 0.99999
+
+# Default scheme for rebucketing reinsurance net/ceded distributions onto the
+# model grid (see ``Aggregate._apply_reins_work``). ``'linear'`` splits each
+# off-grid point's mass across its two bracketing buckets so the first moment
+# is preserved exactly; ``'nearest'`` rounds to the closest bucket (≤ bs/2
+# positional bias). ``'linear'`` is the default because mass-preserving
+# rebucketing keeps the reinsurance moment drift at the FFT noise floor.
+REINS_BUCKET_DEFAULT = 'linear'
 
 # User-local data directory (under Path.home())
 USER_DIR_NAME = '.aggregate'

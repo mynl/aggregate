@@ -12,14 +12,24 @@ into ceded `c(X)` and net `n(X) = X − c(X)`. But the **aggregate** ceded
 `C = Σ c(X_i)` and **aggregate** net `N = Σ n(X_i)` are *not* deterministic
 functions of one another — the random claim count `N_claims` decouples them. We
 currently compute only the two univariate margins
-(`reinsurance_df['p_agg_ceded_occ' | 'p_agg_net_occ']`); the *joint* law of
+(`reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']`); the *joint* law of
 `(C, N)` is unavailable.
+
+> **Naming note (post `reins-reporting`, 1.0.0a19).** The density frame was
+> renamed `reinsurance_df → reins_density_df`. The `p_agg_ceded_occ` /
+> `p_agg_net_occ` columns (aggregate of the ceded / net *occurrence* severity)
+> are unchanged and are exactly the univariate margins this feature joins. These
+> are the **unconditional** occ aggregates — the same objects whose moments
+> appear as the `('occ', 'Ceded')` / `('occ', 'Net')` `agg` rows of
+> `reins_stats_df` and the occ-block ceded/net rows of `reins_describe`. (The
+> *conditional* per-layer `layer.k` columns of `reins_stats_df` are a different
+> basis and are **not** used here.)
 
 The compound-distribution FFT machinery extends to the joint law **with no new
 math**. The per-claim bivariate severity `(c(X), n(X))` is supported on the curve
 `c + n = X`. Its 2D FFT is `Ŝ`, and the joint aggregate characteristic function
 is `freq_pgf(n, Ŝ)`. Because `freq_pgf(n, z)` is elementwise in `z`
-(e.g. Poisson `exp(n(z−1))`, `distributions.py:981`), it applies unchanged to a
+(e.g. Poisson `exp(n(z−1))`, `distributions.py:983`), it applies unchanged to a
 2D array. This is a genuine advance for FFT methods and directly useful: joint
 ceded/net risk, reinsurer-vs-cedent dependency, and co-moments.
 
@@ -50,21 +60,25 @@ Per claim, `(c(X), n(X))` lives on the line `c + n = X`. Placing the gross
 severity mass `p_sev_gross[k]` at the 2D point `(c(x_k), n(x_k))` builds the
 bivariate severity `S`. The joint aggregate density is
 `iFFT2( freq_pgf(n, FFT2(S)) )` — exactly the univariate `_fft_aggregate`
-(`distributions.py:3053`) with 1D → 2D transforms. Marginalizing the resulting
+(`distributions.py:3632`) with 1D → 2D transforms. Marginalizing the resulting
 aggregate over one axis recovers the corresponding univariate occ-ceded /
 occ-net aggregate, which gives exact validation targets.
 
 ## Inputs already available
 
-- Grid / freq: `self.xs`, `self.bs`, `self.n` (`distributions.py:2150, 2480`).
-- Per-claim densities: `self.sev_density_gross / _ceded / _net`
-  (`distributions.py:2200`; set in `apply_occ_reins`, `:3486`).
+*(Line numbers are as of 1.0.0a19 and drift; method/attribute names are the
+stable anchors.)*
+
+- Grid / freq: `self.xs`, `self.bs`, `self.n` (instance attributes set in
+  `update_work`).
+- Per-claim densities: `self.sev_density_gross / _ceded / _net` (set in
+  `apply_occ_reins`, `distributions.py:4103`).
 - Cession maps: `make_ceder_netter(self.occ_reins)` → `ceder, netter`
-  (`utilities.py:224`).
+  (`utilities.py:276`).
 - Univariate occ ceded/net aggregates for sizing + validation:
-  `reinsurance_df['p_agg_ceded_occ' | 'p_agg_net_occ']` (`distributions.py:1830`).
-- FFT / PGF: `freq_pgf` (`distributions.py:981`); 2D via `numpy.fft.rfft2` /
-  `irfft2` (real-input, matching the 1D `rfft` pattern in `utilities.py:118`).
+  `reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']` (`distributions.py:1835`).
+- FFT / PGF: `freq_pgf` (`distributions.py:983`); 2D via `numpy.fft.rfft2` /
+  `irfft2` (real-input, matching the 1D `rfft` pattern in `utilities.py:129`).
 
 ## Algorithm (`Aggregate.occ_bivariate`)
 
@@ -125,9 +139,15 @@ exceed a threshold; recommend `log2 ≤ ~11` per axis.
 
 ## Verification
 
-- **Marginals** of `occ_bivariate` match `reinsurance_df['p_agg_ceded_occ']` and
-  `['p_agg_net_occ']` (compare means / cv to a `VALIDATION_NOISE`-ish tol; full
-  density when `bs_ceded == bs_net == self.bs`).
+- **Marginals** of `occ_bivariate` match `reins_density_df['p_agg_ceded_occ']`
+  and `['p_agg_net_occ']` (compare means / cv to a `VALIDATION_NOISE`-ish tol;
+  full density when `bs_ceded == bs_net == self.bs`).
+- **Cross-check against the reporting frames** (free, exact targets from the
+  same densities): the ceded marginal's `(mean, cv, skew)` equal
+  `reins_stats_df.loc[('agg', m), ('occ', 'Ceded')]` (and `('occ', 'Net')` for
+  net), and equal the `('occ', 'ceded'/'net', 'agg')` `Est` cells of
+  `reins_describe`. The anti-diagonal `C + N` matches the `('occ', 'Gross')`
+  `agg` column / the `('occ', 'gross', 'agg')` `EX` reference.
 - **Additivity**: `E[C] + E[N] == E[gross aggregate]`;
   `Var(C+N) == Var(gross)`.
 - **Anti-diagonal**: the distribution of `C + N` equals the gross aggregate

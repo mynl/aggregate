@@ -247,3 +247,73 @@ net of the portfolio aggregate); the per-stage breakdown stays in each unit's
   which itself already carries the occ rebucketing. The per-stage EX/Est/Change
   isolates each stage's rebucketing error; document that the agg `Change` is the
   agg-stage contribution, not cumulative.
+
+## Post-plan punch-ups (2026-06-01/02) — what actually shipped
+
+The plan above (Decisions §, Design A–D) describes the *first* implementation.
+Author review during the build moved two of the three objects substantially.
+These notes are the source of truth for the **end state**; the design above is
+kept for the reasoning trail.
+
+1. **`reins_stats_df` became a per-layer layering frame** (Decision 4 reversed
+   on review — the by-layer detail is exactly what the actuarial exhibits want).
+   The original per-stage/view/basis **EX-vs-Est** frame (Design B) did not
+   disappear: it is now the **private** `_reins_view_stats` property, and its
+   only consumer is `reins_describe`. The public `reins_stats_df` is now:
+   - Columns `MultiIndex (view, layer)`, `view ∈ occ|agg`: `Gross` (always),
+     each occurrence `layer.k`, then `Ceded` / `Net` totals; likewise the
+     aggregate layers + `Ceded` / `Net`. **No agg `Subject` column** — the
+     subject is whichever occurrence column carries `output == 1`.
+   - Rows: `meta` block `share / limit / attach / pr_attach / pr_detach /
+     pr_loss / lol / output`, then `(freq|sev|agg, ex1|ex2|ex3|mean|cv|skew)`
+     (`ex1` duplicates `mean` for `filter(regex=...)`).
+   - **Occurrence layers are conditional** on reaching the layer (freq
+     `n·P(X>attach)`, sev ÷ `P(X>attach)`, agg = the layer's own FFT — so layer
+     agg means sum to `Ceded`). `Gross` / `Ceded` / `Net` totals are
+     **unconditional** (`Ceded` sev + `Net` sev = `Gross` sev). The aggregate
+     block leaves `freq` / `sev` NaN.
+   - `pr_attach` / `pr_detach` are **ground-up** exposure probabilities from the
+     underlying frozen severity `fz` (`P(X > exp_attach + view_attach[+limit])`),
+     **not** the modeled conditional `sev_density` (which reads 0 at the policy
+     cap). The conditional `self.sev.sf(attach)` is used only for the layer
+     count `n'` — a different basis, documented in the docstring. (This resolves
+     the §"Open / watch" `sf(attach/share)` gross-up question: dropped; ground-up
+     `fz` survival used instead.)
+
+2. **`reins_describe` became the per-stage *economic* view** (not the raw
+   per-view EX-vs-Est rebucketing table of Design C). Same eight `describe`
+   columns, but:
+   - `EX` / `CV` / `Sk` hold the **theoretic reference** — the *leading* view's
+     exact pre-bucket moments (`gross` for occ, `subject` for agg) — **held
+     constant down each component** (the reference every view is compared to).
+   - `Est *` is the **per-view model output** (rebucketed moment).
+   - `Change = (Est − reference) / reference` reads two ways off one arithmetic:
+     on the leading (gross/subject) row it is the **numerical validation /
+     rebucketing error** (~0 under `linear`); on the ceded / net rows it is the
+     **% impact of the cession**. This is the per-view, per-component analogue of
+     `describe`'s single `Change` column.
+   - **Always unconditional** (no dividing by `P(attach)` — that basis is
+     confined to `reins_stats_df`'s `layer.k` columns). Frequency on the `Est`
+     basis: the **gross row is NaN** (mirrors `describe`, which never
+     re-estimates the input frequency); **ceded / net carry the unconditional
+     mean `E[N]` only** (cv / skew NaN) so `freq · sev == agg` holds per view.
+   - `view` / `component` index labels are **lower-case** to match the other
+     frames (`gross/ceded/net/subject`, `freq/sev/agg`).
+
+3. **Label constants.** The gross/subject/net/ceded/output vocabulary is
+   centralised in `constants.py` as `REINS_LABEL_*`. `describe`'s reins view now
+   leads with **Gross** (was "Subject") and labels the model-output column
+   **Net** / **Ceded** / **Output** (mixed; replaces "After"). Canonical ordering
+   (occ before agg, gross/ceded/net, never alphabetical) is enforced by insertion
+   order, not a pandas ordered Categorical (the `layer` level is dynamic).
+
+4. **Portfolio.** `reins_describe`'s `total` block follows the same economic
+   view: `EX/CV/Sk` = the gross end-to-end moment held constant, `Est` = per-view
+   output, `Change` = programme impact (0 on the gross row — no exact pre-bucket
+   reference exists for the convolved portfolio marginals). `reins_stats_df`
+   stays per-unit end-to-end gcn (rows `(view, measure)`, cols units + `total`),
+   **not** the per-layer Aggregate shape.
+
+5. **Tests / counts.** `tests/test_reins_reporting.py` is 33 tests (the plan's 30
+   plus the economic-view / freq / lowercase-label cases). Suite 746 pass at
+   close.

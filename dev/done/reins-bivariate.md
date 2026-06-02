@@ -185,3 +185,38 @@ forward sketch.
   analogous to the univariate path.
 - Offset windows (a linear-phase shift to model a non-zero-floor net) are a
   possible later refinement; phase 1 keeps zero-offset `[0, max]` axes.
+
+## What actually shipped (2026-06-02, 1.0.0a20)
+
+Built essentially as planned. Notable points and divergences:
+
+- **`freq_pgf` is *mathematically* elementwise but not always *implemented*
+  that way.** `FrequencyEmpirical.freq_pgf` (which backs `dfreq`) sums over the
+  frequency support via a `matmul` that assumes a 1-D argument, so it raises on
+  a 2-D `z`. Fix: `freq_pgf(self.n, z.ravel()).reshape(z.shape)` — universally
+  safe (closed-form PGFs are elementwise) and makes every frequency type work.
+- **Marginal *means* match the univariate aggregates exactly** (the linear
+  scatter preserves the first moment), independent of bucket size. **Marginal
+  *cv* matches only at the matched grid** (`bs_ceded == bs_net == self.bs`):
+  linear rebucketing adds `bs²·f(1-f)` to a density's second moment, so when a
+  ceded mean is comparable to the model bucket the *univariate* (model-grid)
+  ceded cv is inflated and the bivariate's auto-sized **finer** ceded axis is the
+  more accurate one. Tests assert means on the auto grid and the full cv identity
+  on a forced matched grid. (This was the one real surprise — the cross-check
+  against `reins_stats_df`/`reins_describe` is mean-level on auto grids.)
+- **Correlation is positive even for a fixed count.** The per-claim `(c, n)` are
+  already positively associated through the cession map (both rise with claim
+  size in the layer), so a deterministic `N` does *not* give ~0 correlation; a
+  random (Poisson) count *adds* a common-shock coupling on top. The test asserts
+  the real invariant: `corr(Poisson) > corr(fixed) > 0` on the same book.
+- **No renormalisation.** Mirroring `_fft_aggregate`, the raw 2-D density is kept
+  (sub-1e-15 dust zeroed) and the lost tail mass is reported as `meta['deficit']`;
+  `BivariateDistribution.moments`/`corr` normalise by the on-grid total.
+- **Files as planned:** new `src/aggregate/bivariate.py`
+  (`BivariateDistribution`, `size_axis`, `scatter_bivariate`),
+  `Aggregate.occ_bivariate` in `distributions.py` (lazy import of the submodule
+  to avoid a cycle; `scipy.fft as sfft` for `rfft2`/`irfft2`),
+  `tests/test_reins_bivariate.py` (31), DecL section Z (`BV.*`). 777 pytest pass.
+  The docs subsection in `2_x_re_pricing.rst` is still pending a manual rebuild.
+- **Portfolio `occ_bivariate` not implemented** — left as the forward sketch
+  above.

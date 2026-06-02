@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from numpy.linalg import inv
 import pandas as pd
+import scipy.fft as sfft
 from scipy.integrate import quad
 import scipy.stats as ss
 from scipy import interpolate
@@ -1953,6 +1954,118 @@ class Aggregate:
             ax1.plot(1 - s_values, y, label=c)
         ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
         ax1.legend()
+
+    def occ_bivariate(self, bs_ceded=None, bs_net=None,
+                      log2_ceded=None, log2_net=None):
+        """Joint law of aggregate occurrence ceded ``C`` and net ``N`` via 2D FFT.
+
+        Computes the *joint* distribution of the aggregate occurrence ceded
+        ``C = sum c(X_i)`` and net ``N = sum n(X_i)`` losses, where each gross
+        claim ``X_i`` is split deterministically by the occurrence cession map.
+        The two are **not** deterministic functions of one another -- the random
+        claim count decouples them -- so the joint law carries genuine
+        information (their correlation, co-moments, reinsurer-vs-cedent
+        dependency) beyond the two univariate margins already in
+        :attr:`reins_density_df`.
+
+        Parameters
+        ----------
+        bs_ceded, bs_net : float, optional
+            Ceded- / net-axis bucket sizes. Default: auto-sized from the
+            univariate occurrence aggregate margins (``p_agg_ceded_occ`` /
+            ``p_agg_net_occ``) via :func:`aggregate.bivariate.size_axis`.
+        log2_ceded, log2_net : int, optional
+            Ceded- / net-axis log2 grid lengths (grid has ``1 << log2`` points).
+            Default: auto-sized (target 10, grown to cover the margin, capped).
+
+        Returns
+        -------
+        BivariateDistribution
+            Container with the joint ``density``, the two axis grids, marginals,
+            mixed moments ``E[C^i N^j]``, correlation, and a contour plot.
+
+        Raises
+        ------
+        ValueError
+            If the object carries no occurrence reinsurance, or has not been
+            updated (no severity densities present).
+
+        Notes
+        -----
+        **Occurrence only.** Any *aggregate* reinsurance on the object is
+        ignored: this is the joint law of the per-occurrence ceded / net
+        aggregates. (The aggregate-cover bivariate is degenerate -- at the
+        aggregate level ceded and net are deterministic functions of the
+        aggregate, supported on a curve -- so it is out of scope.)
+
+        **Method.** Per claim, ``(c(X), n(X))`` lies on the line ``c + n = X``.
+        Placing the gross severity mass at ``(c(x_k), n(x_k))`` (rebucketed onto
+        the 2D grid by the active :attr:`reins_bucket` scheme) builds the
+        bivariate severity ``S``. The joint aggregate density is
+        ``iFFT2(freq_pgf(n, FFT2(S)))`` -- exactly the univariate
+        :meth:`_fft_aggregate` with the 1D transforms replaced by 2D transforms,
+        valid because ``freq_pgf(n, z)`` is elementwise in ``z``. The zero-risk
+        (``n == 0``) and fixed-count-one shortcuts mirror ``_fft_aggregate``.
+        Marginalising the result over one axis recovers the corresponding
+        univariate occurrence ceded / net aggregate (exact validation targets;
+        see the ``Cross-check`` notes in ``dev/done/reins-bivariate.md``).
+        """
+        from .bivariate import BivariateDistribution, size_axis, scatter_bivariate
+
+        if self.occ_reins is None:
+            raise ValueError(
+                'occ_bivariate requires occurrence reinsurance; none configured.')
+        if self.sev_density_gross is None or self.occ_ceder is None:
+            raise ValueError(
+                'occ_bivariate requires an updated object (no severity '
+                'densities present). Call update() first.')
+
+        rd = self.reins_density_df
+        # auto / explicit per-axis sizing from the univariate occ aggregates
+        bs_c, log2_c = size_axis(rd['p_agg_ceded_occ'].to_numpy(), self.xs,
+                                 self.bs, bs=bs_ceded, log2=log2_ceded)
+        bs_n, log2_n = size_axis(rd['p_agg_net_occ'].to_numpy(), self.xs,
+                                 self.bs, bs=bs_net, log2=log2_net)
+        n_c = 1 << log2_c
+        n_n = 1 << log2_n
+        ceded_grid = bs_c * np.arange(n_c)
+        net_grid = bs_n * np.arange(n_n)
+
+        # bivariate severity: gross mass placed at (ceded, net) per claim size
+        cv = np.asarray(self.occ_ceder(self.xs), dtype=float)
+        nv = np.asarray(self.occ_netter(self.xs), dtype=float)
+        mass = np.asarray(self.sev_density_gross, dtype=float)
+        sev2 = scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n,
+                                 scheme=self.reins_bucket)
+
+        # 2D compound FFT (mirrors _fft_aggregate, with the fixed-1 / zero-risk
+        # shortcuts) -- freq_pgf is elementwise so it applies to the 2D transform
+        if self.n == 0:
+            density = np.zeros((n_c, n_n))
+            density[0, 0] = 1.0
+        elif np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
+            density = sev2.copy()
+        else:
+            pad = self.padding
+            s_shape = (n_c << pad, n_n << pad)
+            z = sfft.rfft2(sev2, s=s_shape)
+            # freq_pgf is mathematically elementwise in z, but the empirical
+            # implementation uses a matmul over the frequency support that
+            # assumes a 1D argument -- so flatten, apply, and reshape back.
+            ftagg = self.frequency.freq_pgf(self.n, z.ravel()).reshape(z.shape)
+            density = np.real(sfft.irfft2(ftagg, s=s_shape))[:n_c, :n_n]
+
+        # zero sub-eps FFT dust (matches the 1e-15 floor used elsewhere) and
+        # record the tail mass lost beyond the grid (aliasing deficit)
+        density[np.abs(density) < 1e-15] = 0.0
+        deficit = float(1.0 - density.sum())
+
+        meta = {'name': self.name, 'en': float(self.n),
+                'freq_name': self.frequency.freq_name,
+                'scheme': self.reins_bucket, 'padding': self.padding,
+                'deficit': deficit}
+        return BivariateDistribution(density, ceded_grid, net_grid,
+                                     bs_c, bs_n, meta)
 
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 

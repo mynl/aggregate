@@ -4,9 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-06-02** — after the `reins-reporting` cycle
-> (1.0.0a19), including the economic-view / per-layer punch-ups. Current
-> version 1.0.0a19.
+> **Last updated: 2026-06-02** — after the `reins-bivariate` cycle
+> (1.0.0a20). Current version 1.0.0a20.
 
 ---
 
@@ -149,3 +148,14 @@
   post-plan addendum in `dev/done/reins-reporting.md`; surface documented in
   `dev/pipeline-reinsurance.rst`. Left a docs follow-up (item 10b) for the
   per-layer case studies.
+- (2026-06-02) **`reins-bivariate` (1.0.0a20).** Joint (ceded, net) occurrence
+  aggregate via 2D FFT: `Aggregate.occ_bivariate(...)` → `BivariateDistribution`
+  (new `aggregate/bivariate.py`). Gross severity mass placed at `(c(X), n(X))`
+  on `c+n=X`; joint density `= iFFT2(freq_pgf(n, FFT2(S)))` (empirical-freq PGF
+  handled by ravel/reshape). Auto per-axis sizing (`size_axis`) + `reins_bucket`
+  scatter (`scatter_bivariate`); `bs_*`/`log2_*` overrides. Marginals reproduce
+  the univariate occ ceded/net aggregates, anti-diagonal reproduces gross.
+  Occurrence only. Plan in `dev/done/reins-bivariate.md`;
+  `tests/test_reins_bivariate.py` (31). **Open:** Portfolio `occ_bivariate`
+  (2D convolution across independent units) is sketched but not implemented;
+  offset/non-zero-floor windows deferred.

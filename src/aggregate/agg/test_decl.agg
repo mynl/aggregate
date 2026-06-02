@@ -178,3 +178,16 @@ agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 so 300 xs 
 # gross-only control (reins objects return None).
 port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson
 port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson
+
+
+# Z. Bivariate (joint ceded, net) occurrence reinsurance
+# ======================================================
+# Drive Aggregate.occ_bivariate (1.0.0a20): the joint law of aggregate
+# occurrence ceded C and net N via 2D FFT. Each program carries occurrence
+# reinsurance; the bivariate marginals reproduce the reins_density_df occ
+# ceded/net aggregates and the anti-diagonal reproduces the gross aggregate.
+# See tests/test_reins_bivariate.py and dev/done/reins-bivariate.md.
+agg BV.Occ  10 claims sev lognorm 50 cv 1.5 occurrence net of 50 xs 50 poisson                               note{lognormal; general deficit-carrying path}
+agg BV.OccB 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson                            note{bounded; tightest marginal match; positive corr}
+agg BV.Fix  dfreq [4] dsev [1:20] occurrence net of 6 xs 6                                                    note{fixed count; empirical-freq PGF on the 2D grid}
+agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 poisson                          note{ceded-to output view; bivariate ignores the view}

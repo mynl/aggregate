@@ -7,9 +7,9 @@
 > conversation context is lost.
 >
 > **Last updated: 2026-06-02** — v1.0 core-compute refactor closed at
-> meta.8 (2026-05-30); two reinsurance cycles landed since
-> (`reins-buckets` 1.0.0a18, `reins-reporting` 1.0.0a19, the latter including
-> the economic-view / per-layer punch-ups). Current version **1.0.0a19**.
+> meta.8 (2026-05-30); three reinsurance cycles landed since
+> (`reins-buckets` 1.0.0a18, `reins-reporting` 1.0.0a19, `reins-bivariate`
+> 1.0.0a20). Current version **1.0.0a20**.
 > **Ground truth for code state is `git log`, not this file.** Run
 > `git log --oneline -30` when resuming to see what landed.
 
@@ -68,6 +68,15 @@ Net` layering frame, occ layers conditional) supersedes the removed
 table, ERA/other_misc layer exhibits) can be rebuilt against it directly (still
 needs a docs build to verify — TODO 10b).
 
+| reins-bivariate | 1.0.0a20 | 2026-06-02 | Joint (ceded, net) occurrence aggregate via 2D FFT. New `Aggregate.occ_bivariate(...)` → `BivariateDistribution` (new submodule `aggregate/bivariate.py`, submodule access only). Places gross severity mass at `(c(X), n(X))` on the line `c+n=X` to build a bivariate severity `S`; joint aggregate density `= iFFT2(freq_pgf(n, FFT2(S)))` — the univariate `_fft_aggregate` with 1D→2D transforms, valid because `freq_pgf` is elementwise (empirical-freq matmul PGF handled by ravel/reshape). Occurrence only (agg-cover bivariate is degenerate). Per-axis auto bucket/window sizing from the univariate `p_agg_ceded_occ`/`p_agg_net_occ` margins (`size_axis`), 2D scatter via the active `reins_bucket` scheme (`scatter_bivariate`, linear preserves both marginal means), `bs_*`/`log2_*` overrides; zero-risk/fixed-1 shortcuts mirror `_fft_aggregate`. `BivariateDistribution`: `.marginals()`, `.moments()` (mixed `E[C^i N^j]`), `.corr()` (positive — random count couples C,N), `.contour()`, reprs. Validation: marginals reproduce the univariate occ ceded/net aggregates (means exact via linear scatter; cv matches at matched grid `bs=self.bs` — auto-sizing is finer/more accurate), anti-diagonal `C+N` reproduces gross. `tests/test_reins_bivariate.py` (31); DecL section Z (`BV.*`) |
+
+777 pytest pass at reins-bivariate close (746 → 777: `test_reins_bivariate.py`
+(31)). A key finding: linear rebucketing adds `bs²·f(1-f)` to a severity's
+second moment, so on a coarse model grid (bucket comparable to a small ceded
+mean) the *univariate* ceded cv is inflated; the bivariate's auto-sized finer
+ceded axis is the more accurate one. The rigorous "marginals == univariate"
+identity is therefore asserted at the matched grid.
+
 ---
 
 ## Working files (all in `dev/`)
@@ -79,7 +88,6 @@ needs a docs build to verify — TODO 10b).
 | `pipeline-aggregate.rst` | Aggregate current-state description (was the read-end input to the plans; keep as the algorithmic reference) |
 | `pipeline-portfolio.rst` | Portfolio current-state description (same role) |
 | `pipeline-reinsurance.rst` | Reinsurance reporting surface, object-by-object — rewritten to the live a19 end state (the 3 public objects + private `_reins_view_stats`, Portfolio trio); pre-refactor inventory dropped |
-| `reins-bivariate.md` | Open plan — bivariate/joint reinsurance (not yet started) |
 | `tail-thickness.md` | Open plan — tail-thickness classifier (`tail.py`); not yet started |
 | `tentative-plan-decl-colorization.md` | Parked — IPython tracebacks don't call `_repr_html_` (see TODO-Remember) |
 | `done/plan-meta.md` | The cross-module sequencing — every step done |
@@ -88,6 +96,7 @@ needs a docs build to verify — TODO 10b).
 | `done/plan-baseline-harness.md` | Before/after harness + DecL corpus |
 | `done/reins-buckets.md` | Reins rebucketing switch + layer validation (1.0.0a18) |
 | `done/reins-reporting.md` | Rationalized reins reporting, Aggregate + Portfolio (1.0.0a19) |
+| `done/reins-bivariate.md` | Joint (ceded, net) occurrence aggregate via 2D FFT (1.0.0a20) |
 | `done/plan-A-aggregate-style.md` etc. | Earlier completed plans (pre-meta) |
 
 Convention reminder: when a plan is finished, move it to `dev/done/`.

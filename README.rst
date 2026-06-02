@@ -28,6 +28,42 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a20
+---------
+
+Joint (ceded, net) occurrence distribution via 2D FFT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``Aggregate.occ_bivariate(...)`` returns a ``BivariateDistribution``
+  (new submodule ``aggregate.bivariate``; submodule access only) holding the
+  **joint** law of the aggregate occurrence ceded ``C`` and net ``N`` losses
+  under an occurrence reinsurance program. The two margins are already
+  available individually (``reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']``);
+  the joint law — their correlation, co-moments, reinsurer-vs-cedent
+  dependency — was not, and the random claim count means it does not factor.
+
+- The mathematics is the ordinary compound-distribution FFT with the 1-D
+  transforms replaced by 2-D transforms: per claim, ``(c(X), n(X))`` lies on
+  the line ``c + n = X``, so placing the gross severity mass there builds a
+  bivariate severity ``S`` and the joint aggregate density is
+  ``iFFT2(freq_pgf(n, FFT2(S)))`` — valid because ``freq_pgf(n, z)`` is
+  elementwise in ``z``. Occurrence only (the aggregate-cover bivariate is
+  degenerate). Per-axis bucket / window sizing is auto-derived from the
+  univariate margins (with ``bs_ceded`` / ``bs_net`` / ``log2_ceded`` /
+  ``log2_net`` overrides) and the net/ceded mass is scattered onto the 2-D grid
+  by the active ``reins_bucket`` scheme.
+
+- ``BivariateDistribution`` provides ``.marginals()``, ``.moments(max_order)``
+  (mixed raw moments ``E[C^i N^j]``), ``.corr()`` (Pearson; positive — a random
+  count couples ceded and net), ``.contour()``, and rich reprs. The marginals
+  reproduce the univariate occurrence aggregates and the anti-diagonal ``C+N``
+  reproduces the gross aggregate, giving exact validation targets; auto-sizing
+  generally yields a *finer* (more accurate) ceded grid than the model grid.
+
+- New ``tests/test_reins_bivariate.py`` (31 cases); DecL cases added to
+  ``test_decl.agg`` (section Z). An experimental docs subsection is pending a
+  manual rebuild.
+
 1.0.0a19
 ---------
 

@@ -1297,6 +1297,51 @@ Mata Figures 4, 5, 6 and 7 show the aggregate mixed density and distribution fun
     @savefig mata_l1l2.png scale=20
     ax3.set(xlim=[-50, 5000], ylabel='1M xs 1M distribution');
 
+.. _re bivariate:
+
+Joint Distribution of Ceded and Net (Experimental)
+-----------------------------------------------------
+
+.. warning::
+
+    Experimental (added 1.0.0a20). API and defaults may change.
+
+For an occurrence program, each claim :math:`X` splits deterministically into
+ceded :math:`c(X)` and net :math:`n(X) = X - c(X)`, but the **aggregate** ceded
+:math:`C = \sum c(X_i)` and net :math:`N = \sum n(X_i)` are *not* deterministic
+functions of one another --- the random claim count decouples them. The
+univariate margins are available as
+``reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']``; the *joint* law of
+:math:`(C, N)` --- and hence their correlation and co-moments --- is computed by
+:meth:`~aggregate.distributions.Aggregate.occ_bivariate`, which returns a
+:class:`aggregate.bivariate.BivariateDistribution`.
+
+The method is the ordinary compound-distribution FFT with the one-dimensional
+transforms replaced by two-dimensional transforms: placing the gross severity
+mass at the point :math:`(c(X), n(X))` (which lies on the line :math:`c + n =
+X`) builds a bivariate severity :math:`S`, and the joint aggregate density is
+:math:`\mathrm{iFFT2}\!\big(\mathrm{pgf}_N(\mathrm{FFT2}(S))\big)`. It is valid
+because the frequency PGF is elementwise in its argument.
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build
+    a = build('agg ReBiv 8 claims sev 300 * beta 2 3 '
+              'occurrence net of 0.7 so 60 xs 40 poisson', bs=1, log2=16)
+    biv = a.occ_bivariate()
+    biv
+    biv.moments(2)
+    biv.corr()
+
+The marginals reproduce the univariate occurrence ceded / net aggregates and the
+anti-diagonal :math:`C + N` reproduces the gross aggregate. Only occurrence
+reinsurance is supported (the aggregate-cover bivariate is degenerate). Per-axis
+bucket and window sizes are auto-derived from the univariate margins, with
+``bs_ceded`` / ``bs_net`` / ``log2_ceded`` / ``log2_net`` overrides;
+:meth:`~aggregate.bivariate.BivariateDistribution.contour` plots the joint
+density.
+
 .. _re summary:
 
 Summary of Objects Created by DecL

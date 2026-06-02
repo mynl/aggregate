@@ -4,8 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-06-02** — after the `reins-bivariate` cycle
-> (1.0.0a20). Current version 1.0.0a20.
+> **Last updated: 2026-06-02** — after the `negative-x-agg` cycle
+> (1.0.0a21). Current version 1.0.0a21.
 
 ---
 
@@ -33,21 +33,24 @@
 
 ## Parked (post-v1.0) — from `dev/done/plan-meta.md`
 
-3. **Aggregate FI-1: negative `xs` / windowed FFT.** Allow severity (and
-   therefore aggregate) to take negative values, so per-deal profit/loss
-   distributions convolve. Severity is easy via shift; aggregate is hard at
-   random `N` because `A_shifted = A + N·s` rather than `A + constant`. Clean
-   for `fixed`-N (including `fixed`-1). Most-wished-for enhancement.
-   **Design (2026-06-02), split in two:** `dev/plan-negative-x-agg.md`
-   (READY TO EXECUTE — Aggregate scope: negative-x severity + output window via
-   the recentering/roll method, two-sided window estimation, signed reporting,
-   `value_type ∈ {loss,payoff}` member) and `dev/plan-negative-x-port.md` (DRAFT,
-   refresh after Agg lands — Portfolio combine + density_df column audit +
-   pricing). **Do negative-x before the multivariate plan.**
+3. **Aggregate FI-1: negative `xs` / windowed FFT.** ✅ DONE (1.0.0a21).
+   `dev/plan-negative-x-agg.md` implemented: signed severity (dsev auto-signs;
+   continuous via `update(signed=True)`), output window (`update(x_min=...)`,
+   auto via `x_min=None` + `estimate_agg_window`), `value_type` member, signed
+   reporting. 789 tests pass; default path byte-for-byte. **Discovery:** plan §4
+   wrongly assumed signed severity was free — the Severity layering clamps
+   `x<0→0` and `validate_discrete_distribution` clamped negative dsev atoms;
+   both fixed. **Still open:** the Portfolio half — `dev/plan-negative-x-port.md`
+   (DRAFT, **now ready to refresh** from what we learned: combine + density_df
+   column audit + pricing/`value_type` consumption). **Do this before the
+   multivariate plan.** Deferred follow-ups: two-sided deficit split; `ft.py`
+   recentering helpers → call the core path (+ equivalence test); re-home
+   `estimate_agg_window` to `utilities.py` and unify with `bivariate.size_axis`;
+   occ-reins on a signed severity grid; DecL keyword for `signed`/`value_type`.
 
-4. **Aggregate FI-2: integrated aliasing + movable window.** Same machinery
-   as FI-1 from another angle — a movable, possibly-negative window of
-   interest on the FFT grid.
+4. **Aggregate FI-2: integrated aliasing + movable window.** ✅ DONE with FI-1
+   (the output window `update(x_min=...)` / `x_min=None`, a movable
+   possibly-negative window placed by a single roll on the padded FFT buffer).
 
 5. **Portfolio FI-1: `Portfolio.pricing_bounds` rewrite.** Raises
    `NotImplementedError` as of 1.0.0a11. The old wiring assumed the dense

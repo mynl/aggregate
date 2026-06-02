@@ -323,6 +323,102 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
     return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
 
 
+def estimate_agg_window(m, cv, skew, p=RECOMMEND_P):
+    """Two-sided output window ``[x_lo, x_hi]`` and width ``W`` for an aggregate.
+
+    The signed counterpart of :func:`_estimate_agg_percentile`: where that
+    returns a single upper bound on a non-negative aggregate, this returns
+    *both* edges from method-of-moments fits, so a profit/loss aggregate (mean
+    possibly < 0, mass possibly far from 0) can be placed on a tight window
+    where its mass actually lives. Used by ``Aggregate.update(x_min=None)``.
+
+    Parameters
+    ----------
+    m, cv, skew : float
+        Analytic aggregate mean, coefficient of variation, and skewness. ``m``
+        may be negative (a net-profit P&L). ``cv`` carries the sign of ``m``;
+        only ``sd = |cv * m|`` is used.
+    p : float
+        Coverage. ``p > 1`` is read as ``1 - 10**-p`` (e.g. ``p=6`` ->
+        ``1 - 1e-6``); the per-edge tail probability is ``1 - p``.
+
+    Returns
+    -------
+    (x_lo, x_hi, W) : tuple of float
+        Lower edge, upper edge, and width ``W = x_hi - x_lo``. The window is
+        **not** forced to be centred on the mean -- for a skewed aggregate the
+        two quantiles place it off-centre.
+
+    Notes
+    -----
+    Three regimes (mirrors ``_estimate_agg_percentile`` but two-sided):
+
+    - **Symmetric** (``|skew|`` below a tolerance, incl. any genuinely
+      symmetric P&L): neither shifted-lognormal nor shifted-gamma is defined,
+      so use a **normal** approximation for both edges
+      ``m -/+ z*sd`` with ``z = norm.isf(1-p)``. This is the default fallback,
+      not an afterthought.
+    - **Right-skewed** (``skew > 0``): fit shifted lognormal and shifted gamma
+      to ``(m, sd, skew)`` and take the **wider** window
+      (``min`` of the low quantiles, ``max`` of the high quantiles).
+    - **Left-skewed** (``skew < 0``): **reflect** -- fit to ``-A`` (mean
+      ``-m``, ``skew -skew > 0``), then map the window back as
+      ``[-hi_r, -lo_r]``.
+
+    Falls back to the normal window if the shifted fits fail (e.g. mean ~ 0
+    with non-trivial skew). The returned window is widened, if necessary, to
+    contain ``m``.
+    """
+    if np.isinf(cv):
+        raise ValueError('Infinite variance passed to estimate_agg_window')
+    p = float(np.where(p > 1, 1 - 10.0 ** -p, p))
+    tail = 1.0 - p
+    sd = abs(cv * m)
+    z = ss.norm.isf(tail)
+    if sd == 0:
+        return float(m), float(m), 0.0
+
+    def _normal_window():
+        return float(m - z * sd), float(m + z * sd), float(2 * z * sd)
+
+    skew_tol = 1e-3
+    if abs(skew) <= skew_tol or not np.isfinite(skew):
+        return _normal_window()
+
+    # Reflect for negative skew so the fits always see a right tail.
+    s = 1.0 if skew > 0 else -1.0
+    mm = s * m
+    sk = s * skew
+    cvv = sd / mm if mm != 0 else np.inf
+    los, his = [], []
+    if np.isfinite(cvv):
+        try:
+            shift, mu, sigma = sln_fit(mm, cvv, sk)
+            fz = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+            los.append(float(fz.ppf(tail)))
+            his.append(float(fz.isf(tail)))
+        except Exception:  # pragma: no cover - defensive
+            pass
+        try:
+            shift, alpha, theta = sgamma_fit(mm, cvv, sk)
+            fz = ss.gamma(alpha, scale=theta, loc=shift)
+            los.append(float(fz.ppf(tail)))
+            his.append(float(fz.isf(tail)))
+        except Exception:  # pragma: no cover - defensive
+            pass
+    if not his:
+        return _normal_window()
+    lo_r, hi_r = min(los), max(his)
+    if s == 1.0:
+        x_lo, x_hi = lo_r, hi_r
+    else:  # undo reflection: window of A is the mirror of the window of -A
+        x_lo, x_hi = -hi_r, -lo_r
+    # ensure the window contains the mean
+    x_lo = min(x_lo, m)
+    x_hi = max(x_hi, m)
+    return float(x_lo), float(x_hi), float(x_hi - x_lo)
+
+
 # ---------------------------------------------------------------------------
 # Single-module helpers — used only inside distributions.py.
 # ---------------------------------------------------------------------------
@@ -685,20 +781,47 @@ def _logarithmic_theta(mean):
         return theta
 
 
-def validate_discrete_distribution(xs, ps):
+def validate_discrete_distribution(xs, ps, allow_negative=False):
     """
-    Make sure that outcomes are distinct, non-negative
-    and sorted in asending order, and that probabiliites are
-    summed across distinct outcomes. Used in
-    dsev and dfreq to validate user input.
+    Make sure that outcomes are distinct and sorted in ascending order, and
+    that probabilities are summed across distinct outcomes. Used in dsev and
+    dfreq to validate user input.
+
+    Parameters
+    ----------
+    xs, ps : array-like
+        Support points and probabilities.
+    allow_negative : bool
+        If ``False`` (default, used by ``dfreq`` -- claim counts cannot be
+        negative) any outcome ``< 0`` is clamped to 0 and merged. If ``True``
+        (used by signed ``dsev`` -- a profit is a negative loss) negative
+        outcomes are preserved; the result is still made distinct and sorted
+        ascending so the histogram bin edges / weights align.
+
+    Returns
+    -------
+    (xs, ps) : tuple of np.ndarray
+        Distinct, ascending support and the corresponding (duplicate-summed)
+        probabilities.
     """
-    if len(xs) != len(set(xs)) or len(xs[xs<0]) > 0:
+    xs = np.asarray(xs, dtype=float)
+    ps = np.asarray(ps, dtype=float)
+    has_neg = bool(np.any(xs < 0))
+    has_dup = len(xs) != len(set(xs.tolist()))
+    if has_dup or (has_neg and not allow_negative):
         logger.info('Duplicates in empirical distribution and/or negative values, summarizing.')
         temp_df = pd.DataFrame({'x': xs, 'p': ps})
-        temp_df.loc[temp_df.x < 0, 'x'] = 0.
+        if not allow_negative:
+            temp_df.loc[temp_df.x < 0, 'x'] = 0.
         temp_df = temp_df.groupby('x')[['p']].sum()
         xs = np.array(temp_df.index)
         ps = temp_df.p.values
+    elif allow_negative:
+        # signed dsev with distinct outcomes: still sort ascending so the
+        # histogram construction pairs each weight with the right bin.
+        order = np.argsort(xs)
+        xs = xs[order]
+        ps = ps[order]
     return xs, ps
 
 
@@ -1735,6 +1858,45 @@ class Aggregate:
             self._reins_view_stats_cache = None
             self._reins_describe = None
 
+    def _sev_density_on_output_grid(self):
+        """Severity density mapped from ``xs_sev`` onto the output grid ``xs``.
+
+        The severity is discretised on ``xs_sev`` (physical 0 at index ``i0``);
+        the output grid is ``xs = x_min + bs*arange``. This places each severity
+        bucket at its physical location on the output grid, zero where the
+        severity falls outside the output window. With no offset (``i0 == 0``
+        and ``x_min == 0``) it returns ``self.sev_density`` unchanged.
+
+        Returns
+        -------
+        np.ndarray
+            Severity density aligned to ``self.xs`` (length ``len(xs)``).
+
+        Notes
+        -----
+        Output index ``k`` (physical ``x_min + k*bs``) corresponds to severity
+        index ``k + i0 + j0`` where ``j0 = round(x_min/bs)`` -- because the
+        severity bucket ``s`` sits at physical ``(s - i0)*bs`` and we need
+        ``(s - i0)*bs == x_min + k*bs``. When the severity is far from the
+        output window (e.g. a tight P&L window around a large negative mean) the
+        overlap is empty and the result is all zeros -- the severity simply is
+        not in the displayed window.
+        """
+        sev = self.sev_density
+        if sev is None:
+            return sev
+        N = len(self.xs)
+        j0 = int(round(self.x_min / self.bs)) if self.bs else 0
+        shift = self.i0 + j0
+        if shift == 0:
+            return sev
+        out = np.zeros(N)
+        k = np.arange(N)
+        src = k + shift
+        valid = (src >= 0) & (src < N)
+        out[valid] = np.asarray(sev)[src[valid]]
+        return out
+
     @property
     def density_df(self):
         """Per-bucket density / distribution / risk-measure frame.
@@ -1781,7 +1943,8 @@ class Aggregate:
                 raise ValueError('Update Aggregate before asking for density_df')
 
             # really convenient to have p=p_total to be consistent with Portfolio objects
-            self._density_df = pd.DataFrame(dict(loss=self.xs, p_total=self.agg_density))
+            self._density_df = pd.DataFrame(dict(loss=np.asarray(self.xs, dtype=float),
+                                                 p_total=self.agg_density))
             self._density_df = self._density_df.set_index('loss', drop=False)
             self._density_df['p'] = self._density_df.p_total
             # remove the fuzz, same method as Portfolio.remove_fuzz
@@ -1791,17 +1954,24 @@ class Aggregate:
                 self._density_df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
 
             # we spend a lot of time computing sev exactly, so don't want to flush that away
-            # with remove fuzz...hence add here
-            self._density_df['p_sev'] = self.sev_density
+            # with remove fuzz...hence add here. On a signed / windowed grid the
+            # severity lives on xs_sev, which may differ from the output grid xs;
+            # align it so p_sev sits at the severity's physical location on xs
+            # (zero where the severity falls outside the output window). With no
+            # offset (i0 == 0 and x_min == 0) this is exactly self.sev_density.
+            self._density_df['p_sev'] = self._sev_density_on_output_grid()
 
             # reindex
             self._density_df = self._density_df.set_index('loss', drop=False)
-            self._density_df['log_p'] = np.log(self._density_df.p)
-            # when no sev this causes a problem
-            if self._density_df.p_sev.dtype == np.dtype('O'):
-                self._density_df['log_p_sev'] = np.nan
-            else:
-                self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
+            # guard log of 0 / fp-fuzz negatives (cosmetic display columns only;
+            # values unchanged: log(0) = -inf, log(<0) = nan as before).
+            with np.errstate(divide='ignore', invalid='ignore'):
+                self._density_df['log_p'] = np.log(self._density_df.p)
+                # when no sev this causes a problem
+                if self._density_df.p_sev.dtype == np.dtype('O'):
+                    self._density_df['log_p_sev'] = np.nan
+                else:
+                    self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
 
             # generally acceptable for F, by construction
             self._density_df['F'] = self._density_df.p.cumsum()
@@ -2824,6 +2994,25 @@ class Aggregate:
         self.bs = 0
         self.log2 = 0
         self.padding = 0
+        # Signed-support / output-window state (set by update_work). The
+        # defaults reproduce the non-negative, zero-based grid exactly:
+        #   x_min == 0   -> output window starts at 0 (no output roll)
+        #   i0 == 0      -> severity has no negative buckets (no input roll)
+        #   xs_sev == xs -> severity and output share the grid
+        # See dev/plan-negative-x-agg.md (F1 negative-x, F2 output window).
+        self.x_min = 0.0
+        self.x_max = None
+        self.i0 = 0           # index of physical 0 in the severity array
+        self.xs_sev = None    # severity discretisation grid (may differ from xs)
+        # F1 opt-in: when True the severity keeps its negative support (the
+        # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the
+        # established non-negative behaviour. Opt-in wiring is pending a design
+        # decision (DecL keyword vs flag vs dsev auto-detect).
+        self._signed_sev = False
+        # Sign convention: how the variable is read. Inert for the
+        # distribution itself; consumed at the pricing/distortion layer
+        # (actuarial loss orientation). See plan §5.5.
+        self._value_type = 'loss'
         self.validation_eps = VALIDATION_EPS
         self.sev_calc = ""
         self.discretization_calc = ""
@@ -3322,6 +3511,13 @@ class Aggregate:
             s.append(f'padding                  {self.padding}')
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
+            s.append(f'value_type               {self.value_type}')
+            # Signed-support / output-window line: shown only when the grid is
+            # offset from the default 0-based, non-negative layout.
+            if self._signed_sev or self.x_min != 0:
+                s.append(f'window                   [{self.x_min:,.6g}, '
+                         f'{self.x_max:,.6g}]')
+                s.append(f'signed severity          {self._signed_sev}')
             s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
@@ -3382,6 +3578,113 @@ class Aggregate:
     # ``_freq_sev_convolution`` below.
     # ================================================================
 
+    def _resolve_signed(self, signed):
+        """Resolve the signed-severity opt-in for ``update``.
+
+        Parameters
+        ----------
+        signed : bool or None
+            ``True`` / ``False`` force signed / clamped. ``None`` (default)
+            auto-enables signed mode **only** for discrete severities
+            (``dhistogram`` / ``fixed`` / ``chistogram``) that carry an
+            explicit negative atom -- the unambiguous case (``dsev [-2 5]``).
+            Continuous severities (e.g. ``norm``) stay clamped unless
+            ``signed=True`` is passed explicitly.
+
+        Returns
+        -------
+        bool
+            Whether to treat the severity as signed (negative support).
+
+        Notes
+        -----
+        Per the design decision (dsev auto + flag for continuous): a profit is
+        a negative loss, and ``dsev [-2 5]`` has no other sensible reading, so
+        it auto-signs and ``build('agg ... dsev [-1 10] ... poisson 1e6')``
+        works directly. Continuous P&L severities are ambiguous (e.g.
+        ``100*norm+500`` conventionally clamps its far-left tail), so they
+        require the explicit ``signed=True`` flag.
+        """
+        if signed is not None:
+            return bool(signed)
+        for sev in (self.sevs if self.sevs is not None else []):
+            if getattr(sev, 'sev_kind', '') in ('dhistogram', 'fixed', 'chistogram'):
+                raw = getattr(sev, 'fz', None)
+                try:
+                    lo = float(raw.ppf(1e-12)) if raw is not None else 0.0
+                except Exception:  # pragma: no cover - defensive
+                    lo = 0.0
+                if lo < 0:
+                    return True
+        return False
+
+    def _severity_negative_buckets(self, bs):
+        """Number of negative buckets the severity reaches (index of physical 0).
+
+        Returns ``i0`` such that the severity discretisation grid
+        ``xs_sev = (arange(N) - i0) * bs`` places physical 0 at index ``i0``
+        and covers the severity's left tail. ``0`` for any severity supported
+        on ``[0, inf)`` -- which keeps the non-negative path byte-for-byte
+        unchanged. For a severity that reaches below 0 (e.g. ``norm``, a
+        shifted distribution, or a ``dsev`` with negative atoms) it is the
+        number of buckets from 0 down to the severity's effective lower
+        endpoint.
+
+        Parameters
+        ----------
+        bs : float
+            Bucket size.
+
+        Returns
+        -------
+        int
+            ``max(0, ceil(-lo / bs))`` where ``lo`` is the smallest effective
+            lower endpoint over the severity mixture components. A small
+            tolerance keeps floating-point dust at exactly 0 from spuriously
+            triggering signed mode.
+
+        Notes
+        -----
+        ``lo`` is taken as the ``1e-12`` lower quantile of each component
+        (via the layered ``ppf``), mirroring how the upper grid edge is sized
+        from a high quantile. Any mass below the leftmost bucket is dropped and
+        absorbed by the (optional) renormalisation in ``discretize`` -- at the
+        ``1e-12`` level this is negligible.
+        """
+        # Signed severity is OPT-IN. Without an explicit opt-in the severity
+        # keeps the established clamp-at-0 layering (e.g. ``norm`` piles its
+        # sub-zero tail at 0), so i0 == 0 and the non-negative path is
+        # untouched. The opt-in mechanism (DecL keyword / flag / dsev
+        # auto-detect) is being decided; until wired, ``_signed_sev`` is False.
+        if not getattr(self, '_signed_sev', False):
+            return 0
+        if self.sevs is None or len(self.sevs) == 0:
+            return 0
+        los = []
+        for sev in self.sevs:
+            try:
+                # raw underlying ppf -- the layered ppf is clamped at 0
+                raw = getattr(sev, 'fz', None)
+                lo = float(raw.ppf(1e-12)) if raw is not None else float(sev.ppf(1e-12))
+            except Exception:  # pragma: no cover - defensive
+                lo = 0.0
+            if not np.isfinite(lo):
+                lo = 0.0
+            los.append(lo)
+        lo = min(los) if los else 0.0
+        if lo >= 0:
+            return 0
+        i0 = int(np.ceil(-lo / bs - 1e-9))
+        # The severity's negative reach must fit inside the grid.
+        N = len(self.xs)
+        if i0 >= N:
+            logger.warning(
+                '%s: severity negative reach (%d buckets) exceeds grid size '
+                '%d; clipping. Increase log2 or bs for a signed aggregate.',
+                self.name, i0, N)
+            i0 = N - 1
+        return i0
+
     def discretize(self, sev_calc, discretization_calc, normalize):
         """
         Discretize the severity distributions and weight.
@@ -3422,39 +3725,58 @@ class Aggregate:
         :return:
         """
 
+        # Severity is discretised on ``xs_sev`` (physical 0 at index i0), which
+        # equals ``self.xs`` on the default 0-based grid. ``i0 > 0`` means the
+        # severity reaches below 0 (signed mode).
+        xs_sev = self.xs_sev if self.xs_sev is not None else self.xs
+        signed = self.i0 > 0
+
         if sev_calc == 'discrete' or sev_calc == 'round':
-            # adj_xs = np.hstack((self.xs - self.bs / 2, np.inf))
+            # adj_xs = np.hstack((xs_sev - self.bs / 2, np.inf))
             # mass at the end undesirable. can be put in with reinsurance layer in spec
             # note the first bucket is negative
-            adj_xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
+            adj_xs = np.hstack((xs_sev - self.bs / 2, xs_sev[-1] + self.bs / 2))
         elif sev_calc == 'forward' or sev_calc == 'continuous':
-            adj_xs = np.hstack((self.xs, self.xs[-1] + self.bs))
+            adj_xs = np.hstack((xs_sev, xs_sev[-1] + self.bs))
         elif sev_calc == 'backward':
-            adj_xs = np.hstack((-self.bs, self.xs))  # , np.inf))
+            adj_xs = np.hstack((xs_sev[0] - self.bs, xs_sev))  # , np.inf))
         elif sev_calc == 'moment':
             raise NotImplementedError(
                 'Moment matching discretization not implemented. Embrechts says it is not worth it.')
             #
-            # adj_xs = np.hstack((self.xs, np.inf))
+            # adj_xs = np.hstack((xs_sev, np.inf))
         else:
             raise ValueError(
                 f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
 
-        # in all cases, the first bucket must include the mass at zero
-        # Also allow severity to have real support and so want to capture all the way from -inf, hence:
-        adj_xs[0] = -np.inf
+        if not signed:
+            # Non-negative severity: the first bucket must include all mass at
+            # and below 0. Capture the whole left tail from -inf, exactly as
+            # before (byte-for-byte unchanged on the default path).
+            adj_xs[0] = -np.inf
+        # Signed mode: the leftmost bucket is treated identically to every
+        # other bucket (a finite ``xs_sev[0] - bs/2`` edge, set above) -- no
+        # -inf catch. Any residual mass below it (<= 1e-12 by construction of
+        # i0) is dropped and absorbed by the optional renormalisation below.
 
         # bed = bucketed empirical distribution
         beds = []
         for fz in self.sevs:
+            # Signed mode bypasses the layered (clamp ``x<0 -> 0``) wrappers and
+            # reads the raw underlying frozen distribution, which carries the
+            # severity's true negative support. The non-negative path keeps the
+            # layered cdf/sf exactly as before. (Occurrence reinsurance on a
+            # signed severity is out of scope here -- see plan §6.)
+            cdf = fz.fz.cdf if signed else fz.cdf
+            sf = fz.fz.sf if signed else fz.sf
             if discretization_calc == 'both':
                 # see comments: we rescale each severity...
-                appx = np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
+                appx = np.maximum(np.diff(cdf(adj_xs)), -np.diff(sf(adj_xs)))
             elif discretization_calc == 'survival':
-                appx = -np.diff(fz.sf(adj_xs))
+                appx = -np.diff(sf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             elif discretization_calc == 'distribution':
-                appx = np.diff(fz.cdf(adj_xs))
+                appx = np.diff(cdf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             else:
                 raise ValueError(
@@ -3475,7 +3797,31 @@ class Aggregate:
         ix = self.density_df.index.get_indexer([x], 'nearest')[0]
         return self.density_df.iloc[ix, 0]
 
-    def update(self, log2=16, bs=0, recommend_p=RECOMMEND_P, debug=False, **kwargs):
+    @property
+    def value_type(self):
+        """Sign convention for the variable: ``'loss'`` or ``'payoff'``.
+
+        Records how the aggregate should be read -- actuarial **loss**
+        ("more is worse", the default) vs. **payoff** / asset ("more is
+        better"). It is **inert for the distribution itself**: density,
+        moments, quantiles, deficit and plotting do not depend on it.
+        It is consumed only when applying distortions / pricing (specified
+        in the Portfolio plan and downstream pricing work), where a
+        ``'payoff'`` object is negated / the dual distortion applied.
+
+        See ``dev/plan-negative-x-agg.md`` §5.5.
+        """
+        return self._value_type
+
+    @value_type.setter
+    def value_type(self, v):
+        if v not in ('loss', 'payoff'):
+            raise ValueError(
+                f"value_type must be 'loss' or 'payoff', not {v!r}")
+        self._value_type = v
+
+    def update(self, log2=16, bs=0, recommend_p=RECOMMEND_P, debug=False,
+               x_min=0, x_max=None, signed=None, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -3484,18 +3830,53 @@ class Aggregate:
         :param bs:
         :param recommend_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
         :param debug:
+        :param x_min: lower edge of the output window (default 0 = today's
+          behaviour). May be negative for a profit/loss aggregate. Snapped to
+          a multiple of ``bs``. ``x_min=None`` requests an automatic two-sided
+          window (see ``update_work``).
+        :param x_max: upper edge of the output window; informational, the grid
+          length is fixed by ``log2``. Currently unused when ``x_min`` is given
+          explicitly (the window is ``[x_min, x_min + (2**log2)*bs)``).
+        :param signed: opt-in for negative-support (signed) severity. ``None``
+          (default) auto-enables for discrete severities with negative atoms
+          (e.g. ``dsev [-2 5]``) and leaves continuous severities clamped at 0
+          as before; ``True`` forces signed (e.g. a continuous P&L severity);
+          ``False`` forces the legacy clamp-at-0 behaviour.
         :param kwargs:  passed through to update
         :return:
         """
-        # guess bucket and update
-        if bs == 0:
-            bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
-        xs = np.arange(0, 1 << log2, dtype=float) * bs
-        return self.update_work(xs, debug=debug, **kwargs)
+        # guess bucket and build the grid
+        N = 1 << log2
+        if x_min is None:
+            # Automatic two-sided window from the analytic moments (F2). The
+            # usual direction is "input N, derive bs": size bs from the window
+            # width so the alias-free condition W < N*bs holds by construction.
+            x_lo, x_hi, W = estimate_agg_window(
+                self.agg_m, self.agg_cv, self.agg_skew, p=recommend_p)
+            if bs == 0:
+                bs = round_bucket(W / N) if W > 0 else round_bucket(
+                    self.recommend_bucket(log2, p=recommend_p))
+            # snap the origin down to a bucket multiple (floor so the window
+            # still covers x_lo); offsets must be whole numbers of buckets.
+            x_min = float(np.floor(x_lo / bs) * bs)
+            xs = x_min + np.arange(0, N, dtype=float) * bs
+        else:
+            if bs == 0:
+                bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
+            # Snap the window origin to a bucket multiple so offsets are
+            # integer numbers of buckets (a hard requirement for the rolls).
+            x_min_snapped = round(x_min / bs) * bs
+            if not np.isclose(x_min_snapped, x_min):
+                logger.info('update | x_min %s snapped to bucket multiple %s',
+                            x_min, x_min_snapped)
+            x_min = float(x_min_snapped)
+            xs = x_min + np.arange(0, N, dtype=float) * bs
+        return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
+                                signed=signed, **kwargs)
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False,
-                    reins_bucket=None, debug=False):
+                    reins_bucket=None, debug=False, x_min=0, x_max=None, signed=None):
         """
         Compute a discrete approximation to the aggregate density via FFT.
 
@@ -3530,6 +3911,10 @@ class Aggregate:
         :param reins_bucket: optional override of the net/ceded rebucketing scheme
                ('linear' or 'nearest'); defaults to the current ``self.reins_bucket``.
         :param debug: run reinsurance in debug model if True.
+        :param x_min: ``None`` requests an automatic two-sided output window
+          (NYI in this stage -- treated as the grid origin ``xs[0]``);
+          otherwise informational (the grid origin is read from ``xs[0]``).
+        :param x_max: informational upper window edge.
         :return:
         """
         self._density_df = None  # invalidate
@@ -3548,8 +3933,27 @@ class Aggregate:
             # validating setter; takes effect for the reins applied below
             self.reins_bucket = reins_bucket
         self.xs = xs
-        self.bs = xs[1]
+        # bs is the grid step; xs[1]-xs[0] (not xs[1]) so a signed/offset grid
+        # whose origin xs[0] != 0 still reports the correct bucket size.
+        self.bs = xs[1] - xs[0]
         self.log2 = int(np.log2(len(xs)))
+        # Output-window origin: the physical value at output index 0. For the
+        # default 0-based grid this is 0 and all the offset machinery below is
+        # inert (i0 == 0, j0 == 0 -> no rolls; xs_sev == xs).
+        self.x_min = float(xs[0])
+        self.x_max = float(xs[-1])
+
+        # F1 -- negative-support severity. Resolve the signed opt-in (auto for
+        # discrete severities with negative atoms; explicit flag otherwise),
+        # then determine the severity's negative reach as a whole number of
+        # buckets ``i0`` (the index of physical 0 in the severity array). Zero
+        # for any severity supported on [0, inf), so the non-negative path is
+        # untouched. The severity is then discretised on its own grid
+        # ``xs_sev`` (physical 0 at index i0), which may differ from the output
+        # grid ``xs`` (e.g. a tight far-from-0 output window).
+        self._signed_sev = self._resolve_signed(signed)
+        self.i0 = self._severity_negative_buckets(self.bs)
+        self.xs_sev = (np.arange(len(xs), dtype=float) - self.i0) * self.bs
 
         # claim-count weighted severity vector (always computed; FFT is the only path)
         freq_ex1 = self.stats_df.loc[('freq', 'ex1'), self._comp_cols].values
@@ -3588,7 +3992,8 @@ class Aggregate:
         # same MomentWrangler, so the ex123 rows and the mcvsk values are
         # mutually consistent.
         if self.sev_density is not None:
-            _mw = xsden_to_mwrangler(self.xs, self.sev_density)
+            # severity lives on xs_sev (== xs on the default grid)
+            _mw = xsden_to_mwrangler(self.xs_sev, self.sev_density)
             sev_ex1, sev_ex2, sev_ex3 = _mw.noncentral
             self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _mw.mcvsk
         else:
@@ -3703,21 +4108,23 @@ class Aggregate:
         # empirical block uses (see WHY comment above), wrapped so we can
         # reuse it on subject / after-occ densities.
         _floor = np.finfo(float).eps
-        def _moments(arr):
+        def _moments(arr, grid):
+            # ``grid`` is xs_sev for severity densities, xs for aggregates
+            # (they coincide on the default 0-based grid).
             if arr is None:
                 return (np.nan,) * 6
             clean = np.where(np.abs(arr) < _floor, 0.0, arr)
-            mw = xsden_to_mwrangler(self.xs, clean)
+            mw = xsden_to_mwrangler(grid, clean)
             return (*mw.noncentral, *mw.mcvsk)
 
-        sub_sev_mom = _moments(subject_sev)
-        sub_agg_mom = _moments(subject_agg)
+        sub_sev_mom = _moments(subject_sev, self.xs_sev)
+        sub_agg_mom = _moments(subject_agg, self.xs)
         self._write_stage_moments('gross_empirical', sub_sev_mom, sub_agg_mom,
                                   copy_freq_from='empirical')
 
         if has_occ or has_agg:
-            aft_sev_mom = _moments(after_occ_sev)
-            aft_agg_mom = _moments(after_occ_agg)
+            aft_sev_mom = _moments(after_occ_sev, self.xs_sev)
+            aft_agg_mom = _moments(after_occ_agg, self.xs)
             self._write_stage_moments('after_occ', aft_sev_mom, aft_agg_mom,
                                       copy_freq_from='empirical')
 
@@ -3755,27 +4162,76 @@ class Aggregate:
         Parameters
         ----------
         sev_density : np.ndarray
-            Discretised severity on ``self.xs`` (gross, net, or ceded).
+            Discretised severity on ``self.xs_sev`` (gross, net, or ceded);
+            ``sev_density[j]`` is the mass at physical ``(j - i0) * bs``.
         padding : int
             FFT padding factor passed to ``ft`` / ``ift``.
 
         Returns
         -------
         agg_density : np.ndarray
-            Aggregate density on ``self.xs``.
+            Aggregate density on the output grid ``self.xs``.
         ftagg_density : np.ndarray
             FT of the aggregate (padded length). Callers that don't need
             this (e.g. ``reins_density_df``) discard it.
+
+        Notes
+        -----
+        Two paths, selected by whether any offset is active:
+
+        - **Default (``i0 == 0`` and output window origin ``x_min == 0``).**
+          The original ``ft`` / ``freq_pgf`` / ``ift`` path, unchanged and
+          byte-for-byte identical to prior releases.
+        - **Signed / windowed (F1 + F2).** Negatives live at the top of the
+          padded length-``M = N << padding`` FFT buffer (period ``M*bs``); the
+          severity is laid in with physical 0 at index 0 (``i0`` negative
+          buckets wrapped to the top). After the FFT the result is *relabelled*
+          onto the output window by a single ``np.roll`` of ``-round(x_min/bs)``
+          and the first ``N`` buckets kept. Relabelling a finished, exact array
+          carries no ``N·s`` shift term, so this is correct for random as well
+          as fixed frequency (the key F2 clarification, plan §2). Exact when the
+          aggregate support width ``W < M*bs``; a window narrower than the
+          support shows up as a two-sided deficit.
         """
+        N = len(self.xs)
+        i0 = self.i0
+        j0 = int(round(self.x_min / self.bs)) if self.bs else 0
+        if i0 == 0 and j0 == 0:
+            # ---- default non-negative, zero-based path (unchanged) ----
+            if self.n == 0:
+                out = np.zeros_like(self.xs)
+                out[0] = 1.0
+                return out, ft(out, padding)
+            z = ft(sev_density, padding)
+            ftagg = self.frequency.freq_pgf(self.n, z)
+            if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
+                return sev_density.copy(), ftagg
+            return np.real(ift(ftagg, padding)), ftagg
+
+        # ---- signed / windowed path (F1 negative-x + F2 output window) ----
+        M = N << padding
         if self.n == 0:
-            out = np.zeros_like(self.xs)
-            out[0] = 1.0
-            return out, ft(out, padding)
-        z = ft(sev_density, padding)
-        ftagg = self.frequency.freq_pgf(self.n, z)
-        if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-            return sev_density.copy(), ftagg
-        return np.real(ift(ftagg, padding)), ftagg
+            # Zero-risk: point mass at physical 0, placed at FFT index 0 so the
+            # output-window roll below sends it to the correct output bucket.
+            a = np.zeros(M)
+            a[0] = 1.0
+            ftagg = sfft.rfft(a)
+        else:
+            # Lay the severity into the length-M buffer: physical 0..(N-1-i0)*bs
+            # at indices 0..N-1-i0; the i0 negative buckets wrap to the very top
+            # of M (indices M-i0..M-1). Equivalent to np.roll(sev, -i0) but into
+            # the padded length so the period is M*bs, not N*bs.
+            g = np.zeros(M)
+            g[:N - i0] = sev_density[i0:]
+            if i0:
+                g[M - i0:] = sev_density[:i0]
+            z = sfft.rfft(g)
+            ftagg = self.frequency.freq_pgf(self.n, z)
+            a = sfft.irfft(ftagg, M)
+        # F2: relabel onto the output window. Roll so x_min lands at output
+        # index 0 (j0 may be negative when x_min < 0), then keep the first N.
+        agg = np.roll(a, -j0)[:N]
+        return agg, ftagg
 
     def _write_stage_moments(self, col, sev_mom, agg_mom, copy_freq_from=None):
         """Write a moment tuple into a single ``stats_df`` column.
@@ -4119,7 +4575,11 @@ class Aggregate:
         """
         bs = self.bs
         n = len(self.xs)
-        scaled = np.asarray(values, dtype=float) / bs
+        # Grid index of a value v is (v - x_min) / bs; x_min == 0 on the
+        # default grid recovers the original v / bs. (Occurrence reinsurance on
+        # a signed *severity* grid is out of scope for this stage; the output
+        # grid origin is used here.)
+        scaled = (np.asarray(values, dtype=float) - self.x_min) / bs
         out = np.zeros(n)
         if self.reins_bucket == 'nearest':
             idx = np.clip(np.round(scaled).astype(int), 0, n - 1)
@@ -6526,13 +6986,17 @@ class SeverityDHistogram(Severity):
         self.limit = min(self.limit, xs.max())
         self.detachment = self.limit + self.attachment
         # Validate then compute raw moments from the cleaned (xs, ps).
-        xs, ps = validate_discrete_distribution(xs, ps)
+        # ``allow_negative=True`` preserves negative atoms (a profit is a
+        # negative loss); the aggregate auto-detects signed support from this.
+        xs, ps = validate_discrete_distribution(xs, ps, allow_negative=True)
         self.sev1 = np.sum(xs * ps)
         self.sev2 = np.sum(xs ** 2 * ps)
         self.sev3 = np.sum(xs ** 3 * ps)
         # ``max_log2`` picks a step small enough that subtracting it from the
-        # largest support point stays representable in float64.
-        d = max_log2(np.max(xs))
+        # support point stays representable in float64. Size it from the
+        # largest *magnitude* so the left-epsilon also resolves negative atoms.
+        scale = float(np.max(np.abs(xs)))
+        d = max_log2(scale if scale > 0 else 1.0)
         logger.info('Severity._build | %s d=%s', self.sev_name, d)
         xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
         pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]

@@ -28,6 +28,48 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a21
+---------
+
+Negative-support (profit/loss) severity and the output window
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+First half (``Aggregate`` scope) of the negative-x work in
+``dev/plan-negative-x-agg.md``. A *profit is a negative loss*, so an aggregate
+can now live on a signed grid, making profit/loss (P&L) distributions a
+first-class object.
+
+- **Signed severity (F1).** Severity may take negative values. ``dsev`` with
+  negative atoms (e.g. ``dsev [-2 5] [.5 .5]``) **auto-enables** signed mode --
+  the only sensible reading -- so ``build('agg PnL 1e6 claims dsev [-1 10]
+  [15/16 1/16] poisson')`` works directly. Continuous severities (e.g.
+  ``norm``) keep the legacy clamp-at-0 behaviour unless you opt in with
+  ``a.update(..., signed=True)``. The new ``value_type`` member
+  (``'loss'``/``'payoff'``, default ``'loss'``) records the sign convention;
+  it is inert for the distribution and consumed only at the pricing layer.
+- **Output window (F2).** ``update(x_min=...)`` places the aggregate on a window
+  ``[x_min, x_min + (2**log2)*bs)``; ``x_min`` may be negative. With
+  ``x_min=None`` the window is estimated two-sided from the analytic moments
+  (new ``estimate_agg_window`` -- reflected shifted-lognormal / -gamma fits with
+  a symmetric/normal fallback), so a tight far-from-0 lump (e.g. a Poisson(10^6)
+  P&L concentrated near a *negative* mean) uses a small ``bs`` over a narrow
+  window rather than paying for ``[0, mean]``. The placement is a relabelling
+  (single ``np.roll`` on the padded FFT buffer), exact for random as well as
+  fixed frequency.
+- ``density_df`` is indexed by the signed grid; ``p_sev`` is mapped onto the
+  output grid; ``q``/``tvar``/``var`` and ``info`` (new ``window`` /
+  ``value_type`` / ``signed severity`` lines) work on signed support. The
+  default 0-based, non-negative path is byte-for-byte unchanged.
+- Internals: ``validate_discrete_distribution`` gains ``allow_negative``
+  (``dfreq`` still clamps claim counts; signed ``dsev`` preserves negatives);
+  ``SeverityDHistogram`` places negative atoms correctly. New
+  ``tests/test_negative_x.py``.
+- **Deferred to the Portfolio half** (``dev/plan-negative-x-port.md``):
+  portfolio combine on signed support, the full ``Portfolio.density_df`` column
+  audit (esp. the price column / ``add_exa``), and distortion/pricing
+  consumption of ``value_type``. The ``ft.py`` recentering helpers are not yet
+  refactored to call the core path (follow-up).
+
 1.0.0a20
 ---------
 

@@ -1,7 +1,25 @@
 # Plan: negative-support severity & output window — **Aggregate** scope
 
-> **Status:** READY TO EXECUTE (rev 4, 2026-06-02). Split out of the former
-> combined `plan-negative-x.md`; the Portfolio half is now
+> **Status:** ✅ IMPLEMENTED (1.0.0a21, 2026-06-02). All five stages landed;
+> 789 tests pass (12 new in `tests/test_negative_x.py`); default path
+> byte-for-byte unchanged. Key decisions taken during execution:
+> - **Plan §4 was wrong that signed severity is "free."** The Severity layering
+>   deliberately clamps `x<0→0` (e.g. `norm` piles its sub-zero tail at 0) and
+>   `validate_discrete_distribution` clamped negative `dsev` atoms to 0. Both
+>   fixed: `allow_negative` flag (dfreq still clamps; dsev preserves),
+>   `SeverityDHistogram` negative-atom placement, and a raw-`fz` (un-clamped)
+>   read in `discretize` when signed.
+> - **Opt-in (author decision):** `dsev` with negative atoms **auto-signs**;
+>   continuous severities opt in via `update(..., signed=True)`. Wired as an
+>   Aggregate-level flag now; a DecL keyword is deferred.
+> - **`estimate_agg_window`** lives in `distributions.py` (not `utilities.py` as
+>   §11.3 said) because it reuses the MoM fits there; re-homing + unifying with
+>   `bivariate.size_axis` is a follow-up.
+> - **Deferred (non-blocking):** two-sided deficit split (`deficit_lo/hi`); the
+>   `ft.py` recentering helpers calling the core path + the equivalence test;
+>   occurrence reinsurance on a *signed severity* grid.
+>
+> Split out of the former combined `plan-negative-x.md`; the Portfolio half is now
 > [`plan-negative-x-port.md`](plan-negative-x-port.md) (a draft to be **refreshed
 > after this Aggregate work lands**). Sibling: [`plan-multivariate.md`](plan-multivariate.md)
 > — **build negative-x (this) first**; multivariate reuses the signed-axis /
@@ -31,10 +49,12 @@ produce a P&L aggregate at the usual speed/accuracy, including the motivating
 case
 
 ```
-agg PnL dsev [-1 10] [15/16 1/16] poisson 1e6
+agg PnL 1e6 claims dsev [-1 10] [15/16 1/16] poisson
 ```
 
-a binary per-risk P&L summed over Poisson(10⁶) — a thin, near-Gaussian lump at
+(DecL note: the count goes before `claims` and the frequency type is last;
+`dsev … poisson 1e6` is not valid grammar.) A binary per-risk P&L summed over
+Poisson(10⁶) — a thin, near-Gaussian lump at
 ≈ (−15 + 10) / 16 × 10⁶ (a *negative* mean). This is **TODO #3 / #4** (negative
 `xs`; integrated aliasing + movable window) — the most-wished-for feature.
 (Portfolio-combine, TODO #6, is the sibling plan.)

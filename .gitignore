@@ -23,6 +23,9 @@ wheels/
 .installed.cfg
 MANIFEST
 
+# obsidian
+.obsidian/
+
 # Virtual environments
 .env
 .venv

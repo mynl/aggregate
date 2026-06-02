@@ -38,6 +38,12 @@
    distributions convolve. Severity is easy via shift; aggregate is hard at
    random `N` because `A_shifted = A + N·s` rather than `A + constant`. Clean
    for `fixed`-N (including `fixed`-1). Most-wished-for enhancement.
+   **Design (2026-06-02), split in two:** `dev/plan-negative-x-agg.md`
+   (READY TO EXECUTE — Aggregate scope: negative-x severity + output window via
+   the recentering/roll method, two-sided window estimation, signed reporting,
+   `value_type ∈ {loss,payoff}` member) and `dev/plan-negative-x-port.md` (DRAFT,
+   refresh after Agg lands — Portfolio combine + density_df column audit +
+   pricing). **Do negative-x before the multivariate plan.**
 
 4. **Aggregate FI-2: integrated aliasing + movable window.** Same machinery
    as FI-1 from another angle — a movable, possibly-negative window of
@@ -53,6 +59,12 @@
    half of #3 — combining already-computed unit aggregates is a deterministic
    sum, so a constant shift de-shifts cleanly. Doable without solving the
    within-unit random-frequency problem.
+   **⚠ Author reminder (periodic): signed support requires auditing ALL columns
+   of `Portfolio.density_df`, not just `p_total`/`F`/`S`.** The `add_exa`
+   machinery (`portfolio.py:2122`) and especially the **price** column assume
+   non-negative loss. Author expects this to be straightforward but it *must* be
+   looked at as part of the negative-x Portfolio step. See
+   `dev/plan-negative-x-port.md` §3.
 
 7. **Switcheroo harness case.** Add a `Port.Sample` case (hand-built or
    seeded sample) to the baseline once Portfolio sample work next surfaces,
@@ -159,3 +171,8 @@
   `tests/test_reins_bivariate.py` (31). **Open:** Portfolio `occ_bivariate`
   (2D convolution across independent units) is sketched but not implemented;
   offset/non-zero-floor windows deferred.
+  **Successor design (2026-06-02): `dev/plan-multivariate.md`** — generalises
+  `occ_bivariate` to a DecL-declared `multivariate` / `netceded` facility
+  (`MultivariateAggregate`/`MultivariatePortfolio`); two joint-severity builders
+  (outer-product for separate lines, comonotone scatter for ceded/net) over one
+  ND-FFT backbone; depends on negative-x (signed axes). Iterate after negative-x.

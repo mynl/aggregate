@@ -23,6 +23,8 @@ from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
                         FIG_H, FIG_W, RECOMMEND_P, REINS_BUCKET_DEFAULT,
+                        REINS_LABEL_GROSS, REINS_LABEL_SUBJECT, REINS_LABEL_NET,
+                        REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
                         VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
@@ -1727,9 +1729,10 @@ class Aggregate:
                 f"reins_bucket must be 'linear' or 'nearest', not {value!r}")
         if value != getattr(self, '_reins_bucket', None):
             self._reins_bucket = value
-            self._reinsurance_df = None
-            self._reinsurance_audit_df = None
-            self._reinsurance_report_df = None
+            self._reins_density_df = None
+            self._reins_stats_df = None
+            self._reins_view_stats_cache = None
+            self._reins_describe = None
 
     @property
     def density_df(self):
@@ -1824,109 +1827,113 @@ class Aggregate:
 
         return self._density_df
 
+    # ================================================================
+    # Reinsurance reporting (rationalized; see dev/reins-reporting.md)
+    # ================================================================
+
     @property
-    def reinsurance_df(self):
-        """
-        Version of density_df tailored to reinsurance. Several cases
+    def reins_density_df(self):
+        """Per-bucket gross / ceded / net densities under reinsurance.
 
-        * occ program only: agg_density_.. is recomputed manually for all three outcomes
-        * agg program only: sev_density_... not set for gcn
-        * both programs: agg is gcn for the agg program applied to the requested occ output
+        One row per model-grid bucket (``loss = k * bs``); the empirical,
+        FFT-ready rebucketed densities. Columns are **always present**
+        regardless of which stages are configured; a missing stage
+        contributes the no-cession values (ceded mass at 0, net = subject).
 
+        Columns
+        -------
+        loss : grid (also the index).
+        p_sev_gross, p_sev_ceded, p_sev_net : occurrence-level severity
+            views. With no occurrence cover ``p_sev_ceded`` is a point mass
+            at 0 and ``p_sev_net == p_sev_gross``.
+        p_agg_gross, p_agg_ceded_occ, p_agg_net_occ : aggregate of each
+            occurrence severity view. ``p_agg_gross`` is the *true* gross
+            aggregate (``_fft_aggregate`` of the gross severity).
+        p_agg_subject, p_agg_ceded, p_agg_net : aggregate-cover views.
+            ``p_agg_subject`` is the aggregate input to the aggregate cover
+            (= aggregate of the requested occurrence output); it equals
+            ``p_agg_gross`` only when there is no occurrence cover.
 
-
-        ``_apply_reins_work``
+        Notes
+        -----
+        All aggregate columns route through ``_fft_aggregate`` so the
+        zero-risk / fixed-1 shortcuts apply consistently. Renamed from the
+        legacy ``reinsurance_df``: ``p_agg_gross_occ -> p_agg_gross`` and the
+        old ``p_agg_gross`` (the agg-cover input) ``-> p_agg_subject``.
+        Returns ``None`` when no reinsurance is configured.
         """
         if self.occ_reins is None and self.agg_reins is None:
-            logger.log(WL, 'Asking for reinsurance_df, but no reinsurance specified. Returning None.')
+            logger.log(WL, 'Asking for reins_density_df, but no reinsurance specified. Returning None.')
             return None
 
-        if self._reinsurance_df is None:
-            self._reinsurance_df = \
-                pd.DataFrame({'loss': self.xs,
-                              'p_sev_gross': self.sev_density_gross if
-                              self.sev_density_gross is not None else self.sev_density,
-                              'p_sev_ceded': self.sev_density_ceded,
-                              'p_sev_net': self.sev_density_net
-                              },
-                             index=pd.Index(self.xs, name='loss'))
-            if self.occ_reins is not None:
-                # add agg with gcn occ
+        if self._reins_density_df is None:
+            xs = self.xs
+            has_occ = self.occ_reins is not None
+            has_agg = self.agg_reins is not None
+            # point mass at 0 == the "no cession" density (ceded 0 w.p. 1)
+            zero = np.zeros_like(xs, dtype=float)
+            zero[0] = 1.0
+
+            # --- severity (occurrence-level) views -----------------------
+            sev_gross = np.asarray(
+                self.sev_density_gross if self.sev_density_gross is not None
+                else self.sev_density, dtype=float)
+            sev_ceded = np.asarray(self.sev_density_ceded, dtype=float) if has_occ else zero
+            sev_net = np.asarray(self.sev_density_net, dtype=float) if has_occ else sev_gross
+            df = pd.DataFrame({
+                'loss': xs,
+                'p_sev_gross': sev_gross,
+                'p_sev_ceded': sev_ceded,
+                'p_sev_net': sev_net,
+            }, index=pd.Index(xs, name='loss'))
+
+            # --- aggregate of each occurrence severity view --------------
+            # p_agg_gross is the TRUE gross aggregate (FFT of gross sev).
+            agg_gross, _ = self._fft_aggregate(sev_gross, self.padding)
+            df['p_agg_gross'] = agg_gross
+            if has_occ:
                 logger.info('Computing aggregates with gcn severities')
-                for gcn, sv in zip(['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ'],
-                                   [self.sev_density_gross, self.sev_density_ceded, self.sev_density_net]):
-                    ad, _ = self._fft_aggregate(sv, self.padding)
-                    self._reinsurance_df[gcn] = ad
-            if self.agg_density_gross is None:
-                # no agg program
-                self._reinsurance_df['p_agg_gross'] = self.agg_density
-                self._reinsurance_df['p_agg_ceded'] = None
-                self._reinsurance_df['p_agg_net'] = None
+                agg_ceded_occ, _ = self._fft_aggregate(sev_ceded, self.padding)
+                agg_net_occ, _ = self._fft_aggregate(sev_net, self.padding)
+                df['p_agg_ceded_occ'] = agg_ceded_occ
+                df['p_agg_net_occ'] = agg_net_occ
             else:
-                # agg program
-                self._reinsurance_df['p_agg_gross'] = self.agg_density_gross
-                self._reinsurance_df['p_agg_ceded'] = self.agg_density_ceded
-                self._reinsurance_df['p_agg_net'] = self.agg_density_net
+                df['p_agg_ceded_occ'] = zero
+                df['p_agg_net_occ'] = agg_gross
 
-        return self._reinsurance_df
+            # --- aggregate-cover views -----------------------------------
+            # subject = the aggregate input to the agg cover = aggregate of
+            # the requested occ output (== p_agg_gross when no occ stage).
+            if has_agg:
+                df['p_agg_subject'] = np.asarray(self.agg_density_gross, dtype=float)
+                df['p_agg_ceded'] = np.asarray(self.agg_density_ceded, dtype=float)
+                df['p_agg_net'] = np.asarray(self.agg_density_net, dtype=float)
+            else:
+                df['p_agg_subject'] = np.asarray(self.agg_density, dtype=float)
+                df['p_agg_ceded'] = zero
+                df['p_agg_net'] = np.asarray(self.agg_density, dtype=float)
 
-    @property
-    def reinsurance_occ_layer_df(self):
-        """
-        How losses are layered by the occurrence reinsurance. Expected loss,
-        CV layer loss, and expected counts to layers.
-        """
-        if self.occ_reins is None:
-            return None
-        bit0 = self.reinsurance_audit_df.loc['occ'].xs('ex', axis=1, level=1)
-        bit = self.reinsurance_audit_df.loc['occ'].xs('cv', axis=1, level=1)
-        bit1 = pd.DataFrame(index=bit.index)
-        bit1['ceded'] = [self.n if i == 'gup' else self.n * self.sev.sf(i)
-                         for i in bit1.index.get_level_values('attach')]
-        bit2 = pd.DataFrame(index=bit.index)
-        # i = (share, layer, attach)
-        bit3 = bit0['ceded']
-        bit3 = bit3.iloc[:] / bit0['subject'].iloc[-1]
-        bit2['ceded'] = [v.ceded if i[-1] == 'gup' else v.ceded / self.sev.sf(i[-1] / i[0])
-                         for i, v in bit0[['ceded']].iterrows()]
-        ans = pd.concat((
-            bit0 * self.n,
-            bit, bit1, bit2, bit3),
-            axis=1, keys=['ex', 'cv', 'en', 'severity', 'pct'],
-            names=['stat', 'view'])
-        return ans
+            self._reins_density_df = df
 
-    @property
-    def reinsurance_report_df(self):
-        """
-        Create and return a dataframe with the reinsurance report.
-        TODO: sort out the overlap with reinsurance_audit_df (occ and agg)
-        What this function adds is the ceded/net of occ aggregates before
-        application of the agg reinsurance. The pure occ and agg parts are in
-        reinsurance_audit_df.
-        """
-        if self.reinsurance_df is None:
-            return None
-        elif self._reinsurance_report_df is None:
-            bit = self.reinsurance_df
-            self._reinsurance_report_df = pd.DataFrame({c: xsden_to_meancvskew(bit.loss, bit[c])
-                                                        for c in bit.columns[1:]},
-                                                       index=['mean', 'cv', 'skew'])
-            self._reinsurance_report_df.loc['sd'] = self._reinsurance_report_df.loc['cv'] * \
-                                                    self._reinsurance_report_df.loc['mean']
-            self._reinsurance_report_df = self._reinsurance_report_df.iloc[[0, 1, 3, 2], :]
-        return self._reinsurance_report_df
+        return self._reins_density_df
 
     def reinsurance_occ_plot(self, axs=None):
         """
-        Plots for occurrence reinsurance: occurrence log density and aggregate quantile plot.
+        Plots for occurrence reinsurance: occurrence log density and aggregate
+        quantile plot. Reads the gross/ceded/net views from ``reins_density_df``.
         """
+        if self.occ_reins is None:
+            logger.warning('reinsurance_occ_plot called with no occurrence reinsurance.')
+            return
         if axs is None:
             fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H), constrained_layout=True)
             self.figure = fig
         ax0, ax1 = axs.flat
 
-        self.occ_reins_df.filter(regex='p_[scn]').rename(columns=lambda x: x[2:]).plot(ax=ax0, logy=True)
+        rd = self.reins_density_df
+        rd[['p_sev_gross', 'p_sev_ceded', 'p_sev_net']].rename(
+            columns={'p_sev_gross': 'gross', 'p_sev_ceded': 'ceded',
+                     'p_sev_net': 'net'}).plot(ax=ax0, logy=True)
         xl = ax0.get_xlim()
         l = self.spec['exp_limit']
         if type(l) != float:
@@ -1935,97 +1942,623 @@ class Aggregate:
             xl = [-l / 50, l * 1.025]
         ax0.set(xlim=xl, xlabel='Loss', ylabel='Occurrence log density', title='Occurrence')
 
-        y = self.reinsurance_df.loss.values
-        for c in ['gross', 'ceded', 'net']:
-            s = self.reinsurance_df[f'p_agg_{c}_occ']
+        y = rd.loss.values
+        for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
+                       ('net', 'p_agg_net_occ')]:
+            s = rd[col].to_numpy().copy()
             s[np.abs(s) < 1e-15] = 0
-            s_values = s[::-1].cumsum()[::-1].values
-            s = np.where(np.abs(s_values) < 1e-15, 0, s_values)
-            s = np.where(s == 0, np.nan, s)
-            ax1.plot(1 - s, y, label=c)
+            s_values = s[::-1].cumsum()[::-1]
+            s_values = np.where(np.abs(s_values) < 1e-15, 0, s_values)
+            s_values = np.where(s_values == 0, np.nan, s_values)
+            ax1.plot(1 - s_values, y, label=c)
         ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
         ax1.legend()
 
+    # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
+
+    @staticmethod
+    def _reins_moments6_from_raw(e1, e2, e3):
+        """``(ex1, ex2, ex3, mean, cv, skew)`` from raw moments."""
+        mw = MomentWrangler()
+        mw.noncentral = (e1, e2, e3)
+        return (e1, e2, e3, *mw.mcvsk)
+
+    def _reins_exact_image_raw(self, image_fn, p_subject):
+        """Raw moments ``E[g(X)^j]``, ``j=1..3``, of an exact loss image
+        ``g = image_fn`` weighted by ``p_subject``: the pre-bucket truth
+        ``sum g(xs)^j * p_subject`` with **no** rebucketing scatter.
+
+        Notes
+        -----
+        Unlike :func:`xsden_to_mwrangler` (the ``Est`` basis), no
+        defective-mass tail term is added: that convention places lost mass
+        at the implied max loss ``xs[-1] + bs``, which is right for a gross
+        aggregate but wrong for a ceded image (where the lost mass maps to the
+        capped cession). The EX basis is therefore the literal exact moment of
+        the on-grid subject; the EX-vs-Est difference reflects the rebucketing
+        scatter (plus, for a gross aggregate carried through an FFT, the grid
+        deficit -- negligible on an adequate grid).
+        """
+        g = np.asarray(image_fn(self.xs), dtype=float)
+        p = np.asarray(p_subject, dtype=float)
+        return (float(np.sum(g * p)),
+                float(np.sum(g * g * p)),
+                float(np.sum(g * g * g * p)))
+
+    def _reins_agg6_from_sev_raw(self, s1, s2, s3):
+        """Compound exact severity raw moments into aggregate
+        ``(ex1, ex2, ex3, mean, cv, skew)`` via the frequency."""
+        f1, f2, f3 = self.frequency.freq_moms(self.n)
+        a1, a2, a3 = MomentAggregator.agg_from_fs(f1, f2, f3, s1, s2, s3)
+        return (a1, a2, a3, *MomentAggregator.static_moments_to_mcvsk(a1, a2, a3))
+
+    def _reins_density6(self, p):
+        """``(ex1, ex2, ex3, mean, cv, skew)`` of a density on the grid."""
+        mw = xsden_to_mwrangler(self.xs, np.asarray(p, dtype=float))
+        return (*mw.noncentral, *mw.mcvsk)
+
     @property
-    def reinsurance_audit_df(self):
+    def _reins_view_stats(self):
+        """Per-stage reinsurance moments on two bases: exact and rebucketed.
+
+        Internal frame feeding :meth:`reins_describe` (which surfaces the
+        ``EX`` exact vs ``Est`` rebucketed comparison as its ``Change``
+        column). The public per-layer summary is :meth:`reins_stats_df`.
+        Shaped like ``stats_df`` but indexed by stage / view / basis instead
+        of component columns.
+
+        Rows
+        ----
+        ``MultiIndex (component, measure)`` with ``component in
+        {freq, sev, agg}`` and ``measure in {ex1, ex2, ex3, mean, cv, skew}``.
+
+        Columns
+        -------
+        ``MultiIndex (stage, view, basis)``:
+
+        * ``stage`` ``occ`` (when ``occ_reins``) and/or ``agg`` (when
+          ``agg_reins``);
+        * ``view`` ``gross|ceded|net`` for ``occ``; ``subject|ceded|net`` for
+          ``agg``;
+        * ``basis`` ``EX`` (exact, pre-bucket) or ``Est`` (rebucketed).
+
+        Notes
+        -----
+        **EX** ("theoretic"). For the occurrence stage the exact severity
+        moments are ``E[g(X)^j] = sum g(xs)^j * p_sev_gross`` with ``g`` the
+        identity / ``occ_ceder`` / ``occ_netter``; the aggregate row compounds
+        those via the frequency. For the aggregate stage the exact aggregate
+        moments are ``E[g(S)^j] = sum g(xs)^j * p_agg_subject`` with ``g`` the
+        identity / ``agg_ceder`` / ``agg_netter`` (no compounding -- the cover
+        acts on the aggregate directly). Frequency: the ``EX`` reference is the
+        gross full moments for every view (the count is unchanged by occurrence
+        reinsurance). On the ``Est`` (model-output) basis the gross view is left
+        ``NaN`` (mirroring ``describe``, which never re-estimates the input
+        frequency); occ ceded / net carry the *unconditional* mean ``E[N]`` only
+        (so ``freq * sev == agg`` per view), cv / skew ``NaN``. The aggregate
+        stage has no sev rows and a degenerate freq row (all ``NaN``).
+        Columns are ordered occ before agg, views gross/subject, ceded, net,
+        and ``EX`` before ``Est``.
+
+        **Est** ("empirical") reads the rebucketed densities from
+        :meth:`reins_density_df` through ``xsden_to_mwrangler``. The
+        difference EX vs Est isolates the per-stage ``reins_bucket``
+        rebucketing error (``linear`` preserves the mean exactly; ``nearest``
+        biases it by at most ``bs/2``).
+
+        Lazily built; invalidated by the ``reins_bucket`` setter and on
+        ``update``. Returns ``None`` when no reinsurance is configured.
         """
-        Create and return the _reins_audit_df data frame.
-        Read only property.
+        if self.occ_reins is None and self.agg_reins is None:
+            return None
+        if self._reins_view_stats_cache is not None:
+            return self._reins_view_stats_cache
 
-        :return:
+        measures = ['ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew']
+        components = ['freq', 'sev', 'agg']
+        row_index = pd.MultiIndex.from_product(
+            [components, measures], names=['component', 'measure'])
+        nan6 = (np.nan,) * 6
+
+        rd = self.reins_density_df
+        xs = self.xs
+        data = {}  # (stage, view, basis) -> Series over row_index
+
+        def put(stage, view, basis, freq6, sev6, agg6):
+            s = pd.Series(np.nan, index=row_index)
+            for comp, six in zip(components, (freq6, sev6, agg6)):
+                for m, v in zip(measures, six):
+                    s[(comp, m)] = v
+            data[(stage, view, basis)] = s
+
+        # ---- occurrence stage -------------------------------------------
+        if self.occ_reins is not None:
+            p_gross = rd['p_sev_gross'].to_numpy()
+            n = self.n
+            # Frequency is unchanged by occurrence reinsurance, so the gross
+            # full moments are the theoretic reference (``EX``) for every view.
+            # The model-output (``Est``) frequency is reported *unconditionally*
+            # -- no division by ``P(attach)`` -- so ``freq * sev == agg`` within
+            # each view; only the mean is meaningful (the per-view count is the
+            # gross count), so cv / skew stay ``NaN``. The gross ``Est``
+            # frequency is left ``NaN`` to mirror ``describe`` exactly (the
+            # validation view never re-estimates the input frequency).
+            f1, f2, f3 = self.frequency.freq_moms(n)
+            freq_gross = (f1, f2, f3,
+                          *MomentAggregator.static_moments_to_mcvsk(f1, f2, f3))
+            freq_est_uncond = (np.nan, np.nan, np.nan, f1, np.nan, np.nan)
+
+            # EX: exact image moments of the gross severity, compounded; the
+            # frequency reference is the gross full moments for every view.
+            identity = lambda x: x
+            for view, image_fn in [('gross', identity),
+                                   ('ceded', self.occ_ceder),
+                                   ('net', self.occ_netter)]:
+                s1, s2, s3 = self._reins_exact_image_raw(image_fn, p_gross)
+                put('occ', view, 'EX',
+                    freq_gross,
+                    self._reins_moments6_from_raw(s1, s2, s3),
+                    self._reins_agg6_from_sev_raw(s1, s2, s3))
+
+            # Est: moments of the rebucketed densities; unconditional freq
+            # (gross frequency left NaN to mirror describe).
+            for view, scol, acol, freq6 in [
+                    ('gross', 'p_sev_gross', 'p_agg_gross', nan6),
+                    ('ceded', 'p_sev_ceded', 'p_agg_ceded_occ', freq_est_uncond),
+                    ('net', 'p_sev_net', 'p_agg_net_occ', freq_est_uncond)]:
+                put('occ', view, 'Est',
+                    freq6,
+                    self._reins_density6(rd[scol].to_numpy()),
+                    self._reins_density6(rd[acol].to_numpy()))
+
+        # ---- aggregate stage --------------------------------------------
+        if self.agg_reins is not None:
+            p_subject = rd['p_agg_subject'].to_numpy()
+            identity = lambda x: x
+            for view, image_fn in [('subject', identity),
+                                   ('ceded', self.agg_ceder),
+                                   ('net', self.agg_netter)]:
+                a1, a2, a3 = self._reins_exact_image_raw(image_fn, p_subject)
+                put('agg', view, 'EX', nan6, nan6,
+                    self._reins_moments6_from_raw(a1, a2, a3))
+            for view, acol in [('subject', 'p_agg_subject'),
+                              ('ceded', 'p_agg_ceded'),
+                              ('net', 'p_agg_net')]:
+                put('agg', view, 'Est', nan6, nan6,
+                    self._reins_density6(rd[acol].to_numpy()))
+
+        # Canonical column order: occ before agg; within a stage the views
+        # gross/subject, ceded, net (never alphabetical); EX before Est.
+        ordered = []
+        if self.occ_reins is not None:
+            for view in ('gross', 'ceded', 'net'):
+                for basis in ('EX', 'Est'):
+                    ordered.append(('occ', view, basis))
+        if self.agg_reins is not None:
+            for view in ('subject', 'ceded', 'net'):
+                for basis in ('EX', 'Est'):
+                    ordered.append(('agg', view, basis))
+        out = pd.DataFrame(data)[ordered]
+        out.columns = pd.MultiIndex.from_tuples(
+            ordered, names=['stage', 'view', 'basis'])
+        self._reins_view_stats_cache = out
+        return self._reins_view_stats_cache
+
+    @property
+    def reins_stats_df(self):
+        """Per-layer reinsurance layering summary (empirical, model-grid).
+
+        A layering analysis with one column per reinsurance layer plus the
+        gross book and the ceded / net totals.
+
+        Columns
+        -------
+        ``MultiIndex (view, layer)`` -- ``view`` is ``occ`` / ``agg``:
+
+        * occurrence: ``Gross`` (the gross book -- always present), then, when
+          ``occ_reins``, ``layer.1`` ... ``layer.k`` (one per layer) and
+          ``Ceded`` / ``Net`` totals.
+        * aggregate (when ``agg_reins``): ``layer.1`` ... ``layer.m``,
+          ``Ceded`` / ``Net``. There is **no aggregate ``Subject`` column** --
+          the subject (the occurrence output the aggregate cover applies to)
+          is the column flagged ``('meta', 'output') == 1`` in the occurrence
+          block, or ``Gross`` when there is no occurrence program.
+
+        Rows
+        ----
+        ``MultiIndex (component, measure)``:
+
+        * ``meta``: ``share`` (proportion covered), ``limit``, ``attach``,
+          ``pr_attach`` and ``pr_detach`` -- the **ground-up exposure
+          probabilities** that the underlying loss attaches / fully exhausts
+          the view, ``P(X > exp_attach + view_attach)`` and ``P(X > exp_attach
+          + view_attach + view_limit)``. These come from the **underlying**
+          severity (``self.sevs[i].fz``), not the modeled ``sev_density``,
+          which is conditional (claims to the policy layer) and would report 0
+          at the policy cap. ``pr_detach`` is ``NaN`` for unlimited layers /
+          net totals. ``pr_loss`` (``P(aggregate > 0)`` from the column's
+          aggregate density), ``lol`` (loss on line = expected layer aggregate
+          loss / placed limit), and ``output`` (``0/1`` flag marking each
+          stage's output view -- two 1s for an occ+agg program; ``Gross``
+          carries the 1 when there is no occurrence program). ``Gross`` carries
+          the claim-count-weighted policy ``limit`` / ``attach`` (``share`` 1);
+          the occurrence ``Ceded`` total carries the share-placed sum of layer
+          limits and the minimum attachment. (The layer ``freq`` ``n'`` uses
+          the *conditional* ``P(subject > attach | policy loss)`` -- the model
+          count is claims to the policy -- a separate basis from the absolute
+          ``pr_attach``.)
+        * ``('freq'|'sev'|'agg', ex1|ex2|ex3|mean|cv|skew)`` -- moments
+          (``ex1`` duplicates ``mean`` for easy ``filter(regex=...)`` access).
+
+        Notes
+        -----
+        **Occurrence layers are conditional** on a loss reaching the layer:
+        the frequency is the expected penetrating count ``n' = E[N] * P(X >
+        attach)`` and the severity is the unconditional layer severity divided
+        by ``P(X > attach)`` (conditional given attach), which leaves the layer
+        aggregate mean ``n' * sev`` equal to the unconditional ``E[N] *
+        E[ceded]``. The ``agg`` row is the column's actual aggregate
+        distribution (FFT of the unconditional layer ceded severity), so its
+        higher moments and ``pr_loss`` are exact.
+
+        **The occurrence ``Ceded`` / ``Net`` columns are unconditional**
+        totals: the same claim count as ``Gross`` and unconditional
+        severities, so ``Ceded`` sev + ``Net`` sev == ``Gross`` sev. Aggregate
+        layer means sum to the ``Ceded`` aggregate mean.
+
+        **The aggregate block leaves ``freq`` and ``sev`` all ``NaN``** -- a
+        cover on the aggregate has no per-claim frequency / severity that
+        combine in the usual way.
+
+        Lazily built; invalidated by the ``reins_bucket`` setter and on
+        ``update``. Returns ``None`` when no reinsurance is configured.
         """
-        if self._reinsurance_audit_df is None:
-            # really should have one of these anyway...
-            if self.agg_density is None:
-                logger.warning('Update Aggregate before asking for density_df')
-                return None
+        if self.occ_reins is None and self.agg_reins is None:
+            return None
+        if self._reins_stats_df is not None:
+            return self._reins_stats_df
 
-            ans = []
-            keys = []
-            if self.occ_reins is not None:
-                ans.append(self._reins_audit_df_work(kind='occ'))
-                keys.append('occ')
-            if self.agg_reins is not None:
-                ans.append(self._reins_audit_df_work(kind='agg'))
-                keys.append('agg')
+        measures = ['ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew']
+        components = ['freq', 'sev', 'agg']
+        meta_rows = ['share', 'limit', 'attach', 'pr_attach', 'pr_detach',
+                     'pr_loss', 'lol', 'output']
+        row_index = pd.MultiIndex.from_tuples(
+            [('meta', m) for m in meta_rows]
+            + [(c, m) for c in components for m in measures],
+            names=['component', 'measure'])
+        nan6 = (np.nan,) * 6
+        rd = self.reins_density_df
+        xs = self.xs
+        n = self.n
+        data = {}
 
-            if len(ans):
-                self._reinsurance_audit_df = pd.concat(ans, keys=keys, names=['kind', 'share', 'limit', 'attach'])
+        def col(share=np.nan, limit=np.nan, attach=np.nan, pr_attach=np.nan,
+                pr_detach=np.nan, pr_loss=np.nan, lol=np.nan, output=0.0,
+                freq6=nan6, sev6=nan6, agg6=nan6):
+            s = pd.Series(np.nan, index=row_index)
+            for mk, mv in zip(meta_rows, (share, limit, attach, pr_attach,
+                                          pr_detach, pr_loss, lol, output)):
+                s[('meta', mk)] = mv
+            for comp, six in zip(components, (freq6, sev6, agg6)):
+                for m, v in zip(measures, six):
+                    s[(comp, m)] = v
+            return s
 
-        return self._reinsurance_audit_df
+        def moments6(raw):
+            """(ex1, ex2, ex3, mean, cv, skew) from raw moments ``raw``."""
+            return (*raw, *MomentAggregator.static_moments_to_mcvsk(*raw))
 
-    def _reins_audit_df_work(self, kind='occ'):
+        def _raw3(density):
+            d = np.asarray(density, dtype=float)
+            return (float(np.sum(xs * d)),
+                    float(np.sum(xs * xs * d)),
+                    float(np.sum(xs * xs * xs * d)))
+
+        def _pr_pos(density):
+            """P(loss > 0) = 1 - mass in the zero bucket."""
+            return float(1.0 - np.asarray(density, dtype=float)[0])
+
+        def _sf(a):
+            try:
+                return float(self.sev.sf(a))
+            except Exception:  # pragma: no cover - exotic severities
+                return np.nan
+
+        def _ge(density, t):
+            """P(loss >= t) from a density, ``NaN`` if ``t`` is not finite.
+            Used for the *aggregate*-level attach/detach probabilities (the
+            modeled aggregate density is exact)."""
+            if not np.isfinite(t):
+                return np.nan
+            return float(np.sum(np.asarray(density, dtype=float)[xs >= t]))
+
+        # Claim-count weights and the ground-up severity survival, used for the
+        # occurrence attach/detach probabilities. The modeled ``sev_density``
+        # is *conditional* (claims to the policy layer, ``n`` the conditional
+        # count), so the unconditional exposure probabilities -- P(a ground-up
+        # claim's subject loss exceeds a threshold) -- come from the underlying
+        # frozen severity ``fz`` with each component's policy attachment as the
+        # offset. The limited ``self.sev.sf`` would report 0 at the policy cap
+        # by definition; the ground-up ``fz`` gives the true detachment prob.
+        en = np.asarray(self.en, dtype=float)
+        ws = (en / en.sum() if en.sum() > 0
+              else np.full(len(self.sevs), 1.0 / max(len(self.sevs), 1)))
+
+        def _gsf(t, inclusive=False):
+            """Weighted P(subject loss > t) (``>= t`` if ``inclusive``).
+
+            ``subject_i = layer(X_i; attach_i, limit_i)``, so subject > t iff
+            the ground-up ``X_i > attach_i + t`` (and t below the cap)."""
+            try:
+                tot = 0.0
+                for i, sev in enumerate(self.sevs):
+                    lim = float(sev.limit)
+                    if t < lim or (inclusive and t <= lim):
+                        tot += ws[i] * float(sev.fz.sf(float(sev.attachment) + t))
+                return float(tot)
+            except Exception:  # pragma: no cover - exotic severities
+                return np.nan
+
+        def _gross_detach():
+            """Weighted P(policy detaches) = P(ground-up >= attach + limit)
+            over finite-limit components; ``NaN`` if every component unlimited."""
+            fin = [i for i, sev in enumerate(self.sevs)
+                   if np.isfinite(float(sev.limit))]
+            if not fin:
+                return np.nan
+            try:
+                return float(sum(
+                    ws[i] * float(self.sevs[i].fz.sf(
+                        float(self.sevs[i].attachment) + float(self.sevs[i].limit)))
+                    for i in fin))
+            except Exception:  # pragma: no cover - exotic severities
+                return np.nan
+
+        def _lol(mean, placed_limit):
+            """Loss on line: expected layer aggregate loss / placed limit."""
+            if placed_limit is None or np.isnan(placed_limit):
+                return np.nan
+            if np.isinf(placed_limit):
+                return 0.0
+            return mean / placed_limit if placed_limit > 0 else np.nan
+
+        def _layer_ceded(ceder, subject):
+            """Rebucketed ceded density: subject mass through one layer."""
+            return self._rebucket_to_grid(
+                np.asarray(ceder(xs), dtype=float),
+                np.asarray(subject, dtype=float))
+
+        # Full gross frequency (count unchanged by reinsurance).
+        f1, f2, f3 = self.frequency.freq_moms(n)
+        freq_full = moments6((f1, f2, f3))
+
+        # Claim-count-weighted gross policy limit / attachment (mixtures);
+        # ``en`` / ``ws`` were set with the ground-up survival helpers above.
+        lim = np.asarray(self.limit, dtype=float)
+        att = np.asarray(self.attachment, dtype=float)
+        if en.sum() > 0:
+            gross_limit = float(np.average(lim, weights=en))
+            gross_attach = float(np.average(att, weights=en))
+        else:  # zero-risk fallback
+            gross_limit = float(np.mean(lim))
+            gross_attach = float(np.mean(att))
+
+        # Which view carries each stage's output=1 flag.
+        occ_out = (REINS_LABEL_NET if self.occ_kind == 'net of'
+                   else REINS_LABEL_CEDED) if self.occ_reins is not None else None
+        agg_out = (REINS_LABEL_NET if self.agg_kind == 'net of'
+                   else REINS_LABEL_CEDED) if self.agg_reins is not None else None
+        # Gross is the aggregate subject (output=1) only when there is an
+        # aggregate program but no occurrence program.
+        gross_output = 1.0 if (self.agg_reins is not None
+                               and self.occ_reins is None) else 0.0
+
+        # ----- gross book (always present) -----
+        p_sev_gross = rd['p_sev_gross'].to_numpy()
+        gross_agg6 = self._reins_density6(rd['p_agg_gross'].to_numpy())
+        data[('occ', REINS_LABEL_GROSS)] = col(
+            share=1.0, limit=gross_limit, attach=gross_attach,
+            # exposure probabilities from the underlying ground-up severity
+            pr_attach=_gsf(0.0),            # P(a ground-up claim hits the policy)
+            pr_detach=_gross_detach(),      # P(it exhausts the policy limit)
+            pr_loss=_pr_pos(rd['p_agg_gross'].to_numpy()),
+            lol=_lol(gross_agg6[3], gross_limit),
+            output=gross_output,
+            freq6=freq_full,
+            sev6=self._reins_density6(p_sev_gross),
+            agg6=gross_agg6)
+
+        # ----- occurrence layering (conditional layers; unconditional totals) -----
+        if self.occ_reins is not None:
+            p_gross = rd['p_sev_gross'].to_numpy()
+            for k, (s, y, a) in enumerate(self.occ_reins, 1):
+                ceder_k, _ = make_ceder_netter([(s, y, a)])
+                ceded_k = _layer_ceded(ceder_k, p_gross)
+                # Conditioning for the layer freq / sev is relative to the
+                # *policy* claims (the modeled count ``n``): P(subject > a |
+                # policy loss) = self.sev.sf(a). The displayed pr_attach /
+                # pr_detach are the absolute ground-up exposure probabilities.
+                pr = _sf(a)
+                u1, u2, u3 = _raw3(ceded_k)              # raw (conditional on policy)
+                if pr and not np.isnan(pr):              # condition on the layer
+                    cond = (u1 / pr, u2 / pr, u3 / pr)
+                else:
+                    cond = (np.nan, np.nan, np.nan)
+                lf = self.frequency.freq_moms(n * pr)    # conditional count n'
+                agg_k, _ = self._fft_aggregate(ceded_k, self.padding)
+                agg6 = self._reins_density6(agg_k)
+                data[('occ', f'layer.{k}')] = col(
+                    share=s, limit=y, attach=a,
+                    pr_attach=_gsf(a),
+                    pr_detach=_gsf(a + y, inclusive=True) if np.isfinite(y) else np.nan,
+                    pr_loss=_pr_pos(agg_k),
+                    lol=_lol(agg6[3], s * y),
+                    freq6=moments6(lf), sev6=moments6(cond), agg6=agg6)
+            placed = float(sum(s * y for (s, y, _a) in self.occ_reins))
+            min_attach = float(min(a for (_s, _y, a) in self.occ_reins))
+            ceded_agg6 = self._reins_density6(rd['p_agg_ceded_occ'].to_numpy())
+            data[('occ', REINS_LABEL_CEDED)] = col(
+                limit=placed, attach=min_attach,
+                pr_attach=_gsf(min_attach),   # P(any ceding) = P(hit lowest layer)
+                pr_loss=_pr_pos(rd['p_agg_ceded_occ'].to_numpy()),
+                lol=_lol(ceded_agg6[3], placed),
+                output=1.0 if occ_out == REINS_LABEL_CEDED else 0.0,
+                freq6=freq_full,
+                sev6=self._reins_density6(rd['p_sev_ceded'].to_numpy()),
+                agg6=ceded_agg6)
+            data[('occ', REINS_LABEL_NET)] = col(
+                pr_attach=_gsf(0.0),          # P(any subject loss retained)
+                pr_loss=_pr_pos(rd['p_agg_net_occ'].to_numpy()),
+                output=1.0 if occ_out == REINS_LABEL_NET else 0.0,
+                freq6=freq_full,
+                sev6=self._reins_density6(rd['p_sev_net'].to_numpy()),
+                agg6=self._reins_density6(rd['p_agg_net_occ'].to_numpy()))
+
+        # ----- aggregate layering (freq/sev left NaN -- they don't combine) -----
+        if self.agg_reins is not None:
+            p_subject = rd['p_agg_subject'].to_numpy()
+            pr_subject = _pr_pos(p_subject)              # P(subject > 0)
+
+            def _pr_agg(a):
+                return float(np.sum(p_subject[xs > a]))
+
+            for k, (s, y, a) in enumerate(self.agg_reins, 1):
+                ceder_k, _ = make_ceder_netter([(s, y, a)])
+                ceded_k = _layer_ceded(ceder_k, p_subject)
+                agg6 = self._reins_density6(ceded_k)
+                data[('agg', f'layer.{k}')] = col(
+                    share=s, limit=y, attach=a, pr_attach=_pr_agg(a),
+                    pr_detach=_ge(p_subject, a + y), pr_loss=_pr_pos(ceded_k),
+                    lol=_lol(agg6[3], s * y), agg6=agg6)
+            placed = float(sum(s * y for (s, y, _a) in self.agg_reins))
+            min_attach = float(min(a for (_s, _y, a) in self.agg_reins))
+            ceded_agg6 = self._reins_density6(rd['p_agg_ceded'].to_numpy())
+            data[('agg', REINS_LABEL_CEDED)] = col(
+                limit=placed, attach=min_attach, pr_attach=pr_subject,
+                pr_loss=_pr_pos(rd['p_agg_ceded'].to_numpy()),
+                lol=_lol(ceded_agg6[3], placed),
+                output=1.0 if agg_out == REINS_LABEL_CEDED else 0.0,
+                agg6=ceded_agg6)
+            data[('agg', REINS_LABEL_NET)] = col(
+                pr_attach=pr_subject,
+                pr_loss=_pr_pos(rd['p_agg_net'].to_numpy()),
+                output=1.0 if agg_out == REINS_LABEL_NET else 0.0,
+                agg6=self._reins_density6(rd['p_agg_net'].to_numpy()))
+
+        ordered = list(data.keys())  # gross, occ block, agg block (insertion)
+        out = pd.DataFrame(data)[ordered]
+        out.columns = pd.MultiIndex.from_tuples(ordered, names=['view', 'layer'])
+        self._reins_stats_df = out
+        return self._reins_stats_df
+
+    # Column layout shared with ``describe`` (see :meth:`_describe`): exact
+    # (``EX``) value, rebucketed (``Est``) value, and ``Change`` for the mean
+    # and CV; skew omits the change column (it is the hardest moment to
+    # estimate). ``EX``/``Est`` here are the reins bases, not theory/empirical.
+    _REINS_DESCRIBE_COLS = ['EX', 'Est EX', 'Change EX',
+                            'CV', 'Est CV', 'Change CV',
+                            'Sk', 'Est Sk']
+
+    @property
+    def reins_describe(self):
+        """Per-stage reinsurance summary -- the daily driver.
+
+        Mirrors the **economic view** of :meth:`describe`: compare the theoretic
+        reference (the leading view -- ``Gross`` for occurrence, ``Subject`` for
+        aggregate) against the model output of each view. One block per
+        applicable stage; each block is a ``view x component`` table sharing the
+        **same eight columns as** :meth:`describe`:
+
+        * ``EX`` / ``Est EX`` / ``Change EX`` -- the **theoretic reference** mean
+          (constant down each component), the per-view model-output mean, and
+          ``(Est - reference) / reference``;
+        * ``CV`` / ``Est CV`` / ``Change CV`` -- the same three for the CV;
+        * ``Sk`` / ``Est Sk`` -- reference and model-output skew (no change
+          column).
+
+        ``Change`` carries two readings off one arithmetic: on the leading
+        (Gross / Subject) row the reference and the model output are the same
+        view, so it is the **numerical validation / rebucketing error** (~0 under
+        ``linear``); on the ceded / net rows it is the **% impact of the
+        cession** on that moment. This is the per-view, per-component analogue of
+        the single ``Change`` column in :meth:`describe`.
+
+        Layout (per the gross/subject convention; ``view`` and ``component``
+        labels are lower-case to match the other frames):
+
+        * **Occurrence block** -- leads with ``gross`` (the reference): rows
+          ``(gross|ceded|net) x (freq|sev|agg)``.
+        * **Aggregate block** -- leads with ``subject`` (the reference): rows
+          ``(subject|ceded|net) x (agg)`` (sev not applicable; freq
+          degenerate -> ``NaN``).
+
+        Frequency is reported on the ``Est`` (model-output) basis
+        *unconditionally* (mean ``E[N]`` only, so ``freq * sev == agg`` within a
+        view; cv / skew ``NaN``) -- consistent with :meth:`reins_stats_df`. The
+        leading ``gross`` row's ``Est`` frequency is left ``NaN`` to mirror
+        :meth:`describe` exactly. (Only the per-layer ``layer.k`` columns of
+        :meth:`reins_stats_df` are *conditional*; ``reins_describe`` is always
+        unconditional.)
+
+        Index is ``MultiIndex (stage, view, component)``. Derived from
+        :meth:`reins_stats_df` / the internal view-stats frame. Returns ``None``
+        when no reinsurance is configured.
         """
-        Apply each re layer separately and aggregate loss and other stats.
+        if self.occ_reins is None and self.agg_reins is None:
+            return None
+        if self._reins_describe is not None:
+            return self._reins_describe
+        blocks = []
+        if self.occ_reins is not None:
+            blocks.append(self._reins_describe_block(
+                'occ', ['gross', 'ceded', 'net'], ['freq', 'sev', 'agg']))
+        if self.agg_reins is not None:
+            blocks.append(self._reins_describe_block(
+                'agg', ['subject', 'ceded', 'net'], ['agg']))
+        self._reins_describe = pd.concat(blocks)
+        return self._reins_describe
 
+    def _reins_describe_block(self, stage, views, comps):
+        """One :meth:`reins_describe` block: theoretic reference vs model output
+        by view x component, mirroring the eight-column :meth:`describe` layout.
+
+        The ``EX`` / ``CV`` / ``Sk`` columns hold the **theoretic reference** --
+        the leading view's exact (pre-bucket) moments: ``Gross`` for the
+        occurrence block, ``Subject`` for the aggregate block. They are therefore
+        constant down each component (the same reference is compared against
+        every view). ``Est *`` is the per-view model output (the rebucketed,
+        model-grid moment). ``Change`` is ``(Est - reference) / reference``: on
+        the leading (Gross/Subject) row it degenerates to the rebucketing /
+        validation error (~0 under ``linear``); on the ceded / net rows it reads
+        as the % impact of the cession on that moment.
         """
-        ans = []
-        assert self.sev_density is not None
-
-        # reins = self.occ_reins if kind == 'occ' else self.agg_reins
-
-        if kind == 'occ':
-            if self.sev_density_gross is None:
-                self.sev_density_gross = self.sev_density
-            reins = self.occ_reins
-            for (s, y, a) in reins:
-                c, n, df = self._apply_reins_work([(s, y, a)], self.sev_density_gross, False)
-                ans.append(df)
-            ans.append(self.occ_reins_df)
-        elif kind == 'agg':
-            if self.agg_density_gross is None:
-                self.agg_density_gross = self.agg_density
-            reins = self.agg_reins
-            for (s, y, a) in reins:
-                c, n, df = self._apply_reins_work([(s, y, a)], self.agg_density_gross, False)
-                ans.append(df)
-            ans.append(self.agg_reins_df)
-
-        # gup here even though it messes up things later becasuse of sort order
-        df = pd.concat(ans, keys=reins + [('all', np.inf, 'gup')], names=['share', 'limit', 'attach', 'loss'])
-        # subset and reindex
-        df = df.filter(regex='^(F|p)')
-        df.columns = df.columns.str.split('_', expand=True)
-        df = df.sort_index(axis=1)
-
-        # summarize
-        def f(bit):
-            # summary function to compute stats
-            xs = bit.index.levels[3]
-            xs2 = xs * xs
-            xs3 = xs2 * xs
-
-            def g(p):
-                ex = np.sum(xs * p)
-                ex2 = np.sum(xs2 * p)
-                ex3 = np.sum(xs3 * p)
-                mw = MomentWrangler()
-                mw.noncentral = (ex, ex2, ex3)
-                return mw.stats
-
-            return bit['p'].apply(g)
-
-        return df.groupby(level=(0, 1, 2)).apply(f).unstack(-1).sort_index(level='attach')
+        rs = self._reins_view_stats
+        ref_view = views[0]  # Gross (occ) / Subject (agg) -- theoretic reference
+        rows = []
+        idx = []
+        for view in views:
+            for comp in comps:
+                def _ref_est(measure):
+                    ref = float(rs.loc[(comp, measure), (stage, ref_view, 'EX')])
+                    est = float(rs.loc[(comp, measure), (stage, view, 'Est')])
+                    return ref, est
+                ref_m, est_m = _ref_est('mean')
+                ref_cv, est_cv = _ref_est('cv')
+                ref_sk, est_sk = _ref_est('skew')
+                rows.append([
+                    ref_m, est_m, float(_noise_aware_rel_error(est_m, ref_m)),
+                    ref_cv, est_cv, float(_noise_aware_rel_error(est_cv, ref_cv)),
+                    ref_sk, est_sk,
+                ])
+                idx.append((stage, view, comp))
+        mi = pd.MultiIndex.from_tuples(idx, names=['stage', 'view', 'component'])
+        df = pd.DataFrame(rows, index=mi, columns=self._REINS_DESCRIBE_COLS)
+        # Snap fp dust to 0 in the value columns (skew of a symmetric view);
+        # the Change columns keep their dust as the rebucketing eyeball.
+        for c in df.columns:
+            if not c.startswith('Change'):
+                df[c] = _snap_noise(df[c])
+        return df
 
     def rescale(self, scale, kind='homog'):
         """
@@ -2217,22 +2750,25 @@ class Aggregate:
         self._pdf = None
         self._sev = None
 
-        # Reinsurance state (set by apply_occ_reins / apply_agg_reins)
+        # Reinsurance state (set by apply_occ_reins / apply_agg_reins).
+        # The exact (EX) reporting path reads the ceder/netter step
+        # functions retained here; the per-stage reins frames
+        # (``reins_density_df``, ``reins_stats_df``, ``reins_describe``)
+        # are rebuilt lazily and cached in the underscore members below.
         self.occ_netter = None
         self.occ_ceder = None
-        self.occ_reins_df = None
         self.agg_netter = None
         self.agg_ceder = None
-        self.agg_reins_df = None
         self.sev_density_ceded = None
         self.sev_density_net = None
         self.sev_density_gross = None
         self.agg_density_ceded = None
         self.agg_density_net = None
         self.agg_density_gross = None
-        self._reinsurance_audit_df = None
-        self._reinsurance_report_df = None
-        self._reinsurance_df = None
+        self._reins_density_df = None
+        self._reins_stats_df = None
+        self._reins_view_stats_cache = None
+        self._reins_describe = None
         # rebucketing scheme for reins net/ceded distributions; set the backing
         # field directly (the setter clears the caches just initialised above)
         self._reins_bucket = reins_bucket if reins_bucket is not None else REINS_BUCKET_DEFAULT
@@ -2884,6 +3420,10 @@ class Aggregate:
         :return:
         """
         self._density_df = None  # invalidate
+        self._reins_density_df = None
+        self._reins_stats_df = None
+        self._reins_view_stats_cache = None
+        self._reins_describe = None
         self._var_tvar_function = None
         self._sev_var_tvar_function = None
         self._valid = None
@@ -3095,7 +3635,7 @@ class Aggregate:
         Single source of truth for the FFT-PGF-iFFT core (Mildenhall 2024,
         §2.2). Used by ``_freq_sev_convolution`` (the main per-update path),
         by ``update_work`` for the subject (gross) aggregate when occ-reins
-        is present, and by ``reinsurance_df`` to compute gross/ceded/net
+        is present, and by ``reins_density_df`` to compute gross/ceded/net
         aggregates from the corresponding severities. The zero-risk and
         fixed-1 shortcuts live here so every caller sees them consistently.
 
@@ -3112,7 +3652,7 @@ class Aggregate:
             Aggregate density on ``self.xs``.
         ftagg_density : np.ndarray
             FT of the aggregate (padded length). Callers that don't need
-            this (e.g. ``reinsurance_df``) discard it.
+            this (e.g. ``reins_density_df``) discard it.
         """
         if self.n == 0:
             out = np.zeros_like(self.xs)
@@ -3498,8 +4038,8 @@ class Aggregate:
         else:
             ceder, netter = ans
         # assemble df for answers
-        reins_df = pd.DataFrame({'loss': self.xs, 'p_subject': base_density,
-                                 'F_subject': base_density.cumsum()}).set_index('loss', drop=False)
+        reins_df = pd.DataFrame(
+            {'loss': self.xs, 'p_subject': base_density}).set_index('loss', drop=False)
         reins_df['loss_net'] = netter(reins_df.loss)
         reins_df['loss_ceded'] = ceder(reins_df.loss)
         # Rebucket the off-grid net/ceded values back onto the uniform model
@@ -3510,11 +4050,11 @@ class Aggregate:
         p_ceded = self._rebucket_to_grid(reins_df['loss_ceded'].to_numpy(), p_subject)
         reins_df['p_net'] = p_net
         reins_df['p_ceded'] = p_ceded
-        reins_df['F_net'] = p_net.cumsum()
-        reins_df['F_ceded'] = p_ceded.cumsum()
-        # restore the historical column order (F_* before p_*)
-        reins_df = reins_df[['loss', 'p_subject', 'F_subject', 'loss_net',
-                             'loss_ceded', 'F_net', 'F_ceded', 'p_net', 'p_ceded']]
+        # F_* columns were vestigial from the old interp1d-of-CDF algorithm;
+        # the scatter computes p_net / p_ceded directly. The debug CDF panel
+        # below cumsums inline.
+        reins_df = reins_df[['loss', 'p_subject', 'loss_net',
+                             'loss_ceded', 'p_net', 'p_ceded']]
 
         if debug is False:
             return ceder, netter, reins_df
@@ -3547,7 +4087,9 @@ class Aggregate:
                title=f'Subject and net\nMax net loss {n[-1]:,.1f}')
 
         ax = axd['C']
-        reins_df.filter(regex='F').plot(xlim=xlim, ax=ax)
+        cdf = reins_df[['p_subject', 'p_net', 'p_ceded']].cumsum()
+        cdf.columns = ['F_subject', 'F_net', 'F_ceded']
+        cdf.plot(xlim=xlim, ax=ax)
         ax.set(title=f'Subject, net and ceded\ndistributions')
         ax.legend()
 
@@ -3574,13 +4116,14 @@ class Aggregate:
             return
         logger.info('running apply_occ_reins')
         occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
-        # store stuff
+        # Retain the ceder/netter step functions for the exact (EX) reporting
+        # path; the rebucketed densities go straight onto the gcn members and
+        # into ``reins_density_df`` (no persistent per-stage frame).
         self.occ_ceder = occ_ceder
         self.occ_netter = occ_netter
-        self.occ_reins_df = occ_reins_df
         self.sev_density_gross = self.sev_density
-        self.sev_density_net = occ_reins_df['p_net']
-        self.sev_density_ceded = occ_reins_df['p_ceded']
+        self.sev_density_net = occ_reins_df['p_net'].to_numpy()
+        self.sev_density_ceded = occ_reins_df['p_ceded'].to_numpy()
         if self.occ_kind == 'ceded to':
             self.sev_density = self.sev_density_ceded
         elif self.occ_kind == 'net of':
@@ -3610,13 +4153,13 @@ class Aggregate:
         logger.info('Applying aggregate reinsurance for %s', self.name)
 
         agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-        # store stuff
+        # Retain the ceder/netter for the exact (EX) reporting path; the
+        # rebucketed densities go onto the gcn members / ``reins_density_df``.
         self.agg_ceder = agg_ceder
         self.agg_netter = agg_netter
-        self.agg_reins_df = agg_reins_df
         self.agg_density_gross = self.agg_density
-        self.agg_density_net = agg_reins_df['p_net']
-        self.agg_density_ceded = agg_reins_df['p_ceded']
+        self.agg_density_net = agg_reins_df['p_net'].to_numpy()
+        self.agg_density_ceded = agg_reins_df['p_ceded'].to_numpy()
         if self.agg_kind == 'ceded to':
             self.agg_density = self.agg_density_ceded
         elif self.agg_kind == 'net of':
@@ -3968,20 +4511,19 @@ class Aggregate:
           ``EX | Est EX | Err EX | CV | Est CV | Err CV | Sk | Est Sk``.
           ``Err`` is the noise-aware relative error of empirical vs
           theoretical.
-        * **With reinsurance** -- economic view (Subject is the
-          reinsurance term for the book a treaty applies to). Columns
-          become ``Subject EX | <label> EX | Change EX | Subject CV |
-          <label> CV | Change CV | Subject Sk | <label> Sk``, where
-          ``<label>`` is ``Net`` / ``Ceded`` / ``After`` depending on
-          how the cession is composed. ``Change = (after - subject) /
-          subject`` -- arithmetically the same column as ``Err`` (so the
-          eyeball degenerates cleanly to the validation view when reins
-          is absent), but now read as the % change driven by the
-          cession.
+        * **With reinsurance** -- economic view. Columns become ``Gross EX
+          | <label> EX | Change EX | Gross CV | <label> CV | Change CV |
+          Gross Sk | <label> Sk``, where ``Gross`` is the theoretical
+          before any cover and ``<label>`` is the model output -- ``Net``
+          (all covers net of), ``Ceded`` (all ceded to), or ``Output``
+          (mixed, occ and agg passing different kinds). ``Change = (output
+          - gross) / gross`` -- arithmetically the same column as ``Err``
+          (so the eyeball degenerates cleanly to the validation view when
+          reins is absent), but now read as the % change driven by the
+          cession. Labels are the ``REINS_LABEL_*`` constants.
 
         Sources from the canonical ``self.stats_df``: ``mixed`` for
-        Subject, ``empirical`` for the realised (after-reinsurance)
-        view.
+        Gross, ``empirical`` for the realised (model-output) view.
         """
         return self._describe()
 
@@ -3993,7 +4535,7 @@ class Aggregate:
         force_reins_label : str or None
             When ``None`` (the default, used by the ``describe`` property)
             the column format is chosen from this unit's own reinsurance:
-            the economic Subject/Net/Ceded/After view if a treaty is
+            the economic Gross/Net/Ceded/Output view if a treaty is
             present, else the plain theory/empirical validation view.
 
             When a non-``None`` label is supplied, the economic view is
@@ -4043,12 +4585,14 @@ class Aggregate:
                 'Sk', f'{mid_label} Sk',
             ]
             df = df[ordered]
-        # Subject-column label: under reinsurance the gross theoretical is
-        # the "Subject" view; without reins keep the legacy ``EX``/``CV``/
-        # ``Sk`` headings (no rename necessary).
+        # First-column label: under reinsurance the theoretical is the
+        # ``Gross`` view (top of step 1, before any cover); without reins keep
+        # the legacy ``EX``/``CV``/``Sk`` headings (no rename necessary).
         if rlabel:
             df = df.rename(columns={
-                'EX': 'Subject EX', 'CV': 'Subject CV', 'Sk': 'Subject Sk'})
+                'EX': f'{REINS_LABEL_GROSS} EX',
+                'CV': f'{REINS_LABEL_GROSS} CV',
+                'Sk': f'{REINS_LABEL_GROSS} Sk'})
         # snap floating-point dust to 0 in moment-value columns for
         # display (e.g. the skew of a symmetric severity); NaN preserved.
         # Change/Err columns retain their numeric dust (they are the
@@ -4060,12 +4604,12 @@ class Aggregate:
         return df
 
     def _reins_after_label(self):
-        """Heading for the after-reins column in ``describe``.
+        """Heading for the model-output column in ``describe``.
 
         ``Net`` when every cession passes the net; ``Ceded`` when every
-        cession passes the ceded; ``After`` when occ and agg pass
-        different kinds (e.g. ``net of occ then ceded to agg``). Returns
-        ``None`` when no reinsurance is configured (legacy
+        cession passes the ceded; ``Output`` when occ and agg pass
+        different kinds (e.g. ``net of occ then ceded to agg`` -- a mixed
+        output). Returns ``None`` when no reinsurance is configured (legacy
         validation-view headings apply).
         """
         kinds = []
@@ -4077,10 +4621,10 @@ class Aggregate:
             return None
         uniq = set(kinds)
         if uniq == {'net of'}:
-            return 'Net'
+            return REINS_LABEL_NET
         if uniq == {'ceded to'}:
-            return 'Ceded'
-        return 'After'
+            return REINS_LABEL_CEDED
+        return REINS_LABEL_OUTPUT
 
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
         """

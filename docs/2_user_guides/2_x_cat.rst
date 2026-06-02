@@ -465,10 +465,10 @@ The next plot compares the gross severity and aggregate distributions.
 
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True); \
     ax0, ax1 = axs.flat
-    base.reinsurance_df['p_sev_gross'].cumsum().plot(xlim=[0, 2500], ax=ax0, label='Base'); \
-    sec.reinsurance_df['p_sev_gross'].cumsum().plot(xlim=[0, 2500], ax=ax0, label='Secondary'); \
-    base.reinsurance_df['p_agg_gross_occ'].cumsum().plot(xlim=[0, 2500], ax=ax1, label='Base'); \
-    sec.reinsurance_df['p_agg_gross_occ'].cumsum().plot(xlim=[0, 2500], ax=ax1, label='Secondary'); \
+    base.reins_density_df['p_sev_gross'].cumsum().plot(xlim=[0, 2500], ax=ax0, label='Base'); \
+    sec.reins_density_df['p_sev_gross'].cumsum().plot(xlim=[0, 2500], ax=ax0, label='Secondary'); \
+    base.reins_density_df['p_agg_gross'].cumsum().plot(xlim=[0, 2500], ax=ax1, label='Base'); \
+    sec.reins_density_df['p_agg_gross'].cumsum().plot(xlim=[0, 2500], ax=ax1, label='Secondary'); \
     ax0.set(title='Occurrence', xlabel='Loss', ylabel='Distribution'); \
     ax1.set(title='Aggregate', xlabel='Loss', ylabel='Distribution'); \
     ax0.legend();

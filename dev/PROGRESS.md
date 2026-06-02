@@ -6,9 +6,11 @@
 > release notes in `README.rst`. This file is the resume point if the
 > conversation context is lost.
 >
-> **Last updated: 2026-05-30** — v1.0 core-compute refactor closed at
-> meta.8. **Ground truth for code state is `git log`, not this file.**
-> Run `git log --oneline -30` when resuming to see what landed.
+> **Last updated: 2026-06-01** — v1.0 core-compute refactor closed at
+> meta.8 (2026-05-30); two reinsurance cycles landed since
+> (`reins-buckets` 1.0.0a18, `reins-reporting` 1.0.0a19). Current
+> version **1.0.0a19**. **Ground truth for code state is `git log`, not
+> this file.** Run `git log --oneline -30` when resuming to see what landed.
 
 ---
 
@@ -46,6 +48,26 @@ four new `J.Re18a..d` corpus lines (× parse + snapshot = 8 tests).
 
 ---
 
+## Post-refactor cycles
+
+Standalone reinsurance work after the core-compute refactor. Each is its
+own `a*` bump with a plan now in `dev/done/`.
+
+| Cycle | Ver | Date | Headline |
+|---|---|---|---|
+| reins-buckets | 1.0.0a18 | 2026-05-31 | `Aggregate.reins_bucket` switch (`'linear'` default / `'nearest'`); `_apply_reins_work` rebucket core rewritten as a vectorized `np.add.at` scatter (`_rebucket_to_grid`), replacing the old groupby→interp1d-CDF→diff scheme; `make_ceder_netter` hard-errors on out-of-order/overlapping layers (`_validate_reins_layers`); `Re.Both` baseline regenerated; `tests/test_reins_buckets.py`; DecL `ReBucket` |
+| reins-reporting | 1.0.0a19 | 2026-06-01 | Rationalized reinsurance reporting (Aggregate + Portfolio). `reinsurance_df` → `reins_density_df` (consistent columns; `p_agg_gross_occ→p_agg_gross`, old `p_agg_gross→p_agg_subject`); new **per-layer** `reins_stats_df` (cols `(view, layer)`, `view`∈`occ|agg` = `Gross`/per-layer `layer.k`/`Ceded`/`Net`; **occ layers conditional** — freq `n·P(>attach)`, sev ÷ P(attach), agg = layer FFT, so layer agg means sum to `Ceded`; `Ceded`/`Net` unconditional with `Ceded`+`Net` sev = `Gross`; agg block leaves freq/sev NaN; meta rows `share/limit/attach/pr_attach/pr_detach/pr_loss/lol/output` — Gross = cc-weighted policy terms, occ Ceded = placed-sum limit/min attach, `lol`=loss-on-line, `output` 0/1 marks each stage's output and replaces a separate agg `Subject` column); `reins_describe` (per-stage, same 8 cols as `describe`, fed by internal EX/Est `_reins_view_stats`); new Portfolio trio (end-to-end gcn via independent-FFT convolution). Reins labels centralised as `REINS_LABEL_*`; `describe` reins view leads **Gross** (was Subject), output col **Net/Ceded/Output** (mixed; was After); occ-before-agg + gross/ceded/net ordering canonical. Removed `reinsurance_audit_df`/`reinsurance_report_df`/`reinsurance_occ_layer_df`, the `occ_reins_df`/`agg_reins_df` members, `_reins_audit_df_work`, and the `F_*` engine columns. `tests/test_reins_reporting.py` (30); DecL section Y; `Re.Both` describe baseline regenerated (Gross/Output relabel) |
+
+743 pytest pass at reins-reporting close (701 → 743: reins-buckets +
+`test_reins_reporting.py` (30) + the meta/label/per-layer punch-ups). The new
+per-layer `reins_stats_df` (a `Gross | layer.k | Ceded | Net` layering frame,
+occ layers conditional) supersedes the removed `reinsurance_audit_df` /
+`reinsurance_occ_layer_df`, so the `docs/.../problems/*.rst` case studies left
+as migration notes (bahnemann ILF table, ERA/other_misc layer exhibits) can be
+rebuilt against it directly (still needs a docs build to verify — TODO 10b).
+
+---
+
 ## Working files (all in `dev/`)
 
 | File | Role |
@@ -54,11 +76,16 @@ four new `J.Re18a..d` corpus lines (× parse + snapshot = 8 tests).
 | `TODO-Remember.md` | What's pending: parked enhancements, docs/packaging, deep dives |
 | `pipeline-aggregate.rst` | Aggregate current-state description (was the read-end input to the plans; keep as the algorithmic reference) |
 | `pipeline-portfolio.rst` | Portfolio current-state description (same role) |
+| `pipeline-reinsurance.rst` | Reinsurance reporting surface, object-by-object; Part B marked implemented at a19 |
+| `reins-bivariate.md` | Open plan — bivariate/joint reinsurance (not yet started) |
+| `tail-thickness.md` | Open plan — tail-thickness classifier (`tail.py`); not yet started |
 | `tentative-plan-decl-colorization.md` | Parked — IPython tracebacks don't call `_repr_html_` (see TODO-Remember) |
 | `done/plan-meta.md` | The cross-module sequencing — every step done |
 | `done/plan-aggregate-refactor.md` | Aggregate decisions (D1–D18) + work items |
 | `done/plan-portfolio-refactor.md` | Portfolio decisions (D1–D17) + work items |
 | `done/plan-baseline-harness.md` | Before/after harness + DecL corpus |
+| `done/reins-buckets.md` | Reins rebucketing switch + layer validation (1.0.0a18) |
+| `done/reins-reporting.md` | Rationalized reins reporting, Aggregate + Portfolio (1.0.0a19) |
 | `done/plan-A-aggregate-style.md` etc. | Earlier completed plans (pre-meta) |
 
 Convention reminder: when a plan is finished, move it to `dev/done/`.

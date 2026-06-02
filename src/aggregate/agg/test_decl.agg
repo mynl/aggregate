@@ -153,3 +153,28 @@ dist W.tph       ph   0.7
 # agg X.Typo02 100 claims sev lognorm 100 cv 2 + +                  note{stray punctuation; UnexpectedToken}
 # agg X.Typo03 100 claims sev lognorm                               note{truncated; UnexpectedEOF}
 # agg X.Typo04 100 claims sev lognorm 100 cv 2 ?                    note{unknown character; no suggestions}
+
+
+# Y. Reinsurance reporting regressions
+# ====================================
+# Drive the rationalized reins reporting surface (1.0.0a19): the consistent-
+# column reins_density_df, the per-stage/per-view/per-basis reins_stats_df
+# (EX exact vs Est rebucketed), and the per-stage reins_describe (occurrence
+# leads Gross, aggregate leads Subject). See tests/test_reins_reporting.py and
+# dev/reins-reporting.md.
+#
+# Structural cases (consistent columns, mass, describe shape) on lognormal
+# books -- one per stage combination.
+agg RR.Occ  10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                       note{occurrence only; off-grid excess attach}
+agg RR.Agg  10 claims sev lognorm 100 cv 2 poisson aggregate net of 500 xs 750                                note{aggregate only}
+agg RR.Both 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate}
+# Bounded severities for the EX-vs-Est numeric checks: a bounded aggregate has
+# a negligible FFT deficit, so linear preserves the rebucketed mean exactly and
+# nearest stays within bs/2. Fractional-share off-grid cessions exercise the
+# rebucketing scatter.
+agg RR.OccB 10 claims sev 500 * beta 2 3 occurrence net of 0.8 so 150 xs 100 poisson                          note{bounded; off-grid occ cession}
+agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 so 300 xs 400                           note{bounded; off-grid agg cession}
+# Portfolio end-to-end gcn: a ceding port (occ on A, agg on B, gross C) and a
+# gross-only control (reins objects return None).
+port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson
+port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson

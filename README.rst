@@ -28,6 +28,91 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a19
+---------
+
+Rationalized reinsurance reporting (Aggregate + Portfolio)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Three new reinsurance objects on ``Aggregate`` replace the old fragmented
+  surface:
+
+  - ``reins_density_df`` — per-bucket gross/ceded/net densities with
+    **consistent columns** regardless of which stages are configured (a
+    missing stage contributes the no-cession values). Renamed from the legacy
+    ``reinsurance_df``: ``p_agg_gross_occ → p_agg_gross`` (the true gross
+    aggregate) and the old ``p_agg_gross`` → ``p_agg_subject`` (the
+    aggregate-cover input).
+  - ``reins_stats_df`` — a per-layer layering summary (empirical, model-grid).
+    Columns ``(view, layer)`` with ``view`` ∈ ``occ|agg``: ``Gross`` (always),
+    then per occurrence ``layer.1`` … and the ``Ceded`` / ``Net`` totals, then
+    the aggregate layers and their ``Ceded`` / ``Net`` (no ``Subject`` column —
+    it is the column flagged ``output`` below). **Occurrence layers are
+    conditional** on reaching the layer: frequency is the penetrating count
+    ``n·P(X>attach)`` and severity is the unconditional layer severity divided
+    by ``P(X>attach)`` (so the layer aggregate mean is unchanged and aggregate
+    layer means sum to ``Ceded``); the ``agg`` row is the layer's actual FFT
+    aggregate. ``Ceded`` / ``Net`` totals are unconditional (``Ceded`` sev +
+    ``Net`` sev = ``Gross`` sev). The aggregate block leaves ``freq`` / ``sev``
+    NaN (they don't combine). Meta rows: ``share`` / ``limit`` / ``attach``
+    (``Gross`` = claim-count-weighted policy terms, share 1; occ ``Ceded`` =
+    share-placed sum of limits, min attachment), ``pr_attach`` / ``pr_detach``
+    (ground-up exposure probabilities that the underlying loss attaches /
+    exhausts the view — from the underlying severity ``fz``, since the modeled
+    severity is conditional and reads 0 at the policy cap), ``pr_loss``
+    (P aggregate > 0), ``lol`` (loss on line = layer agg mean / placed limit),
+    and ``output`` (0/1, marks each stage's output view). Plus
+    ``(freq|sev|agg, ex1|ex2|ex3|mean|cv|skew)`` (``ex1`` duplicates ``mean``
+    for ``filter(regex=...)``).
+  - ``reins_describe`` — the daily-driver per-stage summary, sharing the same
+    **eight columns as** ``describe`` (``EX | Est EX | Change EX | CV | Est CV
+    | Change CV | Sk | Est Sk``) and mirroring its **economic view**: ``EX`` /
+    ``CV`` / ``Sk`` hold the *theoretic reference* — the leading view's exact
+    pre-bucket moments (``Gross`` for the occurrence block, ``Subject`` for the
+    aggregate block) — held constant down each component; ``Est *`` is the
+    per-view model output; and ``Change = (Est − reference) / reference`` reads
+    two ways off one arithmetic: on the leading (Gross/Subject) row it is the
+    numerical validation / rebucketing error (~0 under ``linear``), and on the
+    ceded / net rows it is the % impact of the cession on that moment. Follows
+    the gross/subject convention — the occurrence block leads with **Gross**,
+    the aggregate block leads with **Subject**. Frequency is reported
+    *unconditionally* on the ``Est`` basis (mean ``E[N]`` only, so ``freq × sev
+    == agg`` per view; cv / skew ``NaN``) — consistent with ``reins_stats_df``,
+    whose conditional basis is confined to the per-layer ``layer.k`` columns; the
+    leading ``gross`` row's ``Est`` frequency is left ``NaN`` to mirror
+    ``describe``. The ``view`` / ``component`` index labels are lower-case to
+    match the other frames.
+
+- New **Portfolio** reinsurance reporting (previously absent):
+  ``reins_density_df`` / ``reins_stats_df`` / ``reins_describe`` give the
+  end-to-end gross/ceded/net of the portfolio aggregate, convolving the
+  per-unit gcn aggregate marginals under the existing independent-FFT
+  machinery (means add: portfolio total = sum of unit means per view). All
+  three return ``None`` when no unit cedes.
+
+- Removed the redundant/confusing legacy objects: ``reinsurance_df`` (renamed),
+  ``reinsurance_audit_df``, ``reinsurance_report_df``,
+  ``reinsurance_occ_layer_df``, the persistent ``occ_reins_df`` /
+  ``agg_reins_df`` members, and the per-layer ``_reins_audit_df_work`` engine.
+  The vestigial ``F_*`` (CDF) columns are dropped from the per-stage engine
+  frame (the debug plot cumsums inline). ``reinsurance_occ_plot`` now reads
+  from ``reins_density_df``; the ``occ_ceder`` / ``occ_netter`` /
+  ``agg_ceder`` / ``agg_netter`` step functions are retained for the exact
+  (EX) path.
+
+- Reinsurance reporting **labels are centralised constants** in
+  ``constants.py`` (``REINS_LABEL_GROSS`` / ``SUBJECT`` / ``NET`` / ``CEDED`` /
+  ``OUTPUT``). ``describe``'s reinsurance view now leads with **Gross** (was
+  "Subject") and labels the model-output column **Net** / **Ceded** / **Output**
+  (the last for a mixed program, e.g. occ net of + agg ceded to — replacing the
+  old "After"). The occurrence/aggregate ordering and the gross/ceded/net view
+  order are canonical throughout (no longer alphabetical).
+
+- New ``tests/test_reins_reporting.py``; DecL cases added to ``test_decl.agg``
+  (section Y). Docs (``2_x_re_pricing.rst``, ``2_x_cat.rst``) rewritten to the
+  new API — pending a manual docs rebuild. ``Re.Both`` describe baseline
+  regenerated for the Gross/Output relabel.
+
 1.0.0a18
 ---------
 

@@ -326,6 +326,19 @@ Text and plot helpers (unchanged by the plan)
 Part B — mapping to the proposed surface
 ******************************************************
 
+.. note::
+
+   **Implemented in 1.0.0a19.** The surface below is live. Two clarifications
+   from the build: (1) ``reins_describe`` cells are the **mean** loss on the
+   ``EX | Est | Change`` bases — the full ``(ex1, ex2, ex3, mean, cv, skew)``
+   detail lives in ``reins_stats_df``. (2) ``EX`` is the literal pre-bucket
+   image moment (``sum g(xs)^j · p_subject``) with **no** defective-mass tail
+   term, so ``Change ≈ 0`` under ``'linear'`` holds tightly on the
+   *directly-rebucketed* targets — occurrence **severity** rows and **all
+   aggregate-stage** rows — while the occurrence **aggregate** row also carries
+   the FFT grid deficit (it is the compound of the exact severity, not a direct
+   rebucket). See ``tests/test_reins_reporting.py``.
+
 ``reins-reporting.md`` (target 1.0.0a19) collapses the redundant surface into
 **three** coherent objects, defined at the ``Aggregate`` level and combined at
 the ``Portfolio`` level (all new there). The author's inventory → fate:

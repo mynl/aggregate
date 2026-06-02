@@ -90,27 +90,24 @@ Requesting ``net of`` propagates losses net of the cover through to the aggregat
 
 ``[1:6]`` is shorthand for ``[1,2,3,4,5,6]``. The net severity equals 3 = (1 + 2 + 3 + 4 + 4 + 4) / 6.
 
-The ``reinsurance_audit_df`` dataframe shows unconditional (per ground up claim) severity statistics by layer. Multiply by the claim count ``a02.n`` to get layer loss picks. The severity, ``ex``, equals (1 + 2) / 6 = 0.5 (first block). The expected loss to the layer equals 0.5 * 3.5 = 1.75 (second block).
+The ``reins_describe`` dataframe shows mean loss by gross/ceded/net view for
+frequency, severity, and aggregate. The ceded severity ``Sev`` mean equals
+(0 + 0 + 0 + 0 + 1 + 2) / 6 = 0.5 (the 1 xs 4 and 1 xs 5 layers cede 1 at a
+roll of 5 and 2 at a roll of 6), and the ceded aggregate ``Agg`` mean — the
+expected loss to the cover — equals 0.5 × 3.5 = 1.75. The whole-structure view
+combines both layers; for a per-layer breakdown build each layer as its own
+aggregate and read its ``reins_describe``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a02.reinsurance_audit_df['ceded'])
-    qd(a02.reinsurance_audit_df['ceded'], sparsify=False)
-    qd(a02.reinsurance_audit_df['ceded'][['ex']] * a02.n)
-
-The ``reinsurance_occ_layer_df`` shows conditional layer expected loss and CV of loss, along with expected counts by layer and layer severity. The expected count to 1 xs 4 equals 3.5 / 3, because there is a 1/3 chance the layer attaches.
-
-.. ipython:: python
-    :okwarning:
-
-    qd(a02.reinsurance_occ_layer_df, sparsify=False)
+    qd(a02.reins_describe)
 
 An **aggregate excess of loss** reinsurance layer, 12 xs 24, is specified after the frequency clause (you need to know frequency)::
 
     aggregate ceded to 12 xs 34.
 
-Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.Re:01`` by name as a shorthand. ``reinsurance_audit_df`` reports expected loss to the aggregate layer. The layer is shown in two parts to illustrate reporting.
+Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.Re:01`` by name as a shorthand. ``reins_describe`` reports expected loss to the aggregate cover (the aggregate block, leading with Subject).
 
 .. ipython:: python
     :okwarning:
@@ -120,7 +117,7 @@ Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Re
     a03.plot()
     @savefig DD_12x24a.png
     qd(a03)
-    qd(a03.reinsurance_audit_df.stack(0))
+    qd(a03.reins_describe)
 
 Occurrence and aggregate programs can both be applied. The ``ceded to`` and ``net of`` clauses can be mixed. You cannot refer to ``agg.Re:01`` by name because you need to see into the object to apply the occurrence reinsurance.
 
@@ -133,7 +130,7 @@ Occurrence and aggregate programs can both be applied. The ``ceded to`` and ``ne
     @savefig DD_nn.png
     a04.plot()
     qd(a04)
-    qd(a04.reinsurance_audit_df['ceded'])
+    qd(a04.reins_describe)
 
 Layers can be specified as a **share of**  or **part of** to account for coinsurance (partial placement) of the layer:
 
@@ -157,7 +154,7 @@ These concepts are illustrated in the next example. Note the bucket size.
     @savefig DD_nn2.png
     a05.plot()
     qd(a05)
-    qd(a05.reinsurance_audit_df['ceded'])
+    qd(a05.reins_describe)
 
 A **tower** of limits can be specified by giving the attachment points of each layer. The shorthand::
 
@@ -168,7 +165,7 @@ is equivalent to::
     occurrence ceded to 1 xs 0 and 1 xs 1 and 3 xs 2 \
     and 5 xs 5 and 10 xs 10 and 16 xs 20
 
-Here is a summary of these examples. The audit dataframe gives a layering of aggregate losses. The plot is omitted; it is identical to gross since the tower covers all losses.
+Here is a summary of these examples. ``reins_describe`` gives the whole-structure ceded aggregate loss. The plot is omitted; it is identical to gross since the tower covers all losses.
 
 .. ipython:: python
     :okwarning:
@@ -178,7 +175,7 @@ Here is a summary of these examples. The audit dataframe gives a layering of agg
                 'aggregate ceded to tower [0 1 2 5 10 20 36]')
     a06.plot()
     qd(a06)
-    qd(a06.reinsurance_audit_df['ceded'], sparsify=False)
+    qd(a06.reins_describe)
 
 See :ref:`re functions` for more about the reinsurance functions.
 
@@ -204,10 +201,19 @@ This section demonstrates :class:`Aggregate` methods and properties for reinsura
 * :meth:`reinsurance_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
 * :meth:`reinsurance_description` a text description of the layers and shares, by kind.
 * :meth:`reinsurance_occ_plot` plots subject (usually gross), ceded, and net severity, and aggregates created from each. Does not consider aggregate reinsurance.
-* ``reinsurance_audit_df`` dataframe summary by ceded, net, and subject, showing mean, CV, SD, and skewness of occurrence loss by layer and in total by kind.
-* ``reinsurance_occ_layer_df`` dataframe showing an expected loss layering analysis for occurrence reinsurance.
-* ``reinsurance_df`` dataframe showing all possible densities.
-* ``reinsurance_report_df`` dataframe showing mean, CV, skew, and SD statistics for each column in ``reinsurance_df``.
+* ``reins_density_df`` dataframe of all gross/ceded/net densities, with **consistent columns** regardless of which stages are present: severity (``p_sev_gross``, ``p_sev_ceded``, ``p_sev_net``), the aggregate of each occurrence severity view (``p_agg_gross`` is the true gross aggregate, plus ``p_agg_ceded_occ``, ``p_agg_net_occ``), and the aggregate-cover views (``p_agg_subject`` is the input to the aggregate cover, plus ``p_agg_ceded``, ``p_agg_net``).
+* ``reins_stats_df`` dataframe of per-stage moments. Columns are ``(stage, view, basis)`` with ``stage`` occurrence and/or aggregate, occurrence views gross/ceded/net, aggregate views subject/ceded/net, and ``basis`` either ``EX`` (exact, pre-bucket image moment) or ``Est`` (rebucketed, model-grid). The EX vs Est difference isolates the :attr:`reins_bucket` rebucketing error.
+* ``reins_describe`` the daily-driver per-stage loss summary: one block per stage of mean loss by view × component on ``EX | Est | Change`` bases. Following the gross/subject convention, the occurrence block leads with **Gross** and the aggregate block leads with **Subject**.
+
+.. note::
+
+    Earlier versions exposed a by-layer breakdown (``reinsurance_audit_df``,
+    ``reinsurance_occ_layer_df``) and the ``reinsurance_df`` /
+    ``reinsurance_report_df`` pair. These are replaced by the three
+    whole-structure objects above (``reinsurance_df`` was renamed
+    ``reins_density_df``, with ``p_agg_gross`` → ``p_agg_gross`` and the
+    old ``p_agg_gross`` → ``p_agg_subject``). For a by-layer analysis, build
+    each layer as its own aggregate and read its ``reins_describe``.
 
 
 These are illustrated using the a more realistic example that includes occurrence and aggregate reinsurance. Notice that the occurrence program just layers gross (subject) losses. Gross losses are then passed through to the aggregate program. This is done to illustrate the functions below. In a real-world application is is likely the bottom few occurrence layers would be dropped and you would pass the net of through to the aggregate.
@@ -237,34 +243,41 @@ These are illustrated using the a more realistic example that includes occurrenc
     @savefig reins_oa.png scale=20
     a.reinsurance_occ_plot()
 
-The ``reinsurance_audit_df`` dataframe shows unconditional layer severity that "adds-up" to the total layer severity; compare to the total with the severity statistics in description above. These only match when the reinsurance layers exhaust the ground-up limit.
+The ``reins_describe`` dataframe is the per-stage loss summary. The occurrence
+block leads with **Gross** and shows the gross/ceded/net mean loss for each of
+frequency, severity, and aggregate; the aggregate block leads with **Subject**
+(the aggregate input to the cover) and shows the subject/ceded/net aggregate
+mean. Here the occurrence tower exhausts the ground-up limit, so ceded severity
+equals gross and net is zero. ``EX`` is the exact pre-bucket value, ``Est`` the
+rebucketed (model-grid) value, and ``Change`` their relative difference.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.reinsurance_audit_df, sparsify=False)
+    qd(a.reins_describe)
 
-
-The ``reinsurance_occ_layer_df`` dataframe shows unconditional aggregate statistics. The blocks ``ex`` and ``cv`` show values from  ``audit_df`` times expected claim counts; ``en`` shows claim counts by layer. ``severity`` shows the implied conditional layer severity, equal to expected loss from ``audit_df`` divided by the probability of attaching the layer.
-
-.. ipython:: python
-    :okwarning:
-
-    qd(a.reinsurance_occ_layer_df, sparsify=False)
-
-The ``reinsurance_df`` density dataframe shows subject, ceded, and net occurrence (severity); aggregates created from each (without aggregate reinsurance); and subject, ceded, and net of requested aggregate reinsurance.
+The ``reins_stats_df`` dataframe carries the full per-stage moments behind
+``reins_describe`` — every ``(stage, view, basis)`` column with the six
+``(ex1, ex2, ex3, mean, cv, skew)`` rows for frequency, severity, and
+aggregate. Slice it to inspect a single basis or measure.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.reinsurance_df, max_rows=20)
+    qd(a.reins_stats_df.xs('mean', level='measure'))
 
-The ``reinsurance_report_df`` shows statistics for the densities in ``reinsurance_df``. The ``p_agg_gross`` column matches the theoretical (gross) output shown in ``qd(a)`` at the top and the ``p_agg_ceded`` column matches the estimated output because the aggregate program requested ``ceded to`` output. The net column is the difference.
+The ``reins_density_df`` density dataframe shows subject, ceded, and net
+occurrence (severity); aggregates created from each (without aggregate
+reinsurance); and subject, ceded, and net of the requested aggregate
+reinsurance. Columns are always present (a missing stage contributes the
+no-cession values). The ``p_agg_gross`` column matches the theoretical (gross)
+output shown in ``qd(a)`` at the top, and ``p_agg_ceded`` matches the estimated
+output because the aggregate program requested ``ceded to``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a.reinsurance_report_df)
+    qd(a.reins_density_df, max_rows=20)
 
 
 
@@ -308,12 +321,12 @@ There are special options in ``build`` because the claim count is high: 292.7. R
 
 shows aliasing, i.e., there is not enough space in the answer. Adjust by increasing ``log2`` from 16 to 18 and leaving ``bs=1/2``.
 
-The dataframe ``reinsurance_occ_layer_df`` shows layer expected loss, CV, counts, and conditional severity. The last column shows the percent of subject ceded to each layer.
+The ``reins_describe`` dataframe shows the whole-structure ceded loss for the tower. The per-layer layering (layer expected loss, CV, counts, conditional severity) that earlier versions reported via ``reinsurance_occ_layer_df`` is obtained by building each tower layer as its own occurrence cover and reading its ``reins_describe``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a07.reinsurance_occ_layer_df, sparsify=False)
+    qd(a07.reins_describe)
 
 
 .. _re property exposure:
@@ -431,12 +444,12 @@ The shared mixing increases the frequency and aggregate CV and skewness.
          ('agg', 'cv'), ('agg', 'skew')],
         ['independent', 'mixed']])
 
-Look at ``reinsurance_occ_layer_df`` to summarize the analysis.
+Look at ``reins_describe`` to summarize the analysis (whole-structure ceded; build per-layer covers for a per-layer layering).
 
 .. ipython:: python
     :okwarning:
 
-    qd(a08.reinsurance_occ_layer_df, sparsify=False)
+    qd(a08.reins_describe)
 
 Add plots of gross, ceded, and net severity with the placed program, 4000 xs 1000 and 5000 xs 5000. (The net is zero with the ``tower`` clause, so we have to recompute.) The left and right plots differ only in the x-axis scale.
 
@@ -452,7 +465,7 @@ Add plots of gross, ceded, and net severity with the placed program, 4000 xs 100
     qd(a09)
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True); \
     ax0, ax1 = axs.flat; \
-    df = a09.reinsurance_df; \
+    df = a09.reins_density_df; \
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[-50, 2000], ylim=[0.8e-6, 1] , ax=ax0); \
     df.filter(regex='sev_[gcn]').plot(logy=True, xlim=[0, 50000], ylim=[0.8e-6, 1], ax=ax1); \
     ax0.set(xlabel='loss (zoom)', ylabel='Log density');
@@ -1176,34 +1189,31 @@ Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance 
           f'Ceded expected loss {a19.est_m - a19n.est_m:,.1f}\n'
           f'Net expected loss   {a19n.est_m:,.1f}')
 
-The ``reinsurance_audit_df`` dataframe summarizes ground-up (unconditional) layer loss statistics for occurrence covers. Thus, ``ex`` reports the layer severity per ground-up claim. The subject (gross) row is the same for all layers and replicates the gross severity statistics shown above for ``a``.
+The ``reins_describe`` dataframe summarizes the occurrence cover loss by
+gross/ceded/net view (severity and aggregate). Earlier versions reported a
+per-layer ground-up layering via ``reinsurance_audit_df`` /
+``reinsurance_occ_layer_df``; obtain that by building each layer as its own
+occurrence cover and reading its ``reins_describe``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a19n.reinsurance_audit_df.stack(0), sparsify=False)
+    qd(a19n.reins_describe)
 
-The ``reinsurance_occ_layer_df`` dataframe summarizes aggregate losses.
+The whole-structure ceded severities differ slightly from Mata et al. Table 3. The ``aggregate`` computation is closest to Method 3.
 
-.. ipython:: python
-    :okwarning:
+The ``reins_density_df`` dataframe provides the gross, ceded, and net severity and aggregate distributions, with consistent columns regardless of which stages are present:
 
-    qd(a19n.reinsurance_occ_layer_df, sparsify=False)
-
-The layer severities show above differ slightly from Mata et al. Table 3. The ``aggregate`` computation is closest to Method 3. The reported severities are 351.1 and 628.8.
-
-The ``reinsurance_df`` dataframe provides the gross, ceded, and net severity and aggregate distributions:
-
-* Severity distributions: ``p_sev_gross``, ``p_sev_ceded``, ``p_sev_net``
-* Aggregate distribution: ``p_agg_gross_occ``, ``p_agg_ceded_occ``, ``p_agg_net_occ`` show the aggregate distributions computed using gross, cede, and net severity (occurrence) distributions. These are the portfolio gross, ceded and net distributions.
-* The columns ``p_agg_gross``, ``p_agg_ceded``, ``p_agg_net`` are relevant only when there is are ``occurrence`` and  ``aggregate`` reinsurance clauses. They report gross, ceded and net of the aggregate covers, using the severity requested in the occurrence clause. In this case ``p_agg_gross`` is the same as ``p_agg_net_occ`` because the occurrence clause specified ``net of``.
+* Severity distributions: ``p_sev_gross``, ``p_sev_ceded``, ``p_sev_net``.
+* Aggregate of each occurrence severity view: ``p_agg_gross`` (the true gross aggregate), ``p_agg_ceded_occ``, ``p_agg_net_occ`` — the aggregates computed from the gross, ceded, and net severity (occurrence) distributions.
+* Aggregate-cover views: ``p_agg_subject`` (the aggregate input to the aggregate cover), ``p_agg_ceded``, ``p_agg_net``. With no ``aggregate`` clause (as here) there is no cession, so ``p_agg_ceded`` is a point mass at 0 and ``p_agg_subject`` equals ``p_agg_net`` equals ``p_agg_net_occ`` (the requested ``net of`` occurrence output).
 
 Here is an extract from the severity distributions. Ceded severity is at most 1500. The masses at 250, 500, 1000 and 1500 are evident.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a19n.reinsurance_df.loc[0:2000:250,
+    qd(a19n.reins_density_df.loc[0:2000:250,
         ['p_sev_gross', 'p_sev_ceded', 'p_sev_net']])
 
 Here is an extract from the aggregate distributions, followed by the density and distribution plots. The masses are caused by outcomes involving only limit losses.
@@ -1211,12 +1221,12 @@ Here is an extract from the aggregate distributions, followed by the density and
 .. ipython:: python
     :okwarning:
 
-    qd(a19n.reinsurance_df.loc[3000:6000:500,
-        ['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ']])
+    qd(a19n.reins_density_df.loc[3000:6000:500,
+        ['p_agg_gross', 'p_agg_ceded_occ', 'p_agg_net_occ']])
 
     fig, axs = plt.subplots(1, 3, figsize=(3 * 3.5, 2.45), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
-    bit = a19n.reinsurance_df[['p_agg_gross_occ', 'p_agg_ceded_occ', 'p_agg_net_occ']]
+    bit = a19n.reins_density_df[['p_agg_gross', 'p_agg_ceded_occ', 'p_agg_net_occ']]
     bit.plot(ax=ax0);
     bit.plot(logy=True, ax=ax1);
     bit.cumsum().plot(ax=ax2);
@@ -1270,14 +1280,14 @@ Mata Figures 4, 5, 6 and 7 show the aggregate mixed density and distribution fun
     qd(a21)
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True); \
     ax0, ax1, ax2, ax3 = axs.flat; \
-    a20.reinsurance_df.p_agg_ceded_occ.plot(ax=ax0); \
-    a20.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax2); \
-    a21.reinsurance_df.p_agg_ceded_occ.plot(ax=ax1); \
-    a21.reinsurance_df.p_agg_ceded_occ.cumsum().plot(ax=ax3); \
+    a20.reins_density_df.p_agg_ceded_occ.plot(ax=ax0); \
+    a20.reins_density_df.p_agg_ceded_occ.cumsum().plot(ax=ax2); \
+    a21.reins_density_df.p_agg_ceded_occ.plot(ax=ax1); \
+    a21.reins_density_df.p_agg_ceded_occ.cumsum().plot(ax=ax3); \
     xs = np.linspace(0, 5000, 501); \
-    fz = lognorm_approx(a20.reinsurance_df.p_agg_ceded_occ); \
+    fz = lognorm_approx(a20.reins_density_df.p_agg_ceded_occ); \
     ax2.plot(xs, fz.cdf(xs), label='lognorm approx'); \
-    fz = lognorm_approx(a21.reinsurance_df.p_agg_ceded_occ); \
+    fz = lognorm_approx(a21.reins_density_df.p_agg_ceded_occ); \
     ax3.plot(xs, fz.cdf(xs), label='lognorm approx'); \
     ax2.legend(); \
     ax3.legend(); \

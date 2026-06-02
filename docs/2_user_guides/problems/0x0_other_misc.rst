@@ -52,19 +52,18 @@ Build the portfolio.
               )
     qd(a1)
 
-Expected loss and other ceded statistics by layer.
+Expected loss and other ceded statistics by layer are built directly from the
+severity limited expected values in ``make_table`` below.
 
-.. ipython:: python
-    :okwarning:
+.. note::
 
-    ff = lambda x: x if type(x)==str else (
-            f'{x/1e6:,.1f}M' if x >= 500000 else
-            (f'{x:,.3f}' if x < 100 else f'{x:,.0f}'))
-    fp = lambda x: f'{x:.1%}'
-    qdl = lambda x: qd(x, index=False, line_width=200, formatters={'pct': fp},
-                       float_format=ff, col_space=10)
-    qdl(a1.reinsurance_occ_layer_df .xs('ceded', 1, 1).droplevel(0).reset_index(drop=False))
-
+   This step previously displayed the per-layer ``reinsurance_occ_layer_df``
+   dataframe, removed in 1.0.0a19 in favour of the whole-structure
+   ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df`` objects. The
+   per-layer layer-loss-cost exhibit is produced from the severity LEV
+   differences in ``make_table`` (next cell), which does not need the removed
+   object; for a per-layer split via the new API, build each tower layer as its
+   own occurrence cover and read its ``reins_describe``.
 
 ZE provided function to make the exhibit table. The column ``pct`` shows the relative loading.
 

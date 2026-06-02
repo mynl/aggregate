@@ -150,19 +150,18 @@ implicit in the given reinsurance structure, pricing, and the gross stochastic m
 The non-cat property reinsurance has the highest ceded loss ratio and the cat program
 the lowest.
 
-.. ipython:: python
-    :okwarning:
+.. note::
 
-    re_all = pd.concat((a.reinsurance_occ_layer_df for a in abcd_net),
-        keys=abcd_net.unit_names, names=['unit', 'share', 'limit', 'attach']); \
-    re_all = re_all.drop('gup', axis=0, level=3); \
-    qd(re_all, sparsify=False)
-    re_summary = re_all.iloc[:, [0, 3, 6, 7]]; \
-    re_summary.columns = ['ex', 'cv', 'en', 'severity']; \
-    re_summary['premium'] = [4.41, 2.36, 1.53]; \
-    re_summary['lr'] = re_summary.ex / re_summary.premium; \
-    re_summary['margin'] = re_summary.premium - re_summary.ex; \
-    qd(re_summary)
+   This summary previously used the per-unit, per-layer
+   ``reinsurance_occ_layer_df`` dataframe, removed in 1.0.0a19 in favour of the
+   whole-structure ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df``
+   objects. To rebuild it, take each unit's ceded occurrence aggregate mean
+   (``reins_describe`` row ``('occ', 'Ceded', 'Agg')``) and CV
+   (``reins_stats_df`` ``('agg', 'cv')`` at ``('occ', 'ceded', 'Est')``) as the
+   layer loss cost ``ex`` and ``cv``; the ceded count is
+   ``unit.n * unit.sev.sf(attach)``. Combine with the given premium to form the
+   loss ratio and margin. For a per-layer split, build each layer as its own
+   occurrence cover.
 
 Underwriting Result Distributions
 """"""""""""""""""""""""""""""""""

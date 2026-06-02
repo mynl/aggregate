@@ -420,22 +420,20 @@ First, we compute all the aggregates.
         accuracy=4)
 
 
-Next, manipulate the output to determine layer loss costs using the ``reinsurance_audit_df`` dataframe. It tracks statistics for gross, ceded, and net loss across all requested layers, separately for occurrence and aggregate. In this case there are no occurrence layers. This step takes longer than computing the aggregates!
+Next, determine the layer loss costs. The cumulative ceded loss to an aggregate
+limit ``L`` is the limited expected value ``E[S ∧ L]``, which equals the
+whole-structure ceded mean of an ``aggregate ceded to L xs 0`` cover. Read it
+from :meth:`reins_describe` (the ``('agg', 'Ceded', 'Agg')`` row).
 
-.. ipython:: python
-    :okwarning:
+.. note::
 
-    bit = pd.concat([i.reinsurance_audit_df['ceded'].iloc[:-1]
-                    for i in b.values()], keys=b.keys(),
-                    names=['Occ limit', 'kind', 'share', 'limit', 'attach'])
-    bit['Agg limit'] = bit.index.get_level_values('limit') + bit.index.get_level_values('attach')
-    bit = bit.droplevel(['kind', 'share', 'limit', 'attach'])
-    bit = bit.set_index('Agg limit', append=True)
-    bit = bit.groupby(level='Occ limit')[['ex']].cumsum()
-    el = bit.unstack('Agg limit').droplevel(0, axis=1)
-    table = pd.concat((el, el / el.loc[500000, np.inf]),
-                      keys=['Loss', 'ILF'])
-    qd(table.fillna(' - '), accuracy=4)
+   This example previously used the per-layer ``reinsurance_audit_df``
+   dataframe, removed in 1.0.0a19 in favour of the whole-structure
+   ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df`` objects.
+   To rebuild the per-agg-limit ILF table, loop over the aggregate breakpoints
+   ``L`` and the per-claim occurrence limits, build ``aggregate ceded to L xs
+   0`` for each, and collect the ceded aggregate mean from ``reins_describe``;
+   normalise by the ``500000`` per-claim, unlimited-aggregate cell for the ILF.
 
 Here is a reconciliation to Table 6.4 of the 2M per claim and 2M aggregate limit expected loss, using the shifted gamma approximation. The limited aggregate loss is computed using the integral of the survival function ``fz.sf``.  ``quad`` is a general purpose numerical integration routine. It returns the integral and estimated error.
 

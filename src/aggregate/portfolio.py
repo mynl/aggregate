@@ -22,8 +22,8 @@ import warnings
 from IPython.display import HTML, display
 
 from .constants import (ALIASING_RATIO, EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
-                        FT_NOISE_FLOOR, RECOMMEND_P, VALIDATION_EPS,
-                        VALIDATION_NOISE, Validation, WL)
+                        FT_NOISE_FLOOR, RECOMMEND_P, REINS_LABEL_OUTPUT,
+                        VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
 from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
 
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
@@ -318,6 +318,11 @@ class Portfolio(object):
         self.last_update = 0
         self.hash_rep_at_last_update = ''
         self._distortion = None
+        # portfolio reinsurance reporting caches (end-to-end gcn); rebuilt
+        # lazily, invalidated on update. See dev/reins-reporting.md.
+        self._reins_density_df = None
+        self._reins_stats_df = None
+        self._reins_describe = None
         self.sev_calc = ''
         self._remove_fuzz = 0
         self.discretization_calc = ''
@@ -913,8 +918,8 @@ class Portfolio(object):
         reinsurance (the legacy theory/empirical validation view
         applies). When exactly one cession kind appears across all
         ceding units returns that label (``Net`` / ``Ceded``);
-        otherwise returns ``After`` — the umbrella label — so the whole
-        table can share one column layout.
+        otherwise returns ``Output`` — the umbrella label for mixed output —
+        so the whole table can share one column layout.
         """
         labels = {lbl for a in self
                   if (lbl := a._reins_after_label()) is not None}
@@ -922,7 +927,7 @@ class Portfolio(object):
             return None
         if len(labels) == 1:
             return labels.pop()
-        return 'After'
+        return REINS_LABEL_OUTPUT
 
     @property
     def describe(self):
@@ -1007,6 +1012,189 @@ class Portfolio(object):
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X'])
         return df
+
+    # ================================================================
+    # Reinsurance reporting (end-to-end gcn; see dev/reins-reporting.md)
+    # ================================================================
+
+    def _reins_unit_views(self, a):
+        """End-to-end gross / ceded / net aggregate densities for one unit.
+
+        Returns a dict ``{'gross', 'ceded', 'net'}`` of densities on the
+        unit's grid. A non-ceding unit contributes ``gross == net ==
+        modeled`` and a point mass at 0 for ``ceded``. For a ceding unit the
+        views are read from its :meth:`Aggregate.reins_density_df`: when an
+        aggregate cover is present the final aggregate-cover net/ceded; else
+        the occurrence net/ceded. The ``ceded`` view of a unit carrying
+        *both* covers is the final (aggregate-stage) cession; the per-stage
+        chain lives in the unit's own ``reins_describe``.
+        """
+        zero = np.zeros_like(a.xs, dtype=float)
+        zero[0] = 1.0
+        rd = a.reins_density_df
+        if rd is None:
+            modeled = np.asarray(a.agg_density, dtype=float)
+            return {'gross': modeled, 'ceded': zero, 'net': modeled}
+        g = rd['p_agg_gross'].to_numpy()
+        if a.agg_reins is not None:
+            return {'gross': g, 'ceded': rd['p_agg_ceded'].to_numpy(),
+                    'net': rd['p_agg_net'].to_numpy()}
+        if a.occ_reins is not None:
+            return {'gross': g, 'ceded': rd['p_agg_ceded_occ'].to_numpy(),
+                    'net': rd['p_agg_net_occ'].to_numpy()}
+        return {'gross': g, 'ceded': zero, 'net': g}
+
+    @property
+    def reins_density_df(self):
+        """Portfolio end-to-end gross / ceded / net aggregate densities.
+
+        Convolves the per-unit end-to-end gross / ceded / net aggregate
+        marginals (see :meth:`_reins_unit_views`) under the same independent
+        FFT machinery used for the portfolio total, producing three
+        portfolio-level marginal aggregate distributions. Units without
+        reinsurance contribute their modeled density to ``gross`` and ``net``
+        and nothing (point mass at 0) to ``ceded``.
+
+        Columns ``loss``, ``p_agg_gross``, ``p_agg_ceded``, ``p_agg_net``
+        (always present). Returns ``None`` when **no** unit cedes.
+
+        Notes
+        -----
+        Assumes unit independence -- consistent with the existing portfolio
+        total. The three portfolio marginals are *separate* distributions
+        (portfolio gross / ceded / net loss); they no more satisfy
+        ``gross = net (+) ceded`` than the unit-level views do.
+        """
+        if self._reins_after_label() is None:
+            return None
+        if self._reins_density_df is not None:
+            return self._reins_density_df
+        xs = self.density_df['loss'].to_numpy()
+        ft_gross = ft_ceded = ft_net = None
+        for a in self.agg_list:
+            uv = self._reins_unit_views(a)
+            fg = ft(uv['gross'], self.padding)
+            fc = ft(uv['ceded'], self.padding)
+            fn = ft(uv['net'], self.padding)
+            if ft_gross is None:
+                ft_gross, ft_ceded, ft_net = fg, fc, fn
+            else:
+                ft_gross = ft_gross * fg
+                ft_ceded = ft_ceded * fc
+                ft_net = ft_net * fn
+        df = pd.DataFrame({'loss': xs}, index=pd.Index(xs, name='loss'))
+        df['p_agg_gross'] = np.real(ift(ft_gross, self.padding))
+        df['p_agg_ceded'] = np.real(ift(ft_ceded, self.padding))
+        df['p_agg_net'] = np.real(ift(ft_net, self.padding))
+        self._reins_density_df = df
+        return self._reins_density_df
+
+    @property
+    def reins_stats_df(self):
+        """Per-unit and portfolio-total end-to-end gross / ceded / net moments.
+
+        Rows are ``MultiIndex (view, measure)`` with ``view in
+        {gross, ceded, net}`` and ``measure in {ex1, ex2, ex3, mean, cv,
+        skew}`` (aggregate-level; there is no per-stage split at the portfolio
+        level). Columns are the unit names plus ``total``. Unit columns read
+        each unit's end-to-end marginals; ``total`` reads the convolved
+        portfolio marginals in :meth:`reins_density_df`. Returns ``None`` when
+        no unit cedes.
+        """
+        if self._reins_after_label() is None:
+            return None
+        if self._reins_stats_df is not None:
+            return self._reins_stats_df
+        views = ['gross', 'ceded', 'net']
+        measures = ['ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew']
+        row_index = pd.MultiIndex.from_product(
+            [views, measures], names=['view', 'measure'])
+
+        def moments6(xs, p):
+            mw = xsden_to_mwrangler(xs, np.asarray(p, dtype=float))
+            return (*mw.noncentral, *mw.mcvsk)
+
+        cols = {}
+        for a in self.agg_list:
+            uv = self._reins_unit_views(a)
+            s = pd.Series(np.nan, index=row_index)
+            for v in views:
+                for m, val in zip(measures, moments6(a.xs, uv[v])):
+                    s[(v, m)] = val
+            cols[a.name] = s
+        rdp = self.reins_density_df
+        xs = rdp['loss'].to_numpy()
+        s = pd.Series(np.nan, index=row_index)
+        for v, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded'),
+                       ('net', 'p_agg_net')]:
+            for m, val in zip(measures, moments6(xs, rdp[col].to_numpy())):
+                s[(v, m)] = val
+        cols['total'] = s
+        self._reins_stats_df = pd.DataFrame(cols)
+        return self._reins_stats_df
+
+    @property
+    def reins_describe(self):
+        """Portfolio end-to-end reinsurance loss summary.
+
+        One block per unit plus a ``total`` block, concatenated with
+        ``unit`` / ... keys (the :meth:`describe` assembly pattern). Each
+        block is a ``view x component`` table of **mean loss** on the
+        eight :meth:`Aggregate.describe` columns (``EX | Est EX | Change EX |
+        CV | Est CV | Change CV | Sk | Est Sk``) for the unit's own per-stage
+        cession (from :meth:`Aggregate.reins_describe`); units without
+        reinsurance are omitted from their own blocks. The ``total`` block is
+        the end-to-end gross / ceded / net portfolio aggregate moments from
+        :meth:`reins_stats_df`; the ``EX`` / ``CV`` / ``Sk`` reference is the
+        gross end-to-end moment held constant down the three views, ``Est`` is
+        the per-view output and ``Change = (output - gross) / gross`` reads as
+        the % impact of the programme (0 on the gross row -- no exact pre-bucket
+        reference exists for the convolved portfolio marginals).
+
+        Total means equal the sum of the unit end-to-end means per view
+        (means add under convolution). Returns ``None`` when no unit cedes.
+        """
+        if self._reins_after_label() is None:
+            return None
+        if self._reins_describe is not None:
+            return self._reins_describe
+        blocks = []
+        keys = []
+        for a in self:
+            rdesc = a.reins_describe
+            if rdesc is not None:
+                blocks.append(rdesc)
+                keys.append(a.name)
+        # total block: end-to-end gcn, eight columns matching the unit blocks.
+        # Reference (EX/CV/Sk) is the gross end-to-end moment, held constant down
+        # each view (the economic view of describe): Est is the per-view output
+        # and Change = (output - gross) / gross. The gross row compares gross to
+        # gross, so its Change is 0 (no exact pre-bucket reference exists for the
+        # convolved portfolio marginals); the ceded / net rows read as the %
+        # impact of the whole reinsurance programme.
+        rs = self.reins_stats_df
+        gross_mean = float(rs.loc[('gross', 'mean'), 'total'])
+        gross_cv = float(rs.loc[('gross', 'cv'), 'total'])
+        gross_sk = float(rs.loc[('gross', 'skew'), 'total'])
+        rows = []
+        idx = []
+        for v in ['gross', 'ceded', 'net']:
+            mean = float(rs.loc[(v, 'mean'), 'total'])
+            cv = float(rs.loc[(v, 'cv'), 'total'])
+            sk = float(rs.loc[(v, 'skew'), 'total'])
+            rows.append([
+                gross_mean, mean, float(_noise_aware_rel_error(mean, gross_mean)),
+                gross_cv, cv, float(_noise_aware_rel_error(cv, gross_cv)),
+                gross_sk, sk])
+            idx.append(('total', v, 'agg'))
+        total_block = pd.DataFrame(
+            rows,
+            index=pd.MultiIndex.from_tuples(idx, names=['stage', 'view', 'component']),
+            columns=Aggregate._REINS_DESCRIBE_COLS)
+        blocks.append(total_block)
+        keys.append('total')
+        self._reins_describe = pd.concat(blocks, keys=keys, names=['unit'])
+        return self._reins_describe
 
     @property
     def spec(self):
@@ -1486,6 +1674,10 @@ class Portfolio(object):
         # density changes invalidate the augmented_df cache
         self._augmented_dfs = {}
         self._last_applied_distortion_name = None
+        # invalidate reinsurance reporting caches
+        self._reins_density_df = None
+        self._reins_stats_df = None
+        self._reins_describe = None
 
         ft_line_density = {}
 

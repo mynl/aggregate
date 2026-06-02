@@ -4,7 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-05-30** — after meta.8 closed the v1.0 plan.
+> **Last updated: 2026-06-01** — after the `reins-reporting` cycle
+> (1.0.0a19). Current version 1.0.0a19.
 
 ---
 
@@ -76,6 +77,23 @@
     pricing columns, `DefectiveDistributionWarning`). Replace any legacy
     framing.
 
+10b. **Reinsurance case-study docs need a per-layer rewrite (from a19).**
+    The `reins-reporting` cycle removed the per-layer `reinsurance_audit_df` /
+    `reinsurance_occ_layer_df`. Three `docs/2_user_guides/problems/*.rst` case
+    studies that built per-layer / per-agg-limit tables against published
+    references were left as **migration notes + per-layer-build recipes**, not
+    working exhibits: `0x0_bahnemann.rst` (Table 6.4 ILF table),
+    `0x0_enterprise_risk_analysis.rst` (per-unit ceded LR summary),
+    `0x0_other_misc.rst` (Wang tower layer exhibit — note `make_table` below it
+    already does the real work from `density_df.lev`).
+    **Update (a19 punch-up):** `reins_stats_df` is now a per-layer layering
+    frame (cols `Gross`/`layer.k`/`Ceded`, meta share/limit/attach rows), so
+    these exhibits can be rebuilt against it **directly** — e.g.
+    `a.reins_stats_df['occ']` gives the occurrence layering — rather than
+    looping single-layer builds. Still needs a docs build to verify rendered
+    numbers vs the published references. (`0x0_loss_models.rst` and
+    `0x0_loss_data_analytics.rst` were converted faithfully and run.)
+
 11. **Docs reference SLY-era grammar.** `docs/4_agg_language_reference/`
     describes the grammar in SLY's `@_` form. Should `include`
     `aggregate/decl.lark` directly, or call
@@ -113,3 +131,13 @@
   inconsistency — resolved as a side effect of meta.3 / D8: both now route
   through `xsden_to_mwrangler`, which places the tail mass at `xs[-1] + bs`
   identically. Was item #8 on the CLAUDE.md TODO list.
+- (2026-05-31) **`reins-buckets` (1.0.0a18).** `Aggregate.reins_bucket`
+  switch (`'linear'`/`'nearest'`) + vectorized `_rebucket_to_grid` scatter
+  replacing the old groupby→interp1d-CDF→diff scheme; `_validate_reins_layers`
+  hard-errors on out-of-order/overlapping layers. Plan in `dev/done/`.
+- (2026-06-01) **`reins-reporting` (1.0.0a19).** Rationalized reinsurance
+  reporting: `reins_density_df` (renamed, consistent columns), `reins_stats_df`
+  (per stage/view/basis, EX vs Est), `reins_describe` (per-stage), plus the
+  Portfolio trio (end-to-end gcn). Removed the per-layer audit/report/occ_layer
+  objects and the `F_*` columns. Plan in `dev/done/`. Left a docs follow-up
+  (item 10b) for the per-layer case studies.

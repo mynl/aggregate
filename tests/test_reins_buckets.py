@@ -32,8 +32,8 @@ OFF_GRID_PROG = (
 
 
 def _sev_mean(a, col):
-    """First moment of a severity density column of ``reinsurance_df``."""
-    rd = a.reinsurance_df
+    """First moment of a severity density column of ``reins_density_df``."""
+    rd = a.reins_density_df
     return float(np.sum(a.xs * rd[col]))
 
 
@@ -73,7 +73,7 @@ def test_mass_conserved(rb):
     """Both schemes preserve total probability mass on each marginal."""
     a = build(OFF_GRID_PROG, update=False)
     a.update(log2=16, reins_bucket=rb)
-    rd = a.reinsurance_df
+    rd = a.reins_density_df
     assert abs(rd['p_sev_net'].sum() - 1.0) <= 1e-9
     assert abs(rd['p_sev_ceded'].sum() - 1.0) <= 1e-9
 

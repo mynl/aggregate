@@ -11,6 +11,8 @@ __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
            'FT_NOISE_FLOOR', 'RECOMMEND_P', 'REINS_BUCKET_DEFAULT', 'Validation',
            'DefectiveDistributionWarning',
+           'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
+           'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
 
 FIG_W = 3.5
@@ -59,6 +61,20 @@ RECOMMEND_P = 0.99999
 # positional bias). ``'linear'`` is the default because mass-preserving
 # rebucketing keeps the reinsurance moment drift at the FFT noise floor.
 REINS_BUCKET_DEFAULT = 'linear'
+
+# Column / view labels for reinsurance reporting (``describe``,
+# ``reins_describe``, ``reins_stats_df``). Centralised so the wording is
+# changed in one place.
+#   GROSS   -- top of step 1, before any cover (the first describe column).
+#   SUBJECT -- what is subject to the aggregate cover (= the occurrence output).
+#   NET     -- model output when every cover passes the net.
+#   CEDED   -- model output when every cover passes the ceded.
+#   OUTPUT  -- model output when occ and agg pass different kinds (mixed).
+REINS_LABEL_GROSS = 'Gross'
+REINS_LABEL_SUBJECT = 'Subject'
+REINS_LABEL_NET = 'Net'
+REINS_LABEL_CEDED = 'Ceded'
+REINS_LABEL_OUTPUT = 'Output'
 
 # User-local data directory (under Path.home())
 USER_DIR_NAME = '.aggregate'

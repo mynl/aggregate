@@ -167,9 +167,9 @@ agg I.Blend05   5 claims [10 20 50 100] xs 10          sev lognorm 10 cv 1.2 wts
 agg I.Blend06 [10 30 15 5]  claims [inf 10 inf 10] xs [0 0 5 5] sev lognorm  10 cv [1.0 1.25 1.5] wts=3         mixed gamma 0.25
 agg I.Blend07   [10 20 30]  claims [100 200 75] xs [0 50 75]    sev lognorm 100 cv [1 2] wts [.6 .4]            mixed gamma 0.4
 agg I.Blend08      [10 30]  claims                              sev lognorm 100 cv [1 2]                        mixed gamma 0.4
-agg I.Blend09  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5  note{log2=17;}
+agg I.Blend09  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5  hints{log2=17;}
 agg I.Blend10  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
-agg I.Blend11  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5  note{log2=17;}
+agg I.Blend11  [1000 2000 500] prem at [.8 .7 .5] lr            sev lognorm 10 cv [.2 .35 .5] wts [1/2 3/8 1/8] mixed gamma 0.5  hints{log2=17;}
 agg I.Blend12  [500 800 200]   loss                             sev lognorm 10 cv [.2 .35 .5] wts=3             mixed gamma 0.5
 
 # Reinsurance
@@ -219,20 +219,20 @@ port L.Bodoff4 note{Bodoff Thought Experiment No. 4 (check!)} agg a 0.25 claims 
 # =====================
 # hints: reg_p=1; roe=0.10;
 # numbers in names ensure correct sort order
-port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed note{bs=1; log2=8; padding=1}
+port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed hints{bs=1; log2=8; padding=1}
 
 # hints: reg_p=.999, roe=0.10
-port M.PIR.2.Tame note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed note{bs=1/64, log2=16, padding=1}
+port M.PIR.2.Tame note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed hints{bs=1/64; log2=16; padding=1}
 
 # hints: reg_p=.999, roe=0.10
-port M.PIR.3.CNC.Gross note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed note{bs=1/64, log2=16, padding=1}
+port M.PIR.3.CNC.Gross note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed hints{bs=1/64; log2=16; padding=1}
 
-port M.PIR.4.CNC.Net note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 note{bs=1/64, log2=16, padding=1}
+port M.PIR.4.CNC.Net note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 hints{bs=1/64; log2=16; padding=1}
 
 # hints: reg_p=.999, roe=0.10,
-port M.PIR.5.HuSCS.Gross note{PIR Hurricane SCS gross case study.} agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson note{bs=1/4, log2=19, padding=1}
+port M.PIR.5.HuSCS.Gross note{PIR Hurricane SCS gross case study.} agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson hints{bs=1/4; log2=19; padding=1}
 
-port M.PIR.6.HuSCS.Net note{PIR Hurricane SCS net case study.} agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson note{bs=1/4, log2=19, padding=1}
+port M.PIR.6.HuSCS.Net note{PIR Hurricane SCS net case study.} agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson hints{bs=1/4; log2=19; padding=1}
 
 # Proxies for US Lines
 # ====================

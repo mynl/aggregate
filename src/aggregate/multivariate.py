@@ -394,6 +394,9 @@ class MultivariateAggregate:
         per-claim severities.
     note : str, optional
         Free-text note.
+    hints : str, optional
+        Raw ``hints{...}`` build-settings string (``key=value;`` form);
+        retained as annotation and consumed by the underwriter build path.
     exp_en, exp_el, exp_premium, exp_lr : float, optional
         Outer (shared-count) exposure, as parsed. ``exp_en`` (a claim count) is
         used directly; otherwise the count is derived from ``exp_el`` and the
@@ -421,7 +424,7 @@ class MultivariateAggregate:
         Per-axis bucket sizes.
     """
 
-    def __init__(self, name, lines=None, copula=None, note='', mode='copula',
+    def __init__(self, name, lines=None, copula=None, note='', hints='', mode='copula',
                  nc_agg=None, nc_kwargs=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
                  freq_name='poisson', freq_a=0.0, freq_b=0.0,
@@ -433,6 +436,7 @@ class MultivariateAggregate:
         self.mode = mode
         self.name = name
         self.note = note
+        self.hints = hints
         self.program = ''
         # filled by update() (both modes)
         self.density = None

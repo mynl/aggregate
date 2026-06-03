@@ -11,7 +11,8 @@
         1.0
       ],
       "name": "One",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg A.Dice00 dfreq  [1:6]  dsev  [1]                    note{The roll of a single dice.}": {
@@ -44,7 +45,8 @@
       "sev_ps": [
         1.0
       ],
-      "note": "The roll of a single dice."
+      "note": "The roll of a single dice.",
+      "hints": ""
     }
   },
   "agg A.Dice01 dfreq  [1]    dsev  [1:6]                  note{Same as previous example.}": {
@@ -77,7 +79,8 @@
         0.16666666666666666,
         0.16666666666666666
       ],
-      "note": "Same as previous example."
+      "note": "Same as previous example.",
+      "hints": ""
     }
   },
   "agg A.Dice02 dfreq  [2]    dsev  [1:6]                  note{Sum of the rolls of two dice.}": {
@@ -110,7 +113,8 @@
         0.16666666666666666,
         0.16666666666666666
       ],
-      "note": "Sum of the rolls of two dice."
+      "note": "Sum of the rolls of two dice.",
+      "hints": ""
     }
   },
   "agg A.Dice03 dfreq  [5]    dsev  [1:6]                  note{Sum of the rolls of five dice.}": {
@@ -143,7 +147,8 @@
         0.16666666666666666,
         0.16666666666666666
       ],
-      "note": "Sum of the rolls of five dice."
+      "note": "Sum of the rolls of five dice.",
+      "hints": ""
     }
   },
   "agg A.Dice04 dfreq  [1:6]  dsev  [1:6]                  note{Sum of a dice roll of dice rolls}": {
@@ -186,7 +191,8 @@
         0.16666666666666666,
         0.16666666666666666
       ],
-      "note": "Sum of a dice roll of dice rolls"
+      "note": "Sum of a dice roll of dice rolls",
+      "hints": ""
     }
   },
   "agg A.Dice05 dfreq  [1:4]  dsev  [1:16]                 note{Something you can't do easily by hand}": {
@@ -245,7 +251,8 @@
         0.0625,
         0.0625
       ],
-      "note": "Something you can't do easily by hand"
+      "note": "Something you can't do easily by hand",
+      "hints": ""
     }
   },
   "agg B.Basic01 dfreq  [1]  dsev  [0 1]                                   note{toss of a single coin}": {
@@ -270,7 +277,8 @@
         0.5,
         0.5
       ],
-      "note": "toss of a single coin"
+      "note": "toss of a single coin",
+      "hints": ""
     }
   },
   "agg B.Basic02 dfreq  [12]  dsev  [0 1]                                  note{toss of 12 single coins}": {
@@ -295,7 +303,8 @@
         0.5,
         0.5
       ],
-      "note": "toss of 12 single coins"
+      "note": "toss of 12 single coins",
+      "hints": ""
     }
   },
   "agg B.Basic03 dfreq  [1:3]  dsev  [1 2 10]                              note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely}": {
@@ -326,7 +335,8 @@
         0.3333333333333333,
         0.3333333333333333
       ],
-      "note": "1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely"
+      "note": "1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely",
+      "hints": ""
     }
   },
   "agg B.Basic03 dfreq  [1:11:2]  dsev  [1 2 10]                           note{1 3...11 claims range and step, sev 1, 2, 10 all equally likely}": {
@@ -363,7 +373,8 @@
         0.3333333333333333,
         0.3333333333333333
       ],
-      "note": "1 3...11 claims range and step, sev 1, 2, 10 all equally likely"
+      "note": "1 3...11 claims range and step, sev 1, 2, 10 all equally likely",
+      "hints": ""
     }
   },
   "agg B.Basic04 dfreq  [1 2 3]   [.5 1/4 1/4]  dsev  [1 2 10]               note{specify probabilities of claims}": {
@@ -394,7 +405,8 @@
         0.3333333333333333,
         0.3333333333333333
       ],
-      "note": "specify probabilities of claims"
+      "note": "specify probabilities of claims",
+      "hints": ""
     }
   },
   "agg B.Basic05 dfreq  [1:3]    dsev  [1 2 10]   [.4 .4 .2]                 note{specify probabilities of sev}": {
@@ -425,7 +437,8 @@
         0.4,
         0.2
       ],
-      "note": "specify probabilities of sev"
+      "note": "specify probabilities of sev",
+      "hints": ""
     }
   },
   "agg B.Basic06 dfreq  [1:3]   [.5 1/4 1/4]  dsev  [1 2 10]   [.4 .4 .2]      note{specify both probabilities }": {
@@ -456,7 +469,8 @@
         0.4,
         0.2
       ],
-      "note": "specify both probabilities "
+      "note": "specify both probabilities ",
+      "hints": ""
     }
   },
   "agg B.Basic07 dfreq  [0 1 2]   [.5 .3 .2]  sev sev.One": {
@@ -483,7 +497,8 @@
       "sev_ps": [
         1.0
       ],
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg B.Basic08 dfreq  [0 1 2]   [.5 .3 .2]  sev.One": {
@@ -510,7 +525,8 @@
       "sev_ps": [
         1.0
       ],
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg B.Basic09 dfreq  [0 1 2]   [.5 .3 .2]  sev lognorm 10 cv .3": {
@@ -537,7 +553,8 @@
       "sev_wt": 1.0,
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg Ca.Freq01.Fixed        10 claims sev.One fixed": {
@@ -554,6 +571,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "fixed"
     }
   },
@@ -571,6 +589,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "poisson"
     }
   },
@@ -588,6 +607,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "bernoulli"
     }
   },
@@ -605,6 +625,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "binomial",
       "freq_a": 0.5
     }
@@ -623,6 +644,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "geometric"
     }
   },
@@ -640,6 +662,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "pascal",
       "freq_a": 0.8,
       "freq_b": 3.0
@@ -659,6 +682,7 @@
         1.0
       ],
       "note": "shape paramter equals variance multiplier",
+      "hints": "",
       "freq_name": "negbin",
       "freq_a": 3.0
     }
@@ -677,6 +701,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "logarithmic"
     }
   },
@@ -694,6 +719,7 @@
         1.0
       ],
       "note": "shape paramter number of eggs per cluster",
+      "hints": "",
       "freq_name": "neymana",
       "freq_a": 3.0
     }
@@ -712,6 +738,7 @@
         1.0
       ],
       "note": "shape paramter equals variance of mixing distribution",
+      "hints": "",
       "freq_name": "gamma",
       "freq_a": 0.65
     }
@@ -730,6 +757,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "delaporte",
       "freq_a": 0.65,
       "freq_b": 0.25
@@ -749,6 +777,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "ig",
       "freq_a": 0.65
     }
@@ -767,6 +796,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "sig",
       "freq_a": 0.5,
       "freq_b": 0.4
@@ -786,6 +816,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "delaporte",
       "freq_a": 0.65,
       "freq_b": -0.25
@@ -805,6 +836,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "sichel.gamma",
       "freq_a": 0.65,
       "freq_b": 0.25
@@ -824,6 +856,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "sichel.ig",
       "freq_a": 0.65,
       "freq_b": 0.25
@@ -843,6 +876,7 @@
         1.0
       ],
       "note": "",
+      "hints": "",
       "freq_name": "beta",
       "freq_a": 0.5,
       "freq_b": 4.0
@@ -864,7 +898,8 @@
       "freq_name": "poisson",
       "freq_zm": true,
       "freq_p0": 0.0,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg Cc.Freq21.Poisson     4 claims dsev  [1]  poisson zm .5": {
@@ -883,7 +918,8 @@
       "freq_name": "poisson",
       "freq_zm": true,
       "freq_p0": 0.5,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg Cc.Freq22.Geometric   4 claims dsev  [1]  geometric zm .5        note{pr(N=0)=1, there is no zt version}": {
@@ -902,7 +938,8 @@
       "freq_name": "geometric",
       "freq_zm": true,
       "freq_p0": 0.5,
-      "note": "pr(N=0)=1, there is no zt version"
+      "note": "pr(N=0)=1, there is no zt version",
+      "hints": ""
     }
   },
   "agg Cc.Freq23.Logarithmic 4 claims dsev  [1]  logarithmic zm .5      note{pr(N=0)=1, there is no zt version}": {
@@ -921,7 +958,8 @@
       "freq_name": "logarithmic",
       "freq_zm": true,
       "freq_p0": 0.5,
-      "note": "pr(N=0)=1, there is no zt version"
+      "note": "pr(N=0)=1, there is no zt version",
+      "hints": ""
     }
   },
   "agg Cc.Freq24.Binomial    4 claims dsev  [1]  binomial 0.6 zm .5     note{Cannot make p0 smaller than the natural p}": {
@@ -941,7 +979,8 @@
       "freq_a": 0.6,
       "freq_zm": true,
       "freq_p0": 0.5,
-      "note": "Cannot make p0 smaller than the natural p"
+      "note": "Cannot make p0 smaller than the natural p",
+      "hints": ""
     }
   },
   "agg Cc.Freq25.Negbin      4 claims dsev  [1]  negbin 3 zm .5         note{Limits on p0}": {
@@ -961,7 +1000,8 @@
       "freq_a": 3.0,
       "freq_zm": true,
       "freq_p0": 0.5,
-      "note": "Limits on p0"
+      "note": "Limits on p0",
+      "hints": ""
     }
   },
   "agg D.Sev01 1 claim sev 100 * expon        fixed                    note{zero param severity can look odd, but it works}": {
@@ -976,7 +1016,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "zero param severity can look odd, but it works"
+      "note": "zero param severity can look odd, but it works",
+      "hints": ""
     }
   },
   "agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed": {
@@ -993,7 +1034,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev03 1 claim sev 100 * expon   + 10 fixed                    note{will this work?}": {
@@ -1009,7 +1051,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "will this work?"
+      "note": "will this work?",
+      "hints": ""
     }
   },
   "agg D.Sev04 1 claim sev 100 * norm    +500 fixed": {
@@ -1025,7 +1068,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev05 1 claim sev 100 * uniform + 50 fixed": {
@@ -1041,7 +1085,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev05b 2 claims sev 100*uniform + 50 fixed": {
@@ -1057,7 +1102,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev06 1 claim sev 10 * gamma 0.3      fixed": {
@@ -1073,7 +1119,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev07 1 claim sev      gamma 12 cv .3 fixed": {
@@ -1090,7 +1137,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev08 1 claim sev      lognorm 50 cv .3 fixed": {
@@ -1107,7 +1155,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev09 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed          note{mean equals 50 and cv is slightly higher than .3}": {
@@ -1123,7 +1172,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "mean equals 50 and cv is slightly higher than .3"
+      "note": "mean equals 50 and cv is slightly higher than .3",
+      "hints": ""
     }
   },
   "agg D.Sev10 1 claim sev 100 * invgamma 4.07 fixed                   note{remember must set scale or mean}": {
@@ -1139,7 +1189,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "remember must set scale or mean"
+      "note": "remember must set scale or mean",
+      "hints": ""
     }
   },
   "agg D.Sev11 1 claim sev 100 * weibull_min 1.5 fixed": {
@@ -1155,7 +1206,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev12 1 claim sev invgauss 10 cv .5 fixed": {
@@ -1172,7 +1224,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev13 1 claim sev 10 * pareto 2.6  + -10 fixed                note{entering Pareto is awkward}": {
@@ -1189,7 +1242,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "entering Pareto is awkward"
+      "note": "entering Pareto is awkward",
+      "hints": ""
     }
   },
   "agg D.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed": {
@@ -1207,7 +1261,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg D.Sev15 1   claim  sev  dhistogram xps  [1 10 40]   [.5 .3 .2]  fixed  note{old notation}": {
@@ -1231,7 +1286,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "old notation"
+      "note": "old notation",
+      "hints": ""
     }
   },
   "agg D.Sev16 dfreq  [1]  dsev  [1 10 40]   [.5 .3 .2]                         note{preferred new notation}": {
@@ -1258,7 +1314,8 @@
         0.3,
         0.2
       ],
-      "note": "preferred new notation"
+      "note": "preferred new notation",
+      "hints": ""
     }
   },
   "agg D.Sev17 1   claim  sev chistogram xps  [1 10 40]   [.5 .3 .2]  fixed   note{continuous version}": {
@@ -1282,7 +1339,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": "continuous version"
+      "note": "continuous version",
+      "hints": ""
     }
   },
   "agg E.TSev00  1 claim sev      lognorm 10 cv .09 fixed": {
@@ -1299,7 +1357,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev01  1 claim sev 10 * lognorm 10 cv .09 fixed": {
@@ -1316,7 +1375,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev02  1 claim sev      lognorm 10 cv .09 + 20 fixed": {
@@ -1334,7 +1394,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev03  1 claim sev 10 * lognorm 10 cv .09 + 20 fixed": {
@@ -1352,7 +1413,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev04  1 claim sev 9.559974818331 * lognorm .3 fixed": {
@@ -1368,7 +1430,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev05  1 claim sev 9.559974818331 * lognorm .3 + 5 fixed": {
@@ -1385,7 +1448,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev06  1 claim 130 xs 20 sev      lognorm 20 cv 0.75     fixed": {
@@ -1404,7 +1468,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev07  1 claim 130 xs 20 sev 20 * lognorm 0.75           fixed": {
@@ -1422,7 +1487,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev08  1 claim 130 xs 20 sev 20 * lognorm 1 cv 0.75      fixed": {
@@ -1441,7 +1507,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev09  1 claim 130 xs 20 sev 20 * lognorm 1 cv 0.75 + 20 fixed": {
@@ -1461,7 +1528,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev10 10 claims           sev lognorm 10 cv 0.8 poisson": {
@@ -1478,7 +1546,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev11 10 claims  30 xs  0 sev lognorm 10 cv 0.8 poisson": {
@@ -1497,7 +1566,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev12 10 claims 100 xs 10 sev lognorm 10 cv 0.8 poisson": {
@@ -1516,7 +1586,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev13 10 claims inf xs  0 sev lognorm 10 cv 0.8 poisson": {
@@ -1535,7 +1606,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev14 10 claims inf xs 10 sev lognorm 10 cv 0.8 poisson": {
@@ -1554,7 +1626,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg E.TSev15 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}": {
@@ -1572,7 +1645,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "conditional severity"
+      "note": "conditional severity",
+      "hints": ""
     }
   },
   "agg E.TSev16 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}": {
@@ -1591,7 +1665,8 @@
       "sev_ub": "__inf__",
       "sev_conditional": false,
       "freq_name": "poisson",
-      "note": "unconditional severity"
+      "note": "unconditional severity",
+      "hints": ""
     }
   },
   "agg E.TSev17 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity}": {
@@ -1609,7 +1684,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "conditional severity"
+      "note": "conditional severity",
+      "hints": ""
     }
   },
   "agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}": {
@@ -1628,7 +1704,8 @@
       "sev_ub": "__inf__",
       "sev_conditional": false,
       "freq_name": "poisson",
-      "note": "unconditional severity"
+      "note": "unconditional severity",
+      "hints": ""
     }
   },
   "agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}": {
@@ -1645,7 +1722,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "specify number of claims"
+      "note": "specify number of claims",
+      "hints": ""
     }
   },
   "agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims}": {
@@ -1662,7 +1740,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "specify expected loss, derive number of claims"
+      "note": "specify expected loss, derive number of claims",
+      "hints": ""
     }
   },
   "agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}": {
@@ -1681,7 +1760,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "specify premium and loss ratio, derive number of claims"
+      "note": "specify premium and loss ratio, derive number of claims",
+      "hints": ""
     }
   },
   "agg G.Mixed00  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts  [.2 .3 .3 .15 .05]              poisson            note{no shared mixing}": {
@@ -1712,7 +1792,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "no shared mixing"
+      "note": "no shared mixing",
+      "hints": ""
     }
   },
   "agg G.Mixed01  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts  [.2 .3 .3 .15 .05]              mixed gamma 0.3    note{shared mixing, compare audit and report dfs}": {
@@ -1744,7 +1825,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": "shared mixing, compare audit and report dfs"
+      "note": "shared mixing, compare audit and report dfs",
+      "hints": ""
     }
   },
   "agg G.Mixed02  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts=5                              mixed gamma 0.3": {
@@ -1776,7 +1858,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed03  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]                                     mixed gamma 0.3": {
@@ -1802,7 +1885,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed04  1  claim  50 xs 0 sev lognorm  [2 4 6 8 10]  cv 1           wts  [.2 .3 .3 .15 .05]              mixed gamma 0.3": {
@@ -1834,7 +1918,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed05  1  claim 250 xs 0 sev lognorm  [10 15 20 25 50 100]  cv  [0.1 0.2 0.4 0.6 0.8 1.0]  wts=6        mixed gamma 0.3": {
@@ -1875,7 +1960,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed07  1  claim          sev 100               *  beta  [1 200 500 100]   [100 800 500 1]  + 10  wts=4  mixed gamma 0.3": {
@@ -1909,7 +1995,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed08  1  claim          sev  [100 200 250 300]  *  beta  [1 200 500 100]   [100 800 500 1]  + 10  wts=4  mixed gamma 0.3": {
@@ -1948,7 +2035,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed09  8  claim          sev      100 *  [lognorm expon]   [.5 1]  wts  [0.6 .4]                          mixed gamma 0.3    note{different severities}": {
@@ -1974,7 +2062,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": "different severities"
+      "note": "different severities",
+      "hints": ""
     }
   },
   "agg G.Mixed10  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10 wts=2                          mixed gamma 0.3": {
@@ -2004,7 +2093,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg G.Mixed11  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10                                mixed gamma 0.3": {
@@ -2031,7 +2121,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.3,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg H.Limits01               1 claim  [1 5 10 20]  xs  0              sev lognorm 10 cv 1.2  fixed": {
@@ -2055,7 +2146,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg H.Limits02               5 claim            100 xs  [0 10 50]     sev lognorm 10 cv 1.2  fixed": {
@@ -2078,7 +2170,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg H.Limits02               5 claim  [10 20 50 100]  xs  [0 0 50 100]  sev lognorm 10 cv 2.0  fixed": {
@@ -2107,7 +2200,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg H.Limits03    [10 10 10 10]  claims  [inf 10 inf 10]  xs  [0 0 5 5]   sev lognorm 10 cv 1.25 fixed": {
@@ -2141,7 +2235,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend01  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]                  poisson": {
@@ -2168,7 +2263,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend02  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]                  mixed gamma 0.25": {
@@ -2196,7 +2292,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.25,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend03  10 claims  [5 10 15]  xs 0                 sev lognorm 12 cv  [1 1.5 3]  wts=3           mixed gamma 0.25": {
@@ -2228,7 +2325,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.25,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend04   1 claims  [1 5 10 20]  xs  0          sev lognorm 10 cv 1.2 wts  [.50 .20 .20 .1]      mixed gamma 0.25": {
@@ -2258,7 +2356,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.25,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend05   5 claims  [10 20 50 100]  xs 10          sev lognorm 10 cv 1.2 wts  [.50 .20 .20 .1]   mixed gamma 0.25": {
@@ -2288,7 +2387,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.25,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend06  [10 30 15 5]   claims  [inf 10 inf 10]  xs  [0 0 5 5]  sev lognorm  10 cv  [1.0 1.25 1.5]  wts=3         mixed gamma 0.25": {
@@ -2331,7 +2431,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.25,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend07    [10 20 30]   claims  [100 200 75]  xs  [0 50 75]     sev lognorm 100 cv  [1 2]  wts  [.6 .4]             mixed gamma 0.4": {
@@ -2369,7 +2470,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.4,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg I.Blend08       [10 30]   claims                              sev lognorm 100 cv  [1 2]                         mixed gamma 0.4": {
@@ -2393,10 +2495,11 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.4,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
-  "agg I.Blend09   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  note{log2=17;}": {
+  "agg I.Blend09   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  hints{log2=17;}": {
     "kind": "agg",
     "name": "I.Blend09",
     "spec": {
@@ -2433,7 +2536,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.5,
-      "note": "log2=17;"
+      "note": "",
+      "hints": "log2=17;"
     }
   },
   "agg I.Blend10   [500 800 200]    loss                             sev lognorm 10 cv  [.2 .35 .5]  wts=3             mixed gamma 0.5": {
@@ -2463,10 +2567,11 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.5,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
-  "agg I.Blend11   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  note{log2=17;}": {
+  "agg I.Blend11   [1000 2000 500]  prem at  [.8 .7 .5]  lr            sev lognorm 10 cv  [.2 .35 .5]  wts  [1/2 3/8 1/8]  mixed gamma 0.5  hints{log2=17;}": {
     "kind": "agg",
     "name": "I.Blend11",
     "spec": {
@@ -2503,7 +2608,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.5,
-      "note": "log2=17;"
+      "note": "",
+      "hints": "log2=17;"
     }
   },
   "agg I.Blend12   [500 800 200]    loss                             sev lognorm 10 cv  [.2 .35 .5]  wts=3             mixed gamma 0.5": {
@@ -2533,7 +2639,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.5,
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re01  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson": {
@@ -2570,7 +2677,8 @@
       ],
       "occ_kind": "net of",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re02  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate net of 50% so 25 xs 0 and 75 xs 25": {
@@ -2602,7 +2710,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re03  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
@@ -2652,7 +2761,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re04  5 claims 100 xs 0 dsev  [1:100]           occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
@@ -2900,7 +3010,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re05  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson": {
@@ -2937,7 +3048,8 @@
       ],
       "occ_kind": "ceded to",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re06  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate ceded to 50% so 25 xs 0 and 75 xs 25": {
@@ -2969,7 +3081,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re07  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
@@ -3019,7 +3132,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re08  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
@@ -3267,7 +3381,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re09  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 15 xs 5 poisson": {
@@ -3294,7 +3409,8 @@
       ],
       "occ_kind": "ceded to",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re10  5 claims 100 xs 0 sev lognorm 10 cv .75                            poisson aggregate net of   20 xs 0": {
@@ -3321,7 +3437,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re11  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 15 xs 5 poisson aggregate net of   20 xs 0": {
@@ -3356,7 +3473,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re12  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 15 xs 5 poisson aggregate net of   20 xs 0": {
@@ -3589,7 +3707,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re13  5 claims 100 xs 0 dsev  [1:100]           occurrence net of   15 xs 5 poisson aggregate ceded to 20 xs 0": {
@@ -3822,7 +3941,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv  [.2 .35 .5]  wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 xs 2.0       mixed gamma 0.5  aggregate ceded to 1.5 xs 1.5 and 5.0 po 10.0 xs 12.5": {
@@ -3881,7 +4001,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 xs 1 and 2.5 po 5 xs 5 and 25% so 30 xs 20 and inf xs 100 poisson          aggregate net of 10 xs 15": {
@@ -3929,7 +4050,8 @@
         ]
       ],
       "agg_kind": "net of",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re16 5 claims dsev  [0:100]  occurrence ceded to tower  [10:50:10]  poisson": {
@@ -4169,7 +4291,8 @@
       ],
       "occ_kind": "ceded to",
       "freq_name": "poisson",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re17 5 claims dsev  [0:100]  poisson aggregate ceded to tower  [200:500:100]": {
@@ -4404,7 +4527,8 @@
         ]
       ],
       "agg_kind": "ceded to",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re18a 1 claim dsev  [10]  occurrence net of 50% so 10 xs 0 fixed": {
@@ -4429,7 +4553,8 @@
       ],
       "occ_kind": "net of",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re18b 1 claim dsev  [10]  occurrence net of 50% po 10 xs 0 fixed": {
@@ -4454,7 +4579,8 @@
       ],
       "occ_kind": "net of",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re18c 1 claim dsev  [10]  occurrence net of 5 so 10 xs 0 fixed": {
@@ -4479,7 +4605,8 @@
       ],
       "occ_kind": "net of",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg J.Re18d 1 claim dsev  [10]  occurrence net of 5 po 10 xs 0 fixed": {
@@ -4504,7 +4631,8 @@
       ],
       "occ_kind": "net of",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   },
   "agg K.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv}": {
@@ -4521,7 +4649,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "Tweedie defined by claim count, gamma mean and cv"
+      "note": "Tweedie defined by claim count, gamma mean and cv",
+      "hints": ""
     }
   },
   "agg K.Tweedie1 10.050251256281404 claims sev 0.0005 * gamma 199 poisson                  note{Tweedie defined by claim count, gamma scale and shape}": {
@@ -4537,7 +4666,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "Tweedie defined by claim count, gamma scale and shape"
+      "note": "Tweedie defined by claim count, gamma scale and shape",
+      "hints": ""
     }
   },
   "agg K.Tweedie2 tweedie 1 1.005 0.1                                                       note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p}": {
@@ -4550,7 +4680,8 @@
       "sev_name": "gamma",
       "sev_a": 199.00000000000426,
       "sev_scale": 0.0004999999999999894,
-      "note": "Tw(p=1.005, \u03bc=1.0, \u03c3^2=0.1) --> CP(\u03bb= 10.0503, ga(\u03b1=199, \u03b2=0.0005), scale=0.0005"
+      "note": "Tw(p=1.005, \u03bc=1.0, \u03c3^2=0.1) --> CP(\u03bb= 10.0503, ga(\u03b1=199, \u03b2=0.0005), scale=0.0005",
+      "hints": ""
     }
   },
   "port L.Bodoff1 note{Bodoff Thought Experiment No. 1} agg wind1  1 claim sev dhistogram xps  [0,  99]   [0.80, 0.20]  fixed agg quake1 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
@@ -4577,7 +4708,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4599,11 +4731,13 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ]
       ],
-      "note": "Bodoff Thought Experiment No. 1"
+      "note": "Bodoff Thought Experiment No. 1",
+      "hints": ""
     }
   },
   "port L.Bodoff2 note{Bodoff Thought Experiment No. 2} agg wind2  1 claim sev dhistogram xps  [0,  50]   [0.80, 0.20]  fixed agg quake2 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
@@ -4630,7 +4764,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4652,11 +4787,13 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ]
       ],
-      "note": "Bodoff Thought Experiment No. 2"
+      "note": "Bodoff Thought Experiment No. 2",
+      "hints": ""
     }
   },
   "port L.Bodoff3 note{Bodoff Thought Experiment No. 3} agg wind3  1 claim sev dhistogram xps  [0,   5]   [0.80, 0.20]  fixed agg quake3 1 claim sev dhistogram xps  [0, 100]   [0.95, 0.05]  fixed": {
@@ -4683,7 +4820,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4705,11 +4843,13 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ]
       ],
-      "note": "Bodoff Thought Experiment No. 3"
+      "note": "Bodoff Thought Experiment No. 3",
+      "hints": ""
     }
   },
   "port L.Bodoff4 note{Bodoff Thought Experiment No. 4 (check!)} agg a 0.25 claims sev   4 * expon poisson agg b 0.05 claims sev  20 * expon poisson agg c 0.05 claims sev 100 * expon poisson": {
@@ -4729,7 +4869,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4744,7 +4885,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4759,14 +4901,16 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ]
       ],
-      "note": "Bodoff Thought Experiment No. 4 (check!)"
+      "note": "Bodoff Thought Experiment No. 4 (check!)",
+      "hints": ""
     }
   },
-  "port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev  [0 8 10]   [1/2 1/4 1/4]  fixed agg Discrete.X2 1 claim dsev  [0 1 90]   [1/2 1/4 1/4]  fixed note{bs=1; log2=8; padding=1}": {
+  "port M.PIR.1.Discrete note{PIR Discrete case study. Change 8 to 9 for the equal points example.} agg Discrete.X1 1 claim dsev  [0 8 10]   [1/2 1/4 1/4]  fixed agg Discrete.X2 1 claim dsev  [0 1 90]   [1/2 1/4 1/4]  fixed hints{bs=1; log2=8; padding=1}": {
     "kind": "port",
     "name": "M.PIR.1.Discrete",
     "spec": {
@@ -4789,7 +4933,8 @@
               0.25
             ],
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4810,14 +4955,16 @@
               0.25
             ],
             "freq_name": "fixed",
-            "note": "bs=1; log2=8; padding=1"
+            "note": "",
+            "hints": "bs=1; log2=8; padding=1"
           }
         ]
       ],
-      "note": "PIR Discrete case study. Change 8 to 9 for the equal points example."
+      "note": "PIR Discrete case study. Change 8 to 9 for the equal points example.",
+      "hints": ""
     }
   },
-  "port M.PIR.2.Tame note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed note{bs=1/64, log2=16, padding=1}": {
+  "port M.PIR.2.Tame note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma  50 cv 0.10 fixed agg Tame.B 1 claim sev gamma  50 cv 0.15 fixed hints{bs=1/64; log2=16; padding=1}": {
     "kind": "port",
     "name": "M.PIR.2.Tame",
     "spec": {
@@ -4836,7 +4983,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4853,14 +5001,16 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": "bs=1/64, log2=16, padding=1"
+            "note": "",
+            "hints": "bs=1/64; log2=16; padding=1"
           }
         ]
       ],
-      "note": "PIR Tame case study. For reinsurance see text."
+      "note": "PIR Tame case study. For reinsurance see text.",
+      "hints": ""
     }
   },
-  "port M.PIR.3.CNC.Gross note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed note{bs=1/64, log2=16, padding=1}": {
+  "port M.PIR.3.CNC.Gross note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm  20 cv 1.00 fixed hints{bs=1/64; log2=16; padding=1}": {
     "kind": "port",
     "name": "M.PIR.3.CNC.Gross",
     "spec": {
@@ -4879,7 +5029,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4896,14 +5047,16 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": "bs=1/64, log2=16, padding=1"
+            "note": "",
+            "hints": "bs=1/64; log2=16; padding=1"
           }
         ]
       ],
-      "note": "PIR Cat-Noncat gross case study."
+      "note": "PIR Cat-Noncat gross case study.",
+      "hints": ""
     }
   },
-  "port M.PIR.4.CNC.Net note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 note{bs=1/64, log2=16, padding=1}": {
+  "port M.PIR.4.CNC.Net note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma    80 cv 0.15 fixed agg CNC.Net.Cat    1 claim sev lognorm  20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 hints{bs=1/64; log2=16; padding=1}": {
     "kind": "port",
     "name": "M.PIR.4.CNC.Net",
     "spec": {
@@ -4922,7 +5075,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "fixed",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4947,14 +5101,16 @@
               ]
             ],
             "agg_kind": "net of",
-            "note": "bs=1/64, log2=16, padding=1"
+            "note": "",
+            "hints": "bs=1/64; log2=16; padding=1"
           }
         ]
       ],
-      "note": "PIR Cat-Noncat net case study."
+      "note": "PIR Cat-Noncat net case study.",
+      "hints": ""
     }
   },
-  "port M.PIR.5.HuSCS.Gross note{PIR Hurricane SCS gross case study.} agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson note{bs=1/4, log2=19, padding=1}": {
+  "port M.PIR.5.HuSCS.Gross note{PIR Hurricane SCS gross case study.} agg SCS 70 claims sev exp(-1.9**2 / 2)      * lognorm 1.9 poisson agg Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 poisson hints{bs=1/4; log2=19; padding=1}": {
     "kind": "port",
     "name": "M.PIR.5.HuSCS.Gross",
     "spec": {
@@ -4972,7 +5128,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -4988,14 +5145,16 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": "bs=1/4, log2=19, padding=1"
+            "note": "",
+            "hints": "bs=1/4; log2=19; padding=1"
           }
         ]
       ],
-      "note": "PIR Hurricane SCS gross case study."
+      "note": "PIR Hurricane SCS gross case study.",
+      "hints": ""
     }
   },
-  "port M.PIR.6.HuSCS.Net note{PIR Hurricane SCS net case study.} agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson note{bs=1/4, log2=19, padding=1}": {
+  "port M.PIR.6.HuSCS.Net note{PIR Hurricane SCS net case study.} agg Net.SCS 70 claims sev    exp(-1.9**2 / 2)   * lognorm 1.9 poisson agg Net.Hu   2 claims sev exp(-2.5**2/2)/(1/15) * lognorm 2.5 occurrence net of 372.4 xs 40.25 poisson hints{bs=1/4; log2=19; padding=1}": {
     "kind": "port",
     "name": "M.PIR.6.HuSCS.Net",
     "spec": {
@@ -5013,7 +5172,8 @@
             "sev_lb": 0.0,
             "sev_ub": "__inf__",
             "freq_name": "poisson",
-            "note": ""
+            "note": "",
+            "hints": ""
           }
         ],
         [
@@ -5037,11 +5197,13 @@
             ],
             "occ_kind": "net of",
             "freq_name": "poisson",
-            "note": "bs=1/4, log2=19, padding=1"
+            "note": "",
+            "hints": "bs=1/4; log2=19; padding=1"
           }
         ]
       ],
-      "note": "PIR Hurricane SCS net case study."
+      "note": "PIR Hurricane SCS net case study.",
+      "hints": ""
     }
   },
   "agg N.US.Hurricane 1.79 claims 1e12 xs 0 sev exp(19.595) * lognorm 2.581 poisson  note{Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.}": {
@@ -5059,7 +5221,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course."
+      "note": "Based on NOAA reanalysis dataset and sample of hurricane loss. Source SJU RMI3388 Course.",
+      "hints": ""
     }
   },
   "agg N.US.SCS      37.50 claims 50e9 xs 0 sev exp(18.785550228504665) * lognorm 1.75 poisson note{Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B}": {
@@ -5077,7 +5240,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "poisson",
-      "note": "Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B"
+      "note": "Judgmental based on fre3quency of EF4-5 tornadoes, AAL of 25B and extreme event loss of 10B",
+      "hints": ""
     }
   },
   "agg N.Comm.Liability     10e6 loss 1e6 xs 0   sev lognorm 100e3 cv 3.77 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5097,7 +5261,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.26,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "agg N.Comm.Professional  10e6 loss 5e6 xs 0   sev lognorm 850e3 cv 8.48 mixed gamma 0.27 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5117,7 +5282,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.27,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "agg N.Personal.Auto            10e6 loss 300e3 xs 0 sev lognorm  45e3 cv 20.4 mixed gamma 0.13 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5137,7 +5303,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.13,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "agg N.Comm.Umbrella  [6e6 3e6 1e6]  loss  [1e6 4e6 5e6]  xs  [1e6 1e6 5e6]  sev lognorm 250e3 cv 5.00 mixed gamma 0.26 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5169,7 +5336,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.26,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "agg N.Comm.Property  [7e6 3e6]  loss 100e6 xs 0 sev 100e6 * beta 0.1 cv  [1.25 2.5]  mixed gamma 0.28 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5195,7 +5363,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.28,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "agg N.Homeowners           [8e6 2e6]  loss 650e3 xs 0 sev 650e3 * beta 0.1 cv  [0.75 2.75]  mixed gamma 0.37 note{Source: CV from Aon IRS 10th ed, severity selected judgmentally.}": {
@@ -5221,7 +5390,8 @@
       "sev_ub": "__inf__",
       "freq_name": "gamma",
       "freq_a": 0.37,
-      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally."
+      "note": "Source: CV from Aon IRS 10th ed, severity selected judgmentally.",
+      "hints": ""
     }
   },
   "sev N.Comm.Auto.MED  [2.764e3 24.548e3 275.654e3 1.917469e6 10e6]  * expon 1 wts  [0.824796 0.159065 0.014444 0.001624 0.000071]  note{Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)}": {
@@ -5247,7 +5417,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "name": "N.Comm.Auto.MED",
-      "note": "Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)"
+      "note": "Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)",
+      "hints": ""
     }
   },
   "agg O.Logo 1 claim  [10:250:10]  xs 0 sev lognorm 100 cv 1 fixed": {
@@ -5292,7 +5463,8 @@
       "sev_lb": 0.0,
       "sev_ub": "__inf__",
       "freq_name": "fixed",
-      "note": ""
+      "note": "",
+      "hints": ""
     }
   }
 }

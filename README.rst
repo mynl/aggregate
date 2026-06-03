@@ -28,6 +28,35 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a25
+---------
+
+``note{}`` is now pure text; build settings move to ``hints{}``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``note{...}`` used to do double duty: free-text annotation *and* a
+``key=value;`` side-channel for build settings (``log2``, ``bs``, …). That
+overloading meant any ``=`` in note prose — e.g. ``note{... needs x_min<=-6}`` —
+was mis-read as a keyword argument and crashed the build. Notes are now **pure
+annotation**; a dedicated ``hints{...}`` clause carries build settings.
+
+- **Syntax.** ``hints{key=value; key=value}``, e.g.
+  ``agg A 5 claims sev lognorm 10 cv 2 poisson hints{log2=18; bs=1/64}``.
+  ``note{}`` and ``hints{}`` are both optional and order-free (at most one of
+  each); ``hints`` is allowed everywhere ``note`` is (agg, sev, port).
+- **Caller always wins.** Explicit ``build(...)`` keyword arguments override
+  in-program ``hints`` uniformly — including ``recommend_p`` (fixing the old
+  quirk where a note's ``recommend_p`` overrode the caller).
+- **Forgiving.** Values are inferred generically (int / float / ``a/b``
+  fraction / ``True``/``False`` / str). Unknown keys warn and are dropped;
+  a duplicate key warns and the last value wins; a malformed clause warns and is
+  skipped — a bad hint never crashes the build.
+- **Deprecation.** A ``note{}`` that still looks like it carries ``key=value``
+  settings emits a one-time warning (the note is treated as pure text).
+- **Migration.** The bundled ``test_suite.agg`` / ``test_decl.agg`` corpora moved
+  their settings-in-notes into ``hints{}``; built grids are unchanged. See
+  ``dev/plan-note-parse.md``.
+
 1.0.0a24
 ---------
 

@@ -1,6 +1,15 @@
 # Split `note{...}` into pure notes + a new `hints{...}` settings clause
 
-**Status:** planning only. No `src/` changes made.
+**Status:** SHIPPED in 1.0.0a25 (2026-06-03). Implemented with one design
+change from the draft: the `trailer` rule is spelled out as five token-distinct
+alternatives (`NOTE HINTS | HINTS NOTE | NOTE | HINTS | <empty>`) rather than
+the `note hints | hints note` form, which had two parses of the empty trailer
+(Earley-ambiguous). Constructors (`Aggregate`/`Severity`/`MultivariateAggregate`)
+gained a `hints=''` passthrough so `Object(**spec)` accepts the new key. The PIR
+port settings-in-notes were found to be *dead* today (they attach to the last
+agg unit, not the port, and port build ignores unit notes); migrated in place as
+`hints{}` to keep grids bit-identical (a separate fix could hoist them to the
+port to make them live).
 **Date:** 2026-06-03
 
 ## 1. Motivation

@@ -33,6 +33,7 @@ class AggLexer(RegexLexer):
             (r'\\\n', Text),
             (r'\\', Text),
             (r'note\{', Name.Type, 'note'),
+            (r'hints\{', Name.Type, 'hints'),
             (r'\}', Name.Type),
             (r'#.*$', Comment),
             ('!', Generic.Heading),
@@ -53,6 +54,10 @@ class AggLexer(RegexLexer):
         ],
 
         'note': [
+            (r'[^\}]*', Comment, '#pop'),
+            ],
+
+        'hints': [
             (r'[^\}]*', Comment, '#pop'),
             ],
 

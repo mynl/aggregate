@@ -2927,7 +2927,7 @@ class Aggregate:
                  agg_reins=None, agg_kind='',
                  reins_bucket=None,
                  agg_premium=None, agg_reflect=False, agg_shift=0.0, value_type='loss',
-                 note=''):
+                 note='', hints=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
@@ -2986,7 +2986,10 @@ class Aggregate:
         :param value_type:      ``'loss'`` (default) or ``'payoff'``; ``pnl`` sets
                                 ``'payoff'`` (more is better). Inert for the
                                 distribution, consumed at the pricing layer.
-        :param note:            note, enclosed in {}
+        :param note:            free-text note, from a ``note{...}`` clause
+        :param hints:           raw ``hints{...}`` build-settings string
+            (``key=value;`` form). Pure annotation here; the underwriter
+            parses it on build (caller-supplied ``build()`` kwargs win).
         """
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
@@ -3015,6 +3018,9 @@ class Aggregate:
             get_value(freq_zm), get_value(freq_p0))
         # Spec passthroughs from constructor arguments
         self.note = note
+        # Raw `hints{...}` settings string; consumed by the underwriter build
+        # path (caller-wins merge), retained here for round-tripping / repr.
+        self.hints = hints
         self.program = ''  # can be set externally
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
@@ -7049,7 +7055,7 @@ class Severity(ss.rv_continuous):
 
     def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
-                 sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note=''):
+                 sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note='', hints=''):
         """Continuous random variable adding layer/attachment to ``ss.rv_continuous``.
 
         Construction is delegated to a registered subclass — ``__new__``
@@ -7094,7 +7100,10 @@ class Severity(ss.rv_continuous):
         name : str
             Identifier (e.g. set by ``sev SOMENAME …`` in DecL).
         note : str
-            Free-text annotation.
+            Free-text annotation (from a ``note{...}`` clause).
+        hints : str
+            Raw ``hints{...}`` build-settings string; retained as annotation
+            (a standalone ``Severity`` has no build settings to apply).
 
         Warnings
         --------
@@ -7146,6 +7155,7 @@ class Severity(ss.rv_continuous):
         self.name = name
         self.long_name = sev_name
         self.note = note
+        self.hints = hints
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
         self.sev_loc = sev_loc

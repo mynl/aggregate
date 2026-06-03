@@ -271,6 +271,10 @@ class UnderwritingTransformer(Transformer):
     def NOTE(self, tok):
         return str(tok)[5:-1]
 
+    def HINTS(self, tok):
+        # strip the leading ``hints{`` (6 chars) and trailing ``}``.
+        return str(tok)[6:-1]
+
     def ID(self, tok):
         return str(tok)
 
@@ -364,8 +368,10 @@ class UnderwritingTransformer(Transformer):
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):
-        _, name, note, agg_list = c
-        return ("port", name, {"spec": agg_list, "note": note})
+        _, name, trailer, agg_list = c
+        return ("port", name, {"spec": agg_list,
+                               "note": trailer["note"],
+                               "hints": trailer["hints"]})
 
     def agg_list_cons(self, c):
         lst, ag = c
@@ -377,7 +383,7 @@ class UnderwritingTransformer(Transformer):
 
     # ----- aggregate -------------------------------------------------
     def agg_out_full(self, c):
-        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, note = c
+        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, trailer = c
         spec = {
             "name": name,
             **exposures,
@@ -386,12 +392,13 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **freq,
             **agg_reins,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         return ("agg", name, spec)
 
     def agg_out_dfreq(self, c):
-        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, note = c
+        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, trailer = c
         spec = {
             "name": name,
             **dfreq,
@@ -399,7 +406,8 @@ class UnderwritingTransformer(Transformer):
             **sev_clause,
             **occ_reins,
             **agg_reins,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         return ("agg", name, spec)
 
@@ -411,7 +419,7 @@ class UnderwritingTransformer(Transformer):
         # module is also runnable as ``python -m`` for grammar printing).
         from .tweedie import tweedie_convert
 
-        _, name, _tw, mu, pp, sig2, note = c
+        _, name, _tw, mu, pp, sig2, trailer = c
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
         alpha = ans["α"]
         lam = ans["λ"]
@@ -423,23 +431,29 @@ class UnderwritingTransformer(Transformer):
             "sev_name": "gamma",
             "sev_a": alpha,
             "sev_scale": beta,
+            # tweedie synthesises its own descriptive note (the user note is
+            # not preserved, as before); hints still flow through.
             "note": (
                 f"Tw(p={pp}, μ={mu}, σ^2={sig2}) --> "
                 f"CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), scale={beta:.8g}"
             ),
+            "hints": trailer["hints"],
         }
         return ("agg", name, spec)
 
     def agg_out_rename(self, c):
-        _, name, bagg, occ_reins, agg_reins, note = c
+        _, name, bagg, occ_reins, agg_reins, trailer = c
         if "name" in bagg:
             del bagg["name"]
-        spec = {"name": name, **bagg, **occ_reins, **agg_reins, "note": note}
+        spec = {"name": name, **bagg, **occ_reins, **agg_reins,
+                "note": trailer["note"], "hints": trailer["hints"]}
         return ("agg", name, spec)
 
     def agg_out_builtin(self, c):
-        bagg, agg_reins, note = c
-        return ("agg", bagg["name"], {**bagg, **agg_reins, "note": note})
+        bagg, agg_reins, trailer = c
+        return ("agg", bagg["name"], {**bagg, **agg_reins,
+                                      "note": trailer["note"],
+                                      "hints": trailer["hints"]})
 
     # ----- profit-and-loss aggregate (premium minus loss) -----------
     def answer_pnl(self, c):
@@ -482,7 +496,7 @@ class UnderwritingTransformer(Transformer):
 
     def pnl_out_full(self, c):
         (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
-         occ_reins, freq, agg_reins, note) = c
+         occ_reins, freq, agg_reins, trailer) = c
         spec = {
             "name": name,
             **exposures,
@@ -491,14 +505,15 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **freq,
             **agg_reins,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         self._attach_pnl(spec, premium)
         return ("agg", name, spec)
 
     def pnl_out_dfreq(self, c):
         (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
-         occ_reins, agg_reins, note) = c
+         occ_reins, agg_reins, trailer) = c
         spec = {
             "name": name,
             **dfreq,
@@ -506,7 +521,8 @@ class UnderwritingTransformer(Transformer):
             **sev_clause,
             **occ_reins,
             **agg_reins,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         self._attach_pnl(spec, premium)
         return ("agg", name, spec)
@@ -564,26 +580,28 @@ class UnderwritingTransformer(Transformer):
         return Copula('independent')
 
     def mv_out_copula(self, c):
-        _mv, name, exposures, body, copula, freq, note = c
+        _mv, name, exposures, body, copula, freq, trailer = c
         spec = {
             "name": name,
             **exposures,
             **freq,
             "lines": body,
             "copula": copula,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         return ("mvagg", name, spec)
 
     def mv_out_copula_nofreq(self, c):
-        _mv, name, exposures, body, copula, note = c
+        _mv, name, exposures, body, copula, trailer = c
         spec = {
             "name": name,
             **exposures,
             "freq_name": "poisson",
             "lines": body,
             "copula": copula,
-            "note": note,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
         }
         return ("mvagg", name, spec)
 
@@ -597,19 +615,22 @@ class UnderwritingTransformer(Transformer):
             "mode": "netceded",
             "lines": [agg_tuple],
             "note": spec.get("note", ""),
+            "hints": spec.get("hints", ""),
         })
 
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
-        _, name, sev, note = c
+        _, name, sev, trailer = c
         sev["name"] = name
-        sev["note"] = note
+        sev["note"] = trailer["note"]
+        sev["hints"] = trailer["hints"]
         return ("sev", name, sev)
 
     def sev_out_dsev(self, c):
-        _, name, dsev, note = c
+        _, name, dsev, trailer = c
         dsev["name"] = name
-        dsev["note"] = note
+        dsev["note"] = trailer["note"]
+        dsev["hints"] = trailer["hints"]
         return ("sev", name, dsev)
 
     # ----- frequency -------------------------------------------------
@@ -930,12 +951,25 @@ class UnderwritingTransformer(Transformer):
         attach = breaks[:-1]
         return [limits, attach]
 
-    # ----- note ------------------------------------------------------
-    def note_some(self, c):
-        return c[0]
+    # ----- trailer (optional note{...} + hints{...}) -----------------
+    # Each method returns ``{"note": <text>, "hints": <raw settings string>}``
+    # so the order-free / present-or-absent variants collapse to one shape.
+    # ``hints`` is left as a raw ``key=value;`` string here; it is parsed and
+    # type-coerced in ``aggregate.underwriter`` (caller-wins merge).
+    def trailer_nh(self, c):
+        return {"note": c[0], "hints": c[1]}
 
-    def note_none(self, c):
-        return ""
+    def trailer_hn(self, c):
+        return {"note": c[1], "hints": c[0]}
+
+    def trailer_note(self, c):
+        return {"note": c[0], "hints": ""}
+
+    def trailer_hints(self, c):
+        return {"note": "", "hints": c[0]}
+
+    def trailer_none(self, c):
+        return {"note": "", "hints": ""}
 
     # ----- exposures -------------------------------------------------
     def exposures_claims(self, c):

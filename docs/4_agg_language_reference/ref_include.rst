@@ -21,7 +21,9 @@
     
     answer: sev_out          -> answer_sev
           | agg_out          -> answer_agg
+          | pnl_out          -> answer_pnl
           | port_out         -> answer_port
+          | mv_out           -> answer_mv
           | distortion_out   -> answer_distortion
           | expr             -> answer_expr
     
@@ -31,32 +33,94 @@
     
     distortion_out: DISTORTION name ID expr                       -> distortion_out_short
                   | DISTORTION name ID expr "[" numberl "]"       -> distortion_out_long
+                  | DISTORTION name ID buildin_dist_list                                  -> distortion_out_combo
+                  | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]"          -> distortion_out_combo_wtd
+    
+    buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
+                     | BUILTIN_DIST                      -> buildin_dist_list_one
     
     // ======================================================================
     // Portfolio
     // ======================================================================
     
-    port_out: PORT name note agg_list
+    port_out: PORT name trailer agg_list
     
-    agg_list: agg_list agg_out   -> agg_list_cons
-            | agg_out            -> agg_list_one
+    agg_list: agg_list port_item   -> agg_list_cons
+            | port_item            -> agg_list_one
+    
+    // A portfolio unit is an ordinary loss aggregate (``agg``) or a
+    // premium-minus-loss aggregate (``pnl``). Both transform to an
+    // ("agg", name, spec) tuple, so the rest of the portfolio path is
+    // unchanged. ``?port_item`` is inlined (single child) so the
+    // transformer sees the underlying agg_out / pnl_out result directly.
+    ?port_item: agg_out
+              | pnl_out
     
     // ======================================================================
     // Aggregate
     // ======================================================================
     
-    agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins note  -> agg_out_full
-           | AGG name dfreq      layers sev_clause occ_reins         agg_reins note  -> agg_out_dfreq
-           | AGG name TWEEDIE expr expr expr note                                    -> agg_out_tweedie
-           | AGG name builtin_agg occ_reins agg_reins note                           -> agg_out_rename
-           | builtin_agg agg_reins note                                              -> agg_out_builtin
+    agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins trailer  -> agg_out_full
+           | AGG name dfreq      layers sev_clause occ_reins         agg_reins trailer  -> agg_out_dfreq
+           | AGG name TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
+           | AGG name builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
+           | builtin_agg agg_reins trailer                                              -> agg_out_builtin
+    
+    // ======================================================================
+    // Profit-and-loss aggregate (premium minus loss)
+    // ----------------------------------------------------------------------
+    // ``pnl NAME <premium> prem - <loss-agg-body>`` is a sibling of ``agg``.
+    // The premium is a single deterministic amount subtracted ONCE for the
+    // book (an aggregate-level affine shift), as opposed to a constant inside
+    // sev/dsev/ssev which is per-claim (multiplied by frequency). The body
+    // after ``prem -`` is an ordinary aggregate; only the exposure head is
+    // specialised so a bare ``lr`` can bind to the stated premium. See
+    // dev/done/plan-pnl-premium.md.
+    // ======================================================================
+    
+    pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins trailer  -> pnl_out_full
+           | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins trailer  -> pnl_out_dfreq
+    
+    pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
+                 | numbers LOSS     -> pnl_exp_loss
+                 | numbers LR       -> pnl_exp_lr
+    
+    // ======================================================================
+    // Multivariate aggregate (copula-coupled bivariate)
+    // ----------------------------------------------------------------------
+    // ``multivariate NAME <shared-count> <two component aggs> copula KIND P
+    //   [freq]`` couples the two components' per-claim severities by a copula and
+    // accumulates them with a shared outer frequency via a 2D FFT. The body is
+    // exactly TWO ``agg`` / ``pnl`` declarations (validated in the class). The
+    // trailing ``freq`` is optional (defaults to poisson). See
+    // dev/plan-multivariate.md.
+    // ======================================================================
+    
+    mv_out: MULTIVARIATE name exposures mv_body copula_clause freq trailer  -> mv_out_copula
+          | MULTIVARIATE name exposures mv_body copula_clause trailer        -> mv_out_copula_nofreq
+          | NETCEDED agg_out                                              -> mv_out_netceded
+    
+    mv_body: mv_body mv_item   -> mv_body_cons
+           | mv_item           -> mv_body_one
+    
+    // A component is an ordinary loss aggregate (``agg``) or a premium-minus-loss
+    // aggregate (``pnl``); both transform to an ("agg", name, spec) tuple.
+    ?mv_item: agg_out
+            | pnl_out
+    
+    // The copula clause is optional: omitted (or ``copula independent``) means the
+    // independence copula. ``copula KIND`` (no param) is the parameter-free form
+    // (independent); ``copula KIND P`` carries the kind's natural parameter.
+    copula_clause: COPULA ID numbers   -> copula_one_param
+                 | COPULA ID            -> copula_no_param
+                 |                      -> copula_none
     
     // ======================================================================
     // Severity output (standalone `sev X ...` definitions)
     // ======================================================================
     
-    sev_out: SEV name sev note    -> sev_out_sev
-           | SEV name dsev note   -> sev_out_dsev
+    sev_out: SEV name sev trailer    -> sev_out_sev
+           | SEV name dsev trailer   -> sev_out_dsev
     
     // ======================================================================
     // Frequency
@@ -95,6 +159,7 @@
     // ======================================================================
     
     sev_clause: SEV sev          -> sev_clause_sev
+              | SSEV sev         -> sev_clause_ssev
               | dsev             -> sev_clause_dsev
               | BUILTIN_SEV      -> sev_clause_builtin
     
@@ -105,6 +170,7 @@
     
     sev2: sev1 PLUS numbers      -> sev2_add
         | sev1 MINUS numbers     -> sev2_sub
+        | numbers MINUS sev1     -> sev2_rsub
         | sev1                   -> sev2_passthrough
     
     sev1: numbers TIMES sev0     -> sev1_scaled
@@ -151,11 +217,26 @@
     tower: TOWER doutcomes
     
     // ======================================================================
-    // Note (optional trailing `note{...}` clause)
+    // Trailer: optional `note{...}` annotation + `hints{...}` build settings.
+    // ----------------------------------------------------------------------
+    // `note{...}` is pure free-text; `hints{...}` carries `key=value;` build
+    // settings (parsed in the underwriter, not here). Both are optional and
+    // order-free, at most one of each.
+    //
+    // Spelled out as five token-distinct alternatives rather than two
+    // empty-producing nonterminals (`note hints | hints note`): the latter has
+    // two parses of the EMPTY trailer (note_none+hints_none vs hints_none+
+    // note_none), which Earley flags as ambiguous. Here every alternative
+    // matches a distinct token sequence (NOTE HINTS / HINTS NOTE / NOTE / HINTS
+    // / nothing) and `note{` vs `hints{` have disjoint prefixes, so the parse
+    // is unambiguous.
     // ======================================================================
     
-    note: NOTE   -> note_some
-        |        -> note_none
+    trailer: NOTE HINTS   -> trailer_nh
+           | HINTS NOTE    -> trailer_hn
+           | NOTE          -> trailer_note
+           | HINTS         -> trailer_hints
+           |               -> trailer_none
     
     // ======================================================================
     // Exposures
@@ -232,49 +313,62 @@
     // ======================================================================
     
     // Keywords — priority 2 so they outrank the catch-all ID terminal.
-    OCCURRENCE.2: "occurrence"
-    AGGREGATE.2:  "aggregate"
-    EXPOSURE.2:   "exposure"
-    TWEEDIE.2:    "tweedie"
-    PREMIUM.2:    "premium" | "prem"
-    TOWER.2:      "tower"
-    MIXED.2:      "mixed"
-    PICKS.2:      "picks"
-    CLAIMS.2:     "claims" | "claim"
-    SPLICE.2:     "splice"
-    CEDED.2:      "ceded"
-    DFREQ.2:      "dfreq"
-    DSEV.2:       "dsev"
-    LOSS.2:       "loss"
-    PORT.2:       "port"
-    RATE.2:       "rate"
-    NET.2:        "net"
-    SEV.2:        "sev"
-    AGG.2:        "agg"
-    XPS.2:        "xps"
-    WEIGHTS.2:    "wts"
-    AND.2:        "and"
-    EXP.2:        "exp"
-    AT.2:         "at"
-    CV.2:         "cv"
-    LR.2:         "lr"
-    XS.2:         "xs"
-    OF.2:         "of"
-    TO.2:         "to"
-    PART_OF.2:    "po"
-    SHARE_OF.2:   "so"
-    ZM.2:         "zm"
-    ZT.2:         "zt"
-    DISTORTION.2: "distortion" | "dist"
+    //
+    // Each keyword carries a negative lookahead `(?![a-zA-Z0-9._:~\-])` matching
+    // the ID-continuation character class. Without it, Lark's dynamic lexer would
+    // happily peel `agg` off the front of a typo like `aggx`, letting the parse
+    // progress into the wrong rule and surface the error at the wrong column.
+    // The lookahead forces keywords to match only on word boundaries — same trick
+    // Python's tokenizer uses to distinguish `def` from `define`.
+    OCCURRENCE.2: /occurrence(?![a-zA-Z0-9._:~\-])/
+    AGGREGATE.2:  /aggregate(?![a-zA-Z0-9._:~\-])/
+    MULTIVARIATE.2: /(?:multivariate|mv)(?![a-zA-Z0-9._:~\-])/
+    NETCEDED.2:   /netceded(?![a-zA-Z0-9._:~\-])/
+    COPULA.2:     /copula(?![a-zA-Z0-9._:~\-])/
+    EXPOSURE.2:   /exposure(?![a-zA-Z0-9._:~\-])/
+    TWEEDIE.2:    /tweedie(?![a-zA-Z0-9._:~\-])/
+    PREMIUM.2:    /(?:premium|prem)(?![a-zA-Z0-9._:~\-])/
+    TOWER.2:      /tower(?![a-zA-Z0-9._:~\-])/
+    MIXED.2:      /mixed(?![a-zA-Z0-9._:~\-])/
+    PICKS.2:      /picks(?![a-zA-Z0-9._:~\-])/
+    CLAIMS.2:     /(?:claims|claim)(?![a-zA-Z0-9._:~\-])/
+    SPLICE.2:     /splice(?![a-zA-Z0-9._:~\-])/
+    CEDED.2:      /ceded(?![a-zA-Z0-9._:~\-])/
+    DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
+    DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
+    SSEV.2:       /ssev(?![a-zA-Z0-9._:~\-])/
+    LOSS.2:       /loss(?![a-zA-Z0-9._:~\-])/
+    PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
+    PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
+    RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
+    NET.2:        /net(?![a-zA-Z0-9._:~\-])/
+    SEV.2:        /sev(?![a-zA-Z0-9._:~\-])/
+    AGG.2:        /agg(?![a-zA-Z0-9._:~\-])/
+    XPS.2:        /xps(?![a-zA-Z0-9._:~\-])/
+    WEIGHTS.2:    /wts(?![a-zA-Z0-9._:~\-])/
+    AND.2:        /and(?![a-zA-Z0-9._:~\-])/
+    EXP.2:        /exp(?![a-zA-Z0-9._:~\-])/
+    AT.2:         /at(?![a-zA-Z0-9._:~\-])/
+    CV.2:         /cv(?![a-zA-Z0-9._:~\-])/
+    LR.2:         /lr(?![a-zA-Z0-9._:~\-])/
+    XS.2:         /xs(?![a-zA-Z0-9._:~\-])/
+    OF.2:         /of(?![a-zA-Z0-9._:~\-])/
+    TO.2:         /to(?![a-zA-Z0-9._:~\-])/
+    PART_OF.2:    /po(?![a-zA-Z0-9._:~\-])/
+    SHARE_OF.2:   /so(?![a-zA-Z0-9._:~\-])/
+    ZM.2:         /zm(?![a-zA-Z0-9._:~\-])/
+    ZT.2:         /zt(?![a-zA-Z0-9._:~\-])/
+    DISTORTION.2: /(?:distortion|dist)(?![a-zA-Z0-9._:~\-])/
     
-    FREQ.2: "binomial" | "pascal" | "poisson" | "bernoulli" | "geometric"
-          | "fixed" | "neymanA" | "neymana" | "neyman" | "logarithmic" | "negbin"
+    FREQ.2: /(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|neyman|logarithmic|negbin)(?![a-zA-Z0-9._:~\-])/
     
-    // agg.X / sev.X / note{...} — priority 3 outranks the AGG / SEV / ID
-    // alternatives that share their prefix.
-    BUILTIN_AGG.3: /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
-    BUILTIN_SEV.3: /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
-    NOTE.3:        /note\{[^}]*\}/
+    // agg.X / sev.X / dist(ortion).X / note{...} — priority 3 outranks the
+    // AGG / SEV / DISTORTION / ID alternatives that share their prefix.
+    BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+    BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+    BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+    NOTE.3:         /note\{[^}]*\}/
+    HINTS.3:        /hints\{[^}]*\}/
     
     // NUMBER absorbs an optional leading minus so `-3` is one token rather than
     // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
@@ -283,8 +377,10 @@
     // ID is the catch-all identifier — priority 1 (default).
     // Two negative lookaheads at the start of the match make the grammar
     // unambiguous:
-    //   1. (?!agg\.|sev\.)         — anything starting with agg. or sev. is
-    //                                BUILTIN_AGG / BUILTIN_SEV territory.
+    //   1. (?!agg\.|sev\.|dist(ortion)?\.) — anything starting with agg.,
+    //                                sev., dist. or distortion. is
+    //                                BUILTIN_AGG / BUILTIN_SEV / BUILTIN_DIST
+    //                                territory.
     //   2. (?!keyword(?![namechar])) — reject a keyword standing alone (i.e.,
     //                                followed by a non-name character or end
     //                                of input). Names containing a keyword as
@@ -296,7 +392,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|po|poisson|port|prem|premium|rate|sev|so|splice|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

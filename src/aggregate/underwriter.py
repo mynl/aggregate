@@ -22,44 +22,144 @@ logger = logging.getLogger(__name__)
 __all__ = ['Underwriter', 'build', 'build_many', 'CannotBuild']
 
 
-def _parse_note(txt, log2, bs, recommend_p, kwargs):
-    """
-    Extract build kwargs from a DecL note string and merge with caller-supplied
-    defaults. Recognizes ``bs``, ``log2``, ``padding``, ``normalize``, and
-    ``recommend_p`` in CSS-style ``key=value;`` form. ``bs`` accepts ``1/32``
-    style fractions. ``log2`` and ``bs`` from the note are taken only when the
-    caller's value is ``0`` (i.e. unset); ``recommend_p`` from the note always
-    wins. Remaining keys are merged into ``kwargs``.
+# Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
+# else is warned about and dropped (never crashes the build).
+_HINT_KEYS = {
+    'log2', 'bs', 'padding', 'normalize', 'recommend_p',
+    'sev_calc', 'discretization_calc', 'force_severity', 'x_min', 'x_max',
+}
 
-    Returns ``(log2, bs, recommend_p, kwargs)`` ready for ``Aggregate``/``Portfolio``
-    update.
+
+def _coerce_hint_value(v):
+    """Infer a Python type for a ``hints{...}`` value string.
+
+    Tries, in order: ``int``, ``float``, an ``a/b`` fraction (so ``bs=1/64``
+    works), the literals ``True`` / ``False``, else the raw stripped string.
+
+    Parameters
+    ----------
+    v : str
+        The right-hand side of a ``key=value`` hint.
+
+    Returns
+    -------
+    int, float, bool, or str
+        The coerced value.
     """
-    stxt = txt.split(';')
+    v = v.strip()
+    try:
+        return int(v)
+    except ValueError:
+        pass
+    try:
+        return float(v)
+    except ValueError:
+        pass
+    m = re.fullmatch(r'([-+0-9.eE]+)\s*/\s*([-+0-9.eE]+)', v)
+    if m:
+        try:
+            return float(m.group(1)) / float(m.group(2))
+        except (ValueError, ZeroDivisionError):
+            pass
+    if v == 'True':
+        return True
+    if v == 'False':
+        return False
+    return v
+
+
+def _parse_hints(txt):
+    """Parse a ``hints{...}`` body (``key=value; key=value``) into a typed dict.
+
+    Value typing is by :func:`_coerce_hint_value` (int / float / ``a/b``
+    fraction / bool / str). Unknown keys (not in :data:`_HINT_KEYS`) are warned
+    about and dropped; a duplicate key warns and the last value wins; a clause
+    that is not exactly one ``key=value`` warns and is skipped. This function
+    never raises -- a malformed hint degrades to a warning, not a crash.
+
+    Parameters
+    ----------
+    txt : str
+        The raw inner text of a ``hints{...}`` clause (empty string if none).
+
+    Returns
+    -------
+    dict
+        Recognised settings as ``{key: typed_value}``.
+    """
     kw = {}
-    for s in stxt:
-        parts = s.split('=')
-        if len(parts) == 2:
-            k = parts[0].strip()
-            v = parts[1].strip()
-            if re.match('bs|recommend_p', k):
-                if re.match(r'(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?/(\d+\.?\d*|\d*\.\d+)([eE](\+|\-)?\d+)?', v):
-                    v = eval(v)
-                else:
-                    v = float(v)
-            elif re.match('log2|padding', k):
-                v = int(v)
-            elif 'normalize':
-                v = v == 'True'
-            kw[k] = v
-    if 'log2' in kw and log2 == 0:
-        log2 = kw.pop('log2')
-    if 'bs' in kw and bs == 0:
-        bs = kw.pop('bs')
-    if 'recommend_p' in kw:
-        # always take the recommend_p from the note
-        recommend_p = kw.pop('recommend_p')
-    # rest are passed through
-    kwargs.update(kw)
+    for chunk in txt.split(';'):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        if chunk.count('=') != 1:
+            logger.warning("hints: ignoring malformed clause %r (expected a "
+                           "single key=value)", chunk)
+            continue
+        k, v = (s.strip() for s in chunk.split('='))
+        if k not in _HINT_KEYS:
+            logger.warning("hints: unknown key %r ignored (known: %s)",
+                           k, sorted(_HINT_KEYS))
+            continue
+        if k in kw:
+            logger.warning("hints: duplicate key %r; last value wins", k)
+        kw[k] = _coerce_hint_value(v)
+    return kw
+
+
+# Settings keys that used to be (mis)read out of ``note{...}``; used only to
+# emit a deprecation warning now that notes are pure text.
+_NOTE_SETTINGS_RE = re.compile(r'\b(?:log2|bs|padding|normalize|recommend_p)\s*=')
+
+
+def _resolve_hints(spec, log2, bs, recommend_p, kwargs):
+    """Merge a spec's ``hints{...}`` build settings under *caller-wins* rules.
+
+    Parses ``spec['hints']`` via :func:`_parse_hints`, then fills only the
+    settings the caller left at their sentinel default: ``log2`` when ``log2 ==
+    0``, ``bs`` when ``bs == 0``, ``recommend_p`` when it equals
+    :data:`~aggregate.constants.RECOMMEND_P`. Any remaining recognised keys are
+    added to ``kwargs`` with :meth:`dict.setdefault`, so an explicit caller
+    value always wins. A deprecation warning fires if the (now pure-text)
+    ``note`` still looks like it carries ``key=value`` settings.
+
+    Parameters
+    ----------
+    spec : dict
+        A parsed object spec; reads ``spec['note']`` and ``spec['hints']``.
+    log2, bs, recommend_p : int, float, float
+        Caller-supplied build settings (sentinels ``0`` / ``0`` /
+        ``RECOMMEND_P`` mean "unset").
+    kwargs : dict
+        Pass-through update kwargs (mutated in place via ``setdefault``).
+
+    Returns
+    -------
+    (log2, bs, recommend_p, kwargs) : tuple
+        Ready for ``Aggregate`` / ``Portfolio`` / ``MultivariateAggregate``
+        update.
+    """
+    note = spec.get('note', '') or ''
+    if _NOTE_SETTINGS_RE.search(note):
+        logger.warning(
+            "note{...} no longer sets build options; move 'key=value' "
+            "settings into a hints{...} clause. The note is now treated as "
+            "pure text.")
+    hints = _parse_hints(spec.get('hints', '') or '')
+    # log2 / bs / recommend_p are passed explicitly at the update() call, so
+    # they must NEVER also leak through ``kwargs`` (that would duplicate the
+    # keyword). Take the hint value only when the caller left the sentinel
+    # default, then drop the key from the pass-through either way.
+    if log2 == 0 and 'log2' in hints:
+        log2 = int(hints['log2'])
+    if bs == 0 and 'bs' in hints:
+        bs = hints['bs']
+    if recommend_p == RECOMMEND_P and 'recommend_p' in hints:
+        recommend_p = hints['recommend_p']
+    for k in ('log2', 'bs', 'recommend_p'):
+        hints.pop(k, None)
+    for k, v in hints.items():
+        kwargs.setdefault(k, v)
     return log2, bs, recommend_p, kwargs
 
 
@@ -593,8 +693,8 @@ class Underwriter(object):
 
         Smart-update logic: discrete severities pick ``bs=1`` with a log2 sized
         to the max possible loss; continuous ones call :meth:`recommend_bucket`;
-        portfolios use :meth:`best_bucket`. ``note{}`` hints in the program
-        can override these.
+        portfolios use :meth:`best_bucket`. A ``hints{}`` clause in the program
+        can override these (explicit ``build()`` kwargs always win).
 
         :param program: a DecL program producing one or more top-level outputs.
         :param update: override the class-level ``self.update`` default.
@@ -629,16 +729,16 @@ class Underwriter(object):
                 # per-axis auto-sizing lives in MultivariateAggregate.update;
                 # pass log2/bs through (0 => auto), drop agg-only kwargs.
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _parse_note(
-                    d['note'], log2, bs, recommend_p, kwargs)
+                log2, bs, recommend_p, kwargs = _resolve_hints(
+                    d, log2, bs, recommend_p, kwargs)
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): multivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
                 answer.object.update(log2=log2_, bs=bs, **kwargs)
             elif isinstance(answer.object, Aggregate) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _parse_note(
-                    d['note'], log2, bs, recommend_p, kwargs)
+                log2, bs, recommend_p, kwargs = _resolve_hints(
+                    d, log2, bs, recommend_p, kwargs)
                 # ``log2`` is a CAP; bucket + window selection is delegated to
                 # Aggregate.update / _bs_window (the single source of truth:
                 # exact-discrete, bounded, moment, and signed/P&L windows).
@@ -659,8 +759,8 @@ class Underwriter(object):
                 pass
             elif isinstance(answer.object, Portfolio) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _parse_note(
-                    d['note'], log2, bs, recommend_p, kwargs)
+                log2, bs, recommend_p, kwargs = _resolve_hints(
+                    d, log2, bs, recommend_p, kwargs)
                 if log2 == -1:
                     log2_ = 13
                 elif log2 == 0:
@@ -932,6 +1032,7 @@ class Underwriter(object):
             bit = df[['program']].copy()
             bit['program'] = (bit['program']
                               .str.replace(r' note\{[^}]+\}', '', regex=True)
+                              .str.replace(r' hints\{[^}]+\}', '', regex=True)
                               .str.replace(r' {2,}', ' ', regex=True))
             return bit.sort_index()
 

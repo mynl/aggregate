@@ -123,6 +123,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "BUILTIN_SEV": "a builtin severity (sev.X)",
     "BUILTIN_DIST": "a builtin distortion (dist.X)",
     "NOTE": "a note clause (note{...})",
+    "HINTS": "a hints clause (hints{...})",
 }
 
 

@@ -43,7 +43,7 @@ agg P.Sym.Dice     dfreq [1] dsev [1:6]                                         
 agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid}
 agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance}
 agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing}
-agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment; normalize=False}
+agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment} hints{normalize=False}
 agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
 
 
@@ -259,3 +259,20 @@ multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 
 # (same object as Aggregate.occ_bivariate()). Body is an ordinary agg carrying
 # occurrence reinsurance; the two axes are Ceded and Net.
 netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson
+
+# ============================================================
+# HINTS. note{} is pure text; hints{} carries key=value; build settings (1.0.0a25)
+# ============================================================
+# `note{...}` is free-text annotation only; `hints{...}` carries build/update
+# settings (`key=value;`) parsed by the underwriter under caller-wins rules
+# (explicit build() kwargs override in-program hints). note{} and hints{} are
+# both optional and order-free, at most one of each. Unknown hint keys warn and
+# are dropped; a duplicate key warns and the last value wins; `=`-bearing prose
+# in a note no longer crashes the build. See tests/test_hints.py.
+agg HINT.LogTwo  5 claims sev lognorm 10 cv 2 poisson hints{log2=12}
+agg HINT.Frac    1 claim sev gamma 50 cv 0.1 fixed hints{bs=1/64; log2=10}
+agg HINT.Both    5 claims sev lognorm 10 cv 2 poisson note{just prose} hints{log2=12}
+agg HINT.HintsFirst 5 claims sev lognorm 10 cv 2 poisson hints{log2=12} note{just prose}
+agg HINT.ProseEq dfreq [3] dsev [-2 5] [.5 .5] note{closed form support -6,1,8,15; needs x_min<=-6}
+agg HINT.Unknown 5 claims sev lognorm 10 cv 2 poisson hints{frobnicate=3}
+agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}

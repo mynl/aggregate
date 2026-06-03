@@ -41,7 +41,7 @@ buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
 // Portfolio
 // ======================================================================
 
-port_out: PORT name note agg_list
+port_out: PORT name trailer agg_list
 
 agg_list: agg_list port_item   -> agg_list_cons
         | port_item            -> agg_list_one
@@ -58,11 +58,11 @@ agg_list: agg_list port_item   -> agg_list_cons
 // Aggregate
 // ======================================================================
 
-agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins note  -> agg_out_full
-       | AGG name dfreq      layers sev_clause occ_reins         agg_reins note  -> agg_out_dfreq
-       | AGG name TWEEDIE expr expr expr note                                    -> agg_out_tweedie
-       | AGG name builtin_agg occ_reins agg_reins note                           -> agg_out_rename
-       | builtin_agg agg_reins note                                              -> agg_out_builtin
+agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins trailer  -> agg_out_full
+       | AGG name dfreq      layers sev_clause occ_reins         agg_reins trailer  -> agg_out_dfreq
+       | AGG name TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
+       | AGG name builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
+       | builtin_agg agg_reins trailer                                              -> agg_out_builtin
 
 // ======================================================================
 // Profit-and-loss aggregate (premium minus loss)
@@ -76,8 +76,8 @@ agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins note  -> 
 // dev/done/plan-pnl-premium.md.
 // ======================================================================
 
-pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins note  -> pnl_out_full
-       | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins note  -> pnl_out_dfreq
+pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins trailer  -> pnl_out_full
+       | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins trailer  -> pnl_out_dfreq
 
 pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
              | numbers LOSS     -> pnl_exp_loss
@@ -94,8 +94,8 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
 // dev/plan-multivariate.md.
 // ======================================================================
 
-mv_out: MULTIVARIATE name exposures mv_body copula_clause freq note  -> mv_out_copula
-      | MULTIVARIATE name exposures mv_body copula_clause note        -> mv_out_copula_nofreq
+mv_out: MULTIVARIATE name exposures mv_body copula_clause freq trailer  -> mv_out_copula
+      | MULTIVARIATE name exposures mv_body copula_clause trailer        -> mv_out_copula_nofreq
       | NETCEDED agg_out                                              -> mv_out_netceded
 
 mv_body: mv_body mv_item   -> mv_body_cons
@@ -117,8 +117,8 @@ copula_clause: COPULA ID numbers   -> copula_one_param
 // Severity output (standalone `sev X ...` definitions)
 // ======================================================================
 
-sev_out: SEV name sev note    -> sev_out_sev
-       | SEV name dsev note   -> sev_out_dsev
+sev_out: SEV name sev trailer    -> sev_out_sev
+       | SEV name dsev trailer   -> sev_out_dsev
 
 // ======================================================================
 // Frequency
@@ -215,11 +215,26 @@ layers: numbers XS numbers   -> layers_xs
 tower: TOWER doutcomes
 
 // ======================================================================
-// Note (optional trailing `note{...}` clause)
+// Trailer: optional `note{...}` annotation + `hints{...}` build settings.
+// ----------------------------------------------------------------------
+// `note{...}` is pure free-text; `hints{...}` carries `key=value;` build
+// settings (parsed in the underwriter, not here). Both are optional and
+// order-free, at most one of each.
+//
+// Spelled out as five token-distinct alternatives rather than two
+// empty-producing nonterminals (`note hints | hints note`): the latter has
+// two parses of the EMPTY trailer (note_none+hints_none vs hints_none+
+// note_none), which Earley flags as ambiguous. Here every alternative
+// matches a distinct token sequence (NOTE HINTS / HINTS NOTE / NOTE / HINTS
+// / nothing) and `note{` vs `hints{` have disjoint prefixes, so the parse
+// is unambiguous.
 // ======================================================================
 
-note: NOTE   -> note_some
-    |        -> note_none
+trailer: NOTE HINTS   -> trailer_nh
+       | HINTS NOTE    -> trailer_hn
+       | NOTE          -> trailer_note
+       | HINTS         -> trailer_hints
+       |               -> trailer_none
 
 // ======================================================================
 // Exposures
@@ -351,6 +366,7 @@ BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 NOTE.3:         /note\{[^}]*\}/
+HINTS.3:        /hints\{[^}]*\}/
 
 // NUMBER absorbs an optional leading minus so `-3` is one token rather than
 // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.

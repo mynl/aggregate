@@ -1314,7 +1314,8 @@ univariate margins are available as
 ``reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']``; the *joint* law of
 :math:`(C, N)` --- and hence their correlation and co-moments --- is computed by
 :meth:`~aggregate.distributions.Aggregate.occ_bivariate`, which returns a
-:class:`aggregate.bivariate.BivariateDistribution`.
+:class:`aggregate.multivariate.MultivariateAggregate` in ``netceded`` mode (the
+same object produced by the DecL ``netceded <agg>`` statement).
 
 The method is the ordinary compound-distribution FFT with the one-dimensional
 transforms replaced by two-dimensional transforms: placing the gross severity
@@ -1339,8 +1340,8 @@ anti-diagonal :math:`C + N` reproduces the gross aggregate. Only occurrence
 reinsurance is supported (the aggregate-cover bivariate is degenerate). Per-axis
 bucket and window sizes are auto-derived from the univariate margins, with
 ``bs_ceded`` / ``bs_net`` / ``log2_ceded`` / ``log2_net`` overrides;
-:meth:`~aggregate.bivariate.BivariateDistribution.contour` plots the joint
-density.
+:meth:`~aggregate.multivariate.MultivariateAggregate.plot` shows the joint
+per-claim severity and aggregate density side by side.
 
 .. _re summary:
 

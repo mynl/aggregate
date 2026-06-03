@@ -425,6 +425,10 @@ class Underwriter(object):
         if kind == 'agg':
             obj = Aggregate(**spec)
             obj.program = program
+        elif kind == 'mvagg':
+            from .multivariate import MultivariateAggregate
+            obj = MultivariateAggregate(**spec)
+            obj.program = program
         elif kind == 'port':
             # Portfolio expects name, agg_list, uw. agg_list is a list of specs
             # that can be passed to Aggregate. Drop the leading ('agg', name)
@@ -614,11 +618,23 @@ class Underwriter(object):
 
         # in this loop bs_ and log2_ are the values actually used for each
         # update; they do not overwrite the input default values
+        from .multivariate import MultivariateAggregate
+
         for answer in rv:
             if answer.object is None:
                 # object not created (named-mixed-severity case)
                 logger.info('Object %s of kind %s returned as a spec; no further processing.',
                             answer.name, answer.kind)
+            elif isinstance(answer.object, MultivariateAggregate) and update is True:
+                # per-axis auto-sizing lives in MultivariateAggregate.update;
+                # pass log2/bs through (0 => auto), drop agg-only kwargs.
+                d = answer.spec
+                log2, bs, recommend_p, kwargs = _parse_note(
+                    d['note'], log2, bs, recommend_p, kwargs)
+                log2_ = 0 if log2 == 0 else log2
+                logger.info('(%s, %s): multivariate update(log2=%s, bs=%s)',
+                            answer.kind, answer.name, log2_, bs)
+                answer.object.update(log2=log2_, bs=bs, **kwargs)
             elif isinstance(answer.object, Aggregate) and update is True:
                 d = answer.spec
                 log2, bs, recommend_p, kwargs = _parse_note(

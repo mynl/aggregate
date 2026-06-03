@@ -24,7 +24,7 @@ matplotlib.use('Agg')  # headless contour smoke test
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import build  # noqa: E402
-from aggregate.bivariate import (  # noqa: E402
+from aggregate.multivariate import (  # noqa: E402
     BivariateDistribution, size_axis, scatter_bivariate)
 
 
@@ -107,7 +107,7 @@ def test_marginals_sum_to_one(prog):
     cd, nd = b.marginals()
     assert cd.sum() == pytest.approx(1.0, abs=1e-6)
     assert nd.sum() == pytest.approx(1.0, abs=1e-6)
-    assert b.meta['deficit'] < 1e-6
+    assert b.deficit < 1e-6
 
 
 @pytest.mark.parametrize('prog', [OCC, OCC_BOUNDED, OCC_FIXED])
@@ -121,8 +121,8 @@ def test_marginal_means_match_stats_df(prog):
     b = a.occ_bivariate()
     cd, nd = b.marginals()
     rs = a.reins_stats_df
-    c_mean, _, _ = _marginal_moments(b.ceded, cd)
-    n_mean, _, _ = _marginal_moments(b.net, nd)
+    c_mean, _, _ = _marginal_moments(b.axis_xs[0], cd)
+    n_mean, _, _ = _marginal_moments(b.axis_xs[1], nd)
     assert c_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
     assert n_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
 
@@ -145,8 +145,8 @@ def test_matched_grid_reproduces_univariate_cv(prog):
     b = a.occ_bivariate(bs_ceded=a.bs, bs_net=a.bs, log2_ceded=l2c, log2_net=l2n)
     cd, nd = b.marginals()
     rs = a.reins_stats_df
-    c_mean, c_cv, _ = _marginal_moments(b.ceded, cd)
-    n_mean, n_cv, _ = _marginal_moments(b.net, nd)
+    c_mean, c_cv, _ = _marginal_moments(b.axis_xs[0], cd)
+    n_mean, n_cv, _ = _marginal_moments(b.axis_xs[1], nd)
     assert c_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=1e-3)
     assert n_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=1e-3)
     assert c_cv == pytest.approx(rs.loc[('agg', 'cv'), ('occ', 'Ceded')], rel=1e-3)
@@ -160,8 +160,8 @@ def test_marginals_match_describe(prog):
     b = a.occ_bivariate()
     cd, nd = b.marginals()
     rd = a.reins_describe
-    c_mean, _, _ = _marginal_moments(b.ceded, cd)
-    n_mean, _, _ = _marginal_moments(b.net, nd)
+    c_mean, _, _ = _marginal_moments(b.axis_xs[0], cd)
+    n_mean, _, _ = _marginal_moments(b.axis_xs[1], nd)
     assert c_mean == pytest.approx(rd.loc[('occ', 'ceded', 'agg'), 'Est EX'], rel=2e-3)
     assert n_mean == pytest.approx(rd.loc[('occ', 'net', 'agg'), 'Est EX'], rel=2e-3)
 
@@ -240,8 +240,8 @@ def test_poisson_count_increases_correlation():
 def test_explicit_overrides_respected():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate(bs_ceded=2, bs_net=2, log2_ceded=9, log2_net=10)
-    assert b.bs_ceded == 2
-    assert b.bs_net == 2
+    assert b.bs[0] == 2
+    assert b.bs[1] == 2
     assert b.density.shape == (1 << 9, 1 << 10)
 
 
@@ -301,16 +301,29 @@ def test_moments_table_shape_and_total():
 def test_repr_and_html():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
-    assert 'BivariateDistribution' in repr(b)
+    assert 'MultivariateAggregate' in repr(b)
+    assert b.mode == 'netceded'
     assert '<table' in b._repr_html_()
 
 
-def test_contour_smoke():
+def test_plot_smoke():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
-    fig, ax = plt.subplots()
-    out = b.contour(ax=ax)
-    assert out is ax
-    out2 = b.contour(log=True)
-    assert out2 is not None
+    fig, axs = plt.subplots(1, 2)
+    out = b.plot(axs=axs)
+    assert out is None                      # returns None (no double-render)
+    assert axs.flat[0].get_title() == 'severity'
+    assert axs.flat[1].get_title() == 'aggregate'
+    b.plot(log=True)
+    assert len(b.figure.axes) == 2
     plt.close('all')
+
+
+def test_describe_and_info_netceded():
+    a = _build(OCC_BOUNDED)
+    b = a.occ_bivariate()
+    df = b.describe
+    assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
+    assert (df.loc['Ceded', 'kind'], df.loc['Net', 'kind']) == ('netceded', 'netceded')
+    assert np.isclose(float(df.loc['joint', 'corr']), b.corr())
+    assert 'netceded' in b.info

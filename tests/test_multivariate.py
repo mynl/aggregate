@@ -1,0 +1,366 @@
+"""Tests for copula-coupled multivariate aggregates (1.0.0a24).
+
+Covers ``dev/plan-multivariate.md`` Stage 1:
+
+- :class:`aggregate.copula.Copula` -- the registry/factory copula hierarchy
+  (independent / normal / gumbel / clayton / fgm): CDF boundary conditions,
+  monotonicity, natural-parameter -> Kendall tau identities, the discrete-Sklar
+  ``rectangle_pmf`` (marginals exact, independence factorises).
+- :class:`aggregate.multivariate.MultivariateAggregate` -- the ``multivariate``
+  DecL statement: marginals reproduce the standalone outer compound, dependence
+  ordering (corr increases with the copula parameter, mixed adds common shock),
+  and the ``pnl`` axis (signed marginal + sign-flipped correlation).
+
+The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` under the
+``MV`` section.
+"""
+
+import numpy as np
+import pytest
+
+from aggregate import build
+from aggregate.copula import (
+    Copula, CopulaNormal, CopulaGumbel, CopulaClayton, CopulaFGM,
+    CopulaIndependent)
+
+
+# ----------------------------------------------------------------------
+# Copula CDF unit tests
+# ----------------------------------------------------------------------
+
+COPULA_CASES = [
+    ('independent', None),
+    ('normal', 0.5),
+    ('gumbel', 0.4),
+    ('clayton', 0.4),
+    ('fgm', 0.3),
+]
+
+
+@pytest.mark.parametrize('kind,param', COPULA_CASES)
+def test_copula_boundary_conditions(kind, param):
+    c = Copula(kind) if param is None else Copula(kind, param)
+    assert np.isclose(float(c.C(0.0, 0.7)), 0.0)
+    assert np.isclose(float(c.C(0.7, 0.0)), 0.0)
+    assert np.isclose(float(c.C(1.0, 0.7)), 0.7)
+    assert np.isclose(float(c.C(0.7, 1.0)), 0.7)
+    assert np.isclose(float(c.C(1.0, 1.0)), 1.0)
+
+
+@pytest.mark.parametrize('kind,param', COPULA_CASES)
+def test_copula_monotone_in_each_argument(kind, param):
+    c = Copula(kind) if param is None else Copula(kind, param)
+    u = np.linspace(0, 1, 60)
+    cu = c.C(u, 0.6 * np.ones_like(u))
+    cv = c.C(0.6 * np.ones_like(u), u)
+    assert np.all(np.diff(cu) >= -1e-12)
+    assert np.all(np.diff(cv) >= -1e-12)
+
+
+def test_copula_normal_C_half_half():
+    # C(.5,.5) = 1/4 + arcsin(rho)/(2 pi); for rho=.5 this is 1/3
+    assert np.isclose(float(Copula('normal', 0.5).C(0.5, 0.5)), 1.0 / 3.0)
+
+
+def test_copula_tau_identities():
+    assert np.isclose(Copula('gumbel', tau=0.4).tau(), 0.4)
+    assert np.isclose(Copula('clayton', tau=0.4).tau(), 0.4)
+    # fgm: tau = 2 alpha / 9, alpha = 3 rho_s
+    assert np.isclose(Copula('fgm', rho_s=0.3).tau(), 2 * (3 * 0.3) / 9)
+    # normal: tau = (2/pi) arcsin(rho)
+    assert np.isclose(Copula('normal', 0.5).tau(), 2 / np.pi * np.arcsin(0.5))
+    assert np.isclose(Copula('independent').tau(), 0.0)
+
+
+def test_copula_normal_from_tau_roundtrip():
+    c = CopulaNormal.from_tau(0.4)
+    assert np.isclose(c.tau(), 0.4)
+    assert np.isclose(c.rho, np.sin(np.pi * 0.4 / 2))
+
+
+def test_copula_factory_dispatch_and_direct():
+    assert isinstance(Copula('gumbel', 0.4), CopulaGumbel)
+    assert isinstance(Copula('clayton', 0.4), CopulaClayton)
+    assert isinstance(Copula('normal', 0.3), CopulaNormal)
+    assert isinstance(Copula('fgm', 0.2), CopulaFGM)
+    assert isinstance(Copula('independent'), CopulaIndependent)
+    # direct subclass construction with the natural kwarg
+    assert isinstance(CopulaGumbel(tau=0.4), CopulaGumbel)
+
+
+def test_copula_unknown_kind_raises():
+    with pytest.raises(ValueError):
+        Copula('weibull', 0.5)
+
+
+@pytest.mark.parametrize('kind', ['gumbel', 'clayton', 'normal', 'fgm'])
+def test_copula_param_out_of_range_raises(kind):
+    with pytest.raises(ValueError):
+        Copula(kind, 5.0)
+
+
+@pytest.mark.parametrize('kind,param', COPULA_CASES)
+def test_rectangle_pmf_marginals_exact(kind, param):
+    c = Copula(kind) if param is None else Copula(kind, param)
+    g0 = np.array([0.2, 0.5, 1.0])
+    g1 = np.array([0.3, 0.7, 1.0])
+    S = c.rectangle_pmf(g0, g1)
+    assert np.allclose(S.sum(axis=1), np.diff(np.r_[0.0, g0]))
+    assert np.allclose(S.sum(axis=0), np.diff(np.r_[0.0, g1]))
+    assert np.all(S >= -1e-12)
+    assert np.isclose(S.sum(), 1.0)
+
+
+def test_rectangle_pmf_independence_factorises():
+    g0 = np.array([0.2, 0.5, 1.0])
+    g1 = np.array([0.3, 0.7, 1.0])
+    S = Copula('fgm', 0.0).rectangle_pmf(g0, g1)
+    outer = np.outer(np.diff(np.r_[0.0, g0]), np.diff(np.r_[0.0, g1]))
+    assert np.allclose(S, outer)
+    # gumbel tau=0 is also independence
+    Sg = Copula('gumbel', 0.0).rectangle_pmf(g0, g1)
+    assert np.allclose(Sg, outer)
+
+
+# ----------------------------------------------------------------------
+# MultivariateAggregate
+# ----------------------------------------------------------------------
+
+def _mv(copula='gumbel 0.4', freq='poisson'):
+    prog = f'''multivariate MV 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        copula {copula}
+        {freq}'''
+    return build(prog)
+
+
+def test_mv_builds_and_mass_conserved():
+    from aggregate.multivariate import MultivariateAggregate
+    mv = _mv()
+    assert isinstance(mv, MultivariateAggregate)
+    assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
+    assert mv.density.shape[0] >= 256 and mv.density.shape[1] >= 256
+
+
+def test_mv_marginals_reproduce_standalone_outer_compound():
+    # Poisson outer: peril i marginal is the thinned standalone aggregate; at
+    # the (coarse) matched grid the means agree to a few percent.
+    mv = _mv()
+    m0, m1 = mv.marginals()
+    assert np.isclose(m0.sum(), 1.0, atol=1e-6)
+    assert np.isclose(m1.sum(), 1.0, atol=1e-6)
+    mean0 = float((m0 * mv.axis_xs[0]).sum())
+    mean1 = float((m1 * mv.axis_xs[1]).sum())
+    # theoretical loss means: 25 * .7 * 40 = 700, 25 * .5 * 60 = 750
+    assert abs(mean0 - 700) / 700 < 0.05
+    assert abs(mean1 - 750) / 750 < 0.05
+
+
+def test_mv_marginal_exact_at_matched_grid():
+    # The joint marginal equals the 1D outer compound of the SAME discretised
+    # per-event severity g_i (Fourier identity); compare to the inner agg.
+    mv = _mv()
+    m1 = mv.marginals()[1]
+    joint_mean = float((m1 * mv.axis_xs[1]).sum())
+    inner = build('agg Bev dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5',
+                  bs=mv.bs[1], log2=int(np.log2(len(mv.axis_xs[1]))))
+    assert np.isclose(joint_mean, inner.est_m * mv.en, rtol=2e-3)
+
+
+def test_mv_dependence_ordering():
+    c0 = _mv('gumbel 0.2').corr()
+    c1 = _mv('gumbel 0.4').corr()
+    c2 = _mv('gumbel 0.7').corr()
+    assert c0 < c1 < c2
+
+
+def test_mv_independence_baseline_from_shared_count():
+    # Independence copula does NOT make the aggregates independent: the shared
+    # frequency drives both perils, so the output corr is a positive baseline.
+    rho = _mv('fgm 0').corr()
+    assert 0.0 < rho < 0.4
+
+
+def test_mv_mixed_adds_common_shock():
+    poi = _mv('gumbel 0.4', 'poisson').corr()
+    mix = _mv('gumbel 0.4', 'mixed gamma .5').corr()
+    assert mix > poi
+
+
+def test_mv_clayton_lower_tail_less_agg_corr_than_gumbel():
+    # Same Kendall tau, but Clayton's lower-tail dependence yields lower
+    # aggregate correlation than Gumbel's upper-tail dependence.
+    assert _mv('clayton 0.4').corr() < _mv('gumbel 0.4').corr()
+
+
+def test_mv_pnl_axis_signed_marginal_and_sign_flip():
+    prog = '''multivariate PL 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        copula gumbel 0.4
+        poisson'''
+    mv = build(prog)
+    m0, m1 = mv.marginals()
+    assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
+    # B is premium - loss: mean ~ 900 - 750 = 150, two-sided window
+    mean_b = float((m1 * mv.axis_xs[1]).sum())
+    assert abs(mean_b - 150) / 150 < 0.08
+    assert mv.axis_xs[1][0] < 0  # signed window
+    # loss-loss positive copula dependence -> negative loss-A vs profit-B corr
+    assert mv.corr() < -0.3
+
+
+def test_mv_pnl_marginal_matches_standalone_pnl():
+    prog = '''multivariate PL 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        copula gumbel 0.4
+        poisson'''
+    mv = build(prog)
+    mean_b = float((mv.marginals()[1] * mv.axis_xs[1]).sum())
+    # standalone pnl (Poisson thinning 25*.5 = 12.5 claims), premium 900.
+    # est_m carries the P&L (premium - loss) mean; agg_m stays in loss terms.
+    std = build('pnl Bstd 900 prem - 12.5 claims sev lognorm 60 cv 1.5 poisson')
+    assert abs(mean_b - std.est_m) / abs(std.est_m) < 0.08
+
+
+def test_mv_reporting_smoke():
+    mv = _mv()
+    assert 'MultivariateAggregate' in mv.info
+    df = mv.describe                      # property
+    assert {'A', 'B', 'joint'}.issubset(set(df.index))
+    assert np.isclose(float(df.loc['joint', 'corr']), mv.corr())
+    sd = mv.stats_df                      # property
+    assert 'joint' in sd.columns
+    dd = mv.density_df                    # property: wrapper around density
+    assert dd.shape == mv.density.shape
+    assert np.isclose(dd.to_numpy().sum(), 1.0, atol=1e-6)
+    np.testing.assert_array_equal(dd.to_numpy(), mv.density)
+
+
+def test_mv_plot_two_panels():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    mv = _mv()
+    fig, axs = plt.subplots(1, 2)
+    out = mv.plot(axs=axs)
+    assert out is None                      # returns None (no double-render)
+    assert axs.flat[0].get_title() == 'severity'
+    assert axs.flat[1].get_title() == 'aggregate'
+    assert mv.figure is fig
+    plt.close(fig)
+    # also works with no axs supplied: figure stored on self.figure
+    mv.plot()
+    assert len(mv.figure.axes) == 2
+    plt.close('all')
+
+
+def test_mv_help_runs(capsys):
+    mv = _mv()
+    mv.help('corr')   # should not raise
+
+
+def test_mv_no_copula_defaults_independent():
+    # copula clause omitted -> independence copula
+    prog = '''multivariate MV 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        poisson'''
+    mv = build(prog)
+    assert mv.copula.kind == 'independent'
+    # baseline positive corr from the shared count only
+    assert 0.0 < mv.corr() < 0.4
+
+
+def test_mv_copula_independent_no_param():
+    # 'copula independent' with no parameter must parse
+    prog = '''multivariate MV 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        copula independent'''
+    mv = build(prog)
+    assert mv.copula.kind == 'independent'
+
+
+# ----------------------------------------------------------------------
+# netceded mode: joint (ceded, net) of one reinsured aggregate
+# ----------------------------------------------------------------------
+
+NC_PROG = ('agg NC 8 claims sev 300 * beta 2 3 '
+           'occurrence net of 0.7 so 60 xs 40 poisson')
+
+
+def test_netceded_via_decl():
+    from aggregate.multivariate import MultivariateAggregate
+    mv = build(f'netceded {NC_PROG}')
+    assert isinstance(mv, MultivariateAggregate)
+    assert mv.mode == 'netceded'
+    assert mv.line_names == ['Ceded', 'Net']
+    cd, nd = mv.marginals()
+    assert np.isclose(cd.sum(), 1.0, atol=1e-6)
+    assert np.isclose(nd.sum(), 1.0, atol=1e-6)
+    assert mv.corr() > 0
+
+
+def test_netceded_via_occ_bivariate_matches_decl():
+    a = build(NC_PROG, bs=1, log2=16)
+    mv_method = a.occ_bivariate()
+    mv_decl = build(f'netceded {NC_PROG}')
+    # both are netceded MultivariateAggregates; corr in the same ballpark
+    assert mv_method.mode == mv_decl.mode == 'netceded'
+    assert mv_method.corr() == pytest.approx(mv_decl.corr(), abs=0.02)
+
+
+def test_netceded_additivity_mean():
+    # E[Ceded] + E[Net] == E[gross aggregate]
+    a = build(NC_PROG, bs=1, log2=16)
+    mv = a.occ_bivariate()
+    cd, nd = mv.marginals()
+    e_c = float((cd * mv.axis_xs[0]).sum())
+    e_n = float((nd * mv.axis_xs[1]).sum())
+    gross = a.reins_stats_df.loc[('agg', 'mean'), ('occ', 'Gross')]
+    assert e_c + e_n == pytest.approx(gross, rel=2e-3)
+
+
+def test_netceded_requires_occ_reins():
+    a = build('agg G 10 claims sev lognorm 50 cv 1.5 poisson')
+    with pytest.raises(ValueError, match='occurrence reinsurance'):
+        a.occ_bivariate()
+
+
+def test_netceded_reporting_and_plot():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    mv = build(f'netceded {NC_PROG}')
+    df = mv.describe
+    assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
+    assert df.loc['Ceded', 'kind'] == 'netceded'
+    assert np.isnan(df.loc['joint', 'copula_tau'])   # no copula in netceded
+    assert 'netceded' in mv.info
+    mv.plot()
+    assert mv.figure.axes[0].get_title() == 'severity'
+    plt.close('all')
+
+
+def test_mv_wrong_component_count_raises():
+    prog = '''multivariate Bad 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        copula gumbel 0.4
+        poisson'''
+    # one component -> mv_body has a single child, MultivariateAggregate rejects
+    with pytest.raises(Exception):
+        build(prog)
+
+
+def test_mv_default_freq_is_poisson():
+    # the trailing freq line is optional (defaults to poisson)
+    prog = '''multivariate MV 25 claims
+        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+        agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        copula gumbel 0.4'''
+    mv = build(prog)
+    assert mv.freq_name == 'poisson'
+    assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)

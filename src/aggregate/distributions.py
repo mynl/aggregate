@@ -2197,16 +2197,19 @@ class Aggregate:
         bs_ceded, bs_net : float, optional
             Ceded- / net-axis bucket sizes. Default: auto-sized from the
             univariate occurrence aggregate margins (``p_agg_ceded_occ`` /
-            ``p_agg_net_occ``) via :func:`aggregate.bivariate.size_axis`.
+            ``p_agg_net_occ``) via :func:`aggregate.multivariate.size_axis`.
         log2_ceded, log2_net : int, optional
             Ceded- / net-axis log2 grid lengths (grid has ``1 << log2`` points).
             Default: auto-sized (target 10, grown to cover the margin, capped).
 
         Returns
         -------
-        BivariateDistribution
-            Container with the joint ``density``, the two axis grids, marginals,
-            mixed moments ``E[C^i N^j]``, correlation, and a contour plot.
+        MultivariateAggregate
+            A first-class joint object in ``netceded`` mode, with the joint
+            ``density``, the two axis grids (``axis_xs``), ``marginals`` /
+            ``moments`` (``E[C^i N^j]``) / ``corr`` / ``describe`` / ``stats_df``
+            / ``info`` and a two-panel ``plot`` (comonotone per-claim severity
+            and joint aggregate). Equivalent to the DecL ``netceded <agg>`` form.
 
         Raises
         ------
@@ -2233,63 +2236,20 @@ class Aggregate:
         Marginalising the result over one axis recovers the corresponding
         univariate occurrence ceded / net aggregate (exact validation targets;
         see the ``Cross-check`` notes in ``dev/done/reins-bivariate.md``).
+
+        This wraps the object as a :class:`aggregate.multivariate.MultivariateAggregate`
+        in ``netceded`` mode (the engine is :func:`aggregate.multivariate.build_netceded_joint`).
         """
-        from .bivariate import BivariateDistribution, size_axis, scatter_bivariate
+        from .multivariate import MultivariateAggregate
 
-        if self.occ_reins is None:
-            raise ValueError(
-                'occ_bivariate requires occurrence reinsurance; none configured.')
-        if self.sev_density_gross is None or self.occ_ceder is None:
-            raise ValueError(
-                'occ_bivariate requires an updated object (no severity '
-                'densities present). Call update() first.')
-
-        rd = self.reins_density_df
-        # auto / explicit per-axis sizing from the univariate occ aggregates
-        bs_c, log2_c = size_axis(rd['p_agg_ceded_occ'].to_numpy(), self.xs,
-                                 self.bs, bs=bs_ceded, log2=log2_ceded)
-        bs_n, log2_n = size_axis(rd['p_agg_net_occ'].to_numpy(), self.xs,
-                                 self.bs, bs=bs_net, log2=log2_net)
-        n_c = 1 << log2_c
-        n_n = 1 << log2_n
-        ceded_grid = bs_c * np.arange(n_c)
-        net_grid = bs_n * np.arange(n_n)
-
-        # bivariate severity: gross mass placed at (ceded, net) per claim size
-        cv = np.asarray(self.occ_ceder(self.xs), dtype=float)
-        nv = np.asarray(self.occ_netter(self.xs), dtype=float)
-        mass = np.asarray(self.sev_density_gross, dtype=float)
-        sev2 = scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n,
-                                 scheme=self.reins_bucket)
-
-        # 2D compound FFT (mirrors _fft_aggregate, with the fixed-1 / zero-risk
-        # shortcuts) -- freq_pgf is elementwise so it applies to the 2D transform
-        if self.n == 0:
-            density = np.zeros((n_c, n_n))
-            density[0, 0] = 1.0
-        elif np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-            density = sev2.copy()
-        else:
-            pad = self.padding
-            s_shape = (n_c << pad, n_n << pad)
-            z = sfft.rfft2(sev2, s=s_shape)
-            # freq_pgf is mathematically elementwise in z, but the empirical
-            # implementation uses a matmul over the frequency support that
-            # assumes a 1D argument -- so flatten, apply, and reshape back.
-            ftagg = self.frequency.freq_pgf(self.n, z.ravel()).reshape(z.shape)
-            density = np.real(sfft.irfft2(ftagg, s=s_shape))[:n_c, :n_n]
-
-        # zero sub-eps FFT dust (matches the 1e-15 floor used elsewhere) and
-        # record the tail mass lost beyond the grid (aliasing deficit)
-        density[np.abs(density) < 1e-15] = 0.0
-        deficit = float(1.0 - density.sum())
-
-        meta = {'name': self.name, 'en': float(self.n),
-                'freq_name': self.frequency.freq_name,
-                'scheme': self.reins_bucket, 'padding': self.padding,
-                'deficit': deficit}
-        return BivariateDistribution(density, ceded_grid, net_grid,
-                                     bs_c, bs_n, meta)
+        mv = MultivariateAggregate(
+            self.name, mode='netceded', nc_agg=self,
+            nc_kwargs=dict(bs_ceded=bs_ceded, bs_net=bs_net,
+                           log2_ceded=log2_ceded, log2_net=log2_net))
+        # build eagerly so preconditions (occ reins present, object updated)
+        # raise here, and the returned object is ready to query.
+        mv.update()
+        return mv
 
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 

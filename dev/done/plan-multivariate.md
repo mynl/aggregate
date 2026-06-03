@@ -1,5 +1,24 @@
 # Plan: integrated multivariate aggregate distributions (copula-first)
 
+> **Status: IMPLEMENTED (Stage 1, 1.0.0a24, 2026-06-03).** Stage 1a (`copula.py`:
+> Copula registry/factory with normal/gumbel/clayton/fgm/independent) and Stage
+> 1b (`multivariate.py`: `MultivariateAggregate` over the discrete-Sklar +
+> `rfft2` backbone, `bivariate.py` removed, the `multivariate`/`copula` DecL
+> keywords, both `agg` and `pnl` axes via the per-axis affine) shipped. Covered
+> by `tests/test_multivariate.py`; DecL mirrored in `test_decl.agg` (section MV).
+> **Follow-up (same cycle):** the **`netceded` mode** shipped too —
+> `MultivariateAggregate` now carries `mode ∈ {copula, netceded}`; the DecL
+> `netceded <agg with occurrence reinsurance>` statement and
+> `Aggregate.occ_bivariate()` both return a netceded `MultivariateAggregate`
+> (the joint ceded/net law), built by the comonotone severity builder
+> `build_netceded_joint`. Also: the copula clause is optional (→ independent),
+> `contour` became a two-panel `plot`, and `stats_df` / `describe` / `density_df`
+> are properties with a `help` introspector; `BivariateDistribution` stays as the
+> internal 2D density container. **Deferred to later stages:** Stage 2 the `t`
+> copula; Stage 3 reporting/plot polish; Stage 4 the ≥3-variate `rfftn`
+> shared-frequency path; Stage 5 `MultivariatePortfolio`.
+> The original revised-draft plan follows verbatim.
+>
 > **Status:** REVISED DRAFT (2026-06-03), after negative-x agg (1.0.0a21), the
 > signed Portfolio combine (1.0.0a22) and `pnl` (1.0.0a23). The prerequisite
 > signed-axis / window machinery is **now shipped**, so this plan is no longer

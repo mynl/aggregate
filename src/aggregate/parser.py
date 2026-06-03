@@ -526,6 +526,79 @@ class UnderwritingTransformer(Transformer):
         lr, _lr = c
         return {"_pnl_lr": _check_vectorizable(lr)}
 
+    # ----- multivariate (copula-coupled bivariate) ------------------
+    def answer_mv(self, c):
+        return c[0]
+
+    def mv_body_one(self, c):
+        return [c[0]]
+
+    def mv_body_cons(self, c):
+        lst, item = c
+        lst.append(item)
+        return lst
+
+    def copula_one_param(self, c):
+        """Build the :class:`Copula` from ``copula KIND P``.
+
+        ``KIND`` is an id (e.g. ``gumbel``); ``P`` is the kind's natural
+        parameter (Kendall tau, Pearson rho, or Spearman rho_s -- per the
+        :class:`aggregate.copula.Copula` subclass)."""
+        from .copula import Copula
+
+        _copula, kind_id, param = c
+        return Copula(kind_id, float(param))
+
+    def copula_no_param(self, c):
+        """Build a parameter-free :class:`Copula` from ``copula KIND`` (e.g.
+        ``copula independent``)."""
+        from .copula import Copula
+
+        _copula, kind_id = c
+        return Copula(kind_id)
+
+    def copula_none(self, c):
+        """No copula clause -> the independence copula (the default)."""
+        from .copula import Copula
+
+        return Copula('independent')
+
+    def mv_out_copula(self, c):
+        _mv, name, exposures, body, copula, freq, note = c
+        spec = {
+            "name": name,
+            **exposures,
+            **freq,
+            "lines": body,
+            "copula": copula,
+            "note": note,
+        }
+        return ("mvagg", name, spec)
+
+    def mv_out_copula_nofreq(self, c):
+        _mv, name, exposures, body, copula, note = c
+        spec = {
+            "name": name,
+            **exposures,
+            "freq_name": "poisson",
+            "lines": body,
+            "copula": copula,
+            "note": note,
+        }
+        return ("mvagg", name, spec)
+
+    def mv_out_netceded(self, c):
+        """``netceded <agg with occurrence reinsurance>`` -> the joint
+        (ceded, net) occurrence aggregate as a netceded MultivariateAggregate."""
+        _kw, agg_tuple = c          # agg_tuple = ("agg", name, spec)
+        _, name, spec = agg_tuple
+        return ("mvagg", name, {
+            "name": name,
+            "mode": "netceded",
+            "lines": [agg_tuple],
+            "note": spec.get("note", ""),
+        })
+
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
         _, name, sev, note = c

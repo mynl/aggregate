@@ -4,8 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-06-03** — after the `pnl` premium-minus-loss cycle
-> (1.0.0a23). Current version 1.0.0a23.
+> **Last updated: 2026-06-03** — after the `multivariate` copula cycle
+> (1.0.0a24). Current version 1.0.0a24.
 
 ---
 
@@ -262,8 +262,13 @@
   `tests/test_reins_bivariate.py` (31). **Open:** Portfolio `occ_bivariate`
   (2D convolution across independent units) is sketched but not implemented;
   offset/non-zero-floor windows deferred.
-  **Successor design (2026-06-02): `dev/plan-multivariate.md`** — generalises
-  `occ_bivariate` to a DecL-declared `multivariate` / `netceded` facility
-  (`MultivariateAggregate`/`MultivariatePortfolio`); two joint-severity builders
-  (outer-product for separate lines, comonotone scatter for ceded/net) over one
-  ND-FFT backbone; depends on negative-x (signed axes). Iterate after negative-x.
+  **Successor (✅ Stage 1 DONE, 1.0.0a24): `dev/done/plan-multivariate.md`.**
+  The DecL-declared `multivariate` facility shipped: `aggregate.copula.Copula`
+  (registry/factory: normal/gumbel/clayton/fgm/independent) couples two
+  components' per-claim severities via discrete Sklar; `MultivariateAggregate`
+  (new `aggregate.multivariate.py`, which **subsumes** `bivariate.py` →
+  `BivariateDistribution`/`size_axis`/`scatter_bivariate`) accumulates them over
+  the `rfft2` backbone. Both `agg` and `pnl` axes (per-axis affine). 37 tests;
+  DecL mirror section MV. **Deferred:** Stage 2 `t` copula; Stage 3 reporting/
+  plot polish; Stage 4 ≥3-variate `rfftn` shared-frequency path; Stage 5
+  `MultivariatePortfolio` / `netceded` DecL form.

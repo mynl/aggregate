@@ -28,6 +28,78 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a24
+---------
+
+The ``multivariate`` keyword — copula-coupled bivariate aggregates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A single event can drive two correlated perils — wind *and* flood, attritional
+*and* large — and you want the **joint** law of the two aggregates, not just two
+marginals. ``multivariate`` makes that a first-class object: two component
+``agg`` / ``pnl`` severity factories whose per-claim severities are coupled by a
+**copula**, accumulated by a **shared** outer frequency through a 2D FFT. It
+subsumes the ``1.0.0a20`` ``occ_bivariate`` backbone into a modelled,
+DecL-declared facility. See ``dev/plan-multivariate.md``.
+
+- **Syntax.** ::
+
+      multivariate Cat 25 claims
+          agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+          agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+          copula gumbel 0.4          # Kendall tau = 0.4
+          mixed gamma .2             # shared mixing -> common shock
+
+  The shared count (``25 claims``) and trailing frequency own the event count;
+  each component's ``dfreq [0 1] [p0 p1]`` is the per-event trigger probability,
+  so its *aggregate* is the per-event severity ``g_i = (1−p_i)δ₀ + p_i f_i``.
+  The ``copula`` clause is **optional** — omitted (or ``copula independent``)
+  means the independence copula, where the only dependence is the shared count.
+- **Copulas, à la ``Distortion``** (new ``aggregate.copula.Copula``). A registry
+  / factory hierarchy — ``Copula('gumbel', 0.4)`` dispatches on the name — with
+  **normal** (Pearson ρ), **gumbel** (Kendall τ, upper tail), **clayton**
+  (Kendall τ, lower tail), **fgm** (Spearman ρ_s), and **independent**. Each
+  takes its *natural* dependence parameter and converts internally; ``t`` (the
+  two-parameter kind) is deferred.
+- **Discrete Sklar construction.** The joint per-claim severity is the copula
+  rectangle mass ``S[i,j] = C(G1[i],G2[j]) − C(G1[i−1],G2[j]) − C(G1[i],G2[j−1])
+  + C(G1[i−1],G2[j−1])`` over the marginal CDF breakpoints; ``S`` has the
+  component severities as exact marginals (atoms handled as jumps in ``G``). The
+  joint aggregate is ``iFFT2(freq_pgf(N, FFT2(S)))`` — the ordinary compound FFT
+  with 1D transforms replaced by 2D, valid because ``freq_pgf`` is elementwise.
+  Marginalising one axis reproduces that component's standalone aggregate.
+- **``pnl`` axes in v1.** A ``pnl`` component contributes its *loss* severity to
+  the copula+FFT, then its premium becomes a **per-axis affine** (reflect +
+  shift) applied to that tensor axis *after* the FFT — the 1D ``_apply_agg_affine``
+  relabel lifted to one axis. The affine commutes with marginalisation (marginal
+  = the standalone ``pnl``) and flips the loss-loss copula dependence to the
+  correct profit-loss sign.
+- **Reporting.** ``MultivariateAggregate`` exposes ``marginals`` / ``moments``
+  (``E[A0ⁱ A1ʲ]``) / ``corr`` and the properties ``density_df`` / ``stats_df`` /
+  ``describe`` / ``info``, a two-panel ``plot`` (joint per-claim **severity** on
+  the left, joint **aggregate** on the right), and a ``help`` introspector. The
+  realised output correlation is reported
+  **alongside** the copula τ — compounding attenuates per-claim dependence, and a
+  shared *mixing* frequency adds common-shock dependence on top (so even the
+  independence copula gives a positive baseline correlation from the shared
+  count).
+- **Net/ceded as a first-class mode.** The joint per-occurrence (ceded, net)
+  law of a *reinsured* aggregate is now a ``MultivariateAggregate`` in
+  **``netceded`` mode** — same 2D-FFT engine, a different (comonotone)
+  per-claim severity builder. Two entry points: the DecL ``netceded <agg with
+  occurrence reinsurance>`` statement, and ``Aggregate.occ_bivariate()``, which
+  now **returns** that object (so it gets the full ``describe`` / ``stats_df`` /
+  ``info`` / ``plot`` / ``help`` surface, not a bare container). The axes are
+  ``Ceded`` / ``Net``; marginalising reproduces the univariate occurrence
+  ceded / net aggregates, and ``E[Ceded] + E[Net]`` equals the gross mean.
+- **Module move.** ``BivariateDistribution`` (the internal 2D density
+  container) and the ``size_axis`` / ``scatter_bivariate`` / ``build_netceded_joint``
+  helpers live in ``aggregate.multivariate``; the old ``aggregate.bivariate``
+  module is removed (import from ``aggregate.multivariate``).
+- New ``tests/test_multivariate.py`` (37 cases); DecL mirrored in
+  ``test_decl.agg`` (section MV). The ``t`` copula, ≥3-variate ``rfftn`` path,
+  and a ``MultivariatePortfolio`` are scoped as later stages in the plan.
+
 1.0.0a23
 ---------
 

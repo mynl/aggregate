@@ -1,7 +1,31 @@
 # Replacing the epsilon-jump trick in `SeverityDHistogram`
 
-**Status:** planning / recommendation only. No `src/` changes made.
-**Date:** 2026-06-03
+**Status:** SHIPPED in 1.0.0a26 (2026-06-03). `_DiscreteRV` added; the
+eps-trick + `max_log2` removed from `SeverityDHistogram._build`; an exact
+summed-moments fast-path added to `moms()`. Golden (`severity_layer_golden.json`)
+and baseline (`Sym.Dice`, `Port.Bodoff` stats_df/describe) re-captured to record
+the now-exact values; aggregate density bit-stable. Full suite green (907).
+**Date:** 2026-06-03 (reviewed & revised 2026-06-03 after the note/hints work)
+
+> **Correction discovered during implementation (2026-06-03).** §2's claim that
+> "moments never come from `fz` for a discrete severity — `_build` precomputes
+> `sev1/2/3`, so the unlimited case already uses the fast-path" is **wrong**.
+> `_build` sets `self.limit = min(self.limit, max(xs))`, so a discrete severity's
+> `detachment` is always *finite* (= `max(xs)`), never `inf`. The `moms()`
+> path-1 fast-path requires `detachment == inf`, so it **never fired for
+> discrete** — *every* discrete moment, unlimited included, was computed by
+> `_numerical_moms` (quad on the eps-trick `isf`) and returned the trailing-9s
+> artifact (mean `3.4999999995` instead of `3.5`). The fix therefore routes
+> **all** discrete moments (unlimited, limited, layered) through the new exact
+> `_DiscreteRV.layer_moments` summation — see §4a, which became the headline of
+> the change, not a footnote. The `max_log2` eps offset also *scales with atom
+> magnitude*, so the old hack was least accurate for large-valued atoms
+> (visible as the larger `Port.Bodoff` moment shift on re-capture).
+>
+> Line-number anchors (drifted by the 1.0.0a25 `hints{}` work — search by
+> symbol): `SeverityDHistogram._build` ~7791, `_DiscreteRV` inserted ~7777,
+> `max_log2` ~60 (now unused), `moms()` dispatch ~7535, `_numerical_moms`
+> ~6883.
 
 ## 1. The problem
 
@@ -183,6 +207,64 @@ representation changed except by noticing the trailing-9s artifacts vanished.
 - [ ] `rvs` now returns exact atoms instead of `atom - U(0, 2**-d)`; grep tests/docs
       for any severity `.rvs(` that assumed jitter (none found in `tests/`; verify docs).
 
+## 4a. The one path that is NOT zero-blast-radius: layered-discrete moments
+
+The "zero blast radius" argument in §4 is airtight for the **density/FFT path**
+(`cdf`/`sf` at bucket edges) and for the golden probe points — but it has a
+blind spot. For a discrete severity **with a layer**, `Severity.moms()`
+(~7535-7615) falls through paths 1 and 2 to path 3, `_numerical_moms`
+(comment: *"plus any histogram with a layer"*), which integrates `fz.isf` over
+the layer in probability space via `_safe_integrate` → `scipy.integrate.quad`
+with `epsrel=1e-6`/`1e-4`, then **rejects the result as `NaN` if the estimated
+relative error exceeds `max_rel_error = 1e-3`**.
+
+- Today the eps-trick makes `isf` a *continuous* (piecewise-linear) function —
+  quad integrates it cleanly, small error, moment accepted.
+- A true `_DiscreteRV.isf` is a *step* function. quad on a discontinuous
+  integrand inflates the error estimate and can trip the 1e-3 gate, flipping a
+  previously-reported layered-discrete moment to `NaN` ("unreliable"), or
+  shifting it by far more than the ~1e-9 §4 claims.
+
+Crucially, **the golden file does not capture `moms()`** — only
+`cdf/sf/pdf/ppf/isf` at fixed points — so this regression would slip past the
+oracle §4 leans on. (The FFT density itself is unaffected; this is a
+validation/`describe`/reporting-moment regression, not a density one.)
+
+**Fix (do it as part of this change, not a follow-up).** A discrete law's
+layered moments are *exact in closed form* — no integration needed:
+
+```math
+E[X(a,d)^n] = Σ_i  min(d - a, (x_i - a)_+)^n · p_i        (then /P(X>a) if conditional)
+```
+
+Two clean ways to wire it:
+
+1. **Histogram-layered fast-path in `moms()`** — before falling to
+   `_numerical_moms`, if `self._is_histogram` and a layer/attachment is present,
+   sum the layer function over `(xk, pk)` directly (mirrors the
+   attachment/detachment/conditional adjustments `_numerical_moms` already
+   applies). Most localized; leaves `_numerical_moms` for the scipy zoo.
+2. Give `_DiscreteRV` an exact `layer_moments(a, d, n)` helper and call it from
+   that fast-path.
+
+Either removes the only genuine risk and makes layered-discrete moments *more*
+correct (exact vs quad-on-a-step), consistent with the rest of the change.
+
+**Extend verification accordingly:** add the layered `dhistogram` cases'
+`moms()` output to the golden capture (or a dedicated unit test asserting
+`moms()` equals the summation formula), so the moments path is oracle-covered
+too — not just the point probes.
+
+### Surface `_DiscreteRV` actually has to implement (refined)
+The hot, must-be-correct methods are `cdf`, `sf`, `ppf`, `isf`, `pdf`,
+`support`. Note `fz.stats(...)` is **effectively dead for discrete**: in
+`_numerical_moms` it is guarded by `not severity._is_histogram` (~6921, ~6995),
+and the only other caller is the analytic path (lognorm/pareto/gamma/expon),
+never a histogram — so `stats`/`moment`/`mean`/`var`/`rvs` on `_DiscreteRV` can
+be minimal-but-honest (or omitted) without affecting any live path. Keep `rvs`
+honest anyway (returns exact atoms) since it is cheap and removes the
+`atom - U(0, 2**-d)` jitter surprise.
+
 ## 5. Recommendation
 
 **Adopt Option A.** It is the only approach that represents a discrete law *as*
@@ -193,7 +275,9 @@ honest caveat that `ppf/isf` get *more* accurate (re-capture the golden file to
 record that as the new truth).
 
 Scope to a single self-contained change: add `_DiscreteRV`, swap the two lines
-in `SeverityDHistogram._build`, re-capture goldens, run the suite. `SeverityMeta`'s
+in `SeverityDHistogram._build`, **add the histogram-layered moments fast-path
+(§4a)**, re-capture goldens (including `moms()` for the layered cases), run the
+suite. `SeverityMeta`'s
 `b1size = 1e-7` zero-mass hack is the same smell and a natural **follow-up**
 (it is a hybrid discrete-at-0 + continuous-elsewhere object, so it needs a
 mixed representation, not plain `_DiscreteRV`) — keep it out of this change to
@@ -204,3 +288,21 @@ Per CLAUDE.md `Base<Kind>` convention this is a helper, not a `Severity`
 subclass, so `_DiscreteRV` / `FrozenDiscrete` is fine (it is the `fz`, not the
 `Severity`). Keep it private (leading underscore) and near the histogram
 classes in `distributions.py`.
+
+## 7. Close-out (do this when the change lands)
+- **Bump the version.** Increment `pyproject.toml` to the next `1.0.0a*`
+  (currently `1.0.0a25` → `1.0.0a26`). This is a representation change with a
+  user-visible accuracy improvement (`ppf`/`isf`/`support` become exact, and
+  layered-discrete moments become exact), so it earns a version bump.
+- **README.rst bullet.** Add a release-note entry under the new version:
+  `SeverityDHistogram`/`SeverityFixed` now use an honest frozen discrete RV
+  (`_DiscreteRV`) instead of the `rv_histogram` epsilon-jump hack; exact
+  `ppf`/`isf`/`support` and exact layered-discrete moments; `max_log2`
+  dependency removed.
+- **Re-capture the golden** (`tests/data/severity_layer_golden.json`) and note
+  in the commit that the `ppf`/`isf` trailing-9s artifacts are now exact and
+  that `moms()` for the layered cases is newly oracle-covered.
+- **Docs:** keep any `.rst` mentioning the eps-trick / `max_log2` in lockstep;
+  do **not** trigger a full docs build in the loop (CLAUDE.md).
+- **Move this file to `dev/done/`** once merged and the suite is green, matching
+  the convention used for `plan-multivariate.md` and `plan-note-parse.md`.

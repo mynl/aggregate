@@ -28,6 +28,42 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a26
+---------
+
+Honest discrete severity — exact moments, no more ``rv_histogram`` hack
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A truly discrete severity (``dsev``, ``fixed``) used to be represented by
+*abusing* ``scipy.stats.rv_histogram`` — a continuous, piecewise-linear-CDF
+object — forced to mimic a step function by pouring each atom's mass into a
+tiny ``2**-d``-wide sliver to its left (sized by a float-resolution helper,
+``max_log2``). It worked, but it was a representation lie: it produced quantile
+artifacts (``ppf(0.5) = 149.9999999992`` instead of ``150``) and — because the
+sliver width *scales with atom magnitude* — it quietly degraded the **moments**
+of large-valued discrete books.
+
+``SeverityDHistogram`` / ``SeverityFixed`` now back ``self.fz`` with a small,
+honest ``_DiscreteRV``: exact right-continuous step ``cdf``/``sf``, ``pdf = 0``,
+and exact ``ppf``/``isf``/``support`` (no trailing-9s artifacts; ``rvs`` returns
+exact atoms).
+
+- **All discrete moments are now exact**, computed as finite sums over the
+  atoms — unlimited, limited, *and* layered. Previously every discrete moment
+  (even the unlimited mean of a fair die) was computed by numerical
+  isf-integration and came back as ``3.4999999995`` rather than ``3.5``; layered
+  discrete moments integrated a step function by quadrature, which was both
+  inexact and fragile. A discrete severity never routes its moments through the
+  numerical path anymore.
+- **Aggregate density is unchanged** — the FFT samples ``cdf``/``sf`` at
+  half-bucket edges, which never coincide with an atom, so the discretised
+  density is bit-for-bit identical to before. The improvement is confined to
+  reported moments and quantiles, which become *more* correct (the baseline /
+  golden regression snapshots were re-captured to record the exact values).
+- ``max_log2`` is now unused (kept for one release; slated for removal).
+
+See ``dev/done/plan-discrete-severity-fz.md``.
+
 1.0.0a25
 ---------
 

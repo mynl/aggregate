@@ -7577,6 +7577,21 @@ class Severity(ss.rv_continuous):
         if self.signed:
             return self.sev1, self.sev2, self.sev3
 
+        # 0b. Discrete (atomic) severity: every moment -- unlimited, limited,
+        # or layered -- is an exact finite sum over the atoms, so never route a
+        # discrete law through the numerical isf-integration path (path 3),
+        # whose quadrature on a true step isf is both inexact and fragile. This
+        # also fixes the unlimited case, which previously fell to path 3 (NOT
+        # the path-1 fast-path, since _build truncates the implicit limit to
+        # max(xs) so detachment is finite, never inf) and returned the
+        # eps-trick's trailing-9s artifact. ``layer_moments`` reproduces the
+        # exact value path 3 approximates; for the no-layer case limit=max(xs)
+        # and pattach=1, so it returns the plain Σ xⁿ p. Signed discrete is
+        # handled above (no layering on a signed law).
+        if isinstance(self.fz, _DiscreteRV):
+            denom = self.pattach if self.conditional else 1.0
+            return self.fz.layer_moments(self.attachment, self.limit, denom)
+
         # 1. Histogram fast-path: precomputed moments cover the no-layer case.
         if (self.sev1 is not None
                 and self.attachment == 0
@@ -7774,16 +7789,166 @@ def _broadcast_histogram_xs_ps(sev_name, sev_xs, sev_ps):
     return xs, ps
 
 
+class _DiscreteRV:
+    """Frozen discrete distribution over arbitrary float support.
+
+    A small, honest stand-in for the subset of the ``scipy.stats`` frozen
+    random-variable interface that :class:`Severity` consumes, with genuine
+    step-function semantics. It replaces the old ``rv_histogram`` "epsilon
+    jump" hack (a *continuous* object forced to mimic a step function by
+    pouring each atom's mass into a ``2**-d``-wide sliver to its left), which
+    made correctness hinge on a float-resolution tightrope and produced
+    ``ppf``/``isf`` artifacts like ``49.999999999`` instead of ``50``.
+
+    Parameters
+    ----------
+    xs : array_like
+        Support points (atoms); arbitrary finite floats, need not be sorted,
+        may be negative (a profit is a negative loss).
+    ps : array_like
+        Probabilities at each atom; should sum to 1.
+
+    Notes
+    -----
+    ``cdf`` is the exact right-continuous step function ``P(X <= x)``; ``sf``
+    is its complement; ``pdf`` is ``0`` everywhere (a discrete law has no
+    density). ``ppf(q)`` returns the smallest atom with ``cdf >= q``. Moments
+    are exact finite sums ``Σ xⁿ pₙ`` -- see :meth:`layer_moments` for the
+    layered/limited case, which :meth:`Severity.moms` uses so a discrete
+    severity never routes its moments through numerical integration.
+
+    Scalar and array inputs are both supported (the splice / layer / signed
+    decorators in :class:`Severity` pass 0-d and 1-d arrays): a scalar in
+    yields a numpy scalar out, an array in yields an array of the same shape.
+    """
+
+    def __init__(self, xs, ps):
+        xs = np.asarray(xs, dtype=float).ravel()
+        ps = np.asarray(ps, dtype=float).ravel()
+        order = np.argsort(xs)
+        self.xk = xs[order]
+        self.pk = ps[order]
+        self.cum = np.cumsum(self.pk)        # P(X <= xk_i)
+        self.n = self.xk.size
+
+    @staticmethod
+    def _unwrap(out):
+        """Return a numpy scalar for 0-d results, else the array unchanged."""
+        return out[()] if out.ndim == 0 else out
+
+    def cdf(self, x):
+        """Right-continuous CDF ``P(X <= x)``."""
+        x = np.asarray(x, dtype=float)
+        idx = np.searchsorted(self.xk, x, side='right')   # count of atoms <= x
+        out = np.where(idx == 0, 0.0, self.cum[np.clip(idx - 1, 0, self.n - 1)])
+        return self._unwrap(out)
+
+    def sf(self, x):
+        """Survival function ``P(X > x) = 1 - cdf(x)``."""
+        return self._unwrap(1.0 - np.asarray(self.cdf(x), dtype=float))
+
+    def pdf(self, x):
+        """Density of a discrete law: identically ``0`` (mass lives in atoms)."""
+        out = np.zeros_like(np.asarray(x, dtype=float))
+        return self._unwrap(out)
+
+    def ppf(self, q):
+        """Quantile: the smallest atom ``xk`` with ``cdf(xk) >= q``."""
+        q = np.asarray(q, dtype=float)
+        idx = np.clip(np.searchsorted(self.cum, q, side='left'), 0, self.n - 1)
+        return self._unwrap(self.xk[idx])
+
+    def isf(self, q):
+        """Inverse survival: ``ppf(1 - q)``."""
+        return self.ppf(1.0 - np.asarray(q, dtype=float))
+
+    def support(self):
+        """``(min atom, max atom)``."""
+        return self.xk[0], self.xk[-1]
+
+    def moment(self, n):
+        """Exact raw moment ``E[Xⁿ] = Σ xⁿ p``."""
+        return float(np.sum(self.xk ** n * self.pk))
+
+    def stats(self, moments='mv'):
+        """Exact ``(mean, var[, skew[, kurtosis]])`` selected by ``moments``."""
+        m = float(np.sum(self.xk * self.pk))
+        v = float(np.sum((self.xk - m) ** 2 * self.pk))
+        out = []
+        for ch in moments:
+            if ch == 'm':
+                out.append(m)
+            elif ch == 'v':
+                out.append(v)
+            elif ch == 's':
+                out.append(float(np.sum((self.xk - m) ** 3 * self.pk) / v ** 1.5)
+                           if v > 0 else 0.0)
+            elif ch == 'k':
+                out.append(float(np.sum((self.xk - m) ** 4 * self.pk) / v ** 2 - 3.0)
+                           if v > 0 else 0.0)
+        return tuple(out)
+
+    def mean(self):
+        return float(np.sum(self.xk * self.pk))
+
+    def var(self):
+        m = self.mean()
+        return float(np.sum((self.xk - m) ** 2 * self.pk))
+
+    def rvs(self, size=None, random_state=None):
+        """Draw exact atoms (no ``atom - U(0, 2**-d)`` jitter, unlike the hack)."""
+        if random_state is None or isinstance(random_state, (int, np.integer)):
+            rng = np.random.default_rng(random_state)
+        else:
+            rng = random_state
+        return rng.choice(self.xk, size=size, p=self.pk)
+
+    def layer_moments(self, attachment, limit, denom):
+        """Exact first three moments of the layered loss ``min(limit, (X-a)₊)``.
+
+        Parameters
+        ----------
+        attachment : float
+            Layer attachment ``a``.
+        limit : float
+            Layer width (``np.inf`` for an unlimited layer / no cap).
+        denom : float
+            Divisor applied to every moment -- ``P(X > a)`` for a conditional
+            severity, ``1.0`` otherwise.
+
+        Returns
+        -------
+        (E[Y], E[Y²], E[Y³]) : tuple of float
+            where ``Y = min(limit, (X - attachment)₊)``.
+
+        Notes
+        -----
+        This is the exact closed form of the integral that
+        :func:`_numerical_moms` approximates by quadrature: for a discrete
+        law ``∫_{F(a)}^{F(d)} (q(p)-a)ⁿ dp + (d-a)ⁿ S(d) = Σᵢ yᵢⁿ pᵢ``. A zero
+        ``denom`` (layer entirely above the support ⇒ ``P(X>a)=0``, every
+        ``yᵢ=0``) returns zeros rather than ``0/0``.
+        """
+        y = np.clip(self.xk - attachment, 0.0, limit)
+        m1 = float(np.sum(y * self.pk))
+        m2 = float(np.sum(y * y * self.pk))
+        m3 = float(np.sum(y * y * y * self.pk))
+        if denom == 0:
+            return 0.0, 0.0, 0.0
+        return m1 / denom, m2 / denom, m3 / denom
+
+
 class SeverityDHistogram(Severity):
     """Severity with point-mass support at user-supplied loss values.
 
     Notes
     -----
-    Pre-computes ``sev1`` / ``sev2`` / ``sev3`` directly from ``(xs, ps)``
-    rather than going through ``moms()``. Construction adapts the discrete
-    point masses into a ``ss.rv_histogram`` by adding a tiny epsilon to the
-    left of each support point so scipy's histogram CDF interpolation gives
-    sane left-continuous behaviour.
+    Pre-computes ``sev1`` / ``sev2`` / ``sev3`` directly from ``(xs, ps)``.
+    ``self.fz`` is a :class:`_DiscreteRV` -- an honest frozen discrete RV with
+    exact right-continuous step ``cdf``/``sf`` and exact summed moments -- in
+    place of the historical ``rv_histogram`` epsilon-jump hack (which abused a
+    continuous object to mimic a step function and produced ``ppf``/``isf``
+    artifacts and a float-resolution dependency via ``max_log2``).
     """
     sev_kind = 'dhistogram'
     _is_histogram = True
@@ -7809,15 +7974,11 @@ class SeverityDHistogram(Severity):
         self.sev1 = np.sum(xs * ps)
         self.sev2 = np.sum(xs ** 2 * ps)
         self.sev3 = np.sum(xs ** 3 * ps)
-        # ``max_log2`` picks a step small enough that subtracting it from the
-        # support point stays representable in float64. Size it from the
-        # largest *magnitude* so the left-epsilon also resolves negative atoms.
-        scale = float(np.max(np.abs(xs)))
-        d = max_log2(scale if scale > 0 else 1.0)
-        logger.info('Severity._build | %s d=%s', self.sev_name, d)
-        xss = np.sort(np.hstack((xs - 2 ** -d, xs)))
-        pss = np.vstack((ps, np.zeros_like(ps))).reshape((-1,), order='F')[:-1]
-        self.fz = ss.rv_histogram((pss, xss), density=False)
+        # Honest discrete RV: exact step cdf/sf at the FFT bucket edges (which
+        # sit at half-bucket offsets and never coincide with an atom, so the
+        # discretised density is bit-identical to the old eps-jump trick) plus
+        # exact ppf/isf/support and exact moments (see _DiscreteRV).
+        self.fz = _DiscreteRV(xs, ps)
 
 
 class SeverityCHistogram(Severity):

@@ -623,33 +623,19 @@ class Underwriter(object):
                 d = answer.spec
                 log2, bs, recommend_p, kwargs = _parse_note(
                     d['note'], log2, bs, recommend_p, kwargs)
-                if d['sev_name'] == 'dhistogram' and log2 == 0:
-                    bs_ = 1
-                    # how big?
-                    if d['freq_name'] == 'fixed':
-                        max_loss = np.max(d['sev_xs']) * d['exp_en']
-                    elif d['freq_name'] == 'empirical':
-                        max_loss = np.max(d['sev_xs']) * max(d['freq_a'])
-                    elif d['freq_name'] == 'bernoulli':
-                        max_loss = np.max(d['sev_xs'])
-                    else:
-                        # normal approx on count
-                        max_loss = np.max(d['sev_xs']) * d['exp_en'] * (1 + 3 * d['exp_en'] ** 0.5)
-                    # binaries are 0b111... len-2 * 2 is len - 1
-                    log2_ = len(bin(int(max_loss))) - 1
-                    logger.info('(%s, %s): Discrete mode, using bs=1 and log2=%s',
-                                answer.kind, answer.name, log2_)
-                else:
-                    log2_ = self.log2 if log2 == 0 else log2
-                    if bs == 0:
-                        bs_ = round_bucket(answer.object.recommend_bucket(log2_, p=recommend_p))
-                    else:
-                        bs_ = bs
-                    logger.info('(%s, %s): Normal mode, using bs=%s (1/%s) and log2=%s',
-                                answer.kind, answer.name, bs_, 1 / bs_, log2_)
+                # ``log2`` is a CAP; bucket + window selection is delegated to
+                # Aggregate.update / _bs_window (the single source of truth:
+                # exact-discrete, bounded, moment, and signed/P&L windows).
+                # Pass bs=0 to estimate, or an explicit bs (call or note) to
+                # pin the grid. There is deliberately NO separate bucket logic
+                # here -- no back doors around the estimator.
+                log2_ = self.log2 if log2 == 0 else log2
+                logger.info('(%s, %s): update(log2=%s, bs=%s) -> _bs_window',
+                            answer.kind, answer.name, log2_, bs)
                 try:
                     answer.object.update(
-                        log2=log2_, bs=bs_, debug=self.debug, force_severity=True, **kwargs)
+                        log2=log2_, bs=bs, recommend_p=recommend_p,
+                        debug=self.debug, force_severity=True, **kwargs)
                 except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
             elif isinstance(answer.object, Severity):

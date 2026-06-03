@@ -195,11 +195,12 @@ agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 pois
 
 # P&L. Negative-support (signed) severity and the output window (1.0.0a21)
 # =======================================================================
-# Drive negative-x: a profit is a negative loss. dsev with negative atoms
-# auto-enables signed mode; continuous severities opt in with update(signed=True).
-# The aggregate is placed on a window [x_min, x_min+N*bs) via update(x_min=...)
-# or auto via update(x_min=None). See tests/test_negative_x.py and
-# dev/plan-negative-x-agg.md.
-agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support {-6,1,8,15}; needs x_min<=-6}
-agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0; needs a bracketing window}
-agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window x_min=None}
+# Drive negative-x: a profit is a negative loss. dsev with a negative atom
+# auto-signs; continuous P&L severities use the ssev keyword (the never-clamp
+# sibling of sev). A signed aggregate auto-windows from build/update (x_min
+# defaults to 'auto' -> a two-sided window); a number forces the origin. See
+# tests/test_negative_x.py and dev/plan-negative-x-agg.md.
+agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support {-6,1,8,15}}
+agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0}
+agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window}
+agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps}

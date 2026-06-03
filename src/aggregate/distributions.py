@@ -49,6 +49,13 @@ from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
 
+# Probability coverage for the automatic output WINDOW (number of nines):
+# the window spans roughly the 10**-WINDOW_NINES .. 1-10**-WINDOW_NINES
+# quantiles. Deliberately far tighter than RECOMMEND_P (the legacy bucket p)
+# so a P&L / signed aggregate's window captures essentially all the mass.
+# TODO: expose as a user-settable update() argument.
+WINDOW_NINES = 12
+
 
 def max_log2(x):
     """
@@ -323,7 +330,7 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
     return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
 
 
-def estimate_agg_window(m, cv, skew, p=RECOMMEND_P):
+def estimate_agg_window(m, sd, skew, p=RECOMMEND_P):
     """Two-sided output window ``[x_lo, x_hi]`` and width ``W`` for an aggregate.
 
     The signed counterpart of :func:`_estimate_agg_percentile`: where that
@@ -334,10 +341,11 @@ def estimate_agg_window(m, cv, skew, p=RECOMMEND_P):
 
     Parameters
     ----------
-    m, cv, skew : float
-        Analytic aggregate mean, coefficient of variation, and skewness. ``m``
-        may be negative (a net-profit P&L). ``cv`` carries the sign of ``m``;
-        only ``sd = |cv * m|`` is used.
+    m, sd, skew : float
+        Analytic aggregate mean, **standard deviation** (not cv), and skewness.
+        ``m`` may be negative or zero (a net-profit / mean-zero P&L); ``sd`` is
+        taken directly so the mean-zero case -- where ``cv`` is undefined --
+        works.
     p : float
         Coverage. ``p > 1`` is read as ``1 - 10**-p`` (e.g. ``p=6`` ->
         ``1 - 1e-6``); the per-edge tail probability is ``1 - p``.
@@ -354,8 +362,8 @@ def estimate_agg_window(m, cv, skew, p=RECOMMEND_P):
     Three regimes (mirrors ``_estimate_agg_percentile`` but two-sided):
 
     - **Symmetric** (``|skew|`` below a tolerance, incl. any genuinely
-      symmetric P&L): neither shifted-lognormal nor shifted-gamma is defined,
-      so use a **normal** approximation for both edges
+      symmetric or mean-zero P&L): neither shifted-lognormal nor shifted-gamma
+      is defined, so use a **normal** approximation for both edges
       ``m -/+ z*sd`` with ``z = norm.isf(1-p)``. This is the default fallback,
       not an afterthought.
     - **Right-skewed** (``skew > 0``): fit shifted lognormal and shifted gamma
@@ -369,11 +377,11 @@ def estimate_agg_window(m, cv, skew, p=RECOMMEND_P):
     with non-trivial skew). The returned window is widened, if necessary, to
     contain ``m``.
     """
-    if np.isinf(cv):
-        raise ValueError('Infinite variance passed to estimate_agg_window')
+    sd = abs(float(sd))
+    if not np.isfinite(sd):
+        raise ValueError('Infinite/undefined sd passed to estimate_agg_window')
     p = float(np.where(p > 1, 1 - 10.0 ** -p, p))
     tail = 1.0 - p
-    sd = abs(cv * m)
     z = ss.norm.isf(tail)
     if sd == 0:
         return float(m), float(m), 0.0
@@ -1858,6 +1866,25 @@ class Aggregate:
             self._reins_view_stats_cache = None
             self._reins_describe = None
 
+    def _severity_in_window(self):
+        """Whether the severity support overlaps the output window ``[x_min, x_max]``.
+
+        Returns ``True`` (the common case) when at least one severity bucket
+        with positive mass falls inside the aggregate output grid. ``False``
+        flags the divergent case (e.g. a high-claim-count aggregate windowed
+        far from 0 while the per-claim severity sits near 0), where
+        ``density_df.p_sev`` is all zeros and the severity must be read from
+        ``sev_density_df`` instead.
+        """
+        if self.sev_density is None or self.xs_sev is None:
+            return True
+        nz = self.sev_density > 0
+        if not np.any(nz):
+            return True
+        s_lo = float(self.xs_sev[nz][0])
+        s_hi = float(self.xs_sev[nz][-1])
+        return not (s_hi < self.x_min or s_lo > self.x_max)
+
     def _sev_density_on_output_grid(self):
         """Severity density mapped from ``xs_sev`` onto the output grid ``xs``.
 
@@ -1914,13 +1941,9 @@ class Aggregate:
                                                                   is in a port), bounds,
                                                                   ``plot``, user code
         ``p``             alias of ``p_total``                   Portfolio API compat
-        ``p_sev``         ``self.sev_density``                   ``plot``, severity-error
         ``log_p``         ``np.log(p)``                          ``plot`` log scale
-        ``log_p_sev``     ``np.log(p_sev)``                      ``plot`` log scale
         ``F``             ``p.cumsum()``                         ``q``, ``var``, ``tvar``
-        ``F_sev``         ``p_sev.cumsum()``                     ``q_sev``, ``plot``
         ``S``             ``1 - p_total.cumsum()``               ``q``, ``tvar``, ``plot``
-        ``S_sev``         ``1 - p_sev.cumsum()``                 ``tvar_sev``, ``plot``
         ``lev``           ``S.shift(1).cumsum() * bs``           ``epd``, pricing
         ``exa``           alias of ``lev``                       Portfolio API compat
         ``exlea``         ``(lev - loss * S) / F``               pricing
@@ -1953,33 +1976,24 @@ class Aggregate:
             self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
                 self._density_df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
 
-            # we spend a lot of time computing sev exactly, so don't want to flush that away
-            # with remove fuzz...hence add here. On a signed / windowed grid the
-            # severity lives on xs_sev, which may differ from the output grid xs;
-            # align it so p_sev sits at the severity's physical location on xs
-            # (zero where the severity falls outside the output window). With no
-            # offset (i0 == 0 and x_min == 0) this is exactly self.sev_density.
-            self._density_df['p_sev'] = self._sev_density_on_output_grid()
+            # Severity columns (p_sev/F_sev/S_sev/log_p_sev) now live on their
+            # own native grid in ``sev_density_df`` -- on a windowed/signed grid
+            # the severity (near 0) and the aggregate (windowed) no longer share
+            # a grid, so forcing the severity onto the aggregate index is at best
+            # partial. See ``sev_density_df`` and ``info``'s outside-window note.
 
             # reindex
             self._density_df = self._density_df.set_index('loss', drop=False)
-            # guard log of 0 / fp-fuzz negatives (cosmetic display columns only;
+            # guard log of 0 / fp-fuzz negatives (cosmetic display column only;
             # values unchanged: log(0) = -inf, log(<0) = nan as before).
             with np.errstate(divide='ignore', invalid='ignore'):
                 self._density_df['log_p'] = np.log(self._density_df.p)
-                # when no sev this causes a problem
-                if self._density_df.p_sev.dtype == np.dtype('O'):
-                    self._density_df['log_p_sev'] = np.nan
-                else:
-                    self._density_df['log_p_sev'] = np.log(self._density_df.p_sev)
 
             # generally acceptable for F, by construction
             self._density_df['F'] = self._density_df.p.cumsum()
-            self._density_df['F_sev'] = self._density_df.p_sev.cumsum()
 
             # Update 2021-01-28: S is best computed forwards
             self._density_df['S'] = 1 - self._density_df.p_total.cumsum()
-            self._density_df['S_sev'] = 1 - self._density_df.p_sev.cumsum()
 
             # add LEV, TVaR to each threshold point...
             self._density_df['lev'] = self._density_df.S.shift(1, fill_value=0).cumsum() * self.bs
@@ -1997,6 +2011,46 @@ class Aggregate:
             self._density_df['exeqa'] = self._density_df.loss  # E(X | X=a) = a(!) included for symmetry was exa
 
         return self._density_df
+
+    @property
+    def sev_density_df(self):
+        """Per-bucket severity density / distribution on the **severity** grid.
+
+        The severity lives on its own grid ``xs_sev`` (physical 0 at index
+        ``i0``), which equals the aggregate grid only on the default 0-based
+        case. On a windowed / signed aggregate the severity (near 0) and the
+        aggregate (windowed, possibly far from 0) genuinely occupy different
+        grids, so the severity reporting columns live here -- indexed by the
+        severity's own loss -- rather than in ``density_df``. This frame is
+        always correct regardless of the aggregate output window.
+
+        Columns
+        -------
+        loss : severity grid ``xs_sev`` (also the index).
+        p_sev : ``self.sev_density``.
+        log_p_sev : ``log(p_sev)`` (``-inf`` at zero buckets).
+        F_sev : ``p_sev.cumsum()``.
+        S_sev : ``1 - p_sev.cumsum()``.
+
+        Returns
+        -------
+        DataFrame indexed by severity ``loss``.
+        """
+        if self._sev_density_df is None:
+            if self.sev_density is None:
+                raise ValueError('Update Aggregate before asking for sev_density_df')
+            df = pd.DataFrame(dict(loss=np.asarray(self.xs_sev, dtype=float),
+                                   p_sev=self.sev_density))
+            df = df.set_index('loss', drop=False)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                if df.p_sev.dtype == np.dtype('O'):
+                    df['log_p_sev'] = np.nan
+                else:
+                    df['log_p_sev'] = np.log(df.p_sev)
+            df['F_sev'] = df.p_sev.cumsum()
+            df['S_sev'] = 1 - df.p_sev.cumsum()
+            self._sev_density_df = df
+        return self._sev_density_df
 
     # ================================================================
     # Reinsurance reporting (rationalized; see dev/reins-reporting.md)
@@ -2906,6 +2960,7 @@ class Aggregate:
     def __init__(self, name, exp_el=0.0, exp_premium=0.0, exp_lr=0.0, exp_en=0.0, exp_attachment=None, exp_limit=np.inf,
                  sev_name='', sev_a=np.nan, sev_b=0.0, sev_mean=0.0, sev_cv=0.0, sev_loc=0.0, sev_scale=0.0,
                  sev_xs=None, sev_ps=None, sev_wt=1.0, sev_lb=0.0, sev_ub=np.inf, sev_conditional=True,
+                 sev_signed=False, sev_reflect=False,
                  sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='',
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
@@ -2940,6 +2995,11 @@ class Aggregate:
         :param sev_lb:          lower bound for severity (length of sev_lb must equal length of sev_ub and weights)
         :param sev_ub:          upper bound for severity
         :param sev_conditional: if True, severity is conditional, else unconditional.
+        :param sev_signed:      if True the severity is signed (never clamps its
+                                negative support; a profit is a negative loss).
+                                Set by the ``ssev`` DecL keyword. Orthogonal to
+                                ``value_type``. ``dsev`` with a negative atom
+                                self-signs regardless of this flag.
         :param sev_pick_attachments:  if not None, a list of attachment points to define picks
         :param sev_pick_losses:  if not None, a list of losses by layer
         :param occ_reins:       layers: share po layer xs attach or XXXX
@@ -3004,6 +3064,7 @@ class Aggregate:
         self.x_max = None
         self.i0 = 0           # index of physical 0 in the severity array
         self.xs_sev = None    # severity discretisation grid (may differ from xs)
+        self._bs_window_df = None   # inspectable bucket/window estimator summary
         # F1 opt-in: when True the severity keeps its negative support (the
         # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the
         # established non-negative behaviour. Opt-in wiring is pending a design
@@ -3031,6 +3092,7 @@ class Aggregate:
         self.ftagg_density = None
         self.fzapprox = None
         self._density_df = None
+        self._sev_density_df = None
 
         # Empirical moment estimates (set by update_work; consumed by q / tvar)
         self.est_m = 0
@@ -3131,7 +3193,7 @@ class Aggregate:
 
                 # WARNING: note sev_xs and sev_ps are NOT broadcast
                 self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                        _swt, _slb, _sub, sev_conditional)
+                                        _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect)
                 sev1, sev2, sev3 = self.sevs[r].moms()
 
                 # input claim count trumps input loss
@@ -3208,7 +3270,7 @@ class Aggregate:
             if need_gup:
                 for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, _swt in zip(*sev_arrays, sev_wt):
                     gup_sevs.append(Severity(_sn, 0, np.inf, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                             _swt, _slb, _sub, sev_conditional))
+                                             _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect))
 
             # perform looping creation of severity distribution
             for e_idx, (_el, _pr, _lr, _en, _at, _y) in enumerate(zip(*exp_arrays)):
@@ -3224,7 +3286,7 @@ class Aggregate:
                 actual_sevs = []
                 for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, _swt in zip(*sev_arrays, sev_wt):
                     actual_sevs.append(Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                                _swt, _slb, _sub, sev_conditional))
+                                                _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect))
 
                 # now we need to figure the severity across the mixture for this particular layer and  attach
                 moms = []
@@ -3497,11 +3559,7 @@ class Aggregate:
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            if sv.limit == np.inf and sv.attachment == 0:
-                _la = 'unlimited'
-            else:
-                _la = f'{sv.limit:,.0f} xs {sv.attachment:,.0f}'
-            s.append(f'severity distribution    {sv.long_name}, {_la}.')
+            s.append(f'severity distribution    {sv.long_name}, {sv.support_description}.')
         else:
             s.append(f'severity distribution    {n} components')
         if self.bs > 0:
@@ -3518,6 +3576,12 @@ class Aggregate:
                 s.append(f'window                   [{self.x_min:,.6g}, '
                          f'{self.x_max:,.6g}]')
                 s.append(f'signed severity          {self._signed_sev}')
+                # Always report the severity-vs-window status (consistent shape).
+                if self._severity_in_window():
+                    s.append('severity window          inside output window')
+                else:
+                    s.append('severity window          OUTSIDE output window; '
+                             'see sev_density_df')
             s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
@@ -3542,11 +3606,7 @@ class Aggregate:
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            if sv.limit == np.inf and sv.attachment == 0:
-                _la = 'unlimited'
-            else:
-                _la = f'{sv.limit} xs {sv.attachment}'
-            s.append(f'Severity {sv.long_name} distribution, {_la}.')
+            s.append(f'Severity {sv.long_name} distribution, {sv.support_description}.')
         else:
             s.append(f'Severity with {n} components.')
         if self.bs > 0:
@@ -3578,45 +3638,29 @@ class Aggregate:
     # ``_freq_sev_convolution`` below.
     # ================================================================
 
-    def _resolve_signed(self, signed):
-        """Resolve the signed-severity opt-in for ``update``.
+    def _signed(self):
+        """Whether the aggregate has signed (negative-support) severity.
 
-        Parameters
-        ----------
-        signed : bool or None
-            ``True`` / ``False`` force signed / clamped. ``None`` (default)
-            auto-enables signed mode **only** for discrete severities
-            (``dhistogram`` / ``fixed`` / ``chistogram``) that carry an
-            explicit negative atom -- the unambiguous case (``dsev [-2 5]``).
-            Continuous severities (e.g. ``norm``) stay clamped unless
-            ``signed=True`` is passed explicitly.
+        Returns ``True`` iff any component severity is signed -- declared with
+        the ``ssev`` keyword (continuous) or a ``dsev`` with a negative atom,
+        both recorded on ``Severity.signed`` at construction.
 
         Returns
         -------
         bool
-            Whether to treat the severity as signed (negative support).
 
         Notes
         -----
-        Per the design decision (dsev auto + flag for continuous): a profit is
-        a negative loss, and ``dsev [-2 5]`` has no other sensible reading, so
-        it auto-signs and ``build('agg ... dsev [-1 10] ... poisson 1e6')``
-        works directly. Continuous P&L severities are ambiguous (e.g.
-        ``100*norm+500`` conventionally clamps its far-left tail), so they
-        require the explicit ``signed=True`` flag.
+        Signedness is a *parse-time property of the severity*, not a runtime
+        flag -- which is what lets the analytic moments (and hence the auto
+        window) be correct before any FFT, and is why there is **no**
+        ``signed=`` override on ``update``: a built ``Severity`` is already
+        clamped or not, and flipping it would require a deep rebuild. To change
+        signedness, change the declaration (``sev`` / ``dsev`` / ``ssev``).
+        See ``dev/plan-negative-x-agg.md``.
         """
-        if signed is not None:
-            return bool(signed)
-        for sev in (self.sevs if self.sevs is not None else []):
-            if getattr(sev, 'sev_kind', '') in ('dhistogram', 'fixed', 'chistogram'):
-                raw = getattr(sev, 'fz', None)
-                try:
-                    lo = float(raw.ppf(1e-12)) if raw is not None else 0.0
-                except Exception:  # pragma: no cover - defensive
-                    lo = 0.0
-                if lo < 0:
-                    return True
-        return False
+        return any(getattr(s, 'signed', False)
+                   for s in (self.sevs if self.sevs is not None else []))
 
     def _severity_negative_buckets(self, bs):
         """Number of negative buckets the severity reaches (index of physical 0).
@@ -3645,27 +3689,26 @@ class Aggregate:
 
         Notes
         -----
-        ``lo`` is taken as the ``1e-12`` lower quantile of each component
-        (via the layered ``ppf``), mirroring how the upper grid edge is sized
-        from a high quantile. Any mass below the leftmost bucket is dropped and
+        ``lo`` is taken as the ``1e-12`` lower quantile of each *signed*
+        component (a signed Severity has identity layering, so its ``ppf`` is
+        the raw lower quantile), mirroring how the upper grid edge is sized from
+        a high quantile. Any mass below the leftmost bucket is dropped and
         absorbed by the (optional) renormalisation in ``discretize`` -- at the
         ``1e-12`` level this is negligible.
         """
-        # Signed severity is OPT-IN. Without an explicit opt-in the severity
-        # keeps the established clamp-at-0 layering (e.g. ``norm`` piles its
-        # sub-zero tail at 0), so i0 == 0 and the non-negative path is
-        # untouched. The opt-in mechanism (DecL keyword / flag / dsev
-        # auto-detect) is being decided; until wired, ``_signed_sev`` is False.
+        # Only signed severities reach below 0; an unsigned component keeps the
+        # clamp-at-0 layering (no negative buckets). i0 == 0 unless the
+        # aggregate is signed, so the non-negative path is untouched.
         if not getattr(self, '_signed_sev', False):
             return 0
         if self.sevs is None or len(self.sevs) == 0:
             return 0
         los = []
         for sev in self.sevs:
+            if not getattr(sev, 'signed', False):
+                continue
             try:
-                # raw underlying ppf -- the layered ppf is clamped at 0
-                raw = getattr(sev, 'fz', None)
-                lo = float(raw.ppf(1e-12)) if raw is not None else float(sev.ppf(1e-12))
+                lo = float(sev.ppf(1e-12))   # identity layering -> raw quantile
             except Exception:  # pragma: no cover - defensive
                 lo = 0.0
             if not np.isfinite(lo):
@@ -3759,24 +3802,23 @@ class Aggregate:
         # -inf catch. Any residual mass below it (<= 1e-12 by construction of
         # i0) is dropped and absorbed by the optional renormalisation below.
 
-        # bed = bucketed empirical distribution
+        # bed = bucketed empirical distribution. A signed Severity carries
+        # identity layering, so its own cdf/sf are already un-clamped; an
+        # unsigned component keeps the clamp-at-0 layering. So per-component
+        # ``fz.cdf`` / ``fz.sf`` are correct on the signed grid with no special
+        # casing (an unsigned component simply contributes 0 to negative
+        # buckets). Occurrence reinsurance on a signed severity is out of scope
+        # (plan §6).
         beds = []
         for fz in self.sevs:
-            # Signed mode bypasses the layered (clamp ``x<0 -> 0``) wrappers and
-            # reads the raw underlying frozen distribution, which carries the
-            # severity's true negative support. The non-negative path keeps the
-            # layered cdf/sf exactly as before. (Occurrence reinsurance on a
-            # signed severity is out of scope here -- see plan §6.)
-            cdf = fz.fz.cdf if signed else fz.cdf
-            sf = fz.fz.sf if signed else fz.sf
             if discretization_calc == 'both':
                 # see comments: we rescale each severity...
-                appx = np.maximum(np.diff(cdf(adj_xs)), -np.diff(sf(adj_xs)))
+                appx = np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
             elif discretization_calc == 'survival':
-                appx = -np.diff(sf(adj_xs))
+                appx = -np.diff(fz.sf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             elif discretization_calc == 'distribution':
-                appx = np.diff(cdf(adj_xs))
+                appx = np.diff(fz.cdf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             else:
                 raise ValueError(
@@ -3821,7 +3863,7 @@ class Aggregate:
         self._value_type = v
 
     def update(self, log2=16, bs=0, recommend_p=RECOMMEND_P, debug=False,
-               x_min=0, x_max=None, signed=None, **kwargs):
+               x_min='auto', x_max=None, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -3830,53 +3872,39 @@ class Aggregate:
         :param bs:
         :param recommend_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
         :param debug:
-        :param x_min: lower edge of the output window (default 0 = today's
-          behaviour). May be negative for a profit/loss aggregate. Snapped to
-          a multiple of ``bs``. ``x_min=None`` requests an automatic two-sided
-          window (see ``update_work``).
+        :param x_min: lower edge of the output window. ``'auto'`` (default)
+          resolves to ``0`` for an ordinary non-negative aggregate (today's
+          behaviour) and to ``None`` (automatic two-sided window) for a signed
+          aggregate -- so a P&L declared with ``ssev`` / negative ``dsev`` just
+          works from ``build``. ``None`` forces the automatic window; a number
+          forces that origin (snapped to a multiple of ``bs``; may be negative).
         :param x_max: upper edge of the output window; informational, the grid
           length is fixed by ``log2``. Currently unused when ``x_min`` is given
           explicitly (the window is ``[x_min, x_min + (2**log2)*bs)``).
-        :param signed: opt-in for negative-support (signed) severity. ``None``
-          (default) auto-enables for discrete severities with negative atoms
-          (e.g. ``dsev [-2 5]``) and leaves continuous severities clamped at 0
-          as before; ``True`` forces signed (e.g. a continuous P&L severity);
-          ``False`` forces the legacy clamp-at-0 behaviour.
         :param kwargs:  passed through to update
         :return:
+
+        Signedness is carried by the severity declaration (``ssev`` /negative
+        ``dsev``), not by an argument here -- see ``_signed``.
         """
-        # guess bucket and build the grid
+        # Unified bucket + window estimator: runs the candidate sizing methods
+        # (moment / exact_discrete / bounded_small), records them in the
+        # inspectable ``self._bs_window_df``, and selects (see ``_bs_window``).
+        # ``x_min='auto'`` lets the selected method choose the origin (0 for a
+        # non-negative aggregate, a negative origin only when signed); a number
+        # forces it; ``log2`` is a cap. The legacy non-negative ``moment`` path
+        # reproduces ``recommend_bucket`` exactly, so ordinary aggregates are
+        # unchanged.
+        x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
+        bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, recommend_p)
         N = 1 << log2
-        if x_min is None:
-            # Automatic two-sided window from the analytic moments (F2). The
-            # usual direction is "input N, derive bs": size bs from the window
-            # width so the alias-free condition W < N*bs holds by construction.
-            x_lo, x_hi, W = estimate_agg_window(
-                self.agg_m, self.agg_cv, self.agg_skew, p=recommend_p)
-            if bs == 0:
-                bs = round_bucket(W / N) if W > 0 else round_bucket(
-                    self.recommend_bucket(log2, p=recommend_p))
-            # snap the origin down to a bucket multiple (floor so the window
-            # still covers x_lo); offsets must be whole numbers of buckets.
-            x_min = float(np.floor(x_lo / bs) * bs)
-            xs = x_min + np.arange(0, N, dtype=float) * bs
-        else:
-            if bs == 0:
-                bs = round_bucket(self.recommend_bucket(log2, p=recommend_p))
-            # Snap the window origin to a bucket multiple so offsets are
-            # integer numbers of buckets (a hard requirement for the rolls).
-            x_min_snapped = round(x_min / bs) * bs
-            if not np.isclose(x_min_snapped, x_min):
-                logger.info('update | x_min %s snapped to bucket multiple %s',
-                            x_min, x_min_snapped)
-            x_min = float(x_min_snapped)
-            xs = x_min + np.arange(0, N, dtype=float) * bs
+        xs = x_min + np.arange(0, N, dtype=float) * bs
         return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
-                                signed=signed, **kwargs)
+                                **kwargs)
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False,
-                    reins_bucket=None, debug=False, x_min=0, x_max=None, signed=None):
+                    reins_bucket=None, debug=False, x_min=0, x_max=None):
         """
         Compute a discrete approximation to the aggregate density via FFT.
 
@@ -3918,6 +3946,7 @@ class Aggregate:
         :return:
         """
         self._density_df = None  # invalidate
+        self._sev_density_df = None
         self._reins_density_df = None
         self._reins_stats_df = None
         self._reins_view_stats_cache = None
@@ -3951,7 +3980,7 @@ class Aggregate:
         # untouched. The severity is then discretised on its own grid
         # ``xs_sev`` (physical 0 at index i0), which may differ from the output
         # grid ``xs`` (e.g. a tight far-from-0 output window).
-        self._signed_sev = self._resolve_signed(signed)
+        self._signed_sev = self._signed()
         self.i0 = self._severity_negative_buckets(self.bs)
         self.xs_sev = (np.arange(len(xs), dtype=float) - self.i0) * self.bs
 
@@ -4853,7 +4882,7 @@ class Aggregate:
         if self.sev_density is None:
             raise ValueError("Must recalc before computing Cramer Lundberg distribution.")
 
-        bit = self.density_df.p_sev.copy()
+        bit = self.sev_density_df.p_sev.copy()
         if cap:
             idx = np.searchsorted(bit.index, cap, 'right')
             bit.iloc[idx:] = 0
@@ -4919,34 +4948,42 @@ class Aggregate:
         else:
             self.figure = axd['A'].figure
 
-        if self.bs == 1 and self.est_m < 1025:
+        if self.bs == 1 and abs(self.est_m) < 1025:
             # treat as discrete
             if xmax > 0:
                 mx = xmax
             else:
                 mx = self.q(1) * 1.05
-            span = nice_multiple(mx)
+            # Signed aggregate: the support reaches below 0 (e.g. a P&L); use
+            # the true minimum so the left of the axis isn't clipped at ~0.
+            mn = min(self.q(0), 0.0) if (self.xs is not None and self.xs[0] < 0) else 0.0
+            span = nice_multiple(mx - mn)
+            left = mn - (mx - mn) / 25
 
-            df = self.density_df[['p_total', 'p_sev', 'F', 'loss']].copy()
-            df['sevF'] = df.p_sev.cumsum()
-            df.loc[-0.5, :] = (0, 0, 0, 0, 0)
+            # Aggregate from density_df; severity from its own grid
+            # (sev_density_df), which may differ from the aggregate window.
+            df = self.density_df[['p_total', 'F', 'loss']].copy()
+            # anchor a zero row just left of the support so the steps/stems
+            # start from the baseline (at mn - 0.5, not a fixed -0.5).
+            df.loc[mn - 0.5, :] = (0, 0, 0)
             df = df.sort_index()
+            sdf = self.sev_density_df
             if mx <= 60:
                 # stem plot for small means
                 axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0.', label='Aggregate')
-                axd['A'].stem(df.index, df.p_sev, basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
+                axd['A'].stem(sdf.loss, sdf.p_sev, basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
             else:
                 df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
-                df.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
+                sdf.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
 
-            axd['A'].set(xlim=[-mx / 25, mx + 1], title='Probability mass functions')
+            axd['A'].set(xlim=[left, mx + 1], title='Probability mass functions')
             axd['A'].legend()
             if span > 0:
                 axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
             # for discrete plot F next
             df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
-            df.p_sev.cumsum().plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
-            axd['B'].set(xlim=[-mx / 25, mx + 1], title='Distribution functions')
+            sdf.F_sev.plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
+            axd['B'].set(xlim=[left, mx + 1], title='Distribution functions')
             axd['B'].legend().set(visible=False)
             if span > 0:
                 axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
@@ -4958,16 +4995,16 @@ class Aggregate:
             idx = (df.F == df.F.max()).idxmax()
             dft = df.loc[:idx]
             ax.plot(dft.F, dft.loss, drawstyle='steps-pre', lw=3, label='Aggregate')
-            # same trim for severity
-            df['sevF'] = df.p_sev.cumsum()
-            idx = (df.sevF == 1).idxmax()
-            df = df.loc[:idx]
-            ax.plot(df.p_sev.cumsum(), df.loss, drawstyle='steps-pre', lw=1, label='Severity')
-            ax.set(xlim=[-0.025, 1.025], ylim=[-mx / 25, mx + 1], title='Quantile (Lee) plot')
+            # same trim for severity (on its own grid)
+            sidx = (sdf.F_sev >= 1).idxmax()
+            sdft = sdf.loc[:sidx]
+            ax.plot(sdft.F_sev, sdft.loss, drawstyle='steps-pre', lw=1, label='Severity')
+            ax.set(xlim=[-0.025, 1.025], ylim=[left, mx + 1], title='Quantile (Lee) plot')
             ax.legend().set(visible=False)
         else:
             # continuous
             df = self.density_df
+            sdf = self.sev_density_df       # severity on its own grid
             if xmax > 0:
                 xlim = [-xmax / 50, xmax * 1.025]
             else:
@@ -4978,12 +5015,12 @@ class Aggregate:
             ax = axd['A']
             # divide by bucket size...approximating the density
             (df.p_total / self.bs).plot(ax=ax, lw=2, label='Aggregate')
-            (df.p_sev / self.bs).plot(ax=ax, lw=1, label='Severity')
+            (sdf.p_sev / self.bs).plot(ax=ax, lw=1, label='Severity')
             ax.set(xlim=xlim, ylim=ylim, title='Probability density')
             ax.legend()
 
             (df.p_total / self.bs).plot(ax=axd['B'], lw=2, label='Aggregate')
-            (df.p_sev / self.bs).plot(ax=axd['B'], lw=1, label='Severity')
+            (sdf.p_sev / self.bs).plot(ax=axd['B'], lw=1, label='Severity')
             ylim = axd['B'].get_ylim()
             ylim = [1e-15, ylim[1] * 2]
             axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
@@ -4992,7 +5029,7 @@ class Aggregate:
             ax = axd['C']
             # to do: same trimming for p-->1 needed?
             ax.plot(df.F, df.loss, lw=2, label='Aggregate')
-            ax.plot(df.p_sev.cumsum(), df.loss, lw=1, label='Severity')
+            ax.plot(sdf.F_sev, sdf.loss, lw=1, label='Severity')
             ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
             ax.legend().set(visible=False)
 
@@ -5033,11 +5070,17 @@ class Aggregate:
             return f(p999)
 
         if stat == 'range':
-            if kind == 'linear':
-                return f(self.q(0.999))
-            else:
-                # wider range for log density plots
-                return f(self.q(0.99999))
+            p = 0.999 if kind == 'linear' else 0.99999
+            hi = self.q(p)
+            # Signed aggregate (grid origin < 0): the mass can sit anywhere on
+            # the real line, possibly entirely negative, so use a *two-sided*
+            # quantile range. ``f(hi)`` would be reversed/clipped when hi < 0.
+            if self.xs is not None and self.xs[0] < 0:
+                lo = self.q(1 - p)
+                w = hi - lo
+                pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
+                return [lo - pad, hi + pad]
+            return f(hi)
 
         elif stat == 'density':
             # for density need to divide by bs
@@ -5199,6 +5242,303 @@ class Aggregate:
             return REINS_LABEL_CEDED
         return REINS_LABEL_OUTPUT
 
+    def _severity_lattice(self):
+        """Integer-lattice step of the severity, or ``None`` if not on a lattice.
+
+        Returns the gcd of the (integer) severity atoms -- the natural bucket
+        size, since an aggregate of lattice-valued severities is itself on that
+        lattice **regardless of the frequency** (e.g. Poisson x ``dsev [1:10]``
+        is integer-valued, so ``bs=1``). ``None`` for any continuous component.
+        This is what lets the window estimator pick a coarse, exact ``bs`` and
+        shrink ``log2`` to fit, instead of defaulting to a fine ``bs`` over the
+        full ``2**log2`` buckets.
+
+        Returns
+        -------
+        float or None
+            ``gcd`` of the integer atoms (1 for ``dsev [1:n]``; 5 for atoms
+            ``[0 5 10]``), or ``None`` if any severity component is continuous /
+            non-integer.
+        """
+        atoms = []
+        for s in (self.sevs if self.sevs is not None else []):
+            a = getattr(s, 'support_atoms', None)
+            if a is None:
+                return None
+            atoms.append(np.asarray(a, dtype=float))
+        if not atoms:
+            return None
+        allx = np.concatenate(atoms)
+        if not np.allclose(allx, np.round(allx), atol=1e-9):
+            return None
+        ints = np.abs(np.round(allx).astype(np.int64))
+        ints = ints[ints != 0]
+        if len(ints) == 0:
+            return 1.0
+        g = int(np.gcd.reduce(ints))
+        return float(g) if g > 0 else 1.0
+
+    def _exact_discrete_window(self):
+        """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
+
+        Returns ``(A_min, A_max, bs_lattice)`` when the frequency is discrete-
+        finite (``dfreq`` -> ``empirical``, or ``fixed``) **and** every severity
+        component is a discrete histogram on an integer lattice; otherwise
+        ``None``. The aggregate then takes values exactly on the integer lattice
+        and its support is finite and exactly computable.
+
+        Notes
+        -----
+        With claim counts ``N`` (atoms, min ``N_min`` max ``N_max``, possibly
+        including 0) and severity atoms ``s_min … s_max``:
+
+        - ``A_max = max(N_max·s_max, N_min·s_max)`` (the sum is maximised by the
+          largest atom repeated; over ``N`` the extreme is at ``N_max`` if
+          ``s_max>0`` else ``N_min``); include ``0`` if ``0`` is a count atom.
+        - ``A_min = min(N_max·s_min, N_min·s_min)`` symmetrically; include ``0``
+          if ``0`` is a count atom.
+
+        ``bs_lattice`` is 1 for integer atoms (the common case).
+        """
+        freq = self.frequency
+        if freq.freq_name == 'empirical':
+            n_atoms = np.asarray(freq.freq_a, dtype=float)
+            has_zero = bool(np.any(n_atoms == 0))
+        elif freq.freq_name == 'fixed':
+            n_atoms = np.array([float(self.n)])
+            has_zero = (self.n == 0)
+        else:
+            return None
+        if self.sevs is None or len(self.sevs) == 0:
+            return None
+        atoms = []
+        for s in self.sevs:
+            a = getattr(s, 'support_atoms', None)
+            if a is None:
+                return None    # a non-discrete component -> not exact
+            atoms.append(np.asarray(a, dtype=float))
+        s_all = np.concatenate(atoms)
+
+        def _allint(x):
+            return bool(np.allclose(x, np.round(x), atol=1e-9))
+
+        if not (_allint(n_atoms) and _allint(s_all)):
+            return None
+        s_min, s_max = float(s_all.min()), float(s_all.max())
+        n_min, n_max = float(n_atoms.min()), float(n_atoms.max())
+        hi = max(n_max * s_max, n_min * s_max)
+        lo = min(n_max * s_min, n_min * s_min)
+        if has_zero:
+            hi = max(hi, 0.0)
+            lo = min(lo, 0.0)
+        return float(lo), float(hi), 1.0
+
+    def _bounded_severity_window(self, p):
+        """Window for a bounded severity with a (possibly small) claim count.
+
+        Returns ``(A_lo, A_hi)`` using the severity's bounded support and a high
+        frequency quantile ``N_hi`` (from the analytic frequency moments), or
+        ``None`` if the severity is not bounded. For a small claim count this
+        bound is tight; for a large count the law of large numbers concentrates
+        the aggregate far inside ``[0, N_hi·s_max]`` and the moment window is
+        tighter -- the caller (``_bs_window``) only selects this method when it
+        is at least as tight as the moment window.
+        """
+        if self.sevs is None or len(self.sevs) == 0:
+            return None
+        if not all(getattr(s, 'bounded', False) for s in self.sevs):
+            return None
+        s_his, s_los = [], []
+        for s in self.sevs:
+            hi = s.limit if np.isfinite(s.limit) else float(s.fz.support()[1])
+            lo = float(s.fz.support()[0]) if getattr(s, 'signed', False) else 0.0
+            s_his.append(hi)
+            s_los.append(lo)
+        s_max, s_min = max(s_his), min(s_los)
+        f1, f2, f3 = self.frequency.freq_moms(self.n)
+        fsd = float(np.sqrt(max(f2 - f1 * f1, 0.0)))
+        zN = ss.norm.isf(1 - p)
+        n_hi = f1 + zN * fsd
+        return float(min(0.0, n_hi * s_min)), float(n_hi * s_max)
+
+    def _bs_window(self, log2, bs_in, x_min_in, recommend_p):
+        """Decide ``(bs, log2, x_min)`` for ``update`` and build ``_bs_window_df``.
+
+        Runs up to three sizing methods and records each in the expert-
+        inspectable ``self._bs_window_df``, then selects per the documented
+        priority. ``log2`` is a **cap** (the input value, default 16): the exact
+        discrete method may use fewer buckets but never more; the other methods
+        fill the cap. The 0-origin convention is preserved -- ``x_min = 0``
+        whenever the support is non-negative; a negative origin is used only for
+        a genuinely signed aggregate.
+
+        Parameters
+        ----------
+        log2 : int
+            Bucket-count cap, ``2**log2`` buckets.
+        bs_in : float
+            ``0`` to estimate the bucket; ``>0`` to force it (honoured, D4).
+        x_min_in : float or None
+            ``None`` lets the selected method choose the origin; a number forces
+            it (snapped to ``bs``, D4).
+        recommend_p : float
+            Tail probability for the moment / bounded windows.
+
+        Returns
+        -------
+        (bs, log2, x_min) : tuple
+            Final grid parameters; ``self._bs_window_df`` is also populated.
+
+        Methods (rows of ``_bs_window_df``)
+        -----------------------------------
+        - ``moment`` -- always; the legacy 3-moment sizing for non-negative
+          aggregates (reproduces ``recommend_bucket`` exactly), two-sided
+          ``estimate_agg_window`` for signed ones.
+        - ``exact_discrete`` -- ``dfreq``/``fixed`` x ``dsev`` on an integer
+          lattice: exact finite support, ``bs=1``, minimal ``log2`` (<= cap).
+        - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
+          frequency quantile; selected only when tighter than ``moment``.
+
+        Selection: ``exact_discrete`` > ``bounded_small`` (if tighter) >
+        ``moment``.
+        """
+        N0 = 1 << log2
+        m = self.agg_m
+        try:
+            ex2 = float(self.stats_df['mixed'][('agg', 'ex2')])
+            sd = float(np.sqrt(max(ex2 - m * m, 0.0)))
+        except Exception:  # pragma: no cover - defensive
+            sd = self.agg_sd
+        skew = self.agg_skew
+        signed = self._signed()
+        # Window coverage: WINDOW_NINES nines (default 12) -- far tighter than
+        # the legacy bucket p, so the window captures essentially all the mass.
+        p = 1.0 - 10.0 ** -WINDOW_NINES
+        lattice = self._severity_lattice()
+
+        def _size(x_lo, x_hi, lattice_bs):
+            """Origin ``x0`` and grid ``(bs, log2)`` for a window ``[x_lo, x_hi]``.
+
+            Returns ``(x0, bs, log2)`` only -- the *window* edges stay the
+            method's own ``[x_lo, x_hi]``; the realized grid extent
+            (``x0 + 2**log2 * bs``, which power-of-2 padding makes wider than the
+            window) is reported separately in the ``used`` row.
+
+            bs: forced ``bs_in`` if given; else the integer lattice step (so an
+            integer-valued aggregate uses ``bs=1`` not a fine fraction); else a
+            resolution ``round_bucket(W / 2**cap)``. ``log2`` is shrunk to just
+            cover the window (<= cap) when bs is free, keeping the realized grid
+            sensible; if the user pinned bs they control the grid so the cap
+            ``log2`` is honoured; if the window needs more than the cap, bs is
+            coarsened to fit.
+            """
+            W = max(x_hi - x_lo, 0.0)
+            if bs_in > 0:
+                bs = float(bs_in)
+            elif lattice_bs is not None:
+                bs = float(lattice_bs)
+            else:
+                bs = round_bucket(W / N0) if W > 0 else 1.0
+            x0 = float(np.floor(x_lo / bs) * bs) if signed else 0.0
+            span = x_hi - x0
+            need = int(np.ceil(np.log2(max(span / bs + 1.0, 1.0)))) if span > 0 else 0
+            if bs_in > 0:
+                l2 = log2
+            elif need <= log2:
+                # at least 1 (>= 2 buckets) so a degenerate / point-mass window
+                # never collapses to a single bucket.
+                l2 = min(log2, max(need, 1))
+            else:
+                bs = round_bucket(span / N0)
+                x0 = float(np.floor(x_lo / bs) * bs) if signed else 0.0
+                l2 = log2
+            return x0, float(bs), int(l2)
+
+        def _row(x_lo, x_hi, lattice_bs, coverage, note):
+            # ``x_max`` is the method's own computed window top (e.g. the exact
+            # support max), NOT the padded grid extent -- the ``used`` row shows
+            # the realized grid.
+            x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs)
+            return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
+                        W=float(x_hi - x0), bs=bs_, log2=l2_,
+                        coverage=coverage, note=note)
+
+        rows = {}
+
+        # ---- moment (always) --------------------------------------------
+        if bs_in > 0 and not (signed and np.isfinite(sd)):
+            # bs is pinned -> the grid is the user's; the moment "window" is
+            # just the realized extent. Avoids estimating a window (and the
+            # infinite-variance raise) when we don't need one.
+            x_lo, x_hi = 0.0, float(N0 * bs_in)
+        elif signed and np.isfinite(sd):
+            x_lo, x_hi, _W = estimate_agg_window(m, sd, skew, p)
+        else:
+            x_lo = 0.0
+            try:
+                x_hi = float(_estimate_agg_percentile(m, self.agg_cv, skew, p))
+            except ValueError:
+                # no finite variance (e.g. Pareto) and bs free: last-resort
+                # legacy extent (recommend_bucket bumps p / uses the limit).
+                x_hi = float(N0 * round_bucket(self.recommend_bucket(log2, p=recommend_p)))
+            if not np.isfinite(x_hi):
+                # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
+                # the mean (collapses to the mean for a point mass).
+                x_hi = m + 8.0 * sd
+        rows['moment'] = _row(x_lo, x_hi, lattice, f'1-1e-{WINDOW_NINES}',
+                              '3-moment MoM window')
+
+        # ---- exact_discrete ---------------------------------------------
+        ed = self._exact_discrete_window()
+        if ed is not None:
+            a_lo, a_hi, bs_lat = ed
+            r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev integer lattice')
+            if not np.isclose(r['bs'], bs_lat):
+                r['coverage'] = 'support exact, bs coarsened'
+            rows['exact_discrete'] = r
+
+        # ---- bounded_small ----------------------------------------------
+        bw = self._bounded_severity_window(p)
+        if bw is not None:
+            a_lo, a_hi = bw
+            rows['bounded_small'] = _row(a_lo, a_hi, lattice, f'freq 1-1e-{WINDOW_NINES}',
+                                         'bounded severity x freq quantile')
+
+        # ---- selection (D1/D2) ------------------------------------------
+        # bounded_small is selected a bit permissively -- it is a hard support
+        # bound, so accept it even when modestly wider (1.5x) than the moment
+        # window. With high coverage it is typically the tighter of the two.
+        if 'exact_discrete' in rows:
+            selected = 'exact_discrete'
+        elif ('bounded_small' in rows
+              and rows['bounded_small']['W'] <= 1.5 * rows['moment']['W']):
+            selected = 'bounded_small'
+        else:
+            selected = 'moment'
+
+        # ---- realized grid (the ``used`` row) ---------------------------
+        sel_bs = float(rows[selected]['bs'])
+        sel_l2 = int(rows[selected]['log2'])
+        sel_x0 = float(rows[selected]['x_min'])
+        if x_min_in is not None:           # explicit origin override (D4)
+            sel_x0 = float(round(x_min_in / sel_bs) * sel_bs)
+        grid_x_max = sel_x0 + (1 << sel_l2) * sel_bs
+
+        df = pd.DataFrame(rows).T
+        # the winning method is flagged; the ``used`` row is the realized grid.
+        df['selected'] = df.index == selected
+        # The ``used`` row converts the selected method's window into the actual
+        # power-of-2 grid: x_max = x_min + 2**log2 * bs (so a 701-point support
+        # padded to 1024 reads x_max = grid top, W = the full grid width).
+        df.loc['used'] = dict(
+            applies=True, x_min=sel_x0, x_max=float(grid_x_max),
+            W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
+            coverage=rows[selected]['coverage'],
+            note=f'realized grid ({selected})', selected=False)
+        self._bs_window_df = df
+
+        return sel_bs, sel_l2, sel_x0
+
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
         """
         Recommend a bucket size given 2**N buckets. Not rounded.
@@ -5325,7 +5665,7 @@ class Aggregate:
         sev_ans.append(['total',
                         self.limit.max(), min_attach,
                         truncation_point,
-                        self.sf(truncation_point), self.density_df.p_sev.sum(),
+                        self.sf(truncation_point), self.sev_density_df.p_sev.sum(),
                         1, self.n,
                         m, 0.,
                         m, self.est_sev_m
@@ -5423,8 +5763,8 @@ class Aggregate:
         """
 
         if self._sev_var_tvar_function is None:
-            # revised June 2023
-            ser = self.density_df.query('p_sev > 0').p_sev
+            # revised June 2023; severity now on its own grid (sev_density_df)
+            ser = self.sev_density_df.query('p_sev > 0').p_sev
             self._sev_var_tvar_function = self._make_var_tvar(ser)
 
         return self._sev_var_tvar_function['lower'](p)
@@ -6394,7 +6734,7 @@ class Severity(ss.rv_continuous):
 
     def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
-                 sev_conditional=True, name='', note=''):
+                 sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note=''):
         """Continuous random variable adding layer/attachment to ``ss.rv_continuous``.
 
         Construction is delegated to a registered subclass — ``__new__``
@@ -6475,6 +6815,18 @@ class Severity(ss.rv_continuous):
         self.moment_pattach = 0
         self.pdetach = 0
         self.conditional = sev_conditional
+        # Signed (never-clamp) severity: a profit is a negative loss. When True
+        # the layer wrappers are the identity (no x<0 -> 0 clamp) and moments are
+        # the raw distribution's. Set explicitly here (``ssev`` keyword) or by a
+        # discrete ``_build`` that finds negative atoms. Orthogonal to value_type.
+        self.signed = bool(sev_signed)
+        # Reflected (negatively-scaled) severity: ``-1 * X``, optionally shifted
+        # to ``shift - X`` by a trailing ``+/- shift``. scipy cannot carry a
+        # negative scale, so ``_build`` constructs the positive base at loc 0 and
+        # ``_apply_reflect`` maps it to ``shift - X`` (a signed severity). The
+        # shift is captured here, before ``_build`` zeroes the build loc.
+        self.sev_reflect = bool(sev_reflect)
+        self._reflect_shift = float(_scalar_bound(sev_loc)) if self.sev_reflect else 0.0
         self.sev_name = sev_name
         self.name = name
         self.long_name = sev_name
@@ -6501,17 +6853,36 @@ class Severity(ss.rv_continuous):
             f'Severity.__init__ | creating new Severity {self.sev_name} at {super().__repr__()}')
 
         # ---- subclass-specific construction ------------------------------
+        # ``_build`` may also set ``self.signed`` (a discrete severity that
+        # finds negative atoms is signed regardless of the constructor flag).
         self._build()
 
         # ---- shared post-build steps -------------------------------------
-        # Order is load-bearing: splice (lb/ub) modifies the underlying
-        # distribution FIRST, then attachment probabilities are computed
-        # against the already-spliced fz, then validation, then the policy
-        # layer wraps on top of everything.
-        self._apply_lb_ub()
-        self._compute_attachment_probs()
-        self._validate_moments()
-        self._apply_layer_attachment()
+        if self.sev_reflect:
+            # Reflected severity ``shift - X``: build the positive base (loc 0),
+            # then reflect into signed support. ``_apply_reflect`` sets the raw
+            # moments and the reflected fz methods; ``_apply_signed`` then wires
+            # the identity (no-clamp) layering from them.
+            self._apply_lb_ub()
+            self._apply_reflect()
+            self._apply_signed()
+        elif self.signed:
+            # Signed (never-clamp) severity: keep the raw distribution. Honour
+            # an explicit splice, but skip the x<0 -> 0 / attachment clamp and
+            # the layered-loss transform -- the layered methods are the raw fz
+            # methods (identity). Moments are the raw distribution's; discrete
+            # kinds already populated sev1/sev2/sev3 in ``_build``.
+            self._apply_lb_ub()
+            self._apply_signed()
+        else:
+            # Order is load-bearing: splice (lb/ub) modifies the underlying
+            # distribution FIRST, then attachment probabilities are computed
+            # against the already-spliced fz, then validation, then the policy
+            # layer wraps on top of everything.
+            self._apply_lb_ub()
+            self._compute_attachment_probs()
+            self._validate_moments()
+            self._apply_layer_attachment()
 
         assert self.fz is not None
 
@@ -6529,6 +6900,40 @@ class Severity(ss.rv_continuous):
             f'Severity._build not implemented for type {type(self).__name__!r} '
             f'(sev_name={self.sev_name!r}). Registered kinds: {sorted(Severity._registry)}'
         )
+
+    @property
+    def support_description(self):
+        """Short human description of the severity for ``info`` display.
+
+        For a histogram / discrete severity, render the **actual support** --
+        ``atoms {a, b, …}`` (shortened to first/last few when there are many,
+        e.g. ``dsev [1:1001]``) or ``support [lo, hi]`` -- instead of the
+        layer form ``limit xs attachment``, which is meaningless for a discrete
+        or signed severity (e.g. ``dsev [-2 5]`` is *not* a ``5 xs 0`` layer).
+        For a continuous severity keep the familiar ``unlimited`` /
+        ``limit xs attachment`` rendering.
+
+        Returns
+        -------
+        str
+        """
+        atoms = getattr(self, 'support_atoms', None)
+        if atoms is not None and len(atoms):
+            def _fmt(v):
+                return f'{v:g}'
+            if len(atoms) <= 8:
+                body = ' '.join(_fmt(v) for v in atoms)
+                return f'atoms [{body}]'
+            head = ' '.join(_fmt(v) for v in atoms[:3])
+            tail = ' '.join(_fmt(v) for v in atoms[-2:])
+            return (f'{len(atoms)} atoms [{head} ... {tail}] on '
+                    f'[{_fmt(atoms[0])}, {_fmt(atoms[-1])}]')
+        if self.signed:
+            lo, hi = self.fz.support()
+            return f'signed, support [{lo:g}, {hi:g}]'
+        if self.limit == np.inf and self.attachment == 0:
+            return 'unlimited'
+        return f'{self.limit:,.0f} xs {self.attachment:,.0f}'
 
     @property
     def bounded(self) -> bool:
@@ -6627,6 +7032,74 @@ class Severity(ss.rv_continuous):
         self._layered_pdf = make_layer_attachment_pdf(a, l, d, pa, pd, cond)(self.fz.pdf)
         self._layered_isf = make_layer_attachment_isf(a, l, pa, pd, cond)(self.fz.isf)
         self._layered_ppf = make_layer_attachment_ppf(a, l, pa, pd, cond)(self.fz.ppf)
+
+    def _apply_reflect(self):
+        """Post-build for a reflected severity ``Y = shift - X``.
+
+        ``_build`` constructs the positive base ``X = self.fz`` at loc 0 (scipy
+        cannot carry a negative scale). This maps it to ``Y = shift - X`` --
+        a *reflected*, shifted distribution with signed support -- by replacing
+        the frozen-RV methods (the established ``_apply_lb_ub`` pattern) and
+        setting the raw moments from those of ``X``:
+
+        ``F_Y(y) = S_X(shift - y)``, ``S_Y(y) = F_X(shift - y)``,
+        ``f_Y(y) = f_X(shift - y)``, ``q_Y(p) = shift - q_X(1-p)``,
+        and support ``[shift - hi_X, shift - lo_X]``. Moments:
+        ``E[Y^k] = E[(shift - X)^k]`` by binomial expansion.
+
+        Used for ``-1 * dist (+/- shift)`` (e.g. ``100 - lognorm``). Marks the
+        severity signed so the no-clamp path in ``_apply_signed`` is used.
+        """
+        Z = self.fz
+        d = float(self._reflect_shift)
+        # raw moments first (before the method swap below)
+        z1 = float(Z.moment(1)); z2 = float(Z.moment(2)); z3 = float(Z.moment(3))
+        self.sev1 = d - z1
+        self.sev2 = d * d - 2 * d * z1 + z2
+        self.sev3 = d ** 3 - 3 * d * d * z1 + 3 * d * z2 - z3
+        # capture the originals, then install reflected versions on the frozen RV
+        zcdf, zsf, zppf, zisf, zpdf = Z.cdf, Z.sf, Z.ppf, Z.isf, Z.pdf
+        zlo, zhi = Z.support()
+        self.fz.cdf = lambda y, _f=zsf, _d=d: _f(_d - np.asarray(y, dtype=float))
+        self.fz.sf = lambda y, _f=zcdf, _d=d: _f(_d - np.asarray(y, dtype=float))
+        self.fz.pdf = lambda y, _f=zpdf, _d=d: _f(_d - np.asarray(y, dtype=float))
+        self.fz.ppf = lambda q, _f=zisf, _d=d: _d - _f(q)
+        self.fz.isf = lambda q, _f=zppf, _d=d: _d - _f(q)
+        self.fz.support = lambda _d=d, _lo=zlo, _hi=zhi: (_d - _hi, _d - _lo)
+        self.signed = True
+
+    def _apply_signed(self):
+        """Post-build for a signed (never-clamp) severity: identity layering.
+
+        A signed severity (``ssev`` keyword, or a discrete severity with
+        negative atoms) is the raw distribution -- a profit is a negative loss.
+        There is no attachment/limit clamp and no ``x<0 -> 0`` transform, so the
+        layered methods are simply the (possibly spliced) ``self.fz`` methods,
+        the attachment probabilities are trivial, and the moments are the raw
+        distribution's. Discrete kinds already set ``sev1``/``sev2``/``sev3``
+        from their support in ``_build``; for the continuous (scipy) case we
+        read the non-central moments straight off ``self.fz``.
+
+        Notes
+        -----
+        Occurrence reinsurance / layering on a signed severity is out of scope
+        (see ``dev/plan-negative-x-agg.md`` §6); a signed severity is the raw
+        unlayered distribution.
+        """
+        self.pattach = 1.0
+        self.moment_pattach = 1.0
+        self.pdetach = 0.0
+        if self.sev1 is None:
+            # continuous (scipy) signed severity: raw non-central moments
+            self.sev1 = float(self.fz.moment(1))
+            self.sev2 = float(self.fz.moment(2))
+            self.sev3 = float(self.fz.moment(3))
+        # identity layering: the severity IS the (spliced) raw distribution
+        self._layered_cdf = self.fz.cdf
+        self._layered_sf = self.fz.sf
+        self._layered_pdf = self.fz.pdf
+        self._layered_ppf = self.fz.ppf
+        self._layered_isf = self.fz.isf
 
     def _compute_attachment_probs(self):
         """Compute ``pdetach``, ``pattach``, and ``moment_pattach``.
@@ -6774,6 +7247,11 @@ class Severity(ss.rv_continuous):
         The numerical path integrates :math:`\\int q(p)^n dp` and then
         applies the binomial expansion to recover :math:`E[(X-a)^n]`.
         """
+        # 0. Signed (never-clamp) severity: the raw distribution's moments,
+        # set in _apply_signed / _build (no layering on a signed severity).
+        if self.signed:
+            return self.sev1, self.sev2, self.sev3
+
         # 1. Histogram fast-path: precomputed moments cover the no-layer case.
         if (self.sev1 is not None
                 and self.attachment == 0
@@ -6889,6 +7367,12 @@ class SeverityScipy(Severity):
         sev_loc = self.sev_loc
         sev_scale = self.sev_scale
 
+        # Reflected severity: build the POSITIVE base at loc 0; the shift and
+        # negation are applied by ``_apply_reflect`` (Y = shift - X). The shift
+        # was captured as ``self._reflect_shift`` before this point.
+        if self.sev_reflect:
+            sev_loc = 0.0
+
         if n_shapes == 0:
             if sev_loc == 0 and sev_mean > 0:
                 sev_loc = sev_mean
@@ -6989,6 +7473,14 @@ class SeverityDHistogram(Severity):
         # ``allow_negative=True`` preserves negative atoms (a profit is a
         # negative loss); the aggregate auto-detects signed support from this.
         xs, ps = validate_discrete_distribution(xs, ps, allow_negative=True)
+        # A discrete severity with a negative atom is signed (a profit is a
+        # negative loss) -- the only sensible reading -- regardless of the
+        # constructor flag. This is what lets ``dsev [-2 5]`` auto-sign.
+        if np.any(xs < 0):
+            self.signed = True
+        # keep the (validated, sorted) atoms for exact-support sizing and
+        # for the info display (rendered by support_description).
+        self.support_atoms = np.asarray(xs, dtype=float)
         self.sev1 = np.sum(xs * ps)
         self.sev2 = np.sum(xs ** 2 * ps)
         self.sev3 = np.sum(xs ** 3 * ps)

@@ -136,6 +136,38 @@
     `_repr_html_`, so the payoff is mostly Sphinx-docs identity. Wait for a
     clearer use case.
 
+15. **Plot severity when it is outside the aggregate output window.** With the
+    negative-x output window (1.0.0a21), the severity (on `xs_sev`, near 0) and
+    the aggregate (windowed, possibly far from 0, e.g. high claim count) no
+    longer share a grid, so `sev_density_df` can fall entirely outside
+    `[x_min, x_max]`. `info` now warns when this happens and the severity panel
+    is sourced from `sev_density_df`; **open question:** how to *render* the
+    severity in `plot` when its range doesn't overlap the aggregate axis — a
+    separate inset/panel, a broken axis, or its own figure. Pended 2026-06-03.
+
+16. **CONSIDER: support-aware window bounds.** Every severity exposes hard
+    support endpoints via `fz.support()` (e.g. `ssev lognorm 100 cv .2 - 50`
+    has lower bound −50; a `beta` has a finite upper bound). The window
+    estimator uses the *upper* bound in `bounded_small` but not the *lower* one,
+    and not at all for **finite-frequency** cases. For `fixed`/`dfreq`/
+    `binomial`/`bernoulli` the aggregate support is *exactly*
+    `[N·loc, N·ub]` (sign-aware) — a generalisation of `exact_discrete` to
+    continuous bounded/shifted severities, giving an exact window instead of a
+    MoM guess (e.g. `fixed 2 claims ssev lognorm − 50` has agg min exactly
+    −100). For Poisson/unbounded frequency the severity floor is only a
+    per-claim sanity bound (more claims → more extreme), so MoM stays right
+    there. Add a `support_bounds` row / refinement to `_bs_window` keyed off
+    `fz.support()`. Medium priority; pended 2026-06-03.
+
+17. **DecL `constant - dist` (`numbers MINUS sev`).** Negative scale now works
+    (`-1 * lognorm + 100` ⇒ `100 − lognorm`, via `sev_reflect`), but the
+    natural notation `100 - lognorm` is still a parse error (the grammar only
+    allows `sev1 MINUS numbers`, a *shift after* the dist). Add a rule
+    `sev2: numbers MINUS sev1 -> sev_reflect_shift` so `100 - lognorm` desugars
+    to the reflected form. Watch the unary-minus ambiguity that bit the old SLY
+    parser; the `NUMBER` terminal already absorbs a leading minus, so the new
+    rule must not shadow `sev1: numbers TIMES sev0`. Pended 2026-06-03.
+
 ---
 
 ## Done since this file opened

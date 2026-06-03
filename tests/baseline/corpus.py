@@ -157,10 +157,10 @@ PRICING_P = 0.99
 AGG_FRAMES = {
     "stats_df": None,
     "describe": None,
-    # density_df: p_total / p_sev / S / F / lev / loss + any p_/exeqa_ regex
-    # the unit happens to have. We keep an explicit set of columns and let
-    # the capture script intersect with what's available.
-    "density_df": ["loss", "p_total", "p_sev", "F", "S", "lev"],
+    # density_df: p_total / S / F / lev / loss. Severity columns moved to
+    # sev_density_df at 1.0.0a21 (windowed/signed grids decouple sev from agg);
+    # severity is covered by tests/test_negative_x.py and unit tests.
+    "density_df": ["loss", "p_total", "F", "S", "lev"],
 }
 
 PORT_FRAMES = {

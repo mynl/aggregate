@@ -39,31 +39,61 @@ First half (``Aggregate`` scope) of the negative-x work in
 can now live on a signed grid, making profit/loss (P&L) distributions a
 first-class object.
 
-- **Signed severity (F1).** Severity may take negative values. ``dsev`` with
-  negative atoms (e.g. ``dsev [-2 5] [.5 .5]``) **auto-enables** signed mode --
-  the only sensible reading -- so ``build('agg PnL 1e6 claims dsev [-1 10]
-  [15/16 1/16] poisson')`` works directly. Continuous severities (e.g.
-  ``norm``) keep the legacy clamp-at-0 behaviour unless you opt in with
-  ``a.update(..., signed=True)``. The new ``value_type`` member
-  (``'loss'``/``'payoff'``, default ``'loss'``) records the sign convention;
-  it is inert for the distribution and consumed only at the pricing layer.
+- **Signed severity (F1).** Severity may take negative values -- a profit is a
+  negative loss. The DecL severity family is now:
+
+  - ``sev`` -- continuous, **clamps** its sub-zero tail at 0 (unchanged);
+  - ``dsev`` -- discrete, **never clamps**; a negative atom (e.g.
+    ``dsev [-2 5] [.5 .5]``) auto-signs the aggregate, so
+    ``build('agg PnL 1e6 claims dsev [-1 10] [15/16 1/16] poisson')`` works
+    directly;
+  - ``ssev`` -- **new**: continuous, **never clamps** -- the signed / P&L
+    sibling of ``sev`` (e.g. ``ssev 50 * norm + 10``).
+
+  Signedness is a property of the severity declaration (``Severity.signed``),
+  recorded at parse time -- which is what lets the analytic moments (and hence
+  the automatic window) be correct before any FFT. The ``update(..., signed=)``
+  argument remains as an override. The separate ``value_type`` member
+  (``'loss'``/``'payoff'``, default ``'loss'``) records the *pricing* sign
+  convention; it is **orthogonal** to ``ssev`` (signed does not imply payoff),
+  inert for the distribution, and consumed only at the pricing layer.
 - **Output window (F2).** ``update(x_min=...)`` places the aggregate on a window
-  ``[x_min, x_min + (2**log2)*bs)``; ``x_min`` may be negative. With
-  ``x_min=None`` the window is estimated two-sided from the analytic moments
-  (new ``estimate_agg_window`` -- reflected shifted-lognormal / -gamma fits with
-  a symmetric/normal fallback), so a tight far-from-0 lump (e.g. a Poisson(10^6)
-  P&L concentrated near a *negative* mean) uses a small ``bs`` over a narrow
-  window rather than paying for ``[0, mean]``. The placement is a relabelling
-  (single ``np.roll`` on the padded FFT buffer), exact for random as well as
-  fixed frequency.
-- ``density_df`` is indexed by the signed grid; ``p_sev`` is mapped onto the
-  output grid; ``q``/``tvar``/``var`` and ``info`` (new ``window`` /
-  ``value_type`` / ``signed severity`` lines) work on signed support. The
+  ``[x_min, x_min + (2**log2)*bs)``; ``x_min`` may be negative. The default
+  ``x_min='auto'`` resolves to ``0`` for an ordinary aggregate and to an
+  automatic two-sided window for a signed one, so a P&L just works from
+  ``build`` with no extra argument. The window is estimated from the analytic
+  moments (new ``estimate_agg_window(m, sd, skew, p)`` -- reflected
+  shifted-lognormal / -gamma fits with a symmetric/normal fallback; takes the
+  standard deviation directly so the mean-zero case works), so a tight far-from-0
+  lump (e.g. a Poisson(10^6) P&L concentrated near a *negative* mean) uses a
+  small ``bs`` over a narrow window rather than paying for ``[0, mean]``. The
+  placement is a relabelling (single ``np.roll`` on the padded FFT buffer),
+  exact for random as well as fixed frequency.
+- **Bucket + window estimator.** ``update`` now runs up to three sizing methods
+  and records them in an expert-inspectable ``Aggregate._bs_window_df``, then
+  selects: **exact_discrete** (a ``dfreq``/``fixed`` × ``dsev`` on an integer
+  lattice has exact finite support -- ``bs=1`` and a minimal ``log2``) >
+  **bounded_small** (a bounded severity with a small claim count -- window
+  ``[0, N_hi·s_max]`` from a high frequency quantile) > **moment** (the legacy
+  3-moment sizing, reproduced exactly for non-negative aggregates;
+  ``estimate_agg_window`` for signed). ``log2`` is a cap; pinning ``bs`` lets you
+  keep full control of the grid.
+- **Severity reporting moved to** ``Aggregate.sev_density_df`` (its own grid
+  ``xs_sev``). A windowed/signed aggregate and its severity no longer share a
+  grid, so ``p_sev``/``F_sev``/``S_sev``/``log_p_sev`` left ``density_df`` for
+  the new frame; ``plot``, ``q_sev``, ``tvar_sev`` and the error analysis are
+  re-sourced. ``q``/``tvar``/``var`` work on signed support; ``plot`` is
+  signed-aware (axes span the negative support). ``info`` renders discrete
+  severities by their support (``atoms [-2 5]``, shortened for many) instead of a
+  spurious ``5 xs 0`` layer, shows ``window`` / ``value_type`` / ``signed
+  severity``, and warns when the severity falls outside the output window. The
   default 0-based, non-negative path is byte-for-byte unchanged.
 - Internals: ``validate_discrete_distribution`` gains ``allow_negative``
   (``dfreq`` still clamps claim counts; signed ``dsev`` preserves negatives);
-  ``SeverityDHistogram`` places negative atoms correctly. New
-  ``tests/test_negative_x.py``.
+  ``SeverityDHistogram`` places negative atoms correctly; signed severities use
+  identity layering (no ``x<0 -> 0`` clamp) and raw moments. Signedness is the
+  declaration only -- the ``ssev`` keyword is the **only** DecL change, and there
+  is no ``signed=`` argument. New ``tests/test_negative_x.py`` (28 cases).
 - **Deferred to the Portfolio half** (``dev/plan-negative-x-port.md``):
   portfolio combine on signed support, the full ``Portfolio.density_df`` column
   audit (esp. the price column / ``add_exa``), and distortion/pricing

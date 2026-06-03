@@ -1,23 +1,70 @@
 # Plan: negative-support severity & output window — **Aggregate** scope
 
-> **Status:** ✅ IMPLEMENTED (1.0.0a21, 2026-06-02). All five stages landed;
-> 789 tests pass (12 new in `tests/test_negative_x.py`); default path
-> byte-for-byte unchanged. Key decisions taken during execution:
+> **Status:** ✅ IMPLEMENTED (1.0.0a21, 2026-06-02/03). All five stages landed;
+> 799 tests pass (28 in `tests/test_negative_x.py`); default path byte-for-byte
+> unchanged.
+>
+> **Rev 6 (2026-06-03) refinements (author):**
+> - **`signed=` removed from `update`/`update_work`.** Signedness is purely the
+>   severity declaration (`ssev` / negative `dsev` → `Severity.signed`); a runtime
+>   override is incoherent (a built `Severity` is already clamped or not). The
+>   `ppf` auto-detect probe is gone; `_signed()` = `any(s.signed)`.
+> - **Unified bucket+window estimator + `_bs_window_df`.** `update` runs up to
+>   three sizing methods and records them in the inspectable `self._bs_window_df`,
+>   then selects: **exact_discrete** (`dfreq`/`fixed` × `dsev` on an integer
+>   lattice → exact finite support, `bs=1`, minimal `log2`) > **bounded_small**
+>   (bounded severity → `[0, N_hi·s_max]` from a high freq quantile; chosen only
+>   when tighter than moment, so LLN concentration hands large counts back to
+>   moment) > **moment** (legacy 3-moment; reproduces `recommend_bucket` exactly
+>   for non-negative, two-sided `estimate_agg_window` for signed). `log2` is a
+>   **cap** (input or 16): exact may use fewer buckets but never more — *unless*
+>   the user pins `bs`, which means "I control the grid" and the given `log2` is
+>   honoured (this preserves pinned baselines). Origin: `x_min=0` for a
+>   non-negative aggregate (legacy), `floor(x_lo)` (tracks the mass, ± far from 0)
+>   when signed. Explicit `x_min`/`bs` honoured (a `used` row in the df).
+> - **`sev_density_df`.** Severity columns (`p_sev`/`F_sev`/`S_sev`/`log_p_sev`)
+>   moved out of `density_df` onto the severity's own grid `xs_sev` — because a
+>   windowed/signed aggregate and its severity no longer share a grid. `plot`,
+>   `q_sev`, `tvar_sev`, `cramer_lundberg`, `severity_error_analysis` re-sourced;
+>   baseline corpus updated. `density_df.p_sev` is gone.
+> - **`info`** renders discrete/signed severities by their support
+>   (`atoms [-2 5]`, shortened `N atoms [..]` for many) instead of the bogus
+>   `5 xs 0` layer form, and warns when the severity support is **outside** the
+>   output window (read `sev_density_df`). Open: how to *plot* an off-window
+>   severity (TODO #15).
+>
+> Key decisions taken during initial execution:
 > - **Plan §4 was wrong that signed severity is "free."** The Severity layering
 >   deliberately clamps `x<0→0` (e.g. `norm` piles its sub-zero tail at 0) and
 >   `validate_discrete_distribution` clamped negative `dsev` atoms to 0. Both
 >   fixed: `allow_negative` flag (dfreq still clamps; dsev preserves),
 >   `SeverityDHistogram` negative-atom placement, and a raw-`fz` (un-clamped)
 >   read in `discretize` when signed.
-> - **Opt-in (author decision):** `dsev` with negative atoms **auto-signs**;
->   continuous severities opt in via `update(..., signed=True)`. Wired as an
->   Aggregate-level flag now; a DecL keyword is deferred.
-> - **`estimate_agg_window`** lives in `distributions.py` (not `utilities.py` as
->   §11.3 said) because it reuses the MoM fits there; re-homing + unifying with
->   `bivariate.size_axis` is a follow-up.
+> - **Opt-in is a DecL keyword (author decision, rev 5):** signedness is a
+>   *parse-time property of the severity*, which dissolves the moments/clamping
+>   chicken-and-egg (analytic moments are correct before any FFT). The severity
+>   family is now `sev` (continuous, clamps at 0 — unchanged), `dsev` (discrete,
+>   never clamps — auto-signs on a negative atom), and **`ssev`** (continuous,
+>   never clamps — the signed/P&L variant). `Severity.signed` records it; the
+>   aggregate derives `_signed_sev = any(component.signed)`. The `signed=`
+>   argument on `update` survives only as an override; the auto-detect `ppf`
+>   probe is gone. `ssev` is **orthogonal to `value_type`** — it does *not*
+>   imply `payoff`.
+> - **Window default falls out:** `update(x_min='auto')` (the default) resolves
+>   to `None` (auto two-sided window) for a signed aggregate and `0` otherwise,
+>   so a P&L declared in DecL just works from `build()` with no extra argument.
+> - **`estimate_agg_window(m, sd, skew, p)`** takes the analytic **sd** (not
+>   cv) so the mean-zero case (where cv blows up) works. Lives in
+>   `distributions.py` (not `utilities.py` as §11.3 said) because it reuses the
+>   MoM fits there; re-homing + unifying with `bivariate.size_axis` is a
+>   follow-up.
+> - **`plot` is signed-aware:** both the discrete and continuous branches use a
+>   two-sided loss range so the x-axis covers negative support (previously
+>   `f(q(0.999))` reversed/clipped when the support was negative).
 > - **Deferred (non-blocking):** two-sided deficit split (`deficit_lo/hi`); the
 >   `ft.py` recentering helpers calling the core path + the equivalence test;
->   occurrence reinsurance on a *signed severity* grid.
+>   occurrence reinsurance on a *signed severity* grid; a DecL keyword for
+>   `value_type` (the member exists; only the keyword is deferred).
 >
 > Split out of the former combined `plan-negative-x.md`; the Portfolio half is now
 > [`plan-negative-x-port.md`](plan-negative-x-port.md) (a draft to be **refreshed
@@ -58,6 +105,17 @@ Poisson(10⁶) — a thin, near-Gaussian lump at
 ≈ (−15 + 10) / 16 × 10⁶ (a *negative* mean). This is **TODO #3 / #4** (negative
 `xs`; integrated aliasing + movable window) — the most-wished-for feature.
 (Portfolio-combine, TODO #6, is the sibling plan.)
+
+The `dsev` form above auto-signs (a negative atom has no other reading). The
+continuous counterpart uses the new **`ssev`** keyword — the signed,
+never-clamp sibling of `sev`:
+
+```
+agg PnL 100 claims ssev 50 * norm + 10 poisson      # a normal-ish P&L per risk
+```
+
+`sev` keeps clamping its sub-zero tail at 0 (unchanged); `ssev` keeps the
+negative support. The keyword is the only DecL addition the feature needs.
 
 ---
 

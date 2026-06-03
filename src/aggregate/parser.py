@@ -563,6 +563,15 @@ class UnderwritingTransformer(Transformer):
         _sev, sev = c
         return sev
 
+    def sev_clause_ssev(self, c):
+        # ssev = signed (never-clamp) continuous severity: a profit is a
+        # negative loss. Same spec as sev, flagged so the Severity keeps its
+        # negative support instead of clamping x<0 -> 0. Orthogonal to
+        # value_type (does NOT imply payoff). See dev/plan-negative-x-agg.md.
+        _ssev, sev = c
+        sev['sev_signed'] = True
+        return sev
+
     def sev_clause_dsev(self, c):
         return c[0]
 
@@ -612,18 +621,26 @@ class UnderwritingTransformer(Transformer):
     def sev1_scaled(self, c):
         numbers, _times, sev0 = c
         p_numbers = _check_vectorizable(numbers)
+        # A negative multiplier means reflection (``-X``). scipy cannot carry a
+        # negative scale, so record a ``sev_reflect`` flag (toggled, so two
+        # negatives cancel) and scale by the magnitude; the Severity builds the
+        # positive distribution and reflects it (signed support). The trailing
+        # ``+/- shift`` (sev2) is then applied as ``shift - X``.
+        if np.any(np.asarray(p_numbers) < 0):
+            sev0["sev_reflect"] = not sev0.get("sev_reflect", False)
+        mag = np.abs(p_numbers)
         if "sev_mean" in sev0:
-            sev0["sev_mean"] = _check_vectorizable(sev0.get("sev_mean", 0)) * p_numbers
+            sev0["sev_mean"] = _check_vectorizable(sev0.get("sev_mean", 0)) * mag
         if "sev_scale" in sev0:
             sev0["sev_scale"] = (
-                _check_vectorizable(sev0.get("sev_scale", 0)) * p_numbers
+                _check_vectorizable(sev0.get("sev_scale", 0)) * mag
             )
         if "sev_mean" not in sev0:
             # Distributions without an analytic mean (e.g. Pareto) get a scale
             # rather than a scaled mean; setting both would double-count.
-            sev0["sev_scale"] = p_numbers
+            sev0["sev_scale"] = mag
         if "sev_loc" in sev0:
-            sev0["sev_loc"] = _check_vectorizable(sev0["sev_loc"]) * p_numbers
+            sev0["sev_loc"] = _check_vectorizable(sev0["sev_loc"]) * mag
         return sev0
 
     def sev1_passthrough(self, c):

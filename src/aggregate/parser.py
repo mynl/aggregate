@@ -441,6 +441,91 @@ class UnderwritingTransformer(Transformer):
         bagg, agg_reins, note = c
         return ("agg", bagg["name"], {**bagg, **agg_reins, "note": note})
 
+    # ----- profit-and-loss aggregate (premium minus loss) -----------
+    def answer_pnl(self, c):
+        return c[0]
+
+    def _attach_pnl(self, spec, premium):
+        """Attach the premium-minus-loss affine wrapper to a loss ``spec``.
+
+        ``pnl`` builds the same spec an ``agg`` would for the loss body, then
+        records an aggregate-level affine transform: reflect (a profit is a
+        negative loss) and a single deterministic shift equal to the total
+        premium. The premium is subtracted **once for the book**, in contrast
+        to a constant inside ``sev``/``dsev``/``ssev`` which is per-claim.
+
+        Parameters
+        ----------
+        spec : dict
+            The loss-aggregate spec (mutated in place).
+        premium : float or list
+            The stated premium (scalar or per-component vector). The shift is
+            the sum; ``value_type`` is set to ``'payoff'`` (more is better).
+
+        Notes
+        -----
+        For the bare-``lr`` exposure form (``_pnl_lr`` marker on the spec) the
+        premium also drives the loss ratio: ``E[loss] = premium * lr``,
+        synthesised here exactly as :meth:`exposures_premium_lr` does, so the
+        per-component claim-count derivation is reused unchanged.
+        """
+        if "_pnl_lr" in spec:
+            lr = spec.pop("_pnl_lr")
+            spec["exp_premium"] = premium
+            spec["exp_lr"] = lr
+            spec["exp_el"] = np.array(premium) * np.array(lr)
+        shift = float(np.sum(np.asarray(_check_vectorizable(premium), dtype=float)))
+        spec["agg_premium"] = premium
+        spec["agg_reflect"] = True
+        spec["agg_shift"] = shift
+        spec["value_type"] = "payoff"
+
+    def pnl_out_full(self, c):
+        (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
+         occ_reins, freq, agg_reins, note) = c
+        spec = {
+            "name": name,
+            **exposures,
+            **layers,
+            **sev_clause,
+            **occ_reins,
+            **freq,
+            **agg_reins,
+            "note": note,
+        }
+        self._attach_pnl(spec, premium)
+        return ("agg", name, spec)
+
+    def pnl_out_dfreq(self, c):
+        (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
+         occ_reins, agg_reins, note) = c
+        spec = {
+            "name": name,
+            **dfreq,
+            **layers,
+            **sev_clause,
+            **occ_reins,
+            **agg_reins,
+            "note": note,
+        }
+        self._attach_pnl(spec, premium)
+        return ("agg", name, spec)
+
+    def pnl_exp_claims(self, c):
+        numbers, _claims = c
+        return {"exp_en": numbers}
+
+    def pnl_exp_loss(self, c):
+        numbers, _loss = c
+        return {"exp_el": numbers}
+
+    def pnl_exp_lr(self, c):
+        # Bare loss ratio: binds to the pnl premium (resolved in _attach_pnl,
+        # which has the premium in scope). ``lr`` is just the multiplier --
+        # no expense / combined-ratio meaning.
+        lr, _lr = c
+        return {"_pnl_lr": _check_vectorizable(lr)}
+
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
         _, name, sev, note = c

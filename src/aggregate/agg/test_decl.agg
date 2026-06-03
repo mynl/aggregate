@@ -217,3 +217,20 @@ agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                       
 # See tests/test_negative_x_port.py and dev/plan-negative-x-port.md.
 port PortPnL.Pair  agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson
 port PortPnL.Mixed agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 claims ssev 10 * norm poisson
+
+# ============================================================
+# PnLprem. The pnl keyword: premium-minus-loss aggregates (1.0.0a23)
+# ============================================================
+# pnl NAME <premium> prem - <loss body> builds an ordinary loss aggregate and
+# applies an aggregate-level affine wrapper PnL = premium - A (reflect + a
+# single shift by the total premium). The premium is subtracted ONCE for the
+# book (unlike a constant inside sev/ssev, which is per-claim). value_type is
+# set to payoff. Three exposure heads: N% lr (binds to the premium), N claims,
+# N loss. The premium vectorises like an agg exposure (total pnl only). A pnl
+# line goes anywhere an agg does, including as a port unit. See tests/test_pnl.py
+# and dev/done/plan-pnl-premium.md.
+pnl PnLprem.LR     1000 prem - 70% lr sev lognorm 100 cv 2 poisson                                           note{loss ratio form: E[loss]=700, margin 300}
+pnl PnLprem.Claims 100 prem - 10 claims sev lognorm 8 cv 1.5 poisson                                         note{claims form: premium independent of the loss model}
+pnl PnLprem.Loss   100 prem - 85 loss sev lognorm 8 cv 1.5 poisson                                           note{expected-loss form: E[loss]=85, margin 15}
+pnl PnLprem.Vec    [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson             note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)}
+port PnLprem.Book  pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem - 65% lr sev lognorm 100 cv 2 poisson

@@ -1,5 +1,17 @@
 # Plan: the `pnl` keyword — premium-minus-loss aggregates
 
+> **Status:** ✅ IMPLEMENTED (1.0.0a23, 2026-06-03). `tests/test_pnl.py`
+> (15 cases) + full suite green. DecL mirrored in `test_decl.agg` (section
+> PnLprem). One design refinement vs the plan below: the P&L *display* window is
+> a tight, mass-centred two-sided window (`estimate_agg_window` on the affine
+> moments) rather than the full reversed loss grid — the empty far tail of the
+> reversed grid would push the origin far below the mass and mis-position the
+> Portfolio combine. The theoretical `stats_df` columns stay in loss terms (so
+> `valid` / `_bs_window` remain loss-correct); the P&L view (and the SD-not-CV
+> swap, §5a) is formed at display time in `_describe_signed`.
+>
+> **Original plan follows.**
+
 > **Status:** READY (v1, next up — "quick hit"). Ships as **1.0.0a23**. Builds
 > directly on the landed signed-support work: the Aggregate negative-x / output-
 > window machinery (`dev/done/plan-negative-x-agg.md`, 1.0.0a21) and the signed

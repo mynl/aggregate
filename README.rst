@@ -28,6 +28,51 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a23
+---------
+
+The ``pnl`` keyword — premium-minus-loss aggregates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A profit is premium minus loss, and the premium is collected **once for the
+book**, not once per claim. ``pnl`` makes that a first-class object — a sibling
+of ``agg`` that builds an ordinary loss aggregate and applies an
+aggregate-level affine wrapper ``PnL = premium − A``. It is the natural producer
+of payoff-typed objects and goes anywhere an ``agg`` goes, so a ``port`` of
+``pnl`` lines is a book-level underwriting-result distribution (via the signed
+combine landed in ``1.0.0a22``). See ``dev/done/plan-pnl-premium.md``.
+
+- **Syntax.** ``pnl NAME <premium> prem - <loss-exposure> <sev> <freq> …``.
+  Three exposure heads: ``70% lr`` (binds to the stated premium,
+  ``E[loss] = premium·lr``), ``10 claims`` (frequency-driven), ``85 loss``
+  (expected-loss-driven). The premium **vectorises** like an ``agg`` exposure —
+  ``pnl X [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev …`` shifts by
+  ``Σ premium`` and reports the total P&L only.
+- **Once for the book, not per claim.** A constant inside ``sev``/``dsev``/
+  ``ssev`` is multiplied by the claim count; the ``pnl`` premium is a single
+  deterministic shift. ``pnl P 100 prem - 5 claims …`` (mean ``100 − E[A]``) is
+  deliberately **not** ``agg 5 claims ssev 100 - …`` (mean ``5·(100 − E[X])``).
+- **No new numerics.** The loss FFT, its validation, and every ordinary
+  aggregate are byte-for-byte unchanged (gated behind ``agg_reflect`` /
+  ``agg_shift`` defaults). The affine is a pure grid relabel of the finished
+  density: ``mean → premium − E[A]``, ``sd`` unchanged, ``skew → −skew``;
+  ``ftagg_density`` is rebuilt in the combine convention so a book of ``pnl``
+  units convolves with no combine-side change. The P&L window is a tight,
+  mass-centred two-sided window (``estimate_agg_window`` on the affine moments).
+- **Signed-aware ``describe``: SD instead of CV.** ``CV = sd/mean`` is
+  meaningless as the mean → 0 (a P&L straddling break-even), so for **any**
+  signed object — a ``pnl`` *or* a ``ssev`` / negative-``dsev`` aggregate — the
+  moment table now shows an **SD trio** (``SD | Est SD | Err SD``) instead of CV.
+  This also cleans up the ``1.0.0a22`` signed-portfolio ``describe``. Non-signed
+  output is unchanged.
+- **P&L readout.** ``info`` reports ``premium`` / ``E[loss]`` / ``E[margin]`` /
+  ``loss ratio`` / ``P(loss)`` (``= P(PnL < 0)``, read straight off the signed
+  density). ``value_type`` is set to ``payoff`` — finally giving that member a
+  job (consumed by the pricing plan).
+- New ``tests/test_pnl.py`` (15 cases); DecL mirrored in ``test_decl.agg``
+  (section PnLprem). Reinsurance gross/ceded-premium P&L and general aggregate
+  algebra are split out to ``dev/TODO-Remember.md`` (items 6c / 6b).
+
 1.0.0a22
 ---------
 

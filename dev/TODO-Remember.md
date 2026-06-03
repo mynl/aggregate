@@ -4,8 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-06-03** — after the `negative-x-port` combine cycle
-> (1.0.0a22). Current version 1.0.0a22.
+> **Last updated: 2026-06-03** — after the `pnl` premium-minus-loss cycle
+> (1.0.0a23). Current version 1.0.0a23.
 
 ---
 
@@ -91,17 +91,22 @@
      the real answer but it's out of scope for now. Until done, the coarse-`bs`
      deficit is accepted and surfaced per-unit.
 
-6a. **`pnl` keyword — premium-minus-loss as a first-class object. ⭐ NEXT
-    (quick hit, ships 1.0.0a23).** Full design in **`dev/plan-pnl-premium.md`**
-    (READY). A sibling of `agg`, same body, presents **Premium − A** (profit lens
-    of the same loss model): `pnl NAME <prem> prem - <lr|claims|loss> sev … freq`.
-    Premium vectorizes like an `agg` exposure (total `pnl` only). Implementation
-    = the aggregate **affine primitive** (reflect + additive shift, grid relabel
-    at end of `update`, analytic moments; magnitude scaling stays homogeneous on
-    severity) + `value_type=payoff` (finally gives that member a job; consumed by
+6a. **`pnl` keyword — premium-minus-loss as a first-class object. ✅ DONE
+    (1.0.0a23).** Design in **`dev/done/plan-pnl-premium.md`** (with an
+    implemented-status banner). A sibling of `agg`, same body, presents
+    **Premium − A**: `pnl NAME <prem> prem - <lr|claims|loss> sev … freq`. Premium
+    vectorizes like an `agg` exposure (total `pnl` only). Built as the aggregate
+    **affine primitive** (reflect + additive shift, grid relabel at the end of
+    `update_work` in `_apply_agg_affine`; analytic moments; magnitude scaling
+    stays homogeneous on severity) + `value_type=payoff` (consumed by
     `plan-portfolio-neg-x-pricing.md`). Composes via the signed combine (1.0.0a22)
-    into a book P&L. **Includes a general fix:** signed `describe` shows **SD not
-    CV** (CV blows up as mean→0; also cleans up the a22 portfolio P&L describe).
+    into a book P&L (no combine-side change — `ftagg_density` rebuilt in the
+    combine convention). **General fix shipped:** signed `describe` shows **SD not
+    CV** (CV blows up as mean→0; also cleaned up the a22 portfolio P&L describe).
+    **Refinement vs plan:** the P&L display window is a tight, mass-centred
+    two-sided window (`estimate_agg_window` on affine moments), not the full
+    reversed loss grid — otherwise the empty far tail mis-positions the combine.
+    `tests/test_pnl.py` (15), DecL section PnLprem.
 
 6b. **General premium/loss algebra in DecL (consider for v2.0, NOT v1.0).**
     Beyond `pnl`: first-class constant aggregates (`agg Prem 100`), full

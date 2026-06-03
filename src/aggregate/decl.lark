@@ -19,6 +19,7 @@
 
 answer: sev_out          -> answer_sev
       | agg_out          -> answer_agg
+      | pnl_out          -> answer_pnl
       | port_out         -> answer_port
       | distortion_out   -> answer_distortion
       | expr             -> answer_expr
@@ -41,8 +42,16 @@ buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
 
 port_out: PORT name note agg_list
 
-agg_list: agg_list agg_out   -> agg_list_cons
-        | agg_out            -> agg_list_one
+agg_list: agg_list port_item   -> agg_list_cons
+        | port_item            -> agg_list_one
+
+// A portfolio unit is an ordinary loss aggregate (``agg``) or a
+// premium-minus-loss aggregate (``pnl``). Both transform to an
+// ("agg", name, spec) tuple, so the rest of the portfolio path is
+// unchanged. ``?port_item`` is inlined (single child) so the
+// transformer sees the underlying agg_out / pnl_out result directly.
+?port_item: agg_out
+          | pnl_out
 
 // ======================================================================
 // Aggregate
@@ -53,6 +62,25 @@ agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins note  -> 
        | AGG name TWEEDIE expr expr expr note                                    -> agg_out_tweedie
        | AGG name builtin_agg occ_reins agg_reins note                           -> agg_out_rename
        | builtin_agg agg_reins note                                              -> agg_out_builtin
+
+// ======================================================================
+// Profit-and-loss aggregate (premium minus loss)
+// ----------------------------------------------------------------------
+// ``pnl NAME <premium> prem - <loss-agg-body>`` is a sibling of ``agg``.
+// The premium is a single deterministic amount subtracted ONCE for the
+// book (an aggregate-level affine shift), as opposed to a constant inside
+// sev/dsev/ssev which is per-claim (multiplied by frequency). The body
+// after ``prem -`` is an ordinary aggregate; only the exposure head is
+// specialised so a bare ``lr`` can bind to the stated premium. See
+// dev/done/plan-pnl-premium.md.
+// ======================================================================
+
+pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins note  -> pnl_out_full
+       | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins note  -> pnl_out_dfreq
+
+pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
+             | numbers LOSS     -> pnl_exp_loss
+             | numbers LR       -> pnl_exp_lr
 
 // ======================================================================
 // Severity output (standalone `sev X ...` definitions)
@@ -259,6 +287,7 @@ DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
 DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
 SSEV.2:       /ssev(?![a-zA-Z0-9._:~\-])/
 LOSS.2:       /loss(?![a-zA-Z0-9._:~\-])/
+PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
 PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
 RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
 NET.2:        /net(?![a-zA-Z0-9._:~\-])/
@@ -311,7 +340,7 @@ NUMBER.2: /-?(\d+\.?\d*|\d*\.\d+)([eE][+\-]?\d+)?%?|-?inf/
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|negbin|net|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

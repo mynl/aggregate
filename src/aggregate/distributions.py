@@ -2966,6 +2966,7 @@ class Aggregate:
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
                  reins_bucket=None,
+                 agg_premium=None, agg_reflect=False, agg_shift=0.0, value_type='loss',
                  note=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -3011,6 +3012,20 @@ class Aggregate:
         :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
         :param agg_reins:       layers
         :param agg_kind:        ceded to or net of
+        :param agg_premium:     for a ``pnl`` (premium-minus-loss) aggregate, the
+                                stated premium (scalar or per-component vector);
+                                ``None`` for an ordinary loss aggregate. Retained
+                                for the P&L ``info`` readout.
+        :param agg_reflect:     if True, reflect the finished aggregate (``A -> -A``);
+                                set by ``pnl`` (a profit is a negative loss).
+        :param agg_shift:       deterministic shift applied to the finished
+                                aggregate **once for the book** (the total premium
+                                for ``pnl``); 0 for an ordinary aggregate. Together
+                                with ``agg_reflect`` this is the ``pnl`` affine
+                                ``PnL = agg_shift - A``.
+        :param value_type:      ``'loss'`` (default) or ``'payoff'``; ``pnl`` sets
+                                ``'payoff'`` (more is better). Inert for the
+                                distribution, consumed at the pricing layer.
         :param note:            note, enclosed in {}
         """
 
@@ -3070,10 +3085,20 @@ class Aggregate:
         # established non-negative behaviour. Opt-in wiring is pending a design
         # decision (DecL keyword vs flag vs dsev auto-detect).
         self._signed_sev = False
+        # Aggregate-level affine wrapper (the ``pnl`` premium-minus-loss form):
+        # a deterministic relabel of the finished loss aggregate -- reflect
+        # (a profit is a negative loss) and shift by the total premium. Applied
+        # at the end of ``update_work`` (see ``_apply_agg_affine``). Defaults
+        # (reflect False, shift 0) leave every ordinary aggregate byte-for-byte
+        # unchanged. ``agg_premium`` is retained for the P&L ``info`` readout.
+        # See dev/done/plan-pnl-premium.md.
+        self._agg_premium = agg_premium
+        self._agg_reflect = bool(agg_reflect)
+        self._agg_shift = float(agg_shift)
         # Sign convention: how the variable is read. Inert for the
         # distribution itself; consumed at the pricing/distortion layer
-        # (actuarial loss orientation). See plan §5.5.
-        self._value_type = 'loss'
+        # (actuarial loss orientation). ``pnl`` sets ``payoff``. See plan §5.5.
+        self._value_type = value_type if value_type in ('loss', 'payoff') else 'loss'
         self.validation_eps = VALIDATION_EPS
         self.sev_calc = ""
         self.discretization_calc = ""
@@ -3576,12 +3601,30 @@ class Aggregate:
                 s.append(f'window                   [{self.x_min:,.6g}, '
                          f'{self.x_max:,.6g}]')
                 s.append(f'signed severity          {self._signed_sev}')
-                # Always report the severity-vs-window status (consistent shape).
-                if self._severity_in_window():
-                    s.append('severity window          inside output window')
-                else:
-                    s.append('severity window          OUTSIDE output window; '
-                             'see sev_density_df')
+                # Severity-vs-window status only when the *severity* is signed;
+                # for a ``pnl`` (affine) aggregate the loss severity is
+                # non-negative and the comparison against the P&L window is
+                # uninformative, so it is skipped in favour of the readout below.
+                if self._signed_sev:
+                    if self._severity_in_window():
+                        s.append('severity window          inside output window')
+                    else:
+                        s.append('severity window          OUTSIDE output window; '
+                                 'see sev_density_df')
+            # P&L readout: a ``pnl`` (premium-minus-loss) aggregate. ``E[margin]``
+            # and ``P(loss)`` are the headline numbers an underwriter wants;
+            # ``P(loss) = P(PnL < 0)`` is read straight off the signed density.
+            if self._agg_affine_active() and self.agg_density is not None:
+                premium = float(self._agg_shift)
+                e_margin = float(self.est_m)         # PnL mean = premium - E[loss]
+                e_loss = premium - e_margin
+                lr = e_loss / premium if premium else np.nan
+                p_loss = float(self.agg_density[self.xs < 0].sum())
+                s.append(f'premium                  {premium:,.6g}')
+                s.append(f'E[loss]                  {e_loss:,.6g}')
+                s.append(f'E[margin]                {e_margin:,.6g}')
+                s.append(f'loss ratio               {lr:.4g}')
+                s.append(f'P(loss)                  {p_loss:.4g}')
             s.append(f'validation_eps           {self.validation_eps}')
             s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
@@ -3638,12 +3681,34 @@ class Aggregate:
     # ``_freq_sev_convolution`` below.
     # ================================================================
 
-    def _signed(self):
+    def _agg_affine_active(self):
+        """Whether the aggregate-level affine (``pnl``) wrapper is active.
+
+        ``True`` when the finished aggregate is reflected and/or shifted -- the
+        ``pnl`` premium-minus-loss form (``PnL = agg_shift - A``). The defaults
+        (reflect ``False``, shift ``0``) are inert, so an ordinary aggregate
+        returns ``False`` and every affine code path is bypassed.
+
+        Returns
+        -------
+        bool
+        """
+        return bool(getattr(self, '_agg_reflect', False)) or \
+            float(getattr(self, '_agg_shift', 0.0)) != 0.0
+
+    def _signed_severity(self):
         """Whether the aggregate has signed (negative-support) severity.
 
         Returns ``True`` iff any component severity is signed -- declared with
         the ``ssev`` keyword (continuous) or a ``dsev`` with a negative atom,
         both recorded on ``Severity.signed`` at construction.
+
+        This is the *convolution-grid* gate: it drives the negative-x severity
+        layout (``i0``), the two-sided window in :meth:`_bs_window`, and
+        ``_signed_sev``. It is **not** the public display/combine gate -- a
+        ``pnl`` aggregate has an ordinary non-negative loss severity (so this is
+        ``False``) but is signed at the aggregate level via the affine wrapper;
+        see :meth:`_signed`.
 
         Returns
         -------
@@ -3661,6 +3726,23 @@ class Aggregate:
         """
         return any(getattr(s, 'signed', False)
                    for s in (self.sevs if self.sevs is not None else []))
+
+    def _signed(self):
+        """Whether the aggregate is signed (straddles 0) for display / combine.
+
+        ``True`` when the severity itself reaches below 0
+        (:meth:`_signed_severity`) **or** the aggregate-level affine wrapper is
+        active (:meth:`_agg_affine_active` -- the ``pnl`` premium-minus-loss
+        form, whose loss severity is non-negative but whose result straddles 0).
+        This is the gate read by plotting, two-sided quantiles, the
+        signed-aware ``describe`` (SD instead of CV), and the
+        :class:`Portfolio` combine.
+
+        Returns
+        -------
+        bool
+        """
+        return self._signed_severity() or self._agg_affine_active()
 
     def _severity_negative_buckets(self, bs):
         """Number of negative buckets the severity reaches (index of physical 0).
@@ -3898,7 +3980,14 @@ class Aggregate:
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
         bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, recommend_p)
         N = 1 << log2
-        xs = x_min + np.arange(0, N, dtype=float) * bs
+        if self._agg_affine_active():
+            # ``pnl``: the loss convolution runs on the non-negative loss grid;
+            # ``_bs_window`` returned the (signed) P&L display origin, so build
+            # the loss grid here and let ``update_work`` relabel onto the P&L
+            # window via ``_apply_agg_affine``.
+            xs = np.arange(0, N, dtype=float) * bs
+        else:
+            xs = x_min + np.arange(0, N, dtype=float) * bs
         return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
                                 **kwargs)
 
@@ -3980,7 +4069,7 @@ class Aggregate:
         # untouched. The severity is then discretised on its own grid
         # ``xs_sev`` (physical 0 at index i0), which may differ from the output
         # grid ``xs`` (e.g. a tight far-from-0 output window).
-        self._signed_sev = self._signed()
+        self._signed_sev = self._signed_severity()
         self.i0 = self._severity_negative_buckets(self.bs)
         self.xs_sev = (np.arange(len(xs), dtype=float) - self.i0) * self.bs
 
@@ -4175,8 +4264,146 @@ class Aggregate:
         self.stats_df['error'] = _noise_aware_rel_error(
             self.stats_df['gross_empirical'], self.stats_df['mixed'])
 
+        # Aggregate affine (``pnl``): relabel the finished loss aggregate to the
+        # P&L distribution ``agg_shift - A``. Inert (no-op) for every ordinary
+        # aggregate; applied after the loss validation above so ``valid`` still
+        # checks the loss FFT. See ``_apply_agg_affine``.
+        if self._agg_affine_active():
+            self._apply_agg_affine()
+
         # invalidate stored functions
         self._cdf = None
+
+    def _pnl_window(self, bs, N):
+        """Lower edge of the tight, mass-centred P&L output window.
+
+        The ``pnl`` affine reflects + shifts the loss aggregate; the resulting
+        P&L distribution lives around ``agg_shift - E[A]`` with the loss
+        spread. ``estimate_agg_window`` on the **affine moments** gives a tight
+        two-sided window ``[lo, hi]`` (mean possibly < 0); this returns ``lo``
+        snapped down to ``bs`` and fitted to the ``N``-bucket grid. Centring the
+        window on the mass (rather than reversing the full loss grid, whose
+        empty far tail would push the origin far below the mass) is what lets a
+        :class:`Portfolio` of ``pnl`` units position the shared grid correctly.
+
+        Parameters
+        ----------
+        bs : float
+            Bucket size.
+        N : int
+            Number of grid buckets (``2**log2``).
+
+        Returns
+        -------
+        float
+            The snapped P&L window origin ``x_min``.
+        """
+        reflect = self._agg_reflect
+        shift = self._agg_shift
+        m = (shift - self.agg_m) if reflect else (shift + self.agg_m)
+        sd = self.agg_sd
+        skew = -self.agg_skew if reflect else self.agg_skew
+        p = 1.0 - 10.0 ** -WINDOW_NINES
+        if np.isfinite(sd) and sd > 0:
+            try:
+                lo, hi, _W = estimate_agg_window(m, sd, skew, p)
+            except (ValueError, FloatingPointError):  # pragma: no cover - defensive
+                lo, hi = m - 8.0 * sd, m + 8.0 * sd
+        else:
+            # No finite spread (point mass or undefined variance): fall back to
+            # the full reversed-grid window (origin a whole grid below shift).
+            s0 = int(round(shift / bs)) if bs else 0
+            return float((s0 - N + 1) * bs)
+        if hi - lo <= N * bs:
+            pnl_lo = float(np.floor(lo / bs) * bs) if bs else float(lo)
+        else:
+            # Support wider than the grid: centre on the mean, accept a small
+            # two-sided deficit (the heavy-tail residual, documented).
+            pnl_lo = float(np.floor((m - 0.5 * N * bs) / bs) * bs) if bs else float(m - 0.5 * N * bs)
+        return pnl_lo
+
+    def _apply_agg_affine(self):
+        """Relabel the finished loss aggregate to ``agg_shift - A`` (the ``pnl`` form).
+
+        ``pnl`` premium-minus-loss aggregates are an aggregate-level affine
+        transform of an ordinary loss aggregate: reflect (a profit is a negative
+        loss) and a single deterministic shift by the total premium. This is a
+        pure grid relabel of the finished density -- **no new convolution** --
+        so the loss FFT, its validation, and every ordinary aggregate are
+        untouched.
+
+        Notes
+        -----
+        The loss density ``a`` lives on the non-negative grid ``self.xs``
+        (origin ``loss_x0``, index ``j_loss = round(loss_x0/bs)``). With the
+        shift snapped to the bucket (``s0 = round(agg_shift/bs)``) the P&L value
+        of loss bucket ``k`` is ``(s0 - j_loss - k)*bs`` (reflect) and is placed
+        onto the tight P&L grid ``xs = pnl_lo + arange(N)*bs`` (see
+        :meth:`_pnl_window`). The map ``t = (s0 - j_loss - j_pnl) - k`` is a
+        one-to-one reverse-and-roll; buckets falling outside the window are
+        dropped (a negligible far-tail deficit).
+
+        - **ftagg_density** is rebuilt as the rfft of the length-``M`` P&L buffer
+          (physical 0 at index 0, negatives wrapped to the top) by scattering
+          the P&L density at indices ``(j_pnl + arange(N)) mod M``. This is the
+          exact convention the :class:`Portfolio` signed combine multiplies, so
+          a book of ``pnl`` units convolves correctly with no combine-side
+          change.
+        - **moments (closed form):** ``mean -> shift - E[A]``, ``sd`` unchanged,
+          ``skew -> -skew``. Applied to the empirical scalars (``est_*``); the
+          theoretical ``stats_df`` columns are deliberately left in loss terms
+          (so ``valid`` / ``_bs_window`` stay loss-correct) and the P&L view is
+          formed at display time in :meth:`_describe_signed`.
+
+        Idempotent across re-updates: ``_freq_sev_convolution`` regenerates the
+        loss density / ft fresh each ``update_work`` before this runs.
+        """
+        N = len(self.xs)
+        bs = self.bs
+        padding = self.padding
+        reflect = self._agg_reflect
+        shift = self._agg_shift
+        loss_d = self.agg_density
+        loss_x0 = float(self.xs[0])
+        j_loss = int(round(loss_x0 / bs)) if bs else 0
+        s0 = int(round(shift / bs)) if bs else 0
+
+        pnl_lo = self._pnl_window(bs, N)
+        j_pnl = int(round(pnl_lo / bs)) if bs else 0
+
+        # ---- density + output grid (tight signed P&L window) ------------
+        # one-to-one reverse-and-roll; out-of-window buckets dropped.
+        k = np.arange(N)
+        if reflect:
+            t = (s0 - j_loss - j_pnl) - k
+        else:
+            t = (s0 + j_loss - j_pnl) + k
+        valid = (t >= 0) & (t < N)
+        pnl_d = np.zeros(N)
+        pnl_d[t[valid]] = loss_d[k[valid]]
+        self.agg_density = pnl_d
+        self.xs = pnl_lo + np.arange(N, dtype=float) * bs
+        self.x_min = float(self.xs[0])
+        self.x_max = float(self.xs[-1])
+
+        # ---- ftagg_density: rfft of the P&L length-M buffer -------------
+        # (physical 0 at index 0, negatives wrapped to the top -- the combine
+        # convention). Scatter the P&L density at indices (j_pnl + k) mod M.
+        M = N << padding
+        h = np.zeros(M)
+        h[(j_pnl + np.arange(N)) % M] = pnl_d
+        self.ftagg_density = sfft.rfft(h)
+
+        # ---- empirical moment scalars (closed-form affine) --------------
+        # mean -> shift - E[A]; sd unchanged; skew sign flips under reflection.
+        if reflect:
+            self.est_m = self._agg_shift - self.est_m
+            self.est_skew = -self.est_skew
+        else:
+            self.est_m = self._agg_shift + self.est_m
+        # est_sd / est_var unchanged; cv = sd/mean is unstable near mean 0 and
+        # deliberately not relied upon (describe shows SD when signed).
+        self.est_cv = self.est_sd / self.est_m if self.est_m else np.inf
 
     def _fft_aggregate(self, sev_density, padding):
         """Run one FFT convolution: severity density -> aggregate density.
@@ -5166,6 +5393,8 @@ class Aggregate:
         pandas.DataFrame
             Three-row Freq / Sev / Agg frame; see :meth:`describe`.
         """
+        if self._signed():
+            return self._describe_signed(force_reins_label)
         st = self.stats_df['mixed']
         rlabel = force_reins_label if force_reins_label is not None \
             else self._reins_after_label()
@@ -5215,6 +5444,100 @@ class Aggregate:
         # validation eyeball).
         for c in df.columns:
             if ' EX' in c or ' CV' in c or ' Sk' in c or c in ('EX', 'CV', 'Sk'):
+                if not (c.startswith('Err ') or c.startswith('Change ')):
+                    df[c] = _snap_noise(df[c])
+        return df
+
+    def _describe_signed(self, force_reins_label=None):
+        """``describe`` for a signed aggregate -- **SD** trio instead of CV.
+
+        Same 8-column shape and column arithmetic as :meth:`_describe`, but the
+        ``CV`` trio is replaced by an ``SD`` trio. The coefficient of variation
+        ``CV = sd / mean`` is unstable and meaningless when the mean can be ~0
+        (a P&L straddling break-even), so for any signed object -- a ``ssev`` /
+        negative-``dsev`` aggregate **or** a ``pnl`` -- the spread is reported as
+        the standard deviation, which is finite and informative regardless of
+        the mean. (This also cleans up the 1.0.0a22 signed-portfolio describe.)
+
+        For a ``pnl`` aggregate the **Agg** row is additionally the affine
+        (premium-minus-loss) view: ``EX -> agg_shift - E[A]``, ``SD`` unchanged,
+        ``Sk -> -Sk``. The Freq / Sev rows describe the underlying loss process
+        and are unchanged. The theoretical (Gross) column is sourced from the
+        loss ``stats_df`` and transformed here at display time, so the stored
+        validation columns stay in loss terms (see :meth:`_apply_agg_affine`).
+
+        Parameters
+        ----------
+        force_reins_label : str or None
+            As in :meth:`_describe`.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        st = self.stats_df['mixed']
+        emp = self.stats_df['empirical']
+        rlabel = force_reins_label if force_reins_label is not None \
+            else self._reins_after_label()
+        affine = self._agg_affine_active()
+        reflect = self._agg_reflect
+        shift = self._agg_shift
+
+        def _agg_mean(m):
+            if not affine:
+                return m
+            return (shift - m) if reflect else (shift + m)
+
+        def _agg_skew(sk):
+            return -sk if (affine and reflect) else sk
+
+        # Theoretical (loss stats_df; Agg row affine-transformed for display).
+        freq_sd = st[('freq', 'mean')] * st[('freq', 'cv')]
+        sev_sd = self.sev_sd
+        agg_sd = self.agg_sd  # spread is invariant under reflect + shift
+        df = pd.DataFrame(
+            {
+                'EX': [st[('freq', 'mean')], st[('sev', 'mean')],
+                       _agg_mean(st[('agg', 'mean')])],
+                'SD': [freq_sd, sev_sd, agg_sd],
+                'Sk': [st[('freq', 'skew')], st[('sev', 'skew')],
+                       _agg_skew(st[('agg', 'skew')])],
+            },
+            index=['Freq', 'Sev', 'Agg'],
+        )
+        df.index.name = 'X'
+        post_update = pd.notna(emp.get(('agg', 'mean'), np.nan))
+        if post_update:
+            mid_label = rlabel or 'Est'
+            # Empirical: Freq/Sev from the stats_df; Agg from the affine-aware
+            # scalars (est_m / est_sd / est_skew are already the P&L view).
+            emp_freq_sd = emp[('freq', 'mean')] * emp[('freq', 'cv')]
+            df.loc['Sev', f'{mid_label} EX'] = self.est_sev_m
+            df.loc['Agg', f'{mid_label} EX'] = self.est_m
+            change_label = 'Change' if rlabel else 'Err'
+            df.loc[:, f'{change_label} EX'] = _noise_aware_rel_error(
+                df[f'{mid_label} EX'], df['EX'])
+            df.loc['Sev', f'{mid_label} SD'] = self.est_sev_sd
+            df.loc['Agg', f'{mid_label} SD'] = self.est_sd
+            df.loc['Freq', f'{mid_label} SD'] = emp_freq_sd
+            df.loc[:, f'{change_label} SD'] = _noise_aware_rel_error(
+                df[f'{mid_label} SD'], df['SD'])
+            df[f'{mid_label} Sk'] = np.nan
+            df.loc['Sev', f'{mid_label} Sk'] = self.est_sev_skew
+            df.loc['Agg', f'{mid_label} Sk'] = self.est_skew
+            ordered = [
+                'EX', f'{mid_label} EX', f'{change_label} EX',
+                'SD', f'{mid_label} SD', f'{change_label} SD',
+                'Sk', f'{mid_label} Sk',
+            ]
+            df = df[ordered]
+        if rlabel:
+            df = df.rename(columns={
+                'EX': f'{REINS_LABEL_GROSS} EX',
+                'SD': f'{REINS_LABEL_GROSS} SD',
+                'Sk': f'{REINS_LABEL_GROSS} Sk'})
+        for c in df.columns:
+            if ' EX' in c or ' SD' in c or ' Sk' in c or c in ('EX', 'SD', 'Sk'):
                 if not (c.startswith('Err ') or c.startswith('Change ')):
                     df[c] = _snap_noise(df[c])
         return df
@@ -5410,7 +5733,12 @@ class Aggregate:
         except Exception:  # pragma: no cover - defensive
             sd = self.agg_sd
         skew = self.agg_skew
-        signed = self._signed()
+        # Convolution-grid signedness: a ``pnl`` aggregate has a non-negative
+        # loss severity, so the loss FFT is sized here on the ordinary
+        # non-negative grid; the affine relabel onto the signed P&L window is a
+        # post-step (below + in ``_apply_agg_affine``). Hence ``_signed_severity``
+        # not ``_signed`` -- the latter also reports ``True`` for the affine.
+        signed = self._signed_severity()
         # Window coverage: WINDOW_NINES nines (default 12) -- far tighter than
         # the legacy bucket p, so the window captures essentially all the mass.
         p = 1.0 - 10.0 ** -WINDOW_NINES
@@ -5524,20 +5852,47 @@ class Aggregate:
             sel_x0 = float(round(x_min_in / sel_bs) * sel_bs)
         grid_x_max = sel_x0 + (1 << sel_l2) * sel_bs
 
+        # ---- aggregate affine (pnl): tight, mass-centred P&L window ------
+        # The loss FFT runs on the non-negative grid sized above; the finished
+        # aggregate is then reflected and shifted (``_apply_agg_affine``). The
+        # *display* window is a tight two-sided window around the P&L mean
+        # (``estimate_agg_window`` on the affine moments), not the full reversed
+        # loss grid -- so the mass sits in the window (and the Portfolio combine,
+        # which positions the shared grid from the per-unit origins, places a
+        # book of ``pnl`` units correctly).
+        affine = self._agg_affine_active()
+        if affine:
+            N = 1 << sel_l2
+            x0_pnl = self._pnl_window(sel_bs, N)
+            x_max_pnl = float(x0_pnl + N * sel_bs)
+            ret_x0 = x0_pnl
+        else:
+            ret_x0 = sel_x0
+
         df = pd.DataFrame(rows).T
         # the winning method is flagged; the ``used`` row is the realized grid.
         df['selected'] = df.index == selected
         # The ``used`` row converts the selected method's window into the actual
         # power-of-2 grid: x_max = x_min + 2**log2 * bs (so a 701-point support
-        # padded to 1024 reads x_max = grid top, W = the full grid width).
-        df.loc['used'] = dict(
-            applies=True, x_min=sel_x0, x_max=float(grid_x_max),
-            W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
-            coverage=rows[selected]['coverage'],
-            note=f'realized grid ({selected})', selected=False)
+        # padded to 1024 reads x_max = grid top, W = the full grid width). For a
+        # ``pnl`` aggregate the ``used`` row reports the reflected+shifted P&L
+        # window (the loss method rows keep their non-negative loss windows).
+        if affine:
+            df.loc['used'] = dict(
+                applies=True, x_min=x0_pnl, x_max=x_max_pnl,
+                W=float(x_max_pnl - x0_pnl), bs=sel_bs, log2=sel_l2,
+                coverage=rows[selected]['coverage'],
+                note=f'realized P&L grid ({selected}, reflect+shift)',
+                selected=False)
+        else:
+            df.loc['used'] = dict(
+                applies=True, x_min=sel_x0, x_max=float(grid_x_max),
+                W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
+                coverage=rows[selected]['coverage'],
+                note=f'realized grid ({selected})', selected=False)
         self._bs_window_df = df
 
-        return sel_bs, sel_l2, sel_x0
+        return sel_bs, sel_l2, ret_x0
 
     def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
         """

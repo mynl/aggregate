@@ -61,13 +61,18 @@
 6. **Portfolio FI-2: negative `xs` at the portfolio-combine level.** Easier
    half of #3 — combining already-computed unit aggregates is a deterministic
    sum, so a constant shift de-shifts cleanly. Doable without solving the
-   within-unit random-frequency problem.
-   **⚠ Author reminder (periodic): signed support requires auditing ALL columns
-   of `Portfolio.density_df`, not just `p_total`/`F`/`S`.** The `add_exa`
-   machinery (`portfolio.py:2122`) and especially the **price** column assume
-   non-negative loss. Author expects this to be straightforward but it *must* be
-   looked at as part of the negative-x Portfolio step. See
-   `dev/plan-negative-x-port.md` §3.
+   within-unit random-frequency problem. **Now split into two plans:**
+   - **Combine half (next):** `dev/plan-negative-x-port.md` (REFRESHED rev 1) —
+     signed `loss`/`p_total`/`p_{line}`/`F`/`S` + signed VaR/TVaR. Key refresh
+     insight: the FFT product is already origin-at-0 (no per-unit roll), but the
+     current `ift(ft_all)` truncates away the wrapped negative mass — the
+     Portfolio must mirror Aggregate's F2 step (full length-M `irfft` + one roll).
+     Compose per-unit `_bs_window` (no back doors).
+   - **Pricing half (deferred):** `dev/plan-portfolio-neg-x-pricing.md` (DRAFT) —
+     **⚠ the `add_exa` column audit and especially the price/`exeqa` column**
+     (`portfolio.py:2122`), distortion pricing, and `value_type` consumption.
+     Discovery-driven; must be *checked*, not assumed. Signed books warn+fall back
+     to F/S-only until this lands.
 
 7. **Switcheroo harness case.** Add a `Port.Sample` case (hand-built or
    seeded sample) to the baseline once Portfolio sample work next surfaces,

@@ -21,10 +21,12 @@ from textwrap import fill
 import warnings
 from IPython.display import HTML, display
 
-from .constants import (ALIASING_RATIO, EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
+from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
+                        EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
                         FT_NOISE_FLOOR, RECOMMEND_P, REINS_LABEL_OUTPUT,
                         VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
-from .distributions import Aggregate, Severity, _flat_col_to_stats_index, approximate_from_mcvsk
+from .distributions import (Aggregate, Severity, WINDOW_NINES,
+                            _flat_col_to_stats_index, approximate_from_mcvsk)
 
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
            'swap_density_df']
@@ -903,6 +905,9 @@ class Portfolio(object):
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
             s.append(f'bs                       {bss}')
             s.append(f'log2                     {self.log2}')
+            win = getattr(self, '_signed_window', None)
+            if win is not None:
+                s.append(f'signed window            [{win[0]:.6g}, {win[1]:.6g})')
             s.append(f'padding                  {self.padding}')
             s.append(f'sev_calc                 {self.sev_calc}')
             s.append(f'normalize                {self.normalize}')
@@ -1613,6 +1618,130 @@ class Portfolio(object):
 
         return round_bucket(bs)
 
+    def _signed(self):
+        """Whether any unit has signed (negative-support) severity.
+
+        The portfolio is *signed* iff at least one component aggregate is
+        signed -- declared with ``ssev`` (continuous) or a ``dsev`` with a
+        negative atom; see :meth:`Aggregate._signed`. This mirrors the
+        Aggregate gate so the non-signed path stays byte-for-byte identical:
+        every signed-support code path in :meth:`update` (window coarsening,
+        the F2 present roll, the ``add_exa`` fallback) is reached **only**
+        when this returns ``True``.
+
+        Returns
+        -------
+        bool
+        """
+        return any(a._signed() for a in self.agg_list)
+
+    def _build_bs_window_df(self, rows, bs, log2, x_min):
+        """Build the unit-indexed bucket/window summary for a signed combine.
+
+        Mirrors :attr:`Aggregate._bs_window_df`'s idiom but swaps *method*
+        rows for *unit* rows -- the Portfolio convention of one row per unit
+        plus a summary line (cf. ``stats_df`` / ``describe``, which carry
+        per-unit columns and a ``total``). Each unit row is that unit's
+        selected signed window; the final ``used`` row is the realised shared
+        portfolio grid ``[x_min, x_min + 2**log2 * bs)``.
+
+        Parameters
+        ----------
+        rows : list of dict
+            Per-unit window rows (``unit``/``x_min``/``x_max``/``W``/``bs``/
+            ``log2``/``coverage``/``note``); empty for a non-signed portfolio.
+        bs, log2 : float, int
+            The realised shared grid bucket size and log2.
+        x_min : float
+            The realised portfolio-grid origin.
+        """
+        N = 1 << log2
+        cols = ['x_min', 'x_max', 'W', 'bs', 'log2', 'coverage', 'note']
+        if rows:
+            df = pd.DataFrame(rows).set_index('unit')[cols]
+        else:
+            df = pd.DataFrame(columns=cols)
+        df.loc['used'] = dict(
+            x_min=float(x_min), x_max=float(x_min + N * bs),
+            W=float(N * bs), bs=float(bs), log2=int(log2),
+            coverage=f'1-1e-{WINDOW_NINES}', note='realised portfolio grid')
+        self._bs_window_df = df
+
+    def _bs_window(self, log2, bs_in, recommend_p=RECOMMEND_P):
+        """Decide ``(bs, log2, x_min)`` for the portfolio combine grid.
+
+        A thin signed-aware wrapper on :meth:`best_bucket`. For a non-signed
+        portfolio it is a pure pass-through -- ``(best_bucket(...), log2,
+        0.0)`` -- so existing results are unchanged. For a signed (P&L)
+        portfolio it runs the two-phase analytic sizing of the combine plan
+        (``dev/plan-negative-x-port.md`` 3.1b):
+
+        1. **Pre-pass (analytic, no FFT):** each unit's natural signed window
+           ``(x_min_k, x_max_k)`` from its own :meth:`Aggregate._bs_window`.
+        2. **Shared grid:** the summed support
+           ``W_tot = Sigma (x_max_k - x_min_k)`` is wider than any single
+           unit's, but ``N = 2**log2`` is capped, so ``bs`` is *coarsened* to
+           ``max(best_bucket, W_tot / N)`` to hold the sum without aliasing.
+           ``log2`` is a cap (filled, not shrunk -- we want the wider span).
+
+        The origin returned here is the analytic estimate used for the
+        inspectable :attr:`_bs_window_df` ``used`` row; :meth:`update`
+        recomputes the realised origin from the units' post-snap ``x_min``
+        once they are driven on the shared ``bs``.
+
+        Parameters
+        ----------
+        log2 : int
+            Bucket-count cap, ``2**log2`` buckets.
+        bs_in : float
+            ``0`` to estimate the bucket; ``>0`` to force it (honoured).
+        recommend_p : float
+            Tail probability for the per-unit moment windows.
+
+        Returns
+        -------
+        (bs, log2, x_min) : tuple
+            Shared grid parameters. For a signed portfolio
+            :attr:`_bs_window_df` is also populated.
+        """
+        N = 1 << log2
+        if not self._signed():
+            bs = float(bs_in) if bs_in > 0 else self.best_bucket(log2, recommend_p)
+            return bs, log2, 0.0
+
+        # ---- phase 1: per-unit natural signed windows (analytic) ----------
+        rows = []
+        for a in self.agg_list:
+            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, recommend_p)
+            used = a._bs_window_df.loc['used']
+            x_max_k = float(used['x_max'])
+            rows.append(dict(unit=a.name, x_min=float(x_min_k), x_max=x_max_k,
+                             W=x_max_k - float(x_min_k), bs=float(bs_k),
+                             log2=int(l2_k), coverage=used['coverage'],
+                             note=used['note']))
+
+        # ---- phase 2: shared coarsened grid -------------------------------
+        # Summed support fits in W_tot = Sigma range_k; N is capped, so bs
+        # must be the *coarser* of the RMS best_bucket and the fit floor
+        # W_tot/N (buy the space, avoid aliasing/wrap).
+        W_tot = sum(r['W'] for r in rows)
+        if bs_in > 0:
+            bs = float(bs_in)
+        else:
+            bs_best = self.best_bucket(log2, recommend_p)
+            bs_fit = W_tot / N if N else W_tot
+            bs = round_bucket(max(bs_best, bs_fit))
+        # Analytic origin estimate: the support min of the sum, floored so no
+        # per-line marginal wraps (safety floor under the plan's sum-of-
+        # windows -- a unit whose support starts above Sigma x_min would
+        # otherwise wrap on the shared grid). update recomputes this from the
+        # realised post-snap unit origins.
+        x_min_est = min(sum(r['x_min'] for r in rows),
+                        min(r['x_min'] for r in rows))
+        x_min_est = float(np.floor(x_min_est / bs) * bs)
+        self._build_bs_window_df(rows, bs, log2, x_min_est)
+        return bs, log2, x_min_est
+
     def update(self, log2, bs, remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
                trim_df=False, add_exa=True, force_severity=True, recommend_p=RECOMMEND_P,
@@ -1654,7 +1783,15 @@ class Portfolio(object):
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
         self.log2 = log2
-        if bs == 0:
+        # Signed (P&L) portfolios route the bucket/window through the
+        # signed-aware ``_bs_window`` wrapper (coarsen-to-fit); non-signed
+        # books keep the legacy ``best_bucket`` path exactly (3.0 gate).
+        signed = self._signed()
+        if signed:
+            bs, log2, _x_min_est = self._bs_window(log2, bs, recommend_p)
+            self.log2 = log2
+            self.bs = bs
+        elif bs == 0:
             self.bs = self.best_bucket(log2, recommend_p)
             logger.info(f'bs=0 enterered, setting bs={bs:.6g} using self.best_bucket rounded to binary fraction.')
         else:
@@ -1684,47 +1821,120 @@ class Portfolio(object):
         # Build the grid and the per-line densities, accumulating their
         # product in Fourier space to get ``p_total``.
         N = 1 << log2
-        MAXL = N * bs
-        xs = np.linspace(0, MAXL, N, endpoint=False)
-        self.density_df = pd.DataFrame(index=xs)
-        self.density_df['loss'] = xs
-        ft_all = None
-        for agg in self.agg_list:
-            raw_nm = agg.name
-            agg.update_work(xs, self.padding, sev_calc, discretization_calc,
-                            normalize, force_severity, debug=debug)
-            ft_line_density[raw_nm] = agg.ftagg_density
-            self.density_df[f'p_{raw_nm}'] = agg.agg_density
-            if ft_all is None:
-                ft_all = np.copy(ft_line_density[raw_nm])
-            else:
-                ft_all *= ft_line_density[raw_nm]
-        self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
+        if signed:
+            # ---- signed combine on a shared signed grid (plan 2/3) --------
+            # Drive each unit on its OWN signed window [x_min_k, ...) sharing
+            # the portfolio bs/log2/padding, so the unit object stays
+            # internally correct (no false deficit, right moments, right
+            # describe/plot -- plan 2c). The combine reads each unit's
+            # ftagg_density, which is origin-at-0 *regardless* of the unit's
+            # x_min (the output roll hits the density, never ftagg), so the
+            # units' FFTs still multiply correctly here.
+            ft_all = None
+            x_mins = []
+            for agg in self.agg_list:
+                agg.update(log2=log2, bs=self.bs, padding=self.padding,
+                           sev_calc=sev_calc,
+                           discretization_calc=discretization_calc,
+                           normalize=normalize, force_severity=force_severity,
+                           x_min='auto', recommend_p=recommend_p, debug=debug)
+                ft_line_density[agg.name] = agg.ftagg_density
+                x_mins.append(agg.x_min)
+                if ft_all is None:
+                    ft_all = np.copy(agg.ftagg_density)
+                else:
+                    ft_all *= agg.ftagg_density
+            # Realised portfolio origin: the support min of the independent
+            # sum is Sigma x_min_k; floored by min_k x_min_k so no per-line
+            # marginal wraps (safety floor on the plan's sum-of-windows).
+            # Snapped to bs (each unit x_min is already a multiple of bs, so
+            # the sum is too; the round guards fp dust).
+            x_min_tot = float(min(sum(x_mins), min(x_mins)))
+            x_min_tot = float(np.round(x_min_tot / self.bs) * self.bs)
+            j0_tot = int(round(x_min_tot / self.bs))
+            xs = x_min_tot + np.arange(N, dtype=float) * self.bs
+            self.density_df = pd.DataFrame(index=xs)
+            self.density_df['loss'] = xs
+            # F2 present step: full-length irfft then a single roll placing
+            # x_min_tot at output index 0, keep N. ``ift(., 0)`` returns the
+            # whole length-M = N<<padding buffer (origin-at-0, negatives
+            # wrapped to the top); the truncating ``ift(., padding)`` used on
+            # the non-signed path would silently drop that wrapped tail.
+            self.density_df['p_total'] = np.roll(ift(ft_all, 0), -j0_tot)[:N]
+            for agg in self.agg_list:
+                self.density_df[f'p_{agg.name}'] = np.roll(
+                    ift(agg.ftagg_density, 0), -j0_tot)[:N]
+            self._signed_window = (x_min_tot, x_min_tot + N * self.bs)
+        else:
+            # ---- non-signed path (unchanged, byte-for-byte) ---------------
+            # Use self.bs (resolved above): build_many now passes bs through
+            # as 0 => auto, so the grid must read the resolved bucket, not the
+            # raw parameter.
+            MAXL = N * self.bs
+            xs = np.linspace(0, MAXL, N, endpoint=False)
+            self.density_df = pd.DataFrame(index=xs)
+            self.density_df['loss'] = xs
+            ft_all = None
+            for agg in self.agg_list:
+                raw_nm = agg.name
+                agg.update_work(xs, self.padding, sev_calc, discretization_calc,
+                                normalize, force_severity, debug=debug)
+                ft_line_density[raw_nm] = agg.ftagg_density
+                self.density_df[f'p_{raw_nm}'] = agg.agg_density
+                if ft_all is None:
+                    ft_all = np.copy(ft_line_density[raw_nm])
+                else:
+                    ft_all *= ft_line_density[raw_nm]
+            self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
 
         # ``ft_nots[i]`` = FFT of the sum of all lines except ``i`` —
         # needed for ``exeqa_{i}`` in ``add_exa``. The direct division
         # path is faster but unsafe if any FFT bin is exactly zero
         # (symmetric distributions); fall back to building the product.
+        # Skipped for signed books -- ``ft_nots`` is consumed only by
+        # ``add_exa``, which is deferred to the pricing iteration (plan 3.3).
         ft_nots = {}
-        for line in self.line_names:
-            ft_not = np.ones_like(ft_all)
-            if np.any(ft_line_density[line] == 0):
-                for not_line in self.line_names:
-                    if not_line != line:
-                        ft_not *= ft_line_density[not_line]
-            elif len(self.line_names) > 1:
-                ft_not = ft_all / ft_line_density[line]
-            ft_nots[line] = ft_not
+        if not signed:
+            for line in self.line_names:
+                ft_not = np.ones_like(ft_all)
+                if np.any(ft_line_density[line] == 0):
+                    for not_line in self.line_names:
+                        if not_line != line:
+                            ft_not *= ft_line_density[not_line]
+                elif len(self.line_names) > 1:
+                    ft_not = ft_all / ft_line_density[line]
+                ft_nots[line] = ft_not
 
         self.remove_fuzz(log='update')
 
         # add exa details
-        if add_exa:
+        if add_exa and not signed:
             self.add_exa(self.density_df, ft_nots=ft_nots)
         else:
             # at least want F and S to get quantile functions
+            if add_exa and signed:
+                # Pricing/allocation columns assume a loss>=0 axis; defer to
+                # the pricing iteration rather than emit wrong numbers.
+                warnings.warn(
+                    'pricing/allocation columns (add_exa) are not yet '
+                    'available on signed (P&L) support; writing F/S only. '
+                    'See dev/plan-portfolio-neg-x-pricing.md.', stacklevel=2)
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
+
+        # Mass-conservation check on the signed grid: a window narrower than
+        # the summed support shows up as a deficit (the wrapped tail would be
+        # truncated by the final [:N]). Surface it loudly, like the Aggregate
+        # path, rather than silently lose mass.
+        if signed:
+            deficit = 1.0 - float(np.sum(self.density_df['p_total']))
+            if deficit > VALIDATION_NOISE:
+                warnings.warn(
+                    f'{self.name}: portfolio PMF deficit {deficit:.3e} '
+                    f'(Σp = 1 − {deficit:.3e} < 1); the signed window is '
+                    f'narrower than the combined support -- raise log2 or '
+                    f'widen the grid.', DefectiveDistributionWarning,
+                    stacklevel=2)
 
         # Empirical portfolio-total agg moments from the FFT output, via
         # ``xsden_to_mwrangler`` on a de-fuzzed copy -- mirrors
@@ -2051,11 +2261,19 @@ class Portfolio(object):
         assert self.density_df is not None
 
         if stat == 'range':
-            if kind == 'linear':
-                return f(self.q(0.999))
-            else:
-                # wider range for log density plots
-                return f(self.q(1 - 1e-10))
+            p = 0.999 if kind == 'linear' else 1 - 1e-10
+            hi = self.q(p)
+            # Signed (P&L) portfolio (grid origin < 0): the mass can sit
+            # anywhere on the real line, possibly entirely negative, so use a
+            # *two-sided* quantile range. ``f(hi)`` would clip the negative
+            # tail (or reverse the axis when hi < 0). Mirrors the Aggregate
+            # ``_limits`` signed branch.
+            if self.density_df.index[0] < 0:
+                lo = self.q(1 - p)
+                w = hi - lo
+                pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
+                return [lo - pad, hi + pad]
+            return f(hi)
         elif stat == 'density':
             mx = self.density_df.filter(regex='p_[a-zA-Z]').max().max()
             mxx0 = self.density_df.filter(regex='p_[a-zA-Z]').iloc[1:].max().max()

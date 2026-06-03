@@ -4,8 +4,8 @@
 > refactor. As items here move into the codebase, they migrate to PROGRESS.md
 > (which expands as this shrinks).
 >
-> **Last updated: 2026-06-02** — after the `negative-x-agg` cycle
-> (1.0.0a21). Current version 1.0.0a21.
+> **Last updated: 2026-06-03** — after the `negative-x-port` combine cycle
+> (1.0.0a22). Current version 1.0.0a22.
 
 ---
 
@@ -40,10 +40,10 @@
    reporting. 789 tests pass; default path byte-for-byte. **Discovery:** plan §4
    wrongly assumed signed severity was free — the Severity layering clamps
    `x<0→0` and `validate_discrete_distribution` clamped negative dsev atoms;
-   both fixed. **Still open:** the Portfolio half — `dev/plan-negative-x-port.md`
-   (DRAFT, **now ready to refresh** from what we learned: combine + density_df
-   column audit + pricing/`value_type` consumption). **Do this before the
-   multivariate plan.** Deferred follow-ups: two-sided deficit split; `ft.py`
+   both fixed. **Portfolio combine half: ✅ DONE (1.0.0a22)** — see #6. **Still
+   open:** the Portfolio *pricing* half — `dev/plan-portfolio-neg-x-pricing.md`
+   (DRAFT: the `add_exa` column audit + pricing/`value_type` consumption).
+   **Do the multivariate plan after.** Deferred follow-ups: two-sided deficit split; `ft.py`
    recentering helpers → call the core path (+ equivalence test); re-home
    `estimate_agg_window` to `utilities.py` and unify with `bivariate.size_axis`;
    occ-reins on a signed severity grid; DecL keyword for `signed`/`value_type`.
@@ -61,18 +61,64 @@
 6. **Portfolio FI-2: negative `xs` at the portfolio-combine level.** Easier
    half of #3 — combining already-computed unit aggregates is a deterministic
    sum, so a constant shift de-shifts cleanly. Doable without solving the
-   within-unit random-frequency problem. **Now split into two plans:**
-   - **Combine half (next):** `dev/plan-negative-x-port.md` (REFRESHED rev 1) —
-     signed `loss`/`p_total`/`p_{line}`/`F`/`S` + signed VaR/TVaR. Key refresh
-     insight: the FFT product is already origin-at-0 (no per-unit roll), but the
-     current `ift(ft_all)` truncates away the wrapped negative mass — the
-     Portfolio must mirror Aggregate's F2 step (full length-M `irfft` + one roll).
-     Compose per-unit `_bs_window` (no back doors).
+   within-unit random-frequency problem. **Split into two plans:**
+   - **Combine half: ✅ DONE (1.0.0a22).** `dev/plan-negative-x-port.md`
+     implemented — signed `loss`/`p_total`/`p_{line}`/`F`/`S` + signed
+     VaR/TVaR. The FFT product is origin-at-0 (each unit's `ftagg_density` is
+     independent of its `x_min`); the truncating `ift(ft_all)` was replaced by
+     the F2 full length-M `irfft` + single roll, so `p_total` conserves mass.
+     Units are driven on their **own** signed windows (plan §2c) sharing only
+     `bs`/`log2`/`padding`; new signed-aware `Portfolio._bs_window` (thin
+     wrapper on `best_bucket`, coarsen-to-fit) + unit-indexed `_bs_window_df`;
+     two-sided `_limits` plot fix; `build_many` back door removed (bs passes
+     through, no `best_bucket` pre-compute). Gated behind `Portfolio._signed()`
+     so non-signed books are byte-identical. `tests/test_negative_x_port.py`
+     (14 cases); DecL in `test_decl.agg` section PortPnL. **Known limitation
+     (residual #4, accepted):** a fine-lattice unit beside a wide unit gets a
+     coarse shared `bs` and shows a per-unit deficit warning (exactness lost,
+     surfaced not silenced).
    - **Pricing half (deferred):** `dev/plan-portfolio-neg-x-pricing.md` (DRAFT) —
      **⚠ the `add_exa` column audit and especially the price/`exeqa` column**
      (`portfolio.py:2122`), distortion pricing, and `value_type` consumption.
      Discovery-driven; must be *checked*, not assumed. Signed books warn+fall back
      to F/S-only until this lands.
+   - **Multi-resolution combine (parked, NOT touching atm):** the proper fix for
+     residual #4 (coarse shared `bs` corrupting a fine-lattice unit). This is the
+     standard FFT step/grid-mismatch issue: let each unit compute on its **own**
+     smaller `bs`, then **decimate** (down-sample / re-bucket) each unit's output
+     onto the shared coarse portfolio grid before the Fourier product. Keeps
+     per-unit accuracy while still combining on one grid. Author confirms this is
+     the real answer but it's out of scope for now. Until done, the coarse-`bs`
+     deficit is accepted and surfaced per-unit.
+
+6a. **`pnl` keyword — premium-minus-loss as a first-class object. ⭐ NEXT
+    (quick hit, ships 1.0.0a23).** Full design in **`dev/plan-pnl-premium.md`**
+    (READY). A sibling of `agg`, same body, presents **Premium − A** (profit lens
+    of the same loss model): `pnl NAME <prem> prem - <lr|claims|loss> sev … freq`.
+    Premium vectorizes like an `agg` exposure (total `pnl` only). Implementation
+    = the aggregate **affine primitive** (reflect + additive shift, grid relabel
+    at end of `update`, analytic moments; magnitude scaling stays homogeneous on
+    severity) + `value_type=payoff` (finally gives that member a job; consumed by
+    `plan-portfolio-neg-x-pricing.md`). Composes via the signed combine (1.0.0a22)
+    into a book P&L. **Includes a general fix:** signed `describe` shows **SD not
+    CV** (CV blows up as mean→0; also cleans up the a22 portfolio P&L describe).
+
+6b. **General premium/loss algebra in DecL (consider for v2.0, NOT v1.0).**
+    Beyond `pnl`: first-class constant aggregates (`agg Prem 100`), full
+    aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`, mixing units, and hence
+    per-component `pnl`), so P&L / accounting identities compose in the language.
+    Interesting and powerful, but this is an "aggregate algebra" layer — feels
+    like v2.0, not the 1.0 launch. `pnl` (6a) covers the common premium-minus-loss
+    case without it.
+
+6c. **Gross/ceded-premium reinsurance P&L (after `pnl` v1).** Extend `pnl` with
+    both premium legs: `pnl B 1000 gross prem 200 ceded prem - <agg with reins>`
+    → net premium = gross − ceded, and the agg's existing gross/ceded/net **loss**
+    views (`reins_density_df`) become parallel gross/ceded/**net P&L** views — the
+    cedent's *and* reinsurer's underwriting result from one declaration (three
+    affine transforms of the three loss legs). Ceding commission / reinstatement
+    premium are further deterministic shifts. An accounting layer on top of the
+    core `pnl`; ship v1 (6a) first. Split out of `plan-pnl-premium.md` §9.
 
 7. **Switcheroo harness case.** Add a `Port.Sample` case (hand-built or
    seeded sample) to the baseline once Portfolio sample work next surfaces,

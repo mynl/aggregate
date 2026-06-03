@@ -143,6 +143,37 @@ def test_ssev_not_clamped_vs_sev():
     assert clamped.est_m > 3.0                 # clamp at 0 lifts the mean
 
 
+def test_ssev_constant_minus_dist():
+    """``shift - dist`` (premium minus loss) reflects the severity.
+
+    The natural P&L reading: a profit is premium minus loss. ``100 - X``
+    must equal the verbose ``-1 * X + 100`` -- a reflected lognormal shifted
+    to mean ``100 - E[X]``.
+    """
+    pml = build('agg PmL 5 claims ssev 100 - lognorm 80 cv .2 poisson',
+                update=False)
+    verbose = build('agg V 5 claims ssev -1 * lognorm 80 cv .2 + 100 poisson',
+                    update=False)
+    assert pml.sevs[0].signed
+    assert pml._signed()
+    sev_mean = float(pml.stats_df.loc[('sev', 'mean'), 'mixed'])
+    sev_cv = float(pml.stats_df.loc[('sev', 'cv'), 'mixed'])
+    assert sev_mean == pytest.approx(20.0, abs=1e-6)      # 100 - 80
+    assert sev_cv == pytest.approx(0.8, abs=1e-6)         # 0.2 * 80 / 20
+    assert sev_mean == pytest.approx(
+        float(verbose.stats_df.loc[('sev', 'mean'), 'mixed']))
+    assert float(pml.agg_m) == pytest.approx(100.0, abs=1e-6)  # 5 * 20
+
+
+def test_ssev_constant_minus_scaled_dist():
+    """``shift - scale * dist`` composes the reflection with the scale."""
+    a = build('agg PmL2 5 claims ssev 100 - 2 * lognorm 30 cv .5 poisson',
+              update=False)
+    # E[X] = 100 - 2*30 = 40
+    assert float(a.stats_df.loc[('sev', 'mean'), 'mixed']) == pytest.approx(
+        40.0, abs=1e-6)
+
+
 def test_build_auto_windows_signed_dsev():
     """A signed dsev aggregate auto-windows straight from build/update."""
     a = build('agg D 5 claims dsev [-3 4] [.5 .5] poisson', update=False)

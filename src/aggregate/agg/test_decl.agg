@@ -204,3 +204,16 @@ agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                      
 agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0}
 agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window}
 agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps}
+agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                                                    note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
+
+
+# PortPnL. Portfolio combine on signed (P&L) support (1.0.0a22)
+# ============================================================
+# Independent signed units combine onto a shared signed grid: the FFT product
+# is origin-at-0 (ftagg_density is independent of each unit's x_min) and a
+# single F2 roll places the total on [x_min_tot, ...). Comparable-scale units
+# share one bs so the combine is exact (means add, variances add). A signed +
+# ordinary mix straddles 0. Pricing columns (add_exa) are deferred -> F/S only.
+# See tests/test_negative_x_port.py and dev/plan-negative-x-port.md.
+port PortPnL.Pair  agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson
+port PortPnL.Mixed agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 claims ssev 10 * norm poisson

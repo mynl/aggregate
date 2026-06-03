@@ -615,6 +615,25 @@ class UnderwritingTransformer(Transformer):
         sev1["sev_loc"] -= _check_vectorizable(numbers)
         return sev1
 
+    def sev2_rsub(self, c):
+        """``shift - X``: a constant minus a distribution (e.g. premium minus
+        loss). The natural reading of a profit/loss severity. Equivalent to
+        ``-1 * X + shift`` (so it requires ``ssev`` to keep the signed support;
+        under plain ``sev`` the sub-zero tail clamps as usual).
+
+        ``X`` (``sev1``) has value ``Lx + s*base`` with ``s = -1`` if already
+        reflected else ``+1``. Then ``shift - X = (shift - Lx) + (-s)*base``,
+        so set ``sev_loc = shift - Lx`` and toggle ``sev_reflect``. ``loc`` is
+        applied additively *after* reflection in ``Severity`` (independent of
+        the reflect sign), matching the ``sev1_scaled`` convention.
+        """
+        numbers, _minus, sev1 = c
+        shift = _check_vectorizable(numbers)
+        lx = _check_vectorizable(sev1.get("sev_loc", 0))
+        sev1["sev_loc"] = shift - lx
+        sev1["sev_reflect"] = not sev1.get("sev_reflect", False)
+        return sev1
+
     def sev2_passthrough(self, c):
         return c[0]
 

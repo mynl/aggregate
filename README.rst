@@ -28,6 +28,64 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a22
+---------
+
+Portfolio combine on signed (profit/loss) support
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Second half (``Portfolio`` scope) of the negative-x work in
+``dev/plan-negative-x-port.md`` — the *combine*. A portfolio of independent
+signed (P&L) units now aggregates correctly onto a shared signed grid, so a
+book that straddles 0 is a first-class object alongside the single-unit P&L
+landed in ``1.0.0a21``.
+
+- **Window-aware combine.** Each unit keeps its **own** optimal signed window
+  ``[x_min_k, x_max_k)``; the portfolio insists only on a shared ``bs`` /
+  ``log2`` / ``padding``. The FFT product is origin-at-0 because each unit's
+  ``ftagg_density`` is independent of that unit's ``x_min`` (the output roll
+  hits the density, never the transform), so the units multiply correctly and
+  the total is placed on ``[x_min_tot, ...)`` by a single F2 ``np.roll``. This
+  replaces the old truncating ``ift`` (which silently dropped the wrapped
+  negative tail) — ``p_total`` now conserves mass on signed support.
+- **Driven on own grids.** Units are updated on their own signed windows
+  (not a 0-based grid), so each unit object stays internally correct (no
+  spurious deficit warning, right moments / ``describe`` / ``plot``) — a strict
+  improvement in instrumentation over a shared-origin drive.
+- **Coarsen-to-fit bucket.** New signed-aware ``Portfolio._bs_window`` (a thin
+  wrapper on ``best_bucket``, recorded in a unit-indexed
+  ``Portfolio._bs_window_df``) sizes the shared grid: the summed support is
+  wider than any unit's but ``2**log2`` is capped, so ``bs`` is the *coarser*
+  of the RMS recommendation and the fit floor ``W_tot / N`` (buy the space,
+  avoid aliasing). A fine-lattice unit coarsened by the shared grid surfaces
+  its own per-unit deficit warning rather than failing silently.
+- **density_df** ``loss`` / ``p_total`` / ``p_{line}`` / ``F`` / ``S`` are
+  correct on signed support, and hence so are ``q`` / ``var`` / ``tvar`` (the
+  index-agnostic ``make_var_tvar`` needs no change). ``plot`` is signed-aware
+  (``_limits('range')`` returns a two-sided window so the negative tail is no
+  longer clipped), and ``info`` reports the realised signed window.
+- **Pricing deferred.** Pricing / allocation columns (``add_exa`` and
+  everything it writes, distortion pricing, ``value_type`` consumption) assume
+  a ``loss ≥ 0`` axis and are split out to
+  ``dev/plan-portfolio-neg-x-pricing.md``. A signed portfolio routes through
+  the ``add_exa=False`` branch (F/S only); passing ``add_exa=True`` warns and
+  falls back rather than emitting wrong numbers.
+- The non-negative path is **byte-for-byte unchanged** — every signed path is
+  gated behind ``Portfolio._signed()``. The ``build_many`` Portfolio branch no
+  longer pre-computes ``best_bucket`` (no back doors: ``update`` routes
+  ``bs=0`` through ``_bs_window`` itself, mirroring the Aggregate fix). New
+  ``tests/test_negative_x_port.py`` (14 cases); DecL mirrored in
+  ``test_decl.agg`` (section PortPnL).
+- **DecL: ``shift - dist`` severity (premium minus loss).** A constant minus a
+  distribution now parses as the natural P&L reading, e.g.
+  ``ssev 100 - lognorm 80 cv .2`` — premium ``100`` minus a lognormal loss
+  (severity mean ``20``). It is exactly ``-1 * X + 100`` (reflect the
+  distribution, then shift), composes with a scale (``100 - 2 * lognorm ...``),
+  and like all reflection needs ``ssev`` to keep the signed support (plain
+  ``sev`` clamps the sub-zero tail). One grammar rule (``numbers MINUS sev1``)
+  + transformer; the unambiguous whitespace-separated minus means no existing
+  program changes.
+
 1.0.0a21
 ---------
 

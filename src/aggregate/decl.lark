@@ -109,6 +109,7 @@ sev: sev "!"                 -> sev_unconditional
 
 sev2: sev1 PLUS numbers      -> sev2_add
     | sev1 MINUS numbers     -> sev2_sub
+    | numbers MINUS sev1     -> sev2_rsub
     | sev1                   -> sev2_passthrough
 
 sev1: numbers TIMES sev0     -> sev1_scaled

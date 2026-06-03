@@ -1,5 +1,18 @@
 # Plan: negative-support at the **Portfolio** level — combine + `density_df` (p_total / F / S)
 
+> **Status:** ✅ IMPLEMENTED (1.0.0a22, 2026-06-03). The combine half landed:
+> `Portfolio._signed()` gate, signed-aware `_bs_window` (+ unit-indexed
+> `_bs_window_df`), units driven on their own signed grids (§2c), the F2
+> full-`irfft`+roll present step for `p_total`/`p_{line}` (§2b), `ft_nots`/
+> `add_exa` skipped→warn+F/S fallback (§3.3/§4), `build_many` back door removed
+> (§3.4), two-sided `_limits` plot fix + signed-window `info` line (§3.5).
+> `tests/test_negative_x_port.py` (14 cases) + `test_decl.agg` section PortPnL;
+> 813 tests pass; non-signed path byte-identical. Pricing half remains in
+> `plan-portfolio-neg-x-pricing.md`. Residual #4 (coarse shared bs on a
+> fine-lattice unit) accepted and surfaced via the per-unit deficit warning.
+>
+> ---
+>
 > **Status:** REFRESHED (rev 1) from the landed Aggregate work
 > (`plan-negative-x-agg.md`, implemented at 1.0.0a21). Scope deliberately
 > narrowed per author: **this iteration delivers signed-support *combination* and

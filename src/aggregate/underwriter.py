@@ -651,12 +651,13 @@ class Underwriter(object):
                     log2_ = self.log2
                 else:
                     log2_ = log2
-                if bs == 0:
-                    bs_ = answer.object.best_bucket(log2_, recommend_p)
-                else:
-                    bs_ = bs
-                logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs_, log2_)
-                answer.object.update(log2=log2_, bs=bs_, remove_fuzz=True, force_severity=True,
+                # Pass bs through (0 => auto). No back doors: Portfolio.update
+                # routes bs==0 through best_bucket (non-signed) or _bs_window
+                # (signed coarsen-to-fit) itself, so do NOT pre-compute the
+                # bucket here -- mirrors the Aggregate branch above (plan 3.4).
+                logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
+                answer.object.update(log2=log2_, bs=bs, recommend_p=recommend_p,
+                                     remove_fuzz=True, force_severity=True,
                                      debug=self.debug, **kwargs)
             elif isinstance(answer.object, Distortion):
                 pass

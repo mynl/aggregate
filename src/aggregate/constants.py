@@ -9,7 +9,8 @@ from enum import Flag, auto
 __all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
            'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
-           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'REINS_BUCKET_DEFAULT', 'Validation',
+           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'REINS_BUCKET_DEFAULT',
+           'DSEV_BUCKET_DEFAULT', 'Validation',
            'DefectiveDistributionWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
@@ -61,6 +62,17 @@ RECOMMEND_P = 0.99999
 # positional bias). ``'linear'`` is the default because mass-preserving
 # rebucketing keeps the reinsurance moment drift at the FFT noise floor.
 REINS_BUCKET_DEFAULT = 'linear'
+
+# Default scheme for placing discrete-severity atoms (``dsev`` / ``dhistogram``
+# / ``fixed``) onto the model grid during discretization (see
+# ``Aggregate.discretize``). ``'linear'`` splits each off-grid atom's mass
+# across its two bracketing buckets so the discretized first moment equals
+# ``Σ xₖ pₖ`` exactly; ``'nearest'`` snaps each atom to its closest bucket (the
+# historical behaviour, ≤ bs/2 positional bias). ``'linear'`` is the default --
+# mean-preservation is the right default for an accuracy-focused library, and it
+# matches ``REINS_BUCKET_DEFAULT``. On-grid atoms (e.g. integer atoms with
+# ``bs == 1``, the common dice case) give ``f == 0`` so the two schemes coincide.
+DSEV_BUCKET_DEFAULT = 'linear'
 
 # Column / view labels for reinsurance reporting (``describe``,
 # ``reins_describe``, ``reins_stats_df``). Centralised so the wording is

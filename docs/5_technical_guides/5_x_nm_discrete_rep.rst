@@ -198,6 +198,20 @@ The pdf at :math:`kb` can be approximated as :math:`p_k / b`. This suggests anot
 
 Therefore we could rescale the vector :math:`(f(0), f(b), f(2b), \dots)` to have sum 1. This method works well for continuous distributions, but does not apply for mixed ones, e.g., when a policy limit applies.
 
+.. _num dsev bucket:
+
+Discrete (Point-Mass) Severities
+"""""""""""""""""""""""""""""""""
+
+The rounding, forward, and backward methods above all difference the severity distribution function across half-bucket windows. For a **discrete** severity (``dsev`` / ``dhistogram`` / ``fixed``) the distribution function is a step function, so a window :math:`[kb - b/2, kb + b/2)` simply collects whichever atoms fall inside it — i.e. each atom snaps to its **nearest** grid point. When the atoms lie on the grid (the common case of integer atoms with ``bs=1``, such as a die) this is exact; when they are off-grid (empirical loss samples with a non-integer ``bs``) nearest-rounding biases the discretized first moment by up to :math:`b/2` per atom.
+
+The ``dsev_bucket`` setting (a :meth:`build` / :meth:`update` keyword, mirroring the reinsurance ``reins_bucket``) selects how atoms are placed:
+
+* ``'linear'`` (the default) splits each off-grid atom's mass between its two bracketing buckets :math:`k` and :math:`k+1` with weights :math:`1-f` and :math:`f`, where :math:`f = x/b - k`. Because :math:`(1-f)\,kb + f\,(k+1)b = x`, the discretized first moment equals :math:`\sum_k x_k p_k` **exactly** (mean-preserving), and total mass is preserved. On-grid atoms give :math:`f=0`, reducing to nearest.
+* ``'nearest'`` snaps each atom to its closest bucket (the historical behaviour).
+
+This applies to *unlayered* discrete severities. A *layered* discrete severity (a limit/attachment applies) is discretized via the distribution-function difference above and so follows the ``'nearest'`` behaviour regardless of ``dsev_bucket``.
+
 Discretization Example
 """"""""""""""""""""""""
 

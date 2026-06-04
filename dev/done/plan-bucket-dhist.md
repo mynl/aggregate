@@ -1,9 +1,80 @@
 # Mean-preserving (`linear`) bucketing for discrete-histogram severities
 
-**Status:** planning / recommendation only. No `src/` changes made.
-**Date:** 2026-06-03
-**Related:** `dev/plan-discrete-severity-fz.md` (discrete-severity `fz` cleanup);
-reuses the reinsurance rebucketing machinery (`_rebucket_to_grid`, `reins_bucket`).
+**Status:** DONE (2026-06-04), shipped in 1.0.0a28. See README a28 section and
+`tests/test_dsev_bucket.py`. Implementation notes vs this plan:
+- `_rebucket_to_grid` gained **two** new params, not one: `scheme=None` (as
+  planned) **and** `origin=None`. The `origin` fix was essential and is the one
+  thing the plan's revision note got wrong: it claimed `x_min == xs_sev[0]`
+  always holds for signed `dsev`, so the existing `self.x_min` scatter origin
+  would work. That is only true on the *auto* window; a **forced** `x_min` below
+  the smallest atom (e.g. `x_min=-8` with atoms `{-2,5}`) shifts every atom. The
+  bed is indexed on `xs_sev`, so the scatter must use `origin=xs_sev[0]`.
+- Blast radius (revision note point 7): both discrete corpus cases moved, not
+  zero — `Sym.Dice` **and** `Port.Bodoff` (its `{0,99,100}` atoms are on-grid,
+  but linear's exact mass placement beats cdf-diff+normalize by ~1 ULP). Both
+  re-captured; moves are at the FP floor (`<= 1.5e-11` on moment-derived stats,
+  `<= 6e-14` on densities), within `rtol=1e-12`/`atol=1e-14` except the one
+  `Sym.Dice` skew row that nudged just over `atol`.
+
+
+**Date:** 2026-06-03; revised 2026-06-04 after the `_DiscreteRV` cleanup landed
+(1.0.0a26) and per author direction below.
+**Related:** `dev/done/plan-discrete-severity-fz.md` (the `_DiscreteRV` cleanup —
+now shipped, so the atom masses already live on `sev.fz.xk`/`sev.fz.pk`);
+reuses the reinsurance rebucketing machinery (`_rebucket_to_grid`).
+
+> ## Revision note (2026-06-04) — decisions + corrections that OVERRIDE the body
+>
+> Author decisions:
+> 1. **Name `dsev_bucket`** (not `sev_bucket`): the knob applies only to discrete
+>    point-mass severities (`dhistogram`/`fixed`); continuous severities are
+>    already exact via the cdf-difference. Sibling of `reins_bucket`.
+> 2. **Default `'linear'`** (NOT `'nearest'`). Rationale: mean-preservation is the
+>    correct default for an accuracy-focused library, and it matches the existing
+>    `reins_bucket` default (`'linear'`). The `nearest`-default "zero blast radius"
+>    argument in §4/§7 is therefore **rejected**; see the blast-radius revision
+>    below.
+>
+> Corrections to the body (the plan was drafted before `_DiscreteRV` and has two
+> bugs):
+> 3. **§3a is obsolete.** `_DiscreteRV` already stores sorted `xk`/`pk`; read
+>    `sev.fz.xk` / `sev.fz.pk` directly. No new `support_ps` attribute needed.
+> 4. **§3b guard is WRONG.** `sev.detachment == np.inf` is *never* true for a
+>    discrete severity (`_build` truncates `limit = min(limit, max(xs))`, so
+>    `detachment = max(xs)`, finite). The correct "truly unlayered" test is
+>    **`sev.exp_attachment is None`** (verified: unlayered `dsev` has
+>    `exp_attachment is None`, `attachment == 0`, `detachment == max(xs)`). Same
+>    trap that bit the moments path in the `_DiscreteRV` work.
+> 5. **`_rebucket_to_grid` needs a `scheme` parameter.** It currently hard-reads
+>    `self.reins_bucket`. Generalise to `_rebucket_to_grid(values, mass,
+>    scheme=None)` (default `self.reins_bucket`, so the two reinsurance call
+>    sites are unchanged); the `dsev` call passes `scheme=self.dsev_bucket`.
+> 6. **§6 signed-grid concern is RESOLVED, not deferred.** Verified
+>    `x_min == xs_sev[0] == xs[0]` for `dsev [-2 5]`, so the existing scatter onto
+>    `self.xs` already places signed atoms correctly. This *must* work in Phase 1
+>    anyway, because `linear`-default means `dsev [-2 5]` (already in the suite)
+>    hits the scatter on day one. On-grid signed atoms give `f==0` ⇒ linear ==
+>    nearest, so it is exact.
+> 7. **Blast radius is NOT zero (and that's fine).** With `linear` default,
+>    on-grid integer-atom / `bs==1` cases (dice, `dsev [-2 5]`, the PIR discrete
+>    ports) are byte-for-byte unchanged (`f==0`). Only genuinely *off-grid*
+>    discrete cases move — and they move *toward* correctness (mean-preserving),
+>    so any baseline/golden that shifts is **re-captured** as the new truth
+>    (exactly as we did for the `_DiscreteRV` moments). First step of execution:
+>    run the suite and see which, if any, baselines move; expectation is none,
+>    since the corpus `dsev` are all on-grid.
+> 8. **Layered discrete stays on the cdf-diff path in Phase 1** (per §5), but
+>    note `linear`-default makes the unlayered-vs-layered asymmetry *visible*:
+>    document that `dsev_bucket` linear applies to unlayered discrete atoms; a
+>    layered discrete severity discretises via the standard cdf-difference. The
+>    layer value-map needed for Phase 2 is now trivial — it's the same
+>    `clip(atoms-a, 0, limit)` map `_DiscreteRV.layer_moments` already uses.
+> 9. **Close-out:** bump `pyproject.toml` to 1.0.0a28; README bullet; surface
+>    `dsev_bucket` in `info()`/`describe` beside `reins_bucket`/`sev_calc`;
+>    regenerate `ref_include.rst` only if the grammar changes (it does **not** —
+>    `dsev_bucket` is a build/update kwarg, not DecL syntax) so no grammar regen;
+>    keep the `.rst` severity/discretization docs in lockstep; move this file to
+>    `dev/done/` when green.
 
 ## 1. The problem
 
@@ -81,16 +152,21 @@ when the active scheme is `linear`, build that component's bucketed density by
 scattering its atoms instead of differencing the step CDF:
 
 ```python
+# CORRECTED per revision note (4) & (5): use exp_attachment is None for
+# "unlayered", read masses off the _DiscreteRV, and pass the dsev scheme.
 for sev in self.sevs:
-    if (scheme == 'linear'
+    if (self.dsev_bucket == 'linear'
             and sev.sev_kind in ('dhistogram', 'fixed')
-            and sev.attachment == 0 and sev.detachment == np.inf):
-        appx = self._rebucket_to_grid(sev.support_atoms, sev.support_ps)
-        # (already on the grid; honours x_min for signed atoms)
+            and sev.exp_attachment is None):          # truly unlayered
+        appx = self._rebucket_to_grid(sev.fz.xk, sev.fz.pk,
+                                      scheme=self.dsev_bucket)
     else:
-        appx = -np.diff(sev.fz.sf(adj_xs))   # current path == 'nearest'
+        appx = -np.diff(sev.fz.sf(adj_xs))   # current path; == 'nearest' for atoms
     ...
 ```
+> ⚠️ The original guard `sev.detachment == np.inf` is **dead** — discrete
+> severities always have a finite `detachment` (= `max(xs)`). Use
+> `sev.exp_attachment is None`.
 
 Everything downstream (`normalize`, mixture weighting, the FFT) is unchanged —
 `_rebucket_to_grid` returns a length-`n` probability vector exactly like the

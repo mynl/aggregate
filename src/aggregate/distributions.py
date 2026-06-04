@@ -23,6 +23,7 @@ from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
+                        DSEV_BUCKET_DEFAULT,
                         FIG_H, FIG_W, RECOMMEND_P, REINS_BUCKET_DEFAULT,
                         REINS_LABEL_GROSS, REINS_LABEL_SUBJECT, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
@@ -1866,6 +1867,45 @@ class Aggregate:
             self._reins_view_stats_cache = None
             self._reins_describe = None
 
+    @property
+    def dsev_bucket(self) -> str:
+        """Scheme for placing discrete-severity atoms onto the model grid.
+
+        Applies to ``dsev`` / ``dhistogram`` / ``fixed`` (point-mass)
+        severities; continuous severities are already exact via the
+        cdf-difference and ignore this. Sibling of :attr:`reins_bucket`.
+
+        ``'linear'`` (default) splits each off-grid atom's mass across its two
+        bracketing grid buckets ``k``, ``k+1`` with weights ``1-f``, ``f``
+        (``f = x/bs - k``), so the discretized first moment equals
+        ``Σ xₖ pₖ`` **exactly**; ``'nearest'`` snaps each atom to its closest
+        bucket (the historical behaviour, with up to ``bs/2`` positional bias).
+        On-grid atoms (``f == 0``, e.g. integer atoms with ``bs == 1``) give
+        identical results under both schemes.
+
+        Discretization happens in :meth:`update`, so a change after ``build``
+        requires a re-``update()`` to take effect. The setter clears the cached
+        density frames so they rebuild on next access.
+
+        Notes
+        -----
+        Phase 1 covers **unlayered** discrete severities (the empirical-sample
+        use case). A *layered* discrete severity (``a xs b dsev ...``)
+        discretizes via the standard cdf-difference and so behaves as
+        ``'nearest'`` regardless of this setting.
+        """
+        return self._dsev_bucket
+
+    @dsev_bucket.setter
+    def dsev_bucket(self, value: str) -> None:
+        if value not in ('linear', 'nearest'):
+            raise ValueError(
+                f"dsev_bucket must be 'linear' or 'nearest', not {value!r}")
+        if value != getattr(self, '_dsev_bucket', None):
+            self._dsev_bucket = value
+            self._density_df = None
+            self._sev_density_df = None
+
     def _severity_in_window(self):
         """Whether the severity support overlaps the output window ``[x_min, x_max]``.
 
@@ -2925,7 +2965,7 @@ class Aggregate:
                  occ_reins=None, occ_kind='',
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
-                 reins_bucket=None,
+                 reins_bucket=None, dsev_bucket=None,
                  agg_premium=None, agg_reflect=False, agg_shift=0.0, value_type='loss',
                  note='', hints=''):
         """
@@ -3130,6 +3170,12 @@ class Aggregate:
         if self._reins_bucket not in ('linear', 'nearest'):
             raise ValueError(
                 f"reins_bucket must be 'linear' or 'nearest', not {self._reins_bucket!r}")
+        # rebucketing scheme for discrete-severity atoms (dsev/dhistogram/fixed);
+        # set the backing field directly (no caches to clear at construction)
+        self._dsev_bucket = dsev_bucket if dsev_bucket is not None else DSEV_BUCKET_DEFAULT
+        if self._dsev_bucket not in ('linear', 'nearest'):
+            raise ValueError(
+                f"dsev_bucket must be 'linear' or 'nearest', not {self._dsev_bucket!r}")
 
         # ``stats_df`` is pre-created inside each broadcasting arm below once
         # ``n_components`` is known; see ``_init_stats_df``.
@@ -3559,6 +3605,10 @@ class Aggregate:
             s.append(f'log2                     {self.log2}')
             s.append(f'padding                  {self.padding}')
             s.append(f'sev_calc                 {self.sev_calc}')
+            # dsev_bucket governs discrete-atom placement; only meaningful (and
+            # only shown) when a point-mass severity component is present.
+            if any(sv.sev_kind in ('dhistogram', 'fixed') for sv in self.sevs):
+                s.append(f'dsev_bucket              {self.dsev_bucket}')
             s.append(f'normalize                {self.normalize}')
             s.append(f'value_type               {self.value_type}')
             # Signed-support / output-window line: shown only when the grid is
@@ -3853,20 +3903,42 @@ class Aggregate:
         # bed = bucketed empirical distribution. A signed Severity carries
         # identity layering, so its own cdf/sf are already un-clamped; an
         # unsigned component keeps the clamp-at-0 layering. So per-component
-        # ``fz.cdf`` / ``fz.sf`` are correct on the signed grid with no special
+        # ``sev.cdf`` / ``sev.sf`` are correct on the signed grid with no special
         # casing (an unsigned component simply contributes 0 to negative
         # buckets). Occurrence reinsurance on a signed severity is out of scope
         # (plan §6).
         beds = []
-        for fz in self.sevs:
-            if discretization_calc == 'both':
+        for sev in self.sevs:
+            if (self.dsev_bucket == 'linear'
+                    and sev.sev_kind in ('dhistogram', 'fixed')
+                    and sev.exp_attachment is None):
+                # Unlayered discrete severity: place the atoms on the grid with
+                # the mean-preserving linear scatter, so the discretized first
+                # moment equals Σ xₖ pₖ exactly. The default cdf-difference path
+                # (below) snaps each atom to its nearest bucket (== 'nearest'),
+                # biasing the mean by up to bs/2 per atom when atoms are off-grid
+                # (empirical samples, non-integer bs). On-grid atoms give f == 0
+                # so this reduces to nearest -- the dice / integer-bs case is
+                # unchanged. ``sev.fz`` is the _DiscreteRV holding the validated,
+                # sorted atoms (xk) and masses (pk). ``exp_attachment is None``
+                # is the truly-unlayered test (a discrete sev always has a finite
+                # ``detachment`` = max atom, so a ``== np.inf`` test never fires).
+                # Layered discrete severities fall through to the cdf-diff path
+                # (Phase 1; see dsev_bucket). The bed is indexed on ``xs_sev``,
+                # so the scatter origin is the severity grid origin ``xs_sev[0]``
+                # (== -i0·bs), NOT the output-window origin ``x_min`` -- the two
+                # differ when the output window is forced wider than the atom
+                # support (e.g. an explicit ``x_min`` below the smallest atom).
+                appx = self._rebucket_to_grid(sev.fz.xk, sev.fz.pk,
+                                              scheme='linear', origin=xs_sev[0])
+            elif discretization_calc == 'both':
                 # see comments: we rescale each severity...
-                appx = np.maximum(np.diff(fz.cdf(adj_xs)), -np.diff(fz.sf(adj_xs)))
+                appx = np.maximum(np.diff(sev.cdf(adj_xs)), -np.diff(sev.sf(adj_xs)))
             elif discretization_calc == 'survival':
-                appx = -np.diff(fz.sf(adj_xs))
+                appx = -np.diff(sev.sf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             elif discretization_calc == 'distribution':
-                appx = np.diff(fz.cdf(adj_xs))
+                appx = np.diff(sev.cdf(adj_xs))
                 # beds.append(appx / np.sum(appx))
             else:
                 raise ValueError(
@@ -3959,7 +4031,7 @@ class Aggregate:
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False,
-                    reins_bucket=None, debug=False, x_min=0, x_max=None):
+                    reins_bucket=None, dsev_bucket=None, debug=False, x_min=0, x_max=None):
         """
         Compute a discrete approximation to the aggregate density via FFT.
 
@@ -3993,6 +4065,9 @@ class Aggregate:
         :param force_severity: make severities for plotting even when only the aggregate is requested
         :param reins_bucket: optional override of the net/ceded rebucketing scheme
                ('linear' or 'nearest'); defaults to the current ``self.reins_bucket``.
+        :param dsev_bucket: optional override of the discrete-severity atom
+               placement scheme ('linear' or 'nearest'); defaults to the current
+               ``self.dsev_bucket``. See :attr:`dsev_bucket`.
         :param debug: run reinsurance in debug model if True.
         :param x_min: ``None`` requests an automatic two-sided output window
           (NYI in this stage -- treated as the grid origin ``xs[0]``);
@@ -4016,6 +4091,9 @@ class Aggregate:
         if reins_bucket is not None:
             # validating setter; takes effect for the reins applied below
             self.reins_bucket = reins_bucket
+        if dsev_bucket is not None:
+            # validating setter; takes effect for the discretization below
+            self.dsev_bucket = dsev_bucket
         self.xs = xs
         # bs is the grid step; xs[1]-xs[0] (not xs[1]) so a signed/offset grid
         # whose origin xs[0] != 0 still reports the correct bucket size.
@@ -4758,20 +4836,34 @@ class Aggregate:
     # Reinsurance application: occ pre-FFT, agg post-FFT
     # ================================================================
 
-    def _rebucket_to_grid(self, values, mass):
+    def _rebucket_to_grid(self, values, mass, scheme=None, origin=None):
         """Scatter off-grid ``mass`` at target ``values`` onto the model grid.
 
         The model grid is ``self.xs == bs * arange`` with ``xs[0] == 0``, so
         the (fractional) grid index of a value ``v`` is ``v / bs``. Used to
         place reinsurance net/ceded values back on the grid after the cession
-        map moves them off it.
+        map moves them off it, and to place discrete-severity atoms on the grid
+        during discretization (see :meth:`discretize`).
 
         Parameters
         ----------
         values : ndarray
-            Target loss values (net or ceded), one per subject grid point.
+            Target loss values (net/ceded points, or severity atoms).
         mass : ndarray
-            Subject probability mass to redistribute, aligned with ``values``.
+            Probability mass to redistribute, aligned with ``values``.
+        scheme : {'linear', 'nearest'}, optional
+            Placement scheme. Defaults to :attr:`reins_bucket` (so the
+            reinsurance call sites are unchanged); the discrete-severity call
+            site passes :attr:`dsev_bucket`.
+        origin : float, optional
+            Physical value at output index 0 -- the grid origin used to map a
+            value to its (fractional) bucket index ``(v - origin) / bs``.
+            Defaults to :attr:`x_min` (the output-window origin), correct for
+            the reinsurance call sites. The discrete-severity call site passes
+            the *severity* grid origin ``xs_sev[0] == -i0·bs``, which differs
+            from ``x_min`` when the output window is forced wider than the
+            severity support (e.g. an explicit ``x_min`` below the smallest
+            atom).
 
         Returns
         -------
@@ -4780,7 +4872,7 @@ class Aggregate:
 
         Notes
         -----
-        Two schemes, selected by :attr:`reins_bucket`:
+        Two schemes:
 
         - ``'nearest'`` rounds each value to its closest bucket. Full mass
           lands in one bucket, with up to ``bs/2`` positional bias.
@@ -4797,13 +4889,15 @@ class Aggregate:
         """
         bs = self.bs
         n = len(self.xs)
-        # Grid index of a value v is (v - x_min) / bs; x_min == 0 on the
-        # default grid recovers the original v / bs. (Occurrence reinsurance on
-        # a signed *severity* grid is out of scope for this stage; the output
-        # grid origin is used here.)
-        scaled = (np.asarray(values, dtype=float) - self.x_min) / bs
+        if origin is None:
+            origin = self.x_min
+        # Grid index of a value v is (v - origin) / bs; origin == 0 on the
+        # default grid recovers the original v / bs.
+        scaled = (np.asarray(values, dtype=float) - origin) / bs
         out = np.zeros(n)
-        if self.reins_bucket == 'nearest':
+        if scheme is None:
+            scheme = self.reins_bucket
+        if scheme == 'nearest':
             idx = np.clip(np.round(scaled).astype(int), 0, n - 1)
             np.add.at(out, idx, mass)
         else:  # 'linear' -- mass split preserves E[X] exactly

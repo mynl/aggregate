@@ -293,3 +293,9 @@ agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}
 # numerical isf-integration. See tests/test_discrete_severity.py.
 agg DISC.Dice  dfreq [1] dsev [1:6]
 agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed
+# Off-grid atoms: with a non-integer bs these miss the grid, so the
+# `dsev_bucket` placement scheme matters. `dsev_bucket='linear'` (default,
+# a build/update kwarg -- not DecL syntax) splits each atom's mass across its
+# two bracketing buckets to preserve the mean exactly; `'nearest'` snaps and
+# biases by <= bs/2. See tests/test_dsev_bucket.py.
+agg DISC.OffGrid dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]

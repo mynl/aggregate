@@ -28,6 +28,37 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a28
+---------
+
+Mean-preserving (``linear``) bucketing for discrete severities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new ``dsev_bucket`` setting controls how discrete-severity atoms (``dsev`` /
+``dhistogram`` / ``fixed``) are placed onto the model grid during
+discretization, mirroring the existing reinsurance ``reins_bucket``:
+
+- ``'linear'`` (the **default**) splits each off-grid atom's mass across its two
+  bracketing buckets, so the discretized first moment equals ``Σ xₖ pₖ``
+  exactly (mean-preserving);
+- ``'nearest'`` snaps each atom to its closest bucket (the historical
+  behaviour), biasing the discretized mean by up to ``bs/2`` per atom.
+
+This matters when atoms are off-grid — e.g. a severity given as a sample of
+empirical losses with a non-integer ``bs``. The common integer-atom, ``bs = 1``
+case (a die, fixed losses) is on-grid, where the two schemes coincide, so it is
+unchanged. Pass it as a ``build`` / ``update`` keyword::
+
+    a = build('agg Off dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]', bs=0.5)
+    # a.dsev_bucket == 'linear'; discretized mean == 0.3*.5 + 1.7*.3 + 2.4*.2
+
+Scope: Phase 1 covers *unlayered* discrete severities (the empirical-sample use
+case). A *layered* discrete severity discretizes via the cdf-difference and so
+behaves as ``'nearest'`` regardless of the setting. ``info`` shows
+``dsev_bucket`` when a discrete component is present. The two discrete cases in
+the baseline corpus (``Sym.Dice``, ``Port.Bodoff``) shift at the floating-point
+floor toward exact mass placement and were re-captured.
+
 1.0.0a27
 ---------
 

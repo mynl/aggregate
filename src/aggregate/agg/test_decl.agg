@@ -299,3 +299,20 @@ agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed
 # two bracketing buckets to preserve the mean exactly; `'nearest'` snaps and
 # biases by <= bs/2. See tests/test_dsev_bucket.py.
 agg DISC.OffGrid dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]
+
+# ============================================================
+# TAIL. Ordered tail-thickness classification (1.0.0a29)
+# ============================================================
+# Deterministic family lookup gives each aggregate an ordered tail rung
+# (bounded < super-exponential < exponential < subexponential < power-law) and
+# a log-concave flag, surfaced via `.tail_class`, `.tail_description`,
+# `.tail_explanation`, and `.info`. `.bounded` is now derived (bounded iff the
+# aggregate tail class is BOUNDED). The aggregate rung is `max(freq, sev)`.
+# See tests/test_tail.py and src/aggregate/tail.py (Phase 1; numeric estimator
+# for histogram/meta/spliced families is deferred to Phase 2).
+agg TAIL.Subexp   100 claims sev lognorm 100 cv 2 poisson
+agg TAIL.Expon    100 claims sev gamma 100 cv 0.5 poisson
+agg TAIL.PowerLaw 100 claims sev 100 * pareto 3 poisson
+agg TAIL.FreqDriven 100 claims sev 100 * uniform poisson
+agg TAIL.Bounded  dfreq [2] dsev [1 2 3]
+agg TAIL.Mixed    10 claims sev [100 200] * [lognorm pareto] [2 3] wts [.5 .5] poisson

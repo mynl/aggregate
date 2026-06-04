@@ -33,6 +33,8 @@ __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingBoundsResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
+from . import tail as _tail
+from .tail import TailClass
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
@@ -854,24 +856,86 @@ class Portfolio(object):
         return self.agg_list[item]
 
     @property
+    def tail_class(self) -> TailClass:
+        """The portfolio's worst-of aggregate :class:`~aggregate.tail.TailClass`.
+
+        Under independence the tail of a sum is governed by the thickest
+        summand (subexponential closure; and for the lighter rungs the
+        convolution decay rate equals the slowest = thickest), so this is the
+        ``max`` over the unit aggregate rungs. ``UNKNOWN`` on any unit poisons
+        the result (it is not treated as a thickness). A ``_certified_bounded``
+        override forces :attr:`~aggregate.tail.TailClass.BOUNDED`.
+        """
+        if getattr(self, '_certified_bounded', False):
+            return TailClass.BOUNDED
+        worst = TailClass.BOUNDED
+        for a in self.agg_list:
+            c = a.tail_class.agg
+            if c == TailClass.UNKNOWN:
+                return TailClass.UNKNOWN
+            worst = max(worst, c)
+        return worst
+
+    @property
     def bounded(self) -> bool:
         """Whether every unit's aggregate has bounded support.
 
-        Combines per-unit :attr:`Aggregate.bounded` under independence:
-        the portfolio is bounded iff each unit is. Set
-        ``self.bounded = True`` to certify the portfolio bounded (e.g.
-        when a unit's auto-detection is conservatively ``False`` but the
-        modeller knows the support is capped).
+        Derived view: ``True`` iff :attr:`tail_class` is
+        :attr:`~aggregate.tail.TailClass.BOUNDED`, i.e. each unit is bounded
+        (correct under independence). Set ``self.bounded = True`` to certify the
+        portfolio bounded (e.g. when a unit's auto-detection is conservatively
+        ``False`` but the modeller knows the support is capped).
         """
-        if getattr(self, '_certified_bounded', False):
-            return True
-        return all(a.bounded for a in self.agg_list)
+        return self.tail_class == TailClass.BOUNDED
 
     @bounded.setter
     def bounded(self, value: bool) -> None:
         if value is not True and value is not False:
             raise ValueError('bounded must be True (certify) or False (reset)')
         self._certified_bounded = bool(value)
+
+    def _tail_driver(self):
+        """Return ``(worst_class, [driver unit name(s)])`` for the portfolio tail.
+
+        The driver unit(s) are those whose aggregate rung equals the worst-of
+        rung. Returns an empty driver list when the worst class is UNKNOWN or
+        the portfolio is certified bounded.
+        """
+        worst = self.tail_class
+        if worst in (TailClass.UNKNOWN,) or getattr(self, '_certified_bounded', False):
+            return worst, []
+        drivers = [a.name for a in self.agg_list if a.tail_class.agg == worst]
+        return worst, drivers
+
+    @property
+    def tail_description(self) -> str:
+        """One aligned line: the portfolio's worst-of aggregate tail class.
+
+        E.g. ``aggregate tail           subexponential (driver: B)``. Derived
+        from :attr:`tail_class`.
+        """
+        worst, drivers = self._tail_driver()
+        phrase = _tail.tail_class_label(worst)
+        if drivers:
+            phrase += f' (driver: {", ".join(drivers)})'
+        return f'{"aggregate tail":<25}{phrase}'
+
+    @property
+    def tail_explanation(self) -> str:
+        """Sentence: per-unit aggregate tail classes and the named driver unit(s).
+
+        Derived from each unit's :attr:`Aggregate.tail_class`.
+        """
+        worst, drivers = self._tail_driver()
+        parts = [f'{a.name}: {_tail.tail_class_label(a.tail_class.agg)}'
+                 for a in self.agg_list]
+        units = '; '.join(parts)
+        if worst == TailClass.UNKNOWN:
+            return (f'Portfolio aggregate tail undetermined (a unit is an '
+                    f'unrecognised or numeric-only family). Units -- {units}.')
+        driver_txt = (f', driven by {", ".join(drivers)}' if drivers else '')
+        return (f'Portfolio aggregate tail is {_tail.tail_class_label(worst)} '
+                f'(worst-of under independence{driver_txt}). Units -- {units}.')
 
     @property
     def allocation_method(self) -> str:
@@ -901,6 +965,7 @@ class Portfolio(object):
         s.append(f'aggregate objects        {len(self.line_names):d}')
         s.append(f'allocation_method        {self.allocation_method}')
         s.append(f'bounded                  {self.bounded}')
+        s.append(self.tail_description)
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
             s.append(f'bs                       {bss}')

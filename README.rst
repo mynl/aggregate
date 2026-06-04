@@ -28,6 +28,43 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a29
+---------
+
+Tail-thickness classification for aggregates and portfolios
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every ``Aggregate`` and ``Portfolio`` now reports an ordered tail-thickness
+class on a five-rung scale — ``bounded`` < ``super-exponential`` <
+``exponential`` < ``subexponential`` < ``power-law`` — plus a separate
+log-concavity flag. The class is derived by deterministic family lookup keyed on
+the frequency and (scipy) severity families, with the aggregate rung given by
+the heavier of frequency and severity (``max``): for a subexponential-or-heavier
+severity the single-big-jump principle makes the aggregate inherit the severity
+class; for light severity the heavier decay rate wins. New surface:
+
+- ``Aggregate.tail_class`` → a ``(freq, sev, agg)`` named triple of
+  ``TailClass`` rungs; ``Severity.tail_class`` → the component rung;
+- ``Aggregate.tail_description`` (three aligned lines) and
+  ``tail_explanation`` (one sentence, with the power-law tail index ``alpha``
+  and infinite-variance / infinite-mean flags) — both also shown in ``info``;
+- ``Portfolio.tail_class`` / ``tail_description`` / ``tail_explanation`` report
+  the **worst-of** unit aggregate (correct under independence) and name the
+  driving unit(s).
+
+``bounded`` is now a **derived** view of the classifier (``bounded`` iff the
+aggregate tail class is ``BOUNDED``) on ``Aggregate``, ``Severity``, and
+``Portfolio``; the certify setter (``obj.bounded = True``) and the lifted
+natural-allocation admissibility guard are unchanged. The bounded-support tables
+moved to the new leaf module ``aggregate.tail`` (re-exported from
+``distributions`` for back-compat). ``tail.py`` is the single source of truth.
+
+Scope: this is Phase 1 — exact, deterministic, spec-only (``bounded`` resolves
+before ``update()``). Unrecognised or numeric-only families (histogram, meta,
+spliced) classify as ``undetermined``; the numeric density-tail estimator that
+will fill those in (and set the aggregate's log-concavity) is deferred to a
+later Phase 2.
+
 1.0.0a28
 ---------
 

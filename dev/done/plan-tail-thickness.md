@@ -1,7 +1,139 @@
 # tail-thickness — ordered tail classification for Aggregate & Portfolio
 
+> **STATUS: Phase 1 DONE (2026-06-04), shipped in 1.0.0a29.** New leaf module
+> `src/aggregate/tail.py` (TailClass IntEnum with sentinel UNKNOWN, TailInfo /
+> TailClasses structs, `classify_frequency` / `classify_severity` / `combine` /
+> `aggregate_tail_info`, text builders, and the moved `_BOUNDED_*` tables).
+> `Aggregate` / `Severity` / `Portfolio` `.bounded` rewritten as derived views;
+> `.tail_class` / `.tail_description` / `.tail_explanation` added; `.info`
+> integration on both. Tests in `tests/test_tail.py` (46, all green; full suite
+> 993 green). DecL examples appended to `test_decl.agg` TAIL section.
+>
+> **Open-decision C resolved:** option 1 — `UNKNOWN` is a sentinel off the order
+> that poisons `combine`; `bounded` is decided structurally so it is unaffected.
+>
+> **Phase 2 (deferred, NOT built):** `estimate_tail_from_density` (mean-excess
+> slope, log-log-S alpha, discrete log-concavity) for histogram / meta / spliced
+> / unknown families and the aggregate `log_concave` (currently `None`). Heavy
+> mixed-Poisson refinement (PIG / Sichel / Neyman-A) and `invgauss` are the
+> watch items. Everything below the rule is the original plan, kept for Phase 2.
+
 New feature; bumps the `a*` version. Standalone (no dependency on the reins
 plans).
+
+> ## Critical review & revisions (2026-06-04) — read FIRST; OVERRIDES the body
+>
+> Reviewed against the current tree. The math base is sound; the corrections
+> below are about phasing, integration safety, and stale references. Headline
+> recommendation: **ship a deterministic family-lookup base (Phase 1) and defer
+> the numeric density estimator (Phase 2)** — that is where the author expects
+> iteration, and it must not block a testable, exact-by-construction core.
+>
+> ### A. Stale line numbers (all refs in the body are pre-refactor; corrected)
+> - `Aggregate.bounded` → **`distributions.py:1815`** (not 1680).
+> - `Severity.bounded` → **`distributions.py:7358`** (not 5342).
+> - `_BOUNDED_FREQS` → **`:1718`**, `_BOUNDED_SCIPY_SEVS` → **`:1722`** (not 1583).
+> - `Aggregate.info` → **`distributions.py:3592`** (not 2622).
+> - `Portfolio.bounded` → **`portfolio.py:857`**; `_certified_bounded` init at
+>   **`portfolio.py:311`**.
+> - lifted-NA guard → **`portfolio.py:3046`** (not 2636); message at `:3054`.
+> - `Portfolio.info` → **`portfolio.py:898`** (not 891), and it already prints a
+>   `bounded` line at **`:903`** — the new tail line slots in beside it.
+>
+> ### B. PHASE THE WORK (main punch-up)
+> **Phase 1 — deterministic core (this iteration, the "solid base"):**
+> exact family-lookup classifiers (`classify_frequency`, `classify_severity`),
+> the `combine` max-rule, the `TailClass` enum + `log_concave` from the tables,
+> derived `bounded`, the `TailInfo` struct, `tail_description` /
+> `tail_explanation` / `.info` integration, Portfolio worst-of, and the full
+> equivalence test-suite. **No density required** (see invariant D).
+> **Phase 2 — numeric estimator (next iteration):** `estimate_tail_from_density`
+> (mean-excess slope, log-log-S α, discrete log-concavity) for histogram / meta
+> / spliced / unknown families and the aggregate's `log_concave`. This is the
+> tail-region-sensitive, iterate-against-real-data part; keeping it out of
+> Phase 1 lets the base be exact and regression-testable.
+>
+> In Phase 1, families not in the tables resolve to **`TailClass.UNKNOWN`** (see
+> C), `log_concave=None`, and the text reads "undetermined (numeric estimate
+> pending)". Phase 2 fills these in without changing the Phase-1 surface.
+>
+> ### C. OPEN DECISION for the author — how should UNKNOWN sort?
+> A 5-rung `IntEnum` used with `max()` cannot cleanly absorb "don't know yet".
+> Three options; I recommend **(1)**:
+> 1. **Add a sentinel `UNKNOWN` that is NOT on the order and poisons `combine`**
+>    (any `max` involving UNKNOWN → UNKNOWN; the rung is reported as
+>    "undetermined"). Honest: never fabricate a thickness we have not
+>    established. `bounded` is unaffected (it is decided structurally, invariant
+>    D), so the lifted-NA guard keeps working even when the rung is UNKNOWN.
+> 2. Default unknown families to a **conservative `SUBEXPONENTIAL`** with a
+>    "provisional" note. Risk: silently labels an unknown as moderately heavy.
+> 3. Phase 1 simply **omits** the rung for unknown families (property returns
+>    `None`); no sentinel. Cleanest type-wise but makes `combine`/worst-of
+>    special-case `None`.
+> Pick one before coding; it shapes the enum and `combine`.
+>
+> ### D. INVARIANT — `bounded` must stay spec-only (no density)
+> Today `bounded` is a pure-spec property, resolvable **before** `update()`, and
+> the lifted-NA guard (`portfolio.py:3046`) relies on that. The derivation
+> `bounded ⇔ tail_class.agg == BOUNDED` is fine **only if** the BOUNDED
+> determination never touches the numeric fallback. It does not: rung 0 is set
+> by the structural test (finite family / atom / finite `limit` / finite
+> `sev_ub` / `_certified_bounded`), which runs *before* family lookup and long
+> before any density estimate. Make this an explicit invariant and **test that
+> `a.bounded` and `port.bounded` are correct on an un-`update()`-d object.**
+> Corollary: `classify_*` must order checks certified → structural-bounded →
+> family-lookup → (Phase 2) numeric, and return at the first hit.
+>
+> ### E. Multi-component severity (gap in the body)
+> `self.sevs` is a list (mixed/broadcast severities). `classify_severity` takes
+> ONE `Severity`; `Aggregate.tail_class.sev` must be the **max (thickest) over
+> components**, with `log_concave = all(component lc)`. This is consistent with
+> today's `bounded = all(s.bounded ...)`: `max rung == 0 ⇔ every component
+> bounded`. Spell this out; add a mixed-severity test (e.g. lognorm + pareto
+> components → POWER_LAW).
+>
+> ### F. `tail_class` return type — define one struct
+> Have a single internal `_tail_info()` build a small frozen dataclass/namedtuple
+> `TailInfo(freq, sev, agg: TailClass; freq_lc, sev_lc, agg_lc: bool|None;
+> alpha: float|None; flags: dict)`. Then `tail_class` → `(freq, sev, agg)` view,
+> `bounded` → `agg == BOUNDED`, and `tail_description`/`tail_explanation` are
+> formatters over the same struct (no recompute, no drift).
+>
+> ### G. scipy parameter-mapping risk (test per family)
+> The param-aware rules read `sev_a`/`sev_b`, but the scipy→`sev_a` mapping is
+> family-specific and a classic bug source: `gamma` shape, `weibull_min` `c`,
+> `lognorm` σ, `beta` (a,b) all land in `sev_a`/`sev_b`, but the **power-law α**
+> lives in different shape slots (`pareto`/`lomax` `b`, `genpareto` `c`=ξ,
+> `burr` `c`,`d`, `t` `df`). Build a small per-family α-extraction table and
+> **unit-test α against scipy** for each power-law family rather than assuming a
+> uniform slot. `sev_name` can be a non-str (meta/copy wrap an object) — guard
+> `isinstance(sev_name, str)` before any dict lookup, matching `Severity.bounded`.
+>
+> ### H. Module boundary / imports
+> `tail.py` must stay a **leaf**: classifiers take objects and read attributes
+> (`freq_name`, `sev_name`, `sev_a`, `limit`, `sev_ub`, `_certified_bounded`,
+> `sev_density`, `agg_density`) **duck-typed** — no import of `distributions` /
+> `portfolio`, so `distributions` can import `tail` without a cycle. Moving the
+> two `_BOUNDED_*` frozensets is safe: **no test references them** and no other
+> module imports them today; still, re-export them from `distributions` (`from
+> .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS`) so any external `:1718`-era
+> import keeps working.
+>
+> ### I. Math nits (small, fix in the tables)
+> - `weibull_min` with **c == 1 is the exponential** → also `log_concave=True`
+>   (the body marks lc only for c>1). Boundary, but be consistent.
+> - `invgauss → EXPONENTIAL` is defensible (semi-heavy, `e^{-cx}x^{-3/2}`) but
+>   borderline; tag it a Phase-2 numeric-refinement watch item alongside the
+>   mixed-Poisson families.
+> - The `max` combine rule is a sound engineering approximation under the
+>   analytic-pgf caveat already stated; keep that caveat in `tail_explanation`
+>   wording for the heavy-mixing cases.
+>
+> ### J. Compaction
+> Recommend **compacting before implementing Phase 1.** This thread now carries
+> the full `dsev_bucket` build plus a floating-point digression; none of it is
+> needed for tail-thickness, and Phase 1 is a clean, self-contained build the
+> revised plan fully specifies.
 
 ## Context
 

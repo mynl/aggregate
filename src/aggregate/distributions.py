@@ -47,6 +47,9 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation)
 import aggregate.random_agg as ar
 from .spectral import Distortion
+from . import tail as _tail
+# Re-export the bounded tables for back-compat; tail.py is the source of truth.
+from .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS, TailClass
 
 logger = logging.getLogger(__name__)
 
@@ -1714,16 +1717,8 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-# Frequencies with bounded support — used by ``Aggregate.bounded``.
-_BOUNDED_FREQS = frozenset({'fixed', 'bernoulli', 'binomial', 'empirical'})
-
-# scipy.stats families with bounded support — used by ``Severity.bounded``.
-# Conservative: only the standard finite-support members.
-_BOUNDED_SCIPY_SEVS = frozenset({
-    'beta', 'uniform', 'arcsine', 'rdist', 'triang', 'trapezoid',
-    'semicircular', 'truncnorm', 'truncexpon', 'truncpareto',
-    'truncweibull_min', 'cosine', 'anglit', 'wrapcauchy', 'kstwo',
-})
+# ``_BOUNDED_FREQS`` / ``_BOUNDED_SCIPY_SEVS`` are imported from ``tail.py``
+# (the single source of truth) at the top of this module and re-exported here.
 
 
 class Aggregate:
@@ -1811,34 +1806,96 @@ class Aggregate:
         return {'type': type(self), 'spec': self.spec, 'bs': self.bs, 'log2': self.log2,
                 'sevs': len(self.sevs)}
 
+    def _tail_info(self):
+        """Build the :class:`~aggregate.tail.TailInfo` for this aggregate.
+
+        Spec-only (frequency name + severity families); touches no computed
+        density, so it is valid *before* ``update()``. A ``_certified_bounded``
+        override short-circuits to a BOUNDED result so the certify contract and
+        the lifted-natural-allocation guard are preserved.
+
+        Returns
+        -------
+        aggregate.tail.TailInfo
+        """
+        if getattr(self, '_certified_bounded', False):
+            return _tail.TailInfo(
+                freq=TailClass.BOUNDED, sev=TailClass.BOUNDED, agg=TailClass.BOUNDED,
+                freq_lc=None, sev_lc=None, agg_lc=None, alpha=None,
+                driver='certified', flags={'certified': True})
+        return _tail.aggregate_tail_info(self.frequency, self.sevs)
+
+    @property
+    def tail_class(self):
+        """The ``(freq, sev, agg)`` :class:`~aggregate.tail.TailClass` triple.
+
+        The authoritative tail-thickness computation: frequency and severity
+        rungs by deterministic family lookup, the aggregate rung by the
+        ``max`` combine rule. ``.bounded`` and the tail text are derived from
+        this. Returns a :class:`~aggregate.tail.TailClasses` namedtuple with
+        ``.freq`` / ``.sev`` / ``.agg`` fields.
+        """
+        return self._tail_info().classes
+
     @property
     def bounded(self) -> bool:
         """Whether the aggregate has bounded support.
 
-        ``True`` iff the frequency *and* every severity component is
-        bounded. Frequencies in :data:`_BOUNDED_FREQS` (``fixed``,
-        ``bernoulli``, ``binomial``, ``empirical``) are bounded; mixed
-        Poisson / negbin / etc. are not. A severity is bounded when it
-        is a histogram, a fixed atom, a bounded scipy family, or carries
-        a finite layer ``exp_limit`` or splice ``sev_ub``. Conservative:
-        defaults to ``False`` whenever it cannot be proved ``True`` from
-        the spec. Set ``self.bounded = True`` to certify (e.g. a fat-
-        tailed scipy severity with a large layer cap that the heuristic
-        misses).
+        Derived view: ``True`` iff the aggregate tail class is
+        :attr:`~aggregate.tail.TailClass.BOUNDED`, i.e. the frequency *and*
+        every severity component is bounded. Frequencies in
+        :data:`~aggregate.tail._BOUNDED_FREQS` (``fixed``, ``bernoulli``,
+        ``binomial``, ``empirical``) are bounded; mixed Poisson / negbin / etc.
+        are not. A severity is bounded when it is a histogram, a fixed atom, a
+        bounded scipy family, or carries a finite layer ``exp_limit`` or splice
+        ``sev_ub``. Conservative: ``False`` whenever boundedness cannot be
+        proved from the spec. Set ``self.bounded = True`` to certify (e.g. a
+        fat-tailed scipy severity with a large layer cap the heuristic misses).
         """
-        if getattr(self, '_certified_bounded', False):
-            return True
-        if self.frequency.freq_name not in _BOUNDED_FREQS:
-            return False
-        if not self.sevs:
-            return False
-        return all(s.bounded for s in self.sevs)
+        return self._tail_info().agg == TailClass.BOUNDED
 
     @bounded.setter
     def bounded(self, value: bool) -> None:
         if value is not True and value is not False:
             raise ValueError('bounded must be True (certify) or False (reset)')
         self._certified_bounded = bool(value)
+
+    @property
+    def tail_description(self) -> str:
+        """Three aligned lines describing the frequency, severity, and aggregate tails.
+
+        E.g.::
+
+            frequency tail           log-concave, super-exponential (poisson)
+            severity tail            subexponential (lognorm)
+            aggregate tail           subexponential
+
+        Derived from :attr:`tail_class`; the lines are also appended to
+        :meth:`info`.
+        """
+        info = self._tail_info()
+        return '\n'.join(_tail.describe_lines(
+            info, self.frequency.freq_name, self._sev_label()))
+
+    @property
+    def tail_explanation(self) -> str:
+        """One-sentence explanation of how the aggregate tail class arises.
+
+        E.g. "Log-concave super-exponential poisson frequency and
+        subexponential lognorm severity give a subexponential aggregate (single
+        big jump: P(S>x) approx E[N]*P(X>x))." Derived from :attr:`tail_class`.
+        """
+        info = self._tail_info()
+        return _tail.explain(info, self.frequency.freq_name, self._sev_label())
+
+    def _sev_label(self) -> str:
+        """Short severity family label for tail text (the family, or ``'N components'``)."""
+        if not self.sevs:
+            return ''
+        if len(self.sevs) == 1:
+            name = getattr(self.sevs[0], 'sev_name', '')
+            return name if isinstance(name, str) else 'severity'
+        return f'{len(self.sevs)} components'
 
     @property
     def reins_bucket(self) -> str:
@@ -3646,6 +3703,9 @@ class Aggregate:
             s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
             s.append(f'aggregate reinsurance    {self.reinsurance_description("agg").lower()}')
             s.append(f'validation               {self.explain_validation()  }')
+            # Tail-thickness classification (frequency / severity / aggregate).
+            s.extend(_tail.describe_lines(
+                self._tail_info(), self.frequency.freq_name, self._sev_label()))
             s.append('')
         return '\n'.join(s)
 
@@ -7355,29 +7415,27 @@ class Severity(ss.rv_continuous):
         return f'{self.limit:,.0f} xs {self.attachment:,.0f}'
 
     @property
+    def tail_class(self):
+        """This severity's :class:`~aggregate.tail.TailClass` rung.
+
+        Deterministic family lookup (param-aware): structural-bounded test
+        first (so ``bounded`` is spec-only), then scipy family. See
+        :func:`aggregate.tail.classify_severity`.
+        """
+        return _tail.classify_severity(self)[0]
+
+    @property
     def bounded(self) -> bool:
         """Whether the (post-layer, post-splice) severity has bounded support.
 
-        ``True`` for ``fixed``/``dhistogram``/``chistogram`` (finite by
-        construction), for ``scipy`` families in
-        :data:`_BOUNDED_SCIPY_SEVS`, or when a finite layer ``exp_limit``
-        or splice ``sev_ub`` was imposed. ``meta``/``copy`` defer to the
-        wrapped object's ``bounded``.
+        Derived view: ``True`` iff :attr:`tail_class` is
+        :attr:`~aggregate.tail.TailClass.BOUNDED` — i.e. ``fixed`` /
+        ``dhistogram`` / ``chistogram`` (finite by construction), a ``scipy``
+        family in :data:`~aggregate.tail._BOUNDED_SCIPY_SEVS`, a finite layer
+        ``exp_limit`` or splice ``sev_ub``, or a ``meta`` / ``copy`` wrapping a
+        bounded object.
         """
-        if self.sev_kind in ('fixed', 'dhistogram', 'chistogram'):
-            return True
-        if self.sev_kind in ('meta', 'copy'):
-            inner = self.sev_name
-            return bool(getattr(inner, 'bounded', False))
-        # scipy: bounded if the family is bounded, or if a finite layer
-        # / splice ub caps it.
-        if np.isfinite(self.limit):
-            return True
-        if np.isfinite(self.sev_ub):
-            return True
-        if isinstance(self.sev_name, str) and self.sev_name in _BOUNDED_SCIPY_SEVS:
-            return True
-        return False
+        return self.tail_class == TailClass.BOUNDED
 
     def _apply_lb_ub(self):
         """Wrap ``self.fz`` methods with truncation decorators for ``[lb, ub]``.

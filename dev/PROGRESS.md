@@ -6,10 +6,11 @@
 > release notes in `README.rst`. This file is the resume point if the
 > conversation context is lost.
 >
-> **Last updated: 2026-06-02** — v1.0 core-compute refactor closed at
-> meta.8 (2026-05-30); three reinsurance cycles landed since
-> (`reins-buckets` 1.0.0a18, `reins-reporting` 1.0.0a19, `reins-bivariate`
-> 1.0.0a20). Current version **1.0.0a20**.
+> **Last updated: 2026-06-04** — v1.0 core-compute refactor closed at
+> meta.8 (2026-05-30); eleven post-refactor cycles landed since (a18–a28:
+> reinsurance, negative-x / P&L, `pnl`, `multivariate`, notes/hints,
+> discrete severity, distortion DecL, dsev bucketing). Current version
+> **1.0.0a28**.
 > **Ground truth for code state is `git log`, not this file.** Run
 > `git log --oneline -30` when resuming to see what landed.
 
@@ -24,9 +25,14 @@ to the meta.6 capture commit otherwise. The four refactor plans
 (`plan-meta.md`, `plan-aggregate-refactor.md`, `plan-portfolio-refactor.md`,
 `plan-baseline-harness.md`) have moved to `dev/done/`.
 
-What remains is in `dev/TODO-Remember.md` — parked enhancements,
-docs/packaging follow-ups, and deep-dive intentions. As that file
-shrinks, this one expands.
+What remains is in `dev/TODO.md` — pre-ship work and post-v1.0 ideas.
+As that file shrinks, this one expands.
+
+Immediately pre-refactor: **1.0.0a17** (numerical noise cleanup —
+`agg_density` noise, tighter cv/skew noise detection and reporting,
+better `MomentWrangler` use; the `xsden_to_meancv*` tail-mass
+inconsistency was then resolved in meta.3 when both routed through
+`xsden_to_mwrangler`).
 
 ---
 
@@ -51,8 +57,9 @@ four new `J.Re18a..d` corpus lines (× parse + snapshot = 8 tests).
 
 ## Post-refactor cycles
 
-Standalone reinsurance work after the core-compute refactor. Each is its
-own `a*` bump with a plan now in `dev/done/`.
+Standalone cycles after the core-compute refactor. Each is its own `a*`
+bump (one commit per iteration); finished plans live in `dev/done/`, and
+the full release notes are the matching `README.rst` sections.
 
 | Cycle | Ver | Date | Headline |
 |---|---|---|---|
@@ -66,7 +73,7 @@ Net` layering frame, occ layers conditional) supersedes the removed
 `reinsurance_audit_df` / `reinsurance_occ_layer_df`, so the
 `docs/.../problems/*.rst` case studies left as migration notes (bahnemann ILF
 table, ERA/other_misc layer exhibits) can be rebuilt against it directly (still
-needs a docs build to verify — TODO 10b).
+needs a docs build to verify — TODO.md item 16).
 
 | reins-bivariate | 1.0.0a20 | 2026-06-02 | Joint (ceded, net) occurrence aggregate via 2D FFT. New `Aggregate.occ_bivariate(...)` → `BivariateDistribution` (new submodule `aggregate/bivariate.py`, submodule access only). Places gross severity mass at `(c(X), n(X))` on the line `c+n=X` to build a bivariate severity `S`; joint aggregate density `= iFFT2(freq_pgf(n, FFT2(S)))` — the univariate `_fft_aggregate` with 1D→2D transforms, valid because `freq_pgf` is elementwise (empirical-freq matmul PGF handled by ravel/reshape). Occurrence only (agg-cover bivariate is degenerate). Per-axis auto bucket/window sizing from the univariate `p_agg_ceded_occ`/`p_agg_net_occ` margins (`size_axis`), 2D scatter via the active `reins_bucket` scheme (`scatter_bivariate`, linear preserves both marginal means), `bs_*`/`log2_*` overrides; zero-risk/fixed-1 shortcuts mirror `_fft_aggregate`. `BivariateDistribution`: `.marginals()`, `.moments()` (mixed `E[C^i N^j]`), `.corr()` (positive — random count couples C,N), `.contour()`, reprs. Validation: marginals reproduce the univariate occ ceded/net aggregates (means exact via linear scatter; cv matches at matched grid `bs=self.bs` — auto-sizing is finer/more accurate), anti-diagonal `C+N` reproduces gross. `tests/test_reins_bivariate.py` (31); DecL section Z (`BV.*`) |
 
@@ -77,6 +84,21 @@ mean) the *univariate* ceded cv is inflated; the bivariate's auto-sized finer
 ceded axis is the more accurate one. The rigorous "marginals == univariate"
 identity is therefore asserted at the matched grid.
 
+| Cycle | Ver | Date | Headline |
+|---|---|---|---|
+| negative-x Aggregate | 1.0.0a21 | 2026-06-02 | Signed (P&L) severity + movable output window. `ssev` (continuous, never clamps), auto-signing negative `dsev` atoms; `update(x_min=...)` window placed by a single roll on the padded FFT buffer, auto two-sided window from analytic moments via `estimate_agg_window`; three-method bucket/window sizing recorded in `Aggregate._bs_window_df` (exact_discrete > bounded_small > moment); severity reporting moved to `sev_density_df` on its own `xs_sev` grid; `value_type` member (`loss`/`payoff`, pricing-layer only). Default 0-based path byte-for-byte unchanged. `dev/done/plan-negative-x-agg.md`; `tests/test_negative_x.py` (28) |
+| signed Portfolio combine | 1.0.0a22 | 2026-06-02 | Portfolio combine on signed support. Units driven on their **own** signed windows sharing only `bs`/`log2`/`padding` (FFT product is origin-at-0; truncating `ift` replaced by full `irfft` + roll so `p_total` conserves mass); coarsen-to-fit `Portfolio._bs_window` + `_bs_window_df`; signed F/S/VaR/TVaR/plot; gated behind `Portfolio._signed()` so non-signed books byte-identical. Pricing (`add_exa`) deferred to `dev/plan-portfolio-neg-x-pricing.md` — signed books warn + fall back to F/S-only. Accepted residual: a fine-lattice unit beside a wide one gets a coarse shared `bs` (deficit surfaced per-unit; proper fix = multi-resolution decimation, parked). DecL `c - dist` severity (`numbers MINUS sev1`). `dev/done/plan-negative-x-port.md`; `tests/test_negative_x_port.py` (14) |
+| `pnl` keyword | 1.0.0a23 | 2026-06-03 | Premium-minus-loss as a first-class sibling of `agg`: `pnl NAME <prem> prem - <lr\|claims\|loss> …`. Built on the aggregate affine primitive (`_apply_agg_affine` grid relabel after `update_work`; analytic moments; no new numerics); premium vectorises like exposure (total only); tight mass-centred two-sided display window; `value_type='payoff'`. General fix: signed `describe` shows **SD not CV** (CV blows up as mean→0). `dev/done/plan-pnl-premium.md`; `tests/test_pnl.py` (15) |
+| `multivariate` | 1.0.0a24 | 2026-06-03 | DecL-declared copula-coupled bivariate aggregates: two `agg`/`pnl` components' per-claim severities coupled by `aggregate.copula.Copula` (registry: normal/gumbel/clayton/fgm/independent, natural dependence parameters) via discrete Sklar rectangle mass, accumulated by a shared frequency over the `rfft2` backbone. `pnl` axes as per-axis affine after the FFT. `MultivariateAggregate` (new `aggregate/multivariate.py`) subsumes `bivariate.py`; `occ_bivariate` now returns a `netceded`-mode `MultivariateAggregate` with the full reporting surface. Deferred: `t` copula, ≥3-variate `rfftn`, `MultivariatePortfolio`. `dev/done/plan-multivariate.md`; `tests/test_multivariate.py` (37) |
+| notes/hints | 1.0.0a25 | 2026-06-03 | `note{}` becomes pure text; build settings move to a dedicated `hints{key=value; …}` clause (allowed wherever `note` is). Caller kwargs always override hints (incl. `recommend_p`); unknown/duplicate/malformed hints warn, never crash; settings-looking notes get a one-time deprecation warning. Corpora migrated. `dev/done/plan-note-parse.md` |
+| discrete severity `fz` | 1.0.0a26 | 2026-06-03 | Honest discrete severity: `SeverityDHistogram`/`SeverityFixed` back `fz` with `_DiscreteRV` (exact step cdf/sf/ppf/isf/support), replacing the `rv_histogram` epsilon-sliver hack. All discrete moments (unlimited, limited, layered) now exact finite sums; aggregate density bit-for-bit unchanged (half-bucket sampling never hits an atom); snapshots re-captured to exact values; `max_log2` unused. `dev/done/plan-discrete-severity-fz.md` |
+| distortion DecL | 1.0.0a27 | 2026-06-04 | Distortion DecL is a flat number list: `distortion NAME kind n1 n2 …`. Parser's hand-maintained `_distortion_spec` table deleted; each `Distortion` subclass declares `decl_params` and `Distortion.decl_spec` does the mapping — adding a kind no longer touches the parser. `ccoc` takes return `r`; vector/combinator kinds error clearly in flat form; bracketed form removed. No plan file — README a27 + `tests/test_distortion_decl.py` |
+| dsev bucketing | 1.0.0a28 | 2026-06-04 | New `dsev_bucket` setting (mirrors `reins_bucket`): `'linear'` **default** splits off-grid discrete atoms across bracketing buckets (mean-preserving); `'nearest'` is the historical snap. On-grid atoms unchanged; layered discrete severities still discretize via cdf-difference (behave as nearest). Two baseline cases re-captured at the float floor. `dev/done/plan-bucket-dhist.md` |
+
+947 tests collected at a28 (777 at a20 → 947: negative-x 28 + portfolio 14 +
+pnl 15 + multivariate 37 + the notes/hints, discrete-severity, distortion, and
+dsev-bucket cycles' cases and corpus lines).
+
 ---
 
 ## Working files (all in `dev/`)
@@ -84,12 +106,12 @@ identity is therefore asserted at the matched grid.
 | File | Role |
 |---|---|
 | `PROGRESS.md` | This file — what landed |
-| `TODO-Remember.md` | What's pending: parked enhancements, docs/packaging, deep dives |
+| `TODO.md` | What's pending: pre-ship work (features in flight, windows/plotting, numerics deep dives, docs/packaging) and post-v1.0 ideas (was `TODO-Remember.md`) |
 | `pipeline-aggregate.rst` | Aggregate current-state description (was the read-end input to the plans; keep as the algorithmic reference) |
 | `pipeline-portfolio.rst` | Portfolio current-state description (same role) |
 | `pipeline-reinsurance.rst` | Reinsurance reporting surface, object-by-object — rewritten to the live a19 end state (the 3 public objects + private `_reins_view_stats`, Portfolio trio); pre-refactor inventory dropped |
-| `tail-thickness.md` | Open plan — tail-thickness classifier (`tail.py`); not yet started |
-| `tentative-plan-decl-colorization.md` | Parked — IPython tracebacks don't call `_repr_html_` (see TODO-Remember) |
+| `plan-portfolio-neg-x-pricing.md` | DRAFT — the deferred Portfolio pricing half of negative-x (`add_exa` column audit, `value_type` consumption) |
+| `tentative-plan-decl-colorization.md` | Parked — IPython tracebacks don't call `_repr_html_` (see TODO.md) |
 | `done/plan-meta.md` | The cross-module sequencing — every step done |
 | `done/plan-aggregate-refactor.md` | Aggregate decisions (D1–D18) + work items |
 | `done/plan-portfolio-refactor.md` | Portfolio decisions (D1–D17) + work items |
@@ -97,6 +119,15 @@ identity is therefore asserted at the matched grid.
 | `done/reins-buckets.md` | Reins rebucketing switch + layer validation (1.0.0a18) |
 | `done/reins-reporting.md` | Rationalized reins reporting, Aggregate + Portfolio (1.0.0a19) |
 | `done/reins-bivariate.md` | Joint (ceded, net) occurrence aggregate via 2D FFT (1.0.0a20) |
+| `done/plan-negative-x-agg.md` | Signed severity + output window, Aggregate half (1.0.0a21) |
+| `done/plan-negative-x-port.md` | Signed Portfolio combine (1.0.0a22) |
+| `done/plan-pnl-premium.md` | `pnl` keyword — premium-minus-loss (1.0.0a23) |
+| `done/plan-multivariate.md` | Copula-coupled `multivariate` keyword, Stage 1 (1.0.0a24) |
+| `done/plan-note-parse.md` | `note{}` pure text / `hints{}` settings (1.0.0a25) |
+| `done/plan-discrete-severity-fz.md` | `_DiscreteRV` honest discrete severity (1.0.0a26) |
+| `done/spectral-quartet.md` | Distortion info/describe/stats_df/density_df quartet (pre-meta, 2026-05-26) |
+| `done/plan-bucket-dhist.md` | `dsev_bucket` linear/nearest discretization (1.0.0a28) |
+| `done/plan-tail-thickness.md` | Tail-thickness classifier (`tail.py`) — implementation in flight in the working tree, uncommitted |
 | `done/plan-A-aggregate-style.md` etc. | Earlier completed plans (pre-meta) |
 
 Convention reminder: when a plan is finished, move it to `dev/done/`.
@@ -129,6 +160,8 @@ read. Recording them here so the *why* isn't lost as the plans archive.
 
 ## Open decisions
 
-None on the v1.0 core compute. New design questions live in
-`TODO-Remember.md` (most notably `Portfolio.pricing_bounds` alignment to
-the new 513-point `s_grid`, and the negative-`xs` / windowed-FFT family).
+None on the v1.0 core compute. The negative-`xs` / windowed-FFT family
+landed in a21–a24 (the Portfolio *pricing* half remains —
+`plan-portfolio-neg-x-pricing.md`). New design questions live in
+`TODO.md` (most notably `Portfolio.pricing_bounds` alignment to the new
+513-point `s_grid`).

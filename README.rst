@@ -28,6 +28,33 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a27
+---------
+
+Distortion DecL syntax is a flat number list; the parser stops knowing kinds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The DecL distortion form is now uniformly ``distortion NAME kind n1 n2 ...`` — a
+flat list of the kind's parameters, no brackets::
+
+    distortion D ph 0.9
+    distortion D bitvar 0.9 0.99 0.5      # p0 p1 w1
+    distortion D power 0.01 1.0 2         # x0 x1 alpha
+
+Previously the parser carried a hand-maintained ``_distortion_spec`` table that
+re-encoded every kind's parameter names (duplicating what the ``Distortion``
+subclasses already declare) and reached into ``spectral`` for domain facts. That
+table is gone. Each subclass now declares its DecL parameter order in a
+``decl_params`` class attribute, and a single ``Distortion.decl_spec`` maps the
+number list onto the kind's natural keyword arguments — one source of truth,
+and adding a distortion kind no longer touches the parser.
+
+- ``ccoc`` takes the return ``r`` (``distortion D ccoc 0.25``), not the discount.
+- ``wtdtvar`` (parameter *vectors*) and the ``minimum`` / ``mixture`` combinators
+  (which take distortion *references*) have no flat-number form and raise a clear
+  error if written that way; construct them in Python or via the combinator
+  syntax. The bracketed ``kind shape [list]`` form is removed.
+
 1.0.0a26
 ---------
 

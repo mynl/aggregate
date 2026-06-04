@@ -29,8 +29,14 @@ answer: sev_out          -> answer_sev
 // Distortion
 // ======================================================================
 
-distortion_out: DISTORTION name ID expr                       -> distortion_out_short
-              | DISTORTION name ID expr "[" numberl "]"       -> distortion_out_long
+// A distortion is a kind id followed by a flat list of its natural
+// parameters (``distortion D ph 0.9``, ``distortion D power 0 100 2``). The
+// kind->parameter-name mapping lives on the Distortion subclass
+// (``decl_params``) and is applied by ``Distortion.decl_spec`` -- the grammar
+// and parser hold no per-kind knowledge. The ``minimum``/``mixture``
+// combinators take a list of distortion *references* instead, so they keep
+// their own productions.
+distortion_out: DISTORTION name ID numberl                                            -> distortion_out_params
               | DISTORTION name ID buildin_dist_list                                  -> distortion_out_combo
               | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]"          -> distortion_out_combo_wtd
 

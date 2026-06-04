@@ -3016,7 +3016,7 @@ class Aggregate:
         self.frequency = Frequency(
             get_value(freq_name), get_value(freq_a), get_value(freq_b),
             get_value(freq_zm), get_value(freq_p0))
-        # Spec passthroughs from constructor arguments
+        # Spec pass through from constructor arguments
         self.note = note
         # Raw `hints{...}` settings string; consumed by the underwriter build
         # path (caller-wins merge), retained here for round-tripping / repr.

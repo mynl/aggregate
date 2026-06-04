@@ -136,6 +136,12 @@ distortion V.DiscPlotDist  ph 0.3
 dist W.tcc       ccoc .25
 dist W.tdu       dual 2.5
 dist W.tph       ph   0.7
+# Multi-parameter kinds take a FLAT number list (no brackets); the kind ->
+# parameter-name mapping lives on the Distortion subclass (decl_params), applied
+# by Distortion.decl_spec. See tests/test_distortion_decl.py.
+dist W.tbi       bitvar 0.9 0.99 0.5
+dist W.tpw       power 0.01 1.0 2
+dist W.tbe       beta 0.5 2
 # dist W.tMIN      minimum dist.W.tcc dist.W.tdu                            # MinimumDistortion of two
 # dist W.tMIX      mixture dist.W.tcc dist.W.tdu wts [0.6 0.4]              # explicit weights
 # dist W.tMIX3     mixture dist.W.tcc dist.W.tdu dist.W.tph                 # uniform default weights (3 children)

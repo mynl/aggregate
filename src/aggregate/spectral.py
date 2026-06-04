@@ -366,6 +366,14 @@ class Distortion:
     # ``__init__`` entirely.
     param_name: str | None = None
 
+    # Order in which DecL positional parameters (``distortion D kind n1 n2
+    # ...``) map onto this kind's natural keyword arguments. Consumed by
+    # ``decl_spec``. ``None`` means "no DecL number-list form": the scalar
+    # kinds fall back to ``(param_name,)``, while genuinely number-free kinds
+    # (variadic ``wtdtvar``; the ``minimum``/``mixture`` combinators that take
+    # distortion *references*) stay ``None`` and reject the number-list form.
+    decl_params: tuple[str, ...] | None = None
+
     # legacy attribute aliases preserved for back-compat with callers
     # that read class-level lists directly.
     @classmethod
@@ -453,6 +461,60 @@ class Distortion:
         self.display_name = display_name
         self._common_init()
         self._build()
+
+    @classmethod
+    def decl_spec(cls, kind, numbers):
+        """Build a ``Distortion`` spec dict from a DecL number list.
+
+        DecL writes ``distortion NAME kind n1 n2 ...``; this maps the flat
+        number list onto the kind's natural keyword parameters using the
+        subclass's :attr:`decl_params` ordering (falling back to
+        ``(param_name,)`` for the scalar-shape kinds). This is the single
+        source of truth for the DecL-to-constructor mapping -- the parser
+        forwards the number list and holds no per-kind knowledge.
+
+        Parameters
+        ----------
+        kind : str
+            Distortion kind id from DecL (``'roe'`` accepted as a legacy alias
+            for ``'ccoc'``).
+        numbers : sequence of float
+            The parsed positional parameters.
+
+        Returns
+        -------
+        dict
+            ``{'name': kind, **kwargs}`` ready for ``Distortion(**spec)``.
+
+        Raises
+        ------
+        ValueError
+            Unknown kind; a kind with no DecL number-list form (variadic
+            ``wtdtvar``; the ``minimum`` / ``mixture`` combinators, which take
+            distortion references); or a parameter-count mismatch.
+        """
+        lookup = 'ccoc' if kind == 'roe' else kind
+        subclass = cls._registry.get(lookup)
+        if subclass is None:
+            raise ValueError(
+                f"Unknown distortion kind {kind!r}; "
+                f"available: {sorted(cls._registry)}")
+        params = subclass.decl_params
+        if params is None and subclass.param_name is not None:
+            params = (subclass.param_name,)
+        if params is None:
+            raise ValueError(
+                f"Distortion {kind!r} has no DecL number-list form; construct "
+                f"it in Python (weighted-TVaR takes parameter vectors; the "
+                f"minimum/mixture combinators take distortion references).")
+        numbers = list(numbers)
+        if len(numbers) != len(params):
+            raise ValueError(
+                f"DecL distortion {kind!r} expects {len(params)} "
+                f"parameter(s) {params}, got {len(numbers)}: {numbers}")
+        spec = {'name': lookup}
+        spec.update(zip(params, numbers))
+        return spec
 
     def _common_init(self):
         """Initialise the audit/state fields shared by every subclass.
@@ -1631,6 +1693,8 @@ class CCoCDistortion(Distortion):
     kind via :meth:`Distortion.__new__`.
     """
     kind = 'ccoc'
+    # DecL passes the single number as the return r (not the discount d).
+    decl_params = ('r',)
     med_name = 'Const CoC'
     long_name = 'Constant CoC'
     documented = True
@@ -2148,6 +2212,7 @@ class BiTVaRDistortion(Distortion):
     ``w1`` on ``p1``.
     """
     kind = 'bitvar'
+    decl_params = ('p0', 'p1', 'w1')
     med_name = 'BiTVaR'
     long_name = 'BiTVaR'
     documented = True
@@ -2844,6 +2909,7 @@ class BetaDistortion(Distortion):
     adequacy" (IME 1999).
     """
     kind = 'beta'
+    decl_params = ('a', 'b')
     med_name = 'Beta'
     long_name = 'Beta'
     documented = True
@@ -2927,6 +2993,7 @@ class PowerDistortion(Distortion):
     and 1. NOT calibratable through ``Portfolio.calibrate_distortion``.
     """
     kind = 'power'
+    decl_params = ('x0', 'x1', 'alpha')
     med_name = 'Power'
     long_name = 'Power'
     documented = False
@@ -3023,6 +3090,8 @@ class CLLDistortion(Distortion):
     mass-at-zero intercept.
     """
     kind = 'cll'
+    # r0 keeps its default; DecL sets only the primary parameter b.
+    decl_params = ('b',)
     med_name = 'Capd Loglin'
     long_name = 'Capped Loglinear'
     documented = True
@@ -3137,6 +3206,8 @@ class CLinDistortion(Distortion):
     intercept. Requires ``slope >= 1 - r0``.
     """
     kind = 'clin'
+    # r0 keeps its default; DecL sets only the slope.
+    decl_params = ('slope',)
     med_name = 'Capped Linear'
     long_name = 'Capped Linear'
     documented = True
@@ -3247,6 +3318,8 @@ class LEPDistortion(Distortion):
     ``r0`` (mass intercept).
     """
     kind = 'lep'
+    # r0 keeps its default; DecL sets only r.
+    decl_params = ('r',)
     med_name = 'Lev Equiv'
     long_name = 'Leverage Equivalent Pricing'
     documented = True
@@ -3381,6 +3454,8 @@ class LYDistortion(Distortion):
     ``ess_sup * r0 / (1 + r0)``.
     """
     kind = 'ly'
+    # r0 keeps its default; DecL sets only r.
+    decl_params = ('r',)
     med_name = 'Lin Yield'
     long_name = 'Linear Yield'
     documented = True

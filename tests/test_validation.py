@@ -59,7 +59,8 @@ def test_empirical_skew_clean_on_wide_grid():
     """Empirical moments are taken from a de-fuzzed copy, so the stored skew
     stays clean on a wide grid where x**3-amplified FFT fuzz would otherwise
     corrupt it. (self.agg_density itself is left as the raw FFT output.)"""
-    from aggregate.constants import VALIDATION_NOISE
+    from aggregate.config import get_settings
+    VALIDATION_NOISE = get_settings().validation.noise
     a = build("agg Die dfreq [1] dsev [1:6]", bs=1, log2=16)
     assert abs(float(a.stats_df["empirical"][("agg", "skew")])) < VALIDATION_NOISE
     assert np.isclose(float(a.stats_df["empirical"][("agg", "ex3")]), 441.0 / 6.0, rtol=1e-9)

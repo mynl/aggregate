@@ -1,43 +1,46 @@
-"""Module-level constants for ``aggregate``: figure-size defaults shared by
-plotting consumers, logging level ``WL``, validation tolerance and
-recommendation probability, the ``Validation`` flag enum used by
-:func:`Aggregate.explain_validation`, and user-data / package-data paths."""
+"""Dependency-free leaf holding the few non-settings constants and types that
+low-level ``aggregate`` modules need.
+
+This module is deliberately tiny and import-free so it can sit *below*
+``distributions`` / ``portfolio`` in the import graph without risking a cycle:
+``utilities`` imports :class:`Validation` and ``spectral`` uses
+:class:`DefectiveDistributionWarning`, and both are imported by
+``distributions`` / ``portfolio``. A ``Flag`` enum and a ``Warning`` subclass
+are types, not user settings, so they do not belong in :mod:`aggregate.config`.
+
+The reinsurance labels are *structural* MultiIndex column / axis keys
+(referenced by literal in ``multivariate`` and asserted across the reins
+tests), so they are constants here, not user-tunable settings.
+
+All tunable defaults (grid sizing, databases, discretization schemes,
+validation tolerances) and the path names now live in :mod:`aggregate.config`.
+The plotting figure constants and the numerics-pending noise floors below are
+slated to move to :mod:`aggregate.config` in a later phase.
+"""
 
 from enum import Flag, auto
 
 
-__all__ = ['FIG_W', 'FIG_H', 'WL', 'FONT_SIZE', 'LEGEND_FONT',
-           'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'VALIDATION_EPS',
-           'VALIDATION_NOISE', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
-           'FT_NOISE_FLOOR', 'RECOMMEND_P', 'REINS_BUCKET_DEFAULT',
-           'DSEV_BUCKET_DEFAULT', 'Validation',
-           'DefectiveDistributionWarning',
+__all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
+           'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
+           'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR', 'FT_NOISE_FLOOR',
+           'Validation', 'DefectiveDistributionWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
-           'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
-           'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME']
+           'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT']
 
+# --- plotting figure defaults (move to config [plotting] in Phase 2) -------
+# These are used as module-level constants in default argument expressions
+# (e.g. ``figsize=(2 * FIG_W, FIG_H)``), so they stay literals until the
+# plotting/style work repoints those call sites.
 FIG_W = 3.5
 FIG_H = 2.45
-
-# level used for logging that replaces warning in cases where a warning is not appropriate
-# but was used for debugging purposes. (WL = Warning Level)
-WL = 25
-
-
 FONT_SIZE = 9
 LEGEND_FONT = 'x-small'
 # see https://matplotlib.org/stable/gallery/color/named_colors.html
 PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
-VALIDATION_EPS = 1e-4
-# Absolute floor below which a quantity is treated as exact zero / pure
-# numerical noise. aggregate's FFT arithmetic is essentially exact, so
-# genuine dust lives around 1e-14--1e-15 (e.g. the skewness of a symmetric
-# distribution); 1e-12 clears it with headroom while sitting ~3 orders above
-# numpy pairwise-summation roundoff and 8 orders below VALIDATION_EPS. Used
-# for defective-distribution detection and for the near-zero (absolute vs
-# relative) error fallback in validation and the describe/stats_df displays.
-VALIDATION_NOISE = 1e-12
+
+# --- numerics-pending validation floors (values await the numerics review) --
 # Aliasing test ratio. The ALIASING flag fires when the relative error on the
 # aggregate mean exceeds ALIASING_RATIO times the relative error on the
 # severity mean: aliasing inflates the agg-mean error far above the sev-mean
@@ -53,30 +56,10 @@ EXEQA_NOISE_FLOOR = 1e-4
 # branch is preferred over division in the per-line FT decomposition (avoids
 # divide-by-near-zero).
 FT_NOISE_FLOOR = 1e-10
-RECOMMEND_P = 0.99999
-
-# Default scheme for rebucketing reinsurance net/ceded distributions onto the
-# model grid (see ``Aggregate._apply_reins_work``). ``'linear'`` splits each
-# off-grid point's mass across its two bracketing buckets so the first moment
-# is preserved exactly; ``'nearest'`` rounds to the closest bucket (≤ bs/2
-# positional bias). ``'linear'`` is the default because mass-preserving
-# rebucketing keeps the reinsurance moment drift at the FFT noise floor.
-REINS_BUCKET_DEFAULT = 'linear'
-
-# Default scheme for placing discrete-severity atoms (``dsev`` / ``dhistogram``
-# / ``fixed``) onto the model grid during discretization (see
-# ``Aggregate.discretize``). ``'linear'`` splits each off-grid atom's mass
-# across its two bracketing buckets so the discretized first moment equals
-# ``Σ xₖ pₖ`` exactly; ``'nearest'`` snaps each atom to its closest bucket (the
-# historical behaviour, ≤ bs/2 positional bias). ``'linear'`` is the default --
-# mean-preservation is the right default for an accuracy-focused library, and it
-# matches ``REINS_BUCKET_DEFAULT``. On-grid atoms (e.g. integer atoms with
-# ``bs == 1``, the common dice case) give ``f == 0`` so the two schemes coincide.
-DSEV_BUCKET_DEFAULT = 'linear'
 
 # Column / view labels for reinsurance reporting (``describe``,
 # ``reins_describe``, ``reins_stats_df``). Centralised so the wording is
-# changed in one place.
+# changed in one place. These are structural keys, not user settings.
 #   GROSS   -- top of step 1, before any cover (the first describe column).
 #   SUBJECT -- what is subject to the aggregate cover (= the occurrence output).
 #   NET     -- model output when every cover passes the net.
@@ -88,13 +71,6 @@ REINS_LABEL_NET = 'Net'
 REINS_LABEL_CEDED = 'Ceded'
 REINS_LABEL_OUTPUT = 'Output'
 
-# User-local data directory (under Path.home())
-USER_DIR_NAME = '.aggregate'
-# Subdirectory inside the installed `aggregate` package holding bundled .agg files
-PACKAGE_DATA_DIR = 'agg'
-# The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR)
-TEST_SUITE_FILENAME = 'test_suite.agg'
-
 
 class Validation(Flag):
     """Flag set of validation failures surfaced by ``Aggregate.explain_validation``.
@@ -102,9 +78,9 @@ class Validation(Flag):
     ``NOT_UNREASONABLE`` is the empty (passing) state; the remaining members
     are individual failure modes that combine via bitwise OR. ``SEV_*`` and
     ``AGG_*`` flag moment-matching errors (analytic vs empirical mean, CV,
-    skew) above ``VALIDATION_EPS``. ``ALIASING`` flags FFT wrap-around;
-    ``REINSURANCE`` flags reinsurance-induced moment drift; ``NOT_UPDATED``
-    signals the object hasn't been ``update``-d yet.
+    skew) above the validation ``eps`` tolerance. ``ALIASING`` flags FFT
+    wrap-around; ``REINSURANCE`` flags reinsurance-induced moment drift;
+    ``NOT_UPDATED`` signals the object hasn't been ``update``-d yet.
     """
 
     NOT_UNREASONABLE = 0
@@ -123,14 +99,14 @@ class DefectiveDistributionWarning(UserWarning):
     """Emitted when an aggregate empirical PMF carries a genuine deficit.
 
     The aggregate FFT loses mass off the right end of the grid when ``log2``
-    is too small for the support. A deficit `1 - Σp_agg > VALIDATION_NOISE`
-    is real, not numerical dust: forwards `S = 1 - cumsum` plateaus at the
-    deficit (carries it as a tail blob) while backwards `S` reaches zero
-    (drops the deficit silently). The two pricing answers therefore differ
-    by exactly the deficit. Surface the deficit at construction time so the
-    divergence in `Distortion.price` is never silent.
+    is too small for the support. A deficit `1 - Σp_agg` above the validation
+    noise floor (``config`` ``validation.noise``) is real, not numerical dust:
+    forwards `S = 1 - cumsum` plateaus at the deficit (carries it as a tail
+    blob) while backwards `S` reaches zero (drops the deficit silently). The
+    two pricing answers therefore differ by exactly the deficit. Surface the
+    deficit at construction time so the divergence in `Distortion.price` is
+    never silent.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).
     """
-

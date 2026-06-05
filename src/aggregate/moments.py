@@ -7,9 +7,12 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .constants import VALIDATION_NOISE
+from .config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Absolute dust floor, resolved once per session from aggregate.config.
+VALIDATION_NOISE = get_settings().validation.noise
 
 __all__ = [
     'MomentAggregator', 'MomentWrangler',
@@ -584,9 +587,9 @@ def _noise_aware_rel_error(est, ref):
     when ``ref`` is genuinely zero. aggregate produces values that are
     exactly zero in theory but appear as floating-point dust (e.g. the
     skewness of a symmetric distribution); a naive relative error against
-    that dust is meaningless. Where ``|ref|`` is at or below
-    :data:`~aggregate.constants.VALIDATION_NOISE` the absolute error
-    ``est - ref`` is returned instead.
+    that dust is meaningless. Where ``|ref|`` is at or below the configured
+    ``validation.noise`` floor the absolute error ``est - ref`` is returned
+    instead.
 
     Parameters
     ----------
@@ -634,7 +637,7 @@ def _snap_noise(x):
 
     Used to keep floating-point dust (e.g. ``1.7e-14`` for the skewness of a
     symmetric distribution) out of rendered tables. Values with magnitude at
-    or below :data:`~aggregate.constants.VALIDATION_NOISE` become ``0.0``;
+    or below the configured ``validation.noise`` floor become ``0.0``;
     ``nan`` is preserved.
 
     Parameters

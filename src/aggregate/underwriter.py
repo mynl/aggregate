@@ -9,10 +9,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .constants import (WL, VALIDATION_EPS, RECOMMEND_P,
-                        USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME)
+from .config import (get_settings, reload_settings as _reload_settings,
+                     write_default_config as _write_default_config,
+                     describe_settings, config_path,
+                     USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME)
 from .portfolio import Portfolio
-from .distributions import Aggregate, Severity
+from .distributions import Aggregate, Severity, BUCKET_SIZING_P
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
 from .utilities import (round_bucket, qd, agg_help)
@@ -21,11 +23,16 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['Underwriter', 'build', 'build_many', 'CannotBuild']
 
+# Sentinel for Underwriter.__init__ arguments that should fall back to the
+# configured defaults (aggregate.config [build]). Distinct from None, which for
+# ``databases`` still means "load nothing".
+_UNSET = object()
+
 
 # Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
 # else is warned about and dropped (never crashes the build).
 _HINT_KEYS = {
-    'log2', 'bs', 'padding', 'normalize', 'recommend_p',
+    'log2', 'bs', 'padding', 'normalize', 'bucket_sizing_p',
     'sev_calc', 'discretization_calc', 'force_severity', 'x_min', 'x_max',
 }
 
@@ -109,16 +116,16 @@ def _parse_hints(txt):
 
 # Settings keys that used to be (mis)read out of ``note{...}``; used only to
 # emit a deprecation warning now that notes are pure text.
-_NOTE_SETTINGS_RE = re.compile(r'\b(?:log2|bs|padding|normalize|recommend_p)\s*=')
+_NOTE_SETTINGS_RE = re.compile(r'\b(?:log2|bs|padding|normalize|bucket_sizing_p)\s*=')
 
 
-def _resolve_hints(spec, log2, bs, recommend_p, kwargs):
+def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     """Merge a spec's ``hints{...}`` build settings under *caller-wins* rules.
 
     Parses ``spec['hints']`` via :func:`_parse_hints`, then fills only the
     settings the caller left at their sentinel default: ``log2`` when ``log2 ==
-    0``, ``bs`` when ``bs == 0``, ``recommend_p`` when it equals
-    :data:`~aggregate.constants.RECOMMEND_P`. Any remaining recognised keys are
+    0``, ``bs`` when ``bs == 0``, ``bucket_sizing_p`` when it equals
+    the configured ``discretization.bucket_sizing_p``. Any remaining recognised keys are
     added to ``kwargs`` with :meth:`dict.setdefault`, so an explicit caller
     value always wins. A deprecation warning fires if the (now pure-text)
     ``note`` still looks like it carries ``key=value`` settings.
@@ -127,15 +134,15 @@ def _resolve_hints(spec, log2, bs, recommend_p, kwargs):
     ----------
     spec : dict
         A parsed object spec; reads ``spec['note']`` and ``spec['hints']``.
-    log2, bs, recommend_p : int, float, float
+    log2, bs, bucket_sizing_p : int, float, float
         Caller-supplied build settings (sentinels ``0`` / ``0`` /
-        ``RECOMMEND_P`` mean "unset").
+        ``BUCKET_SIZING_P`` mean "unset").
     kwargs : dict
         Pass-through update kwargs (mutated in place via ``setdefault``).
 
     Returns
     -------
-    (log2, bs, recommend_p, kwargs) : tuple
+    (log2, bs, bucket_sizing_p, kwargs) : tuple
         Ready for ``Aggregate`` / ``Portfolio`` / ``MultivariateAggregate``
         update.
     """
@@ -146,7 +153,7 @@ def _resolve_hints(spec, log2, bs, recommend_p, kwargs):
             "settings into a hints{...} clause. The note is now treated as "
             "pure text.")
     hints = _parse_hints(spec.get('hints', '') or '')
-    # log2 / bs / recommend_p are passed explicitly at the update() call, so
+    # log2 / bs / bucket_sizing_p are passed explicitly at the update() call, so
     # they must NEVER also leak through ``kwargs`` (that would duplicate the
     # keyword). Take the hint value only when the caller left the sentinel
     # default, then drop the key from the pass-through either way.
@@ -154,13 +161,13 @@ def _resolve_hints(spec, log2, bs, recommend_p, kwargs):
         log2 = int(hints['log2'])
     if bs == 0 and 'bs' in hints:
         bs = hints['bs']
-    if recommend_p == RECOMMEND_P and 'recommend_p' in hints:
-        recommend_p = hints['recommend_p']
-    for k in ('log2', 'bs', 'recommend_p'):
+    if bucket_sizing_p == BUCKET_SIZING_P and 'bucket_sizing_p' in hints:
+        bucket_sizing_p = hints['bucket_sizing_p']
+    for k in ('log2', 'bs', 'bucket_sizing_p'):
         hints.pop(k, None)
     for k, v in hints.items():
         kwargs.setdefault(k, v)
-    return log2, bs, recommend_p, kwargs
+    return log2, bs, bucket_sizing_p, kwargs
 
 
 def _row_stats(a, summary_cols):
@@ -259,25 +266,38 @@ class Underwriter(object):
     by ``(kind, name)`` with columns ``spec`` and ``program``.
     """
 
-    def __init__(self, name='Rory', databases=None, update=False, log2=10, debug=False):
+    def __init__(self, name='Rory', databases=_UNSET, update=_UNSET, log2=_UNSET, debug=False):
         """
         Create an underwriter object. The underwriter is the interface to the knowledge base
         of the aggregate system. It is the interface to the parser and the interpreter, and
         to the database of curves, portfolios and aggregates.
 
+        ``databases``, ``update``, and ``log2`` default to the configured
+        values in :mod:`aggregate.config` (the ``[build]`` section); pass an
+        explicit value to override. This is what unifies the historical
+        10-vs-16 ``log2`` split between a bare ``Underwriter`` and the
+        module-level ``build``.
+
         :param name: name of underwriter. Defaults to Rory, after Rory Cline, the best underwriter
             I know and a supporter of an analytic approach to underwriting.
-        :param databases: name or list of database files to read in on creation. if None: nothing loaded; if
-            'default' (installed) or 'site' (user, in ~/aggregate/databases) database \\*.agg files in default or site
-            directory are loaded. If 'all' both default and site databases loaded. A string refers to a single database;
-            an interable of strings is also valid. See `read_database` for search path.
-        :param update: if True, update database files with new objects.
-        :param log2: log2 of number of buckets in discrete representation.  10 is 1024 buckets.
+        :param databases: name or list of database files to read in on creation.
+            Unset uses the configured ``build.databases``; ``None`` loads nothing;
+            'default' (installed) loads bundled \\*.agg files, 'user' loads
+            ~/.aggregate \\*.agg files, 'all' loads both. A string refers to a
+            single database; an iterable of strings is also valid. See
+            `read_database` for search path.
+        :param update: if True, update constructed objects. Unset uses the
+            configured ``build.update``.
+        :param log2: log2 of number of buckets in discrete representation. 10 is
+            1024 buckets. Unset uses the configured ``build.log2``.
         :param debug: if True, print debug messages.
         """
 
+        build_settings = get_settings().build
         self.name = name
-        self.update = update
+        self.update = build_settings.update if update is _UNSET else update
+        if log2 is _UNSET:
+            log2 = build_settings.log2
         if log2 <= 0:
             raise ValueError(
                 'log2 must be > 0. The number of buckets used equals 2**log2.')
@@ -286,7 +306,12 @@ class Underwriter(object):
         self._lexer = None
         self._parser = None
         # make sure all database entries are stored; they are read on demand
-        self.databases = [] if databases is None else databases
+        if databases is _UNSET:
+            self.databases = list(build_settings.databases)
+        elif databases is None:
+            self.databases = []
+        else:
+            self.databases = databases
 
         # do not read in until needed for faster loading
         self._default_dir = None
@@ -482,6 +507,30 @@ class Underwriter(object):
         except ValueError:
             return str(path.resolve())
 
+    def _config_line(self) -> str:
+        """One-line summary of the active config file and override counts.
+
+        Reports whether ``~/.aggregate/config.toml`` (or an ``AGGREGATE_CONFIG``
+        override) is loaded, plus how many settings differ from the built-in
+        defaults via the file and via the environment. Backs the ``config``
+        line in :meth:`__repr__`.
+        """
+        p = config_path()
+        rows = describe_settings(get_settings())
+        n_cfg = sum(1 for _, _, src in rows if src == 'config')
+        n_env = sum(1 for _, _, src in rows if src == 'env')
+        if p is None:
+            base = '(disabled via AGGREGATE_CONFIG=none)'
+        elif Path(p).exists():
+            plural = '' if n_cfg == 1 else 's'
+            base = f'{self._format_dir(Path(p))} (loaded, {n_cfg} override{plural})'
+        else:
+            base = '(none - defaults)'
+        if n_env:
+            plural = '' if n_env == 1 else 's'
+            base += f', {n_env} env override{plural}'
+        return base
+
     def __repr__(self):
         # Count knowledge entries from the cached frame directly — avoid
         # self.knowledge here, which would trigger a database read.
@@ -500,7 +549,8 @@ class Underwriter(object):
             f'update             {self.update}\n'
             f'log2               {self.log2}\n'
             f'debug              {self.debug}\n'
-            f'validation_eps     {VALIDATION_EPS}\n'
+            f'validation_eps     {get_settings().validation.eps}\n'
+            f'config             {self._config_line()}\n'
             f'user dir           {self._format_dir(self.user_dir)}\n'
             f'default dir        {self._format_dir(self.default_dir)}\n'
             f'browse             call .discover(regex) to list knowledge entries'
@@ -538,9 +588,9 @@ class Underwriter(object):
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
-                logger.log(WL,
-                           'Mixed severity cannot be created, returning spec. You had %s, expected 1',
-                           spec["sev_wt"])
+                logger.warning(
+                    'Mixed severity cannot be created, returning spec. You had %s, expected 1',
+                    spec["sev_wt"])
                 obj = None
             else:
                 obj = Severity(**spec)
@@ -571,6 +621,55 @@ class Underwriter(object):
         """Path to the bundled test suite ``.agg`` file, or ``None`` if not present."""
         f = self.default_dir / TEST_SUITE_FILENAME
         return f if f.exists() else None
+
+    @staticmethod
+    def show_settings():
+        """Print every resolved setting and where its value came from.
+
+        Each row is ``section.key = value  [source]`` where source is
+        ``default`` (built-in), ``config`` (the TOML file), or ``env`` (an
+        ``AGGREGATE_*`` variable). This is the discoverable, no-magic view of
+        the configuration described in :mod:`aggregate.config`.
+        """
+        rows = describe_settings(get_settings())
+        width = max(len(k) for k, _, _ in rows)
+        lines = [f'{k:<{width}} = {v!r}  [{src}]' for k, v, src in rows]
+        print('\n'.join(lines))
+
+    @staticmethod
+    def write_default_config(path=None, *, force=False):
+        """Write the annotated, fully-commented config template to ``~/.aggregate``.
+
+        Thin delegate to :func:`aggregate.config.write_default_config`. The
+        written file is inert (all lines commented) until you uncomment a key.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, optional
+            Destination; defaults to ``~/.aggregate/config.toml``.
+        force : bool, default False
+            Overwrite an existing file.
+
+        Returns
+        -------
+        pathlib.Path
+            The path written.
+        """
+        return _write_default_config(path, force=force)
+
+    @staticmethod
+    def reload_settings():
+        """Re-read the config file / environment and refresh the module ``build``.
+
+        Thin delegate to :func:`aggregate.config.reload_settings`. Use after
+        editing ``~/.aggregate/config.toml`` in a live session.
+
+        Returns
+        -------
+        Settings
+            The freshly resolved settings.
+        """
+        return _reload_settings()
 
     def _build_work(self, portfolio_program, log2=0, bs=0, update=None, **kwargs):
         """
@@ -622,7 +721,7 @@ class Underwriter(object):
             rv.append(answer)
 
         if not rv:
-            logger.log(WL, 'Program did not contain any output')
+            logger.warning('Program did not contain any output')
         else:
             logger.info('Program created %d objects.', len(rv))
         return rv
@@ -684,7 +783,7 @@ class Underwriter(object):
         # don't want to pass back the original; changes would be reflected in the knowledge
         return deepcopy(parsed.spec)
 
-    def build_many(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
+    def build_many(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """
         Parse a (possibly multi-output) DecL program, construct each object, and smart-update.
 
@@ -701,7 +800,7 @@ class Underwriter(object):
         :param log2: 0 (default) estimates log2 for discrete severities and
             uses ``self.log2`` for everything else.
         :param bs: bucket size; 0 lets the object recommend one.
-        :param recommend_p: passed to :meth:`recommend_bucket`; raise (closer
+        :param bucket_sizing_p: passed to :meth:`recommend_bucket`; raise (closer
             to 1) for thick-tailed distributions.
         :param kwargs: passed to each ``update`` call. ``force_severity=True``
             is always applied.
@@ -710,7 +809,7 @@ class Underwriter(object):
         rv = self._build_work(program, update=False, force_severity=True)
 
         if not rv:
-            logger.log(WL, 'build produced no output')
+            logger.warning('build produced no output')
             return rv
 
         if update is None:
@@ -729,16 +828,16 @@ class Underwriter(object):
                 # per-axis auto-sizing lives in MultivariateAggregate.update;
                 # pass log2/bs through (0 => auto), drop agg-only kwargs.
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _resolve_hints(
-                    d, log2, bs, recommend_p, kwargs)
+                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
+                    d, log2, bs, bucket_sizing_p, kwargs)
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): multivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
                 answer.object.update(log2=log2_, bs=bs, **kwargs)
             elif isinstance(answer.object, Aggregate) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _resolve_hints(
-                    d, log2, bs, recommend_p, kwargs)
+                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
+                    d, log2, bs, bucket_sizing_p, kwargs)
                 # ``log2`` is a CAP; bucket + window selection is delegated to
                 # Aggregate.update / _bs_window (the single source of truth:
                 # exact-discrete, bounded, moment, and signed/P&L windows).
@@ -750,7 +849,7 @@ class Underwriter(object):
                             answer.kind, answer.name, log2_, bs)
                 try:
                     answer.object.update(
-                        log2=log2_, bs=bs, recommend_p=recommend_p,
+                        log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
                         debug=self.debug, force_severity=True, **kwargs)
                 except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
@@ -759,8 +858,8 @@ class Underwriter(object):
                 pass
             elif isinstance(answer.object, Portfolio) and update is True:
                 d = answer.spec
-                log2, bs, recommend_p, kwargs = _resolve_hints(
-                    d, log2, bs, recommend_p, kwargs)
+                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
+                    d, log2, bs, bucket_sizing_p, kwargs)
                 if log2 == -1:
                     log2_ = 13
                 elif log2 == 0:
@@ -772,7 +871,7 @@ class Underwriter(object):
                 # (signed coarsen-to-fit) itself, so do NOT pre-compute the
                 # bucket here -- mirrors the Aggregate branch above (plan 3.4).
                 logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
-                answer.object.update(log2=log2_, bs=bs, recommend_p=recommend_p,
+                answer.object.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
                                      remove_fuzz=True, force_severity=True,
                                      debug=self.debug, **kwargs)
             elif isinstance(answer.object, Distortion):
@@ -784,7 +883,7 @@ class Underwriter(object):
 
         return rv
 
-    def build(self, program, update=None, log2=0, bs=0, recommend_p=RECOMMEND_P, **kwargs):
+    def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """
         Parse a single DecL program and return the constructed object.
 
@@ -796,7 +895,7 @@ class Underwriter(object):
         :param log2: 0 (default) estimates log2 for discrete severities and
             uses ``self.log2`` for everything else.
         :param bs: bucket size; 0 lets the object recommend one.
-        :param recommend_p: passed to :meth:`recommend_bucket`; raise (closer
+        :param bucket_sizing_p: passed to :meth:`recommend_bucket`; raise (closer
             to 1) for thick-tailed distributions.
         :param kwargs: passed to ``update`` (e.g. ``padding``). ``force_severity=True``
             is always applied.
@@ -809,7 +908,7 @@ class Underwriter(object):
             receive the :class:`ParsedProgram` instead.
         """
         rv = self.build_many(program, update=update, log2=log2, bs=bs,
-                             recommend_p=recommend_p, **kwargs)
+                             bucket_sizing_p=bucket_sizing_p, **kwargs)
         if len(rv) != 1:
             raise ValueError(
                 f'build() expects a single output, got {len(rv)}; '
@@ -1080,13 +1179,29 @@ class Underwriter(object):
         return df
 
 # Module-level singleton — the canonical user-facing entry point. Importable
-# as `from aggregate import build`. `update=True` is why `build('agg ...')`
-# auto-updates the constructed object's discrete distribution; pass
-# `update=False` (or override at call time) to disable.
-build = Underwriter(databases='test_suite', update=True, debug=False, log2=16)
+# as `from aggregate import build`. Its databases / log2 / update now come from
+# aggregate.config ([build] section), which is also what a bare `Underwriter()`
+# reads — so there is a single configured default (no more 10-vs-16 split).
+build = Underwriter(debug=False)
 # Sibling entry point for building several objects from one program text.
 # Bound to the same singleton so `from aggregate import build_many` returns
 # a DataFrame summary across all objects in the input.
 build_many = build.build_many
+
+
+def _refresh_default_underwriter():
+    """Refresh the module-level ``build`` underwriter from current settings.
+
+    Called by :func:`aggregate.config.reload_settings`. Mutates the existing
+    ``build`` object in place (rather than rebinding the name) so that any
+    ``from aggregate import build`` references already held by callers see the
+    new configured defaults. Cached knowledge is cleared so reconfigured
+    databases reload lazily on next access.
+    """
+    s = get_settings().build
+    build.update = s.update
+    build.log2 = s.log2
+    build.databases = list(s.databases)
+    build._knowledge = build._knowledge.iloc[0:0]
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

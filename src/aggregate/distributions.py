@@ -23,11 +23,11 @@ from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
-                        DSEV_BUCKET_DEFAULT,
-                        FIG_H, FIG_W, RECOMMEND_P, REINS_BUCKET_DEFAULT,
+                        FIG_H, FIG_W,
                         REINS_LABEL_GROSS, REINS_LABEL_SUBJECT, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
-                        VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
+                        Validation)
+from .config import get_settings
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
                       xsden_to_meancv, xsden_to_meancvskew,
@@ -53,12 +53,21 @@ from .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS, TailClass
 
 logger = logging.getLogger(__name__)
 
-# Probability coverage for the automatic output WINDOW (number of nines):
-# the window spans roughly the 10**-WINDOW_NINES .. 1-10**-WINDOW_NINES
-# quantiles. Deliberately far tighter than RECOMMEND_P (the legacy bucket p)
-# so a P&L / signed aggregate's window captures essentially all the mass.
-# TODO: expose as a user-settable update() argument.
-WINDOW_NINES = 12
+# Config-backed module constants, resolved once per session from
+# aggregate.config (see that module for the cascade and reload semantics).
+#
+# WINDOW_NINES: probability coverage for the automatic output WINDOW (number of
+# nines): the window spans roughly the 10**-WINDOW_NINES .. 1-10**-WINDOW_NINES
+# quantiles. Deliberately far tighter than BUCKET_SIZING_P (the bucket-sizing
+# percentile) so a P&L / signed aggregate's window captures essentially all the
+# mass.
+WINDOW_NINES = get_settings().discretization.window_nines
+# BUCKET_SIZING_P: percentile of the fitted distribution fed to
+# recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
+BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
+# VALIDATION_NOISE: absolute dust floor below which a quantity is treated as
+# exact zero / numerical noise.
+VALIDATION_NOISE = get_settings().validation.noise
 
 
 def max_log2(x):
@@ -116,7 +125,7 @@ def sln_fit(m, cv, skew):
         sigma = np.sqrt(np.log(1 + eta ** 2))
         shift = m - cv * m / eta
         if shift > m:
-            logger.log(WL, f'sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
+            logger.warning(f'sln_fit | shift > m, {shift} > {m}, too extreme skew {skew}')
             shift = m - 1e-6
         mu = np.log(m - shift) - sigma ** 2 / 2
         return shift, mu, sigma
@@ -334,7 +343,7 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
     return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
 
 
-def estimate_agg_window(m, sd, skew, p=RECOMMEND_P):
+def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
     """Two-sided output window ``[x_lo, x_hi]`` and width ``W`` for an aggregate.
 
     The signed counterpart of :func:`_estimate_agg_percentile`: where that
@@ -522,7 +531,7 @@ def _partial_e(sev_name, fz, a, n):
         # single parameter Pareto is scale=lambda, loc=0
         # these formulae for regular pareto, hence
         if λ + loc != 0:
-            logger.log(WL, 'Pareto not shifted to x>0 range...using numeric moments.')
+            logger.warning('Pareto not shifted to x>0 range...using numeric moments.')
             return _partial_e_numeric(fz, a, n)
         ans = []
         # will return inf if the Pareto does not have the relevant moments
@@ -694,7 +703,7 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
     # display(achieved)
     if abs(achieved.iloc[0] - target[0]) > 1e-3:
         # issues with hitting 1
-        logger.log(WL, f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
+        logger.warning(f'achieved[0] = {achieved.iloc[0]} != target[0] = {target[0]}')
         # take top right corner off
         if target[0] > attachments[0]:
             raise ValueError(f'target[0] = {target[0]} > first attachment[0] = {attachments[0]} which is impossible.')
@@ -710,7 +719,7 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
         # update
         density['p_adj'] = density['S_adj'].shift(1, fill_value=1) - density['S_adj']
         achieved = density.groupby(density.layer.shift(-1)).apply(lambda g: g['S_adj'].sum() * bs)
-        logger.log(WL, f'Revised layer 1 achieved = {achieved.iloc[0]}')
+        logger.warning(f'Revised layer 1 achieved = {achieved.iloc[0]}')
 
     density['diff S'] = density['S'] - density['Sa']
 
@@ -720,7 +729,7 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
     # data frame of layer statistics from input density
     exact = None
     if sf is not None:
-        logger.log(WL, 'sf passed in; computing exact layer statistics')
+        logger.warning('sf passed in; computing exact layer statistics')
         exact = pd.DataFrame(columns=['a', 'lev', 'aS', 'S'],
                              index=range(1, 1+len(attachments)), dtype=float)
         for i, x in enumerate(attachments):
@@ -2185,7 +2194,7 @@ class Aggregate:
         Returns ``None`` when no reinsurance is configured.
         """
         if self.occ_reins is None and self.agg_reins is None:
-            logger.log(WL, 'Asking for reins_density_df, but no reinsurance specified. Returning None.')
+            logger.warning('Asking for reins_density_df, but no reinsurance specified. Returning None.')
             return None
 
         if self._reins_density_df is None:
@@ -3162,7 +3171,7 @@ class Aggregate:
         # distribution itself; consumed at the pricing/distortion layer
         # (actuarial loss orientation). ``pnl`` sets ``payoff``. See plan §5.5.
         self._value_type = value_type if value_type in ('loss', 'payoff') else 'loss'
-        self.validation_eps = VALIDATION_EPS
+        self.validation_eps = get_settings().validation.eps
         self.sev_calc = ""
         self.discretization_calc = ""
         self.normalize = ""
@@ -3223,13 +3232,13 @@ class Aggregate:
         self._reins_describe = None
         # rebucketing scheme for reins net/ceded distributions; set the backing
         # field directly (the setter clears the caches just initialised above)
-        self._reins_bucket = reins_bucket if reins_bucket is not None else REINS_BUCKET_DEFAULT
+        self._reins_bucket = reins_bucket if reins_bucket is not None else get_settings().discretization.reins_bucket
         if self._reins_bucket not in ('linear', 'nearest'):
             raise ValueError(
                 f"reins_bucket must be 'linear' or 'nearest', not {self._reins_bucket!r}")
         # rebucketing scheme for discrete-severity atoms (dsev/dhistogram/fixed);
         # set the backing field directly (no caches to clear at construction)
-        self._dsev_bucket = dsev_bucket if dsev_bucket is not None else DSEV_BUCKET_DEFAULT
+        self._dsev_bucket = dsev_bucket if dsev_bucket is not None else get_settings().discretization.dsev_bucket
         if self._dsev_bucket not in ('linear', 'nearest'):
             raise ValueError(
                 f"dsev_bucket must be 'linear' or 'nearest', not {self._dsev_bucket!r}")
@@ -4042,7 +4051,7 @@ class Aggregate:
                 f"value_type must be 'loss' or 'payoff', not {v!r}")
         self._value_type = v
 
-    def update(self, log2=16, bs=0, recommend_p=RECOMMEND_P, debug=False,
+    def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
@@ -4050,7 +4059,7 @@ class Aggregate:
 
         :param log2:
         :param bs:
-        :param recommend_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
+        :param bucket_sizing_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
         :param debug:
         :param x_min: lower edge of the output window. ``'auto'`` (default)
           resolves to ``0`` for an ordinary non-negative aggregate (today's
@@ -4076,7 +4085,7 @@ class Aggregate:
         # reproduces ``recommend_bucket`` exactly, so ordinary aggregates are
         # unchanged.
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
-        bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, recommend_p)
+        bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p)
         N = 1 << log2
         if self._agg_affine_active():
             # ``pnl``: the loss convolution runs on the non-negative loss grid;
@@ -4189,7 +4198,7 @@ class Aggregate:
 
         # adjust for picks if necessary
         if self.sev_pick_attachments is not None:
-            logger.log(WL, 'Adjusting for picks.')
+            logger.warning('Adjusting for picks.')
             self.sev_density = self.picks(self.sev_pick_attachments, self.sev_pick_losses)
 
         if force_severity == 'yes':
@@ -5804,7 +5813,7 @@ class Aggregate:
         n_hi = f1 + zN * fsd
         return float(min(0.0, n_hi * s_min)), float(n_hi * s_max)
 
-    def _bs_window(self, log2, bs_in, x_min_in, recommend_p):
+    def _bs_window(self, log2, bs_in, x_min_in, bucket_sizing_p):
         """Decide ``(bs, log2, x_min)`` for ``update`` and build ``_bs_window_df``.
 
         Runs up to three sizing methods and records each in the expert-
@@ -5824,7 +5833,7 @@ class Aggregate:
         x_min_in : float or None
             ``None`` lets the selected method choose the origin; a number forces
             it (snapped to ``bs``, D4).
-        recommend_p : float
+        bucket_sizing_p : float
             Tail probability for the moment / bounded windows.
 
         Returns
@@ -5928,7 +5937,7 @@ class Aggregate:
             except ValueError:
                 # no finite variance (e.g. Pareto) and bs free: last-resort
                 # legacy extent (recommend_bucket bumps p / uses the limit).
-                x_hi = float(N0 * round_bucket(self.recommend_bucket(log2, p=recommend_p)))
+                x_hi = float(N0 * round_bucket(self.recommend_bucket(log2, p=bucket_sizing_p)))
             if not np.isfinite(x_hi):
                 # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
                 # the mean (collapses to the mean for a point mass).
@@ -6014,7 +6023,7 @@ class Aggregate:
 
         return sel_bs, sel_l2, ret_x0
 
-    def recommend_bucket(self, log2=10, p=RECOMMEND_P, verbose=False):
+    def recommend_bucket(self, log2=10, p=BUCKET_SIZING_P, verbose=False):
         """
         Recommend a bucket size given 2**N buckets. Not rounded.
 
@@ -6024,7 +6033,7 @@ class Aggregate:
         in that situation.
 
         :param log2: log2 of number of buckets. log2=10 is default.
-        :param p: percentile to use to determine needed range. Default is RECOMMEND_P. if > 1 converted to 1-10**-n.
+        :param p: percentile to use to determine needed range. Default is BUCKET_SIZING_P. if > 1 converted to 1-10**-n.
         :param verbose: print out recommended bucket sizes for 2**n for n in {log2, 16, 13, 10}
         :return:
         """

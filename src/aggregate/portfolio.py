@@ -23,10 +23,14 @@ from IPython.display import HTML, display
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
                         EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
-                        FT_NOISE_FLOOR, RECOMMEND_P, REINS_LABEL_OUTPUT,
-                        VALIDATION_EPS, VALIDATION_NOISE, Validation, WL)
-from .distributions import (Aggregate, Severity, WINDOW_NINES,
+                        FT_NOISE_FLOOR, REINS_LABEL_OUTPUT, Validation)
+from .config import get_settings
+from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             _flat_col_to_stats_index, approximate_from_mcvsk)
+
+# Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
+# is the absolute dust floor used throughout validation.
+VALIDATION_NOISE = get_settings().validation.noise
 
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
            'swap_density_df']
@@ -349,7 +353,7 @@ class Portfolio(object):
         # these are set when the object is updated
         self.est_m = self.est_cv = self.est_skew = self.est_sd = self.est_var = 0
 
-        self.validation_eps = VALIDATION_EPS
+        self.validation_eps = get_settings().validation.eps
 
     def help(self, regex):
         """
@@ -1667,19 +1671,19 @@ class Portfolio(object):
         df.loc['total', :] = df.sum()
         return df
 
-    def best_bucket(self, log2=16, recommend_p=RECOMMEND_P):
+    def best_bucket(self, log2=16, bucket_sizing_p=BUCKET_SIZING_P):
         """
         Recommend the best bucket. Rounded recommended bucket for log2 points.
 
         TODO: Is this really the best approach?!
 
         :param log2:
-        :param recommend_p:
+        :param bucket_sizing_p:
         :return:
         """
 
-        # bs = sum([a.recommend_bucket(log2, p=recommend_p) for a in self])
-        bs = sum([a.recommend_bucket(log2, p=recommend_p) ** 2 for a in self]) ** 0.5
+        # bs = sum([a.recommend_bucket(log2, p=bucket_sizing_p) for a in self])
+        bs = sum([a.recommend_bucket(log2, p=bucket_sizing_p) ** 2 for a in self]) ** 0.5
 
         return round_bucket(bs)
 
@@ -1732,7 +1736,7 @@ class Portfolio(object):
             coverage=f'1-1e-{WINDOW_NINES}', note='realised portfolio grid')
         self._bs_window_df = df
 
-    def _bs_window(self, log2, bs_in, recommend_p=RECOMMEND_P):
+    def _bs_window(self, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
         """Decide ``(bs, log2, x_min)`` for the portfolio combine grid.
 
         A thin signed-aware wrapper on :meth:`best_bucket`. For a non-signed
@@ -1760,7 +1764,7 @@ class Portfolio(object):
             Bucket-count cap, ``2**log2`` buckets.
         bs_in : float
             ``0`` to estimate the bucket; ``>0`` to force it (honoured).
-        recommend_p : float
+        bucket_sizing_p : float
             Tail probability for the per-unit moment windows.
 
         Returns
@@ -1771,13 +1775,13 @@ class Portfolio(object):
         """
         N = 1 << log2
         if not self._signed():
-            bs = float(bs_in) if bs_in > 0 else self.best_bucket(log2, recommend_p)
+            bs = float(bs_in) if bs_in > 0 else self.best_bucket(log2, bucket_sizing_p)
             return bs, log2, 0.0
 
         # ---- phase 1: per-unit natural signed windows (analytic) ----------
         rows = []
         for a in self.agg_list:
-            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, recommend_p)
+            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
             used = a._bs_window_df.loc['used']
             x_max_k = float(used['x_max'])
             rows.append(dict(unit=a.name, x_min=float(x_min_k), x_max=x_max_k,
@@ -1793,7 +1797,7 @@ class Portfolio(object):
         if bs_in > 0:
             bs = float(bs_in)
         else:
-            bs_best = self.best_bucket(log2, recommend_p)
+            bs_best = self.best_bucket(log2, bucket_sizing_p)
             bs_fit = W_tot / N if N else W_tot
             bs = round_bucket(max(bs_best, bs_fit))
         # Analytic origin estimate: the support min of the sum, floored so no
@@ -1809,7 +1813,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
-               trim_df=False, add_exa=True, force_severity=True, recommend_p=RECOMMEND_P,
+               trim_df=False, add_exa=True, force_severity=True, bucket_sizing_p=BUCKET_SIZING_P,
                debug=False):
         """
 
@@ -1839,7 +1843,7 @@ class Portfolio(object):
         :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
             epd info
         :param force_severity: force computation of severities for aggregate components even when approximating
-        :param recommend_p: percentile to use for bucket recommendation.
+        :param bucket_sizing_p: percentile to use for bucket recommendation.
         :param debug: if True, print debug information
         :return:
         """
@@ -1853,11 +1857,11 @@ class Portfolio(object):
         # books keep the legacy ``best_bucket`` path exactly (3.0 gate).
         signed = self._signed()
         if signed:
-            bs, log2, _x_min_est = self._bs_window(log2, bs, recommend_p)
+            bs, log2, _x_min_est = self._bs_window(log2, bs, bucket_sizing_p)
             self.log2 = log2
             self.bs = bs
         elif bs == 0:
-            self.bs = self.best_bucket(log2, recommend_p)
+            self.bs = self.best_bucket(log2, bucket_sizing_p)
             logger.info(f'bs=0 enterered, setting bs={bs:.6g} using self.best_bucket rounded to binary fraction.')
         else:
             self.bs = bs
@@ -1902,7 +1906,7 @@ class Portfolio(object):
                            sev_calc=sev_calc,
                            discretization_calc=discretization_calc,
                            normalize=normalize, force_severity=force_severity,
-                           x_min='auto', recommend_p=recommend_p, debug=debug)
+                           x_min='auto', bucket_sizing_p=bucket_sizing_p, debug=debug)
                 ft_line_density[agg.name] = agg.ftagg_density
                 x_mins.append(agg.x_min)
                 if ft_all is None:
@@ -2432,7 +2436,7 @@ class Portfolio(object):
 
         if not np.all(df.p_total >= 0):
             n_neg = (df.p_total < -cut_eps).sum()
-            logger.log(WL, f'p_total has {n_neg} negative values; NOT setting to zero...')
+            logger.warning(f'p_total has {n_neg} negative values; NOT setting to zero...')
         sum_p_total = df.p_total.sum()
         logger.info(f'{self.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')
         df['F'] = np.cumsum(df.p_total)
@@ -2916,7 +2920,7 @@ class Portfolio(object):
         n_neg = (df.S < 0).sum()
         if n_neg:
             n_below_neg_eps = (df.S < -cut_eps).sum()
-            logger.log(WL, f'{n_below_neg_eps} negative S < -eps values being set to zero...')
+            logger.warning(f'{n_below_neg_eps} negative S < -eps values being set to zero...')
         df.loc[df.S < 0, 'S'] = 0
 
         df['gS'] = g(df.S)

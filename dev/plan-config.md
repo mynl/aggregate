@@ -7,7 +7,25 @@ reins plans). Goal: lift the "secret bits" currently hard-coded in
 hand-editable **TOML** file under `~/.aggregate/`, layered as an override on the
 shipped defaults — without violating the project's no-magic principle.
 
-> **STATUS: NOT STARTED — plan for review.** Author confirmed (2026-06-04):
+> **STATUS: PHASE 1 SHIPPED (2026-06-05, v1.0.0a30).** `config.py` +
+> annotated `data/config.default.toml` landed; `requires-python>=3.11` + stdlib
+> `tomllib`; `WL` deleted (→ `logger.warning`); full `recommend_p →
+> bucket_sizing_p` rename (no alias); `[build]` / `[discretization]` /
+> `[validation].eps`+`.noise` / `[multivariate].window_nines` wired through
+> `get_settings()`; the 10-vs-16 `log2` split fixed (bare `Underwriter()` and
+> module `build` both read `[build]`); `Underwriter` gains a `config` info line,
+> `show_settings()`, `write_default_config()`, `reload_settings()`; new
+> `tests/test_config.py` (16 cases); full suite green (1009 passed). **One
+> deliberate deviation from the slim-everything wording:** `constants.py` still
+> holds the **plotting** constants (`FIG_*`, `FONT_SIZE`, …) and the
+> **numerics-pending floors** (`ALIASING_RATIO`, `EXEQA_NOISE_FLOOR`,
+> `FT_NOISE_FLOOR`) — the plotting ones are used in default-argument
+> expressions (must stay module-level until the Phase 2 plot repoint), and the
+> floors await the numerics review. **Phase 2 remains** (plotting/`[plotting]` +
+> mplstyle override, the rest of the env matrix, the floors); this plan stays in
+> `dev/` until it ships.
+>
+> **STATUS (original): NOT STARTED — plan for review.** Author confirmed (2026-06-04):
 > TOML format; location `~/.aggregate/` via `Path.home()` (option A — **no
 > `platformdirs`**); precedence defaults→file→env→kwargs; never auto-create;
 > ship an all-commented template you uncomment to activate; `Underwriter.info`

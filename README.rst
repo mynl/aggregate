@@ -28,6 +28,66 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a30
+---------
+
+User-editable configuration file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The "secret bits" that used to be hard-coded literals — the default ``log2``,
+the default database, the reinsurance / discrete-severity bucketing scheme, the
+bucket-sizing percentile, the output-window coverage, and the validation
+tolerances — are now read from a single, optional, hand-editable **TOML** file
+at ``~/.aggregate/config.toml``. Values layer lowest-to-highest as
+**built-in defaults → config file → ``AGGREGATE_*`` environment variables →
+explicit ``build(...)`` / ``Underwriter(...)`` keyword arguments**, so a call
+argument always wins and two fresh installs with no file behave identically.
+
+New surface (all on the module-level ``build`` and any ``Underwriter``):
+
+- ``build.write_default_config()`` writes an annotated, **fully-commented**
+  template to ``~/.aggregate/config.toml`` (inert until you uncomment a key);
+- ``build.show_settings()`` prints every setting **and its source**
+  (``default`` / ``config`` / ``env``);
+- ``build.reload_settings()`` re-reads the file/environment after an edit and
+  refreshes the module ``build`` in place;
+- ``aggregate.get_settings()`` returns the resolved, immutable ``Settings``
+  snapshot (read once per session);
+- ``repr(build)`` / ``Underwriter`` info gains a ``config`` line reporting the
+  active file and how many settings are overridden;
+- escape hatches: ``AGGREGATE_CONFIG=/path`` relocates the file,
+  ``AGGREGATE_CONFIG=none`` ignores it (reproducible runs). Unknown keys,
+  sections, and ``AGGREGATE_*`` variables warn loudly rather than silently
+  no-op.
+
+The tunable defaults and the path names now live in the new leaf module
+``aggregate.config``; ``aggregate.constants`` is slimmed to the ``Validation``
+flag enum, ``DefectiveDistributionWarning``, and the structural reinsurance
+column labels.
+
+**Breaking changes**
+
+- **Minimum Python is now 3.11** (the config reader uses the standard-library
+  ``tomllib``; no new third-party dependency). The 3.10 classifier is dropped.
+- **``recommend_p`` is renamed to ``bucket_sizing_p``** everywhere — the
+  ``build`` / ``build_many`` / ``update`` keyword, the ``hints{...}`` key, and
+  the underlying constant. There is **no alias**; update any call sites.
+- The tunable names that used to live in ``aggregate.constants`` (e.g.
+  ``VALIDATION_EPS``, ``VALIDATION_NOISE``, ``RECOMMEND_P``,
+  ``REINS_BUCKET_DEFAULT``, ``DSEV_BUCKET_DEFAULT``) moved to
+  ``aggregate.config`` and are **not** re-exported; read them from
+  ``get_settings()`` (e.g. ``get_settings().validation.noise``).
+- A bare ``Underwriter()`` now takes its ``log2`` / ``databases`` / ``update``
+  defaults from the configured ``[build]`` section (this unifies the old
+  10-vs-16 ``log2`` split with the module ``build``); pass ``databases=None``
+  to load nothing.
+
+Scope: this is Phase 1 — the ``[build]``, ``[discretization]``,
+``[validation].eps`` / ``.noise``, and ``[multivariate].window_nines`` settings.
+Plot styling (``[plotting]`` / ``.mplstyle`` override) and the numerics-pending
+validation floors (``aliasing_ratio``, ``exeqa_noise_floor``, ``ft_noise_floor``)
+land in a later phase.
+
 1.0.0a29
 ---------
 

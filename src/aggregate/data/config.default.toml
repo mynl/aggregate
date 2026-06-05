@@ -1,0 +1,84 @@
+# aggregate configuration -- annotated template
+# =============================================================================
+# Copy this file to  ~/.aggregate/config.toml  (e.g. via
+# `aggregate.config.write_default_config()` or
+# `build.write_default_config()`), then UNCOMMENT and edit the lines you want
+# to change. Every line below is commented out, so a freshly written file is
+# inert: it produces exactly the built-in defaults until you uncomment a key.
+#
+# Precedence (low -> high): built-in defaults  <  this file  <  AGGREGATE_*
+# environment variables  <  explicit build(...) / Underwriter(...) keywords.
+#
+# The file is read ONCE per session (on first use). After editing it in a live
+# session, call  aggregate.config.reload_settings()  (or restart). The shown
+# values are the defaults.
+# =============================================================================
+
+
+# [build] -- defaults for Underwriter() and the module-level `build`.
+[build]
+# log2: log2 of the number of grid buckets (2**log2 buckets). Larger = finer
+# and more accurate but more memory/time (memory ~ 2**log2). Typical 10..20.
+# log2 = 16
+
+# bs: bucket size. 0 = let the object recommend one (recommended). Otherwise a
+# positive float (a power of two, or 1/64 etc.) pins the grid.
+# bs = 0
+
+# padding: FFT zero-padding (extra powers of two of space) used in update.
+# padding = 1
+
+# normalize: renormalise the discretized severity in update. true | false.
+# normalize = true
+
+# databases: knowledge base(s) loaded on construction. A list of names.
+#   "test_suite"           -- the bundled reference suite (historical default)
+#   "default"              -- every bundled *.agg file
+#   "user"                 -- your *.agg files in ~/.aggregate
+#   "all"                  -- bundled + user
+#   "my_book"              -- a single named file (CWD, then ~/.aggregate, then bundled)
+# databases = ["test_suite"]
+
+# update: auto-update constructed objects. true | false.
+# update = true
+
+
+# [discretization] -- how distributions are placed on the FFT grid.
+[discretization]
+# reins_bucket: rebucketing scheme for reinsurance net/ceded distributions.
+#   "linear"  -- split off-grid mass across the two bracketing buckets
+#                (preserves the first moment exactly) [recommended]
+#   "nearest" -- round to the closest bucket (<= bs/2 positional bias)
+# reins_bucket = "linear"
+
+# dsev_bucket: placement scheme for discrete-severity atoms (dsev / dhistogram
+# / fixed). Same options as reins_bucket.
+# dsev_bucket = "linear"
+
+# bucket_sizing_p: percentile of the fitted distribution used to size bs in
+# recommend_bucket. Values > 1 are read as a number of nines (p -> 1 - 10**-p),
+# so e.g. 6 means 0.999999. Raise toward 1 for thick-tailed distributions.
+# bucket_sizing_p = 0.99999
+
+# window_nines: nines defining the automatic 1-D aggregate output window
+# (spans ~ 10**-n .. 1 - 10**-n quantiles). Higher = wider window. Typical 8..14.
+# window_nines = 12
+
+
+# [validation] -- moment-matching tolerances.
+[validation]
+# eps: relative-error threshold above which a moment mismatch is flagged.
+# eps = 1e-4
+
+# noise: absolute dust floor; quantities below this are treated as exact zero.
+# This is a numerical floor, NOT a coverage target. aggregate's FFT arithmetic
+# is essentially exact, so keep this tight: sensible band 1e-12 .. 1e-14.
+# noise = 1e-12
+
+
+# [multivariate] -- defaults for the multivariate module.
+[multivariate]
+# window_nines: nines for the per-axis 2-D sizing window. Independent of
+# [discretization].window_nines because the 2-D per-axis grid may want fewer
+# nines to control memory (memory ~ grid squared). Typical 8..12.
+# window_nines = 12

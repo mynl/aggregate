@@ -19,8 +19,11 @@ import numpy as np
 import pytest
 
 from aggregate import build
-from aggregate.constants import REINS_BUCKET_DEFAULT, VALIDATION_NOISE
+from aggregate.config import get_settings
 from aggregate.utilities import make_ceder_netter, _validate_reins_layers
+
+VALIDATION_NOISE = get_settings().validation.noise
+REINS_BUCKET_DEFAULT = get_settings().discretization.reins_bucket
 
 
 # An excess layer with an off-grid attachment relative to the recommended

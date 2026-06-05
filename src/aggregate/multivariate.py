@@ -57,15 +57,17 @@ import pandas as pd
 import scipy.fft as sfft
 
 from .constants import FIG_H, FIG_W
+from .config import get_settings
 from .moments import MomentAggregator, xsden_to_mwrangler
 from .utilities import round_bucket
 
 logger = logging.getLogger(__name__)
 
 # Coverage of the per-axis sizing window: 1 - 10**-_WINDOW_NINES per tail.
-# Mirrors distributions.WINDOW_NINES; duplicated to avoid importing the heavy
-# distributions module at import time (it imports this module's siblings).
-_WINDOW_NINES = 12
+# First-class multivariate setting (see aggregate.config [multivariate]);
+# independent of the 1-D distributions.WINDOW_NINES because the 2-D per-axis
+# grid may want fewer nines for memory. Resolved once per session.
+_WINDOW_NINES = get_settings().multivariate.window_nines
 
 
 def size_axis(agg_density, xs, bs_model, bs=None, log2=None,

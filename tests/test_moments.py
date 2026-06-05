@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aggregate.constants import VALIDATION_NOISE
+from aggregate.config import get_settings
 from aggregate.moments import (
     xsden_to_mwrangler,
     ser_to_mwrangler,
@@ -24,6 +24,8 @@ from aggregate.moments import (
     _noise_aware_rel_error,
     _snap_noise,
 )
+
+VALIDATION_NOISE = get_settings().validation.noise
 
 # A fair die: discrete uniform on {1, ..., 6}.
 DIE_XS = np.arange(1.0, 7.0)

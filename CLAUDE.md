@@ -138,8 +138,8 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 
 ## TODO
 
-The full pending list — parked refactor items, docs/packaging follow-ups, and
-deep-dive intentions — lives in **`dev/TODO-Remember.md`**. Check there before
+The full pending list — pre-ship work and post-v1.0 ideas — lives in
+**`dev/TODO.md`** (what's landed is in `dev/PROGRESS.md`). Check there before
 proposing structural changes so you don't reinvent something already scoped (or
 already deferred for a reason).
 

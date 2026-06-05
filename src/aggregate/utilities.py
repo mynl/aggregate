@@ -654,7 +654,7 @@ def agg_help(self, regex):
                 display(Markdown(f'### Callable: {i}\n'))
                 try:
                     print(ob())
-                except Exception as e:
+                except Exception:
                     help(ob)
 
 

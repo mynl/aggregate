@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from functools import lru_cache, wraps
 import json
 import inspect
-import itertools
 import logging
 import warnings
 import matplotlib.ticker as ticker
@@ -19,12 +18,11 @@ from scipy.optimize import newton
 from scipy.special import kv, gammaln, hyp1f1, loggamma, binom
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
-from scipy.interpolate import interp1d
 from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
                         FIG_H, FIG_W,
-                        REINS_LABEL_GROSS, REINS_LABEL_SUBJECT, REINS_LABEL_NET,
+                        REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
                         Validation)
 from .config import get_settings
@@ -49,7 +47,9 @@ import aggregate.random_agg as ar
 from .spectral import Distortion
 from . import tail as _tail
 # Re-export the bounded tables for back-compat; tail.py is the source of truth.
-from .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS, TailClass
+# (Unused here, but tests/external code import them via this module -- see
+# tests/test_tail.py; keep the noqa so ruff doesn't strip the re-export.)
+from .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS, TailClass  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -2464,7 +2464,6 @@ class Aggregate:
         nan6 = (np.nan,) * 6
 
         rd = self.reins_density_df
-        xs = self.xs
         data = {}  # (stage, view, basis) -> Series over row_index
 
         def put(stage, view, basis, freq6, sev6, agg6):
@@ -4825,7 +4824,7 @@ class Aggregate:
             # locate correct left hand edge, index created below
             L = (L // N) * N
             # method reporting
-            mode = f'Shift only'  # \n{L=}'
+            mode = 'Shift only'  # \n{L=}'
         elif l == r - 1:
             # must wrap answer into one block and shift
             # figure location of extreme points as remainders
@@ -4839,7 +4838,7 @@ class Aggregate:
             # shifted index, factoring in unwrap
             L = (L // N + 1) * N - roll_forward
             # method reporting
-            mode = f'Shift and wrap'  # \n{roll_forward=}, {L=}'
+            mode = 'Shift and wrap'  # \n{roll_forward=}, {L=}'
         else:
             # see blog post
             print(f'Should not occur: {l=}, {r=}')
@@ -5048,12 +5047,12 @@ class Aggregate:
         cdf = reins_df[['p_subject', 'p_net', 'p_ceded']].cumsum()
         cdf.columns = ['F_subject', 'F_net', 'F_ceded']
         cdf.plot(xlim=xlim, ax=ax)
-        ax.set(title=f'Subject, net and ceded\ndistributions')
+        ax.set(title='Subject, net and ceded\ndistributions')
         ax.legend()
 
         ax = axd['D']
         reins_df.filter(regex='p_').plot(xlim=xlim, drawstyle='steps-post', ax=ax)
-        ax.set(title=f'Subject, net and ceded\ndensities')
+        ax.set(title='Subject, net and ceded\ndensities')
         ax.legend()
 
         return ceder, netter, reins_df
@@ -5451,7 +5450,7 @@ class Aggregate:
                 return [eps, mx * 1.5]
         else:
             # if you fall through to here, wrong args
-            raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
+            raise ValueError('Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
     # ================================================================
     # Display reports, diagnostics, queries, risk measures, pricing

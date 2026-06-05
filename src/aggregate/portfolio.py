@@ -1,16 +1,9 @@
-from collections.abc import Iterable
 from copy import deepcopy
 import json
 import logging
-import matplotlib as mpl
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from matplotlib.ticker import (MultipleLocator, StrMethodFormatter, MaxNLocator,
-                               FixedLocator, FixedFormatter, AutoMinorLocator)
 import numpy as np
 import pandas as pd
-from pandas.io.formats.format import EngFormatter
 from pandas.plotting import scatter_matrix
 from pathlib import Path
 import re
@@ -19,11 +12,10 @@ from scipy.optimize import bisect
 from scipy.spatial import ConvexHull
 from textwrap import fill
 import warnings
-from IPython.display import HTML, display
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
                         EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
-                        FT_NOISE_FLOOR, REINS_LABEL_OUTPUT, Validation)
+                        REINS_LABEL_OUTPUT, Validation)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             _flat_col_to_stats_index, approximate_from_mcvsk)
@@ -39,12 +31,11 @@ from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
 from .spectral import Distortion, DISTORTION_DTYPE
 from . import tail as _tail
 from .tail import TailClass
-from .moments import (MomentAggregator, MomentWrangler,
-                      xsden_to_mwrangler,
+from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from .iman_conover import iman_conover
 from .utilities import (ft, ift, decl_pprint,
-                        subsets, round_bucket,
+                        round_bucket,
                         make_var_tvar, agg_help, explain_validation)
 import aggregate.random_agg as ar
 
@@ -643,7 +634,7 @@ class Portfolio(object):
         raise NotImplementedError(
             'Portfolio.pricing_bounds is pending an update for the new '
             'Bounds API (1.0.0a11). See GitHub issue / CLAUDE.md TODO.')
-        from .bounds import Bounds  # noqa: unreachable
+        from .bounds import Bounds
         if a == 0:
             assert p > 0, 'Must provide either a or p'
             a = self.q(p)
@@ -1379,7 +1370,7 @@ class Portfolio(object):
             elif 'scale' in s:
                 s['scale'] *= other
             else:
-                raise ValueError(f"Cannot adjust s['name'] for scale")
+                raise ValueError(f"Cannot adjust {s['name']} for scale")
 
         return Portfolio(f'{other} x {self.name}', new_spec)
 
@@ -2213,7 +2204,7 @@ class Portfolio(object):
             rv |= r
 
         if rv != Validation.NOT_UNREASONABLE:
-            logger.info(f'Exiting: Portfolio validation steps skipped due to failed or n/a Aggregate validation')
+            logger.info('Exiting: Portfolio validation steps skipped due to failed or n/a Aggregate validation')
             self._valid = rv
             return rv
         else:
@@ -2358,7 +2349,7 @@ class Portfolio(object):
             return [1e-12, mx * 2]
         else:
             # if you fall through to here, wrong args
-            raise ValueError(f'Inadmissible stat/kind passsed, expected range/density and log/linear.')
+            raise ValueError('Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
     def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
         """

@@ -9,7 +9,6 @@ itself on import via ``__init_subclass__`` and supplies its own ``g``,
 instance of the appropriate subclass; existing call sites are unchanged.
 """
 from collections import namedtuple
-from collections.abc import Iterable
 from functools import cached_property
 from io import StringIO
 import logging

@@ -11,7 +11,7 @@ it across modules. Future additions: figure-generation helpers currently in
 ``recentering_convolution[_example]``) and ``aggregate.tweedie``
 (``tweedie_illustration``).
 """
-from itertools import count, cycle
+from itertools import count
 import logging
 import matplotlib.pyplot as plt
 import matplotlib as mpl

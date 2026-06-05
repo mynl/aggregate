@@ -4,8 +4,6 @@ pygments lexer for the Dec Language  using standard colorings.
 """
 
 
-from pygments import highlight
-from pygments.formatters import HtmlFormatter
 from pygments.lexer import RegexLexer, include,  words
 from pygments.token import (Text, Comment, Operator, Keyword, Number,
                             Punctuation, Name, Generic)

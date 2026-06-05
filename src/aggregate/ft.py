@@ -18,7 +18,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from scipy.fft import irfft, rfft, ifft as ift
-from numpy import real, imag, roll
+from numpy import roll
 
 from .constants import FIG_H, FIG_W
 from .distributions import Aggregate
@@ -973,7 +973,7 @@ class FourierTools:
 
 def make_levy_chf(alpha, beta):
     """Make the ch of stable(alpha, beta) per Nolan book page 5 Def 1.3."""
-    assert 0 < alpha < 2, f'alpha must be in (0, 2]'
+    assert 0 < alpha < 2, 'alpha must be in (0, 2]'
     if alpha == 1:
         def chf(t):
             return np.where(t==0, 1.,

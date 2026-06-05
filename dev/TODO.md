@@ -1,150 +1,267 @@
 # TODO
 
-> Two lists: (1) must-do before v1.0 ships, (2) ideas and post-v1.0
-> considerations. Snappy entries only; details live in the plan files
-> (`dev/`, `dev/done/`) and the git log (one commit per a-iteration).
-> What's landed is in `PROGRESS.md`.
+> The v1.0 backlog, organized into **tracks** with mnemonic codes. Two tables
+> first (tracks; priorities + dependencies), then the details, then post-v1.0
+> ideas. Snappy entries only — details live in the plan files (`dev/`,
+> `dev/done/`) and the git log. What's landed is in `PROGRESS.md`.
 >
-> **Last updated: 2026-06-04** — current version 1.0.0a28.
+> **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
+> `[B]` early beta = fine just after the alpha→beta cut, does not block it.
+>
+> **Last updated: 2026-06-05** — current version 1.0.0a30.
 
 ---
 
-## DOD
+## Track codes (alphabetical)
 
-- [ ] Docs updated
-    - [ ] new features
-    - [ ] new grammar
-    - [ ] new syntax
-    - [ ] removed features
-    - [ ] Journey for v1.0
-    - [ ] statements of philosophy: user manages logging, user manages warnings and matplotlib setup; the distribution **is** pi at xi (not a cts approx thereunto - can't detect jumps); user manages fancy pd.DataFrame formatting - ``qd`` is an exception for docs fixed font print
-- [ ] Numerical calculations checked
-- [ ] Numerical methods updated for negative xs
-- [ ] Sensible test suite trimmed for go-forward development
+| Code | Track |
+|------|-------|
+| **B** | Bugs & investigations |
+| **D** | Docs & packaging |
+| **F** | Features (approximation, pricing, config) |
+| **H** | Hygiene (module organization & dependencies) |
+| **M** | Multivariate |
+| **N** | Numerics & pricing core (incl. signed / negative-x) |
+| **T** | Tests (suite consolidation) |
+| **W** | Windows & plotting |
 
+## Priorities & dependencies
 
-- [ ] NUMERICS: Review Severity numerical moments calc - it works but can it be improved - change with zero blast radius
-- [ ] NUMERICS: Review Aggregate main computation loop - the P. M. Q. etc elements
-- [ ] NUMERICS: Review Portfolio numerics... (split from interface) (ditto)
-- [ ] NUMERICS: what does plot_twelve actually need
-- [ ] NUMERICS: Review Bounds numerics
-- [ ] NUMERICS: implications of negative xs
-- [ ] NUMERICS: Portfolio.pricing_bounds (possible duplicate)
-- [ ] **alpha**? Ability to do approximate somehow (and pick gamma lognormal based on tail) (again, since functin removedoality removed)
-- [ ] **alpha**?Pedagogy to reproduce G & H tilting example (since that was removed)
-- [ ] **alpha**?move make_ceder_netter  from ultilities to distributions - why is it where it is?
-- [ ] **alpha**? why utilities make_var_tvar and a version in distributions
-- [ ] **alpha**? Review all import dependencies for small non-standard packages. eg cycler in graphics?
+**Critical path (the spine):** `N1 → N2 → N3 → N4 → N5`, plus `N6` (validation)
+alongside. **Start at `N1`.**
 
-- [ ] New README and split out CHANGELOG.md
-- [ ] PUNCHUP pedagogy and integrate with docs - possible minor renamings. OK to push into beta
-- [ ] DOCS: tail descriptor testing and docs (bounded, log concave, super expon, expon, sub expon) for f and s
-- [ ] DOCS:  bounded / unbounded indicator
-- [ ] 10000 xs 0 lognorm 120 cv 1.5 triggers sum sev < 1 warning? --> is it for agg not sev
-- [ ] DECL: ``of`` in place or as well as ``po`` / ``so`` (and or spell them out)
-- [ ] Reins structure diagrams? Use PMIR code?
-- [ ] Gross -> subject for agg only in desc.
-- [ ] Port pmir code w best bucket and the clever manual kappa calculation? (minor add, ok beta)
-- [ ] Can we avoid the ugly cts histogram with small spikes if we use linear/nearest? Was it all about stats? WHAT IS THIS??? I forget...
-- [ ] IMPORTANT: review validation calc; all switches config; docs reflect actual algo (compare published Aggregate paper); validation fix: fails agg mean error >> sev, possible aliasing; try larger bs which is often a bit annoying and maybe too tight tolerance.
-- [ ] built in test_suite library - combine the three libraries we have into one - with out breaking tests (see next)
-- [ ] **TESTS** inspect tests for needed / no longer needed. ratioalize without decreasing effectiveness. Integrate better with new single test_suite. 
+| Status | ID | Item | Phase | Depends on | Parallel-safe with |
+|:--|----|------|:-----:|------------|--------------------|
+|    | N1 | Aggregate `update` — base `density_df` calcs (+ neg-x) | A | — | H*, B*, F1–F3, D3, D5, W1 |
+|    | N2 | Portfolio `update` — kappa / exa / `add_exa` (+ neg-x) | A | N1 | (same) |
+|    | N3 | Portfolio apply-distortion calcs — columns, masses, `plot_twelve` | A | N2 | (same) |
+|    | N4 | Bounds numerics read-through | A | N2 | runs after the spine settles |
+|    | N5 | `Portfolio.pricing_bounds` rewrite | A | N4 | — *(periodic reminders)* |
+|    | N6 | Validation-calc review | A | — | independent of N1–N5 |
+|    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
+|    | H1 | Relocate `make_ceder_netter` | A | — | everything |
+|    | H2 | Dedupe `make_var_tvar` | A | — | everything |
+|    | H3 | Import-dependency audit | A | — | everything |
+|    | H4 | Docstring style sweep → NumPy | A | — | everything |
+|    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
+|    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
+|    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
+|    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
+|    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
+|    | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
+|    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
+|    | F5 | DecL `of` synonym | B | — | — |
+|    | F6 | Gross/ceded-premium reinsurance P&L | B | — | — |
+|    | F7 | PMIR best-bucket + manual kappa | B | — | pairs T3 |
+|    | F8 | Config **Phase 2** (plotting/style, env, floors) | B | — | ties W1–W3 |
+|    | W1 | Support-aware window bounds | A | — | N*, H*, B* |
+|    | W2 | Window bounds for bivariate | B | W1 | ties M |
+|    | W3 | Plot severity outside the agg window | B | — | — |
+|    | M1 | Multivariate later stages (2–5) | B | — | — |
+|    | M2 | Multivariate punch-up (sizing/coverage) | B | — | ties W2 |
+|    | T1 | Merge the three `.agg` libraries into one | A | — | — |
+|    | T2 | Rationalize tests / library coupling | A | T1 | after code churn |
+|    | T3 | Switcheroo `Port.Sample` regression case | B | — | pairs F7 |
+|    | D1 | New README + split CHANGELOG | A | — | docs parallel |
+|    | D2 | v1.0 Journey + statements of philosophy | A | — | docs parallel |
+|    | D3 | Grammar reference from `decl.lark` | A | — | ready now |
+|    | D4 | Tail-descriptor docs + tests | A | tail (shipped) | docs parallel |
+|    | D5 | Doc gaps (errors, ZT/ZM, splice, site refs…) | A | — | ready now |
+|    | D6 | API docstring coverage / rendering | A | H4 | docs parallel |
+|    | D7 | Reinsurance case-study docs rewrite | B | N2–N3 | — |
+|    | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 | — |
+|    | D9 | Reinsurance structure diagrams | B | — | — |
 
+**Status:** blank = untouched, X Done, P in Progress
 
-## 1. TODO before v1.0 ships
-
-### Features added from my personal list
-
-- [ ] Docs: custom errors
-- [ ] Docs: syntax checker and better error reporting
-- [ ] Docs: check for refs to "site" database (2_user_guides/2_x_case_studies.html)
-- [ ] Docs: check and examples for ZT and ZM (zero truncation...)
-- [ ] Docs: splice examples
-- [ ] pricing_at method needs a = P + Q and consistent Pentagon output
-- [ ] ?better Pentagon integration? Output to Pentagon?
-
-### Features in flight
-
-- [x] (1) **Tail-thickness classifier.** Implementation in flight (`tail.py`,
-   `tests/test_tail.py` in the working tree); plan in
-   `dev/done/plan-tail-thickness.md`.
-- [ ] (2) **Portfolio negative-x pricing half.** `dev/plan-portfolio-neg-x-pricing.md`
-   (DRAFT): the `add_exa` column audit, distortion pricing, `value_type`
-   consumption. Signed books warn + fall back to F/S-only until this lands.
-- [ ] (3) **Negative-x deferred follow-ups.** Two-sided deficit split; `ft.py`
-   recentering helpers → call the core path; re-home `estimate_agg_window` to
-   `utilities.py`; occ-reins on a signed severity grid; DecL keyword for
-   `signed`/`value_type`.
-- [ ] (4) **Multivariate later stages.** Stage 2 `t` copula; Stage 3 reporting/plot
-   polish; Stage 4 ≥3-variate `rfftn` shared frequency; Stage 5
-   `MultivariatePortfolio` / `netceded` DecL form. See
-   `dev/done/plan-multivariate.md`. Better implementation of window.
-- [ ] (5) **Gross/ceded-premium reinsurance P&L.** Extend `pnl` with both premium
-   legs so the gross/ceded/net loss views become parallel P&L views. Split
-   out of `plan-pnl-premium.md` §9.
-
-### Windows and plotting
-
-- [ ] (6) **Support-aware window bounds.** Use `fz.support()` lower/upper endpoints
-   in the window estimator; for finite frequency the aggregate support is
-   exactly `[N·loc, N·ub]` — an exact window instead of a MoM guess.
-- [ ] (7) **Window bounds for bivariate.** Apply the window estimation machinery to
-   the bivariate/multivariate per-axis sizing.
-- [ ] (8) **Plot severity outside the aggregate window.** When the windowed
-   aggregate and severity grids don't overlap, how to render severity in
-   `plot` — inset, broken axis, or separate figure? `info` already warns.
-
-### Numerics and pricing deep dives
-
-- [ ] (9) **Portfolio update numerics.** Trace `Portfolio.update` → `add_exa`
-   end-to-end (every column, the `shift(-1)` tail handling, the `loss_max`
-   blanking heuristic that wants a principled `F < k·eps` rule).
-- [ ] (10) **Bounds numerics.** Read `bounds.py` (IME 2022, 513-point binary
-    `s_grid`) end-to-end before attempting the `pricing_bounds` rewrite.
-- [ ] (11) **`Portfolio.pricing_bounds` rewrite.** `NotImplementedError` since a11;
-    needs `exeqa_*` interpolated onto the new `s_grid`. **Author wants
-    periodic reminders.**
-
-### Testing
-
-- [ ] (12) **Switcheroo harness case.** Add a `Port.Sample` case to the baseline when
-    Portfolio sample work next surfaces, to regression-guard the
-    kappa-replacement path.
-
-### Docs and packaging
-
-- [ ] (13) **New README.** Rewrite `README.rst` for the stable v1.0 audience (what,
-    who, install, one-liner DecL example); it currently reads as release
-    notes.
-- [ ] (14) **CHANGELOG file.** Extract the README iteration notes into a proper
-    `CHANGELOG.rst` keyed by version.
-- [ ] (15) **Docs intro for v1.0.** Short orienting page on the v1.0 shift (linear
-    allocation default, bounded detection, forwards-`S`, pentagon columns,
-    `DefectiveDistributionWarning`); replace legacy framing.
-- [ ] (16) **Reinsurance case-study docs rewrite.** Three `docs/2_user_guides/problems`
-    case studies (bahnemann, enterprise risk, other_misc) were left as
-    migration notes after a19; rebuild their per-layer exhibits directly from
-    `reins_stats_df` and verify against published references.
-- [ ] (17) **Grammar reference docs.** `docs/4_agg_language_reference/` still
-    describes the SLY-era grammar; switch to including `decl.lark` /
-    `grammar(add_to_doc=True)` output.
-- [ ] (18) **Docstring style sweep.** Convert `iman_conover.py` / `moments.py` (and
-    pockets elsewhere) from Sphinx `:param:` style to NumPy style; public
-    surface first.
-- [ ] (19) **`pedagogy.py` migrations.** Move the remaining figure generators out of
-    `ft.py` and `tweedie.py` so those modules stay API-focused.
+**DOD mapping:** Docs updated → **D**; Numerical calculations checked +
+negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## 2. Ideas to consider
+## Track N — Numerics & pricing core  `[A]` (critical path)
 
-- [ ] (20) **Multi-resolution portfolio combine.** The real fix for the coarse
-    shared-`bs` deficit (a22 residual #4): compute each unit on its own `bs`,
-    decimate onto the shared grid before the Fourier product. Out of scope for
-    now; the deficit is accepted and surfaced.
-- [ ] (21) **General premium/loss algebra in DecL (v2.0).** Constant aggregates,
-    full aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl` covers the
-    common case for v1.0.
-- [ ] (22) **DecL colorization.** Design parked 2026-05-27
-    (`dev/tentative-plan-decl-colorization.md`); payoff is mostly Sphinx-docs
-    identity. Wait for a clearer use case.
+> Negative-x is folded in here: it focuses on the same code and the same
+> calculations. All "review numerics" work is **zero blast radius** (internal,
+> no API change, ideally identical numbers — faster compute + trim unused
+> `density_df` columns) **except** where the negative-x angle deliberately
+> extends behaviour to signed support. **Separate the base `density_df` calcs
+> from the apply-distortion calcs — both have a negative-x angle.**
+
+- [ ] **N1 `[A]` Aggregate `update` — base `density_df` calcs.** Severity
+  numerical-moments review (#26) + the main compute loop, the P / M / Q
+  (Pentagon) elements (#27), with the **negative-x** angle on the Aggregate grid
+  (#31). Includes **BUG: `.plot` draws a baseline from 0 to the first `xs`**,
+  wrong for signed support *(new, 2026-06-05)*. The severity-moments and
+  agg-loop pieces can split into parallel sub-tasks.
+- [ ] **N2 `[A]` Portfolio `update`.** Computation of **kappas, exa / exeqa,
+  `add_exa`** with the negative-x angle (#28 + #9). Trace
+  `Portfolio.update → add_exa` end-to-end (every column, the `shift(-1)` tail,
+  the `loss_max` blanking heuristic → wants a principled `F < k·eps` rule).
+  Audit **what `plot_twelve` actually needs** (#29) — it constrains the column
+  trim. **needs N1.**
+- [ ] **N3 `[A]` Portfolio apply-distortion calcs.** Which columns;
+  **handling masses (currently black-magic / a cluster)**; signed /
+  `value_type` distortion pricing (`dev/plan-portfolio-neg-x-pricing.md`:
+  `add_exa` column audit, distortion pricing, `value_type` consumption — signed
+  books warn + fall back to F/S-only until this lands); `plot_twelve` impact;
+  **trim unused `density_df` columns**. **needs N2.**
+- [ ] **N4 `[A]` Bounds numerics read-through** (#30 + #10) — `bounds.py`
+  (IME 2022, 513-point binary `s_grid`) end-to-end. **needs N2; prereq for N5.**
+- [ ] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) —
+  `NotImplementedError` since a11; needs `exeqa_*` interpolated onto the new
+  `s_grid`. **needs N4. Author wants periodic reminders.**
+- [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
+  published *Aggregate* paper; make docs match the actual algo; finish "all
+  switches → config" (`eps`/`noise` already moved in a30); fix the false-positive
+  *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
+  too-tight tolerance). Independent of N1–N5.
+- [ ] **N7 `[B]` Negative-x deferred follow-ups** (#3) — two-sided deficit
+  split; `ft.py` recentering helpers → call the core path; re-home
+  `estimate_agg_window` → `utilities.py`; occ-reins on a signed severity grid;
+  DecL keyword for `signed` / `value_type`. **needs N1–N3.**
+
+---
+
+## Track H — Hygiene (module organization & dependencies)  `[A]` (parallel)
+
+- [ ] **H1 `[A]`** Relocate `make_ceder_netter` `utilities.py:276` → `distributions` (#35).
+- [ ] **H2 `[A]`** Dedupe var/tvar: `utilities.make_var_tvar:498` vs
+  `distributions._make_var_tvar:6232` (#36).
+- [ ] **H3 `[A]`** Audit imports for small non-standard deps (e.g. `cycler`) (#37).
+- [ ] **H4 `[A]`** Docstring sweep `iman_conover.py` / `moments.py` (and pockets
+  elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
+- [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
+  `tweedie.py` so those stay API-focused (#19).
+
+---
+
+## Track B — Bugs & investigations  `[A]` (small, parallel)
+
+- [ ] **B1 `[A]`** `10000 xs 0 lognorm 120 cv 1.5` triggers a "sum sev < 1"
+  warning — is it firing for the **agg, not the sev**? (#43)
+- [ ] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
+  this was about; is it the `linear`/`nearest` discretization, and was it only
+  ever a stats/moment concern? (#48 — *forgotten; reconstruct on sight*)
+
+---
+
+## Track F — Features (approximation, pricing, config)
+
+- [ ] **F1 `[A]` `approximate()` restored, tail-aware** (#33) — pick gamma vs
+  lognormal via the **tail-thickness classifier** (a very good application of
+  it). **needs** tail work (shipped, `dev/done/plan-tail-thickness.md`).
+  Removed in `6de20f2`.
+- [ ] **F2 `[A]` G&H tilting DIY** (#34) — the `ft` exponential **tilt**
+  (Grübel–Hermesmeier aliasing reduction) was removed in `6de20f2`, breaking the
+  doc example. Replace it with a hands-on illustration of the mechanics;
+  consider exposing it as a small `Aggregate` method.
+- [ ] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — consistent `a = P + Q`
+  Pentagon output; ?better Pentagon integration / output *to* Pentagon.
+- [ ] **F4 `[A]` Gross → Subject in `describe`** (#46) — relabel the first
+  describe column to *Subject* for agg-only covers (no occ reins). Uses the
+  `REINS_LABEL_*` constants.
+- [ ] **F5 `[B]` DecL `of`** (#44) — `of` in place of / alongside `po` / `so`;
+  maybe spell them out.
+- [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
+  both premium legs (`plan-pnl-premium.md` §9).
+- [ ] **F7 `[B]` PMIR best-bucket + manual kappa** (#47) — port the best-bucket
+  and clever manual kappa calc. Pairs **T3**.
+- [ ] **F8 `[B]` Config Phase 2** — `dev/plan-config.md`: `[plotting]` +
+  `.mplstyle` override, the rest of the env matrix, and the numerics-pending
+  floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`). Ties Track W.
+
+---
+
+## Track W — Windows & plotting
+
+- [ ] **W1 `[A]`** Support-aware window bounds (#6) — use `fz.support()`
+  endpoints; for finite frequency the support is exactly `[N·loc, N·ub]` (exact
+  window, not a MoM guess).
+- [ ] **W2 `[B]`** Window bounds for bivariate/multivariate per-axis sizing (#7).
+  **needs W1**; ties Track M.
+- [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
+  broken axis, or separate figure when grids don't overlap (`info` already warns).
+
+---
+
+## Track M — Multivariate  `[B]` (early beta)
+
+- [ ] **M1 `[B]`** Multivariate later stages (#4) — Stage 2 `t` copula; Stage 3
+  reporting/plot polish; Stage 4 ≥3-variate `rfftn` shared frequency; Stage 5
+  `MultivariatePortfolio` / `netceded` DecL form (`dev/done/plan-multivariate.md`).
+- [ ] **M2 `[B]`** Multivariate punch-up — axis sizing / coverage reconciliation
+  (`dev/plan-multivariate-punchup.md`). Ties **W2**.
+
+---
+
+## Track T — Tests (suite consolidation)  `[A]` (DOD: test suite trimmed)
+
+> The crux is **how the current tests use / interact with the test libraries**
+> (e.g. `conftest` parametrizing every line of `test_suite.agg`, the SLY
+> snapshot regression) — consolidating the data is only half the job; the test
+> code's coupling to it is the other half.
+
+- [ ] **T1 `[A]`** Merge the three `.agg` libraries (`test_suite`,
+  `test_suite2`, `test_decl`) into **one** without breaking tests (#50).
+- [ ] **T2 `[A]`** Rationalize tests — needed vs no-longer-needed; untangle and
+  re-wire how the suite *consumes* the single library without losing
+  effectiveness (#51). **needs T1.**
+- [ ] **T3 `[B]`** Switcheroo harness `Port.Sample` regression case (#12) — guards
+  the kappa-replacement path. Pairs **F7**.
+
+---
+
+## Track D — Docs & packaging
+
+- [ ] **D1 `[A]`** New `README.rst` for the stable-v1.0 audience (what / who /
+  install / one-liner DecL) **+ split out `CHANGELOG.rst`** keyed by version
+  (#39, #13, #14).
+- [ ] **D2 `[A]`** v1.0 intro / "Journey" page **+ statements of philosophy**
+  (user manages logging / warnings / matplotlib; the distribution **is** `p_i`
+  at `x_i`, no jump detection; `qd` is the doc-only fixed-font exception); cover
+  the v1.0 shift (linear allocation default, bounded detection, forwards-`S`,
+  pentagon columns, `DefectiveDistributionWarning`) (#15 + DOD).
+- [ ] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
+  — `docs/4_agg_language_reference/` still describes the SLY-era grammar (#17).
+  *No code dependency — ready now.*
+- [ ] **D4 `[A]`** Tail-descriptor docs **+ tests** (bounded / log-concave /
+  super-exp / exp / sub-exp for freq **and** sev) and the bounded/unbounded
+  indicator (#41, #42). Aligns with tail Phase 2.
+- [ ] **D5 `[A]`** Doc gaps: custom errors (#58); syntax checker / better error
+  reporting (#59); stale "site" database refs (#60); ZT/ZM zero-truncation/
+  modification (#61); splice examples (#62). *No code dependency — ready now.*
+- [ ] **D6 `[A]`** API docstring coverage / rendering — every public function/
+  class carries a NumPy-style docstring that renders in the API reference (the
+  "Docs updated" DOD bullet, doc side of **H4**).
+- [ ] **D7 `[B]`** Reinsurance case-study docs rewrite — `bahnemann`,
+  `enterprise risk`, `other_misc`: rebuild per-layer exhibits from
+  `reins_stats_df`, verify vs published (#16). **needs N2–N3** (stable numerics).
+- [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
+  renamings (#40). **needs H5.**
+- [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
+
+---
+
+## Related plans
+
+- `dev/plan-portfolio-neg-x-pricing.md` → **N3**.
+- `dev/plan-config.md` (Phase 2) → **F8**.
+- `dev/plan-multivariate-punchup.md` → **M2**.
+- `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
+  multivariate stages 0–1, etc.
+
+---
+
+## Post-v1.0 ideas
+
+- [ ] **Multi-resolution portfolio combine** (#20) — the real fix for the coarse
+  shared-`bs` deficit (a22 residual #4): compute each unit on its own `bs`,
+  decimate onto the shared grid before the Fourier product. Deficit accepted /
+  surfaced for now.
+- [ ] **General premium/loss algebra in DecL (v2.0)** (#21) — constant
+  aggregates, full aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl`
+  covers the common case for v1.0.
+- [ ] **DecL colorization** (#22) — design parked 2026-05-27
+  (`dev/tentative-plan-decl-colorization.md`); payoff mostly Sphinx-docs
+  identity. Wait for a clearer use case.

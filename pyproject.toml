@@ -69,6 +69,7 @@ dev = [
     "sphinx-design",
     "pytest>=7",
     "pyarrow>=15",
+    "ruff>=0.6",
 ]
 notebook = [
     "jupyterlab",
@@ -85,6 +86,21 @@ packages = ["aggregate"]
 
 [tool.setuptools.package-data]
 aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle", "data/*.toml"]
+
+[tool.ruff]
+# Linting only for now -- no whole-repo reformat (that would be a huge diff and
+# collide with the in-flight numerics refactor). Run `uv run ruff check src`.
+line-length = 100
+
+[tool.ruff.lint]
+# Start conservative: just pyflakes (unused imports/vars, bad f-strings, etc.).
+# Deliberately NOT enabling pycodestyle E so the long-lined codebase doesn't
+# drown in E501. Widen this set later if desired.
+select = ["F"]
+
+[tool.ruff.lint.per-file-ignores]
+# The package __init__ intentionally re-exports submodule surfaces via `import *`.
+"__init__.py" = ["F401", "F403"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

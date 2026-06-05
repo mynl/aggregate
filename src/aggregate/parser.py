@@ -44,7 +44,7 @@ import logging
 import re
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Iterable, Iterator
+from typing import Iterator
 
 import numpy as np
 from lark import Lark, Transformer

@@ -17,7 +17,7 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, BUCKET_SIZING_P
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
-from .utilities import (round_bucket, qd, agg_help)
+from .utilities import (qd, agg_help)
 
 logger = logging.getLogger(__name__)
 

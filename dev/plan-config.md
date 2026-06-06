@@ -7,7 +7,7 @@ reins plans). Goal: lift the "secret bits" currently hard-coded in
 hand-editable **TOML** file under `~/.aggregate/`, layered as an override on the
 shipped defaults — without violating the project's no-magic principle.
 
-**PHASE 2: Open**
+**PHASE 2: Open.** Matplotlib graphics into config - **optional**. 
 
 > **STATUS: PHASE 1 SHIPPED (2026-06-05, v1.0.0a30).** `config.py` +
 > annotated `data/config.default.toml` landed; `requires-python>=3.11` + stdlib

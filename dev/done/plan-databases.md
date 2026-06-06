@@ -1,13 +1,14 @@
 # plan-databases — make Underwriter database loading legible
 
-> **STATUS: PLAN FOR REVIEW (2026-06-06).** No code yet. Author finds the
-> current database-reading surface confusing on return to it; it is low-impact
-> (the module-level `build` is effectively the only consumer, loading the
-> bundled `test_suite`), so we have room to change it. Maps to TODO **H6**.
-> Tagged `[A]` (alpha) — small, self-contained hygiene, ideally **zero numeric
-> blast radius** (same knowledge, clearer plumbing). **Rev 2026-06-06:** design
-> decisions confirmed with the author (see *Decisions*); one open item remains
-> (knowledge-store representation).
+> **STATUS: DONE — shipped in 1.0.0a32 (2026-06-06).** All four phases landed
+> together: dict-backed store + `source` provenance, the glob-aware resolver,
+> `load` / `reload` / `resolve_databases` / `available_databases`, the
+> `_loaded` flag, `databases` = loaded paths, one preprocessing owner
+> (`UnderwritingLexer.preprocess`), and `to_agg` save/export. `read_database` /
+> `read_databases` renamed outright to `load` (no aliases). Full suite green
+> (1018 passed); `src` ruff clean. Maps to TODO **H6**. Tagged `[A]` (alpha) —
+> small, self-contained hygiene with zero numeric blast radius (same knowledge,
+> clearer plumbing). The design notes below are kept as the as-built record.
 
 ## How the new design works (at a glance)
 

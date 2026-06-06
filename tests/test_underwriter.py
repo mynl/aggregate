@@ -1,9 +1,12 @@
 """Regression net for ``aggregate.underwriter.Underwriter``.
 
 Pins the observable surface (build / interpret_program / __getitem__ /
-read_database) before the refactor lands and as the contract afterwards.
-Anything that changes here is an intentional, documented behavior change.
+load / reload / resolve_databases / available_databases / to_agg) before the
+refactor lands and as the contract afterwards. Anything that changes here is an
+intentional, documented behavior change.
 """
+
+from pathlib import Path
 
 import pytest
 
@@ -95,27 +98,121 @@ def test_interpret_program_returns_list_fills_knowledge():
     assert parsed.kind == 'agg'
     assert parsed.name == 'PhaseZero:IP'
     assert parsed.object is None  # not built yet
-    assert ('agg', 'PhaseZero:IP') in uw._knowledge.index
+    assert ('agg', 'PhaseZero:IP') in uw._knowledge
 
 
 # ---------------------------------------------------------------------------
 # database loading
 # ---------------------------------------------------------------------------
 
-def test_read_database_populates_knowledge():
+def test_load_populates_knowledge():
     uw = Underwriter()
-    uw.read_database('test_suite')
+    uw.load('test_suite')
     assert len(uw._knowledge) >= 140
 
 
-def test_read_databases_is_idempotent():
-    """Calling read_databases twice should not error and should not double-populate."""
+def test_load_is_idempotent():
+    """The configured lazy load runs once; a second load() is a no-op."""
     uw = Underwriter(databases='test_suite')
-    _ = uw.knowledge  # triggers first read
+    _ = uw.knowledge  # triggers first (configured) read
     n1 = len(uw._knowledge)
-    uw.read_databases()  # second call
+    assert uw.load() == []  # second call: already loaded
     n2 = len(uw._knowledge)
     assert n1 == n2 >= 140
+
+
+def test_load_missing_literal_raises():
+    """An explicit load() of a literal name that does not exist raises."""
+    uw = Underwriter(databases=None)
+    with pytest.raises(FileNotFoundError):
+        uw.load('definitely_not_a_real_database')
+
+
+def test_load_glob_no_match_warns_not_raises(caplog):
+    """A glob that matches nothing warns and loads nothing (no raise)."""
+    import logging
+    uw = Underwriter(databases=None)
+    with caplog.at_level(logging.WARNING, logger='aggregate.underwriter'):
+        read = uw.load('zzz_no_such_prefix_*')
+    assert read == []
+    assert any('matched no files' in r.getMessage() for r in caplog.records)
+
+
+def test_databases_reports_loaded_paths():
+    """`databases` is the list of resolved Paths actually read."""
+    uw = Underwriter(databases='test_suite')
+    _ = uw.knowledge
+    assert len(uw.databases) == 1
+    assert isinstance(uw.databases[0], Path)
+    assert uw.databases[0].name == 'test_suite.agg'
+
+
+def test_resolve_databases_matches_load():
+    """resolve_databases previews exactly what load reads (for files that exist)."""
+    uw = Underwriter(databases=None)
+    preview = uw.resolve_databases('test_suite')
+    assert len(preview) == 1 and preview[0].name == 'test_suite.agg'
+    read = uw.load('test_suite')
+    assert [p.name for p in read] == [p.name for p in preview]
+
+
+def test_available_databases_discovers_bundled():
+    """available_databases lists the bundled test_suite among on-disk files."""
+    uw = Underwriter(databases=None)
+    df = uw.available_databases()
+    assert 'name' in df.columns and 'where' in df.columns and 'path' in df.columns
+    assert 'test_suite' in set(df['name'])
+
+
+def test_reload_resets_to_as_created():
+    """reload drops in-session builds and ad-hoc loads, restoring the request."""
+    uw = Underwriter(databases='test_suite')
+    _ = uw.knowledge
+    n0 = len(uw._knowledge)
+    uw.build('agg ReloadMe 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    assert ('agg', 'ReloadMe') in uw._knowledge
+    uw.reload()
+    assert ('agg', 'ReloadMe') not in uw._knowledge
+    assert len(uw._knowledge) == n0
+
+
+def test_source_provenance():
+    """Loaded entries carry their file Path; in-session builds carry 'session'."""
+    uw = Underwriter(databases='test_suite')
+    _ = uw.knowledge
+    # pick any loaded entry — its source is the test_suite file Path
+    loaded = next(iter(uw._knowledge.values()))
+    assert isinstance(loaded.source, Path)
+    uw.build('agg SessionSrc 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    assert uw._knowledge[('agg', 'SessionSrc')].source == 'session'
+
+
+def test_to_agg_round_trip(tmp_path):
+    """to_agg writes session builds; a fresh Underwriter reloads the same specs."""
+    uw = Underwriter(databases=None)
+    uw.build('agg RT:One 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    uw.build('sev RT:Two lognorm 5 cv 0.5', update=False)
+    out = uw.to_agg(tmp_path / 'mybook')  # absolute -> used as given
+    assert out.exists() and out.suffix == '.agg'
+
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('agg', 'RT:One') in uw2._knowledge
+    assert ('sev', 'RT:Two') in uw2._knowledge
+    assert (uw2._knowledge[('agg', 'RT:One')].spec
+            == uw._knowledge[('agg', 'RT:One')].spec)
+
+
+def test_to_agg_kind_filter(tmp_path):
+    """to_agg(kind=...) restricts the export to one kind."""
+    uw = Underwriter(databases=None)
+    uw.build('agg KF:A 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    uw.build('sev KF:S lognorm 5 cv 0.5', update=False)
+    out = uw.to_agg(tmp_path / 'aggsonly', kind='agg')
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('agg', 'KF:A') in uw2._knowledge
+    assert ('sev', 'KF:S') not in uw2._knowledge
 
 
 # ---------------------------------------------------------------------------
@@ -226,11 +323,15 @@ def test_user_dir_path():
     assert uw.user_dir == Path.home() / '.aggregate'
 
 
-def test_databases_site_raises_with_migration_hint():
-    """Old `databases='site'` should fail loudly, directing the user to 'user'."""
+def test_databases_site_token_no_longer_special(caplog):
+    """The removed `'site'` collection token is now just an ordinary (missing)
+    filename: the configured lazy load warns and loads nothing, never raises."""
+    import logging
     uw = Underwriter(databases='site')
-    with pytest.raises(ValueError, match="'user'"):
-        uw.read_databases()
+    with caplog.at_level(logging.WARNING, logger='aggregate.underwriter'):
+        _ = uw.knowledge  # triggers the configured load
+    assert len(uw._knowledge) == 0
+    assert any('site' in r.getMessage() for r in caplog.records)
 
 
 def test_dropped_properties_no_longer_exist():

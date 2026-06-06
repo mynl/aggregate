@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-06** — current version 1.0.0a31.
+> **Last updated: 2026-06-06** — current version 1.0.0a32.
 
 ---
 
@@ -45,7 +45,7 @@ alongside. **Start at `N1`.**
 |    | H3 | Import-dependency audit | A | — | everything |
 |    | H4 | Docstring style sweep → NumPy | A | — | everything |
 |    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
-|    | H6 | Underwriter database-loading rewrite | A | — | everything |
+| ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
 |    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
@@ -144,17 +144,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
-- [ ] **H6 `[A]` Underwriter database loading rewrite** — `dev/plan-databases.md`
-  (design decisions confirmed). Make loading legible: dict-backed store (with a
+- [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
+  (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest
   `_loaded` flag; single `load(request=None)` verb + `reload` (reset to
   as-created), `resolve_databases` (preview), `available_databases` (discover);
-  `databases` reports loaded paths; one preprocessing owner; **`to_agg(path,
-  pattern, kind, source)`** save/export (to user dir unless absolute). Renamed
-  outright (no `read_database(s)`
-  aliases). Low impact (`build` is effectively the only consumer). *(Track
-  placement provisional — internal plumbing tidy; move if you'd rather it sit
-  under F/config.)*
+  `databases` reports loaded paths; one preprocessing owner
+  (`UnderwritingLexer.preprocess`); **`to_agg(path, pattern, kind, source)`**
+  save/export (to user dir unless absolute). Renamed outright (no
+  `read_database(s)` aliases).
 
 ---
 
@@ -277,11 +275,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 - `dev/plan-portfolio-neg-x-pricing.md` → **N3**.
 - `dev/plan-config.md` (Phase 2) → **F8**.
-- `dev/plan-databases.md` → **H6**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
-  pentagon pricing contract (**F3**, `plan-pentagon.md`), multivariate
-  stages 0–1, etc.
+  pentagon pricing contract (**F3**, `plan-pentagon.md`), database loading
+  (**H6**, `plan-databases.md`), multivariate stages 0–1, etc.
 
 ---
 

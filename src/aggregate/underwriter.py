@@ -1,5 +1,6 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
 from importlib.resources import files
 import logging
 from pathlib import Path
@@ -222,12 +223,18 @@ class ParsedProgram:
     :meth:`Underwriter.factory` / :meth:`Underwriter.build`. The ``object``
     field is ``None`` after parsing and is populated by :meth:`Underwriter.factory`
     once the corresponding Aggregate / Severity / Portfolio / Distortion is built.
+
+    The ``source`` field records provenance: the :class:`pathlib.Path` of the
+    ``.agg`` file the entry was read from, or the sentinel ``'session'`` for an
+    entry created by an in-session ``build(...)`` call (not yet saved to any
+    file). It backs the ``source`` filter on :meth:`Underwriter.to_agg`.
     """
-    kind: str           # 'agg' | 'sev' | 'port' | 'distortion' | 'expr'
-    name: str           # the user-given name (e.g. 'Dice', 'MyBook')
-    spec: Any           # dict of kwargs for the constructor
-    program: str        # the original DecL source line
-    object: Any = None  # the constructed object once factory has run
+    kind: str             # 'agg' | 'sev' | 'port' | 'distortion' | 'expr'
+    name: str             # the user-given name (e.g. 'Dice', 'MyBook')
+    spec: Any             # dict of kwargs for the constructor
+    program: str          # the original DecL source line
+    object: Any = None    # the constructed object once factory has run
+    source: Any = 'session'  # originating Path, or 'session' for in-session builds
 
 
 class CannotBuild(ValueError):
@@ -253,17 +260,30 @@ class Underwriter(object):
 
     Responsibilities:
 
-    - Persist DecL programs to and from ``.agg`` files.
+    - Read DecL programs from ``.agg`` files (:meth:`load`) and write a
+      selection back out (:meth:`to_agg`).
     - Bridge to the parser (`UnderwritingLexer` / `UnderwritingParser`).
     - Safe lookup of named programs from the knowledge base for the parser.
 
     Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``, ``'port'``,
     ``'distortion'``) and a *name*. Parsing produces a :class:`ParsedProgram`
-    holding the kind, name, dict spec, source program, and (once :meth:`factory`
-    runs) the constructed object.
+    holding the kind, name, dict spec, source program, provenance, and (once
+    :meth:`factory` runs) the constructed object.
 
-    The knowledge base is stored in ``self._knowledge`` — a DataFrame indexed
-    by ``(kind, name)`` with columns ``spec`` and ``program``.
+    The knowledge base is a flat in-memory union, ``(kind, name) ->
+    ParsedProgram``, stored in ``self._knowledge`` as a plain dict. It is fed by
+    the loaded ``.agg`` files and by in-session ``build(...)`` calls; there is no
+    "active" database. ``(kind, name)`` is the unique key — a later entry with
+    the same key overrides an earlier one (last load / last build wins). Each
+    entry carries a ``source`` provenance tag (its originating file ``Path``, or
+    ``'session'`` for an in-session build). The :attr:`knowledge` property
+    exposes this as a ``(kind, name)``-indexed DataFrame, built on demand.
+
+    The loading surface is: construct with a ``databases=`` request, then
+    :meth:`load` (read more), :meth:`resolve_databases` (preview a request),
+    :meth:`available_databases` (discover what is on disk), :attr:`databases`
+    (the resolved file ``Path``\\ s actually loaded) / :attr:`knowledge`
+    (inspect), :meth:`to_agg` (save), and :meth:`reload` (reset to as-created).
     """
 
     def __init__(self, name='Rory', databases=_UNSET, update=_UNSET, log2=_UNSET, debug=False):
@@ -280,12 +300,15 @@ class Underwriter(object):
 
         :param name: name of underwriter. Defaults to Rory, after Rory Cline, the best underwriter
             I know and a supporter of an analytic approach to underwriting.
-        :param databases: name or list of database files to read in on creation.
-            Unset uses the configured ``build.databases``; ``None`` loads nothing;
-            'default' (installed) loads bundled \\*.agg files, 'user' loads
-            ~/.aggregate \\*.agg files, 'all' loads both. A string refers to a
-            single database; an iterable of strings is also valid. See
-            `read_database` for search path.
+        :param databases: the load *request* — what to read on first access.
+            Unset uses the configured ``build.databases``; ``None`` loads
+            nothing. ``'default'`` loads the bundled ``*.agg`` files, ``'user'``
+            loads ``~/.aggregate`` ``*.agg`` files, ``'all'`` loads both. Any
+            other string is a file path or glob, resolved against the search
+            path cwd -> user_dir -> default_dir (see :meth:`load`). An iterable
+            of such entries is also valid. The request is stored privately as
+            ``self._request``; the resolved files actually read appear in
+            :attr:`databases`.
         :param update: if True, update constructed objects. Unset uses the
             configured ``build.update``.
         :param log2: log2 of number of buckets in discrete representation. 10 is
@@ -305,22 +328,27 @@ class Underwriter(object):
         self.debug = debug
         self._lexer = None
         self._parser = None
-        # make sure all database entries are stored; they are read on demand
+
+        # The load request (what to read); resolved + read lazily on first
+        # access to .knowledge, or eagerly via .load(). _UNSET -> configured
+        # default; None -> load nothing.
         if databases is _UNSET:
-            self.databases = list(build_settings.databases)
+            self._request = list(build_settings.databases)
         elif databases is None:
-            self.databases = []
+            self._request = None
         else:
-            self.databases = databases
+            self._request = databases
 
         # do not read in until needed for faster loading
         self._default_dir = None
         self._user_dir = None
-        self._knowledge = pd.DataFrame(columns=['kind', 'name', 'spec', 'program'], dtype=object).set_index(
-            ['kind', 'name'])
-
-        # (removed: was `pd.set_option('display.max_colwidth', 100)`; set in
-        # your own session if you want wider DataFrame column display)
+        # Knowledge base: a flat dict {(kind, name): ParsedProgram}. The
+        # DataFrame view is built on demand by the `knowledge` property.
+        self._knowledge: dict[tuple, ParsedProgram] = {}
+        # `databases` (public) reports the resolved file Paths actually loaded;
+        # `_loaded` is the honest "configured request has been read" flag.
+        self.databases: list = []
+        self._loaded = False
 
     @property
     def lexer(self):
@@ -355,7 +383,7 @@ class Underwriter(object):
 
         Drop your own ``.agg`` databases here and they will be picked up by
         ``Underwriter(databases='all')`` (or ``='user'``) or by
-        ``read_database('my_curves')``.  List user databases::
+        ``uw.load('my_curves')``.  List user databases::
 
             list(uw.user_dir.glob('*.agg'))
         """
@@ -364,78 +392,267 @@ class Underwriter(object):
             self._user_dir.mkdir(parents=True, exist_ok=True)
         return self._user_dir
 
-    def read_databases(self):
-        """
-        Resolve ``self.databases`` (the constructor argument) into a list of
-        files and read each one into the knowledge base. Does not mutate
-        ``self.databases`` — calling this twice is idempotent.
-        """
-        requested = self.databases
-        if not requested:
-            return
-        if requested == 'all':
-            requested = ['default', 'user']
-        elif isinstance(requested, str):
-            requested = [requested]
+    # Glob metacharacters that mark a request entry as a pattern rather than a
+    # literal filename.
+    _GLOB_CHARS = ('*', '?', '[')
 
-        db_files = []
-        for entry in requested:
-            if entry == 'default':
-                db_files.extend(self.default_dir.glob('*.agg'))
-            elif entry == 'user':
-                db_files.extend(self.user_dir.glob('*.agg'))
-            elif entry == 'site':
-                raise ValueError(
-                    "databases='site' is not recognized; use 'user' "
-                    "(renamed for v1.0; data lives in ~/.aggregate)")
+    def _search_dirs(self):
+        """The literal/glob search path: cwd, then user_dir, then default_dir."""
+        return [Path.cwd(), self.user_dir, self.default_dir]
+
+    def _resolve_database_request(self, request, *, explicit):
+        """Normalise a load request into an ordered list of ``.agg`` ``Path``\\ s.
+
+        The single resolver shared by construction, :meth:`load`,
+        :meth:`reload`, and :meth:`resolve_databases`. The reserved collection
+        names are simply predefined globs, so there is one mechanism rather than
+        a special case per token.
+
+        Resolution rules:
+
+        - ``None`` / ``[]`` -> no files.
+        - ``'default'`` -> ``<default_dir>/*.agg``; ``'user'`` ->
+          ``<user_dir>/*.agg``; ``'all'`` -> both.
+        - An entry containing a directory separator (or an absolute path, or a
+          leading ``~``) is used as given; the search dirs are not consulted.
+        - A **glob** entry (contains ``*``, ``?`` or ``[``) is matched against
+          all three search dirs and the matches are **unioned** (cwd included);
+          a bare pattern with no suffix globs ``<pattern>.agg``. An empty match
+          warns ("load whatever is there").
+        - A **literal** entry (no glob metacharacters) gets a ``.agg`` suffix if
+          it has none and is resolved **first-match-wins** across the search
+          dirs (the nearest file). A missing literal **raises**
+          :class:`FileNotFoundError` when ``explicit`` (the caller named one
+          file in a :meth:`load` call), else **warns** (a configured entry).
+
+        Parameters
+        ----------
+        request : None, str, pathlib.Path, or iterable
+            The load specification.
+        explicit : bool
+            True for a user-supplied :meth:`load` request (missing literal
+            raises); False for the configured/lazy request (missing literal
+            warns).
+
+        Returns
+        -------
+        list[pathlib.Path]
+            Files to read, in resolution order, de-duplicated by resolved path.
+        """
+        if request is None:
+            return []
+        if isinstance(request, (str, Path)):
+            request = [request]
+
+        paths: list = []
+        seen: set = set()
+
+        def _add(p):
+            p = Path(p)
+            key = p.resolve()
+            if key not in seen:
+                seen.add(key)
+                paths.append(p)
+
+        def _add_glob(pattern_dirs, pattern_name, *, what):
+            matches = []
+            for d in pattern_dirs:
+                matches.extend(sorted(d.glob(pattern_name)))
+            if not matches:
+                logger.warning('Database request %s matched no files. Ignoring.', what)
+            for m in matches:
+                _add(m)
+
+        for entry in request:
+            entry_str = str(entry)
+            # Reserved collection names -> predefined globs.
+            if entry_str == 'default':
+                _add_glob([self.default_dir], '*.agg', what="'default'")
+                continue
+            if entry_str == 'user':
+                _add_glob([self.user_dir], '*.agg', what="'user'")
+                continue
+            if entry_str == 'all':
+                _add_glob([self.default_dir, self.user_dir], '*.agg', what="'all'")
+                continue
+
+            p = Path(entry_str).expanduser()
+            is_glob = any(c in entry_str for c in self._GLOB_CHARS)
+            has_dir = p.is_absolute() or len(p.parts) > 1
+            if p.suffix == '':
+                p = p.with_suffix('.agg')
+
+            if has_dir:
+                # Used as given; search dirs are not consulted.
+                if is_glob:
+                    _add_glob([p.parent], p.name, what=repr(entry_str))
+                elif p.exists():
+                    _add(p)
+                elif explicit:
+                    raise FileNotFoundError(f'Database {entry_str!r} not found.')
+                else:
+                    logger.warning('Database %r not found. Ignoring.', entry_str)
+            elif is_glob:
+                # Glob across the search path; union the matches.
+                _add_glob(self._search_dirs(), p.name, what=repr(entry_str))
             else:
-                db_files.append(entry)
+                # Literal name: first match wins across the search path.
+                found = next((d / p.name for d in self._search_dirs()
+                              if (d / p.name).exists()), None)
+                if found is not None:
+                    _add(found)
+                elif explicit:
+                    raise FileNotFoundError(
+                        f'Database {entry_str!r} not found on the search path '
+                        f'(cwd, {self.user_dir}, {self.default_dir}).')
+                else:
+                    logger.warning('Database %r not found on the search path. Ignoring.',
+                                   entry_str)
 
-        for fn in db_files:
-            self.read_database(fn)
+        return paths
 
-    def read_database(self, fn):
+    def load(self, request=None):
         """
-        Read a database of curves, aggs, and portfolios from a ``.agg`` file.
+        Resolve a request and read the matching ``.agg`` files into the knowledge base.
 
-        ``fn`` may be a string filename, with or without extension; a ``.agg``
-        extension is added if there is no suffix. Search path:
+        The single load verb. ``request=None`` reads the **configured** request
+        (``self._request``, from the constructor or ``config.build.databases``)
+        exactly once — this is the lazy path that :attr:`knowledge` triggers on
+        first access. A given ``request`` (filename, glob, collection name, or
+        list thereof) is resolved and read **additively**: its files are added
+        to the knowledge base and appended to :attr:`databases`.
 
-        * the current directory
-        * :attr:`user_dir` (``~/.aggregate``)
-        * :attr:`default_dir` (installed)
+        Reading "one or more" files is just a glob or a list. The search path
+        and ``.agg`` suffixing rules are documented on
+        :meth:`_resolve_database_request`.
 
-        :param fn: database file name (with or without ``.agg`` suffix).
+        Error policy: a **literal** file named in an explicit ``load(path)`` call
+        that does not exist raises :class:`FileNotFoundError`; the configured
+        request (``load()``) and any glob that matches nothing only warn.
+
+        Parameters
+        ----------
+        request : None, str, pathlib.Path, or iterable, optional
+            What to load. ``None`` (default) loads the configured request once.
+
+        Returns
+        -------
+        list[pathlib.Path]
+            The files read by this call (empty if the configured request was
+            already loaded).
         """
-
-        p = Path(fn)
-        if p.suffix == '':
-            p = p.with_suffix('.agg')
-        if p.exists():
-            db_path = p
-        elif (self.user_dir / p).exists():
-            db_path = self.user_dir / p
-        elif (self.default_dir / p).exists():
-            db_path = self.default_dir / p
+        if request is None:
+            if self._loaded:
+                return []
+            paths = self._resolve_database_request(self._request, explicit=False)
+            self._loaded = True
         else:
-            logger.error('Database %s not found. Ignoring.', fn)
-            return
+            paths = self._resolve_database_request(request, explicit=True)
 
+        read = []
+        for p in paths:
+            if self._read_file(p):
+                read.append(p)
+        return read
+
+    def _read_file(self, path):
+        """Read and interpret one ``.agg`` file; record it in :attr:`databases`.
+
+        Tags every entry with ``source=path`` (provenance) and appends ``path``
+        to :attr:`databases`. Whitespace/continuation handling is the lexer's
+        job (:meth:`UnderwritingLexer.preprocess`); this method does no text
+        munging of its own.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            The ``.agg`` file to read.
+
+        Returns
+        -------
+        bool
+            True if the file was read; False if it could not be opened.
+        """
+        path = Path(path)
         try:
-            program = db_path.read_text(encoding='utf-8')
+            program = path.read_text(encoding='utf-8')
         except OSError:
-            logger.exception('Error reading requested database %s. Ignoring.', db_path.name)
-        else:
-            # read in, parse, save to sev/agg/port dictionaries
-            # throw away answer...not creating anything
-            # get rid of cosmetic spaces, but keep newline tabs (2 or more spaces)
-            program = re.sub('^  +', '\t', program, flags=re.MULTILINE)
-            program = re.sub(' +', ' ', program)
-            logger.info('Reading database %s...', fn)
-            n = len(self._knowledge)
-            self._interpret_program(program)
-            n = len(self._knowledge) - n
-            logger.info('Database %s read into knowledge, adding %d entries.', fn, n)
+            logger.exception('Error reading requested database %s. Ignoring.', path.name)
+            return False
+        logger.info('Reading database %s...', path)
+        n = len(self._knowledge)
+        self._interpret_program(program, source=path)
+        added = len(self._knowledge) - n
+        logger.info('Database %s read into knowledge, adding %d entries.', path.name, added)
+        self.databases.append(path)
+        return True
+
+    def reload(self):
+        """
+        Reset the underwriter to its as-created state and re-read the configured request.
+
+        Clears the knowledge base, the :attr:`databases` list, and the
+        ``_loaded`` flag, restores the original load request, then re-resolves
+        and re-reads it from disk. This **drops** any ad-hoc ``load(...)``-ed
+        files and any in-session ``build(...)`` entries — the object returns to
+        exactly its constructor-time state. Picks up on-disk edits to the
+        configured ``.agg`` files. Backs config reload via
+        :func:`_refresh_default_underwriter`.
+
+        Returns
+        -------
+        list[pathlib.Path]
+            The files re-read.
+        """
+        self._knowledge = {}
+        self.databases = []
+        self._loaded = False
+        return self.load()
+
+    def resolve_databases(self, request=None):
+        """
+        Preview the files a request *would* load, without reading them (dry run).
+
+        Answers "if I ask to load ``xxx``, what will I get?". ``request=None``
+        previews the configured request. Resolution is lenient here (a missing
+        literal warns and is omitted rather than raising), so it is safe to use
+        for exploration; for files that exist it matches what a subsequent
+        :meth:`load` reads.
+
+        Parameters
+        ----------
+        request : None, str, pathlib.Path, or iterable, optional
+            The request to preview; ``None`` previews the configured request.
+
+        Returns
+        -------
+        list[pathlib.Path]
+            The files the request resolves to.
+        """
+        req = self._request if request is None else request
+        return self._resolve_database_request(req, explicit=False)
+
+    def available_databases(self):
+        """
+        Discover the ``.agg`` files present on the search path (cwd / user / default).
+
+        Distinct from :meth:`resolve_databases` ("what *would* this request
+        load") — this is "what *could* I load". A discovery view of the files on
+        disk, regardless of any request.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per ``.agg`` file found, columns ``name`` (file stem),
+            ``where`` (``'cwd'`` / ``'user'`` / ``'default'``), and ``path``
+            (the full path). The same name may appear in more than one location.
+        """
+        rows = []
+        for where, d in (('cwd', Path.cwd()), ('user', self.user_dir),
+                         ('default', self.default_dir)):
+            for f in sorted(d.glob('*.agg')):
+                rows.append({'name': f.stem, 'where': where, 'path': str(f)})
+        return pd.DataFrame(rows, columns=['name', 'where', 'path'])
 
     def __getitem__(self, item):
         """
@@ -471,33 +688,30 @@ class Underwriter(object):
         --------
         __call__ : the user-facing entry that also constructs the object.
         """
-        # much less fancy version:
         if not isinstance(item, (str, tuple)):
             raise ValueError(
                 f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
 
-        assert self.knowledge is not None
+        if not self._loaded:
+            self.load()
 
-        try:
-            if type(item) == str:
-                # name == item, any type
-                rows = self._knowledge.xs(
-                    item, axis=0, level=1, drop_level=False)
-            elif type(item) == tuple:
-                # return a dataframe row
-                rows = self._knowledge.loc[[item]]
-        except KeyError:
+        if isinstance(item, tuple):
+            try:
+                entry = self._knowledge[item]
+            except KeyError:
+                raise KeyError(f'Item {item} not found.')
+            # Hand back a copy so the caller's factory cannot mutate the stored
+            # recipe (object stays None in the knowledge base).
+            return replace(entry)
+
+        # str: match by name across all kinds (must be unique).
+        matches = [pp for (kind, name), pp in self._knowledge.items() if name == item]
+        if len(matches) == 1:
+            return replace(matches[0])
+        if not matches:
             raise KeyError(f'Item {item} not found.')
-        except TypeError as e:
-            # TODO fix this "TypeError: unhashable type: 'slice'"
-            raise KeyError(f'getitem TypeError looking for {item}, {e}') from e
-        else:
-            if len(rows) == 1:
-                kind, name, spec, program = rows.reset_index().iloc[0]
-                return ParsedProgram(kind=kind, name=name, spec=spec, program=program)
-            else:
-                raise KeyError(
-                    f'Error: no unique object found matching {item}. Found {len(rows)} objects.')
+        raise KeyError(
+            f'Error: no unique object found matching {item}. Found {len(matches)} objects.')
 
     @staticmethod
     def _format_dir(path: Path) -> str:
@@ -532,10 +746,10 @@ class Underwriter(object):
         return base
 
     def __repr__(self):
-        # Count knowledge entries from the cached frame directly — avoid
-        # self.knowledge here, which would trigger a database read.
+        # Count knowledge entries from the dict directly — avoid self.knowledge
+        # here, which would trigger a database read. _loaded is the honest flag.
         n = len(self._knowledge)
-        if n == 0 and self.databases:
+        if not self._loaded and self._request:
             kn_line = (
                 'knowledge          0 loaded '
                 '(access .knowledge to read configured database(s))'
@@ -604,12 +818,62 @@ class Underwriter(object):
         parsed.object = obj
         return parsed
 
+    def add_entry(self, kind, name, spec, program, source='session'):
+        """
+        Add (or overwrite) one parsed declaration in the knowledge base.
+
+        The single public mutator of the store. ``(kind, name)`` is the unique
+        key; an existing entry with the same key is overwritten (last write
+        wins). Used by :meth:`_interpret_program` and by test fixtures that need
+        to seed the knowledge base directly.
+
+        Parameters
+        ----------
+        kind : str
+            One of ``'sev'``, ``'agg'``, ``'port'``, ``'distortion'``, ``'mvagg'``.
+        name : str
+            The declaration name.
+        spec : dict
+            The parsed constructor kwargs.
+        program : str
+            The originating DecL source line.
+        source : pathlib.Path or str, default 'session'
+            Provenance: the file the entry came from, or ``'session'`` for an
+            in-session build.
+        """
+        self._knowledge[(kind, name)] = ParsedProgram(
+            kind=kind, name=name, spec=spec, program=program, source=source)
+
+    def _knowledge_frame(self):
+        """Build the ``(kind, name)``-indexed DataFrame view of the dict store.
+
+        Columns ``program``, ``spec``, ``source`` (the historical
+        ``program``/``spec`` shape plus provenance), sorted by index. Built on
+        demand so the store itself stays a plain dict.
+        """
+        if not self._knowledge:
+            empty = pd.MultiIndex.from_arrays([[], []], names=['kind', 'name'])
+            return pd.DataFrame(columns=['program', 'spec', 'source'], index=empty)
+        index = pd.MultiIndex.from_tuples(list(self._knowledge.keys()),
+                                          names=['kind', 'name'])
+        df = pd.DataFrame(
+            {'program': [pp.program for pp in self._knowledge.values()],
+             'spec': [pp.spec for pp in self._knowledge.values()],
+             'source': [pp.source for pp in self._knowledge.values()]},
+            index=index)
+        return df.sort_index()
+
     @property
     def knowledge(self):
-        if len(self._knowledge) == 0 and len(self.databases) > 0:
-            # knowledge - accounts and line known to the underwriter
-            self.read_databases()
-        return self._knowledge.sort_index()[['program', 'spec']]
+        """The knowledge base as a ``(kind, name)``-indexed DataFrame (lazy-loaded).
+
+        Reads the configured databases on first access (the lazy path), then
+        returns a DataFrame built on demand from the dict store, with columns
+        ``program``, ``spec``, and ``source``.
+        """
+        if not self._loaded:
+            self.load()
+        return self._knowledge_frame()
 
     @property
     def version(self):
@@ -726,13 +990,18 @@ class Underwriter(object):
             logger.info('Program created %d objects.', len(rv))
         return rv
 
-    def _interpret_program(self, portfolio_program):
+    def _interpret_program(self, portfolio_program, source='session'):
         """
         Internal: preprocess and parse a program one line at a time, storing
         each parsed spec in the knowledge base. No objects are constructed.
 
         :param portfolio_program: the DecL program text.
-        :return: list of :class:`ParsedProgram` (``object`` is ``None`` for each).
+        :param source: provenance tag for the stored entries — the originating
+            file :class:`~pathlib.Path` when reading a database, else
+            ``'session'`` for in-session builds.
+        :return: list of :class:`ParsedProgram` (``object`` is ``None`` for
+            each). The returned programs are copies; mutating their ``object``
+            field does not touch the stored recipes.
         """
         portfolio_program = self.lexer.preprocess(portfolio_program)
         rv = []
@@ -752,8 +1021,10 @@ class Underwriter(object):
             else:
                 logger.info('answer out: %s object %s parsed successfully...adding to knowledge',
                             kind, name)
-                self._knowledge.loc[(kind, name), :] = [spec, program_line]
-                rv.append(ParsedProgram(kind=kind, name=name, spec=spec, program=program_line))
+                self.add_entry(kind, name, spec, program_line, source=source)
+                # Hand back a fresh copy: _build_work / build_many set .object
+                # on these, which must not leak into the stored recipe.
+                rv.append(replace(self._knowledge[(kind, name)]))
         return rv
 
     def _safe_lookup(self, buildinid):
@@ -1178,6 +1449,85 @@ class Underwriter(object):
             return (objects[0] if len(objects) == 1 else objects), df
         return df
 
+    def to_agg(self, path, pattern='.*', kind='all', source='session'):
+        """
+        Write a selection of knowledge entries to a ``.agg`` file (pandas-style export).
+
+        Because the knowledge base has no "active" database, "save" is an
+        explicit export of selected entries to a named file. Each entry already
+        stores its ``program`` (DecL source) line, so writing is just emitting
+        those lines; the result **re-loads cleanly** via :meth:`load` —
+        round-trip correctness is the contract.
+
+        The default call ``uw.to_agg('mybook')`` writes every entry built this
+        session (``source='session'``) to ``~/.aggregate/mybook.agg``, ready to
+        re-load by name later.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            Destination. An **absolute** path is used as given; otherwise the
+            file is written to :attr:`user_dir` (``~/.aggregate``) so it is
+            immediately discoverable by :meth:`available_databases` and
+            re-loadable by name. A ``.agg`` suffix is added if absent.
+        pattern : str, default '.*'
+            Regex matched against each entry *name* (the axis :meth:`discover`
+            filters on). Default matches all names.
+        kind : str, default 'all'
+            Filter by kind: ``'all'`` (default), ``'agg'``, ``'sev'``,
+            ``'port'``, ``'distortion'``, or ``'mvagg'``. Mirrors
+            ``discover(kind=...)``.
+        source : str, pathlib.Path, or None, default 'session'
+            Provenance filter. Default ``'session'`` exports only the entries
+            built this session (not yet in any file). ``'all'`` or ``None``
+            ignores provenance and exports every match; a file stem or
+            :class:`~pathlib.Path` exports only entries that came from that file
+            (re-export / round-trip).
+
+        Returns
+        -------
+        pathlib.Path
+            The file written.
+        """
+        # make sure the configured databases are available to filter against
+        if not self._loaded:
+            self.load()
+
+        name_re = re.compile(pattern)
+
+        def _source_match(entry_source):
+            if source in (None, 'all'):
+                return True
+            if source == 'session':
+                return entry_source == 'session'
+            # a file stem or Path: match on the file stem (suffix-insensitive)
+            want = Path(str(source)).stem
+            if isinstance(entry_source, Path):
+                return entry_source.stem == want
+            return str(entry_source) == str(source)
+
+        selected = [
+            pp for (k, n), pp in sorted(self._knowledge.items())
+            if (kind in ('', 'all') or k == kind)
+            and name_re.match(n)
+            and _source_match(pp.source)
+        ]
+
+        out = Path(path).expanduser()
+        if out.suffix == '':
+            out = out.with_suffix('.agg')
+        if not out.is_absolute():
+            out = self.user_dir / out.name
+
+        header = (f'# written by aggregate {self.version} on '
+                  f'{datetime.now():%Y-%m-%d %H:%M:%S}\n'
+                  f'# {len(selected)} program(s); pattern={pattern!r}, '
+                  f'kind={kind!r}, source={source!r}\n')
+        body = '\n'.join(pp.program for pp in selected)
+        out.write_text(header + body + ('\n' if body else ''), encoding='utf-8')
+        logger.info('Wrote %d program(s) to %s.', len(selected), out)
+        return out
+
 # Module-level singleton — the canonical user-facing entry point. Importable
 # as `from aggregate import build`. Its databases / log2 / update now come from
 # aggregate.config ([build] section), which is also what a bare `Underwriter()`
@@ -1201,7 +1551,10 @@ def _refresh_default_underwriter():
     s = get_settings().build
     build.update = s.update
     build.log2 = s.log2
-    build.databases = list(s.databases)
-    build._knowledge = build._knowledge.iloc[0:0]
+    build._request = list(s.databases)
+    # reset to as-created so the reconfigured request reloads lazily on next access
+    build._knowledge = {}
+    build.databases = []
+    build._loaded = False
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

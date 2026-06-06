@@ -63,7 +63,7 @@ def main() -> None:
             continue
         out[line] = {"kind": kind, "name": name, "spec": jsonify(spec)}
         # Populate knowledge so subsequent builtin lookups (sev.X, agg.X) resolve.
-        uw._knowledge.loc[(kind, name), :] = [spec, line]
+        uw.add_entry(kind, name, spec, line)
 
     OUT.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"Wrote {len(out)} entries to {OUT.relative_to(REPO_ROOT)}")

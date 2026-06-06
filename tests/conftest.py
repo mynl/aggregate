@@ -31,5 +31,5 @@ def underwriter(test_suite_lines):
             kind, name, spec = uw.parser.parse(uw.lexer.tokenize(line))
         except Exception:
             continue
-        uw._knowledge.loc[(kind, name), :] = [spec, line]
+        uw.add_entry(kind, name, spec, line)
     return uw

@@ -130,9 +130,9 @@ distortion V.DiscPlotDist  ph 0.3
 # Leaf distortions are live and validated by interpret_file. The four combo
 # lines below are commented out because interpret_file() parses each line
 # with a fresh, empty knowledge base — combo lookups need the children
-# already registered, which only happens through read_database (sequential
-# load). They are listed verbatim for reference; uncomment when loading
-# via read_database.
+# already registered, which only happens through a sequential file load
+# (Underwriter.load). They are listed verbatim for reference; uncomment when
+# loading via Underwriter.load.
 dist W.tcc       ccoc .25
 dist W.tdu       dual 2.5
 dist W.tph       ph   0.7

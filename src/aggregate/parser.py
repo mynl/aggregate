@@ -98,8 +98,11 @@ class UnderwritingLexer:
            collapsed to spaces.
         2. ``//`` and ``#`` comments are removed through end of line.
         3. ``\\\\n`` line continuation is mapped to a space.
-        4. ``\\n\\t`` and four-space indented ``\\n    `` (the tabbed Portfolio
-           layout) are collapsed to a space.
+        4. A newline followed by **any** indentation (a tab or one or more
+           spaces) is collapsed to a space. This is the single owner of the
+           continuation/indent rule — it folds the tabbed and space-indented
+           Portfolio layouts alike, so ``.agg`` files need no separate
+           whitespace munging when read by :meth:`Underwriter.load`.
         5. The result is split on newlines.
         6. Empty lines are dropped.
 
@@ -124,10 +127,10 @@ class UnderwritingLexer:
         # Strip // and # comments through end of line.
         program = re.sub(r"(//|#)[^\n]*$", r"\n", program, flags=re.MULTILINE)
 
-        # Line continuation and Portfolio-indent collapse.
-        program = (
-            program.replace("\\\n", " ").replace("\n\t", " ").replace("\n    ", " ")
-        )
+        # Line continuation, then collapse any indented continuation line (a
+        # newline followed by a tab or one-or-more spaces) into its predecessor.
+        program = program.replace("\\\n", " ")
+        program = re.sub(r"\n[ \t]+", " ", program)
 
         return [i.strip() for i in program.split("\n") if len(i.strip()) > 0]
 

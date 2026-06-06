@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.0.0a32
+
+### Legible `Underwriter` database loading
+
+The `Underwriter` knowledge-base loading surface — historically one overloaded
+`databases` attribute plus the near-identical `read_database` / `read_databases`
+methods, a fragile `len(knowledge)==0` lazy-load proxy, and a DataFrame-backed
+store — was rebuilt around one explicit pipeline. The resolved knowledge is
+unchanged (`build` loads the same `test_suite`); only the plumbing changed.
+
+- **Dict-backed store with provenance.** The knowledge base is now a flat
+  `{(kind, name): ParsedProgram}` dict; the `(kind, name)`-indexed DataFrame is
+  built on demand for `knowledge` / `discover` (now with a `source` column).
+  Each entry carries a `source` tag — the originating file `Path`, or
+  `'session'` for an in-session `build(...)` — answering "where did this come
+  from?".
+- **One request, one resolver.** The constructor `databases=` argument is the
+  *request* (stored privately); the public `databases` attribute now reports the
+  resolved file `Path`s **actually loaded**. A single glob-aware resolver
+  handles it: `'default'` / `'user'` / `'all'` are predefined globs, anything
+  else is a path or glob resolved across cwd → `~/.aggregate` → bundled
+  (literals first-match-wins; globs union across all three). `databases=['cat_*']`
+  now works. The removed `'site'` token is no longer special-cased.
+- **Honest lazy load + clear verbs.** An explicit `_loaded` flag replaces the
+  entry-count proxy. New/renamed methods: `load(request=None)` (the one load
+  verb; configured-once when `None`, additive otherwise), `reload()` (reset to
+  as-created and re-read), `resolve_databases(request)` (preview without
+  reading), `available_databases()` (discover `.agg` files on disk).
+  **Breaking:** `read_database` / `read_databases` are renamed outright to
+  `load` (no deprecated aliases) — `build` was effectively the only caller.
+- **Consistent error policy.** A literal file named in an explicit `load(path)`
+  that is missing raises `FileNotFoundError`; the configured request and any
+  empty glob only warn.
+- **Save / export.** New `to_agg(path, pattern='.*', kind='all',
+  source='session')` writes selected entries' DecL back to a `.agg` file
+  (round-trip re-loadable), to `~/.aggregate` unless the path is absolute. The
+  default `uw.to_agg('mybook')` saves everything built this session — making the
+  class docstring's "persist to and from `.agg` files" claim true.
+- **One preprocessing owner.** `read_database`'s ad-hoc whitespace regexes are
+  gone; `UnderwritingLexer.preprocess` now owns continuation/indent folding (a
+  newline followed by any tab or spaces is a continuation), covering the tabbed
+  and space-indented Portfolio layouts alike.
+
 ## 1.0.0a31
 
 ### One canonical pricing readout (the "pentagon")

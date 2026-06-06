@@ -6,17 +6,9 @@
 > `dev/done/`) and the git log. What's landed is in `CHANGELOG.md`.
 >
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
-> `[B]` early beta = fine just after the alpha→beta cut, does not block it.
+> `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
 > **Last updated: 2026-06-06** — current version 1.0.0a31.
-
----
-
-## Items ported over from readme - need categorizing and adding
-
-- Treatment of zero lb is not consistent with attachment equals zero.
-- Flag attempts to use fixed frequency with non-integer expected value.
-- Flag attempts to use mixing with inconsistent frequency distribution.
 
 ---
 
@@ -47,11 +39,13 @@ alongside. **Start at `N1`.**
 |    | N5 | `Portfolio.pricing_bounds` rewrite | A | N4 | — *(periodic reminders)* |
 |    | N6 | Validation-calc review | A | — | independent of N1–N5 |
 |    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
+|    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
 |    | H1 | Relocate `make_ceder_netter` | A | — | everything |
 |    | H2 | Dedupe `make_var_tvar` | A | — | everything |
 |    | H3 | Import-dependency audit | A | — | everything |
 |    | H4 | Docstring style sweep → NumPy | A | — | everything |
 |    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
+|    | H6 | Underwriter database-loading rewrite | A | — | everything |
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
 |    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
@@ -128,6 +122,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   split; `ft.py` recentering helpers → call the core path; re-home
   `estimate_agg_window` → `utilities.py`; occ-reins on a signed severity grid;
   DecL keyword for `signed` / `value_type`. **needs N1–N3.**
+- [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
+  2026-06-06)* — three small correctness/guard items:
+  - Treatment of zero `lb` is not consistent with attachment equals zero.
+  - Flag attempts to use **fixed** frequency with a non-integer expected value.
+  - Flag attempts to use **mixing** with an inconsistent frequency distribution.
+
+  The latter two are input-validation guards; the first is a layer/attachment
+  semantics fix. Pairs with **N6** (validation) but distinct (guards, not the
+  validation-calc algorithm).
 
 ---
 
@@ -141,6 +144,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
+- [ ] **H6 `[A]` Underwriter database loading rewrite** — `dev/plan-databases.md`
+  (design decisions confirmed). Make loading legible: dict-backed store (with a
+  DataFrame view) + `source` provenance; one glob-aware resolver; honest
+  `_loaded` flag; single `load(request=None)` verb + `reload` (reset to
+  as-created), `resolve_databases` (preview), `available_databases` (discover);
+  `databases` reports loaded paths; one preprocessing owner; **`to_agg(path,
+  pattern, kind, source)`** save/export (to user dir unless absolute). Renamed
+  outright (no `read_database(s)`
+  aliases). Low impact (`build` is effectively the only consumer). *(Track
+  placement provisional — internal plumbing tidy; move if you'd rather it sit
+  under F/config.)*
 
 ---
 
@@ -263,6 +277,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 - `dev/plan-portfolio-neg-x-pricing.md` → **N3**.
 - `dev/plan-config.md` (Phase 2) → **F8**.
+- `dev/plan-databases.md` → **H6**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
   pentagon pricing contract (**F3**, `plan-pentagon.md`), multivariate

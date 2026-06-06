@@ -1,0 +1,2091 @@
+# Changelog
+
+## 1.0.0a31
+
+### One canonical pricing readout (the "pentagon")
+
+Every pricing method emits the same eight accounting quantities — the amounts
+`L` (loss), `M` (margin), `P` (premium `= L + M`), `Q` (capital),
+`a` (assets `= P + Q`) and the ratios `LR = L/P`, `PQ = P/Q`,
+`ROE = M/Q`. These used to be built independently by each method, disagreeing
+on naming, order, completeness and dtype. They are now a single canonical
+contract owned by `aggregate.pentagon`:
+
+- **One name, one order.** `M/Q` is always `ROE` (with `CoC` documented as
+  the synonym); the canonical order is `[L, M, P, Q, a, LR, PQ, ROE]`
+  (`pentagon.PENTAGON_STATS` / `PENTAGON_DTYPE`). `Portfolio.pricing_at`,
+  `price`, `price_ccoc`, `analyze_distortion`, `analyze_distortions` and
+  `Aggregate.price` all route through one `complete_pentagon` helper, so the
+  derivation `a = P + Q; LR = L/P; …` lives in exactly one place.
+- **Consistent orientation.** Stats are always columns, one row per priced
+  entity; any descriptor columns lead and the pentagon octet is the trailing
+  eight (`df.iloc[:, -8:]`).
+- **``analyze_distortion` audit fixed.** Its `audit_df` is now a one-row frame
+  in that shape — `dname`/`dshape` lead, the full octet trails. *(Shape
+  change: previously a column-oriented frame that omitted ``PQ` and mixed the
+  metadata into the stat index.)* `price_ccoc` now emits `ROE` instead of
+  `COC`.
+- **Pentagon objects (additive).** New `Portfolio.pentagon_at(distortion, p|a, line)` returns a single-row `Pentagon` — an eight-vector with named
+  attributes and provenance that completes any soluble partial input via
+  `Pentagon.solve` (e.g. give it `P`, `L` and `a` or `Q`, get the
+  rest). No existing method changed its return type.
+
+## 1.0.0a30
+
+### User-editable configuration file
+
+The "secret bits" that used to be hard-coded literals — the default `log2`,
+the default database, the reinsurance / discrete-severity bucketing scheme, the
+bucket-sizing percentile, the output-window coverage, and the validation
+tolerances — are now read from a single, optional, hand-editable **TOML** file
+at `~/.aggregate/config.toml`. Values layer lowest-to-highest as
+**built-in defaults → config file → ``AGGREGATE_*` environment variables →
+explicit ``build(...)`` / ``Underwriter(...)` keyword arguments**, so a call
+argument always wins and two fresh installs with no file behave identically.
+
+New surface (all on the module-level `build` and any `Underwriter`):
+
+- `build.write_default_config()` writes an annotated, **fully-commented**
+  template to `~/.aggregate/config.toml` (inert until you uncomment a key);
+- `build.show_settings()` prints every setting **and its source**
+  (`default` / `config` / `env`);
+- `build.reload_settings()` re-reads the file/environment after an edit and
+  refreshes the module `build` in place;
+- `aggregate.get_settings()` returns the resolved, immutable `Settings`
+  snapshot (read once per session);
+- `repr(build)` / `Underwriter` info gains a `config` line reporting the
+  active file and how many settings are overridden;
+- escape hatches: `AGGREGATE_CONFIG=/path` relocates the file,
+  `AGGREGATE_CONFIG=none` ignores it (reproducible runs). Unknown keys,
+  sections, and `AGGREGATE_*` variables warn loudly rather than silently
+  no-op.
+
+The tunable defaults and the path names now live in the new leaf module
+`aggregate.config`; `aggregate.constants` is slimmed to the `Validation`
+flag enum, `DefectiveDistributionWarning`, and the structural reinsurance
+column labels.
+
+**Breaking changes**
+
+- **Minimum Python is now 3.11** (the config reader uses the standard-library
+  `tomllib`; no new third-party dependency). The 3.10 classifier is dropped.
+- **``recommend_p`` is renamed to ``bucket_sizing_p`** everywhere — the
+  `build` / `build_many` / `update` keyword, the `hints{...}` key, and
+  the underlying constant. There is **no alias**; update any call sites.
+- The tunable names that used to live in `aggregate.constants` (e.g.
+  `VALIDATION_EPS`, `VALIDATION_NOISE`, `RECOMMEND_P`,
+  `REINS_BUCKET_DEFAULT`, `DSEV_BUCKET_DEFAULT`) moved to
+  `aggregate.config` and are **not** re-exported; read them from
+  `get_settings()` (e.g. `get_settings().validation.noise`).
+- A bare `Underwriter()` now takes its `log2` / `databases` / `update`
+  defaults from the configured `[build]` section (this unifies the old
+  10-vs-16 `log2` split with the module `build`); pass `databases=None`
+  to load nothing.
+
+Scope: this is Phase 1 — the `[build]`, `[discretization]`,
+`[validation].eps` / `.noise`, and `[multivariate].window_nines` settings.
+Plot styling (`[plotting]` / `.mplstyle` override) and the numerics-pending
+validation floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`)
+land in a later phase.
+
+## 1.0.0a29
+
+### Tail-thickness classification for aggregates and portfolios
+
+Every `Aggregate` and `Portfolio` now reports an ordered tail-thickness
+class on a five-rung scale — `bounded` \< `super-exponential` \<
+`exponential` \< `subexponential` \< `power-law` — plus a separate
+log-concavity flag. The class is derived by deterministic family lookup keyed on
+the frequency and (scipy) severity families, with the aggregate rung given by
+the heavier of frequency and severity (`max`): for a subexponential-or-heavier
+severity the single-big-jump principle makes the aggregate inherit the severity
+class; for light severity the heavier decay rate wins. New surface:
+
+- `Aggregate.tail_class` → a `(freq, sev, agg)` named triple of
+  `TailClass` rungs; `Severity.tail_class` → the component rung;
+- `Aggregate.tail_description` (three aligned lines) and
+  `tail_explanation` (one sentence, with the power-law tail index `alpha`
+  and infinite-variance / infinite-mean flags) — both also shown in `info`;
+- `Portfolio.tail_class` / `tail_description` / `tail_explanation` report
+  the **worst-of** unit aggregate (correct under independence) and name the
+  driving unit(s).
+
+`bounded` is now a **derived** view of the classifier (`bounded` iff the
+aggregate tail class is `BOUNDED`) on `Aggregate`, `Severity`, and
+`Portfolio`; the certify setter (`obj.bounded = True`) and the lifted
+natural-allocation admissibility guard are unchanged. The bounded-support tables
+moved to the new leaf module `aggregate.tail` (re-exported from
+`distributions` for back-compat). `tail.py` is the single source of truth.
+
+Scope: this is Phase 1 — exact, deterministic, spec-only (`bounded` resolves
+before `update()`). Unrecognised or numeric-only families (histogram, meta,
+spliced) classify as `undetermined`; the numeric density-tail estimator that
+will fill those in (and set the aggregate's log-concavity) is deferred to a
+later Phase 2.
+
+## 1.0.0a28
+
+### Mean-preserving (`linear`) bucketing for discrete severities
+
+A new `dsev_bucket` setting controls how discrete-severity atoms (`dsev` /
+`dhistogram` / `fixed`) are placed onto the model grid during
+discretization, mirroring the existing reinsurance `reins_bucket`:
+
+- `'linear'` (the **default**) splits each off-grid atom's mass across its two
+  bracketing buckets, so the discretized first moment equals `Σ xₖ pₖ`
+  exactly (mean-preserving);
+- `'nearest'` snaps each atom to its closest bucket (the historical
+  behaviour), biasing the discretized mean by up to `bs/2` per atom.
+
+This matters when atoms are off-grid — e.g. a severity given as a sample of
+empirical losses with a non-integer `bs`. The common integer-atom, `bs = 1`
+case (a die, fixed losses) is on-grid, where the two schemes coincide, so it is
+unchanged. Pass it as a `build` / `update` keyword:
+
+    a = build('agg Off dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]', bs=0.5)
+    # a.dsev_bucket == 'linear'; discretized mean == 0.3*.5 + 1.7*.3 + 2.4*.2
+
+Scope: Phase 1 covers *unlayered* discrete severities (the empirical-sample use
+case). A *layered* discrete severity discretizes via the cdf-difference and so
+behaves as `'nearest'` regardless of the setting. `info` shows
+`dsev_bucket` when a discrete component is present. The two discrete cases in
+the baseline corpus (`Sym.Dice`, `Port.Bodoff`) shift at the floating-point
+floor toward exact mass placement and were re-captured.
+
+## 1.0.0a27
+
+### Distortion DecL syntax is a flat number list; the parser stops knowing kinds
+
+The DecL distortion form is now uniformly `distortion NAME kind n1 n2 ...` — a
+flat list of the kind's parameters, no brackets:
+
+    distortion D ph 0.9
+    distortion D bitvar 0.9 0.99 0.5      # p0 p1 w1
+    distortion D power 0.01 1.0 2         # x0 x1 alpha
+
+Previously the parser carried a hand-maintained `_distortion_spec` table that
+re-encoded every kind's parameter names (duplicating what the `Distortion`
+subclasses already declare) and reached into `spectral` for domain facts. That
+table is gone. Each subclass now declares its DecL parameter order in a
+`decl_params` class attribute, and a single `Distortion.decl_spec` maps the
+number list onto the kind's natural keyword arguments — one source of truth,
+and adding a distortion kind no longer touches the parser.
+
+- `ccoc` takes the return `r` (`distortion D ccoc 0.25`), not the discount.
+- `wtdtvar` (parameter *vectors*) and the `minimum` / `mixture` combinators
+  (which take distortion *references*) have no flat-number form and raise a clear
+  error if written that way; construct them in Python or via the combinator
+  syntax. The bracketed `kind shape [list]` form is removed.
+
+## 1.0.0a26
+
+### Honest discrete severity — exact moments, no more `rv_histogram` hack
+
+A truly discrete severity (`dsev`, `fixed`) used to be represented by
+*abusing* `scipy.stats.rv_histogram` — a continuous, piecewise-linear-CDF
+object — forced to mimic a step function by pouring each atom's mass into a
+tiny `2**-d`-wide sliver to its left (sized by a float-resolution helper,
+`max_log2`). It worked, but it was a representation lie: it produced quantile
+artifacts (`ppf(0.5) = 149.9999999992` instead of `150`) and — because the
+sliver width *scales with atom magnitude* — it quietly degraded the **moments**
+of large-valued discrete books.
+
+`SeverityDHistogram` / `SeverityFixed` now back `self.fz` with a small,
+honest `_DiscreteRV`: exact right-continuous step `cdf`/`sf`, `pdf = 0`,
+and exact `ppf`/`isf`/`support` (no trailing-9s artifacts; `rvs` returns
+exact atoms).
+
+- **All discrete moments are now exact**, computed as finite sums over the
+  atoms — unlimited, limited, *and* layered. Previously every discrete moment
+  (even the unlimited mean of a fair die) was computed by numerical
+  isf-integration and came back as `3.4999999995` rather than `3.5`; layered
+  discrete moments integrated a step function by quadrature, which was both
+  inexact and fragile. A discrete severity never routes its moments through the
+  numerical path anymore.
+- **Aggregate density is unchanged** — the FFT samples `cdf`/`sf` at
+  half-bucket edges, which never coincide with an atom, so the discretised
+  density is bit-for-bit identical to before. The improvement is confined to
+  reported moments and quantiles, which become *more* correct (the baseline /
+  golden regression snapshots were re-captured to record the exact values).
+- `max_log2` is now unused (kept for one release; slated for removal).
+
+See `dev/done/plan-discrete-severity-fz.md`.
+
+## 1.0.0a25
+
+### `note{}` is now pure text; build settings move to `hints{}`
+
+`note{...}` used to do double duty: free-text annotation *and* a
+`key=value;` side-channel for build settings (`log2`, `bs`, …). That
+overloading meant any `=` in note prose — e.g. `note{... needs x_min<=-6}` —
+was mis-read as a keyword argument and crashed the build. Notes are now **pure
+annotation**; a dedicated `hints{...}` clause carries build settings.
+
+- **Syntax.** `hints{key=value; key=value}`, e.g.
+  `agg A 5 claims sev lognorm 10 cv 2 poisson hints{log2=18; bs=1/64}`.
+  `note{}` and `hints{}` are both optional and order-free (at most one of
+  each); `hints` is allowed everywhere `note` is (agg, sev, port).
+- **Caller always wins.** Explicit `build(...)` keyword arguments override
+  in-program `hints` uniformly — including `recommend_p` (fixing the old
+  quirk where a note's `recommend_p` overrode the caller).
+- **Forgiving.** Values are inferred generically (int / float / `a/b`
+  fraction / `True`/`False` / str). Unknown keys warn and are dropped;
+  a duplicate key warns and the last value wins; a malformed clause warns and is
+  skipped — a bad hint never crashes the build.
+- **Deprecation.** A `note{}` that still looks like it carries `key=value`
+  settings emits a one-time warning (the note is treated as pure text).
+- **Migration.** The bundled `test_suite.agg` / `test_decl.agg` corpora moved
+  their settings-in-notes into `hints{}`; built grids are unchanged. See
+  `dev/plan-note-parse.md`.
+
+## 1.0.0a24
+
+### The `multivariate` keyword — copula-coupled bivariate aggregates
+
+A single event can drive two correlated perils — wind *and* flood, attritional
+*and* large — and you want the **joint** law of the two aggregates, not just two
+marginals. `multivariate` makes that a first-class object: two component
+`agg` / `pnl` severity factories whose per-claim severities are coupled by a
+**copula**, accumulated by a **shared** outer frequency through a 2D FFT. It
+subsumes the `1.0.0a20` `occ_bivariate` backbone into a modelled,
+DecL-declared facility. See `dev/plan-multivariate.md`.
+
+- **Syntax.** :
+
+      multivariate Cat 25 claims
+          agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+          agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+          copula gumbel 0.4          # Kendall tau = 0.4
+          mixed gamma .2             # shared mixing -> common shock
+
+  The shared count (`25 claims`) and trailing frequency own the event count;
+  each component's `dfreq [0 1] [p0 p1]` is the per-event trigger probability,
+  so its *aggregate* is the per-event severity `g_i = (1−p_i)δ₀ + p_i f_i`.
+  The `copula` clause is **optional** — omitted (or `copula independent`)
+  means the independence copula, where the only dependence is the shared count.
+
+- **Copulas, à la ``Distortion`** (new `aggregate.copula.Copula`). A registry
+  / factory hierarchy — `Copula('gumbel', 0.4)` dispatches on the name — with
+  **normal** (Pearson ρ), **gumbel** (Kendall τ, upper tail), **clayton**
+  (Kendall τ, lower tail), **fgm** (Spearman ρ_s), and **independent**. Each
+  takes its *natural* dependence parameter and converts internally; `t` (the
+  two-parameter kind) is deferred.
+
+- **Discrete Sklar construction.** The joint per-claim severity is the copula
+  rectangle mass `S[i,j] = C(G1[i],G2[j]) − C(G1[i−1],G2[j]) − C(G1[i],G2[j−1]) + C(G1[i−1],G2[j−1])` over the marginal CDF breakpoints; `S` has the
+  component severities as exact marginals (atoms handled as jumps in `G`). The
+  joint aggregate is `iFFT2(freq_pgf(N, FFT2(S)))` — the ordinary compound FFT
+  with 1D transforms replaced by 2D, valid because `freq_pgf` is elementwise.
+  Marginalising one axis reproduces that component's standalone aggregate.
+
+- **``pnl` axes in v1.** A `pnl` component contributes its *loss* severity to
+  the copula+FFT, then its premium becomes a **per-axis affine** (reflect +
+  shift) applied to that tensor axis *after* the FFT — the 1D `_apply_agg_affine`
+  relabel lifted to one axis. The affine commutes with marginalisation (marginal
+  = the standalone `pnl`) and flips the loss-loss copula dependence to the
+  correct profit-loss sign.
+
+- **Reporting.** `MultivariateAggregate` exposes `marginals` / `moments`
+  (`E[A0ⁱ A1ʲ]`) / `corr` and the properties `density_df` / `stats_df` /
+  `describe` / `info`, a two-panel `plot` (joint per-claim **severity** on
+  the left, joint **aggregate** on the right), and a `help` introspector. The
+  realised output correlation is reported
+  **alongside** the copula τ — compounding attenuates per-claim dependence, and a
+  shared *mixing* frequency adds common-shock dependence on top (so even the
+  independence copula gives a positive baseline correlation from the shared
+  count).
+
+- **Net/ceded as a first-class mode.** The joint per-occurrence (ceded, net)
+  law of a *reinsured* aggregate is now a `MultivariateAggregate` in
+  **``netceded` mode** — same 2D-FFT engine, a different (comonotone)
+  per-claim severity builder. Two entry points: the DecL `netceded <agg with occurrence reinsurance>` statement, and `Aggregate.occ_bivariate()`, which
+  now **returns** that object (so it gets the full `describe` / `stats_df` /
+  `info` / `plot` / `help` surface, not a bare container). The axes are
+  `Ceded` / `Net`; marginalising reproduces the univariate occurrence
+  ceded / net aggregates, and `E[Ceded] + E[Net]` equals the gross mean.
+
+- **Module move.** `BivariateDistribution` (the internal 2D density
+  container) and the `size_axis` / `scatter_bivariate` / `build_netceded_joint`
+  helpers live in `aggregate.multivariate`; the old `aggregate.bivariate`
+  module is removed (import from `aggregate.multivariate`).
+
+- New `tests/test_multivariate.py` (37 cases); DecL mirrored in
+  `test_decl.agg` (section MV). The `t` copula, ≥3-variate `rfftn` path,
+  and a `MultivariatePortfolio` are scoped as later stages in the plan.
+
+## 1.0.0a23
+
+### The `pnl` keyword — premium-minus-loss aggregates
+
+A profit is premium minus loss, and the premium is collected **once for the
+book**, not once per claim. `pnl` makes that a first-class object — a sibling
+of `agg` that builds an ordinary loss aggregate and applies an
+aggregate-level affine wrapper `PnL = premium − A`. It is the natural producer
+of payoff-typed objects and goes anywhere an `agg` goes, so a `port` of
+`pnl` lines is a book-level underwriting-result distribution (via the signed
+combine landed in `1.0.0a22`). See `dev/done/plan-pnl-premium.md`.
+
+- **Syntax.** `pnl NAME <premium> prem - <loss-exposure> <sev> <freq> …`.
+  Three exposure heads: `70% lr` (binds to the stated premium,
+  `E[loss] = premium·lr`), `10 claims` (frequency-driven), `85 loss`
+  (expected-loss-driven). The premium **vectorises** like an `agg` exposure —
+  `pnl X [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev …` shifts by
+  `Σ premium` and reports the total P&L only.
+- **Once for the book, not per claim.** A constant inside `sev`/`dsev`/
+  `ssev` is multiplied by the claim count; the `pnl` premium is a single
+  deterministic shift. `pnl P 100 prem - 5 claims …` (mean `100 − E[A]`) is
+  deliberately **not** `agg 5 claims ssev 100 - …` (mean `5·(100 − E[X])`).
+- **No new numerics.** The loss FFT, its validation, and every ordinary
+  aggregate are byte-for-byte unchanged (gated behind `agg_reflect` /
+  `agg_shift` defaults). The affine is a pure grid relabel of the finished
+  density: `mean → premium − E[A]`, `sd` unchanged, `skew → −skew`;
+  `ftagg_density` is rebuilt in the combine convention so a book of `pnl`
+  units convolves with no combine-side change. The P&L window is a tight,
+  mass-centred two-sided window (`estimate_agg_window` on the affine moments).
+- **Signed-aware ``describe`: SD instead of CV.** `CV = sd/mean` is
+  meaningless as the mean → 0 (a P&L straddling break-even), so for **any**
+  signed object — a `pnl` *or* a `ssev` / negative-`dsev` aggregate — the
+  moment table now shows an **SD trio** (`SD | Est SD | Err SD`) instead of CV.
+  This also cleans up the `1.0.0a22` signed-portfolio `describe`. Non-signed
+  output is unchanged.
+- **P&L readout.** `info` reports `premium` / `E[loss]` / `E[margin]` /
+  `loss ratio` / `P(loss)` (`= P(PnL < 0)`, read straight off the signed
+  density). `value_type` is set to `payoff` — finally giving that member a
+  job (consumed by the pricing plan).
+- New `tests/test_pnl.py` (15 cases); DecL mirrored in `test_decl.agg`
+  (section PnLprem). Reinsurance gross/ceded-premium P&L and general aggregate
+  algebra are split out to `dev/TODO-Remember.md` (items 6c / 6b).
+
+## 1.0.0a22
+
+### Portfolio combine on signed (profit/loss) support
+
+Second half (`Portfolio` scope) of the negative-x work in
+`dev/plan-negative-x-port.md` — the *combine*. A portfolio of independent
+signed (P&L) units now aggregates correctly onto a shared signed grid, so a
+book that straddles 0 is a first-class object alongside the single-unit P&L
+landed in `1.0.0a21`.
+
+- **Window-aware combine.** Each unit keeps its **own** optimal signed window
+  `[x_min_k, x_max_k)`; the portfolio insists only on a shared `bs` /
+  `log2` / `padding`. The FFT product is origin-at-0 because each unit's
+  `ftagg_density` is independent of that unit's `x_min` (the output roll
+  hits the density, never the transform), so the units multiply correctly and
+  the total is placed on `[x_min_tot, ...)` by a single F2 `np.roll`. This
+  replaces the old truncating `ift` (which silently dropped the wrapped
+  negative tail) — `p_total` now conserves mass on signed support.
+- **Driven on own grids.** Units are updated on their own signed windows
+  (not a 0-based grid), so each unit object stays internally correct (no
+  spurious deficit warning, right moments / `describe` / `plot`) — a strict
+  improvement in instrumentation over a shared-origin drive.
+- **Coarsen-to-fit bucket.** New signed-aware `Portfolio._bs_window` (a thin
+  wrapper on `best_bucket`, recorded in a unit-indexed
+  `Portfolio._bs_window_df`) sizes the shared grid: the summed support is
+  wider than any unit's but `2**log2` is capped, so `bs` is the *coarser*
+  of the RMS recommendation and the fit floor `W_tot / N` (buy the space,
+  avoid aliasing). A fine-lattice unit coarsened by the shared grid surfaces
+  its own per-unit deficit warning rather than failing silently.
+- **density_df** `loss` / `p_total` / `p_{line}` / `F` / `S` are
+  correct on signed support, and hence so are `q` / `var` / `tvar` (the
+  index-agnostic `make_var_tvar` needs no change). `plot` is signed-aware
+  (`_limits('range')` returns a two-sided window so the negative tail is no
+  longer clipped), and `info` reports the realised signed window.
+- **Pricing deferred.** Pricing / allocation columns (`add_exa` and
+  everything it writes, distortion pricing, `value_type` consumption) assume
+  a `loss ≥ 0` axis and are split out to
+  `dev/plan-portfolio-neg-x-pricing.md`. A signed portfolio routes through
+  the `add_exa=False` branch (F/S only); passing `add_exa=True` warns and
+  falls back rather than emitting wrong numbers.
+- The non-negative path is **byte-for-byte unchanged** — every signed path is
+  gated behind `Portfolio._signed()`. The `build_many` Portfolio branch no
+  longer pre-computes `best_bucket` (no back doors: `update` routes
+  `bs=0` through `_bs_window` itself, mirroring the Aggregate fix). New
+  `tests/test_negative_x_port.py` (14 cases); DecL mirrored in
+  `test_decl.agg` (section PortPnL).
+- **DecL: ``shift - dist` severity (premium minus loss).** A constant minus a
+  distribution now parses as the natural P&L reading, e.g.
+  `ssev 100 - lognorm 80 cv .2` — premium `100` minus a lognormal loss
+  (severity mean `20`). It is exactly `-1 * X + 100` (reflect the
+  distribution, then shift), composes with a scale (`100 - 2 * lognorm ...`),
+  and like all reflection needs `ssev` to keep the signed support (plain
+  `sev` clamps the sub-zero tail). One grammar rule (`numbers MINUS sev1`)
+  \+ transformer; the unambiguous whitespace-separated minus means no existing
+  program changes.
+
+## 1.0.0a21
+
+### Negative-support (profit/loss) severity and the output window
+
+First half (`Aggregate` scope) of the negative-x work in
+`dev/plan-negative-x-agg.md`. A *profit is a negative loss*, so an aggregate
+can now live on a signed grid, making profit/loss (P&L) distributions a
+first-class object.
+
+- **Signed severity (F1).** Severity may take negative values -- a profit is a
+  negative loss. The DecL severity family is now:
+
+  - `sev` -- continuous, **clamps** its sub-zero tail at 0 (unchanged);
+  - `dsev` -- discrete, **never clamps**; a negative atom (e.g.
+    `dsev [-2 5] [.5 .5]`) auto-signs the aggregate, so
+    `build('agg PnL 1e6 claims dsev [-1 10] [15/16 1/16] poisson')` works
+    directly;
+  - `ssev` -- **new**: continuous, **never clamps** -- the signed / P&L
+    sibling of `sev` (e.g. `ssev 50 * norm + 10`).
+
+  Signedness is a property of the severity declaration (`Severity.signed`),
+  recorded at parse time -- which is what lets the analytic moments (and hence
+  the automatic window) be correct before any FFT. The `update(..., signed=)`
+  argument remains as an override. The separate `value_type` member
+  (`'loss'`/`'payoff'`, default `'loss'`) records the *pricing* sign
+  convention; it is **orthogonal** to `ssev` (signed does not imply payoff),
+  inert for the distribution, and consumed only at the pricing layer.
+
+- **Output window (F2).** `update(x_min=...)` places the aggregate on a window
+  `[x_min, x_min + (2**log2)*bs)`; `x_min` may be negative. The default
+  `x_min='auto'` resolves to `0` for an ordinary aggregate and to an
+  automatic two-sided window for a signed one, so a P&L just works from
+  `build` with no extra argument. The window is estimated from the analytic
+  moments (new `estimate_agg_window(m, sd, skew, p)` -- reflected
+  shifted-lognormal / -gamma fits with a symmetric/normal fallback; takes the
+  standard deviation directly so the mean-zero case works), so a tight far-from-0
+  lump (e.g. a Poisson(10^6) P&L concentrated near a *negative* mean) uses a
+  small `bs` over a narrow window rather than paying for `[0, mean]`. The
+  placement is a relabelling (single `np.roll` on the padded FFT buffer),
+  exact for random as well as fixed frequency.
+
+- **Bucket + window estimator.** `update` now runs up to three sizing methods
+  and records them in an expert-inspectable `Aggregate._bs_window_df`, then
+  selects: **exact_discrete** (a `dfreq`/`fixed` × `dsev` on an integer
+  lattice has exact finite support -- `bs=1` and a minimal `log2`) \>
+  **bounded_small** (a bounded severity with a small claim count -- window
+  `[0, N_hi·s_max]` from a high frequency quantile) \> **moment** (the legacy
+  3-moment sizing, reproduced exactly for non-negative aggregates;
+  `estimate_agg_window` for signed). `log2` is a cap; pinning `bs` lets you
+  keep full control of the grid.
+
+- **Severity reporting moved to** `Aggregate.sev_density_df` (its own grid
+  `xs_sev`). A windowed/signed aggregate and its severity no longer share a
+  grid, so `p_sev`/`F_sev`/`S_sev`/`log_p_sev` left `density_df` for
+  the new frame; `plot`, `q_sev`, `tvar_sev` and the error analysis are
+  re-sourced. `q`/`tvar`/`var` work on signed support; `plot` is
+  signed-aware (axes span the negative support). `info` renders discrete
+  severities by their support (`atoms [-2 5]`, shortened for many) instead of a
+  spurious `5 xs 0` layer, shows `window` / `value_type` / `signed severity`, and warns when the severity falls outside the output window. The
+  default 0-based, non-negative path is byte-for-byte unchanged.
+
+- Internals: `validate_discrete_distribution` gains `allow_negative`
+  (`dfreq` still clamps claim counts; signed `dsev` preserves negatives);
+  `SeverityDHistogram` places negative atoms correctly; signed severities use
+  identity layering (no `x<0 -> 0` clamp) and raw moments. Signedness is the
+  declaration only -- the `ssev` keyword is the **only** DecL change, and there
+  is no `signed=` argument. New `tests/test_negative_x.py` (28 cases).
+
+- **Deferred to the Portfolio half** (`dev/plan-negative-x-port.md`):
+  portfolio combine on signed support, the full `Portfolio.density_df` column
+  audit (esp. the price column / `add_exa`), and distortion/pricing
+  consumption of `value_type`. The `ft.py` recentering helpers are not yet
+  refactored to call the core path (follow-up).
+
+## 1.0.0a20
+
+### Joint (ceded, net) occurrence distribution via 2D FFT
+
+- New `Aggregate.occ_bivariate(...)` returns a `BivariateDistribution`
+  (new submodule `aggregate.bivariate`; submodule access only) holding the
+  **joint** law of the aggregate occurrence ceded `C` and net `N` losses
+  under an occurrence reinsurance program. The two margins are already
+  available individually (`reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']`);
+  the joint law — their correlation, co-moments, reinsurer-vs-cedent
+  dependency — was not, and the random claim count means it does not factor.
+- The mathematics is the ordinary compound-distribution FFT with the 1-D
+  transforms replaced by 2-D transforms: per claim, `(c(X), n(X))` lies on
+  the line `c + n = X`, so placing the gross severity mass there builds a
+  bivariate severity `S` and the joint aggregate density is
+  `iFFT2(freq_pgf(n, FFT2(S)))` — valid because `freq_pgf(n, z)` is
+  elementwise in `z`. Occurrence only (the aggregate-cover bivariate is
+  degenerate). Per-axis bucket / window sizing is auto-derived from the
+  univariate margins (with `bs_ceded` / `bs_net` / `log2_ceded` /
+  `log2_net` overrides) and the net/ceded mass is scattered onto the 2-D grid
+  by the active `reins_bucket` scheme.
+- `BivariateDistribution` provides `.marginals()`, `.moments(max_order)`
+  (mixed raw moments `E[C^i N^j]`), `.corr()` (Pearson; positive — a random
+  count couples ceded and net), `.contour()`, and rich reprs. The marginals
+  reproduce the univariate occurrence aggregates and the anti-diagonal `C+N`
+  reproduces the gross aggregate, giving exact validation targets; auto-sizing
+  generally yields a *finer* (more accurate) ceded grid than the model grid.
+- New `tests/test_reins_bivariate.py` (31 cases); DecL cases added to
+  `test_decl.agg` (section Z). An experimental docs subsection is pending a
+  manual rebuild.
+
+## 1.0.0a19
+
+### Rationalized reinsurance reporting (Aggregate + Portfolio)
+
+- Three new reinsurance objects on `Aggregate` replace the old fragmented
+  surface:
+  - `reins_density_df` — per-bucket gross/ceded/net densities with
+    **consistent columns** regardless of which stages are configured (a
+    missing stage contributes the no-cession values). Renamed from the legacy
+    `reinsurance_df`: `p_agg_gross_occ → p_agg_gross` (the true gross
+    aggregate) and the old `p_agg_gross` → `p_agg_subject` (the
+    aggregate-cover input).
+  - `reins_stats_df` — a per-layer layering summary (empirical, model-grid).
+    Columns `(view, layer)` with `view` ∈ `occ|agg`: `Gross` (always),
+    then per occurrence `layer.1` … and the `Ceded` / `Net` totals, then
+    the aggregate layers and their `Ceded` / `Net` (no `Subject` column —
+    it is the column flagged `output` below). **Occurrence layers are
+    conditional** on reaching the layer: frequency is the penetrating count
+    `n·P(X>attach)` and severity is the unconditional layer severity divided
+    by `P(X>attach)` (so the layer aggregate mean is unchanged and aggregate
+    layer means sum to `Ceded`); the `agg` row is the layer's actual FFT
+    aggregate. `Ceded` / `Net` totals are unconditional (`Ceded` sev +
+    `Net` sev = `Gross` sev). The aggregate block leaves `freq` / `sev`
+    NaN (they don't combine). Meta rows: `share` / `limit` / `attach`
+    (`Gross` = claim-count-weighted policy terms, share 1; occ `Ceded` =
+    share-placed sum of limits, min attachment), `pr_attach` / `pr_detach`
+    (ground-up exposure probabilities that the underlying loss attaches /
+    exhausts the view — from the underlying severity `fz`, since the modeled
+    severity is conditional and reads 0 at the policy cap), `pr_loss`
+    (P aggregate \> 0), `lol` (loss on line = layer agg mean / placed limit),
+    and `output` (0/1, marks each stage's output view). Plus
+    `(freq|sev|agg, ex1|ex2|ex3|mean|cv|skew)` (`ex1` duplicates `mean`
+    for `filter(regex=...)`).
+  - `reins_describe` — the daily-driver per-stage summary, sharing the same
+    **eight columns as** `describe` (`EX | Est EX | Change EX | CV | Est CV | Change CV | Sk | Est Sk`) and mirroring its **economic view**: `EX` /
+    `CV` / `Sk` hold the *theoretic reference* — the leading view's exact
+    pre-bucket moments (`Gross` for the occurrence block, `Subject` for the
+    aggregate block) — held constant down each component; `Est *` is the
+    per-view model output; and `Change = (Est − reference) / reference` reads
+    two ways off one arithmetic: on the leading (Gross/Subject) row it is the
+    numerical validation / rebucketing error (~0 under `linear`), and on the
+    ceded / net rows it is the % impact of the cession on that moment. Follows
+    the gross/subject convention — the occurrence block leads with **Gross**,
+    the aggregate block leads with **Subject**. Frequency is reported
+    *unconditionally* on the `Est` basis (mean `E[N]` only, so `freq × sev == agg` per view; cv / skew `NaN`) — consistent with `reins_stats_df`,
+    whose conditional basis is confined to the per-layer `layer.k` columns; the
+    leading `gross` row's `Est` frequency is left `NaN` to mirror
+    `describe`. The `view` / `component` index labels are lower-case to
+    match the other frames.
+- New **Portfolio** reinsurance reporting (previously absent):
+  `reins_density_df` / `reins_stats_df` / `reins_describe` give the
+  end-to-end gross/ceded/net of the portfolio aggregate, convolving the
+  per-unit gcn aggregate marginals under the existing independent-FFT
+  machinery (means add: portfolio total = sum of unit means per view). All
+  three return `None` when no unit cedes.
+- Removed the redundant/confusing legacy objects: `reinsurance_df` (renamed),
+  `reinsurance_audit_df`, `reinsurance_report_df`,
+  `reinsurance_occ_layer_df`, the persistent `occ_reins_df` /
+  `agg_reins_df` members, and the per-layer `_reins_audit_df_work` engine.
+  The vestigial `F_*` (CDF) columns are dropped from the per-stage engine
+  frame (the debug plot cumsums inline). `reinsurance_occ_plot` now reads
+  from `reins_density_df`; the `occ_ceder` / `occ_netter` /
+  `agg_ceder` / `agg_netter` step functions are retained for the exact
+  (EX) path.
+- Reinsurance reporting **labels are centralised constants** in
+  `constants.py` (`REINS_LABEL_GROSS` / `SUBJECT` / `NET` / `CEDED` /
+  `OUTPUT`). `describe`'s reinsurance view now leads with **Gross** (was
+  "Subject") and labels the model-output column **Net** / **Ceded** / **Output**
+  (the last for a mixed program, e.g. occ net of + agg ceded to — replacing the
+  old "After"). The occurrence/aggregate ordering and the gross/ceded/net view
+  order are canonical throughout (no longer alphabetical).
+- New `tests/test_reins_reporting.py`; DecL cases added to `test_decl.agg`
+  (section Y). Docs (`2_x_re_pricing.rst`, `2_x_cat.rst`) rewritten to the
+  new API — pending a manual docs rebuild. `Re.Both` describe baseline
+  regenerated for the Gross/Output relabel.
+
+## 1.0.0a18
+
+### Reinsurance rebucketing switch + layer-order validation
+
+- New `Aggregate.reins_bucket` switch (`'linear'` default, or
+  `'nearest'`) controls how net/ceded distributions are rebucketed onto
+  the model grid. `'linear'` splits each off-grid value's mass across its
+  two bracketing buckets, preserving the first moment **exactly**;
+  `'nearest'` rounds to the closest bucket (≤ `bs/2` positional bias).
+  Property + validating setter mirror `Portfolio.allocation_method` (clears
+  cached reins frames on change); a new module constant
+  `REINS_BUCKET_DEFAULT` and an `update`/`update_work`
+  `reins_bucket=` kwarg thread it through. Reinsurance is baked in at
+  `update`, so a post-build change needs a re-`update()`.
+- `Aggregate._apply_reins_work` rebucket core rewritten: the old
+  `groupby` → `interp1d` CDF-interpolation → `np.diff` scheme (an
+  undocumented third method that did not cleanly preserve the mean, plus two
+  `len(...)==1` special cases) is replaced by a vectorized `np.add.at`
+  scatter (new `_rebucket_to_grid` helper). Same `reins_df` columns; the
+  degenerate "all ceded → net is 0" case falls out naturally. Top-of-grid
+  overflow piles into the last bucket (same mode as an aggregate deficit).
+- `make_ceder_netter` now hard-errors on out-of-order or overlapping
+  reinsurance layers via a new `_validate_reins_layers` check at its single
+  choke point: attachments must be non-decreasing and layers must not overlap.
+  Gaps are allowed — express one with a zero-share layer `0 po L xs A`.
+- Baseline `Re.Both` snapshots regenerated (the only case affected; drift
+  ~1e-5 relative, reflecting the more accurate mass-preserving rebucket).
+  New `tests/test_reins_buckets.py`; DecL case `ReBucket` added to
+  `test_decl.agg`.
+
+## 1.0.0a17
+
+### Refactor harness + Copy-on-Write opt-in
+
+- New `tests/baseline/` characterisation harness for the v1.0 core-compute
+  refactor: 10 deterministic cases (7 aggregates, 3 portfolios) snapshot
+  `stats_df` / `describe` / `density_df` plus per-distortion
+  `augmented_df` / `pricing_at` / `price()` to parquet at
+  `rtol=1e-12`, with a pinned manifest recording versions + commit SHA.
+  `tests/test_baseline.py` runs every case before reporting, collecting
+  all divergences into one summary (see `dev/plan-baseline-harness.md`).
+  Adds `pyarrow>=15` to dev extras.
+- Pandas Copy-on-Write is now opted in at package import for pandas 2.x
+  (pandas \>= 3.0 has CoW on as the default, so the option-setter is a
+  conditional no-op there to avoid the deprecated-option warning).
+
+Parser so/po disambiguation + mixture-arm perf guard
+\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~\~~
+
+- `so` (share-of) and `po` (part-of) reinsurance keywords are now
+  true synonyms; the **number** sets the meaning. A literal percentage
+  (`50% so 200 xs 100`, `50% po 200 xs 100`) is the share directly;
+  a bare number (`5 so 10 xs 0`, `5 po 10 xs 0`) is an absolute
+  amount and the share is `amount / limit`. Previously `50% po`
+  divided the percentage by the limit (silent factor-of-200 error)
+  and `5 so` returned the bare value as the share (out-of-range).
+  Implementation: parser tracks the `%` suffix through a tiny
+  `_PercentNumber` float subclass; arithmetic strips it, so an
+  expression like `25 * 2` falls through as an absolute amount.
+- New corpus cases `J.Re18a`..`J.Re18d` cover all four
+  (keyword, percent-or-absolute) combinations and assert they collapse
+  to the same `(share, limit, attach)` tuple.
+- Mixture-arm `Aggregate.__init__` skips the ground-up-mixture
+  `Severity` constructions when no exposure row carries a positive
+  attachment — saves one Severity per mixture component on the common
+  no-excess path. They were only needed for the `sf(attach)`
+  re-weighting under excess covers.
+
+### Portfolio cleanup (add_exa_details slim, swap_density_df, comments)
+
+- `Portfolio.add_exa_details` slimmed to the still-meaningful EPD +
+  reimbursement diagnostic columns (`epd_0_total`, `epd_0_{line}`,
+  `epd_1_{line}`, `e1xi_1gta_*`). The legacy eta-mu /
+  second-priority surface (`ημ_*`, `exeqa_ημ_*`, `e2pri_*`,
+  `lev_ημ_*`, `exlea_ημ_*`, `exi_xgta_ημ_*`, `exa_ημ_*`,
+  `epd_2_*`, `epd_0_ημ_*`, `epd_1_ημ_*`) and the
+  `add_eta_mu()` companion method removed — they were
+  `plot_twelve`-only defensive scaffolding, and `plot_twelve`
+  doesn't actually read them.
+- `Portfolio._build_augmented(efficient=False)` no longer computes
+  `exi_xgtag_ημ_*` / `exag_ημ_*` (no consumers). `pedagogy.plot_twelve`
+  no longer warms `add_exa_details(eta_mu=True)`.
+- `swap_density_df` promoted from experimental method to standalone
+  function in `aggregate.portfolio` (the method is now a thin shim).
+  The function recomputes empirical stats via `xsden_to_mwrangler`;
+  a swapped portfolio has no `mixed`/`independent` decomposition
+  so those stats_df columns are left blank by design.
+- `Portfolio.add_exa` / `Portfolio.update` journey-of-discovery
+  comments scrubbed: commented-out alternative implementations,
+  T.S. Eliot quote, `# TODO What is this crap?` markers, `Doh`
+  asides, and dead chained-assignment-workaround blocks gone.
+  The `ft_nots` argument of `add_exa` is now required (the
+  `None`/`ημ_<line>`-fallback branch was dead since the eta-mu
+  removal).
+
+### Portfolio pricing & allocation (pentagon, linear default, ROE fix)
+
+- `Portfolio.price` default flips to `allocation='linear'` (was
+  `'lifted'`). Lifted natural allocation reads from the risk-adjusted
+  `augmented_df` and is unstable on the right edge for a mass
+  distortion on an unbounded support — essentially all the distortion
+  weight lands on the last bucket. Linear collapses tail states with
+  objective probabilities and stays bounded.
+- New `Portfolio.allocation_method` member (`'linear'` /
+  `'lifted'`) is the source of truth; the setter clears the
+  `augmented_df` cache so the next `apply_distortion` rebuilds.
+  Shown in `info`. `price(allocation=…)` still overrides on a
+  one-off basis.
+- New `Aggregate.bounded` / `Portfolio.bounded` property: `True`
+  iff the frequency *and* every severity component is bounded
+  (`fixed` / `bernoulli` / `binomial` / `empirical` frequencies
+  and finite-support / layer-capped / splice-capped severities).
+  Conservative — defaults to `False` whenever it cannot be proved
+  `True`. Certify with `obj.bounded = True` (escape hatch for
+  cases the heuristic misses).
+- `Portfolio.price(allocation='lifted')` now **refuses** when the
+  portfolio is unbounded and any requested distortion carries a mass
+  (e.g. CCoC on Port.CNC); the error points the caller at
+  `allocation='linear'` or the `bounded` override. Bounded
+  portfolios (Bodoff, beta mixtures) still take lifted+CCoC unchanged.
+- `Portfolio._build_augmented` de-duplicated: the total-level block
+  (`exag_total`, `M.M_total`, `M.Q_total`, `M.ROE_total`,
+  `roe_zero`) is now computed once with the correct L'Hôpital ROE
+  fallback `ROE(1) = 1/g'(1) − 1`. Previously the `efficient=True`
+  branch (the default) used `g'(1)` and disagreed with the
+  `efficient=False` branch on the right edge — surfaces as numerical
+  shifts on mass-distortion + tail cells (the baseline harness moves on
+  Port.Bounded and PEG CCoC; non-mass distortions are unaffected).
+  When `g'(1) = 0` (TVaR beyond the threshold) the limit is `+∞`
+  and `M.Q_{line}/∞ = 0` falls through cleanly.
+- `pricing_at` returns the pentagon order `L M P Q a | LR PQ ROE`
+  (amounts then ratios; `a = P + Q` is now a first-class column,
+  not a post-hoc decoration in `analyze_distortions`). The lifted
+  and linear branches of `price` emit the same column shape.
+  `PRICING_STAT_ORDER` / `PRICING_STAT_DTYPE` updated to match.
+- Linear-branch `price`: the distortion-independent `exp_loss`
+  integral (and the tail-collapse on `exeqa`) is hoisted out of the
+  per-distortion loop. With *k* distortions the per-call cost drops
+  from *k* full reverse-cumsum sweeps to one.
+- Journey-of-discovery comments in `_build_augmented` and the linear
+  `price` branch deleted; the surviving comments are short, current,
+  and point at the equation numbers in PIR §14 where useful.
+
+### Aggregate cleanups + forwards-S unification
+
+- `Distortion.price` now defaults to `S_calculation='forwards'`
+  (`S = 1 − cumsum`). Backwards is still available via the same kwarg.
+  Forwards is the conservative, mass-preserving choice: under a genuine
+  PMF deficit it carries the missing mass as a tail blob rather than
+  silently dropping it. Aligns `Distortion.price` with the four other
+  sites (`add_exa`, `_build_augmented`, `add_exa_sample`,
+  `density_df.S`) that already use forwards by default.
+- New `DefectiveDistributionWarning(UserWarning)` in
+  `aggregate.constants`, emitted once per `update_work` when the
+  aggregate PMF deficit `1 − Σp_agg` exceeds `VALIDATION_NOISE`
+  (forwards and backwards `S` diverge by exactly the deficit, so the
+  warning advertises the divergence at construction time rather than
+  letting it surface silently in downstream pricing).
+- New private `Aggregate._fft_aggregate` helper is now the single source
+  of truth for the FFT-PGF-iFFT core. `_freq_sev_convolution`,
+  `reinsurance_df`, and the subject-aggregate hook in `update_work`
+  all delegate to it; the zero-risk and fixed-1 shortcuts live in one
+  place.
+- Redundant `est_*` moment writes inside `apply_occ_reins` and
+  `apply_agg_reins` removed: `update_work` overwrites those fields
+  immediately from the same densities using the de-fuzzed
+  `xsden_to_mwrangler` worker. The unused
+  `Aggregate.aggregate_keys` class attribute is also gone.
+
+### Aggregate reinsurance reporting (Subject / Net / Change)
+
+- `Aggregate.describe` becomes an economic view under reinsurance:
+  columns are `Subject EX | <label> EX | Change EX | Subject CV | <label> CV | Change CV | Subject Sk | <label> Sk`, where `<label>`
+  is `Net` (every cession passes the net), `Ceded` (every cession
+  passes the ceded), or `After` (occ and agg pass different kinds).
+  `Change = (after − subject) / subject` is the same column arithmetic
+  as the legacy `Err` and reads either as the validation eyeball (no
+  reins) or as the cession impact (under reins).
+- Headings switch to the denser `EX` / `CV` / `Sk` form on both
+  `Aggregate.describe` and `Portfolio.describe` (legacy
+  `E[X]` / `CV(X)` / `Skew(X)` retired).
+- `Portfolio.describe` now picks its column layout at the **portfolio**
+  level so the unit blocks and the `total` block always agree. If
+  **any** unit carries reinsurance the whole table flips to the economic
+  Subject / `<label>` / Change view (the `total` Subject is the gross
+  theoretical, `<label>` the realised after-reins); units with no
+  cession are rendered in that layout too. With no reinsurance anywhere
+  the table keeps the plain theory/empirical validation view. Previously
+  the `total` block stayed in validation headings while ceding units
+  used economic headings, so the columns misaligned under `pd.concat`.
+  New `Portfolio._reins_after_label` aggregates the per-unit labels
+  (one kind → that label, mixed → `After`); `Aggregate.describe` is
+  refactored onto `Aggregate._describe(force_reins_label=...)` so the
+  portfolio can impose one shared label on every unit.
+- The scaffold `stats_df` columns from the previous iteration are now
+  populated: `after_occ` (post-occ-reins moments, pre-agg-reins),
+  `occ_impact` (after_occ / mixed), `agg_impact` (empirical /
+  after_occ), and `gross_empirical` (subject empirical, via one extra
+  FFT of `sev_density_gross` when occ-reins is present, free
+  otherwise).
+- `stats_df['error']` is now the subject-validation column:
+  `gross_empirical` vs `mixed`. Under no reinsurance
+  `gross_empirical == empirical` and this is exactly the legacy
+  theoretical-vs-empirical column. Under reinsurance it is the only
+  apples-to-apples check available (the after-reins object has no
+  independent theoretical to validate against).
+- `Aggregate.valid` now validates the SUBJECT under the hood and ORs
+  in `Validation.REINSURANCE` when reins is present. `info` /
+  `explain_validation` surface this as `reinsurance; subject not unreasonable` (or `reinsurance; subject fails ...`) so the user
+  can tell whether the gross object is sound.
+
+### Shared stats hygiene across Aggregate and Portfolio
+
+- `stats_df` is now an all-`float64` frame on both `Aggregate` and
+  `Portfolio`; the legacy `('meta','name')` string row has been removed
+  (the name lives on `self.name`). All the `.astype(float)` casts at
+  consumer sites are gone.
+- Per-component columns are renamed from flat `comp_<i>` to the 2-D
+  `e{e}.m{m}` form (exposure component × severity-mixture component).
+  The limit-profile arm uses `m=0`; the mixture-product arm carries both
+  indices.
+- `stats_df` gains scaffold columns for the upcoming reinsurance
+  reporting redesign: `after_occ`, `occ_impact`, `agg_impact`,
+  `gross_empirical` (NaN-filled for now, populated when reinsurance
+  reporting lands).
+- `Aggregate.valid` and `Portfolio.valid` now read mean / aliasing
+  signals straight off `stats_df['error']` -- single source of truth, no
+  detour through `describe`. The hard-coded `eps**3` floor and `10×`
+  aliasing ratio are replaced with named constants `VALIDATION_NOISE` and
+  `ALIASING_RATIO` in `aggregate.constants`.
+- `Portfolio.update` and `Portfolio.create_from_sample` now compute
+  empirical aggregate moments via the de-fuzzed `xsden_to_mwrangler`
+  worker -- the same convention `Aggregate.update_work` already uses
+  (small absolute shift in `est_m`/`est_cv`/`est_skew` and downstream
+  pricing -- the PEG / harness baselines move at ~1e-9 relative and are
+  recaptured in this iteration).
+- `Portfolio._write_empirical_stats` no longer inverts each unit's
+  empirical severity `(mean, cv, skew)` back into raw moments via
+  `MomentWrangler`; it reads `Aggregate.stats_df['empirical']` raw
+  moments directly.
+- Two new floor constants in `aggregate.constants` replace the bare
+  numerics in `add_exa` / `add_exa_details`: `EXEQA_NOISE_FLOOR`
+  (the `exeqa` decomposition-error truncation threshold, was `1e-4`)
+  and `FT_NOISE_FLOOR` (the "build up the product" guard, was `1e-10`).
+
+### Noise-aware validation, denoised `describe`, empirical raw moments
+
+- `Aggregate.valid` / `Portfolio.valid` now test CV and skewness with
+  `np.isclose` against a definite noise floor (`VALIDATION_NOISE = 1e-12`) instead of a relative error guarded only by `> 0`. This fixes
+  spurious skew/CV failures for symmetric or low-skew distributions whose
+  analytic value is exactly 0 but computes as floating-point dust -- e.g.
+  `dsev [1:6]` (a fair die) no longer reports `fails sev skew, agg skew`.
+- `describe` no longer displays floating-point dust: near-zero moment
+  cells are snapped to 0, and the error columns fall back to absolute error
+  where the theoretical value is ~0.
+- `stats_df['error']` is now noise-aware (same fallback). The raw
+  `empirical` and `mixed` / `total` columns retain their exact values.
+- Empirical raw moments `ex1` / `ex2` / `ex3` are now populated in
+  `Aggregate.stats_df['empirical']` for the `sev` and `agg` rows
+  (`Portfolio` already did this).
+- Empirical aggregate moments are now computed from a de-fuzzed *copy* of
+  the FFT density (sub-machine-epsilon fp noise zeroed, the same
+  `remove_fuzz` threshold `density_df` uses), so the stored higher
+  moments -- notably skew -- are clean and grid-independent instead of
+  picking up `x**3`-amplified far-tail noise. `agg_density` itself is
+  left untouched as the raw FFT output.
+- New `moments.ser_to_mwrangler(ser)` builds a `MomentWrangler` from a
+  Series whose index is the support (e.g. `density_df.p_total`).
+- `utilities.silence_warnings` now takes optional `category` / `message`
+  / `module` arguments to scope what is suppressed.
+- The `xsden_to_*` moment helpers now share a single public entry point
+  `xsden_to_mwrangler` (returns a `MomentWrangler`), resolving the
+  previous `meancv` / `meancvskew` tail-mass inconsistency and avoiding
+  redundant moment passes where both raw and standardized moments are
+  needed; a definitely defective distribution
+  (`sum(p) < 1 - VALIDATION_NOISE`) is now logged at INFO.
+
+## 1.0.0a16
+
+### Distortion: atom-row stats_df, Kusuoka summary in describe
+
+`describe` now ends with three Kusuoka-summary rows for every kind:
+`mean_mass` (atom of $`\mu`$ at `p=0`), `max_mass` (atom at
+`p=1`), and `interior_atoms` (boolean). The unambiguous names
+replace the earlier `mass_at_0` / `mass_at_1` labelling.
+
+`stats_df` drops those three rows and instead carries a variable-length
+**atoms section** -- one row per Dirac atom of $`\mu`$, indexed
+`mu_<p:.3f>`. The `closed_form` column holds the `p` value;
+`D_g` holds the atom mass.
+
+`MixtureDistortion._kusuoka_atoms` merges duplicate `p` across
+members. `MinimumDistortion._kusuoka_atoms` detects atoms via two
+sources: `brentq`-refined active-member transitions (mass via the
+slope-jump identity $`m = s^* (g_i'(s^*) - g_j'(s^*))`$) and
+boundary atoms inherited from the member active near `s = 0` /
+`s = 1`.
+
+### Portfolio.calibrate_distortion(s) cleanup
+
+- `calibrate_distortion`: dropped the unused `df` parameter; default
+  `r0` changed `0.0 → 0.05`. Docstring clarifies that `r0` is
+  consumed only by the mass-at-zero kinds (`cll`, `clin`, `lep`,
+  `ly`) and ignored otherwise.
+- `calibrate_distortions`: dropped `r0` and `df` -- both were
+  dead, since the calibrated-kind list is fixed to
+  `[ccoc, ph, wang, dual, tvar]` (none take `r0`; the legacy `tt`
+  kind that consumed `df` was removed earlier).
+- Updated 7 `.rst` doc call sites from the legacy
+  `calibrate_distortions(ROEs=[r], Ps=[p], strict='ordered')` to the
+  current `calibrate_distortions(coc=r, p=p)`. Also fixed
+  `port.dists[…]` → `port.distortions[…]` and `dist_ans` →
+  `distortion_df` in the 10-min walkthrough prose.
+
+### plot_twelve self-warming and bound-method fix
+
+`pedagogy.plot_twelve` was silently relying on two preconditions the
+user had to set up by hand. Now self-sufficient:
+
+- Detects when the cached `augmented_df` is the lean
+  (`efficient=True`) build (no per-line `M.M_<line>` columns), pops
+  the cache entry, warms the eta-mu derivatives via
+  `add_exa_details(eta_mu=True)` if needed, and rebuilds with
+  `apply_distortion(distortion_name, efficient=False)`.
+- Two stale `port.augmented_df.loc` / `.query` accesses (treating
+  `augmented_df` as a property -- it's been a method since the
+  `apply_distortion` refactor) now use the local `aug_df` variable.
+
+### Package surface housekeeping
+
+Each submodule declares its own `__all__`; the package `__init__.py`
+is now a stack of `from .module import *` lines. Single source of
+truth -- change what's public at the top level by editing the source
+module, not `__init__`.
+
+The `warnings.simplefilter('ignore')` block formerly run on package
+import is gone. Library code should not mutate global state at import
+time. The replacement is an explicit, opt-in helper:
+
+``` python
+from aggregate import silence_warnings
+silence_warnings()    # mute warnings globally; user choice, not the
+                      # library's
+```
+
+The four remaining `from .constants import *` lines (in
+`distributions`, `utilities`, `spectral`, `portfolio`) were
+replaced with explicit imports listing only the constants each module
+actually uses.
+
+### aggregate.parser_errors: structured DecL parse-error reports
+
+New `aggregate.parser_errors` module turns Lark's terse parse
+exceptions into structured `ErrorReport` dataclasses with line and
+column, source-line echo, caret marker, friendly terminal labels, and
+"did you mean..." suggestions via `difflib.get_close_matches`. With
+Earley + dynamic lexer, almost every DecL parse failure surfaces as
+`UnexpectedCharacters`; the formatter recovers the full mistyped word
+by scanning forward through the DecL identifier character class, then
+compares it against the parser-state's allowed terminal set.
+
+The report is attached to every `build()` parse failure as
+`e.report` (and `e.report.render()` gives the multi-line text
+form). The wrapping `ValueError`'s `args[0]` is now a one-line
+human-readable summary, so `str(e)` at the traceback tail reads
+e.g. `DecL parse error at line 1, column 9: Unexpected 'cliams'. Did you mean: claims?` rather than the historical
+`namespace(type='?', value='c', index=8)`. The Lark cause chain is
+suppressed (`raise … from None`) so notebook tracebacks don't dump
+Lark's internal `UnexpectedCharacters` frame; `e.report` carries
+forward everything users actually need from it. Three opt-in recipes
+(notebook print-then-raise, programmatic suggestion read, IPython
+traceback hook) are documented in the "Reading Parse Errors" section
+of the DecL language reference.
+
+Long source lines are windowed around the caret with word-boundary
+snap and ellipsis markers (`...` / `...`) so the marker stays
+visible on a single terminal row. The rendered block uses a tight
+layout: the "Did you mean" suggestion and the "Expected" list both
+appear inline on the same line as the "Unexpected ..." message, with
+no blank breaks.
+
+### decl.lark: keyword terminals now require word boundaries
+
+Every DecL keyword terminal (`AGG`, `SEV`, `PORT`, `CLAIMS`,
+`MIXED`, `DISTORTION`, `FREQ`, …) now carries a negative
+lookahead `(?![a-zA-Z0-9._:~\-])` mirroring the ID-continuation
+character class. Without this, Lark's dynamic lexer would peel a
+keyword off the front of a typo like `aggx` and continue parsing as
+if the user had written `agg x`, surfacing the error several tokens
+downstream at the wrong column. The lookahead forces keywords to
+match only on word boundaries — same trick Python's tokenizer uses
+for `def` vs `define`. Typos like `aggx Re:MFV41 …` now report
+`Unexpected 'aggx'. Did you mean: agg?` at column 1 instead of a
+misleading column-6 error about `Re:MFV41`.
+
+## 1.0.0a15
+
+### `Distortion` info / describe / stats_df / density_df quartet
+
+`Distortion` now exposes the same four-property quartet as `Aggregate`
+and `Portfolio`: `info` (multi-line summary string), `describe`
+(small `(D_g, D_g_inv)` DataFrame with checks block), `stats_df`
+(single-column `D_g` table with closed-form and error columns), and
+`density_df` (full grid: `g, g_inv, g_dual, g_dual_inv, g_prime, g_dual_prime, kusuoka`).
+
+All four are lazy `cached_property` — zero cost if never accessed.
+Parameter setters (`d.a = 0.5`) and calibration (`_finalize_calibration`)
+both route through `_build()` which invalidates the cache, so
+calibrate-then-read returns fresh tables. The cache survives pickling.
+
+Closed-form moments are surfaced where available: `ph`, `wang`,
+`dual`, `tvar`, `ccoc`, `beta`, `bitvar`, `wtdtvar`, `cll`,
+`clin`, `lep`. Multi-knot kinds (`minimum`, `mixture`) and the
+remaining kinds (`power`, `ly`) leave the `closed_form` column as
+`NaN` and rely on numeric values. The `error` column gives an
+instant readout of trapezoidal-grid accuracy.
+
+A new `_density_knots()` hook is overridden on kinked kinds so the
+grid splices in TVaR/BiTVaR/WtdTVaR kinks (and the cap points for
+CLL/CLin); `Distortion.plot()` now reads from `density_df`, so
+the plotted curve is consistent with the tables and benefits from
+the same knot splicing.
+
+A `_kusuoka_summary()` hook returns three rows surfaced in
+`stats_df` — the atoms of the Kusuoka spectral measure $`\mu`$
+at `p=0` and `p=1`, and a boolean flag for interior atoms in
+`\mu` (True for `tvar`, `bitvar`, `wtdtvar`, and combinations
+of these).
+
+## 1.0.0a14
+
+### `aggregate` matplotlib house-style
+
+New `aggregate.style` module — single source of truth for plot styling,
+shared by the docs build and any forthcoming server / notebook use. The
+underlying style is shipped as `aggregate/data/aggregate.mplstyle`
+(color, serif, `figure.figsize = 3.5, 2.45`, `figure.dpi = 300`,
+constrained layout).
+
+To use the style in JupyterLab, at the top of any notebook:
+
+    import aggregate.style
+    aggregate.style.use()
+
+That mutates `matplotlib.rcParams` globally for the kernel and also
+sets `pd.options.display.width = 120`. Any plots from that point on
+use the house style.
+
+Variants:
+
+    # leave pandas alone (e.g. you've already configured display.width):
+    aggregate.style.use(pandas=False)
+
+    # scoped — only for one figure, restores prior rcParams on exit:
+    with aggregate.style.context():
+        fig, ax = plt.subplots()
+        ax.plot(x, y)
+        plt.show()
+
+    # scoped with overrides — bigger figure for a screen demo:
+    with aggregate.style.context(**{"figure.figsize": (7, 4),
+                                    "figure.dpi": 100}):
+        fig, ax = plt.subplots()
+
+**One gotcha:** matplotlib's inline backend in Jupyter has its own
+`figure.dpi` / `figure.figsize` defaults that it applies *after*
+import. If cells imported `matplotlib` before you called `use()`,
+the inline backend's defaults can sneak back. Safest pattern is to put
+`import aggregate.style` / `aggregate.style.use()` as the **first**
+matplotlib-touching lines in the notebook.
+
+If figures still look wrong after that, force the inline backend's own
+dpi explicitly:
+
+    %config InlineBackend.figure_format = 'retina'   # or 'png'
+    %config InlineBackend.rc = {'figure.dpi': 100}   # override for screen
+
+Replaces `knobble_fonts` (formerly inlined in `docs/conf.py`); the
+docs build now calls `aggregate.style.use()`. The B&W branch is
+dropped (paperless commitment). `rc_params()` exposes the parsed
+style as a dict for inspection / composition.
+
+## 1.0.0a13
+
+`Distortion` constructors take natural, kind-specific parameter names
+instead of the generic `(name, shape, r0, df, col_x, col_y)` slots.
+
+- New signature per kind (positional or kwarg):
+  - `Distortion('ph', a=)`, `Distortion('wang', lam=)`,
+    `Distortion('dual', b=)`, `Distortion('tvar', p=)`.
+  - `Distortion('ccoc', d=)` *or* `Distortion('ccoc', r=)` —
+    keyword-only; passing exactly one of `d` or `r` is required;
+    positional `Distortion('ccoc', x)` raises `TypeError` (explicit
+    over implicit). `Distortion.ccoc(d)` static factory unchanged.
+  - `Distortion('bitvar', p0=, p1=, w1=)` — `w1` is the weight on the
+    upper threshold `p1`.
+  - `Distortion('wtdtvar', ps=, wts=)` — `ps` and `wts` are equal
+    length; `wts` summing close to 1 is normalised silently, otherwise
+    `ValueError`.
+  - `Distortion('cll', r0=, b=)`, `Distortion('clin', r0=, slope=)`,
+    `Distortion('lep', r0=, r=)`, `Distortion('ly', r0=, r=)`.
+  - `Distortion('beta', a=, b=)`, `Distortion('power', x0=, x1=, alpha=)`.
+  - `Distortion('minimum', distortions=)`,
+    `Distortion('mixture', distortions=, wts=)`.
+- Each scalar-shape subclass exposes its natural name as a read/write
+  property (e.g. `d.a`, `d.p`); the writer re-runs `_build` so
+  downstream cached state stays consistent.
+- DecL grammar unchanged; `parser.py` translates the legacy
+  `kind shape [df]` tuple to natural kwargs via a new
+  `_distortion_spec` helper. Existing `distortion d1 ph 0.5`,
+  `distortion d2 bitvar 0.5 [0.95 0.99]`, etc. all still parse.
+- `ConvexDistortion` removed (it was a constructor, not a kind).
+  Replaced by module-level `aggregate.spectral.convex_distortion(s, gs, *, display_name='')` that takes two raw arrays and returns a
+  `WtdTVaRDistortion` whose piecewise-linear `g` matches the upper
+  convex envelope. Companions `bagged_distortion` and
+  `convex_example` are likewise module-level (not staticmethods).
+- Removed: `Distortion.average_distortion`,
+  `Distortion.bagged_distortion`, `Distortion.s_gs_distortion`,
+  `Distortion.convex_example` staticmethods; `_plot_decorations`
+  hook (presentation concern, not core behaviour).
+- `power` is no longer calibratable through `Portfolio.calibrate_distortion`
+  (`_calibration_init_shape` dropped; `strict_pricing=False`).
+- Snapshot regression: `tests/data/distortion_g_snapshot.csv` pins
+  `g` and `g_inv` at canonical parameter sets for every documented
+  kind to `rtol=1e-10`.
+
+## 1.0.0a12
+
+`extensions/` package removed. Optional/auxiliary code consolidated into
+top-level modules or migrated out:
+
+- New: `aggregate.pedagogy` absorbs all doc-cited figure helpers
+  (`adjusting_layer_losses`, `savings_charge`, `mixing_convergence`,
+  `power_variance_family`, `fig_4_1`, `fig_4_5`, `fig_4_6`,
+  `fig_4_8`, `fig_9_1`, `natural_scale`) plus four curated, renamed
+  PIR figures: `plot_distortion_and_ins_stats` (was `fig_10_3`),
+  `plot_spectral_three_panel` (was `fig_10_5`), `plot_twelve` (was
+  `twelve_plot`), `plot_bivariate` (was `biv_contour_plot`). Also
+  `bodoff_exhibit` (now takes `port` as first arg, not `self`).
+  `ClassicalPremium` pulled in to keep `fig_9_1` working.
+- New: `aggregate.pentagon` (was `extensions.pentagon`). Class plus
+  the `mapper` / `make_possible_pentagons` helpers. Not re-exported
+  from top-level `aggregate`; reach as
+  `from aggregate.pentagon import Pentagon`.
+- Deleted: `basic.py`, `samples.py`, `test_suite.py` (visual
+  reporter; pytest now drives the test_suite.agg coverage),
+  `bodoff.py`, `risk_progression.py`, `case_studies.py`,
+  `portfolio_pir.py`, `pir_figures.py` and `figures.py`
+  (cherry-picked into `pedagogy.py`; the rest deleted),
+  `cnc.py` / `discrete.py` / `hs.py` / `tame.py` (PIR
+  case-study runner scripts), and the entire `templates/` folder
+  (HTML/Markdown scaffolding for the deleted exhibit pipeline; the
+  package-data entry in `pyproject.toml` was dropped to match).
+- PIR case-study reproduction: install `aggregate==0.30.1` in an
+  isolated environment to get the legacy `CaseStudy` workflow. PMIR
+  is a separate forward-looking project and does **not** reproduce PIR
+  exhibits.
+- Doc imports updated to point at `aggregate.pedagogy` (technical
+  guides) and `aggregate.ft` / `aggregate.tweedie` (reference page).
+  Case-studies user-guide page replaced with a redirect note. The stale
+  `aggregate.extensions.ft_invert` examples in
+  `5_x_nm_ft_conv_algo.rst` were removed.
+- No backwards-compat shim. `from aggregate.extensions import ...` is
+  gone; `from aggregate.pedagogy import ...` is the new path.
+
+## 1.0.0a11
+
+`Bounds` redesigned. The IME 2022 pricing-bounds class is now one-shot:
+`Bounds(obj, premium, *, a=np.inf, line='total', n_p=257, n_s=513)`
+runs the full computation at construction. Access `p_star`, `min_envelope`
+(a coherent `Distortion`), `max_envelope` (a callable; not a Distortion
+because max-of-concaves isn't concave in general), `min_envelope_hinges`
+(the active `(p_lo, p_hi)` bracket at each `s`), `cloud_df`,
+`weight_df` and `tvar_df` as properties.
+
+- Accepted input types broadened: `Portfolio` (with `line=`),
+  `Aggregate`, `pd.Series`, `pd.DataFrame` (first column = pmf).
+- `p_star` solved with `scipy.optimize.brentq` after a dyadic coarse
+  bracket on `k/256`. Adaptive p-knots densify the grid at
+  `p_star ± 2^{-k}` for `k = 8..11` so the kink between the CCoC
+  and TVaR regimes resolves cleanly.
+- `cloud_view` → `plot_envelope`. `weight_image` → `plot_weights`.
+- Renaming internal arrays to clarify the math:
+  `p_knots` (TVaR thresholds, shape `(n_p,)`),
+  `s_grid` (distortion eval points, shape `(n_s,)`),
+  `tvar_x_p` (`TVaR_p(min(X, a))` at each knot),
+  `tvar_hinges` (`min(1, s/(1-p))`, shape `(n_p, n_s)`).
+- Removed: `principal_extreme_distortion_analysis`, `ped_distortion`,
+  `quick_price` (uncalled), `t_mode` getter/setter and Gauss-Legendre
+  branch, `add_one` flag (locked True), `make_tvar_function` (folded
+  into the bounded TVaR cache), `tvar_with_bound` (ditto).
+- Pedagogy helpers `similar_risks_graphs_sa`, `similar_risks_example`,
+  module-level `plot_max_min`, and `plot_lee` moved to a new
+  `aggregate.pedagogy` module. Not exported from top-level
+  `aggregate`. `plot_max_min` and `plot_lee` previously exported
+  from top-level — those exports dropped per the no-shim policy.
+- `Portfolio.pricing_bounds` now raises `NotImplementedError` —
+  pending rewrite against the new Bounds API. The matmul-shape bug
+  reported on PEG (33977 vs 512) was a symptom of the legacy
+  `Bounds.tvar_cloud` accepting a free-form `s` array; the new
+  `Bounds` always uses a 513-point binary `s_grid`.
+- `tests/test_bounds.py` (9 cases). Closed-form analytical pins:
+  brackets `(p_star, p_hi)` at `premium = TVaR_{p_star}` carry
+  weight zero, so the resulting cloud columns equal the
+  `TVaR_{p_star}` distortion exactly. Arbitrary bracket reproduces
+  the weighted-combination formula to `1e-10`.
+
+## 1.0.0a10
+
+`ft` consolidation. `FourierTools` and friends promoted from
+`aggregate.extensions.ft` to top-level `aggregate.ft`. Reach for
+the class via `from aggregate.ft import FourierTools` (submodule
+access only, no top-level re-export — same treatment as `Tweedie`).
+
+- The legacy procedural `ft_invert` function (~140 LOC) deleted.
+  Its functionality is fully covered by the `FourierTools` class,
+  which the module's own docstring already documented as the
+  preferred replacement. Docs that reference `ft_invert` are stale
+  and will be swept separately.
+- Paper-figure helpers (`poisson_example`, `fft_wrapping_illustration`,
+  `recentering_convolution`, `recentering_convolution_example`)
+  retained in `aggregate.ft` for now. A future `aggregate.pedagogy`
+  module will consolidate figure-generators from across the codebase
+  (see CLAUDE.md TODO).
+- `make_levy_chf` retained.
+- Reach-back imports inside `ft.py` (`from .. import build, qd, Aggregate`)
+  replaced by direct module imports — eliminates the
+  partially-loaded-package fragility that drove tweedie's load-order
+  dance in 1.0.0a9.
+- `aggregate.tweedie`'s `FourierTools` import repathed
+  (`from .extensions.ft` → `from .ft`).
+- Light tidy: `FourierTools(object)` → `FourierTools`; stale
+  `ft_invert` references in docstrings / assert messages / dead
+  commented debug lines cleaned up.
+- New `tests/test_ft.py` — small in-regression case asserting that
+  `FourierTools` against a closed-form distribution
+  (`scipy.stats.norm`) inverts to the analytic pdf.
+- Old `from aggregate.extensions.ft import ...` will break — no
+  shim per the no-backcompat policy in `CLAUDE.md`.
+
+## 1.0.0a9 (in progress)
+
+Tweedie consolidation. `Tweedie` class promoted from
+`aggregate.extensions.tweedie` to top-level `aggregate.tweedie`.
+`tweedie_convert` and `tweedie_density` moved out of
+`utilities.py` into the same module; their public re-exports from
+`aggregate` are unchanged. Public import path for the class:
+`from aggregate.tweedie import Tweedie`.
+
+- `Mode`, `Tweedie`, `tweedie_illustration` are NOT re-exported
+  at top level — submodule access is the only path. `Tweedie` gets
+  the same treatment as `Bounds` (peripheral-but-public).
+- `make_test_suite` and `run_test` (interactive notebook scaffolds
+  that read a CSV and `IPython.display` audit frames) deleted.
+  Replaced by a small in-regression pytest module
+  `tests/test_tweedie.py` covering `tweedie_convert` round-trip,
+  `tweedie_density` at the mass-at-zero point, Tweedie class moments
+  matching V(μ)=disp·μ^p, and the additive↔reproductive duality.
+- Light tidy in the moved file: `Tweedie(object)` → `Tweedie`;
+  dead commented imports / unused `Path` / `IPython.display`
+  removed; `# noqa` annotation on `Aggregate` import dropped.
+- `parser.py`'s lazy `tweedie_convert` import repathed from
+  `.utilities` to `.tweedie`.
+- Old `from aggregate.extensions.tweedie import ...` will break —
+  no shim per the no-backcompat policy in `CLAUDE.md`.
+- Docs (`docs/2_user_guides/DecL/100_tweedie.rst`, technical guide)
+  still reference the old import path — pending a separate docs
+  sweep.
+
+## 1.0.0a8 (in progress)
+
+Portfolio refactor sub-project E — stats consolidation. Six overlapping
+`Portfolio` stats frames (`statistics_df`, `statistics`,
+`report_df`, `report`, `audit_df`, `make_audit_df`) collapsed
+into a single canonical `stats_df`. Public stats surface on
+`Portfolio` is now exactly three things: `info`, `describe`,
+`stats_df` — same shape as `Aggregate`.
+
+- **``stats_df`** is a `DataFrame` with MultiIndex on
+  `(component, measure)` rows (`meta` + `freq` + `sev` + `agg`
+  blocks) and columns one-per-unit + `total` + `empirical` + `error`.
+  Per-unit columns hold each `Aggregate.stats_df['mixed']` (the
+  unit's own view); `total` is the portfolio-aggregate theoretical
+  view (sum of each unit's `mixed`); `empirical` is the post-FFT
+  combined view; `error = empirical / total - 1`.
+- Column is `total` rather than Aggregate's `mixed`: at the
+  Portfolio level there is no mixed-vs-independent distinction
+  (mixed-vs-independent is an Aggregate-only concept that strips a
+  single agg's freq mixing distribution).
+- **Empirical column is fully populated**:
+  - `('agg', *)` rows — raw moments `ex1` / `ex2` / `ex3` plus
+    `mean` / `cv` / `skew`, computed straight from the
+    portfolio-total FFT density (plain summation, no tail-mass
+    correction — matches the PEG baseline numerics).
+  - `('sev', *)` rows — raw moments and central moments,
+    re-aggregated from each unit's empirical sev mean/cv/skew via a
+    fresh `MomentAggregator`. `Aggregate.stats_df` stores only
+    empirical mean/cv/skew for sev, so the raw moments are inverted
+    via `MomentWrangler` before being fed to the aggregator.
+  - `('meta', *)` rows for `limit` / `attachment` / `el` /
+    `prem` / `lr` — copied across from `total` with implied
+    `error = 0` (these are factual or sums of expected values,
+    no FFT analog).
+  - `('freq', *)` rows stay `NaN` in `empirical` — frequency is
+    exact (no convolution operates on it); same convention as
+    `Aggregate.stats_df`.
+- **Meta totals tightened**:
+  - `total[('meta', 'attachment')]` = `0` when every unit attaches
+    at 0 (previously `NaN`); `NaN` only when units disagree.
+  - `total[('meta', 'limit')]` = `max` across units (legacy
+    convention preserved).
+  - `total[('meta', 'lr')]` = `el / prem` when `prem > 0` else
+    `NaN`.
+- **``('agg', 'P99.9e')` row dropped** — Aggregate dropped the
+  estimated-99.9th-percentile row in Stage 1c+; Portfolio follows
+  suit. Percentile access via `port.q(p)` / `port.var_dict(p)`
+  remains.
+- `describe` and the headline `agg_m` / `agg_cv` / `agg_skew` /
+  `est_m` / `est_cv` / `est_skew` now read from `stats_df`.
+  `describe` total row surfaces empirical sev mean/cv/skew (was
+  blank before — sev empirical only existed per-unit).
+- `extensions.portfolio_pir.accounting_economic_balance_sheet` and
+  `extensions.bodoff` updated to read `stats_df`. The remaining
+  `case_studies` exhibit code keeps its old `audit_df` references —
+  those extensions are slated for removal at 1.0 per the master plan.
+- PEG regression baseline unchanged (numbers reproduce bit-identically
+  at `rtol=1e-10`).
+
+Housekeeping in the same release block:
+
+- `extensions.portfolio_pir.gamma` (the ~136-LOC conditional layer
+  effectiveness γ exhibit) and its `GammaResult` dataclass deleted —
+  both were orphaned: not called from `make_all`, not exercised by
+  any test, not referenced in any rendered doc.
+- `Underwriter.__repr__` gains a one-line usage hint pointing at
+  `.discover(regex)` — fills the discoverability gap left when
+  `qshow` / `qlist` / `show` were removed in 1.0.0a1.
+- Eight stale comments and docstrings across `distributions.py` /
+  `utilities.py` / `portfolio.py` that still mentioned
+  `statistics_df` / `report_ser` / `audit_df` (in their
+  stats-consolidation sense) refreshed. Distinct
+  `reinsurance_audit_df` / `reinsurance_report_df` attributes
+  and the `audit_df` field on `AnalyzeDistortionResult` are
+  unrelated and unchanged.
+
+Utilities refactor — `aggregate/utilities.py` shrinks from 3,753 to
+~700 LOC. The grab-bag module is reduced to a focused set of
+cross-cutting helpers; dead code is removed; themed code moves into
+new modules or back to its only caller.
+
+- **Deletes (~1,300 LOC):**
+  - `frequency_examples` / `axiter_factory` / `AxisManager`
+    (~530 LOC of pedagogical scaffolding with no consumers).
+  - `MomentAggregator.stats_series` (retired by Stage 1c+).
+  - `test_var_tvar` (internal scaffold).
+  - Plotting / formatting subsystem: `FigureManager`,
+    `make_mosaic_figure`, `easy_formatter`, `knobble_fonts`,
+    `style_df`, `friendly`, `GreatFormatter`, `sEngFormatter`,
+    `show_fig` (~630 LOC). `aggregate` no longer touches the
+    user's matplotlib settings.
+  - Dead-import / alias cleanup: `html_title`, `suptitle_and_tight`,
+    `ln_fit` alias.
+  - Dead public helpers: `mv`, `qdp`, `introspect`,
+    `get_fmts`, `sensible_jump`, `GCN` namedtuple.
+  - Timer cruft and the commented `knobble_fonts(True)` call.
+- **New modules:**
+  - `aggregate/moments.py` — `MomentAggregator`, `MomentWrangler`,
+    `xsden_to_meancv`, `xsden_to_meancvskew`.
+  - `aggregate/iman_conover.py` — `iman_conover` + `ic_*`,
+    `block_iman_conover`, `make_corr_matrix`,
+    `random_corr_matrix`, `rearrangement_algorithm_max_VaR`.
+- **Public ``*_fit`` family in ``distributions.py`:** symmetric
+  `(m, cv[, skew])` → distribution-parameter cluster, all importable
+  from `aggregate`: `lognorm_fit` (renamed from
+  `mu_sigma_from_mean_cv`), `gamma_fit`, `beta_fit`,
+  `invgamma_fit`, `invgauss_fit`, `sln_fit`, `sgamma_fit`.
+  Plus `approximate_from_mcvsk` (renamed from `approximate_work`),
+  `lognorm_approx`, `lognorm_lev`. The `ln_fit` alias is
+  dropped — `lognorm_fit` is canonical.
+  `approximate_from_mcvsk`'s gamma branch now calls
+  `gamma_fit(m, cv)` — symmetric with the lognorm branch using
+  `lognorm_fit`.
+- **Private single-module helpers moved + privatised** (no public
+  surface change beyond the underscore): `_estimate_agg_percentile`,
+  `_picks_work`, `_moms_analytic` + `_partial_e` +
+  `_partial_e_numeric`, `_integral_by_doubling`,
+  `_logarithmic_theta` all moved into `distributions.py`.
+  `_parse_note` (the merge of `parse_note` + `parse_note_ex`)
+  moved into `underwriter.py`. `_short_hash` moved into
+  `spectral.py`.
+- `make_comonotonic_allocations` moved to `portfolio.py` as a
+  public module-level function (paired with the `Portfolio`
+  method of the same name). Named locally
+  `make_comonotonic_allocations_work` to avoid clashing with the
+  method; re-exported cleanly as `make_comonotonic_allocations`.
+- `Aggregate.plot` and the `bounds.py` `FigureManager` call
+  site rewritten to plain matplotlib (`plt.subplot_mosaic`,
+  `plt.subplots`). `extensions/case_studies.py` mpl call sites
+  converted likewise.
+- `pprint` renamed to `decl_pprint` (the DecL syntax-highlighter
+  helper; avoids stdlib name collision).
+- Documentation: `mu_sigma_from_mean_cv` → `lognorm_fit` updated
+  in `2_x_actuary_student.rst`, `2_x_re_pricing.rst`, and
+  `5_x_rearrangement_algorithm.rst`. Other rst pages pending a
+  full sweep.
+- PEG regression baseline unchanged (numbers reproduce bit-identically
+  at `rtol=1e-10`); 430 pytest cases pass.
+
+Packaging: src/ layout. The package source moved from
+`aggregate/` to `src/aggregate/`. The src layout prevents accidental
+imports from the source tree when CWD is the repo root — the only way
+to `import aggregate` is now via the installed (editable) package,
+which makes editable installs behave identically to wheel installs.
+`pyproject.toml` gains `package-dir = {"" = "src"}`; `MANIFEST.in`
+grafts repathed; `docs/conf.py` `sys.path` insert updated to
+`../src`; four test/capture files repathed to
+`src/aggregate/agg/test_suite{,2}.agg`. No public API change; 430
+pytest cases still pass.
+
+## 1.0.0a7
+
+Portfolio refactor sub-project D — distortion-pricing pipeline redesign.
+Six related changes that together collapse ~500 LOC of pricing code into
+a small cache + a single signature convention:
+
+- **D.1 — augmented_df lazy-eval cache.** `Portfolio.apply_distortion`
+  becomes a thin cache lookup-or-build keyed on distortion name; the
+  construction logic lives in a private `_build_augmented`. Second
+  calls return the cached frame (`frame_a is frame_b`).
+  `port.augmented_dfs` is a dict view of the cache; `port.augmented_df`
+  is the clean read-side accessor (also routes through the cache).
+  `apply_distortion` drops the `df_in=` (gradient path, gone),
+  `create_augmented=` (the cache replaces it), and `plots=`
+  (uninvoked) kwargs. `apply_distortions` (plural) deleted. New
+  `Portfolio.pricing_at(distortion, *, p=None, a=None)` consolidates
+  the row-extraction logic that previously lived in `price` and
+  `analyze_distortion`.
+- **D.2 — analyze_distortion(s) and calibrate_distortions collapse onto
+  the cache.** Each former 100-250 LOC method becomes ~25 LOC.
+  `analyze_distortion(distortion, *, p=None, a=None)` returns an
+  `AnalyzeDistortionResult` dataclass with `pricing_df` and
+  `audit_df`. `analyze_distortions(*, p=None, a=None, distortions=None)` returns `AnalyzeDistortionsResult` with the
+  multi-distortion exhibit (MultiIndex `(distortion, stat)`) and a
+  cache snapshot. `analyze_distortions2` and the list-based
+  `calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, …)` deleted in
+  favour of single-coc / single-p forms.
+- **Explicit ``p=`` / ``a=` convention** across the pricing surface
+  (`pricing_at`, `analyze_distortion`, `analyze_distortions`,
+  `calibrate_distortions`). The legacy implicit `p > 1 → asset`
+  threshold is gone; callers state intent. Each method raises
+  `ValueError` if both or neither is supplied.
+- **D.3 — Answer → typed dataclasses.** The legacy `Answer` dict
+  class is deleted. `aggregate.results` defines `PricingResult`,
+  `PricingBoundsResult`, `AnalyzeDistortionResult`,
+  `AnalyzeDistortionsResult`, and `GammaResult` (the last used by
+  `extensions.portfolio_pir`). Inline `namedtuple` definitions in
+  `Portfolio.price` and `Portfolio.pricing_bounds` promoted to the
+  same module.
+- **D.4 — ordered categoricals.** `aggregate.spectral.DISTORTION_ORDER`
+  / `DISTORTION_DTYPE` (`ccoc, ph, wang, dual, tvar, wtdtvar, lep, ly, clin, tt, cll, bitvar, blend`) and
+  `aggregate.portfolio.PRICING_STAT_ORDER` / `PRICING_STAT_DTYPE`
+  (`L, LR, M, P, PQ, Q, ROE`) bake the canonical order into the data.
+  `Portfolio.distortion_df` `method` index level, `pricing_at`
+  columns, and `analyze_distortions` pricing_df `distortion` level
+  are typed categoricals -- `sort_index()` produces the canonical
+  order without ad-hoc reordering.
+- **D.5 — renames.** `Portfolio.dists` → `Portfolio.distortions`;
+  `Portfolio.dist_ans` and the `distortion_df` property merged into
+  a single `Portfolio.distortion_df` attribute with the trimmed 9-col
+  layout (`S, L, P, PQ, Q, COC, param, std_param, error`) and index
+  names `('a', 'LR', 'method')`; `Portfolio.limits` →
+  `Portfolio._limits` (internal helper).
+- PEG regression baseline unchanged -- `test_pricing` at `rtol=1e-8`
+  reproduces the legacy `analyze_distortions2` exhibit bit-identically.
+  The new pipeline is mathematically the same; only the API surface changed.
+
+## 1.0.0a6
+
+Portfolio refactor sub-project C — distortion calibration moves to the
+`Distortion` subclasses themselves:
+
+- `Portfolio.calibrate_distortion` was ~240 LOC of per-name Newton
+  iterations in a giant `if name == 'ph': ... elif name == 'wang': ...`
+  switch. Each branch defined a local `f(shape) → (residual, derivative)`
+  closure and ran a hand-rolled Newton loop. That code now lives on the
+  `Distortion` subclasses — each pricing-distortion class owns its own
+  `calibrate(S, bs, premium_target, *, ess_sup, assets, el, **kwargs)`
+  method: `PHDistortion`, `WangDistortion`, `DualDistortion`,
+  `TVaRDistortion` (`max_iter=200`), `CCoCDistortion` (closed-form,
+  no iteration), `LYDistortion`, `CLinDistortion`, `LEPDistortion`,
+  `CLLDistortion`.
+- `Portfolio.calibrate_distortion` shrinks to ~100 LOC — about half
+  asset/S resolution (unchanged), about half dispatch to the subclass via
+  `Distortion._registry`. The `tt` (Wang-t) branch is gone — there is
+  no `TtDistortion` subclass to host it and the branch was dead code.
+  `wtdtvar` calibration is also dropped from the dispatcher (the
+  parametrisation overload between calibration form `(w, [p0, p1])` and
+  the standard form `(ps, wts)` was already broken in the constructor;
+  pick a pricing distortion that calibrates cleanly instead).
+- New `Distortion` base-class methods `_newton_iterate(f, shape, *, max_iter, tol)` and `_finalize_calibration(shape, fx, prem, assets)`
+  factor the Newton loop and the post-iteration bookkeeping (write
+  `shape` / `error` / `premium_target` / `assets`, log on
+  non-convergence, re-run `_build` to refresh cached state) out of the
+  per-subclass methods.
+- Class attribute `Distortion._calibration_init_shape` is the
+  per-kind starting shape used both to construct the uncalibrated
+  distortion and as the Newton iteration's starting point. `None` on
+  the base means "not calibratable through the Portfolio dispatch."
+- Each subclass is now testable in isolation. New
+  `tests/test_distortion_calibrate.py` (12 cases) exercises every
+  migrated kind directly on a synthetic `S` vector and asserts the
+  achieved premium matches the target.
+- PEG regression baseline unchanged — the new subclass-based Newton
+  iteration reproduces bit-identical Newton convergence.
+
+## 1.0.0a5
+
+Portfolio refactor sub-project B — drop approximation and tilting paths
+from `Portfolio.update` and `Aggregate.update_work`:
+
+- Removed the auto-fallback method-of-moments approximation path. The
+  `approx_freq_ge` / `approx_type` / `approximation` kwargs are gone
+  from `Portfolio.update`; the matching `approx_type` /
+  `approx_freq_ge` attrs are gone from `Portfolio.__init__`,
+  `Portfolio.json`, and `Portfolio.__repr__`. The
+  `'exact' if agg.n < approx_freq_ge else approx_type` ternary is gone;
+  callers always get the FFT path. The slognorm / sgamma branch in
+  `Aggregate.update_work` (and the `approximation` attribute on
+  `Aggregate`) is deleted. `Portfolio.approximate` /
+  `Aggregate.approximate` (the user-facing on-demand
+  method-of-moments fit returning a `scipy.stats` frozen RV or a DecL
+  spec) are unchanged.
+- Removed FFT tilting (Grübel/Hermesmeier 1999) from the update pipeline:
+  the `tilt_amount` attr is gone from `Portfolio.__init__`, the
+  `tilt_vector` construction block is gone from `Portfolio.update`,
+  and the `tilt=` parameter is removed from the `ft` / `ift`
+  module-level helpers in `aggregate.utilities` and the matching
+  `Portfolio.ft` / `Portfolio.ift` wrappers. The tilt branches inside
+  `Aggregate.update_work`, `Aggregate._freq_sev_convolution`, and
+  `Aggregate.apply_agg_reins` are gone. Use more buckets if aliasing
+  shows up — per author's standing preference.
+- `aggregate.extensions.figures.gh_example` was the only consumer of
+  tilting in the visualisation layer; it now compares the padded FFT
+  result against the exact compound probability without the
+  tilt-comparison loop.
+- PEG regression baseline (`tests/data/peg_baseline.json`) re-captured
+  against the exact FFT path. The previous baseline incidentally
+  exercised slognorm — PEG's two units (n=100 and n=150) tripped the
+  default `approx_freq_ge=100` threshold. The drift is ~5e-6 on
+  `est_m` and ~2e-5 on pricing cells; the new contract is the
+  exact-FFT result.
+
+Portfolio refactor sub-project A — pure deletions + PIR move
+(`portfolio.py` shrinks from 6,133 → 3,707 LOC):
+
+- Deleted ~700 LOC of dead code from `Portfolio`: `gradient` (~196 LOC),
+  non-spectral allocations (`merton_perold`, `cotvar`,
+  `equal_risk_var_tvar`, `equal_risk_epd`), the EPD / priority /
+  collateral family (`analysis_priority`, `analysis_collateral`,
+  `priority_capital_df`, `epd_2_assets`, `assets_2_epd` properties
+  plus their backing attrs), the `uat` / `uat_differential` /
+  `uat_interpolation_functions` trio, `collapse`, `audits`,
+  `stat_renamer`, and the `var_dict(kind='epd')` branch.
+- Stripped `analyze_distortion_add_comps` and
+  `analyze_distortion_plots` (~470 LOC) — both consumed the deleted
+  allocation methods. `analyze_distortion` keeps `add_comps` and
+  `plot` parameters as no-op defaults (`add_comps=False` now).
+- Moved ~1,800 LOC of PIR-exhibit machinery to the new
+  `aggregate.extensions.portfolio_pir` module as free functions taking
+  a `Portfolio` as the first argument: `premium_capital`,
+  `multi_premium_capital`, `accounting_economic_balance_sheet`,
+  `make_all`, `show_enhanced_exhibits`, `set_a_p`,
+  `profit_segment_plot`, `natural_profit_segment_plot`,
+  `density_sample`, `biv_contour_plot`, `twelve_plot`,
+  `short_renamer`, `gamma`, `stand_alone_pricing`,
+  `stand_alone_pricing_work`, `calibrate_blends` (with helpers
+  `check01` / `make_array` / `convex_points`), the bulk
+  constructors `from_DataFrame` / `from_Excel` /
+  `from_dict_of_aggs`, and the big `renamer` plus
+  `premium_capital_renamer`.
+- `aggregate.extensions.case_studies` updated to call the moved
+  functions as free functions; `aggregate.extensions.bodoff` inlines
+  the deleted `cotvar` lookup.
+
+## 1.0.0a4
+
+Portfolio refactor sub-project 0 — PEG regression baseline:
+
+- New regression fixture `tests/peg.py` exposes `build_peg` which
+  constructs the canonical two-unit `port PEG` Portfolio (limit-and-attachment severity, three-component lognormal severity mixture per
+  unit, gamma frequency mixing with different mixing CVs per unit).
+- New capture script `tests/capture_peg_baseline.py` runs PEG through
+  `calibrate_distortions(COCs=[.15], Ps=[.995])` and
+  `analyze_distortions2(.995)` for the five-distortion suite
+  (`ccoc`, `ph`, `wang`, `dual`, `tvar`) and writes the
+  numerical baseline to `tests/data/peg_baseline.json`.
+- New test module `tests/test_portfolio_peg_regression.py` pins
+  portfolio moments (`rtol=1e-10`), per-distortion calibration shapes
+  (`rtol=1e-8`, `|error| < 1e-5`), and every cell of the
+  `analyze_distortions2` exhibit (120 values, `rtol=1e-8`).
+- Every subsequent Portfolio refactor sub-project (A through E) must
+  reproduce these baseline numbers; the JSON is the contract.
+
+`Aggregate` stats consolidation — finish the job: eliminate the
+`_statistics_df` / `_statistics_total_df` scratch frames so `stats_df`
+is the only theoretical-moment DataFrame the class holds:
+
+- `Aggregate.__init__` now pre-creates an empty `stats_df` (canonical
+  `MultiIndex` rows, NaN-filled) right after `n_components` is known in
+  each broadcasting arm, via a new `_init_stats_df` helper.
+- `_record_component` writes a column of `stats_df` directly (no more
+  intermediate row in `_statistics_df`).
+- The post-loop totals block writes `mixed` / `independent` /
+  `('meta', 'wt')` directly into `stats_df` columns.
+- `('agg', 'P99.9e')` row dropped — it had only two populated cells
+  (`mixed` and `independent`), was read in one spot (`_limits`
+  fallback when `agg_density` is `None`), and is cheaply rebuildable
+  on demand via `estimate_agg_percentile`. That one read site now
+  computes on the fly.
+- All readers migrated: `avg_limit` / `avg_attach` / `tot_prem` /
+  `tot_loss`, `self.agg_m` / `agg_cv` / `agg_skew` / `sev_*`,
+  `update_work` severity weights, `severity_error_analysis` weights,
+  `info` / `_html_info_blob` component count.
+- `_statistics_df`, `_statistics_total_df`, and the
+  `_build_stats_df` method are gone.
+- Side benefit: `stats_df` row layout is now cleaner — all `meta` rows
+  together at the top (`mix_cv` and `wt` previously trailed at the
+  bottom because of how the legacy scratch frames were ordered).
+
+## 1.0.0a3
+
+`Aggregate` stats consolidation: six overlapping moment DataFrames → one
+`stats_df` (breaking changes; v1.0 cleanup):
+
+- New canonical `Aggregate.stats_df`: single source of truth for moment
+  statistics. `MultiIndex (component, measure)` rows (`component` ∈
+  `{meta, freq, sev, agg}`; `measure` ∈ `{mean, cv, skew, ex1, ex2, ex3, …}`); columns are per-component (`comp_0`, …), `mixed`,
+  `independent`, `empirical`, and `error`. Built in two phases:
+  theoretical content in `__init__`, `empirical` and `error` appended
+  in `update_work` after the FFT. Empty cells are `NaN` where
+  meaningful (e.g. `('freq', *) × empirical` is undefined — the FFT
+  produces one combined empirical distribution, not per-component
+  empirical moments).
+- Naming convention unified: `ex1` / `ex2` / `ex3` for raw moments
+  and `mean` / `cv` / `skew` for derived. The legacy `_1` / `_m`
+  flat-column convention is gone.
+- The Aggregate "stats surface" is now exactly three things — `info` (text
+  about the Aggregate), `describe` (the daily-driver moment audit), and
+  `stats_df`. Removed: `report_df`, `report_ser`, `statistics`,
+  `audit_df`. Privatised: `statistics_df` → `_statistics_df`,
+  `statistics_total_df` → `_statistics_total_df`.
+- `Aggregate.describe` rewritten to source from `stats_df`; output
+  byte-identical.
+- `Portfolio` migrated to read `a.stats_df['mixed']` instead of
+  `a.report_ser` (three lines in `portfolio.py`). Portfolio's own
+  `statistics_df` / `audit_df` / `report_df` are unaffected — they
+  live on Portfolio, not Aggregate, and will be rationalised in Stage 2.
+- Docs migrated: ~30 references to `report_df` / `statistics` /
+  `statistics_df` across nine tutorial pages rewritten to use
+  `stats_df` with explicit row / column accessors.
+
+## 1.0.0a2
+
+Aggregate surface rationalization (breaking changes; v1.0 cleanup):
+
+- Visible layer structure: file-level section dividers in `distributions.py` and a public-API block in the `Aggregate` class docstring document the integration surface (`report_ser`, `statistics_df`, `update_work`, `agg_density`, `ftagg_density`, `density_df`, plus the risk-measure surface `q` / `tvar` / `cdf` / `sf` / …) that `Portfolio` and `Bounds` consume.
+- FFT five-line core extracted to `Aggregate._freq_sev_convolution`; docstring references the four-step algorithm in §2.2 of the paper. `update_work` reads top-to-bottom as compute-severity → occurrence reinsurance → convolution → aggregate reinsurance → audit.
+- Shared inner-block of `__init__`'s two broadcasting arms factored into `Aggregate._record_component` (centralises `statistics_df` column ordering across the limit-profile arm and the mixture-product arm).
+- `__init__` state initialization regrouped into labelled blocks: spec passthroughs, grid + runtime config, exposure outputs, computed densities, empirical moment estimates, cached lazy functions, reinsurance state, theoretical moment tables.
+- `density_df` property docstring expanded with a column-by-column reference table (set-by / read-by for each of 17 columns) — no behavior change.
+- Aggregate methods privatised (leading underscore): `audit_df` → `_audit_df`, `statistics_total_df` → `_statistics_total_df`, `limits` → `_limits`, `html_info_blob` → `_html_info_blob`. `aggregate/extensions/figures.py` and `aggregate/extensions/test_suite.py` updated for the renames.
+- `Aggregate.more`, `Portfolio.more`, `Underwriter.more` renamed to `.help`. Backing free function in `utilities.py` renamed `more` → `agg_help` (prefixed so it doesn't shadow Python's builtin `help` at module / package level).
+- `pprogram` / `pprogram_html` collapsed: dropped the `split=20` line-magic and the `show=True` side-effect print. Methods preserved — cheat sheets and Underwriter consume them.
+- Historical-comment sweep across the `Aggregate` class: stale `# TODO` / `# WHOA! WTF` markers and a commented-out spec-dict block removed.
+- Logger calls in `distributions.py` converted to lazy `%s`-style formatting (extends the earlier `utilities.py` cleanup).
+- Public surface intentionally retained after a docs audit revealed heavy tutorial usage: `statistics`, `statistics_df`, `report_df`, `report_ser`, `info`, `describe`, `snap`, `unwrap`, `picks`, `recommend_bucket`.
+
+`Underwriter.build()` return contract uniform:
+
+- `Underwriter.build()` now raises `CannotBuild` (subclass of `ValueError`) when a parsed spec produces no top-level object — previously returned a `ParsedProgram` with `object=None` in the named-mixed-severity edge case. The contract is now uniform: `build → object` always (or raises), `build_many → list[ParsedProgram]` always. `CannotBuild` is exported from the `aggregate` package.
+- `Underwriter.discover()` catches `CannotBuild` and skips the row with a `logger.warning` (mirrors today's `NotImplementedError` handling).
+
+Tooling:
+
+- New `doc-test-uv.ps1` script: uv-managed doc build that replaces the clone-to-tmp dance in `doc-test.ps1`. Builds in place, uses a dedicated `.doc-venv` (set via `UV_PROJECT_ENVIRONMENT`) so doc builds don't disturb the main development `.venv`. Supports any Python via `--python X.Y` (uv auto-downloads if needed).
+
+## 1.0.0a1
+
+Underwriter surface rationalization (breaking changes; v1.0 cleanup):
+
+- `Underwriter.discover(regex, kind='', plot=False, describe=False, return_objects=False, **kwargs)` replaces `show` / `qshow` / `qlist` (all three removed). Default behavior is the lightweight directory view (matches today's `qshow`); pass `plot=True` or `describe=True` to build each match.
+- `Underwriter.build_many(program, ...)` is the explicit-batch counterpart to `build`; `build` now raises `ValueError` when its program produces 0 or \>1 top-level outputs (directing the user to `build_many`).
+- `Underwriter.interpret_file(filename=None, where='')` replaces `interpret_test_file` and absorbs `run_test_suite`; with no arguments it runs the bundled test suite. Fixes a `KeyError: 0` bug from the pandas iterrows path.
+- Directory rationalization: `site_dir`, `case_dir`, `template_dir` properties removed. Single new `user_dir` (`~/.aggregate`). `default_dir` is now located via `importlib.resources.files`.
+- Base data directory moved from `~/aggregate` to `~/.aggregate` (dotted convention). No fallback — existing users must `mv ~/aggregate ~/.aggregate`.
+- Constructor magic strings: `databases='all'` now expands to `['default', 'user']`; `databases='site'` raises `ValueError` directing users to `'user'`.
+- Methods privatized (now leading underscore): `write` → `_build_work`, `factory` → `_factory`, `safe_lookup` → `_safe_lookup`, `interpret_program` → `_interpret_program`. `write_from_file`, `dir`, `test_suite()` method, `run_test_suite` deleted (all unused).
+- Portfolio and case_studies internal callers switched from `uw.write(spec)` to `uw.build_many(spec, update=False)` (equivalent — same `ParsedProgram` list, no smart-update).
+- `ParsedProgram` (dataclass) replaces `Answer` for the Underwriter parse-output type. `Answer` itself remains in `utilities.py` and continues to be used by `Portfolio`.
+- `Underwriter.__repr__` clarified: shows `0 loaded (access .knowledge to read configured database(s))` when knowledge is pending; no I/O side effect.
+- Several bug fixes: `factory` `ValueError` is now actually raised; the buggy "1 port among many" return path is gone; `__getitem__` `TypeError` → `KeyError` chain preserved with `from e`; `read_database` narrows to `OSError` and uses `logger.exception`.
+- Three new constants in `constants.py`: `USER_DIR_NAME`, `PACKAGE_DATA_DIR`, `TEST_SUITE_FILENAME`.
+- Internal cleanup: lazy `%s`-formatted logger calls throughout; ~130 lines of stale commented-out code removed from `utilities.py`.
+
+## 0.30.1
+
+- Confirmed support for Python 3.13 and 3.14
+
+## 0.30.0
+
+- Added `comonotonic_allocations` to `Portfolio` to implement the method of Denuit, Michel, et al. "Comonotonicity and Pareto optimality, with application to collaborative insurance." Insurance: Mathematics and Economics 120 (2025): 1-16. This uses numba if available. Warning: it can be very slow without numba!
+
+## 0.29.0
+
+- Portfolio analyze_distortions2 to iron out annoyances with current function but retain it for backwards compatibility.
+- Portfolio calibrate_distortions2 for same reasons, args coc and reg_p.
+- Spectral tvar_info_df and plot_affine for working with weighted TVaR distortions.
+- Changed behavior of Distortion.random_distortion so that input number of knots *includes* mass and mean if present.
+- Added random_distortion_ex(n=1, random_state=None) in Distortion class to simulate across types, extending random_distortion which is only a wtdtvar.
+
+## 0.28.1
+
+- `applymap` to `map` per Pandas update.
+
+## 0.28.0
+
+- Added `standard_shape` to Distortion and added to distortion_df created by Portfolio.calibrate_distortions.
+- Updated dependencies and imports for doc build.
+- Added `spectral.consistent_distortions` to create consistent family of representative distortions.
+
+## 0.27.1
+
+- Fixed a bug with recommend unit in a portfolio with all fixed components.
+- Adjusted line styles in twelve plot and clarified use in doc string.
+- Corrected ROE calculation of natural allocation premium when g(s) = 1.
+
+### 0.27.0
+
+- Removed control over logging and just use `logger = logging.getLogger(__name__)` in all modules. Removed `log_test` function and `LoggerManager` class.
+- Removed `numba` as a requirement - huge library, hardly used. Only occurs in spectral module.
+- Replaced build_docs batch file with doc-test which mirrors readthedocs process more closely.
+
+### 0.26.0
+
+- `extensions` no longer sets `pd.float_format` to Engineering.
+- Added `tweedie.Tweedie` class to `extensions` to compute the Tweedie class distributions for
+  all valid $`p`$. (Dangling jax dependence.)
+
+### 0.25.0
+
+- Tweak `extensions.ft.FourierTools`: added `invert_simpson` method using Simpson's rule,
+  better for stable distributions. This is the method used by `scipy.stats`.
+- Bumped to 0.25 which should have done in 0.24.2 because it added new functionality
+- Tidied docs
+- `knobble_fonts` uses serif font by default in matplotlib, and sets up
+  in color mode by default.
+
+### 0.24.2
+
+- Added `Distortion.make_q` to return the risk adjusted probabilities used
+  in pricing. Same logic as `price_ex`. Makes it easy to compute the natural
+  allocation from a distortion.
+- Added `extensions.ft.FourierTools` class, which performs direct inversion of a (continuous) Fourier transform (characteristic function)
+  using FFTs. This is particularly useful for stable distributions, where the Fourier transform is known but the density is not. See examples in Section 5 of the documentation.
+- Added `make_levy_chf` to `extensions` to compute the characteristic function of a Levy stable distribution.
+
+### 0.24.1
+
+- Added script to build the documentation from a local clone of the repository.
+- Added `Aggregate.unwrap` to adjust aggregates computed with too few buckets
+  but enough space. It unwraps the computed aggregate by adjusting the index. This
+  reverses the "wagon-wheel" effect, whereby FFTs wrap-around the end of the array.
+- Vectorized `ultilities.estimate_agg_percentile` for use in `Aggregate.unwrap`
+
+### 0.24.0
+
+- Added state to Distortions so they can be pickled. Involved separating part of `Distortion.__init__`
+  into a new method, `Distortion._complete_init`. This is called from `__init__` and `__setstate__`.
+  Ensured `_complete_init` refers to arguments as self.argname, not argname and set self
+  variables in class `__init__` method.
+- Fixed mixture g functions to handle input multidimensional arrays.
+- Simplified `Distortion.__repr__` and `Distortion.__str__`.
+- Added `Distortion.id` to generate a unique ID depending on `__dict__` argument elements.
+- Corrected `g_prime` for minimum distortion.
+- Fixed biTVaR distortion to handle p1==1 by including the mass explicitly.
+- Added `Distortion.price_ex` to combine best of price and price2 methods and improve flexibility. It sorts and summarizes if needed. Optional return formats.
+- Added four numba compiled functions to Distortion for fast computation of
+  g.g(1-ps.cumsum()) and g.price( kind='ask'). These are tvar_gS, bitvar_gS,
+  tvar_ra (for risk adjusted expected value) and bitvar_ra. In each case the
+  values are computed without any copies of the original data, making them
+  far more memory efficient for very large input arrays. At the extreme,
+  bitvar_ra results in a speed up of the order of 2000x in realistic
+  situations, even with small (100s) input vectors. The functions are static
+  members of Distortion (numba requirement). They are not parallelized
+  because of the cumulative computation of S. See the file
+  PyWork/Distortion-price-tester.ipynb for tests (TODO: integraete into the
+  documentation.) This addition results in numba being a required package.
+- Removed dependency on `titlecase` package.
+- Removed `Distortion.calibrate` method, which was not used and never tested. It lives with `Portfolio`.
+
+### 0.23.0
+
+- Added `sample_df` dataframe to `Portfolio` when created from a sample
+  to store the sample. Original sample is needed in various applications.
+- Added `swap_density_df(self, new_df, padding=1)` to `Portfolio`.
+- Fixed errors in Case Studies caused by changes in Pandas.
+- Added ability to create Markdown case output, rather than HTML.
+- Added beta distortion (generalizes the PH and dual)
+- Updated `np.alltrue` to `np.all`; updated `NoConverge` in `scipy.optimize`.
+- Added `Distortion.calibrate` to calibrate to a pricing target from input `density_df` (TODO: needs testing).
+- Added `wtdtvar`` to ``Distortion` to compute the weighted TVaR from p values and weights,
+  masses and mean components.
+- Added `minimum` to `Distortion` to create a new `Distortion` as the minimum of a list of input Distortions. The list is passed as shape.
+- Added `random_distortion` to `Distortions` to compute a random distortion, useful
+  for testing!
+- Fixed `tvar` distortion to allow p=1 (max)
+- Simplified `Distortion.__repr__` and `Distortion.__str__`.
+- Added `Distortion.ph``, ``.wang`, ..., methods for common distortions, with better
+  hints for parameters. All are static methods that delegate to the constructor.
+- Fixed documentation build errors.
+
+### 0.22.0
+
+- Created version 0.22.0, "convolation" for AAS submission
+
+### 0.21.4
+
+- Updated requirement using `pipreqs` recommendations
+- Color graphics in documentation
+- Added `expected_shift_reduce = 16  # Set this to the number of expected shift/reduce conflicts` to `parser.py`
+  to avoid warnings. The conflicts are resolved in the correct way for the grammar to work.
+- Issues: there is a difference between `dfreq[1]` and `1 claim ... fixed`, e.g.,
+  when using spliced severities. These should not occur.
+
+### 0.21.3
+
+- Risk progression, defaults to linear allocation.
+- Added `g_insurance_statistics` to `extensions` to plot insurance statistics from a distortion `g`.
+- Added `g_risk_appetite` to `extensions` to plot risk appetite from a distortion `g` (value, loss ratio,
+  return on capital, VaR and TVaR weights).
+- Corrected Wang distortion derivative.
+- Vectorized `Distortion.g_prime` calculation for proportional hazard
+- Added `tvar_weights` function to `spectral` to compute the TVaR weights of a distortion. (Work in progress)
+- Updated dependencies in pyproject.toml file.
+
+### 0.21.2
+
+- Misc documentation updates.
+- Experimental magic functions, allowing, eg. %agg \[spec\] to create an aggregate object (one-liner).
+- 0.21.1 yanked from pypi due to error in pyproject.toml.
+
+### 0.21.0
+
+- Moved `sly` into the project for better control. `sly` is a Python implementation of lex and yacc parsing tools.
+  It is written by Dave Beazley. Per the sly repo on github:
+
+  The SLY project is no longer making package-installable releases. It's fully functional, but if choose to use it,
+  you should vendor the code into your application. SLY has zero-dependencies. Although I am semi-retiring the project,
+  I will respond to bug reports and still may decide to make future changes to it depending on my mood.
+  I'd like to thank everyone who has contributed to it over the years. --Dave
+
+- Experimenting with a line/cell DecL magic interpreter in Jupyter Lab to obviate the
+  need for `build`.
+
+### 0.20.2
+
+- risk progression logic adjusted to exclude values with zero probability; graphs
+  updated to use step drawstyle.
+
+### 0.20.1
+
+- Bug fix in parser interpretation of arrays with step size
+- Added figures for AAS paper to extensions.ft and extensions.figures
+- Validation "not unreasonable" flag set to 0
+- Added aggregate_white_paper.pdf
+- Colors in risk_progression
+
+### 0.20.0
+
+- `sev_attachment`: changed default to `None`; in that case gross losses equal
+  ground-up losses, with no adjustment. But if layer is 10 xs 0 then losses
+  become conditional on X \> 0. That results in a different behaviour, e.g.,
+  when using `dsev[0:3]`. Ripple through effect in Aggregate (change default),
+  Severity (change default, and change moment calculation; need to track the "attachment"
+  of zero and the fact that it came from None, to track Pr attaching)
+- dsev: check if any elements are \< 0 and set to zero before computing moments
+  in dhistogram
+- same for dfreq; implemented in `validate_discrete_distribution` in distributions module
+- Default `recommend_p=0.99999` set in constsants module.
+- `interpreter_test_suite` renamed to `run_test_suite` and includes test
+  to count and report if there are errors.
+- Reason codes for failing validation; Aggregate.qt becomes Aggregte.explain_validation
+
+### 0.19.0
+
+- Fixed reinsurance description formatting
+- Improved splice parsing to allow explicit entry of lb and ub; needed to
+  model mixtures of mixtures (Albrecher et al. 2017)
+
+### 0.18.0 (major update)
+
+- Added ability to specify occ reinsurance after a built in agg; this
+  allows you to alter a gross aggregate more easily.
+
+- `Underwriter.safe_lookup` uses deepcopy rather than copy to avoid
+  problems array elements.
+
+- Clean up and improved Parser and grammar
+
+  > - atom -\> term is much cleaner (removed power, factor; now
+  >   managed with prcedence and assoicativity)
+  > - EXP and EXPONENT are right
+  >   associative, division is not associative so 1/2/3 gives an error.
+  > - Still SR conflict from dfreq \[ \] \[ \] because it could be the
+  >   probabilities clause or the start of a vectorized limit clause
+  > - Remaining SR conflicts are from NUMBER, which is used in many
+  >   places. This is a problem with the grammar, not the parser.
+  > - Added more tests to the parser test suite
+  > - Severity weights clause must come after locations (more natural)
+  > - Added ability for unconditional dsev.
+  > - Support for splicing (see below)
+
+- Cleanup of `Aggregate` class, concurrent with creating a cheat sheet
+
+  > - many documentation updates
+  > - `plot_old` deleted
+  > - deleted `delbaen_haezendonck_density`; not used; not doing anything
+  >   that isn't easy by hand. Includes dh_sev_density and dh_agg_density.
+  > - deleted `fit` as alternative name for `approximate`
+  > - deleted unused fields
+
+- Cleanup of `Portfolio` class, concurrent with creating a cheat sheet
+
+  > - deleted `fit` as alternative name for `approximate`
+  > - deleted `q_old_0_12_0` (old quantile), `q_temp`, `tvar_old_0_12_0`
+  > - deleted `plot_old`, `last_a`, `_(inverse)_tail_var(_2)`
+  > - deleted `def get_stat(self, line='total', stat='EmpMean'): return self.audit_df.loc[line, stat]`
+  > - deleted `resample`, was an alias for sample
+
+- Management of knowledge in `Underwriter` changed to support loading
+  a database after creation. Databases not loaded until needed - alas
+  that includes printing the object. TODO: Consider a change?
+
+- Frequency mfg renamed to freq_pgf to match other Frequency class methods and
+  to accuractely describe the function as a probability generating function
+  rather than a moment generating function.
+
+- Added `introspect` function to Utilities. Used to create a cheat sheet
+  for Aggregate.
+
+- Added cheat sheets, completed for Aggregate
+
+- Severity can now be conditional on being in a layer (see splice); managed
+  adjustments to underlying frozen rv using decorators. No overhead if not
+  used.
+
+- Added "splice" option for Severity (see Albrecher et. al ch XX) and Aggregate,
+  new arguments `sev_lb` and `sev_ub`, each lists.
+
+- `Underwriter.build` defaults update argument to None, which uses the object default.
+
+- pretty printing: now returns a value, no tacit mode; added `html` version to
+  run through pygments, that looks good in Jupyter Lab.
+
+### 0.17.1
+
+- Adjusted pyproject.toml
+- pygments lexer tweaks
+- Simplified grammar: % and inf now handled as part of resolving NUMBER; still 16 = 5 \* 3 + 1 SR conflicts
+- Reading databases on demand in Underwriter, resulting in faster object creation
+- Creating and testing exsitance of subdirectories in Undewriter on demand using properties
+- Creating directories moved into Extensions \_\_init\_\_.py
+- lexer and parser as properties for Underwriter object creation
+- Default `recommend_p` changed from 0.999 to 0.99999.
+- `recommend_bucket` now uses `p=max(p, 1-1e-8)` if severity is unlimited.
+
+### 0.17.0 (July 2023)
+
+- `more` added as a proper method
+- Fixed debugfile in parser.py which stops installation if not None (need to
+  enure the directory exists)
+- Fixed build and MANIFEST to remove build warning
+- parser: semicolon no longer mapped to newline; it is now used to provide hints
+  notes
+- `recommend_bucket` uses p=max(p, 1-1e-8) if limit=inf. Default increased from 0.999
+  to 0.99999 based on examples; works well for limited severity but not well for unlimited severity.
+- Implemented calculation hints in note strings. Format is k=v; pairs; k
+  bs, log2, padding, recommend_p, normalize are recognized. If present they are used
+  if no arguments are passed explicitly to `build`.
+- Added `interpreter_test_suite()` to `Underwriter` to run the test suite
+- Added `test_suite_file` to `Underwriter` to return `Path` to `test_suite.agg` file
+- Layers, attachments, and the reinsurance tower can now be ranges, `[s:f:j]` syntax
+
+### 0.16.1 (July 2023)
+
+- IDs can now include dashes: Line-A is a legitimate date
+- Include templates and test-cases.agg file in the distribution
+- Fixed mixed severity / limit profile interaction. Mixtures now work with
+  exposure defined by losses and premium (as opposed to just claim count),
+  correctly account for excess layers (which requires re-weighting the
+  mixture components). Involves fixing the ground up severity and using it
+  to adjust weights first. Then, by layer, figure the severity and convert
+  exposure to claim count if necessary. Cases where there is no loss in the
+  layer (high layer from low mean / low vol componet) replace by zero. Use
+  logging level 20 for more details.
+- Added `more` function to `Portfolio`, `Aggregate` and `Underwriter` classes.
+  Given a regex it returns all methods and attributes matching. It tries to call a method
+  with no arguments and reports the answer. `more` is defined in utilities
+  and can be applied to any object.
+- Moved work of `qt` from utilities into `Aggregate` (where it belongs).
+  Retained `qt` for backwards compatibility.
+- Parser: power \<- atom \*\* factor to power \<- factor \*\* factor to allow (1/2)\*\*(3/4)
+- `` random` module renamed `random_agg `` to avoid conflict with Python `random`
+- Implemented exact moments for exponential (special case of gamma) because
+  MED is a common distribution and computing analytic moments is very time
+  consuming for large mixtures.
+- Added ZM and ZT examples to test_cases.agg; adjusted Portfolio examples to
+  be on one line so they run through interpreter_file tests.
+
+### 0.16.0 (June 2023)
+
+- Implemented ZM and ZT distributions using decorators!
+- Added panjer_ab to Frequency, reports a and b values, p_k = (a + b / k) [p](){k-1}. These values can be tested
+  by computing implied a and b values from r_k = k p_k / [p](){k-1} = ak + b; diff r_k = a and b is an easy
+  computation.
+- Added freq_dist(log2) option to Freq to return the frequency distribution stand-alone
+- Added negbin frequency where freq_a equals the variance multiplier
+
+### 0.15.0 (June 2023)
+
+- Added pygments lexer for decl (called agg, agregate, dec, or decl)
+- Added to the documentation
+- using pygments style in `decl_pprint` html mode
+- removed old setup scripts and files and stack.md
+
+### 0.14.1 (June 2023)
+
+- Added scripts.py for entry points
+- Updated .readthedocs.yaml to build from toml not requirements.txt
+- Fixes to documentation
+- `Portfolio.tvar_threshold` updated to use `scipy.optimize.bisect`
+- Added `kaplan_meier` to `utilities` to compute product limit estimator survival
+  function from censored data. This applies to a loss listing with open (censored)
+  and closed claims.
+- doc to docs \[\]
+- Enhanced `make_var_tvar` for cases where all probabilities are equal, using linspace rather
+  than cumsum.
+
+### 0.13.0 (June 4, 2023)
+
+- Updated `Portfolio.price` to implement `allocation='linear'` and
+  allow a dictionary of distortions
+
+- `ordered='strict'` default for `Portfolio.calibrate_distortions`
+
+- Pentagon can return a namedtuple and solve does not return a dataframe (it has no return value)
+
+- Added random.py module to hold random state. Incorporated into
+
+  > - Utilities: Iman Conover (ic_noise permuation) and rearrangement algorithms
+  > - `Portfolio` sample
+  > - `Aggregate` sample
+  > - Spectral `bagged_distortion`
+
+- `Portfolio` added `n_units` property
+
+- `Portfolio` simplified `__repr__`
+
+- Added `block_iman_conover` to `utilitiles`. Note tester code in the documentation. Very Nice! 😁😁😁
+
+- New VaR, quantile and TVaR functions: 1000x speedup and more accurate. Builder function in `utilities`.
+
+- pyproject.toml project specification, updated build process, now creates whl file rather than egg file.
+
+### 0.12.0 (May 2023)
+
+- `add_exa_sample` becomes method of `Portfolio`
+- Added `create_from_sample` method to `Portfolio`
+- Added `bodoff` method to compute layer capital allocation to `Portfolio`
+- Improved validation error reporting
+- `extensions.samples` module deleted
+- Added `spectral.approx_ccoc` to create a ct approx to the CCoC distortion
+- `qdp` moved to `utilities` (describe plus some quantiles)
+- Added `Pentagon` class in `extensions`
+- Added example use of the Pollaczeck-Khinchine formula, reproducing examples from
+  the `actuar` risk vignette to Ch 5 of the documentation.
+
+### Earlier versions
+
+See github commit notes.
+
+Version numbers follow semantic versioning, MAJOR.MINOR.PATCH:
+
+- MAJOR version changes with incompatible API changes.
+- MINOR version changes with added functionality in a backwards compatible manner.
+- PATCH version changes with backwards compatible bug fixes.

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "aggregate"
 version = "1.0.0a31"
 description = "Tools for creating and working with aggregate probability distributions."
-readme = "README.rst"
+readme = "README.md"
 authors = [
     {name = "Stephen J. Mildenhall", email = "steve@convexrisk.com"},
 ]

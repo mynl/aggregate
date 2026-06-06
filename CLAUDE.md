@@ -136,11 +136,29 @@ The snapshot can be regenerated with `uv run python tests/capture_sly_snapshot.p
 
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
 
+## Release & housekeeping workflow
+
+These are standing rules — follow them without being re-asked:
+
+- **Every plan-based code change bumps the version.** Any code change executed
+  from a plan (a `dev/plan-*.md`, or any multi-step feature/refactor) bumps the
+  `1.0.0a*` version in `pyproject.toml`. (Pure tidying — file moves, comment or
+  doc-only edits with no behaviour change — does not.)
+- **Keep `CHANGELOG.md` current.** Each version bump adds a `## <version>`
+  section to `CHANGELOG.md` (the running release-notes draft) describing what
+  landed and any breaking changes — add it at the close of the iteration, don't
+  defer. `README.md` is the stable-audience front page (purpose, install,
+  getting started, links) and points at `CHANGELOG.md`; touch it only when that
+  front-page material itself changes.
+- **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
+  note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
+  Move a completed plan from `dev/` to `dev/done/`.
+
 ## TODO
 
 The full pending list — pre-ship work and post-v1.0 ideas — lives in
-**`dev/TODO.md`** (what's landed is in `dev/PROGRESS.md`). Check there before
-proposing structural changes so you don't reinvent something already scoped (or
-already deferred for a reason).
+**`dev/TODO.md`**; what's landed is in `CHANGELOG.md` and the git log. Check
+there before proposing structural changes so you don't reinvent something
+already scoped (or already deferred for a reason).
 
 - **PIR case-study reproduction.** The `CaseStudy` machinery (formerly `extensions/case_studies.py`, `portfolio_pir.py`, `risk_progression.py`, and the `cnc`/`discrete`/`hs`/`tame` runner scripts) was deleted at 1.0.0a12. **PMIR is a separate forward-looking project and does NOT reproduce PIR exhibits** — do not point users at it for that purpose. The only path to reproducing the published PIR exhibits is `pip install aggregate==0.30.1` in an isolated environment.

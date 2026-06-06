@@ -3,12 +3,12 @@
 > The v1.0 backlog, organized into **tracks** with mnemonic codes. Two tables
 > first (tracks; priorities + dependencies), then the details, then post-v1.0
 > ideas. Snappy entries only — details live in the plan files (`dev/`,
-> `dev/done/`) and the git log. What's landed is in `PROGRESS.md`.
+> `dev/done/`) and the git log. What's landed is in `CHANGELOG.md`.
 >
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it.
 >
-> **Last updated: 2026-06-05** — current version 1.0.0a30.
+> **Last updated: 2026-06-06** — current version 1.0.0a31.
 
 ---
 
@@ -217,9 +217,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track D — Docs & packaging
 
-- [ ] **D1 `[A]`** New `README.rst` for the stable-v1.0 audience (what / who /
-  install / one-liner DecL) **+ split out `CHANGELOG.rst`** keyed by version
-  (#39, #13, #14).
+- [ ] **D1 `[A]`** New `README.md` for the stable-v1.0 audience (what / who /
+  install / one-liner DecL) (#39, #13, #14).
+  - [x] **Split done (2026-06-06):** `README.rst` → markdown `README.md`
+    (intro / install / getting-started / badges) **+ `CHANGELOG.md`** (full
+    version history, keyed by version); `dev/PROGRESS.md` removed, subsumed by
+    `CHANGELOG.md` + git log; `pyproject.toml` `readme` repointed.
+  - [ ] Remaining: rewrite the README body for the stable-v1.0 audience (it is
+    currently the verbatim moved content).
 - [ ] **D2 `[A]`** v1.0 intro / "Journey" page **+ statements of philosophy**
   (user manages logging / warnings / matplotlib; the distribution **is** `p_i`
   at `x_i`, no jump detection; `qd` is the doc-only fixed-font exception); cover
@@ -252,7 +257,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - `dev/plan-config.md` (Phase 2) → **F8**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
-  multivariate stages 0–1, etc.
+  pentagon pricing contract (**F3**, `plan-pentagon.md`), multivariate
+  stages 0–1, etc.
 
 ---
 

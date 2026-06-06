@@ -332,7 +332,7 @@ class Distortion:
         * ``pricing_ok: bool = True`` — included in pricing-only lists.
         * ``has_mass_default: bool = False`` — listed in ``_has_mass_``.
         * ``def _build(self): ...`` — set ``self.has_mass``, ``self.mass``,
-          ``self.standard_shape`` (if applicable), ``self.display_name``
+          ``self.gini_p`` (if applicable), ``self.display_name``
           (if blank), and override ``g``/``g_inv``/``g_prime`` if the
           default class methods aren't applicable.
 
@@ -520,11 +520,11 @@ class Distortion:
 
         Called from every ``__init__`` before ``_build``. Subclass
         ``_build`` may then overwrite ``has_mass`` / ``mass`` /
-        ``standard_shape``.
+        ``gini_p``.
         """
         self.has_mass = False
         self.mass = 0.0
-        self.standard_shape = np.nan
+        self.gini_p = np.nan
         self.error = 0.0
         self.premium_target = 0.0
         self.assets = 0.0
@@ -1750,7 +1750,7 @@ class CCoCDistortion(Distortion):
         self.v = 1.0 - self.d
         self.has_mass = (self.d > 0)
         self.mass = self.d
-        self.standard_shape = self.d
+        self.gini_p = self.d
 
     def _id_fields(self):
         return (self._name, self.r, self.d, self.display_name)
@@ -1841,7 +1841,7 @@ class PHDistortion(Distortion):
         self._build()
 
     def _build(self):
-        self.standard_shape = (1 - self.shape) / (1 + self.shape)
+        self.gini_p = (1 - self.shape) / (1 + self.shape)
 
     def g(self, x):
         return x ** self.shape
@@ -1931,7 +1931,7 @@ class WangDistortion(Distortion):
     def _build(self):
         n = ss.norm()
         self._norm = n
-        self.standard_shape = 2 * n.cdf(self.shape / 2 ** 0.5) - 1
+        self.gini_p = 2 * n.cdf(self.shape / 2 ** 0.5) - 1
 
     def g(self, x):
         n = self._norm
@@ -2006,7 +2006,7 @@ class DualDistortion(Distortion):
         self._build()
 
     def _build(self):
-        self.standard_shape = (self.shape - 1) / (self.shape + 1)
+        self.gini_p = (self.shape - 1) / (self.shape + 1)
 
     def g(self, x):
         return 1 - (1 - x) ** self.shape
@@ -2102,7 +2102,7 @@ class TVaRDistortion(Distortion):
 
     def _build(self):
         p = self.shape
-        self.standard_shape = p
+        self.gini_p = p
         if p == 1:
             self.has_mass = True
             self.mass = 1

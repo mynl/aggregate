@@ -148,3 +148,59 @@ def test_price_stand_alone_arg_checks(peg):
         port.price_stand_alone(12345, p=0.99)          # dist wrong type
     with pytest.raises(KeyError):
         port.price_stand_alone('no_such_distortion', p=0.99)
+
+
+# ---------------------------------------------------------------------------
+# distortion_df / calibration_df — de-crufted calibration summary (F10)
+# ---------------------------------------------------------------------------
+
+def test_distortion_df_schema(peg):
+    """distortion_df is the per-distortion receipt: index 'distortion', columns
+    param_name/param/gini_p/area/error, in canonical order."""
+    port, _ = peg
+    p = BASELINE['meta']['p_calibration']
+    coc = BASELINE['meta']['coc_calibration']
+    ddf = port.calibrate_distortions(coc=coc, p=p)
+
+    assert ddf.index.name == 'distortion'
+    assert list(ddf.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
+    assert list(ddf.columns) == ['param_name', 'param', 'gini_p', 'area', 'error']
+    assert ddf['param_name'].to_dict() == {
+        'ccoc': 'r', 'ph': 'a', 'wang': 'lam', 'dual': 'b', 'tvar': 'p'}
+    # area == (gini_p + 1)/2 == int g, exactly (definitional)
+    assert np.allclose(ddf['area'], (ddf['gini_p'] + 1) / 2, rtol=0, atol=1e-12)
+    # the verified identity: tvar's raw param IS its gini_p (TVaR-equiv level)
+    assert np.isclose(ddf.loc['tvar', 'param'], ddf.loc['tvar', 'gini_p'], rtol=1e-9)
+    # premium miss is small
+    assert (ddf['error'].abs() < 1e-4).all()
+
+
+def test_calibration_df_self_contained(peg):
+    """calibration_df leads with the inputs coc, p then the pentagon octet; the
+    ROE == coc self-check holds and the octet trails (iloc[:, -8:])."""
+    port, _ = peg
+    p = BASELINE['meta']['p_calibration']
+    coc = BASELINE['meta']['coc_calibration']
+    port.calibrate_distortions(coc=coc, p=p)
+    cal = port.calibration_df
+
+    assert len(cal) == 1
+    assert list(cal.columns) == [
+        'coc', 'p', 'L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
+    row = cal.iloc[0]
+    assert np.isclose(row['coc'], coc)
+    assert np.isclose(row['p'], p)
+    assert np.isclose(row['ROE'], coc, rtol=1e-6)         # the self-check
+    assert np.isclose(row['a'], row['P'] + row['Q'])
+    assert list(cal.iloc[:, -8:].columns) == [
+        'L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
+
+
+def test_distortion_gini_p_attribute(peg):
+    """Distortion exposes gini_p (renamed from standard_shape)."""
+    port, _ = peg
+    port.calibrate_distortions(coc=BASELINE['meta']['coc_calibration'],
+                               p=BASELINE['meta']['p_calibration'])
+    for dist in port.distortions.values():
+        assert hasattr(dist, 'gini_p')
+        assert not hasattr(dist, 'standard_shape')

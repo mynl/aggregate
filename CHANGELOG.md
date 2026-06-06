@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0a34
+
+### De-crufted calibration summary (`distortion_df` / `calibration_df`)
+
+`Portfolio.calibrate_distortions` produced a wide `distortion_df` that mixed the
+*per-distortion result* with the *calibration target* — the latter constant
+across all five rows, with a part-vestigial `(a, LR, method)` MultiIndex left
+over from a removed batch API. Split into two clean frames.
+
+- **`distortion_df`** is now the per-distortion receipt only: index
+  `distortion` (ordered categorical, canonical `ccoc, ph, wang, dual, tvar`),
+  columns `param_name, param, gini_p, area, error`. `param_name` names the
+  family's parameter (`r, a, lam, b, p`); `gini_p` is the comparable normalised
+  shape `= 2∫g−1 = p_equiv`; `area = (gini_p+1)/2 = ∫g`; `error` is the premium
+  miss.
+- **`calibration_df`** (new attribute) holds the shared target once: a one-row
+  frame leading with the inputs `coc, p`, then the canonical pentagon octet
+  `L, M, P, Q, a, LR, PQ, ROE`. `ROE` equals the requested `coc` — a built-in
+  self-check.
+- **Breaking — `Distortion.standard_shape` renamed to `Distortion.gini_p`**
+  (attribute, end to end). Verified `= 2∫g−1` for every calibrated family.
+- Calibration is one-point (no batch mode); the index no longer implies a batch
+  that does not exist. Docs (`2_x_10mins`, `5_x_distortions`) updated to read
+  `P` from `calibration_df` and describe the new columns.
+
 ## 1.0.0a33
 
 ### `Portfolio.price_stand_alone` restored (modernised)

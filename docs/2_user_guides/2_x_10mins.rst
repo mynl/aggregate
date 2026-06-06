@@ -1334,9 +1334,10 @@ The :meth:`calibrate_distortions` method calibrates distortions to achieve reque
 
     p07.calibrate_distortions(coc=0.15, p=0.996);
     qd(p07.distortion_df)
+    qd(p07.calibration_df)
     pprint(p07.distortions)
 
-The answer is returned in the ``distortion_df`` dataframe. The requested distortions are all single parameter, returned in the ``param`` column. The last column gives the error in achieved premium. The attribute ``p07.distortions`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
+The per-distortion result is returned in (and stored on) the ``distortion_df`` dataframe, indexed by distortion. The requested distortions are all single parameter: ``param`` gives the raw shape (``param_name`` names it for each family), ``gini_p`` the comparable normalized shape (the TVaR-equivalent level :math:`2\int g - 1`), ``area`` the area under the distortion :math:`\int g = (\mathrm{gini\_p}+1)/2`, and ``error`` the miss in achieved premium. The shared calibration target is shown once on ``p07.calibration_df`` — the inputs ``coc``, ``p`` followed by the pentagon octet ``L, M, P, Q, a, LR, PQ, ROE`` (where ``ROE`` equals the requested ``coc``). The attribute ``p07.distortions`` is a dictionary with keys distortion types and values :class:`Distortion` objects. See PIR REF for more discussion.
 
 .. _10 min analyze distortions:
 

@@ -281,7 +281,8 @@ Determine distortion parameters to achieve a 10% return at 99 percentile capital
    pa.calibrate_distortions(coc=0.1, p=0.99);
    d = pa.distortions['dual']
    qd(pa.distortion_df)
-   f"Exact premium {pa.distortion_df.iloc[0, 2]:.15f}"
+   qd(pa.calibration_df)
+   f"Exact premium {pa.calibration_df['P'].iloc[0]:.15f}"
 
 Compute pricing in the four ways described above.
 

@@ -30,9 +30,14 @@ is clean): **G1, G3, G9, G10**. Each new expression was validated at runtime.
   cascades** `'Limit1' is not in list` and `KeyError: 'A'` (the port now builds
   both units).
 
+**Resolved by code (1.0.0a33):**
+- **G4 ✅** — `Portfolio.price_stand_alone(dist, p)` restored (modernised; built
+  on `Aggregate.price` + `pricing_at`, canonical pentagon). The two
+  `2_x_10mins.rst` call sites updated to `price_stand_alone(...)` + `print(a.T)`
+  (the `.iloc[:8]` cascades are gone, since `a` is now the pricing frame).
+
 **Pended (per request / not clear):**
 - **G2** — `tilt_vector` removed → rewrite under TODO **F2**.
-- **G4** — `stand_alone_pricing` removed, no in-code replacement (fix unclear).
 - **G6** — mixed-severity `comp_*` columns / `('meta','name')` keys (fix unclear).
 - **G7 / G8** — `describe`/reins length-mismatch + `Gross`→`Subject` labels:
   **assessed not-clear** — entangled with the undecided **F4** relabel and the
@@ -77,8 +82,13 @@ downstream `.xs('LR', axis=0, level=1)` still applies (rows are
 `(distortion, stat)`).
 **Instances (~3):** `2_x_10mins.txt:2274` (`comp_df`), `2473, 2566` (`pricing`).
 
-## G4 — `Portfolio.stand_alone_pricing` removed  ❓ fix unclear
-**Cause.** Method deleted; **no in-code replacement**. Downstream
+## G4 — `Portfolio.stand_alone_pricing` removed  ✅ fixed (1.0.0a33)
+**Resolution.** Restored as `Portfolio.price_stand_alone(dist, p)` (renamed to
+sort with `price`/`price_ccoc`), reimplemented on top of `Aggregate.price`
+(per-unit stand-alone) + `pricing_at` (total), all through the canonical
+pentagon. Docs updated: both `2_x_10mins.rst` call sites now use
+`price_stand_alone(...)` and `print(a.T)`.
+**Original cause.** Method deleted; **no in-code replacement**. Downstream
 `a.iloc[:8]` then fails because `a` keeps an earlier `Aggregate` binding
 (`'Aggregate' object has no attribute 'iloc'` — cascade).
 **Fix.** **Fix unclear** — needs an example rewrite. Likely re-expressed via
@@ -161,9 +171,9 @@ G2/G7:
 3. **G7/G8** — after the reins-describe label decision (F4), then rebuild the
    case studies (D7).
 4. **G2** — fold into the F2 tilting-DIY rewrite.
-5. **G4, G6, G11** — **fix unclear**: need an API-mapping decision
-   (`stand_alone_pricing` replacement; mixed-severity component scheme) before
-   editing.
+5. **G6, G11** — **fix unclear**: need an API-mapping decision
+   (mixed-severity component scheme) before editing. (**G4 resolved** in a33 —
+   `price_stand_alone` restored.)
 
 **Note.** Edits land in the doc *source* (`docs/…` `.rst` / notebooks); the
 `.txt`/HTML are build artefacts. Don't rebuild in the iteration loop (per

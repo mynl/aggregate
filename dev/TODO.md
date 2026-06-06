@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-06** — current version 1.0.0a33.
+> **Last updated: 2026-06-06** — current version 1.0.0a34.
 
 ---
 
@@ -193,6 +193,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **F8 `[B]` Config Phase 2** — `dev/plan-config.md`: `[plotting]` +
   `.mplstyle` override, the rest of the env matrix, and the numerics-pending
   floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`). Ties Track W.
+- [x] **F9 `[A]` `Portfolio.price_stand_alone`** — **done v1.0.0a33**. Restored
+  the deleted `stand_alone_pricing` (renamed to sort with `price`/`price_ccoc`):
+  per-unit stand-alone pricing via `Aggregate.price` + total via `pricing_at`,
+  canonical pentagon orientation (stats = columns), arg-checking, docstring.
+  Unblocks the 10-min guide (clears **doc-fix G4**).
+- [x] **F10 `[A]` De-cruft `distortion_df`** — **done v1.0.0a34**
+  (`dev/done/plan-distortion-df.md`). `distortion_df` is now per-distortion only
+  (index `distortion`; columns `param_name, param, gini_p, area, error`); the
+  constant target moved to a new one-row pentagon `calibration_df` (inputs
+  `coc, p` + octet, `ROE == coc` check). Renamed `Distortion.standard_shape` →
+  `gini_p` (`= 2∫g−1 = p_equiv`). No batch mode.
 
 ---
 
@@ -278,7 +289,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
   pentagon pricing contract (**F3**, `plan-pentagon.md`), database loading
-  (**H6**, `plan-databases.md`), multivariate stages 0–1, etc.
+  (**H6**, `plan-databases.md`), calibration summary de-cruft (**F10**,
+  `plan-distortion-df.md`), multivariate stages 0–1, etc.
 
 ---
 

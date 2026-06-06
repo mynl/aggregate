@@ -332,6 +332,7 @@ class Portfolio(object):
         self.program = ''
         self.distortions = None
         self.distortion_df = None
+        self.calibration_df = None
         self.figure = None
 
         # for consistency with Aggregates
@@ -2684,20 +2685,28 @@ class Portfolio(object):
         Returns
         -------
         pandas.DataFrame
-            Calibration audit table (one row per distortion in
-            ``[ccoc, ph, wang, dual, tvar]``) with columns
-            ``[S, L, P, PQ, Q, COC, param, std_param, error]`` and
-            MultiIndex ``(a, LR, method)``. ``method`` is an ordered
-            categorical so sorts produce the canonical distortion order.
-            Also stored on ``self.distortion_df``. The calibrated
-            distortion objects are stored on ``self.distortions`` keyed
-            by name.
+            The per-distortion calibration receipt, ``distortion_df`` (also
+            stored on ``self.distortion_df``): one row per distortion in
+            ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
+            ordered categorical, canonical sort), columns
+            ``[param_name, param, gini_p, area, error]``. ``param`` is the raw
+            shape (``param_name`` says what it is per family); ``gini_p`` is the
+            comparable normalised shape ``= 2∫g−1 = p_equiv`` (TVaR-equivalent
+            level); ``area = (gini_p+1)/2 = ∫g``; ``error`` is the premium miss.
 
         Notes
         -----
-        Replaces both the legacy
+        The shared calibration *target* — identical across all five rows — is
+        not repeated here; it is stored once on ``self.calibration_df`` as a
+        one-row frame: the inputs ``coc, p`` lead, then the canonical pentagon
+        octet ``L, M, P, Q, a, LR, PQ, ROE``. ``ROE`` there equals ``coc`` (a
+        free self-check). The calibrated distortion objects are on
+        ``self.distortions`` keyed by name.
+
+        Calibration is one-point (one ``coc`` at one ``p``/``a``). This replaces
+        both the legacy batch
         ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, ...)`` and
-        ``calibrate_distortions2(coc, reg_p)``. 
+        ``calibrate_distortions2(coc, reg_p)``.
         """
         if (p is None) == (a is None):
             raise ValueError(
@@ -2705,16 +2714,15 @@ class Portfolio(object):
                 'or a= (asset level).')
         if a is None:
             a = self.q(p, kind)
+            p_val = p
         else:
             a = self.snap(a)
-        exa, S = self.density_df.loc[a, ['exa_total', 'S']]
+            p_val = self.cdf(a)
+        exa = self.density_df.loc[a, 'exa_total']
         # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
         delta = coc / (1 + coc)
         nu = 1 - delta
         P = nu * exa + delta * a
-        LR = exa / P
-        profit = P - exa
-        K = a - P
         d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
         rows = []
         distortions = {}
@@ -2722,21 +2730,29 @@ class Portfolio(object):
             dist = self.calibrate_distortion(
                 name=dname, premium_target=P, assets=a)
             distortions[dname] = dist
-            rows.append(
-                [S, exa, P, P / K, K, profit / K,
-                 dist.shape, dist.standard_shape, dist.error])
+            # param_name is the family's natural parameter ('a', 'lam', 'b',
+            # 'p'); ccoc has none -> 'r'. gini_p = 2*int(g) - 1 (= p_equiv);
+            # area = int(g) = (gini_p + 1)/2.
+            param_name = getattr(dist, 'param_name', None) or 'r'
+            rows.append([param_name, dist.shape, dist.error, dist.gini_p,
+                         (dist.gini_p + 1) / 2])
         distortion_df = pd.DataFrame(
             rows,
-            columns=['S', 'L', 'P', 'PQ', 'Q', 'COC',
-                     'param', 'std_param', 'error'],
+            columns=['param_name', 'param', 'error', 'gini_p', 'area'],
+            index=pd.CategoricalIndex(
+                d_list, dtype=DISTORTION_DTYPE, name='distortion'),
         )
-        distortion_df.index = pd.MultiIndex.from_arrays(
-            [[a] * len(d_list),
-             [LR] * len(d_list),
-             pd.Categorical(d_list, dtype=DISTORTION_DTYPE)],
-            names=['a', 'LR', 'method'],
-        )
+
+        # the shared calibration target, shown once: the inputs coc, p enter as
+        # leading descriptor columns and complete_pentagon trails the canonical
+        # octet (a is the octet's a, not duplicated as a lead column).
+        calibration_df = complete_pentagon(
+            pd.DataFrame([[coc, p_val, self.cdf(a), exa, P - exa, P, a - P]],
+                         columns=['coc', 'p', 'F(a)', 'L', 'M', 'P', 'Q'],
+                         index=pd.Index(['calibration'], name='line')))
+
         self.distortion_df = distortion_df
+        self.calibration_df = calibration_df
         self.distortions = distortions
         return distortion_df
 

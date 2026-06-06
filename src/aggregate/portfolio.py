@@ -3285,6 +3285,103 @@ class Portfolio(object):
 
         return ans
 
+    def price_stand_alone(self, dist, p):
+        """
+        Price each unit on a stand-alone basis and compare to the diversified whole.
+
+        Every unit is priced *as if it were the only line in the book*: its
+        capital standard is its own VaR at level ``p`` (no diversification
+        credit), and the distortion ``dist`` is applied to its own loss
+        distribution. This is contrasted with the ``total`` column — the whole
+        portfolio priced together at the portfolio VaR(``p``) — and with the
+        ``sum`` column, the simple sum of the stand-alone parts. The gap between
+        ``sum`` and ``total`` is the diversification benefit.
+
+        Each unit's stand-alone row is produced by :meth:`Aggregate.price`
+        (a unit is just an :class:`Aggregate`); the ``total`` row by
+        :meth:`pricing_at`. Both route through the canonical pentagon
+        (:func:`~aggregate.pentagon.complete_pentagon`), so every row carries
+        the full octet ``L, M, P, Q, a, LR, PQ, ROE`` derived in one place.
+
+        Parameters
+        ----------
+        dist : Distortion or str
+            The (already calibrated) pricing distortion, or the name of one in
+            :attr:`distortions` (populated by :meth:`calibrate_distortions`).
+        p : float
+            Probability in ``(0, 1)``; the VaR capital standard for each
+            stand-alone unit and for the total.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Canonical pentagon orientation: the eight statistics ``L, M, P, Q,
+            a, LR, PQ, ROE`` are the columns; rows are one per priced entity —
+            the units, plus ``total`` (diversified whole) and ``sum`` (sum of
+            the stand-alone parts) — under a ``(method, unit)`` MultiIndex, where
+            ``method`` is the distortion's string form. Transpose for the
+            traditional stat-down-the-side exhibit (``a.T``), matching
+            ``analyze_distortion(...).pricing_df.T``.
+
+        Raises
+        ------
+        TypeError
+            If ``dist`` is neither a :class:`Distortion` nor a string, or ``p``
+            is not numeric.
+        ValueError
+            If ``p`` is not in ``(0, 1)``, or a distortion name is requested
+            when no distortions have been calibrated.
+        KeyError
+            If a distortion name is not found in :attr:`distortions`.
+
+        Notes
+        -----
+        The amounts (``L, M, P, Q, a``) add across units, so the ``sum`` row is
+        their column-wise total; the ratios (``LR, PQ, ROE``) do not add and are
+        re-derived from the summed amounts via ``complete_pentagon``.
+        """
+        # ---- validate p -------------------------------------------------
+        if isinstance(p, bool) or not isinstance(p, (int, float)):
+            raise TypeError(f'p must be a probability in (0, 1), got {p!r}.')
+        if not 0 < p < 1:
+            raise ValueError(f'p must be a probability in (0, 1), got {p}.')
+
+        # ---- resolve the distortion ------------------------------------
+        if isinstance(dist, str):
+            if not self.distortions:
+                raise ValueError(
+                    f'No calibrated distortions on this Portfolio; cannot look '
+                    f'up {dist!r}. Pass a Distortion instance, or call '
+                    f'calibrate_distortions(...) first.')
+            try:
+                dist = self.distortions[dist]
+            except KeyError:
+                raise KeyError(
+                    f'Distortion {dist!r} not found; available: '
+                    f'{sorted(self.distortions)}.')
+        elif not isinstance(dist, Distortion):
+            raise TypeError(
+                f'dist must be a Distortion or the name of a calibrated '
+                f'distortion, got {type(dist).__name__}.')
+
+        # ---- per-unit stand-alone pentagons (each at its OWN VaR(p)) ----
+        parts = pd.concat([ag.price(p, dist) for ag in self.agg_list])
+
+        # ---- the whole book priced together at the portfolio VaR(p) -----
+        total = self.pricing_at(dist, p=p).loc[['total']]
+
+        # ---- sum of the stand-alone parts: amounts add, ratios re-derive --
+        sop = parts[['L', 'M', 'P', 'Q']].sum().to_frame('sum').T
+        sop.index.name = 'line'
+        sop = complete_pentagon(sop)
+
+        # ---- assemble in canonical orientation: stats are the columns, one
+        # row per entity (units, then total, then sum), tagged by method ----
+        exhibit = pd.concat([parts, total, sop])[list(PENTAGON_STATS)]
+        exhibit.index.name = 'unit'
+        exhibit.columns.name = 'stat'
+        return pd.concat({str(dist): exhibit}, names=['method'])
+
     def price_ccoc(self, p, ccoc):
         """
         Convenience function to price with a constant cost of captial equal ``ccoc``

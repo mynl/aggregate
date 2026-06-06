@@ -1492,8 +1492,8 @@ Applying the same distortion on a stand-alone basis produces:
 .. ipython:: python
     :okwarning:
 
-    a = p09.stand_alone_pricing(p09.distortions['dual'], p=p09.cdf(12.5))
-    print(a.iloc[:8])
+    a = p09.price_stand_alone(p09.distortions['dual'], p=p09.cdf(12.5))
+    print(a.T)
 
 The lifted natural allocation (diversified pricing) is given next. These numbers
 are so different than the stand-alone because X2 has to compensate X1 for the
@@ -1545,8 +1545,8 @@ Applying the same distortion on a stand-alone basis produces:
     :okwarning:
 
     assets = p10.q(0.996)
-    a = p10.stand_alone_pricing(p10.distortions['dual'], p=p10.cdf(assets))
-    print(a.iloc[:8])
+    a = p10.price_stand_alone(p10.distortions['dual'], p=p10.cdf(assets))
+    print(a.T)
 
 The lifted natural allocation (diversified pricing) is given next.
 

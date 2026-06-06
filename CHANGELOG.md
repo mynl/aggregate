@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0a33
+
+### `Portfolio.price_stand_alone` restored (modernised)
+
+Reinstated `Portfolio.price_stand_alone(dist, p)` — used by the "10 minutes"
+guide (its absence was breaking that build). It prices every unit on a
+**stand-alone** basis (each backed by its own VaR(`p`) capital, the distortion
+applied to its own loss distribution) and contrasts that with the diversified
+whole.
+
+- Built on the existing pricing primitives: each unit's column comes from
+  `Aggregate.price` (a unit is just an `Aggregate`), the `total` column from
+  `Portfolio.pricing_at` — so stand-alone and allocated pricing share one code
+  path rather than re-deriving the integral by hand.
+- Every row routes through the canonical pentagon
+  (`complete_pentagon`), so the readout carries the full octet
+  `L, M, P, Q, a, LR, PQ, ROE` in one consistent order. The `sum` row adds the
+  amounts across units and re-derives the ratios.
+- Canonical orientation, matching `pricing_at`: the eight stats are the
+  columns, one row per entity (units, `total`, `sum`) under a `(method, unit)`
+  MultiIndex. Transpose (`a.T`) for the traditional stat-down-the-side exhibit.
+- Argument checking: `p` must be a probability in `(0, 1)`; `dist` must be a
+  `Distortion` or the name of a calibrated one (clear `TypeError` / `ValueError`
+  / `KeyError` otherwise). NumPy-style docstring added.
+
 ## 1.0.0a32
 
 ### Legible `Underwriter` database loading

@@ -90,3 +90,61 @@ def test_pricing(peg):
                 actual = ad.loc[(dname, stat), column]
                 assert np.isclose(actual, expected, rtol=1e-8), \
                     f'{dname}.{column}.{stat}: {actual!r} vs baseline {expected!r}'
+
+
+# ---------------------------------------------------------------------------
+# price_stand_alone — structure + accounting identities
+# ---------------------------------------------------------------------------
+
+def test_price_stand_alone_shape_and_identities(peg):
+    """price_stand_alone returns the canonical pentagon readout (stats are the
+    columns, one row per entity) and the sum/total rows satisfy the accounting
+    identities."""
+    port, _ = peg
+    p = BASELINE['meta']['p_calibration']
+    dname = next(iter(port.distortions))
+    a = port.price_stand_alone(port.distortions[dname], p=p)
+
+    # canonical orientation: 8 pentagon stats are the columns; rows are one per
+    # entity (units + total + sum) under a (method, unit) MultiIndex
+    assert list(a.index.names) == ['method', 'unit']
+    assert list(a.columns) == ['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
+
+    flat = a.droplevel('method')
+    assert len(flat) == len(port.line_names) + 2
+    assert {'sum', 'total'}.issubset(flat.index)
+    units = [u for u in flat.index if u not in ('sum', 'total')]
+    assert units == port.line_names
+
+    # amounts add: the sum row is the column-wise total of the stand-alone units
+    for stat in ['L', 'M', 'P', 'Q', 'a']:
+        assert np.isclose(flat.loc['sum', stat], flat.loc[units, stat].sum(), rtol=1e-10)
+
+    # ratios are re-derived from amounts in EVERY row (not summed)
+    for u in flat.index:
+        L, M, P, Q, A = (flat.loc[u, s] for s in ['L', 'M', 'P', 'Q', 'a'])
+        assert np.isclose(A, P + Q, rtol=1e-10)
+        assert np.isclose(flat.loc[u, 'LR'], L / P, rtol=1e-10)
+        assert np.isclose(flat.loc[u, 'PQ'], P / Q, rtol=1e-10)
+        assert np.isclose(flat.loc[u, 'ROE'], M / Q, rtol=1e-10)
+
+    # the 'total' row is the diversified whole == pricing_at total
+    pa = port.pricing_at(port.distortions[dname], p=p).loc['total']
+    for stat in ['L', 'M', 'P', 'Q', 'a']:
+        assert np.isclose(flat.loc['total', stat], pa[stat], rtol=1e-8)
+
+
+def test_price_stand_alone_arg_checks(peg):
+    """Bad arguments raise the documented exceptions."""
+    port, _ = peg
+    dname = next(iter(port.distortions))
+    dist = port.distortions[dname]
+
+    with pytest.raises(ValueError):
+        port.price_stand_alone(dist, p=1.5)            # p out of range
+    with pytest.raises(TypeError):
+        port.price_stand_alone(dist, p='0.99')         # p not numeric
+    with pytest.raises(TypeError):
+        port.price_stand_alone(12345, p=0.99)          # dist wrong type
+    with pytest.raises(KeyError):
+        port.price_stand_alone('no_such_distortion', p=0.99)

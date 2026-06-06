@@ -1164,10 +1164,10 @@ Mata et al. pay careful attention to the implied severity in each ceded layer, a
 
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45), constrained_layout=True)
     ax0, ax1, ax2, ax3 = axs.flat
-    (a19.density_df.p_sev / a19.sev.sf(500)).plot(xlim=[500, 1005],   logy=True, ax=ax0);
-    (a19.density_df.p_sev / a19.sev.sf(1000)).plot(xlim=[1000, 2005], logy=True, ax=ax1);
-    ((a19.density_df.F_sev - a19.sev.cdf(500)) / (a19.sev.cdf(1000) - a19.sev.cdf(500))).plot(xlim=[500, 1005], ylim=[-0.05, 1.05], ax=ax2);
-    ((a19.density_df.F_sev - a19.sev.cdf(1000)) / (a19.sev.cdf(2000) - a19.sev.cdf(1000))).plot(xlim=[1000, 2005], ylim=[-0.05, 1.05], ax=ax3);
+    (a19.sev_density_df.p_sev / a19.sev.sf(500)).plot(xlim=[500, 1005],   logy=True, ax=ax0);
+    (a19.sev_density_df.p_sev / a19.sev.sf(1000)).plot(xlim=[1000, 2005], logy=True, ax=ax1);
+    ((a19.sev_density_df.F_sev - a19.sev.cdf(500)) / (a19.sev.cdf(1000) - a19.sev.cdf(500))).plot(xlim=[500, 1005], ylim=[-0.05, 1.05], ax=ax2);
+    ((a19.sev_density_df.F_sev - a19.sev.cdf(1000)) / (a19.sev.cdf(2000) - a19.sev.cdf(1000))).plot(xlim=[1000, 2005], ylim=[-0.05, 1.05], ax=ax3);
     for ax, y in zip(axs.flat, ['Log density', 'Log density', 'Density', 'Density']):
         ax.set(ylabel=y);
     @savefig mata_2_3.png scale=20

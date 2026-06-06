@@ -10,6 +10,39 @@
 
 Captured 2026-06-05 against 1.0.0a30.
 
+## Status (2026-06-06) — first fix pass
+
+**Fixed in doc source** (no version bump; the author committed first so the diff
+is clean): **G1, G3, G9, G10**. Each new expression was validated at runtime.
+
+- **G1 ✅** — every `density_df.<sev col>` → `sev_density_df`; the three
+  mixed agg+sev selections split across the two frames (`density_df` for
+  `p/F/S`, `sev_density_df` joined/reindexed for `p_sev/F_sev/S_sev`). Includes
+  `2_x_re_pricing.rst:1167-1170` which is the same root cause but did **not**
+  surface as a captured traceback (a `@savefig` cell).
+- **G3 ✅** — `ans.comp_df` → `ans.pricing_df`;
+  `a2.pricing.unstack(1).droplevel(0, axis=0).T` → `a2.pricing_df.T` (verified
+  this yields the intended stat×line table).
+- **G9 ✅** — restored `fp`/`qdl` in the first setup cell of `0x0_other_misc.rst`
+  (`qd` passes `**kwargs` to `to_string`, so `index/line_width/formatters` work).
+- **G10 ✅** — `5_x_pk.rst` `PZTest` build: `'poisson'` → `'poisson '` (the
+  missing space that concatenated to `poissonagg`). **This also clears the G11
+  cascades** `'Limit1' is not in list` and `KeyError: 'A'` (the port now builds
+  both units).
+
+**Pended (per request / not clear):**
+- **G2** — `tilt_vector` removed → rewrite under TODO **F2**.
+- **G4** — `stand_alone_pricing` removed, no in-code replacement (fix unclear).
+- **G6** — mixed-severity `comp_*` columns / `('meta','name')` keys (fix unclear).
+- **G7 / G8** — `describe`/reins length-mismatch + `Gross`→`Subject` labels:
+  **assessed not-clear** — entangled with the undecided **F4** relabel and the
+  **D7** case-study rebuild (and the bahnemann `KeyError: 100000` rows are
+  cascades). Pended.
+- **G11 remainder** — `KeyError: 'Est'` (loss_data_analytics) still open; the
+  `gh_example` str+float bug folds into the G2/F2 rewrite.
+
+Per-group detail below is the original catalogue; the ✅ groups are now done.
+
 ---
 
 ## G1 — severity columns moved to `sev_density_df`  ✅ easy

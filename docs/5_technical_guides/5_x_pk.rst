@@ -198,7 +198,7 @@ The first is based on a mean 10 Poisson compound with shape 2 gamma severity. Th
     qd(a.tvar([.9, .95, .99]))
     ruins, find_us, mean, dfi  = a.cramer_lundberg(.2)
     ax0.plot(np.cumsum(dfi), label='integrated')
-    ax0.plot(a.density_df.p_sev.cumsum(), label='severity')
+    ax0.plot(a.sev_density_df.p_sev.cumsum(), label='severity')
     ax0.set(xlim=[0, 40], title='Severity and integrated severity distributions')
     ax0.legend(loc='lower right')
     @savefig pz-actuar.png scale=20
@@ -247,7 +247,7 @@ Set up the portfolio.
                         '0.1 claims '
                         '1000000 xs 0 '
                         'sev lognorm 50000 cv 10 '
-                        'poisson'
+                        'poisson '
                      'agg Limit10 '
                         '0.1 claims '
                         ' 10000000 xs 0 '

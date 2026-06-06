@@ -42,6 +42,8 @@ Build the portfolio.
     :okwarning:
 
     from aggregate import build, qd
+    fp = lambda x: f'{x:.1%}'
+    qdl = lambda x: qd(x, index=False, line_width=200, formatters={'pct': fp})
     layers = [0, 50e3, 100e3, 200e3, 300e3, 400e3, 500e3, 1000e3, 2000e3, 5000e3, 10000e3]
     a1 = build('agg Wang.t1 '
                '1 claim '

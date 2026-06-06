@@ -680,7 +680,7 @@ The following are equal using the defaut discretization method.
 .. ipython:: python
     :okwarning:
 
-    a03.density_df.loc[20, 'F_sev'], a03.sev.cdf(20 + a03.bs/2)
+    a03.sev_density_df.loc[20, 'F_sev'], a03.sev.cdf(20 + a03.bs/2)
 
 .. _10 min reinsurance:
 
@@ -1350,7 +1350,7 @@ The :meth:`analyze_distortions` method applies the distortions in ``p07.distorti
     :okwarning:
 
     ans = p07.analyze_distortions(p=0.996)
-    print(ans.comp_df.xs('LR', axis=0, level=1).
+    print(ans.pricing_df.xs('LR', axis=0, level=1).
          to_string(float_format=lambda x: f'{x:.1%}'))
 
 .. _10 min twelve plot:
@@ -1504,7 +1504,7 @@ by X2 and so X2 receives a disproportionate share of the assets in default.
     :okwarning:
 
     a2 = p09.analyze_distortion('dual', a=12.5)
-    print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
+    print(a2.pricing_df.T)
 
 The second portfolio has been selected with two thick tailed units. A appears riskier at lower return periods and B at higher. Pricing is calibrated to a 15% ROE at a 99.6% capital level.
 
@@ -1554,7 +1554,7 @@ The lifted natural allocation (diversified pricing) is given next.
     :okwarning:
 
     a2 = p10.analyze_distortion('dual', a=assets)
-    print(a2.pricing.unstack(1).droplevel(0, axis=0).T)
+    print(a2.pricing_df.T)
 
 
 .. _10 min extensions:

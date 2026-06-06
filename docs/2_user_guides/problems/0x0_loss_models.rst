@@ -502,8 +502,8 @@ Negative binomial :math:`c=1/2` and hence mixing cv :math:`\sqrt{c}`, and the me
                      'mixed gamma 2**-0.5')
     qd(kpw_9_63)
     mv(kpw_9_63)
-    qd(kpw_9_63.density_df.loc[:400:40*64,
-        ['p', 'F', 'S', 'p_sev', 'F_sev', 'S_sev']],
+    qd(kpw_9_63.density_df.loc[:400:40*64, ['p', 'F', 'S']].join(
+        kpw_9_63.sev_density_df[['p_sev', 'F_sev', 'S_sev']]),
         accuracy=5)
 
 Next, calculations performed with the requested broader ``bs=40``.
@@ -513,8 +513,8 @@ Next, calculations performed with the requested broader ``bs=40``.
 
     kpw_9_63.update(log2=8, bs=40)
     qd(kpw_9_63)
-    qd(kpw_9_63.density_df.loc[:400,
-        ['p', 'F', 'S', 'p_sev', 'F_sev', 'S_sev']],
+    qd(kpw_9_63.density_df.loc[:400, ['p', 'F', 'S']].join(
+        kpw_9_63.sev_density_df[['p_sev', 'F_sev', 'S_sev']]),
         accuracy=5)
 
 The apparent difference in the severity distribution is caused by the rounding method. In the first case F(40) is almost exact whereas in the second it is actually F(60).

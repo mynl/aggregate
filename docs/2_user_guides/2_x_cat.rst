@@ -174,10 +174,10 @@ The next block of code shows the same information as Jewson's Figure 2. It inclu
 
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.45), constrained_layout=True)
     for ax, mw, title, xmax in zip(axs.flat[::-1], [m, w], ['Martinez estimates', 'Weinkel estimates'], [550, 240]):
-        bit = np.exp(-(1-mw.density_df.F_sev.loc[:1000]) * m.n)
+        bit = np.exp(-(1-mw.sev_density_df.F_sev.loc[:1000]) * m.n)
         bit = 1 / (1 - bit)
         bit.plot(logy=True, ax=ax, label='OEP = Pr no events in year')
-        bit = 1 / ((1 - mw.density_df.F_sev.loc[:20000]) * m.n)
+        bit = 1 / ((1 - mw.sev_density_df.F_sev.loc[:20000]) * m.n)
         bit.plot(logy=True, ax=ax, label='EEF RP = 1/freq')
         xs = np.linspace(0, 500, 501)
         if title[0] == 'M':
@@ -212,7 +212,8 @@ as :math:`x\to\infty`, see REF. The next plot confirms that Feller's approximati
     fig, axs = plt.subplots(1, 2, figsize=(2 * 3.5, 2.55), constrained_layout=True)
 
     for ax, mw, lim, title in zip(axs.flat[::-1], [m, w], [5000, 5000], ['Martinez', 'Weinkle']):
-        bit = mw.density_df.loc[:5000, ['S', 'S_sev']]
+        bit = mw.density_df.loc[:5000, ['S']].copy()
+        bit['S_sev'] = mw.sev_density_df['S_sev'].reindex(bit.index)
         bit['Feller'] = bit.S_sev * mw.n
         bit = 1 / bit
         bit.plot(xlim=[-10, lim], logy=True, ax=ax, ylim=[1000000, 0.5], lw=1)
@@ -313,9 +314,9 @@ Here are plots of the base and adjusted AEP and OEP curves. Compare Jewson Figur
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.5), constrained_layout=True)
     axs = axs.flat[::-1]
     for axo, axa, (mw, mwcc), title in zip(axs.flat[0::2], axs.flat[1::2], [(m, mcc), (w, wcc)], ['Martinez', 'Weinkle']):
-        bit = 1 / ((1 - mw.density_df.F_sev.loc[:2000]) * mw.n)
+        bit = 1 / ((1 - mw.sev_density_df.F_sev.loc[:2000]) * mw.n)
         bit.plot(logy=True, ax=axo, label='OEP');
-        bit = 1 / ((1 - mwcc.density_df.F_sev.loc[:2000]) * mw.n)
+        bit = 1 / ((1 - mwcc.sev_density_df.F_sev.loc[:2000]) * mw.n)
         bit.plot(logy=True, ax=axo, label='OEP, climate chanage');
         bit = 1 / (1 - mw.density_df.F.loc[:2000])
         bit.plot(logy=True, ax=axa, label='AEP');
@@ -366,7 +367,7 @@ The next dataframe adds expected losses and compares them to the ILW pricing. Th
     :okwarning:
 
     views = ['Weinkle', 'Weinkle Adj', 'Martinez', 'Martinez Adj']
-    ilw = pd.concat((x.density_df.loc[[15, 20, 25, 30, 40, 50, 60],
+    ilw = pd.concat((x.sev_density_df.loc[[15, 20, 25, 30, 40, 50, 60],
                         ['S_sev']].rename(columns={'S_sev': 'EL'})
                         for x in [w, wcc, m, mcc]),
                    axis=1, keys=views,

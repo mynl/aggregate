@@ -33,11 +33,14 @@ class AnalyzeDistortionResult:
         The pricing distortion this row pertains to.
     pricing_df : pandas.DataFrame
         Per-line pricing readout at the chosen asset level, indexed by
-        line (units + ``'total'``), columns ``['L', 'LR', 'M', 'P', 'PQ',
-        'Q', 'ROE']``. Lifted from :meth:`Portfolio.pricing_at`.
+        line (units + ``'total'``); columns are the canonical pentagon octet
+        ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']`` (see
+        :data:`aggregate.pentagon.PENTAGON_STATS`). Lifted from
+        :meth:`Portfolio.pricing_at`.
     audit_df : pandas.DataFrame
-        Calibration audit values (``a``, ``LR``, ``ROE``, ``L``, ``P``,
-        ``Q``, ``dname``, ``dshape``) at the total level.
+        One-row total-level audit: descriptor columns ``dname``, ``dshape``
+        first, then the canonical pentagon octet as the trailing eight columns
+        (so ``audit_df.iloc[:, -8:]`` is the octet).
     """
 
     distortion: 'Distortion'
@@ -55,8 +58,10 @@ class AnalyzeDistortionsResult:
         The distortions analysed, keyed by name.
     pricing_df : pandas.DataFrame
         Concatenated per-distortion exhibit, MultiIndex
-        ``(distortion, stat)`` on rows, line names on columns. ``stat``
-        runs over ``['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE', 'a']``.
+        ``(distortion, stat)`` on rows, line names on columns. ``stat`` is an
+        ordered categorical over the canonical pentagon octet
+        ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``
+        (:data:`aggregate.pentagon.PENTAGON_STATS`).
     augmented_dfs : dict[str, pandas.DataFrame]
         Snapshot of the Portfolio's augmented_df cache at the time of
         the call -- the per-distortion DataFrames the pricing was read
@@ -76,8 +81,10 @@ class PricingResult:
     ----------
     df : pandas.DataFrame
         Per-(distortion, line) pricing readout. MultiIndex
-        ``(distortion, unit)`` on rows; columns include ``L``, ``P``,
-        ``M``, ``Q``, ``a``, ``LR``, ``PQ``, ``COC``.
+        ``(distortion, unit)`` on rows; columns are the canonical pentagon
+        octet ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``
+        (:data:`aggregate.pentagon.PENTAGON_STATS`). ``M/Q`` is named ``ROE``
+        (cost of capital, ``CoC``, is the synonym).
     price : float
         Total premium for the last distortion applied (back-compat with
         the legacy single-distortion case).

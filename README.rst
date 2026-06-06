@@ -28,6 +28,39 @@ Version History
 
 .. Conda Forge: https://github.com/conda-forge/aggregate-feedstock https://anaconda.org/conda-forge/aggregate/files
 
+1.0.0a31
+---------
+
+One canonical pricing readout (the "pentagon")
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every pricing method emits the same eight accounting quantities — the amounts
+``L`` (loss), ``M`` (margin), ``P`` (premium ``= L + M``), ``Q`` (capital),
+``a`` (assets ``= P + Q``) and the ratios ``LR = L/P``, ``PQ = P/Q``,
+``ROE = M/Q``. These used to be built independently by each method, disagreeing
+on naming, order, completeness and dtype. They are now a single canonical
+contract owned by ``aggregate.pentagon``:
+
+- **One name, one order.** ``M/Q`` is always ``ROE`` (with ``CoC`` documented as
+  the synonym); the canonical order is ``[L, M, P, Q, a, LR, PQ, ROE]``
+  (``pentagon.PENTAGON_STATS`` / ``PENTAGON_DTYPE``). ``Portfolio.pricing_at``,
+  ``price``, ``price_ccoc``, ``analyze_distortion``, ``analyze_distortions`` and
+  ``Aggregate.price`` all route through one ``complete_pentagon`` helper, so the
+  derivation ``a = P + Q; LR = L/P; …`` lives in exactly one place.
+- **Consistent orientation.** Stats are always columns, one row per priced
+  entity; any descriptor columns lead and the pentagon octet is the trailing
+  eight (``df.iloc[:, -8:]``).
+- **``analyze_distortion`` audit fixed.** Its ``audit_df`` is now a one-row frame
+  in that shape — ``dname``/``dshape`` lead, the full octet trails. *(Shape
+  change: previously a column-oriented frame that omitted ``PQ`` and mixed the
+  metadata into the stat index.)* ``price_ccoc`` now emits ``ROE`` instead of
+  ``COC``.
+- **Pentagon objects (additive).** New ``Portfolio.pentagon_at(distortion,
+  p|a, line)`` returns a single-row ``Pentagon`` — an eight-vector with named
+  attributes and provenance that completes any soluble partial input via
+  ``Pentagon.solve`` (e.g. give it ``P``, ``L`` and ``a`` or ``Q``, get the
+  rest). No existing method changed its return type.
+
 1.0.0a30
 ---------
 

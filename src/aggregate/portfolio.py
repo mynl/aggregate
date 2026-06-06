@@ -31,6 +31,8 @@ from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
 from .spectral import Distortion, DISTORTION_DTYPE
 from . import tail as _tail
 from .tail import TailClass
+from .pentagon import (PENTAGON_STATS, PENTAGON_DTYPE, complete_pentagon,
+                       Pentagon)
 from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from .iman_conover import iman_conover
@@ -145,13 +147,11 @@ def make_comonotonic_allocations_work(s_grid: np.ndarray, pdf_s: np.ndarray, kap
 make_comonotonic_allocations = make_comonotonic_allocations_work
 
 
-# Canonical column order for pricing exhibits. Used as a pandas
-# ``CategoricalDtype`` so ``pricing_at`` results sort consistently.
-# Pentagon order ``L M P Q a | LR PQ ROE``: amounts first (L=loss,
-# M=margin, P=premium=L+M, Q=equity, a=assets=P+Q), then ratios
-# (LR=L/P, PQ=P/Q, ROE=M/Q). Matches ``pentagon.py``.
-PRICING_STAT_ORDER = ['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
-PRICING_STAT_DTYPE = pd.CategoricalDtype(categories=PRICING_STAT_ORDER, ordered=True)
+# Canonical column order/dtype for pricing exhibits — the single source of
+# truth lives in ``pentagon.py`` (the accounting authority). These module-level
+# aliases preserve the historical names used throughout this file.
+PRICING_STAT_ORDER = PENTAGON_STATS
+PRICING_STAT_DTYPE = PENTAGON_DTYPE
 
 
 # Canonical row MultiIndex for ``Portfolio.stats_df``. Parallels
@@ -2850,7 +2850,7 @@ class Portfolio(object):
         lines = list(self.line_names_ex)
         out = pd.DataFrame(
             index=lines,
-            columns=PRICING_STAT_ORDER,
+            columns=['L', 'M', 'P', 'Q'],
             dtype=float,
         )
         out.index.name = 'line'
@@ -2862,13 +2862,68 @@ class Portfolio(object):
         # exact total Q = a - exag_total beats the layer-by-layer cumsum,
         # which can drift by a few buckets in the tail.
         out.loc['total', 'Q'] = a - row['exag_total']
-        out['a'] = out['P'] + out['Q']
-        out['LR'] = out['L'] / out['P']
-        out['PQ'] = out['P'] / out['Q']
-        out['ROE'] = out['M'] / out['Q']
-        out.columns = pd.CategoricalIndex(
-            out.columns, dtype=PRICING_STAT_DTYPE, name='stat')
+        # fill a + ratios and stamp the canonical categorical (pentagon.py)
+        out = complete_pentagon(out)
         return out
+
+    def pentagon_at(self, distortion, *, p=None, a=None, line='total'):
+        """Single-line pentagon as a :class:`~aggregate.pentagon.Pentagon` object.
+
+        The object-flavored analogue of :meth:`pricing_at`: returns one fully
+        solved :class:`Pentagon` (an eight-vector with named attributes and
+        provenance) for ``line`` at probability ``p`` or asset level ``a``,
+        rather than a DataFrame of all lines. The natural entry point for the
+        "complete a partial input" workflow — the returned object carries the
+        accounting identities and can be re-solved.
+
+        Parameters
+        ----------
+        distortion : Distortion or str
+            Passed through to :meth:`apply_distortion`.
+        p : float, optional
+            Probability; converted to asset level via ``self.q(p)``. Exactly
+            one of ``p`` or ``a`` must be provided.
+        a : float, optional
+            Asset level; snapped to the index.
+        line : str, default 'total'
+            Which unit to read (``'total'`` for the portfolio total).
+
+        Returns
+        -------
+        Pentagon
+            Fully solved, with ``.distortion`` / ``.shape`` provenance attached.
+
+        Notes
+        -----
+        Reads the same augmented-distortion row as :meth:`pricing_at`; the
+        total ``Q`` uses the exact ``a - exag_total`` (matching ``pricing_at``),
+        so the two agree.
+        """
+        if (p is None) == (a is None):
+            raise ValueError(
+                'pentagon_at requires exactly one of p= (probability) '
+                'or a= (asset level).')
+        if isinstance(distortion, str):
+            distortion = self.distortions[distortion]
+        if a is None:
+            a = self.q(p)
+        else:
+            a = self.snap(a)
+        aug = self.apply_distortion(distortion)
+        row = aug.loc[a] if a in aug.index else aug.iloc[-1]
+        peg = Pentagon(obj=self)
+        L = row[f'exa_{line}']
+        P = row[f'exag_{line}']
+        if line == 'total':
+            # exact total Q, matching pricing_at
+            Q = a - row['exag_total']
+        else:
+            Q = row[f'T.Q_{line}']
+        # L, P, Q are the three independent amounts; M = P - L, a = P + Q follow.
+        peg.solve(L=L, P=P, Q=Q)
+        peg.distortion = distortion
+        peg.shape = getattr(distortion, 'shape', None)
+        return peg
 
     def _build_augmented(self, dist, *, view='ask', S_calculation='forwards', efficient=True):
         """Construct an augmented_df from ``self.density_df`` under ``dist``.
@@ -3144,11 +3199,7 @@ class Portfolio(object):
                     df.loc[line, 'P'] = aug_row[f'exag_{line}']
                     df.loc[line, 'M'] = aug_row[f'T.M_{line}']
                     df.loc[line, 'Q'] = aug_row[f'T.Q_{line}']
-                df['a'] = df.P + df.Q
-                df['LR'] = df.L / df.P
-                df['PQ'] = df.P / df.Q
-                df['ROE'] = df.M / df.Q
-                df = df[PRICING_STAT_ORDER]
+                df = complete_pentagon(df)
                 price[k] = last_price = df.loc['total', 'P']
                 dfs[k] = df.sort_index()
 
@@ -3225,12 +3276,8 @@ class Portfolio(object):
                     axis=1, keys=['L', 'P', 'Q']
                 ).rename(index=lambda x: x.replace('exeqa_', '')).sort_index()
                 df['M'] = df.P - df.L
-                df['a'] = df.P + df.Q
-                df['LR'] = df.L / df.P
-                df['PQ'] = df.P / df.Q
-                df['ROE'] = df.M / df.Q
+                df = complete_pentagon(df)
                 price[k] = last_price = df.loc['total', 'P']
-                df = df[PRICING_STAT_ORDER]
                 dfs[k] = df
 
             df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
@@ -3241,19 +3288,18 @@ class Portfolio(object):
     def price_ccoc(self, p, ccoc):
         """
         Convenience function to price with a constant cost of captial equal ``ccoc``
-        at VaR level ``p``. Does not invoke a Distortion. Returns standard DataFrame
-        format.
+        at VaR level ``p``. Does not invoke a Distortion. Returns the standard
+        canonical pentagon DataFrame (one ``'total'`` row, columns
+        :data:`~aggregate.pentagon.PENTAGON_STATS`).
 
         """
         a = self.q(p)
         el = self.density_df.loc[a, 'exa_total']
-        p = (el + ccoc * a) / (1 + ccoc)
-        q = a - p
-        m = p - el
-        df = pd.DataFrame([[el, p, p - el, a - p, a, el / p, p / q, m / q]],
-                          columns=['L', 'P', "M", 'Q', 'a', 'LR', 'PQ', 'COC'],
-                          index=['total'])
-        return df
+        prem = (el + ccoc * a) / (1 + ccoc)
+        df = pd.DataFrame([[el, prem - el, prem, a - prem]],
+                          columns=['L', 'M', 'P', 'Q'],
+                          index=pd.Index(['total'], name='line'))
+        return complete_pentagon(df)
 
     def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """
@@ -3277,8 +3323,9 @@ class Portfolio(object):
         -------
         AnalyzeDistortionResult
             Holds the per-line pricing DataFrame (from :meth:`pricing_at`)
-            and a small audit DataFrame with the total-level calibration
-            quantities (a, L, P, M, Q, LR, ROE, dname, dshape).
+            and a one-row ``audit_df`` for the total: descriptor columns
+            ``dname``, ``dshape`` first, then the canonical pentagon octet
+            (:data:`~aggregate.pentagon.PENTAGON_STATS`) as the trailing eight.
         """
         if (p is None) == (a is None):
             raise ValueError(
@@ -3291,17 +3338,17 @@ class Portfolio(object):
         else:
             a_cal = self.snap(a)
         pricing_df = self.pricing_at(distortion, a=a_cal)
-        L = pricing_df.loc['total', 'L']
-        P = pricing_df.loc['total', 'P']
-        M = pricing_df.loc['total', 'M']
-        Q = pricing_df.loc['total', 'Q']
+        # one-row audit, same orientation as every other readout: descriptors
+        # (dname/dshape) lead, the pentagon octet is the trailing [-8:].
         audit_df = pd.DataFrame(
-            {'value': [a_cal, L, P, M, Q,
-                       pricing_df.loc['total', 'LR'],
-                       pricing_df.loc['total', 'ROE'],
-                       distortion.name, distortion.shape]},
-            index=['a', 'L', 'P', 'M', 'Q', 'LR', 'ROE', 'dname', 'dshape'],
+            {'dname': distortion.name, 'dshape': distortion.shape,
+             'L': pricing_df.loc['total', 'L'],
+             'M': pricing_df.loc['total', 'M'],
+             'P': pricing_df.loc['total', 'P'],
+             'Q': pricing_df.loc['total', 'Q']},
+            index=pd.Index(['total'], name='line'),
         )
+        audit_df = complete_pentagon(audit_df)
         return AnalyzeDistortionResult(
             distortion=distortion,
             pricing_df=pricing_df,
@@ -3355,25 +3402,29 @@ class Portfolio(object):
             a_cal = self.snap(a)
         per_dist = {}
         for name, d in distortions.items():
-            # rows: line, cols: [L, LR, M, P, PQ, Q, ROE] -> transpose so
-            # stats are rows and lines are columns. The transpose drops the
-            # categorical column dtype, so we work in plain string indices
-            # here and reapply the canonical ordering after concat.
+            # pricing_at returns lines × canonical pentagon columns; transpose
+            # so stats are rows and lines are columns. The transpose drops the
+            # categorical column dtype, so work in plain string labels here and
+            # reapply the canonical stat order/dtype after concat.
             exhibit = self.pricing_at(d, a=a_cal).T
             exhibit.index = exhibit.index.astype(str)
             # 'a' row: P + Q per line, rescaled so totals sum to a_cal.
             a_row = exhibit.loc['P'] + exhibit.loc['Q']
             a_row = a_row * a_cal / a_row['total']
             exhibit.loc['a'] = a_row
-            per_dist[name] = exhibit
+            # canonical stat order (pentagon.py), trailing octet semantics
+            per_dist[name] = exhibit.reindex(PENTAGON_STATS)
         pricing_df = pd.concat(
             per_dist.values(),
             keys=per_dist.keys(),
             names=['distortion', 'stat'],
         )
-        # bake the canonical distortion order into level 0 of the index
+        # bake the canonical distortion order into level 0 and the canonical
+        # stat order/dtype into level 1 of the index (survives the transpose).
         pricing_df.index = pricing_df.index.set_levels(
             pricing_df.index.levels[0].astype(DISTORTION_DTYPE), level='distortion')
+        pricing_df.index = pricing_df.index.set_levels(
+            pricing_df.index.levels[1].astype(PENTAGON_DTYPE), level='stat')
         # snapshot only the distortions analysed
         augmented_dfs = {
             n: self._augmented_dfs[n] for n in distortions if n in self._augmented_dfs

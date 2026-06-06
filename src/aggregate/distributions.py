@@ -45,6 +45,7 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation)
 import aggregate.random_agg as ar
 from .spectral import Distortion
+from .pentagon import complete_pentagon
 from . import tail as _tail
 # Re-export the bounded tables for back-compat; tail.py is the source of truth.
 # (Unused here, but tests/external code import them via this module -- see
@@ -6579,22 +6580,17 @@ class Aggregate:
         self.apply_distortion(g)
         aug_row = self.density_df.loc[a_reg]
 
-        # holder for the answer
-        df = pd.DataFrame(columns=['line', 'L', 'P', 'M', 'Q'], dtype=float)
-        df.columns.name = 'statistic'
-        df = df.set_index('line', drop=True)
-
         el = aug_row['exa']
         P = aug_row['exag']
         M = P - el
         Q = a_reg - P
 
-        df.loc[self.name, :] = [el, P, M, Q]
-        df['a'] = a_reg
-        df['LR'] = df.L / df.P
-        df['PQ'] = df.P / df.Q
-        df['ROE'] = df.M / df.Q
-        return df
+        # one-row canonical pentagon (pentagon.py owns the identities + order)
+        df = pd.DataFrame(
+            [[el, M, P, Q]], columns=['L', 'M', 'P', 'Q'],
+            index=pd.Index([self.name], name='line'),
+        )
+        return complete_pentagon(df)
 
 
 

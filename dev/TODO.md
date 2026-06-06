@@ -48,7 +48,7 @@ alongside. **Start at `N1`.**
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
 |    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
 |    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
-|    | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
+| ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
 |    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
 |    | F5 | DecL `of` synonym | B | — | — |
 |    | F6 | Gross/ceded-premium reinsurance P&L | B | — | — |
@@ -156,8 +156,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   (Grübel–Hermesmeier aliasing reduction) was removed in `6de20f2`, breaking the
   doc example. Replace it with a hands-on illustration of the mechanics;
   consider exposing it as a small `Aggregate` method.
-- [ ] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — consistent `a = P + Q`
-  Pentagon output; ?better Pentagon integration / output *to* Pentagon.
+- [x] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — **done v1.0.0a31**
+  (`dev/done/plan-pentagon.md`). Canonical `pentagon.py` contract
+  (`PENTAGON_STATS`/`complete_pentagon`); all emitters routed through it;
+  `analyze_distortion` audit fixed; additive `Portfolio.pentagon_at` →
+  `Pentagon` object output.
 - [ ] **F4 `[A]` Gross → Subject in `describe`** (#46) — relabel the first
   describe column to *Subject* for agg-only covers (no occ reins). Uses the
   `REINS_LABEL_*` constants.

@@ -12,6 +12,14 @@
 
 ---
 
+## Items ported over from readme - need categorizing and adding
+
+- Treatment of zero lb is not consistent with attachment equals zero.
+- Flag attempts to use fixed frequency with non-integer expected value.
+- Flag attempts to use mixing with inconsistent frequency distribution.
+
+---
+
 ## Track codes (alphabetical)
 
 | Code | Track |

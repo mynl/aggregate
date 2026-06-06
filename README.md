@@ -1,5 +1,5 @@
- [![Latest Version](https://img.shields.io/github/commit-activity/m/mynl/aggregate)](https://github.com/mynl/aggregate) [![Documentation Status](https://readthedocs.org/projects/aggregate/badge/?version=latest)](https://aggregate.readthedocs.io/en/latest/) [![Latest version](https://img.shields.io/pypi/v/aggregate.svg?label=pypi)](https://pypi.org/project/aggregate)  
- ![Supported Python versions](https://img.shields.io/pypi/pyversions/aggregate.svg) [![Downloads](https://img.shields.io/pypi/dm/aggregate.svg)](https://pepy.tech/project/aggregate) [![Github stars](https://img.shields.io/github/stars/mynl/aggregate.svg)](https://github.com/mynl/aggregate/stargazers) [![Github forks](https://img.shields.io/github/forks/mynl/aggregate.svg)](https://github.com/mynl/aggregate/network/members)  
+ [![Latest Version](https://img.shields.io/github/commit-activity/m/mynl/aggregate)](https://github.com/mynl/aggregate) [![Documentation Status](https://readthedocs.org/projects/aggregate/badge/?version=latest)](https://aggregate.readthedocs.io/en/latest/) [![Latest version](https://img.shields.io/pypi/v/aggregate.svg?label=pypi)](https://pypi.org/project/aggregate)
+ ![Supported Python versions](https://img.shields.io/pypi/pyversions/aggregate.svg) [![Downloads](https://img.shields.io/pypi/dm/aggregate.svg)](https://pepy.tech/project/aggregate) [![Github stars](https://img.shields.io/github/stars/mynl/aggregate.svg)](https://github.com/mynl/aggregate/stargazers) [![Github forks](https://img.shields.io/github/forks/mynl/aggregate.svg)](https://github.com/mynl/aggregate/network/members)
  [![License](https://img.shields.io/pypi/l/aggregate.svg)](https://github.com/mynl/aggregate/blob/master/LICENSE) [![Binary packages](https://repology.org/badge/tiny-repos/python:aggregate.svg)](https://repology.org/metapackage/python:aggregate/versions) [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10557199.svg)](https://zenodo.org/records/10557199)
 
 ------------------------------------------------------------------------
@@ -34,32 +34,45 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ## Installation
 
-To install into a new `Python>=3.10` virtual environment:
+`aggregate` requires Python 3.11 or later. The strongly recommended way to
+install and manage it is with [uv](https://docs.astral.sh/uv/), Astral's fast
+Python package and project manager — follow the
+[uv installation guide](https://docs.astral.sh/uv/getting-started/installation/)
+to get it.
 
-    python -m venv path/to/your/venv``
-    cd path/to/your/venv
+Once uv is installed, add `aggregate` to a uv-managed project:
 
-followed by:
+```bash
+uv init myproject      # or cd into an existing uv project
+cd myproject
+uv add aggregate       # resolves, locks, and installs into .venv
+```
 
-    \path\to\env\Scripts\activate
+`uv add` records the dependency in your `pyproject.toml` and syncs the project
+environment; from then on `uv sync` recreates that exact, locked environment on
+any machine. To also pull the optional documentation and test tooling, request
+the `dev` extra:
 
-on Windows, or:
+```bash
+uv add "aggregate[dev]"
+```
 
-    source /path/to/env/bin/activate
+Run anything inside the managed environment with `uv run`, for example
+`uv run python` or `uv run jupyter lab`. All the code examples have been tested
+in such an environment and the documentation builds in it.
 
-on Linux/Unix or MacOS. Finally, install the package:
+If you already have an environment and simply want the package dropped into it,
+install it directly — with uv:
 
-    pip install aggregate[dev]
+```bash
+uv pip install aggregate
+```
 
-All the code examples have been tested in such a virtual environment and the documentation will build.
+or with plain pip:
 
-To build the documentation run
-
-## Issues and Todo
-
-- Treatment of zero lb is not consistent with attachment equals zero.
-- Flag attempts to use fixed frequency with non-integer expected value.
-- Flag attempts to use mixing with inconsistent frequency distribution.
+```bash
+pip install aggregate
+```
 
 ## Getting started
 
@@ -71,11 +84,12 @@ Here is a model of the sum of three dice rolls. The DataFrame `describe` compare
     a = build('agg Dice dfreq [3] dsev [1:6]')
     qd(a)
 
-\>\>\> E\[X\] Est E\[X\] Err E\[X\] CV(X) Est CV(X) Err CV(X) Skew(X) Est Skew(X)
+\>\>\>        EX Est EX     Err EX      CV  Est CV Sk Est Sk
 \>\>\> X
-\>\>\> Freq 3 0
-\>\>\> Sev 3.5 3.5 0 0.48795 0.48795 -3.3307e-16 0 2.8529e-15
-\>\>\> Agg 10.5 10.5 -3.3307e-16 0.28172 0.28172 -8.6597e-15 0 -1.5813e-13
+\>\>\> Freq    3                         0
+\>\>\> Sev   3.5    3.5          0 0.48795 0.48795  0      0
+\>\>\> Agg  10.5   10.5 2.2204e-16 0.28172 0.28172  0      0
+\>\>\> log2 = 5, bandwidth = 1, validation: not unreasonable.
 
     print(f'\nProbability sum < 12 = {a.cdf(12):.3f}\nMedian = {a.q(0.5):.0f}')
 
@@ -89,17 +103,18 @@ severity, mean 50 and cv 2.
     a = build('agg Example 10 claims sev lognorm 50 cv 2 poisson')
     qd(a)
 
-\>\>\> E\[X\] Est E\[X\] Err E\[X\] CV(X) Est CV(X) Err CV(X) Skew(X) Est Skew(X)
+\>\>\>       EX Est EX     Err EX      CV  Est CV      Sk Est Sk
 \>\>\> X
-\>\>\> Freq 10 0.31623 0.31623
-\>\>\> Sev 50 49.888 -0.0022464 2 1.9314 -0.034314 14 9.1099
-\>\>\> Agg 500 498.27 -0.0034695 0.70711 0.68235 -0.035007 3.5355 2.2421
+\>\>\> Freq  10                   0.31623         0.31623
+\>\>\> Sev   50     50 8.8689e-06       2       2      14 13.981
+\>\>\> Agg  500    500 8.8689e-06 0.70711 0.70711  3.5355 3.5312
+\>\>\> log2 = 16, bandwidth = 2, validation: not unreasonable.
 
     # cdf and quantiles
-    print(f'Pr(X<=500)={a.cdf(500):.3f}\n0.99 quantile={a.q(0.99)}')
 
-\>\>\> Pr(X\<=500)=0.611
-\>\>\> 0.99 quantile=1727.125
+
+\>\>\> Pr(X\<=500)=0.612
+\>\>\> 0.99 quantile=1736.0
 
 See the documentation for more examples.
 

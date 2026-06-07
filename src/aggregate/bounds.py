@@ -623,6 +623,15 @@ class AllocationBounds:
     ----------
     port : Portfolio
         Must be updated (``density_df`` with ``exeqa_*`` columns available).
+    a : float, default ``np.inf``
+        Asset cap.  Finite ``a`` bounds the total at ``X ∧ a``: grid rows
+        below ``a`` are kept as-is and all default states ``X >= a``
+        collapse into a single atom at ``a`` carrying the *linear* natural
+        allocation ``a · E[X_i/X | X >= a]`` (equal-priority proportional
+        sharing; the lifted allocation is not offered).  Built by
+        :meth:`Portfolio._collapsed_exeqa`, the same construction used by
+        ``Portfolio.price(allocation='linear')``.  ``a`` is snapped to the
+        loss grid.  Default ``np.inf`` is the unbounded total.
     units : list of str, optional
         Unit (line) names to include.  Default: all of ``port.line_names``.
     s_floor : float, default 1e-14
@@ -631,7 +640,8 @@ class AllocationBounds:
         (and ``add_exa`` zeroes ``exeqa`` below its own cut), so conditional
         expectations there are unreliable.  Truncation shrinks the feasible
         premium range upper end from ``ess sup X`` to ``T(1 - s_floor)``;
-        set ``s_floor=0`` to keep everything.
+        set ``s_floor=0`` to keep everything.  Mostly moot when bounded:
+        the collapsed default atom has macroscopic mass.
 
     Attributes
     ----------
@@ -692,8 +702,17 @@ class AllocationBounds:
     so each envelope is one monotone-chain pass, O(n).
 
     All computations use the *linear* natural allocation
-    ``sum_x kappa_i(x) Delta g(S(x))``; the total is unbounded (no asset
-    cap).
+    ``sum_x kappa_i(x) Delta g(S(x))``.
+
+    **Bounded totals.**  With finite ``a`` the input triple describes
+    ``X ∧ a`` and the unit payouts ``X_i 1_{X<a} + a (X_i/X) 1_{X>=a}``;
+    since ``sum_i X_i/X = 1`` the collapsed allocations sum to ``a`` by
+    construction.  ``X ∧ a`` is just another discrete rv with its own
+    kappa decomposition, so the exactness argument and all machinery apply
+    verbatim; :attr:`premium_range` becomes ``[E[X ∧ a], a]`` and the
+    range collapses to the default-state allocations at ``P = a``.  The
+    p = 0 vertex equals ``(exa_total(a), exa_i(a))`` from ``density_df``
+    (the PIR ``alpha S`` integral) — an independent cross-check.
 
     Examples
     --------
@@ -701,6 +720,7 @@ class AllocationBounds:
 
         from aggregate.bounds import AllocationBounds
         ab = AllocationBounds(port)        # build once: vertices + hulls
+        ab = port.allocation_bounds(p=0.995)   # bounded at assets q(0.995)
         ab.curve_df                        # the (p, T(p), a_i(p)) vertex table
         ab.bounds([1200, 1300])            # tidy (P, unit) lower/upper frame
         ab.bitvars(1200)                   # achieving biTVaRs (p0, p1, w1)
@@ -710,9 +730,10 @@ class AllocationBounds:
         ab.plot(P=1200)                    # curves, hulls, slice
     """
 
-    def __init__(self, port, units=None, s_floor=1e-14):
+    def __init__(self, port, *, a=np.inf, units=None, s_floor=1e-14):
         self.port = port
         self.s_floor = float(s_floor)
+        self.a = float(a)
 
         if units is None:
             units = list(port.line_names)
@@ -729,12 +750,25 @@ class AllocationBounds:
         # ------------------------------------------------------------------
         # Extract the discrete distribution: outcomes x, masses prob, and the
         # conditional allocations kappa_i(x) = E[X_i | X = x] = exeqa_i.
+        # Bounded (finite a): X ∧ a with the default states X >= a collapsed
+        # into one atom at a carrying the linear-NA allocations
+        # a·E[X_i/X | X >= a] — built by Portfolio._collapsed_exeqa, the
+        # same construction price(allocation='linear') uses.
         # ------------------------------------------------------------------
-        x = df.index.to_numpy(dtype=float)
-        prob = df['p_total'].to_numpy(dtype=float)
-        # kappa matrix: first column is the total (kappa_total(x) = x), so the
-        # total's "allocation" IS TVaR and row sums give a built-in audit.
-        kappa = np.column_stack([x, df[kcols].to_numpy(dtype=float)])
+        if np.isfinite(self.a):
+            self.a = float(port.snap(self.a))
+            S_df, _, exeqa_df, ps = port._collapsed_exeqa(self.a)
+            x = S_df.index.to_numpy(dtype=float)
+            prob = ps.to_numpy(dtype=float).ravel()
+            unit_kappa = exeqa_df[kcols].to_numpy(dtype=float)
+        else:
+            x = df.index.to_numpy(dtype=float)
+            prob = df['p_total'].to_numpy(dtype=float)
+            unit_kappa = df[kcols].to_numpy(dtype=float)
+        # kappa matrix: first column is the total (kappa_total(x) = x — and
+        # exactly a at the collapsed atom), so the total's "allocation" IS
+        # TVaR and row sums give a built-in audit.
+        kappa = np.column_stack([x, unit_kappa])
 
         # FFT densities carry tiny negative noise; tolerate at machine scale
         # only (tight threshold by project convention), error on real mass.
@@ -820,7 +854,8 @@ class AllocationBounds:
 
     def __repr__(self):
         lo, hi = self.premium_range
-        return (f'AllocationBounds({self.port.name!r}, units={self.units}, '
+        cap = f'a={self.a:.6g}, ' if np.isfinite(self.a) else ''
+        return (f'AllocationBounds({self.port.name!r}, {cap}units={self.units}, '
                 f'{len(self._T)} vertices, premium range [{lo:.6g}, {hi:.6g}], '
                 f'additivity error {self.additivity_error:.3g})')
 

@@ -621,24 +621,37 @@ class Portfolio(object):
         bit[('', 'difference')] = bit[('independent', 'p_total')] - bit[('sample', 'p_total')]
         return bit
 
-    def allocation_bounds(self, units=None, s_floor=1e-14):
+    def allocation_bounds(self, *, a=0, p=0, units=None, s_floor=1e-14):
         """
         Natural-allocation premium ranges by unit, as a function of the
         total premium.
 
         Constructs an :class:`~aggregate.bounds.AllocationBounds` object:
-        for any total premium P (within the feasible range
-        ``[E[X], max TVaR]``) it returns the lower/upper bound on each
-        unit's natural allocation over all distortions pricing the total to
-        P, together with the achieving biTVaR distortions. Construction is
-        P-independent (exact convex hulls of the ``(TVaR_p, a_i(p))``
-        curves); evaluating at a premium is a cheap slice.
+        for any total premium P within the feasible range it returns the
+        lower/upper bound on each unit's natural allocation over all
+        distortions pricing the total to P, together with the achieving
+        biTVaR distortions. Construction is P-independent (exact convex
+        hulls of the ``(TVaR_p, a_i(p))`` curves); evaluating at a premium
+        is a cheap slice.
+
+        With assets specified (``a`` or ``p``) the total is bounded at
+        ``X ∧ a``: default states ``X >= a`` collapse to a single atom
+        carrying the *linear* natural allocation ``a · E[X_i/X | X >= a]``
+        (built by :meth:`_collapsed_exeqa`, shared with
+        ``price(allocation='linear')``); the feasible premium range becomes
+        ``[E[X ∧ a], a]``. With neither given the total is unbounded.
 
         Replaces the pre-1.0 ``pricing_bounds`` method (removed at
-        1.0.0a36); the total is unbounded — no asset-cap argument yet.
+        1.0.0a36).
 
         Parameters
         ----------
+        a : float, default 0
+            Asset level, snapped to the loss grid. ``0`` means
+            unspecified.
+        p : float, default 0
+            Probability level: resolves ``a = q(p)`` when ``a`` is
+            unspecified. Both zero gives the unbounded total.
         units : list of str, optional
             Unit names to include. Default: all of ``line_names``.
         s_floor : float, default 1e-14
@@ -650,12 +663,18 @@ class Portfolio(object):
         AllocationBounds
             Call it (or its ``bounds`` method) with one or more premiums::
 
-                ab = port.allocation_bounds()
+                ab = port.allocation_bounds(p=0.995)
                 ab.bounds([1200, 1300])    # (P, unit) -> lower/upper/width
                 ab.bitvars(1200)           # achieving (p0, p1, w1)
         """
         from .bounds import AllocationBounds
-        return AllocationBounds(self, units=units, s_floor=s_floor)
+        if a == 0 and p == 0:
+            a = np.inf
+        elif a == 0:
+            a = self.q(p)
+        else:
+            a = self.snap(a)
+        return AllocationBounds(self, a=a, units=units, s_floor=s_floor)
 
     @property
     def distortion(self):
@@ -3050,6 +3069,73 @@ class Portfolio(object):
             d = {k: self.snap(v) for k, v in d.items()}
         return d
 
+    def _collapsed_exeqa(self, a, *, collapse=None):
+        """Tail-collapsed slice of ``density_df`` for linear-NA work at assets ``a``.
+
+        The bounded total ``X ∧ a`` keeps the grid rows ``loss < a``
+        unchanged and collapses all default states ``X >= a`` into a single
+        atom at ``a``. Under the *linear* natural allocation
+        (equal-priority proportional sharing in default: unit i receives
+        ``a · X_i / X``), the conditional allocation at the collapsed atom
+        is
+
+            ``exeqa_i(a) = a · E[X_i / X | X >= a] = a · exi_xgta_i(a - bs)``
+
+        read from the precomputed ``exi_xgta_*`` columns. The atom's
+        probability is ``S(a - bs)``: the construction forces ``S(a) = 0``,
+        so the whole tail mass — including any PMF deficit — lands in the
+        last bucket. ``exeqa_total`` at the atom is filled from the sum of
+        parts (there is no ``exi_xgta_total``).
+
+        Single owner of this delicate collapse idiom, shared by
+        :meth:`price` (``allocation='linear'``) and
+        :class:`~aggregate.bounds.AllocationBounds`.
+
+        Parameters
+        ----------
+        a : float
+            Asset level; must lie on the loss grid (callers snap).
+        collapse : bool, optional
+            Force (``True``) or suppress (``False``) the exeqa tail
+            re-aiming. Default ``None`` collapses iff the tail mass
+            ``sf(a)`` exceeds the PMF deficit ``1 - sum(p_total)`` — i.e.,
+            there is real mass beyond ``a``, not just FFT leakage.
+
+        Returns
+        -------
+        S, loss, exeqa, ps : DataFrame
+            All indexed by loss on ``[0, a]``: survival (with ``S(a) = 0``
+            forced), loss levels, conditional allocations (tail-collapsed
+            last row), and the resulting probability masses.
+        """
+        sle = slice(0, a)
+        S = self.density_df.loc[sle, ['S']].copy()
+        loss = self.density_df.loc[sle, ['loss']]
+        # deal losses for allocations; not eta-mu versions
+        exeqa = self.density_df.filter(regex='exeqa_[^η]').loc[sle]
+
+        # last entry collapses all remaining losses from a-bs onwards
+        S.loc[a, 'S'] = 0.
+        ps = pd.DataFrame(-np.diff(S, prepend=1, axis=0), index=S.index)
+
+        # Tail-collapse on exeqa is distortion-independent: when
+        # sf(a) > 1 - sum(p_total) the tail-bucket carries the
+        # missing tail mass and exeqa at a has to be re-aimed at
+        # a * exi_xgta_{line}.
+        if collapse is None:
+            collapse = bool(self.sf(a) > (1 - self.density_df.p_total.sum()))
+        if collapse:
+            logger.info('Collapsing tail events by replacing exeqa with a * exi_xgta')
+            rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
+            exeqa.loc[a, :] = self.density_df.filter(
+                regex='exi_xgta_.+$(?<!exi_xgta_sum)'). \
+                rename(columns=rner).loc[a - self.bs] * a
+            # there is no exi_xgta_total — fill from the sum of parts
+            if np.isnan(exeqa.loc[a, 'exeqa_total']):
+                exeqa.loc[a, 'exeqa_total'] = exeqa.loc[a].fillna(0).sum()
+
+        return S, loss, exeqa, ps
+
     def price(self, p, distortion=None, *, allocation=None, view='ask', efficient=True):
         """Price the total under a distortion and allocate to units.
 
@@ -3150,32 +3236,12 @@ class Portfolio(object):
             ans = PricingResult(df, last_price, price, a_reg, reg_p)
 
         elif allocation == 'linear':
-            # code mirrored the (removed) legacy pricing_bounds method
-            # slice for extracting
-            # sle = slice(self.bs, a_reg)
-            sle = slice(0, a_reg)
-            S = self.density_df.loc[sle, ['S']].copy()
-            loss = self.density_df.loc[sle, ['loss']]
-            # deal losses for allocations; not eta-mu versions
-            exeqa = self.density_df.filter(regex='exeqa_[^η]').loc[sle]
-
-            # last entry collapses all remaining losses from a-bs onwards
-            S.loc[a_reg, 'S'] = 0.
-            ps = pd.DataFrame(-np.diff(S, prepend=1, axis=0), index=S.index)
-
-            # Tail-collapse on exeqa is distortion-independent: when
-            # sf(a_reg) > 1 - sum(p_total) the tail-bucket carries the
-            # missing tail mass and exeqa at a_reg has to be re-aimed at
-            # a * exi_xgta_{line}.
-            if self.sf(a_reg) > (1 - self.density_df.p_total.sum()) and p != 1:
-                logger.info('Collapsing tail events by replacing exeqa with a * exi_xgta')
-                rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
-                exeqa.loc[a_reg, :] = self.density_df.filter(
-                    regex='exi_xgta_.+$(?<!exi_xgta_sum)'). \
-                    rename(columns=rner).loc[a_reg - self.bs] * a_reg
-                # there is no exi_xgta_total — fill from the sum of parts
-                if np.isnan(exeqa.loc[a_reg, 'exeqa_total']):
-                    exeqa.loc[a_reg, 'exeqa_total'] = exeqa.loc[a_reg].fillna(0).sum()
+            # Tail-collapsed slice [0, a_reg] — S, loss levels, conditional
+            # allocations and masses. The delicate collapse construction
+            # lives in _collapsed_exeqa (shared with AllocationBounds);
+            # p == 1 suppresses the collapse (a_reg is the essential sup).
+            S, loss, exeqa, ps = self._collapsed_exeqa(
+                a_reg, collapse=None if p != 1 else False)
 
             # Distortion-independent expected-loss integral (αS) — hoist
             # so the per-distortion loop only redoes the distortion-

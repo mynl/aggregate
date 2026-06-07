@@ -15,11 +15,19 @@ an atom), so the hulls — built from conditional tail expectations via reverse
 cumsums — are exact, O(n) per unit, and **P-independent**: construct once,
 slice for any premium.
 
-- Entry point: **`Portfolio.allocation_bounds(units=None, s_floor=1e-14)`**
-  returns the `AllocationBounds` object; query with `bounds(P)`,
-  `bitvars(P)` (achieving `(p0, p1, w1)`), `p_star(P)` (exact TVaR
-  inversion), `distortion(P, unit, bound)`, `check(P)` (first-principles
-  repricing audit), `na_grid(p_grid)`, `plot(P=...)`.
+- Entry point: **`Portfolio.allocation_bounds(*, a=0, p=0, units=None,
+  s_floor=1e-14)`** returns the `AllocationBounds` object; query with
+  `bounds(P)`, `bitvars(P)` (achieving `(p0, p1, w1)`), `p_star(P)` (exact
+  TVaR inversion), `distortion(P, unit, bound)`, `check(P)`
+  (first-principles repricing audit), `na_grid(p_grid)`, `plot(P=...)`.
+- **Bounded totals** via `a=` (asset level, snapped to the grid) or `p=`
+  (resolves `a = q(p)`): prices `X ∧ a` with the default states `X >= a`
+  collapsed to one atom carrying the *linear* natural allocation
+  `a·E[X_i/X | X >= a]` (lifted NA not offered); feasible premium range
+  becomes `[E[X ∧ a], a]`. The delicate tail-collapse idiom was factored
+  out of `price(allocation='linear')` into a single owner,
+  **`Portfolio._collapsed_exeqa(a)`**, now shared by both callers —
+  `price` outputs verified byte-identical before/after the refactor.
 - The `bounds.py` module docstring now contrasts `Bounds` (IME 2022:
   distortion envelopes for the total, premium fixed at construction) with
   `AllocationBounds` (allocation ranges, premium at call time).
@@ -28,7 +36,7 @@ slice for any premium.
 
 **Removed:** the long-broken `Portfolio.pricing_bounds`
 (`NotImplementedError` since 1.0.0a11) and its `PricingBoundsResult`
-dataclass. Asset-cap support is deferred (tracked in `dev/TODO.md`).
+dataclass.
 
 ## 1.0.0a35
 

@@ -113,9 +113,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) — **done
   1.0.0a36** as `Portfolio.allocation_bounds` / `bounds.AllocationBounds`
   (`dev/done/plan-allocation-bounds.md`): exact convex-hull slicing of the
-  `(TVaR_p, a_i(p))` curve, no `s_grid` interpolation needed. Deferred
-  follow-up: **asset-cap `a` support** (interacts with linear-vs-lifted NA
-  at default; linear NA preferred, refuse lifted on unbounded+mass).
+  `(TVaR_p, a_i(p))` curve, no `s_grid` interpolation needed. Bounded
+  totals (`a=` / `p=`, linear NA, tail collapse) landed in the same
+  release; the collapse idiom was factored into
+  `Portfolio._collapsed_exeqa`, shared with `price(allocation='linear')`.
 - [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
   published *Aggregate* paper; make docs match the actual algo; finish "all
   switches → config" (`eps`/`noise` already moved in a30); fix the false-positive

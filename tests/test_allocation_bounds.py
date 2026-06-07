@@ -45,6 +45,32 @@ At P = 7:
 
 p_star(7): 7 lies between T_1 = 20/3 and T_2 = 9, atom at x = 2:
     1 - p* = S_2 (T_2 - 2)/(P - 2) = 0.5 * 7/5 = 0.7,  p* = 0.3.
+
+Bounded at assets a = 9 (linear natural allocation)
+---------------------------------------------------
+
+Default states X >= 9 = {10} collapse to a single atom at 9 with mass .25
+and conditional allocations 9 * (8/10, 2/10) = (7.2, 1.8) (sum = 9).
+Vertices:
+
+    m  p     T = E[X^9|X^9>=x_m]   a_A       a_B
+    0  0     4.75                  3.8       0.95
+    1  .25   19/3                  76/15     19/15
+    2  .5    8.5                   7.6       0.9
+    3  .75   9                     7.2       1.8
+
+Hulls for A: lower = chord (4.75,3.8)-(9,7.2), slope 0.8 (vertices 1, 2
+above it; vertex 1 exactly collinear); upper = (4.75,3.8), (8.5,7.6),
+(9,7.2).  For B: lower = (4.75,.95), (8.5,.9), (9,1.8); upper = chord
+(4.75,.95)-(9,1.8), slope 0.2 (vertex 1 exactly collinear).  At P = 7:
+
+    lower A = 3.8 + 0.8(7-4.75)        = 5.6
+    upper A = 3.8 + (3.8/3.75)(7-4.75) = 6.08
+    lower B = 0.95 - (0.05/3.75)(7-4.75) = 0.92
+    upper B = 0.95 + 0.2(7-4.75)       = 1.4
+
+The p = 0 vertex (4.75, 3.8, 0.95) must equal density_df
+(exa_total, exa_A, exa_B) at loss = 9 — the PIR alpha-S integral.
 """
 
 import numpy as np
@@ -58,23 +84,38 @@ TOL = 1e-12
 
 
 @pytest.fixture(scope='module')
-def discrete_ab():
-    """The hand-checkable portfolio and its AllocationBounds."""
-    port = build("""port SmallAB
+def small_port():
+    """The hand-checkable discrete portfolio."""
+    return build("""port SmallAB
         agg A dfreq [1] dsev [0 8]
         agg B dfreq [1] dsev [0 2]
     """, bs=1, log2=8)
-    return port.allocation_bounds()
 
 
 @pytest.fixture(scope='module')
-def cts_ab():
+def discrete_ab(small_port):
+    """Unbounded AllocationBounds on the discrete portfolio."""
+    return small_port.allocation_bounds()
+
+
+@pytest.fixture(scope='module')
+def discrete_ab9(small_port):
+    """Bounded at assets a = 9: tail {10} collapses to an atom at 9."""
+    return small_port.allocation_bounds(a=9)
+
+
+@pytest.fixture(scope='module')
+def cts_port():
     """A continuous two-unit portfolio for self-consistency audits."""
-    port = build("""port CtsAB
+    return build("""port CtsAB
         agg A 10 claims sev lognorm 10 cv 1.25 poisson
         agg B  4 claims sev gamma 25 cv 0.8 mixed gamma 0.6
     """)
-    return port.allocation_bounds()
+
+
+@pytest.fixture(scope='module')
+def cts_ab(cts_port):
+    return cts_port.allocation_bounds()
 
 
 # ---------------------------------------------------------------------------
@@ -227,3 +268,89 @@ def test_cts_pstar_inverts_tvar(cts_ab):
     ps = cts_ab.p_star(P)
     # Cross-check against the Portfolio's own TVaR function.
     assert cts_ab.port.tvar(ps) == pytest.approx(P, rel=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# Bounded totals (asset cap, linear natural allocation)
+# ---------------------------------------------------------------------------
+
+def test_bounded_curve_vertices_exact(discrete_ab9):
+    cd = discrete_ab9.curve_df
+    assert np.allclose(cd.index, [0, .25, .5, .75], atol=TOL)
+    assert np.allclose(cd['exeqa_total'], [4.75, 19 / 3, 8.5, 9], atol=TOL)
+    assert np.allclose(cd['exeqa_A'], [3.8, 76 / 15, 7.6, 7.2], atol=TOL)
+    assert np.allclose(cd['exeqa_B'], [0.95, 19 / 15, 0.9, 1.8], atol=TOL)
+
+
+def test_bounded_premium_range(discrete_ab9):
+    lo, hi = discrete_ab9.premium_range
+    assert lo == pytest.approx(4.75, abs=TOL)   # E[X ∧ 9]
+    assert hi == pytest.approx(9.0, abs=TOL)    # the cap
+
+
+def test_bounded_bounds_at_7(discrete_ab9):
+    b = discrete_ab9.bounds(7.0)
+    assert b.loc[(7.0, 'A'), 'lower'] == pytest.approx(5.6, abs=1e-10)
+    assert b.loc[(7.0, 'A'), 'upper'] == pytest.approx(6.08, abs=1e-10)
+    assert b.loc[(7.0, 'B'), 'lower'] == pytest.approx(0.92, abs=1e-10)
+    assert b.loc[(7.0, 'B'), 'upper'] == pytest.approx(1.4, abs=1e-10)
+
+
+def test_bounded_collapse_at_cap(discrete_ab9):
+    # At P = a only the max distortion qualifies; allocations are the
+    # default-state linear shares a * E[X_i/X | X >= a].
+    b = discrete_ab9.bounds(9.0)
+    assert np.abs(b['width']).max() < TOL
+    assert b.loc[(9.0, 'A'), 'lower'] == pytest.approx(7.2, abs=TOL)
+    assert b.loc[(9.0, 'B'), 'lower'] == pytest.approx(1.8, abs=TOL)
+
+
+def test_bounded_p0_vertex_equals_exa(discrete_ab9):
+    # Independent cross-check: the p = 0 vertex is the linear-NA expected
+    # loss, which add_exa precomputes as exa_i(a) = int_0^a S exi_xgta dx.
+    exa = discrete_ab9.port.density_df.loc[9.0, ['exa_total', 'exa_A', 'exa_B']]
+    assert np.allclose(discrete_ab9.curve_df.iloc[0], exa, atol=TOL)
+
+
+def test_bounded_check_reprices(discrete_ab9):
+    chk = discrete_ab9.check(7.0)
+    assert np.abs(chk['err']).max() < 1e-12
+    assert np.abs(chk['total_err']).max() < 1e-12
+
+
+def test_bounded_additivity(discrete_ab9):
+    # Collapsed kappas sum to a by construction; whole curve additive.
+    assert discrete_ab9.additivity_error < 1e-12
+
+
+def test_p_resolves_to_assets(small_port):
+    # a via p: q(0.75) = 8, so p=0.75 and a=8 must agree.
+    ab_p = small_port.allocation_bounds(p=0.75)
+    ab_a = small_port.allocation_bounds(a=8)
+    assert ab_p.a == ab_a.a == 8.0
+    pd_idx = ab_p.curve_df.index
+    assert np.allclose(pd_idx, ab_a.curve_df.index, atol=TOL)
+    assert np.allclose(ab_p.curve_df, ab_a.curve_df, atol=TOL)
+
+
+def test_cap_beyond_ess_sup_matches_unbounded(small_port, discrete_ab):
+    # a at the essential sup: the "collapse" is a no-op and the bounded
+    # object reproduces the unbounded curve.
+    ab10 = small_port.allocation_bounds(a=10)
+    assert np.allclose(ab10.curve_df.index, discrete_ab.curve_df.index, atol=1e-12)
+    assert np.allclose(ab10.curve_df, discrete_ab.curve_df, atol=1e-12)
+    b1, b2 = ab10.bounds(7.0), discrete_ab.bounds(7.0)
+    assert np.allclose(b1, b2, atol=1e-12)
+
+
+def test_cts_bounded_audits(cts_port):
+    ab = cts_port.allocation_bounds(p=0.995)
+    a = ab.a
+    assert ab.premium_range[1] == pytest.approx(a, abs=1e-10)
+    P = ab.premium_range[0] * 1.05
+    chk = ab.check(P)
+    assert np.abs(chk['err']).max() < 1e-9 * P
+    assert np.abs(chk['total_err']).max() < 1e-9 * P
+    # Bounded additivity: the collapsed atom sums to a exactly; residual
+    # only from the body exeqa noise.
+    assert ab.additivity_error < 1e-4 * ab.premium_range[0]

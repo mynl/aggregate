@@ -56,3 +56,30 @@ P-independent construction, cheap slicing per P.
 - `uv run pytest` (full suite + new test module).
 - Smoke: rebuild hackathon example, compare `AllocationBounds` output to
   validated `hacks/pb.py` results.
+
+## Extension (same release, separate commit): bounded totals
+
+Author reconsidered the unbounded-only scope: most use is bounded.
+Investigation showed `density_df` already carries the ingredients
+(`exi_xgta_i(a-bs)` = the collapsed kappa; `exa_i(a)` = the bounded p=0
+vertex) and `price(allocation='linear')` carried the only live copy of the
+tail-collapse idiom (historically inlined twice; legacy `pricing_bounds`
+was the other).
+
+Changes (no version bump — folded into a36):
+
+1. **`Portfolio._collapsed_exeqa(a, *, collapse=None)`** — single owner of
+   the collapse: slice `[0, a]`, force `S(a)=0`, re-aim the last `exeqa`
+   row at `a·exi_xgta(a-bs)` (guarded by tail mass > PMF deficit),
+   `exeqa_total` from sum of parts. `price(allocation='linear')`
+   refactored to call it; outputs verified **byte-identical** before/after
+   (6 calls × 4 distortions, `assert_frame_equal(check_exact=True)`).
+2. **`AllocationBounds(port, *, a=np.inf, ...)`** — finite `a` builds the
+   input triple from `_collapsed_exeqa`; total kappa column = grid x
+   (exactly `a` at the atom). Everything downstream unchanged.
+3. **`Portfolio.allocation_bounds(*, a=0, p=0, ...)`** — `p` resolves
+   `a = q(p)`; `a` snapped to grid; both zero = unbounded.
+4. Tests: bounded hand-checked case (a=9 collapse of the discrete
+   portfolio), `exa` cross-check (p=0 vertex == `exa_*` at `a`),
+   `p=`/`a=` agreement, cap-beyond-ess-sup == unbounded, continuous
+   bounded audits. 25 tests total.

@@ -215,6 +215,73 @@ def test_to_agg_kind_filter(tmp_path):
     assert ('sev', 'KF:S') not in uw2._knowledge
 
 
+def test_to_agg_writes_dependencies_first(tmp_path):
+    """A named reference must be written before the entry that uses it, so the
+    file re-loads sequentially (sev before the agg referencing sev.X)."""
+    uw = Underwriter(databases=None)
+    # build the agg AFTER the sev so insertion order is sev, agg; the bug was
+    # that to_agg re-sorts to (kind, name) and 'agg' < 'sev', inverting them.
+    uw.build_many('sev Dep:Sev lognorm 10 cv 1', update=False)
+    uw.build('agg Dep:Agg 100 claims sev.Dep:Sev poisson', update=False)
+    out = uw.to_agg(tmp_path / 'deps')
+
+    text = out.read_text(encoding='utf-8')
+    assert text.index('sev Dep:Sev') < text.index('agg Dep:Agg')
+
+    # and it must actually re-load without a missing-reference error
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('sev', 'Dep:Sev') in uw2._knowledge
+    assert ('agg', 'Dep:Agg') in uw2._knowledge
+
+
+def test_to_agg_default_mode_x_raises_on_existing(tmp_path):
+    """Default mode 'x' is safe: it refuses to clobber an existing file."""
+    uw = Underwriter(databases=None)
+    uw.build('agg X:1 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    uw.to_agg(tmp_path / 'book')                       # creates
+    with pytest.raises(FileExistsError):
+        uw.to_agg(tmp_path / 'book')                   # exists -> raise
+
+
+def test_to_agg_mode_w_overwrites(tmp_path):
+    """mode='w' replaces the file's contents."""
+    uw = Underwriter(databases=None)
+    uw.build('agg W:1 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    out = uw.to_agg(tmp_path / 'book')
+    uw2 = Underwriter(databases=None)
+    uw2.build('agg W:2 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    uw2.to_agg(out, mode='w')                          # absolute path, overwrite
+    text = out.read_text(encoding='utf-8')
+    assert 'W:2' in text and 'W:1' not in text
+
+
+def test_to_agg_mode_a_appends_dated_block_and_round_trips(tmp_path):
+    """mode='a' adds a dated block at the end; a dependency written earlier in
+    the file still precedes the appended entry that references it."""
+    uw = Underwriter(databases=None)
+    uw.build_many('sev A:Sev lognorm 10 cv 1', update=False)
+    out = uw.to_agg(tmp_path / 'book', kind='sev')     # write the sev
+    uw.build('agg A:Agg 100 claims sev.A:Sev poisson', update=False)
+    uw.to_agg(out, kind='agg', mode='a')               # append the agg block
+
+    text = out.read_text(encoding='utf-8')
+    assert '# added' in text
+    assert text.index('sev A:Sev') < text.index('agg A:Agg')
+
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('sev', 'A:Sev') in uw2._knowledge
+    assert ('agg', 'A:Agg') in uw2._knowledge
+
+
+def test_to_agg_bad_mode_raises(tmp_path):
+    uw = Underwriter(databases=None)
+    uw.build('agg M:1 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    with pytest.raises(ValueError):
+        uw.to_agg(tmp_path / 'book', mode='q')
+
+
 # ---------------------------------------------------------------------------
 # __repr__ — sanity
 # ---------------------------------------------------------------------------

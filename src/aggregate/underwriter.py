@@ -40,6 +40,13 @@ class _Unset:
 _UNSET = _Unset()
 
 
+# Write order for to_agg: .agg files load sequentially and named references
+# (sev.X, agg.X, dist.X) must resolve as each line is parsed, so a definition
+# must precede anything that references it. Severities and distortions come
+# before the aggregates that use them; aggregates before portfolios.
+_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'mvagg': 3, 'port': 4}
+
+
 # Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
 # else is warned about and dropped (never crashes the build).
 _HINT_KEYS = {
@@ -1458,7 +1465,7 @@ class Underwriter(object):
             return (objects[0] if len(objects) == 1 else objects), df
         return df
 
-    def to_agg(self, path, pattern='.*', kind='all', source='session'):
+    def to_agg(self, path, pattern='.*', kind='all', source='session', mode='x'):
         """
         Write a selection of knowledge entries to a ``.agg`` file (pandas-style export).
 
@@ -1492,12 +1499,38 @@ class Underwriter(object):
             ignores provenance and exports every match; a file stem or
             :class:`~pathlib.Path` exports only entries that came from that file
             (re-export / round-trip).
+        mode : {'x', 'w', 'a'}, default 'x'
+            File-open mode, mirroring Python's open modes:
+
+            * ``'x'`` (default, safe) — create a new file; **raise**
+              :class:`FileExistsError` if it already exists.
+            * ``'w'`` — overwrite an existing file (logged).
+            * ``'a'`` — append the selection as a new block at the end of an
+              existing file (a fresh dated comment precedes the block); if the
+              file does not exist it is created like ``'w'``.
 
         Returns
         -------
         pathlib.Path
             The file written.
+
+        Notes
+        -----
+        Entries are written in dependency order — severities and distortions,
+        then aggregates, then portfolios (:data:`_KIND_WRITE_ORDER`) — because
+        ``.agg`` files load sequentially and a named reference (``sev.X`` /
+        ``agg.X`` / ``dist.X``) must resolve as its line is parsed. (One residual
+        case: a *combo* distortion that references other distortions by name is
+        only guaranteed to follow them if it sorts after them by name; deep
+        distortion chains may still need a manual reorder.)
+
+        ``mode='a'`` orders only the newly appended block; it does not merge or
+        re-sort against what is already in the file, so a freshly appended
+        definition that an earlier (already-written) entry references would not
+        be reordered ahead of it.
         """
+        if mode not in ('x', 'w', 'a'):
+            raise ValueError(f"mode must be one of 'x', 'w', 'a'; got {mode!r}.")
         # make sure the configured databases are available to filter against
         if not self._loaded:
             self.load()
@@ -1515,12 +1548,15 @@ class Underwriter(object):
                 return entry_source.stem == want
             return str(entry_source) == str(source)
 
-        selected = [
-            pp for (k, n), pp in sorted(self._knowledge.items())
-            if (kind in ('', 'all') or k == kind)
-            and name_re.match(n)
-            and _source_match(pp.source)
-        ]
+        # Order by kind dependency-priority, then name, so the file re-loads
+        # sequentially: definitions precede the entries that reference them.
+        selected = sorted(
+            (pp for (k, n), pp in self._knowledge.items()
+             if (kind in ('', 'all') or k == kind)
+             and name_re.match(n)
+             and _source_match(pp.source)),
+            key=lambda pp: (_KIND_WRITE_ORDER.get(pp.kind, 99), pp.name),
+        )
 
         out = Path(path).expanduser()
         if out.suffix == '':
@@ -1528,13 +1564,33 @@ class Underwriter(object):
         if not out.is_absolute():
             out = self.user_dir / out.name
 
-        header = (f'# written by aggregate {self.version} on '
-                  f'{datetime.now():%Y-%m-%d %H:%M:%S}\n'
-                  f'# {len(selected)} program(s); pattern={pattern!r}, '
-                  f'kind={kind!r}, source={source!r}\n')
+        stamp = f'{datetime.now():%Y-%m-%d %H:%M:%S}'
         body = '\n'.join(pp.program for pp in selected)
-        out.write_text(header + body + ('\n' if body else ''), encoding='utf-8')
-        logger.info('Wrote %d program(s) to %s.', len(selected), out)
+
+        if mode == 'x' and out.exists():
+            raise FileExistsError(
+                f'{out} already exists; pass mode="w" to overwrite or '
+                f'mode="a" to append.')
+
+        if mode == 'a' and out.exists():
+            # Append a dated block at the end; leading newline guarantees a
+            # clean separation even if the file did not end with one.
+            block = (f'\n# added {stamp} — {len(selected)} program(s); '
+                     f'pattern={pattern!r}, kind={kind!r}, source={source!r}\n'
+                     f'{body}' + ('\n' if body else ''))
+            with out.open('a', encoding='utf-8') as fh:
+                fh.write(block)
+            logger.info('Appended %d program(s) to %s.', len(selected), out)
+        else:
+            # 'w', 'x' (new), or 'a' on a missing file: a fresh file with the
+            # full provenance header.
+            if mode == 'w' and out.exists():
+                logger.info('Overwriting %s.', out)
+            header = (f'# written by aggregate {self.version} on {stamp}\n'
+                      f'# {len(selected)} program(s); pattern={pattern!r}, '
+                      f'kind={kind!r}, source={source!r}\n')
+            out.write_text(header + body + ('\n' if body else ''), encoding='utf-8')
+            logger.info('Wrote %d program(s) to %s.', len(selected), out)
         return out
 
 # Module-level singleton — the canonical user-facing entry point. Importable

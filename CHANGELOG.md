@@ -20,6 +20,29 @@ the bundled `test_suite`.
   `<config default>` in signatures (Jupyter `?`, `inspect.signature`) instead of
   `<object object at 0x…>`.
 
+### Fixed: `to_agg` writes entries in dependency order
+
+`to_agg` wrote entries sorted by `(kind, name)`, so severities (`'sev'`) landed
+**after** the aggregates that reference them (`'agg' < 'sev'`). Because `.agg`
+files load sequentially and named references (`sev.X` / `agg.X` / `dist.X`) must
+resolve as each line is parsed, a saved file containing a named-reference would
+fail to re-load — breaking the advertised round-trip. Entries are now written in
+dependency order (severities and distortions, then aggregates, then portfolios),
+so cross-referenced books round-trip. (Deeply chained *combo* distortions that
+reference each other by name may still need a manual reorder.)
+
+### `to_agg` gains a write `mode` (`x` / `w` / `a`)
+
+`to_agg(..., mode=...)` mirrors Python's open modes so an existing file is no
+longer silently clobbered:
+
+- `'x'` (**new default**, safe) — create a new file, raising `FileExistsError`
+  if it already exists.
+- `'w'` — overwrite (logged).
+- `'a'` — append the selection as a new block at the end, preceded by a dated
+  `# added <timestamp>` comment; the block is written in dependency order. (On
+  a missing file `'a'` behaves like `'w'`.)
+
 ## 1.0.0a34
 
 ### De-crufted calibration summary (`distortion_df` / `calibration_df`)

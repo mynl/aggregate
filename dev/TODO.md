@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-06** — current version 1.0.0a35.
+> **Last updated: 2026-06-06** — current version 1.0.0a33.
 
 ---
 
@@ -198,16 +198,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   per-unit stand-alone pricing via `Aggregate.price` + total via `pricing_at`,
   canonical pentagon orientation (stats = columns), arg-checking, docstring.
   Unblocks the 10-min guide (clears **doc-fix G4**).
-- [x] **F10 `[A]` De-cruft `distortion_df`** — **done v1.0.0a34**
-  (`dev/done/plan-distortion-df.md`). `distortion_df` is now per-distortion only
-  (index `distortion`; columns `param_name, param, gini_p, area, error`); the
-  constant target moved to a new one-row pentagon `calibration_df` (inputs
-  `coc, p` + octet, `ROE == coc` check). Renamed `Distortion.standard_shape` →
-  `gini_p` (`= 2∫g−1 = p_equiv`). No batch mode.
 
 ---
 
-## Track W — Windows & plotting
+## Track W — Windows (range for output) & plotting
 
 - [ ] **W1 `[A]`** Support-aware window bounds (#6) — use `fz.support()`
   endpoints; for finite frequency the support is exactly `[N·loc, N·ub]` (exact
@@ -219,7 +213,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## Track M — Multivariate  `[B]` (early beta)
+## Track M — Multivariate `[B]` (early beta)
 
 - [ ] **M1 `[B]`** Multivariate later stages (#4) — Stage 2 `t` copula; Stage 3
   reporting/plot polish; Stage 4 ≥3-variate `rfftn` shared frequency; Stage 5
@@ -289,8 +283,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
   pentagon pricing contract (**F3**, `plan-pentagon.md`), database loading
-  (**H6**, `plan-databases.md`), calibration summary de-cruft (**F10**,
-  `plan-distortion-df.md`), multivariate stages 0–1, etc.
+  (**H6**, `plan-databases.md`), multivariate stages 0–1, etc.
 
 ---
 

@@ -7,6 +7,10 @@ Bounds Module
    :members:
    :private-members:
 
+.. autoclass:: aggregate.bounds.AllocationBounds
+   :special-members: __init__, __call__
+   :members:
+
 .. automodule:: aggregate.bounds
    :members:
 

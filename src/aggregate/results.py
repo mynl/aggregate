@@ -9,7 +9,6 @@ Currently defined:
 - ``AnalyzeDistortionResult`` — single-distortion pricing readout.
 - ``AnalyzeDistortionsResult`` — multi-distortion exhibit.
 - ``PricingResult`` — :meth:`Portfolio.price`.
-- ``PricingBoundsResult`` — :meth:`Portfolio.pricing_bounds`.
 """
 from __future__ import annotations
 
@@ -19,7 +18,6 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 if TYPE_CHECKING:
-    from .bounds import Bounds
     from .spectral import Distortion
 
 
@@ -103,33 +101,3 @@ class PricingResult:
     reg_p: float
 
 
-@dataclass
-class PricingBoundsResult:
-    """Return type for :meth:`Portfolio.pricing_bounds`.
-
-    Attributes
-    ----------
-    bounds : Bounds
-        The underlying ``Bounds`` object (with ``cloud_df`` / ``weight_df``
-        attached) used to compute the natural allocation cloud.
-    allocs : pandas.DataFrame
-        Natural allocations across the bound cloud (fast path).
-    stats : pandas.DataFrame
-        Summary statistics of the natural allocations across the cloud.
-    comp : pandas.DataFrame or None
-        Per-line min/mean/max comparison of slow-path natural allocations
-        with the fast-path allocations. ``None`` if the slow path was not
-        run.
-    allocs_slow : pandas.DataFrame or None
-        Per-(pl, pu) bi-TVaR allocations from the slow path. ``None`` if
-        the slow path was not run.
-    p_star : float
-        Calibrating ``p*`` for the bi-TVaR family at the input premium.
-    """
-
-    bounds: 'Bounds'
-    allocs: pd.DataFrame
-    stats: pd.DataFrame
-    comp: pd.DataFrame | None
-    allocs_slow: pd.DataFrame | None
-    p_star: float

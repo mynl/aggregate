@@ -27,7 +27,7 @@ VALIDATION_NOISE = get_settings().validation.noise
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
            'swap_density_df']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
-                      PricingBoundsResult, PricingResult)
+                      PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
 from . import tail as _tail
 from .tail import TailClass
@@ -621,116 +621,41 @@ class Portfolio(object):
         bit[('', 'difference')] = bit[('independent', 'p_total')] - bit[('sample', 'p_total')]
         return bit
 
-    def pricing_bounds(self, premium, a=0, p=0, n_tps=512, s=512, kind='interp', slow=False, verbose=250):
+    def allocation_bounds(self, units=None, s_floor=1e-14):
         """
-        Natural allocation premium ranges by unit, consistent with total
-        premium at asset level ``a`` or ``p``.
+        Natural-allocation premium ranges by unit, as a function of the
+        total premium.
 
-        PENDING: this method is currently broken on dense portfolios (matmul
-        shape mismatch when ``s`` defaults to ``port.density_df.S.values``)
-        and was written against the legacy ``Bounds`` API (``tvar_cloud``,
-        ``p_star`` as a method). Pending API alignment with the rewritten
-        ``Bounds`` class. Raises ``NotImplementedError``.
+        Constructs an :class:`~aggregate.bounds.AllocationBounds` object:
+        for any total premium P (within the feasible range
+        ``[E[X], max TVaR]``) it returns the lower/upper bound on each
+        unit's natural allocation over all distortions pricing the total to
+        P, together with the achieving biTVaR distortions. Construction is
+        P-independent (exact convex hulls of the ``(TVaR_p, a_i(p))``
+        curves); evaluating at a premium is a cheap slice.
+
+        Replaces the pre-1.0 ``pricing_bounds`` method (removed at
+        1.0.0a36); the total is unbounded — no asset-cap argument yet.
+
+        Parameters
+        ----------
+        units : list of str, optional
+            Unit names to include. Default: all of ``line_names``.
+        s_floor : float, default 1e-14
+            Tail-probability floor below which curve vertices are dropped
+            as FFT noise; see :class:`~aggregate.bounds.AllocationBounds`.
+
+        Returns
+        -------
+        AllocationBounds
+            Call it (or its ``bounds`` method) with one or more premiums::
+
+                ab = port.allocation_bounds()
+                ab.bounds([1200, 1300])    # (P, unit) -> lower/upper/width
+                ab.bitvars(1200)           # achieving (p0, p1, w1)
         """
-        raise NotImplementedError(
-            'Portfolio.pricing_bounds is pending an update for the new '
-            'Bounds API (1.0.0a11). See GitHub issue / CLAUDE.md TODO.')
-        from .bounds import Bounds
-        if a == 0:
-            assert p > 0, 'Must provide either a or p'
-            a = self.q(p)
-
-        # need a -= self.bs?
-        S = self.density_df.loc[:a, 'S'].copy()
-        # last entry needs to include all remaining losses from a-bs onwards, hence:
-        S.iloc[-1] = 0.
-        bounds = Bounds(self)
-        bounds.add_one = True
-        # bounds.tvar_cloud('total', premium, a, n_tps, S.values, kind=kind)
-        if s <= 0:
-            bounds.tvar_cloud('total', premium, a,  n_tps, S.values, kind=kind)
-        else:
-            bounds.tvar_cloud('total', premium, a,  n_tps, s, kind=kind)
-
-        # TODO: (hack) pl=1 and s=1 is driving an error NAN - need to replace with 0. But WHY?
-        gS = bounds.cloud_df.fillna(0).values.T
-        gps = -np.diff(gS, axis=1, prepend=1)
-        # sum products for allocations
-        deal_losses = self.density_df.filter(regex='exeqa_[A-Z0-9]').loc[:a]
-        if self.sf(a) > 0:
-            # see notes below in slow method
-            logger.info('Adjusting tail of deal_losses')
-            deal_losses.iloc[-1] = self.density_df.loc[a-self.bs].filter(regex='exi_xgta_[A-Z]') * a
-
-        # compute the allocations
-        allocs = pd.DataFrame(
-            gps @ (deal_losses.to_numpy()),
-            columns=[i.replace('exeqa_', 'alloc_') for i in deal_losses.columns],
-            index=bounds.weight_df.index)
-
-        # this is a good audit: should have max = min
-        allocs['total'] = allocs.sum(1)
-
-        allocs = allocs.rename(columns=lambda x: x.replace('alloc_', ''))
-        # summary stats
-        stats = pd.concat((pd.concat((allocs.min(0), allocs.mean(0), allocs.max(0)),
-                                     keys=['min', 'mean', 'max'], axis=0).unstack(1),
-                           pd.concat((allocs.idxmin(0), allocs.idxmax(0)),
-                                     keys=['min', 'max'], axis=0).unstack(1)),
-                          axis=1).fillna('')
-
-        if slow:
-            # alternative method (slow)
-            logger.info('Calculating extreme natural allocations: mechanical method')
-            # probabilities of total loss
-            pt = self.density_df.p_total
-            S = 1 - np.minimum(1, pt.loc[:a].cumsum())
-            # individual deal losses
-            deal_losses = self.density_df.loc[:a].filter(regex='exeqa_')
-            if self.sf(a) > 0:
-                # need to adjust for losses in default region
-                # use the linear natural allocation (note price uses the lifted allocation)
-                # replace the last row with E[Xi/X | X>=a] a
-                # need >=, so pull from the prior row
-                # exi_xgta includes a sum column for the total, must exclude that
-                deal_losses.iloc[-1] = self.density_df.\
-                                           drop(columns='exi_xgta_sum').\
-                                           loc[[a-self.bs]].filter(regex='exi_xgta_') * a
-            # deal_losses
-            # linear natural allocation for each total outcome
-            ans = {}
-            i = 0
-            for _, r in bounds.weight_df.reset_index().iterrows():
-                pl, pu, tl, tu, w = r.values
-                d = Distortion('bitvar', p0=pl, p1=pu, w1=w)
-                # pricing kernel, this in-lines the function rap (that was in extensions.sample)
-                gS = np.array(d.g(S))
-                z = -np.diff(gS[:-1], prepend=1, append=0)
-                ans[(pl, pu)] = z @ deal_losses
-                i += 1
-                if verbose and i % verbose == 0:
-                    logger.info(f'Completed {i} out of {len(bounds.weight_df)} biTVaRs')
-
-            # all pricing ranges: rows = (pl, pu) pairs defining extreme distortion
-            # cols = deals
-            allocs_slow = pd.concat(ans.values(), keys=ans.keys()).unstack(2)
-            # get max/min/mean natural allocation by deal and compare to actual pricing
-            comp = {}
-            for c in allocs_slow.iloc[:, :-1]:
-                col = allocs_slow[c]
-                nm = c.split('_')[1]
-                comp[nm] = [col.min(), col.mean(), col.max()]
-
-            comp = pd.DataFrame(comp.values(),
-                                 index=comp.keys(),
-                                 columns=['min', 'mean', 'max'])
-        else:
-            comp = allocs_slow = None
-        # assemble answer
-        p_star = bounds.p_star('total', premium, a, kind=kind)
-        return PricingBoundsResult(
-            bounds=bounds, allocs=allocs, stats=stats, comp=comp,
-            allocs_slow=allocs_slow, p_star=p_star)
+        from .bounds import AllocationBounds
+        return AllocationBounds(self, units=units, s_floor=s_floor)
 
     @property
     def distortion(self):
@@ -3225,7 +3150,7 @@ class Portfolio(object):
             ans = PricingResult(df, last_price, price, a_reg, reg_p)
 
         elif allocation == 'linear':
-            # code mirrors pricing_bounds
+            # code mirrored the (removed) legacy pricing_bounds method
             # slice for extracting
             # sle = slice(self.bs, a_reg)
             sle = slice(0, a_reg)

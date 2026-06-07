@@ -12,7 +12,7 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a35"
+version = "1.0.0a36"
 source = { editable = "." }
 dependencies = [
     { name = "cycler" },
@@ -48,6 +48,7 @@ dev = [
 ]
 notebook = [
     { name = "attrs" },
+    { name = "ipython-autotime" },
     { name = "ipywidgets" },
     { name = "jupyterlab" },
     { name = "jupytext" },
@@ -60,6 +61,7 @@ requires-dist = [
     { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.20,<0.22" },
     { name = "ipykernel" },
     { name = "ipython" },
+    { name = "ipython-autotime", marker = "extra == 'notebook'" },
     { name = "ipywidgets", marker = "extra == 'notebook'" },
     { name = "jinja2" },
     { name = "jupyter-sphinx", marker = "extra == 'dev'", specifier = ">=0.5.3" },
@@ -756,6 +758,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cd/c4/87cda5842cf5c31837c06ddb588e11c3c35d8ece89b7a0108c06b8c9b00a/ipython-9.13.0.tar.gz", hash = "sha256:7e834b6afc99f020e3f05966ced34792f40267d64cb1ea9043886dab0dde5967", size = 4430549, upload-time = "2026-04-24T12:24:55.221Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/86/3060e8029b7cc505cce9a0137431dda81d0a3fde93a8f0f50ee0bf37a795/ipython-9.13.0-py3-none-any.whl", hash = "sha256:57f9d4639e20818d328d287c7b549af3d05f12486ea8f2e7f73e52a36ec4d201", size = 627274, upload-time = "2026-04-24T12:24:53.038Z" },
+]
+
+[[package]]
+name = "ipython-autotime"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ipython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/9d/f8b72a7cf940c704299ef712c75e862abd7fac3bbc4675a87f9851f20241/ipython-autotime-0.3.2.tar.gz", hash = "sha256:fc03ab920266072f0f6d7f1cc04247afe1c2f22f7bd052542af700939769d5f4", size = 6347, upload-time = "2023-11-01T11:43:24.725Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/6b/c668b9d6a3552eeb4d82c0e6f1e79debc9cfaecc2d59ddb5b2f38c24cdfc/ipython_autotime-0.3.2-py2.py3-none-any.whl", hash = "sha256:c51e1175b9d0d2c5da51ac17963f3a836036cf389b8ef20f8a7483573d2c3dce", size = 6971, upload-time = "2023-11-01T11:43:23.549Z" },
 ]
 
 [[package]]

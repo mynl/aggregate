@@ -1,10 +1,39 @@
 """
-Pricing-bounds analysis (Mildenhall, IME 2022).
+Pricing-bounds analysis.
 
-The :class:`Bounds` class is constructed in one shot from a distribution and a
-target premium. It computes the bounding pricing distortions consistent with
-the premium, exposes the min/max envelope of that family, and renders the
-three-panel "cloud" figure from the paper.
+Two related classes, two related papers:
+
+- :class:`Bounds` (Mildenhall, IME 2022) is constructed in one shot from a
+  distribution and a target premium. It computes the bounding pricing
+  distortions consistent with the premium, exposes the min/max envelope of
+  that family, and renders the three-panel "cloud" figure from the paper.
+
+- :class:`AllocationBounds` (similar-risks paper) takes the next step: given
+  that the total is priced to P, what is the range of *natural allocation*
+  premiums to each unit of a Portfolio? It slices the convex hull of the
+  exact ``(TVaR_p(X), a_i(p))`` curve at ``T = P``.
+
+How they differ
+---------------
+
+==============  ===================================  ===================================
+Aspect          ``Bounds``                           ``AllocationBounds``
+==============  ===================================  ===================================
+Object of       the *distortion family* G_P:         the *allocation image* of G_P:
+study           envelopes of g in (s, g(s)) space    ranges of NA premium by unit
+Input           Portfolio, Aggregate, or pmf         Portfolio only (needs ``exeqa_*``)
+                Series (needs ``tvar``, ``cdf``)
+Premium         baked in at construction             argument at call time; hulls are
+                                                     P-independent
+Machinery       p-knot grid + brentq root find,      CDF-breakpoint vertices and
+                approximate                          monotone-chain hulls, exact for
+                                                     the discretized distribution
+``p_star``      cached property at the fixed         ``p_star(P)`` method, exact
+                premium, generic root find           per-atom inversion
+==============  ===================================  ===================================
+
+Both parameterize the extreme consistent distortions as biTVaRs
+``(1 - w1) TVaR_{p0} + w1 TVaR_{p1}`` with ``p0 <= p_star <= p1``.
 
 Naming convention used throughout
 ---------------------------------
@@ -41,7 +70,7 @@ from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Bounds']
+__all__ = ['AllocationBounds', 'Bounds']
 
 
 def _resolve_obj(obj, line):
@@ -116,11 +145,12 @@ class Bounds:
         Asset cap. The class bounds prices of ``min(X, a)``.
     line : str, default ``'total'``
         Only used when ``obj`` is a ``Portfolio``.
-    n_p : int, default ``257``
+    n_p : int, default ``256``
         Base p-grid size. Adaptive refinement adds a handful of knots
-        around ``p_star``.
+        around ``p_star``. Base excludes endpoint so use power of 2.
     n_s : int, default ``513``
-        s-grid size. Binary, ``np.linspace(0, 1, n_s)``.
+        s-grid size. Binary, ``np.linspace(0, 1, n_s)`` includes
+        endpoint so power of 2 plus 1.
 
     Attributes
     ----------
@@ -148,7 +178,7 @@ class Bounds:
     """
 
     def __init__(self, obj, premium, *, a=np.inf, line='total',
-                 n_p=257, n_s=513):
+                 n_p=256, n_s=513):
         self._obj = obj
         self.premium = float(premium)
         self.a = float(a) if not np.isinf(a) else np.inf
@@ -530,3 +560,617 @@ class Bounds:
             ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16,
                                      label='Weight to p_upper')
         return ax
+
+
+def _monotone_hull(t, y, side):
+    """
+    Indices of the lower or upper convex envelope of points sorted by t.
+
+    Parameters
+    ----------
+    t : ndarray
+        Strictly increasing x-coordinates (the TVaR values).
+    y : ndarray
+        y-coordinates (the unit allocations).
+    side : {'lower', 'upper'}
+        Which envelope to build.
+
+    Returns
+    -------
+    ndarray of int
+        Indices into ``t``/``y`` of the envelope vertices, left to right.
+
+    Notes
+    -----
+    Andrew's monotone-chain algorithm, single left-to-right pass.  For the
+    lower hull pop the middle point while the turn o -> a -> b is clockwise
+    or collinear (cross <= 0); for the upper hull pop while counterclockwise
+    or collinear (cross >= 0).  Exactly-collinear interior vertices are
+    removed; near-collinear vertices are kept as short edges, which is
+    harmless (the envelope is unchanged) and keeps the achieving bitvar
+    report local.  No tolerance machinery is needed because the input
+    points are exact vertices of a piecewise-linear curve.
+    """
+    sgn = 1.0 if side == 'lower' else -1.0
+    idx = []
+    for i in range(len(t)):
+        while len(idx) >= 2:
+            o, a = idx[-2], idx[-1]
+            cross = (t[a] - t[o]) * (y[i] - y[o]) - (y[a] - y[o]) * (t[i] - t[o])
+            if sgn * cross <= 0.0:
+                idx.pop()
+            else:
+                break
+        idx.append(i)
+    return np.asarray(idx, dtype=np.intp)
+
+
+class AllocationBounds:
+    """
+    Natural-allocation premium ranges consistent with a total premium.
+
+    Given a :class:`~aggregate.portfolio.Portfolio` with total
+    ``X = sum_i X_i``, determine for each unit the range of natural
+    allocation (NA) premiums over all distortions g that price the total to
+    P, ``G_P = { g : rho_g(X) = P }`` — the allocation counterpart of
+    :class:`Bounds` (see the module docstring for the comparison).
+
+    Build once from a Portfolio; thereafter :meth:`bounds`, :meth:`bitvars`,
+    etc. evaluate for any target premium P by slicing precomputed convex
+    envelopes — the P-dependence is a cheap piecewise-linear lookup.
+
+    Parameters
+    ----------
+    port : Portfolio
+        Must be updated (``density_df`` with ``exeqa_*`` columns available).
+    units : list of str, optional
+        Unit (line) names to include.  Default: all of ``port.line_names``.
+    s_floor : float, default 1e-14
+        Drop curve vertices with tail probability ``S < s_floor``.  Deep in
+        the tail both the tail sums and ``exeqa`` are dominated by FFT noise
+        (and ``add_exa`` zeroes ``exeqa`` below its own cut), so conditional
+        expectations there are unreliable.  Truncation shrinks the feasible
+        premium range upper end from ``ess sup X`` to ``T(1 - s_floor)``;
+        set ``s_floor=0`` to keep everything.
+
+    Attributes
+    ----------
+    curve_df : DataFrame
+        Vertex table indexed by ``p`` with columns ``exeqa_total`` (=
+        ``TVaR_p(X)``) and ``exeqa_<unit>`` (= NA to the unit at that p).
+        Exact at every index value; the underlying curve is linear in the
+        (T, a_i) plane between consecutive rows.
+    premium_range : tuple of float
+        ``(E[X], T_max)`` — the feasible P values.
+    units : list of str
+        Included unit names.
+    additivity_error : float
+        ``max_p |sum_i a_i(p) - T(p)|`` over the kept vertices.  Inherited
+        from ``density_df`` (``add_exa`` zeroes ``exeqa`` where ``p_total``
+        is below its cut, and ``exeqa`` carries FFT noise), so it bounds the
+        absolute accuracy of the allocation bounds — typically ~1e-6
+        relative, concentrated in the deep tail.
+
+    Notes
+    -----
+    **Theory** (similar-risks paper).  Represent a distortion by its Kusuoka
+    measure ``mu``, so ``rho_mu(X) = int TVaR_p(X) mu(dp)`` and the NA to
+    unit i is ``A_i(mu) = int a_i(p) mu(dp)`` where ``a_i(p)`` is the
+    TVaR_p natural allocation.  The pricing constraint is one affine
+    constraint on probability measures, so the extreme consistent measures
+    are two-point TVaR mixtures — *biTVaRs* ``(p0, p1, w1)`` with
+    ``TVaR_{p0}(X) <= P <= TVaR_{p1}(X)`` and weight ``w1`` on ``p1``
+    chosen to hit P exactly.  Every scalar extremum ``min/max A_i`` (indeed
+    any linear allocation score) is attained at a biTVaR.  The biTVaR
+    allocation is the height at ``T = P`` of the chord joining
+    ``(T(p0), a_i(p0))`` and ``(T(p1), a_i(p1))`` on the parametric curve
+    ``C_i = {(T(p), a_i(p))}``, hence
+
+        [min A_i, max A_i] = vertical slice at T = P through the convex
+        hull of C_i,
+
+    lower envelope giving the minimum and upper the maximum, with the hull
+    edge crossing ``T = P`` identifying the achieving biTVaR.
+
+    **Exactness.**  For the discrete (FFT-grid) distribution the curve is
+    exactly piecewise linear with kinks only at CDF breakpoints: within the
+    atom at ``x_k``, writing ``u = 1/(1 - p)``,
+
+        ``T(p) = x_k + (A_k - S_k x_k) u``,
+        ``a_i(p) = kappa_ik + (A_ik - S_k kappa_ik) u``,
+
+    (``S_k = Pr(X > x_k)``, ``kappa_ij = E[X_i | X = x_j]`` = ``exeqa``,
+    ``A_k, A_ik`` strict-tail sums) — both coordinates affine in the *same*
+    parameter u, so eliminating p leaves a straight segment: the 1/(1-p)
+    nonlinearity is common to both axes and cancels.  The hull of the curve
+    therefore equals the hull of its breakpoint vertices,
+
+        vertex m = ( E[X | X >= x_m], E[X_i | X >= x_m] ),  p_m = F_{m-1},
+
+    plain conditional tail expectations computed with reverse cumulative
+    sums.  No p-grid, no interpolation error.  Vertices arrive sorted by T,
+    so each envelope is one monotone-chain pass, O(n).
+
+    All computations use the *linear* natural allocation
+    ``sum_x kappa_i(x) Delta g(S(x))``; the total is unbounded (no asset
+    cap).
+
+    Examples
+    --------
+    ::
+
+        from aggregate.bounds import AllocationBounds
+        ab = AllocationBounds(port)        # build once: vertices + hulls
+        ab.curve_df                        # the (p, T(p), a_i(p)) vertex table
+        ab.bounds([1200, 1300])            # tidy (P, unit) lower/upper frame
+        ab.bitvars(1200)                   # achieving biTVaRs (p0, p1, w1)
+        ab.p_star(1200)                    # p with TVaR_p(X) = P (exact)
+        ab.distortion(1200, 'A', 'upper')  # the achieving Distortion object
+        ab.check(1200)                     # audit: reprice with each biTVaR
+        ab.plot(P=1200)                    # curves, hulls, slice
+    """
+
+    def __init__(self, port, units=None, s_floor=1e-14):
+        self.port = port
+        self.s_floor = float(s_floor)
+
+        if units is None:
+            units = list(port.line_names)
+        self.units = list(units)
+
+        df = getattr(port, 'density_df', None)
+        if df is None:
+            raise ValueError(f'Portfolio {port.name!r} has no density_df; call update() first.')
+        kcols = [f'exeqa_{u}' for u in self.units]
+        missing = [c for c in kcols if c not in df.columns]
+        if missing:
+            raise ValueError(f'density_df missing columns {missing}; check unit names {self.units}.')
+
+        # ------------------------------------------------------------------
+        # Extract the discrete distribution: outcomes x, masses prob, and the
+        # conditional allocations kappa_i(x) = E[X_i | X = x] = exeqa_i.
+        # ------------------------------------------------------------------
+        x = df.index.to_numpy(dtype=float)
+        prob = df['p_total'].to_numpy(dtype=float)
+        # kappa matrix: first column is the total (kappa_total(x) = x), so the
+        # total's "allocation" IS TVaR and row sums give a built-in audit.
+        kappa = np.column_stack([x, df[kcols].to_numpy(dtype=float)])
+
+        # FFT densities carry tiny negative noise; tolerate at machine scale
+        # only (tight threshold by project convention), error on real mass.
+        tol = 64 * np.finfo(float).eps * max(1.0, np.abs(prob).sum())
+        if np.any(prob < -tol):
+            raise ValueError('p_total has negative mass beyond floating-point tolerance.')
+        prob = np.where(np.abs(prob) <= tol, 0.0, prob)
+
+        keep = prob > 0.0
+        if not keep.any():
+            raise ValueError('p_total has no positive mass.')
+        x, prob, kappa = x[keep], prob[keep], kappa[keep]
+
+        # Normalize so the masses sum to exactly 1 (FFT total is ~1 + eps).
+        prob = prob / prob.sum()
+
+        # ------------------------------------------------------------------
+        # Curve vertices.  Vertex m corresponds to p_m = F_{m-1} (so m = 0 is
+        # p = 0) and carries the conditional tail expectations
+        #     T_m = E[X | X >= x_m],   a_im = E[X_i | X >= x_m].
+        # Reverse cumsums accumulate from the tail end, which is the accurate
+        # direction for tail quantities (no 1 - F cancellation).
+        # ------------------------------------------------------------------
+        S = np.cumsum(prob[::-1])[::-1]                       # S_m = Pr(X >= x_m)
+        T = np.cumsum((prob * x)[::-1])[::-1] / S             # E[X | X >= x_m]
+        A = np.cumsum((prob[:, None] * kappa)[::-1], axis=0)[::-1] / S[:, None]
+        F = np.cumsum(prob)
+        p_vert = np.concatenate([[0.0], F[:-1]])              # p at vertex m
+
+        # Drop noise-dominated deep-tail vertices (see s_floor docstring).
+        ok = S >= self.s_floor
+        if not ok.all():
+            logger.info('AllocationBounds: dropping %d tail vertices with S < %g',
+                        (~ok).sum(), self.s_floor)
+
+        # T must be strictly increasing for hulling and slicing.  It is in
+        # exact arithmetic (conditional tail expectations increase); guard
+        # against floating-point wobble in the deep tail by keeping only
+        # vertices that strictly advance T.
+        Tm = np.where(ok, T, -np.inf)
+        runmax = np.maximum.accumulate(np.concatenate([[-np.inf], Tm[:-1]]))
+        ok &= Tm > runmax
+
+        if ok.sum() < 2:
+            raise ValueError('Fewer than two usable curve vertices; '
+                             'total is degenerate or s_floor too aggressive.')
+
+        self._x = x
+        self._prob = prob
+        self._kappa = kappa                                   # (n, 1 + n_units)
+        self._S = S[ok]                                       # = 1 - p, exact
+        self._T = T[ok]
+        self._A = A[ok]
+        self._p_vert = p_vert[ok]
+        # Map kept-vertex position -> original row, for p_star atom lookup.
+        self._row = np.flatnonzero(ok)
+
+        self.curve_df = pd.DataFrame(
+            self._A,
+            index=pd.Index(self._p_vert, name='p'),
+            columns=['exeqa_total'] + kcols)
+
+        # ------------------------------------------------------------------
+        # Per-unit envelopes: indices into the vertex arrays.  P-independent,
+        # so all later queries are O(log n) slices.
+        # ------------------------------------------------------------------
+        self._hulls = {}
+        for j, u in enumerate(self.units):
+            y = self._A[:, j + 1]                             # col 0 is total
+            self._hulls[u] = {'lower': _monotone_hull(self._T, y, 'lower'),
+                              'upper': _monotone_hull(self._T, y, 'upper')}
+
+        self.premium_range = (float(self._T[0]), float(self._T[-1]))
+
+        # Diagnostic: sum of unit allocations should equal T at every vertex.
+        # Any residual is inherited from density_df; see class docstring.
+        self.additivity_error = float(
+            np.abs(self._A[:, 1:].sum(axis=1) - self._T).max())
+
+    # ----------------------------------------------------------------------
+    # Representation
+    # ----------------------------------------------------------------------
+
+    def __repr__(self):
+        lo, hi = self.premium_range
+        return (f'AllocationBounds({self.port.name!r}, units={self.units}, '
+                f'{len(self._T)} vertices, premium range [{lo:.6g}, {hi:.6g}], '
+                f'additivity error {self.additivity_error:.3g})')
+
+    # ----------------------------------------------------------------------
+    # p_star — exact inversion of TVaR_p(X) = P on the grid
+    # ----------------------------------------------------------------------
+
+    def p_star(self, P):
+        """
+        The p with ``TVaR_p(X) = P``, exact for the discrete distribution.
+
+        Compare :attr:`Bounds.p_star`, the generic root-found counterpart
+        (premium fixed at construction, any input object).
+
+        Parameters
+        ----------
+        P : float
+            Target premium, within :attr:`premium_range`.
+
+        Returns
+        -------
+        float
+
+        Notes
+        -----
+        Locate the bracketing vertices ``T_m <= P <= T_{m+1}``; within that
+        atom ``TVaR_p = x_m + (A - S x_m)/(1 - p)`` with
+        ``A = S_{m+1} T_{m+1}`` and ``S = S_{m+1}`` the strict-tail mass, so
+
+            1 - p* = S_{m+1} (T_{m+1} - x_m) / (P - x_m).
+        """
+        P = float(P)
+        self._validate_P(np.array([P]))
+        m = int(np.searchsorted(self._T, P))
+        if self._T[m] == P:
+            return float(self._p_vert[m])
+        # P strictly between T[m-1] and T[m]: inside the atom at x of row m-1.
+        xk = self._x[self._row[m - 1]]
+        s = self._S[m] * (self._T[m] - xk) / (P - xk)
+        return float(1.0 - s)
+
+    # ----------------------------------------------------------------------
+    # Core slicing
+    # ----------------------------------------------------------------------
+
+    def _validate_P(self, P):
+        """Raise if any target premium lies outside the feasible range."""
+        lo, hi = self.premium_range
+        bad = (P < lo) | (P > hi)
+        if bad.any():
+            raise ValueError(
+                f'P={P[bad][:5]} outside feasible premium range [{lo:.6g}, {hi:.6g}] '
+                f'(= [E[X], TVaR at s_floor truncation]).')
+
+    def _slice(self, unit, side, P):
+        """
+        Evaluate one envelope at premiums P.
+
+        Returns
+        -------
+        value, p0, p1, w1, i0, i1 : ndarrays
+            Envelope height at each P; the achieving biTVaR (TVaR levels
+            ``p0 < p1``, weight ``w1`` on ``p1``); and the kept-vertex
+            indices of the edge endpoints (used internally for exact-S
+            repricing).  When the slice lands exactly on a vertex the
+            biTVaR is degenerate (``w1`` 0 or 1 — a pure TVaR).
+        """
+        h = self._hulls[unit][side]
+        xh, yh = self._T[h], self._A[h, self.units.index(unit) + 1]
+        # Edge e spans [xh[e], xh[e+1]]; right side puts P == xh[e] on the
+        # edge to its left except at the first vertex; clip handles ends.
+        e = np.clip(np.searchsorted(xh, P, side='right') - 1, 0, len(xh) - 2)
+        x0, x1 = xh[e], xh[e + 1]
+        w1 = (P - x0) / (x1 - x0)
+        value = (1.0 - w1) * yh[e] + w1 * yh[e + 1]
+        return value, self._p_vert[h[e]], self._p_vert[h[e + 1]], w1, h[e], h[e + 1]
+
+    # ----------------------------------------------------------------------
+    # Public queries
+    # ----------------------------------------------------------------------
+
+    def bounds(self, P):
+        """
+        Lower/upper natural-allocation bounds by unit at total premium P.
+
+        Parameters
+        ----------
+        P : float or array_like
+            Target total premium(s), each within :attr:`premium_range`.
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(P, unit)`` with columns ``lower``, ``upper``,
+            ``width``.  Within each P the lower (resp. upper) column sums to
+            at most (at least) P; equality holds only when every unit's
+            bound is achieved by the same biTVaR.
+        """
+        P = np.atleast_1d(np.asarray(P, dtype=float))
+        self._validate_P(P)
+        blocks = []
+        for u in self.units:
+            lo, *_ = self._slice(u, 'lower', P)
+            hi, *_ = self._slice(u, 'upper', P)
+            blocks.append(pd.DataFrame(
+                {'lower': lo, 'upper': hi, 'width': hi - lo},
+                index=pd.MultiIndex.from_arrays([P, [u] * len(P)], names=['P', 'unit'])))
+        return pd.concat(blocks).sort_index()
+
+    def bitvars(self, P):
+        """
+        Achieving biTVaRs for each unit's lower and upper bound at P.
+
+        Parameters
+        ----------
+        P : float or array_like
+            Target total premium(s).
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(P, unit, bound)`` with columns ``value`` (the
+            bound), ``p0``, ``p1``, ``w1`` — the biTVaR
+            ``(1 - w1) TVaR_{p0} + w1 TVaR_{p1}``, weight on the upper level
+            per the :class:`~aggregate.spectral.Distortion` convention.
+
+        Notes
+        -----
+        When the achieving hull edge joins *adjacent* curve vertices the
+        curve itself is on the envelope there, and the biTVaR is equivalent
+        (for every unit's allocation simultaneously) to the pure
+        ``TVaR_{p_star(P)}`` inside that atom — the two-point representation
+        is then one of many optimizers.  Edges that skip vertices are
+        genuine two-point biTVaRs.
+        """
+        P = np.atleast_1d(np.asarray(P, dtype=float))
+        self._validate_P(P)
+        recs = []
+        for u in self.units:
+            for side in ('lower', 'upper'):
+                v, p0, p1, w1, *_ = self._slice(u, side, P)
+                for i in range(len(P)):
+                    recs.append((P[i], u, side, v[i], p0[i], p1[i], w1[i]))
+        return (pd.DataFrame(recs, columns=['P', 'unit', 'bound', 'value', 'p0', 'p1', 'w1'])
+                .set_index(['P', 'unit', 'bound'])
+                .sort_index())
+
+    def __call__(self, P):
+        """Shorthand for :meth:`bounds`."""
+        return self.bounds(P)
+
+    def distortion(self, P, unit, bound):
+        """
+        The achieving distortion for one unit/bound at premium P.
+
+        Parameters
+        ----------
+        P : float
+        unit : str
+        bound : {'lower', 'upper'}
+
+        Returns
+        -------
+        Distortion
+            ``Distortion('bitvar', p0, p1, w1)``, or ``Distortion('tvar', p)``
+            when the optimizer is degenerate (slice exactly at a vertex).
+        """
+        v, p0, p1, w1, *_ = self._slice(unit, bound, np.array([float(P)]))
+        p0, p1, w1 = float(p0[0]), float(p1[0]), float(w1[0])
+        # Degenerate: slice landed on a vertex -> pure TVaR at that level.
+        if w1 == 0.0 or p0 == p1:
+            return Distortion('tvar', p=p0, display_name=f'TVaR({p0:.5g})')
+        if w1 == 1.0:
+            return Distortion('tvar', p=p1, display_name=f'TVaR({p1:.5g})')
+        return Distortion('bitvar', p0=p0, p1=p1, w1=w1,
+                          display_name=f'bitvar({p0:.5g}, {p1:.5g}; {w1:.4g})')
+
+    # ----------------------------------------------------------------------
+    # Audits
+    # ----------------------------------------------------------------------
+
+    def na_grid(self, p_grid):
+        """
+        TVaR and natural allocations at arbitrary p values (audit helper).
+
+        Direct evaluation of ``T(p)`` and ``a_i(p)`` from the discrete
+        distribution — independent of the vertex/hull machinery, so it
+        cross-checks :attr:`curve_df` (at vertex p's) and interior linearity.
+
+        Parameters
+        ----------
+        p_grid : array_like
+            Values in [0, 1].
+
+        Returns
+        -------
+        DataFrame
+            Indexed by p with columns ``exeqa_total``, ``exeqa_<unit>``.
+
+        Notes
+        -----
+        For p with VaR atom k (the smallest x with F(x) > p, located via
+        ``searchsorted(F, p, side='right')``), the TVaR allocation is
+
+            [ sum_{j>k} prob_j kappa_ij + (F_k - p) kappa_ik ] / (1 - p),
+
+        and at p = 1 it is kappa_i at the largest positive-mass loss.
+
+        .. warning:: Parametrizing by p is ill-conditioned near p = 1: the
+           denominator ``1 - p`` suffers catastrophic cancellation once
+           ``1 - p`` approaches the cumulative rounding error of F (~1e-11
+           on a 2**16 grid), so values there diverge from :attr:`curve_df`
+           like noise/(1-p).  ``curve_df``, built from reverse cumulative
+           sums indexed by the outcome, is the accurate representation;
+           use this method for auditing at moderate p only.
+        """
+        prob, kappa = self._prob, self._kappa
+        F = np.cumsum(prob)
+        F[-1] = 1.0
+        # Tail sums excluding the current row: sum_{j>k} prob_j kappa_ij.
+        pk = prob[:, None] * kappa
+        tail_excl = np.vstack([np.cumsum(pk[::-1], axis=0)[::-1][1:],
+                               np.zeros((1, kappa.shape[1]))])
+
+        p = np.asarray(p_grid, dtype=float)
+        if np.any((p < 0) | (p > 1)):
+            raise ValueError('p_grid values must lie in [0, 1].')
+
+        out = np.empty((len(p), kappa.shape[1]))
+        at_one = p == 1.0
+        pp = p[~at_one]
+        if pp.size:
+            k = np.searchsorted(F, pp, side='right')
+            atom = np.maximum(F[k] - pp, 0.0)               # mass of the split atom
+            out[~at_one] = (tail_excl[k] + atom[:, None] * kappa[k]) / (1.0 - pp)[:, None]
+        out[at_one] = kappa[-1]                              # TVaR_1 = ess sup
+
+        return pd.DataFrame(out, index=pd.Index(p, name='p'),
+                            columns=self.curve_df.columns)
+
+    def check(self, P):
+        """
+        Audit the bounds at P by direct repricing with the achieving biTVaRs.
+
+        For each unit and bound, take the achieving biTVaR and compute its
+        linear natural allocation ``sum_x kappa_i(x) Delta g(S(x))`` from
+        first principles, then compare to the hull-slice value.
+
+        Parameters
+        ----------
+        P : float
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(unit, bound)`` with columns ``value`` (hull),
+            ``repriced`` (direct), ``err`` (difference), ``total``
+            (distortion price of X — should equal P), ``total_err``.
+
+        Notes
+        -----
+        Evaluates the biTVaR hinge ``g(s) = (1-w1) min(1, s/s0) +
+        w1 min(1, s/s1)`` in closed form using the *exact vertex tail
+        probabilities* ``s_m = Pr(X > x_{m-1}) = 1 - p_m`` from the reverse
+        cumsum — both more accurate than ``1 - p`` (which cancels
+        catastrophically for p near 1) and sharper than ``Distortion.g``
+        (interp1d-backed for bitvar, smearing the kink at tiny ``s1``).
+        """
+        P = float(P)
+        # Strict-tail survival S(x_j) = Pr(X > x_j) at every kept outcome.
+        Sx = np.append(np.cumsum(self._prob[::-1])[::-1][1:], 0.0)
+
+        def hinge(s, s_level):
+            # TVaR distortion with 1 - p = s_level; s_level = 0 is the max
+            # distortion 1_{s > 0}.
+            if s_level <= 0.0:
+                return (s > 0).astype(float)
+            return np.minimum(1.0, s / s_level)
+
+        recs = []
+        for u in self.units:
+            for side in ('lower', 'upper'):
+                v, p0, p1, w1, i0, i1 = self._slice(u, side, np.array([P]))
+                v, w1, i0, i1 = float(v[0]), float(w1[0]), int(i0[0]), int(i1[0])
+                gS = ((1.0 - w1) * hinge(Sx, self._S[i0])
+                      + w1 * hinge(Sx, self._S[i1]))
+                # Risk-adjusted mass on each outcome: Delta g(S) telescopes
+                # from g(S(-inf)) = g(1) = 1 down the tail.
+                gp = -np.diff(gS, prepend=1.0)
+                j = self.units.index(u) + 1                  # col 0 = total
+                repriced = float(gp @ self._kappa[:, j])
+                total = float(gp @ self._x)
+                recs.append((u, side, v, repriced, repriced - v,
+                             total, total - P))
+        return (pd.DataFrame(recs, columns=['unit', 'bound', 'value', 'repriced',
+                                            'err', 'total', 'total_err'])
+                .set_index(['unit', 'bound']))
+
+    # ----------------------------------------------------------------------
+    # Plotting
+    # ----------------------------------------------------------------------
+
+    def plot(self, units=None, P=None, axs=None, max_t=None):
+        """
+        Plot each unit's allocation curve, envelopes, and optional P-slice.
+
+        Parameters
+        ----------
+        units : list of str, optional
+            Default: all units.
+        P : float, optional
+            Draw the vertical slice at T = P and mark the bounds.
+        axs : array of Axes, optional
+            One per unit; created if omitted.
+        max_t : float, optional
+            Truncate the T axis (the far tail compresses the picture).
+
+        Returns
+        -------
+        array of Axes
+        """
+        if units is None:
+            units = self.units
+        if axs is None:
+            n = len(units)
+            ncols = min(n, 3)
+            nrows = -(-n // ncols)
+            fig, axs = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 2.8 * nrows),
+                                    constrained_layout=True, squeeze=False)
+            axs = axs.flat
+        for ax, u in zip(axs, units):
+            j = self.units.index(u) + 1
+            t, y = self._T, self._A[:, j]
+            if max_t is not None:
+                mask = t <= max_t
+                t, y = t[mask], y[mask]
+            ax.plot(t, y, lw=0.75, c='C0', label=r'$a_i(p)$ vs $T(p)$')
+            for side, c in (('lower', 'C2'), ('upper', 'C3')):
+                h = self._hulls[u][side]
+                th, yh = self._T[h], self._A[h, j]
+                if max_t is not None:
+                    m = th <= max_t
+                    th, yh = th[m], yh[m]
+                ax.plot(th, yh, lw=1.25, c=c, ls='--', label=side)
+            if P is not None:
+                lo, *_ = self._slice(u, 'lower', np.array([float(P)]))
+                hi, *_ = self._slice(u, 'upper', np.array([float(P)]))
+                ax.axvline(P, lw=0.5, c='k')
+                ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
+                ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
+            ax.set(title=u, xlabel='$T(p)$ = total premium', ylabel='NA premium')
+            ax.legend(fontsize='x-small')
+        return axs

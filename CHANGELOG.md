@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0a36
+
+### New: `AllocationBounds` — natural-allocation pricing ranges (TODO N5)
+
+`bounds.py` gains **`AllocationBounds`**: given that the portfolio total is
+priced to P, the range of natural-allocation premiums to each unit over all
+consistent distortions `G_P = {g : rho_g(X) = P}` (similar-risks paper). The
+extreme allocations are attained at biTVaRs; each unit's range is the vertical
+slice at `T = P` through the convex hull of the curve `(TVaR_p(X), a_i(p))`.
+On the discrete FFT grid that curve is *exactly piecewise linear* with
+vertices at CDF breakpoints (both coordinates are affine in `1/(1-p)` within
+an atom), so the hulls — built from conditional tail expectations via reverse
+cumsums — are exact, O(n) per unit, and **P-independent**: construct once,
+slice for any premium.
+
+- Entry point: **`Portfolio.allocation_bounds(units=None, s_floor=1e-14)`**
+  returns the `AllocationBounds` object; query with `bounds(P)`,
+  `bitvars(P)` (achieving `(p0, p1, w1)`), `p_star(P)` (exact TVaR
+  inversion), `distortion(P, unit, bound)`, `check(P)` (first-principles
+  repricing audit), `na_grid(p_grid)`, `plot(P=...)`.
+- The `bounds.py` module docstring now contrasts `Bounds` (IME 2022:
+  distortion envelopes for the total, premium fixed at construction) with
+  `AllocationBounds` (allocation ranges, premium at call time).
+- Diagnostics: `additivity_error` surfaces the `exeqa` noise floor inherited
+  from `density_df`; `s_floor` truncates noise-dominated tail vertices.
+
+**Removed:** the long-broken `Portfolio.pricing_bounds`
+(`NotImplementedError` since 1.0.0a11) and its `PricingBoundsResult`
+dataclass. Asset-cap support is deferred (tracked in `dev/TODO.md`).
+
 ## 1.0.0a35
 
 ### A bare `Underwriter()` loads no databases by default

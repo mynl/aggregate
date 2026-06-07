@@ -36,7 +36,7 @@ alongside. **Start at `N1`.**
 |    | N2 | Portfolio `update` — kappa / exa / `add_exa` (+ neg-x) | A | N1 | (same) |
 |    | N3 | Portfolio apply-distortion calcs — columns, masses, `plot_twelve` | A | N2 | (same) |
 |    | N4 | Bounds numerics read-through | A | N2 | runs after the spine settles |
-|    | N5 | `Portfolio.pricing_bounds` rewrite | A | N4 | — *(periodic reminders)* |
+| ✅ | N5 | `Portfolio.pricing_bounds` rewrite → `allocation_bounds` (a36) | A | N4 | — |
 |    | N6 | Validation-calc review | A | — | independent of N1–N5 |
 |    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
 |    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
@@ -110,9 +110,12 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   **trim unused `density_df` columns**. **needs N2.**
 - [ ] **N4 `[A]` Bounds numerics read-through** (#30 + #10) — `bounds.py`
   (IME 2022, 513-point binary `s_grid`) end-to-end. **needs N2; prereq for N5.**
-- [ ] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) —
-  `NotImplementedError` since a11; needs `exeqa_*` interpolated onto the new
-  `s_grid`. **needs N4. Author wants periodic reminders.**
+- [x] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) — **done
+  1.0.0a36** as `Portfolio.allocation_bounds` / `bounds.AllocationBounds`
+  (`dev/done/plan-allocation-bounds.md`): exact convex-hull slicing of the
+  `(TVaR_p, a_i(p))` curve, no `s_grid` interpolation needed. Deferred
+  follow-up: **asset-cap `a` support** (interacts with linear-vs-lifted NA
+  at default; linear NA preferred, refuse lifted on unbounded+mass).
 - [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
   published *Aggregate* paper; make docs match the actual algo; finish "all
   switches → config" (`eps`/`noise` already moved in a30); fix the false-positive

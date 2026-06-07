@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0a35
+
+### A bare `Underwriter()` loads no databases by default
+
+**Behavior change.** `Underwriter(databases=...)` now defaults to `None` —
+a bare `Underwriter()` starts **empty** (loads nothing) rather than pulling the
+configured `build.databases`. This makes "give me an empty underwriter" the
+trivial default and removes the surprise of an ad-hoc instance silently loading
+the bundled `test_suite`.
+
+- The module-level **`build` still loads the configured `build.databases`**
+  (`test_suite` by default) — it now passes that request explicitly, so
+  `config.toml`'s `[build].databases` continues to control what `build` knows.
+  `discover()` and the built-in examples are unaffected.
+- `databases` is therefore no longer config-driven at the *constructor* level
+  (only `build` reads config); `log2` / `update` still default from config.
+- Nicer help: the "use the configured default" sentinel now renders as
+  `<config default>` in signatures (Jupyter `?`, `inspect.signature`) instead of
+  `<object object at 0x…>`.
+
 ## 1.0.0a34
 
 ### De-crufted calibration summary (`distortion_df` / `calibration_df`)
@@ -11,14 +31,14 @@ over from a removed batch API. Split into two clean frames.
 
 - **`distortion_df`** is now the per-distortion receipt only: index
   `distortion` (ordered categorical, canonical `ccoc, ph, wang, dual, tvar`),
-  columns `param_name, param, gini_p, area, error`. `param_name` names the
-  family's parameter (`r, a, lam, b, p`); `gini_p` is the comparable normalised
-  shape `= 2∫g−1 = p_equiv`; `area = (gini_p+1)/2 = ∫g`; `error` is the premium
-  miss.
+  columns `param_name, param, error, gini_p, area`. `param_name` names the
+  family's parameter (`r, a, lam, b, p`); `error` is the premium miss; `gini_p`
+  is the comparable normalised shape `= 2∫g−1 = p_equiv`; `area = (gini_p+1)/2
+  = ∫g`.
 - **`calibration_df`** (new attribute) holds the shared target once: a one-row
-  frame leading with the inputs `coc, p`, then the canonical pentagon octet
-  `L, M, P, Q, a, LR, PQ, ROE`. `ROE` equals the requested `coc` — a built-in
-  self-check.
+  frame leading with the inputs `coc, p, F(a)`, then the canonical pentagon
+  octet `L, M, P, Q, a, LR, PQ, ROE`. `ROE` equals the requested `coc` — a
+  built-in self-check.
 - **Breaking — `Distortion.standard_shape` renamed to `Distortion.gini_p`**
   (attribute, end to end). Verified `= 2∫g−1` for every calibrated family.
 - Calibration is one-point (no batch mode); the index no longer implies a batch

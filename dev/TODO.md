@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-06** — current version 1.0.0a34.
+> **Last updated: 2026-06-06** — current version 1.0.0a35.
 
 ---
 

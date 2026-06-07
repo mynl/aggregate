@@ -164,7 +164,7 @@ def test_distortion_df_schema(peg):
 
     assert ddf.index.name == 'distortion'
     assert list(ddf.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
-    assert list(ddf.columns) == ['param_name', 'param', 'gini_p', 'area', 'error']
+    assert list(ddf.columns) == ['param_name', 'param', 'error', 'gini_p', 'area']
     assert ddf['param_name'].to_dict() == {
         'ccoc': 'r', 'ph': 'a', 'wang': 'lam', 'dual': 'b', 'tvar': 'p'}
     # area == (gini_p + 1)/2 == int g, exactly (definitional)
@@ -186,7 +186,7 @@ def test_calibration_df_self_contained(peg):
 
     assert len(cal) == 1
     assert list(cal.columns) == [
-        'coc', 'p', 'L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
+        'coc', 'p', 'F(a)', 'L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
     row = cal.iloc[0]
     assert np.isclose(row['coc'], coc)
     assert np.isclose(row['p'], p)

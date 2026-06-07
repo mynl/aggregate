@@ -2689,18 +2689,19 @@ class Portfolio(object):
             stored on ``self.distortion_df``): one row per distortion in
             ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
             ordered categorical, canonical sort), columns
-            ``[param_name, param, gini_p, area, error]``. ``param`` is the raw
-            shape (``param_name`` says what it is per family); ``gini_p`` is the
-            comparable normalised shape ``= 2∫g−1 = p_equiv`` (TVaR-equivalent
-            level); ``area = (gini_p+1)/2 = ∫g``; ``error`` is the premium miss.
+            ``[param_name, param, error, gini_p, area]``. ``param`` is the raw
+            shape (``param_name`` says what it is per family); ``error`` is the
+            premium miss; ``gini_p`` is the comparable normalised shape
+            ``= 2∫g−1 = p_equiv`` (TVaR-equivalent level); ``area = (gini_p+1)/2
+            = ∫g``.
 
         Notes
         -----
         The shared calibration *target* — identical across all five rows — is
         not repeated here; it is stored once on ``self.calibration_df`` as a
-        one-row frame: the inputs ``coc, p`` lead, then the canonical pentagon
-        octet ``L, M, P, Q, a, LR, PQ, ROE``. ``ROE`` there equals ``coc`` (a
-        free self-check). The calibrated distortion objects are on
+        one-row frame: the inputs ``coc, p, F(a)`` lead, then the canonical
+        pentagon octet ``L, M, P, Q, a, LR, PQ, ROE``. ``ROE`` there equals
+        ``coc`` (a free self-check). The calibrated distortion objects are on
         ``self.distortions`` keyed by name.
 
         Calibration is one-point (one ``coc`` at one ``p``/``a``). This replaces

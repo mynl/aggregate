@@ -26,8 +26,18 @@ __all__ = ['Underwriter', 'build', 'build_many', 'CannotBuild']
 
 # Sentinel for Underwriter.__init__ arguments that should fall back to the
 # configured defaults (aggregate.config [build]). Distinct from None, which for
-# ``databases`` still means "load nothing".
-_UNSET = object()
+# ``databases`` still means "load nothing". The custom __repr__ keeps the
+# argument readable in help/signatures (Jupyter ``?``, ``inspect.signature``)
+# instead of showing ``<object object at 0x...>``.
+class _Unset:
+    """Singleton sentinel meaning "use the configured aggregate.config default"."""
+    __slots__ = ()
+
+    def __repr__(self):
+        return '<config default>'
+
+
+_UNSET = _Unset()
 
 
 # Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
@@ -286,29 +296,32 @@ class Underwriter(object):
     (inspect), :meth:`to_agg` (save), and :meth:`reload` (reset to as-created).
     """
 
-    def __init__(self, name='Rory', databases=_UNSET, update=_UNSET, log2=_UNSET, debug=False):
+    def __init__(self, name='Rory', databases=None, update=_UNSET, log2=_UNSET, debug=False):
         """
         Create an underwriter object. The underwriter is the interface to the knowledge base
         of the aggregate system. It is the interface to the parser and the interpreter, and
         to the database of curves, portfolios and aggregates.
 
-        ``databases``, ``update``, and ``log2`` default to the configured
-        values in :mod:`aggregate.config` (the ``[build]`` section); pass an
-        explicit value to override. This is what unifies the historical
-        10-vs-16 ``log2`` split between a bare ``Underwriter`` and the
-        module-level ``build``.
+        ``update`` and ``log2`` default to the configured values in
+        :mod:`aggregate.config` (the ``[build]`` section); pass an explicit
+        value to override. This is what unifies the historical 10-vs-16 ``log2``
+        split between a bare ``Underwriter`` and the module-level ``build``.
+        ``databases`` is **not** config-driven: a bare ``Underwriter()`` loads
+        **nothing** (``databases=None``). The module-level ``build`` is the one
+        that loads the configured ``build.databases`` (``test_suite`` by
+        default), by passing it explicitly — so ``config.toml`` still controls
+        what ``build`` knows, while ad-hoc underwriters start empty.
 
         :param name: name of underwriter. Defaults to Rory, after Rory Cline, the best underwriter
             I know and a supporter of an analytic approach to underwriting.
         :param databases: the load *request* — what to read on first access.
-            Unset uses the configured ``build.databases``; ``None`` loads
-            nothing. ``'default'`` loads the bundled ``*.agg`` files, ``'user'``
-            loads ``~/.aggregate`` ``*.agg`` files, ``'all'`` loads both. Any
-            other string is a file path or glob, resolved against the search
-            path cwd -> user_dir -> default_dir (see :meth:`load`). An iterable
-            of such entries is also valid. The request is stored privately as
-            ``self._request``; the resolved files actually read appear in
-            :attr:`databases`.
+            ``None`` (the default) loads nothing. ``'default'`` loads the bundled
+            ``*.agg`` files, ``'user'`` loads ``~/.aggregate`` ``*.agg`` files,
+            ``'all'`` loads both. Any other string is a file path or glob,
+            resolved against the search path cwd -> user_dir -> default_dir (see
+            :meth:`load`). An iterable of such entries is also valid. The request
+            is stored privately as ``self._request``; the resolved files actually
+            read appear in :attr:`databases`.
         :param update: if True, update constructed objects. Unset uses the
             configured ``build.update``.
         :param log2: log2 of number of buckets in discrete representation. 10 is
@@ -330,14 +343,10 @@ class Underwriter(object):
         self._parser = None
 
         # The load request (what to read); resolved + read lazily on first
-        # access to .knowledge, or eagerly via .load(). _UNSET -> configured
-        # default; None -> load nothing.
-        if databases is _UNSET:
-            self._request = list(build_settings.databases)
-        elif databases is None:
-            self._request = None
-        else:
-            self._request = databases
+        # access to .knowledge, or eagerly via .load(). Default None -> load
+        # nothing (bare underwriters start empty). The module-level ``build``
+        # passes the configured ``build.databases`` explicitly (see below).
+        self._request = databases
 
         # do not read in until needed for faster loading
         self._default_dir = None
@@ -1529,10 +1538,12 @@ class Underwriter(object):
         return out
 
 # Module-level singleton — the canonical user-facing entry point. Importable
-# as `from aggregate import build`. Its databases / log2 / update now come from
-# aggregate.config ([build] section), which is also what a bare `Underwriter()`
-# reads — so there is a single configured default (no more 10-vs-16 split).
-build = Underwriter(debug=False)
+# as `from aggregate import build`. log2 / update come from aggregate.config
+# ([build] section). Unlike a bare ``Underwriter()`` (which loads nothing),
+# ``build`` loads the configured ``build.databases`` (``test_suite`` by
+# default) by passing it explicitly — so config.toml still controls what
+# ``build`` knows out of the box.
+build = Underwriter(databases=list(get_settings().build.databases) or None, debug=False)
 # Sibling entry point for building several objects from one program text.
 # Bound to the same singleton so `from aggregate import build_many` returns
 # a DataFrame summary across all objects in the input.
@@ -1551,7 +1562,7 @@ def _refresh_default_underwriter():
     s = get_settings().build
     build.update = s.update
     build.log2 = s.log2
-    build._request = list(s.databases)
+    build._request = list(s.databases) or None
     # reset to as-created so the reconfigured request reloads lazily on next access
     build._knowledge = {}
     build.databases = []

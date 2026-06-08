@@ -2,6 +2,19 @@
 
 ## 1.0.0a43
 
+### Fixed: `Portfolio.describe` spread column for signed portfolios
+
+`Portfolio.describe` reports the spread as **CV** normally and **SD** when the
+portfolio is signed (any unit is a P&L / negative-support `ssev`/`dsev` unit),
+mirroring `Aggregate.describe`. The choice is now made once, portfolio-wide:
+CV and SD cannot be mixed in one frame, so if *any* unit is signed the whole
+table — every unit block and the total — uses SD, with unsigned units forced
+via the new `Aggregate._describe(force_sd=...)`. The total SD is read robustly
+from the second moment (`sqrt(ex2 - mean²)`), never `mean × cv`. Previously a
+mixed signed/unsigned portfolio produced a ragged frame (some unit blocks in CV,
+others in SD) and the mean-zero total showed a blown-up `Est CV`. All-unsigned
+portfolios are unaffected (byte-for-byte identical output).
+
 ### Added: `price_pentagon` on `Aggregate` and `Portfolio`
 
 Complete the eight-stat pricing octet (`L, M, P, Q, a, LR, PQ, ROE`) from a
@@ -9,22 +22,23 @@ capital level plus one target — no distortion involved, pure accounting
 completion against expected loss at that level:
 
 ```python
-port.price_pentagon(p=0.99, roe=0.10)   # VaR capital + cost of capital
-agg.price_pentagon(a=250, lr=0.70)      # asset level + loss ratio
+port.price_pentagon(p=0.99, ROE=0.10)   # VaR capital + cost of capital
+agg.price_pentagon(a=250, LR=0.70)      # asset level + loss ratio
 ```
 
 - Fix the capital level with exactly one of `p` (VaR probability) or `a` (asset
   level, snapped to the grid).
-- Supply exactly one pricing target: premium `P`, cost of capital `roe`
-  (a.k.a. CoC), loss ratio `lr` — also `M`, `Q`, `pq`. Clear `ValueError` if not
-  exactly one capital input and one target.
+- Supply exactly one pricing target: premium `P`, cost of capital `ROE`
+  (a.k.a. CoC), loss ratio `LR` — also `M`, `Q`, `PQ`. The target keywords match
+  the canonical stat names (`PENTAGON_STATS`). Clear `ValueError` if not exactly
+  one capital input and one target.
 - Returns the canonical one-row `'total'` pentagon DataFrame
   (`PENTAGON_STATS` columns), matching the rest of the pricing family.
 
 Thin wrapper over the existing `Pentagon` machinery — no new pricing math.
 `Pentagon.solve_obj` now accepts `a=` as well as `p=` (and `p` becomes
 keyword-only; it has no other callers). `Portfolio.price_ccoc` is now a thin
-alias for `price_pentagon(p=p, roe=ccoc)` (the cost-of-capital special case);
+alias for `price_pentagon(p=p, ROE=ccoc)` (the cost-of-capital special case);
 its output is unchanged.
 
 ## 1.0.0a42

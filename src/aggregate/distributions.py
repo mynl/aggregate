@@ -5524,7 +5524,7 @@ class Aggregate:
         """
         return self._describe()
 
-    def _describe(self, force_reins_label=None):
+    def _describe(self, force_reins_label=None, force_sd=False):
         """Build the ``describe`` frame, optionally forced into reins view.
 
         Parameters
@@ -5541,13 +5541,19 @@ class Aggregate:
             passes a portfolio-wide label here so that every unit block —
             including units with no reinsurance — shares one column
             layout and aligns with the ``total`` block.
+        force_sd : bool, default False
+            Force the **SD** spread trio (instead of CV) even when this unit
+            is not itself signed. A signed unit always uses SD; this flag lets
+            ``Portfolio.describe`` push the whole table into SD when *any* unit
+            is signed, so the unit blocks and the ``total`` block share one
+            column layout (CV and SD cannot be mixed in one frame).
 
         Returns
         -------
         pandas.DataFrame
             Three-row Freq / Sev / Agg frame; see :meth:`describe`.
         """
-        if self._signed():
+        if self._signed() or force_sd:
             return self._describe_signed(force_reins_label)
         st = self.stats_df['mixed']
         rlabel = force_reins_label if force_reins_label is not None \
@@ -6618,15 +6624,16 @@ class Aggregate:
         return complete_pentagon(df)
 
     def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
-                       lr=None, pq=None, roe=None):
+                       LR=None, PQ=None, ROE=None):
         """Complete the pricing octet at a capital level given one target.
 
         Fix the capital level with exactly one of ``p`` (a VaR probability,
         ``a = self.q(p)``) or ``a`` (an asset level, snapped to the grid), then
         supply exactly one pricing target -- premium ``P``, cost of capital
-        ``roe`` (a.k.a. CoC), or a loss ratio via ``lr`` (equivalently ``M``,
-        ``Q`` or ``pq``). Returns the canonical one-row (``'total'``) pentagon
+        ``ROE`` (a.k.a. CoC), or a loss ratio via ``LR`` (equivalently ``M``,
+        ``Q`` or ``PQ``). Returns the canonical one-row (``'total'``) pentagon
         ``DataFrame`` (columns :data:`~aggregate.pentagon.PENTAGON_STATS`).
+        The target keywords match the canonical stat names.
 
         Pure accounting completion against the object's expected loss at the
         chosen capital level -- **no distortion is involved** (contrast
@@ -6639,7 +6646,7 @@ class Aggregate:
             VaR probability fixing the capital level; mutually exclusive with ``a``.
         a : float, optional
             Asset level fixing the capital; mutually exclusive with ``p``.
-        P, M, Q, lr, pq, roe : float, optional
+        P, M, Q, LR, PQ, ROE : float, optional
             Exactly one pricing target -- premium, margin, capital, loss ratio,
             premium-to-capital, or cost of capital (``M/Q``).
 
@@ -6656,14 +6663,14 @@ class Aggregate:
         """
         if (p is None) == (a is None):
             raise ValueError('price_pentagon: pass exactly one of p= or a=')
-        targets = {'P': P, 'M': M, 'Q': Q, 'lr': lr, 'pq': pq, 'roe': roe}
+        targets = {'P': P, 'M': M, 'Q': Q, 'LR': LR, 'PQ': PQ, 'ROE': ROE}
         n_targets = sum(v is not None for v in targets.values())
         if n_targets != 1:
             raise ValueError(
                 'price_pentagon: pass exactly one pricing target '
-                f'(one of P, M, Q, lr, pq, roe); got {n_targets}.')
+                f'(one of P, M, Q, LR, PQ, ROE); got {n_targets}.')
         pent = Pentagon(obj=self)
-        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=lr, pq=pq, roe=roe)
+        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
         return pent.as_frame(line='total')
 
 

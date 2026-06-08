@@ -164,9 +164,9 @@ def test_describe_finite(pnl):
 
     No infinities, and the **EX error** column stays small everywhere because
     ``_noise_aware_rel_error`` degrades to absolute error when the theoretical
-    mean is at noise level -- it does not explode via division by ~0. (A
-    mean-exactly-zero total does give a large ``Est CV`` = sd/~0, which is
-    honest, so we don't assert on CV.)
+    mean is at noise level -- it does not explode via division by ~0. A signed
+    portfolio reports **SD** (not CV), so the mean-exactly-zero total no longer
+    shows a blown-up ``Est CV`` = sd/~0; the spread columns are finite.
     """
     d = pnl.describe
     arr = d.select_dtypes('number').to_numpy(dtype=float)
@@ -174,6 +174,46 @@ def test_describe_finite(pnl):
     err_ex = d['Err EX'].to_numpy(dtype=float)
     err_ex = err_ex[~np.isnan(err_ex)]
     assert np.all(np.abs(err_ex) < 1e-3)
+    # signed portfolio -> SD spread columns, no CV columns
+    assert any('SD' in str(c) for c in d.columns)
+    assert not any('CV' in str(c) for c in d.columns)
+
+
+def test_describe_mixed_signed_forces_sd_everywhere():
+    """One signed unit forces the WHOLE describe table into SD.
+
+    The spread choice (CV vs SD) is portfolio-wide: CV and SD cannot be mixed
+    in one frame, so if any unit is signed the unsigned units render in SD too
+    (via ``Aggregate._describe(force_sd=...)``) and the table aligns.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', DefectiveDistributionWarning)
+        p = build('''port Mixed
+            agg Signed dfreq [3] dsev [-2 -1 1 2]
+            agg Plain  1 claim sev lognorm 10 cv .3 fixed''')
+    d = p.describe
+    # SD throughout, no CV anywhere
+    assert any('SD' in str(c) for c in d.columns)
+    assert not any('CV' in str(c) for c in d.columns)
+    # every unit block AND total share one column layout (concat aligned)
+    units = d.index.get_level_values('unit').unique().tolist()
+    assert units == ['Signed', 'Plain', 'total']
+    cols = list(d.columns)
+    for u in units:
+        assert list(d.xs(u, level='unit').columns) == cols
+    # the unsigned unit's own SD is finite and matches its agg_sd
+    plain = p['Plain']
+    assert np.isclose(d.loc[('Plain', 'Agg'), 'SD'], plain.agg_sd)
+
+
+def test_describe_unsigned_portfolio_uses_cv():
+    """An all-unsigned portfolio keeps the CV layout unchanged."""
+    p = build('''port Unsigned
+        agg A 1 claim sev lognorm 10 cv .3 fixed
+        agg B 1 claim sev lognorm 8 cv .2 fixed''')
+    d = p.describe
+    assert any('CV' in str(c) for c in d.columns)
+    assert not any('SD' in str(c) for c in d.columns)
 
 
 def test_info_reports_window(pnl):

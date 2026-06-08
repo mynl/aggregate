@@ -37,7 +37,7 @@ def test_roe_target_matches_ccoc_arithmetic(port):
     p0, r = 0.99, 0.1
     a0 = port.q(p0)
     L = _L_at(port, a0, 'exa_total')
-    df = port.price_pentagon(a=a0, roe=r)
+    df = port.price_pentagon(a=a0, ROE=r)
     assert np.isclose(df.loc['total', 'L'], L)
     assert np.isclose(df.loc['total', 'a'], a0)
     assert np.isclose(df.loc['total', 'P'], (L + r * a0) / (1 + r))
@@ -59,7 +59,7 @@ def test_lr_target_gives_premium_from_loss_ratio(port):
     p0, lr0 = 0.99, 0.7
     a0 = port.q(p0)
     L = _L_at(port, a0, 'exa_total')
-    df = port.price_pentagon(a=a0, lr=lr0)
+    df = port.price_pentagon(a=a0, LR=lr0)
     assert np.isclose(df.loc['total', 'P'], L / lr0)
     assert np.isclose(df.loc['total', 'LR'], lr0)
 
@@ -68,23 +68,23 @@ def test_p_and_a_give_identical_octet(port):
     """p= and the equivalent a=q(p) produce the same eight stats."""
     p0, r = 0.99, 0.1
     a0 = port.q(p0)
-    via_p = port.price_pentagon(p=p0, roe=r)
-    via_a = port.price_pentagon(a=a0, roe=r)
+    via_p = port.price_pentagon(p=p0, ROE=r)
+    via_a = port.price_pentagon(a=a0, ROE=r)
     assert np.allclose(via_p.values, via_a.values)
 
 
 def test_price_ccoc_is_thin_alias(port):
-    """price_ccoc(ccoc, p=) == price_pentagon(p=, roe=ccoc), frame-identical."""
+    """price_ccoc(ccoc, p=) == price_pentagon(p=, ROE=ccoc), frame-identical."""
     p0, r = 0.99, 0.1
     old = port.price_ccoc(r, p=p0)
-    new = port.price_pentagon(p=p0, roe=r)
+    new = port.price_pentagon(p=p0, ROE=r)
     assert list(old.columns) == list(new.columns) == list(PENTAGON_STATS)
     assert old.index.equals(new.index)
     assert np.allclose(old.values, new.values)
 
 
 def test_returns_canonical_one_row_total(port):
-    df = port.price_pentagon(p=0.99, roe=0.1)
+    df = port.price_pentagon(p=0.99, ROE=0.1)
     assert list(df.columns) == list(PENTAGON_STATS)
     assert df.index.tolist() == ['total']
     assert df.index.name == 'line'
@@ -96,7 +96,7 @@ def test_aggregate_roe_target(agg):
     pa, r = 0.95, 0.12
     aa = agg.q(pa)
     L = _L_at(agg, aa, 'exa')
-    df = agg.price_pentagon(a=aa, roe=r)
+    df = agg.price_pentagon(a=aa, ROE=r)
     assert np.isclose(df.loc['total', 'L'], L)
     assert np.isclose(df.loc['total', 'ROE'], r)
 
@@ -105,17 +105,17 @@ def test_aggregate_lr_target(agg):
     pa, lr0 = 0.95, 0.8
     aa = agg.q(pa)
     L = _L_at(agg, aa, 'exa')
-    df = agg.price_pentagon(p=pa, lr=lr0)
+    df = agg.price_pentagon(p=pa, LR=lr0)
     assert np.isclose(df.loc['total', 'P'], L / lr0)
 
 
 # ---------------------------------------------------------------- guards
 
 @pytest.mark.parametrize('kwargs', [
-    {'roe': 0.1},                       # no capital level
-    {'p': 0.99, 'a': 100.0, 'roe': 0.1},  # both p and a
+    {'ROE': 0.1},                       # no capital level
+    {'p': 0.99, 'a': 100.0, 'ROE': 0.1},  # both p and a
     {'p': 0.99},                        # no target
-    {'p': 0.99, 'roe': 0.1, 'lr': 0.7},   # two targets
+    {'p': 0.99, 'ROE': 0.1, 'LR': 0.7},   # two targets
 ])
 def test_input_guards_raise(port, kwargs):
     with pytest.raises(ValueError):

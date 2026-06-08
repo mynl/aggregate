@@ -192,6 +192,12 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
   rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
   `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.
+- [x] **B3b `[A]`** `Portfolio.describe` CV/SD mixing (a43, no bump) — spread
+  choice now portfolio-wide: any signed unit forces SD across all unit blocks +
+  total (via `Aggregate._describe(force_sd=...)`); total SD from `ex2-mean^2`.
+  All-unsigned output byte-identical. NB surfaced a **pre-existing** signed-
+  *combine* gap (FFT total var > independent sum of unit vars; identical under
+  the old CV path) — tracked under **N2** / `plan-portfolio-neg-x-pricing.md`.
 
 ---
 

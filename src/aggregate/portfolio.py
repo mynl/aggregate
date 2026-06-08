@@ -1013,17 +1013,50 @@ class Portfolio(object):
           is the portfolio-wide :meth:`_reins_after_label`. Every unit —
           including those with no cession — is rendered in this layout
           (forced via ``Aggregate._describe``) so the table aligns.
+
+        The spread column is **CV** normally, but **SD** when the portfolio is
+        signed (any unit is a P&L / negative-support ``ssev``/``dsev`` unit),
+        since CV is unstable near a zero mean. The choice is portfolio-wide —
+        CV and SD cannot be mixed in one frame — so every unit block is forced
+        to SD (via ``Aggregate._describe(force_sd=...)``) and the total SD is
+        read robustly from the second moment, not ``mean * cv``.
         """
         _total = self.stats_df['total']
+        emp = self.stats_df['empirical']
         rlabel = self._reins_after_label()
+
+        # Spread column: CV by default, **SD** when the portfolio is signed.
+        # CV = sd / mean is unstable/meaningless when a mean can be ~0 (a P&L
+        # unit straddling break-even), so a signed portfolio reports the
+        # standard deviation instead. CV and SD cannot be mixed in one frame,
+        # so the choice is made ONCE here, at the portfolio level: if ANY unit
+        # is signed (``self._signed()``) the whole table -- every unit block
+        # and the total -- switches to SD, with the units forced via
+        # ``Aggregate._describe(force_sd=...)``. SD is taken robustly from the
+        # second moment, ``sqrt(ex2 - mean**2)``, never ``mean * cv``.
+        use_sd = self._signed()
+        spread = 'SD' if use_sd else 'CV'
+
+        def _theo_spread(comp):
+            if not use_sd:
+                return float(_total[(comp, 'cv')])
+            m = float(_total[(comp, 'mean')])
+            return float(np.sqrt(max(float(_total[(comp, 'ex2')]) - m * m, 0.0)))
+
+        def _emp_spread(comp):
+            if not use_sd:
+                return float(emp[(comp, 'cv')])
+            m = float(emp[(comp, 'mean')])
+            return float(np.sqrt(max(float(emp[(comp, 'ex2')]) - m * m, 0.0)))
+
         df = pd.DataFrame(
             {
                 'EX': [float(_total[('freq', 'ex1')]),
                        float(_total[('sev',  'ex1')]),
                        float(_total[('agg',  'ex1')])],
-                'CV': [float(_total[('freq', 'cv')]),
-                       float(_total[('sev',  'cv')]),
-                       float(_total[('agg',  'cv')])],
+                spread: [_theo_spread('freq'),
+                         _theo_spread('sev'),
+                         _theo_spread('agg')],
                 'Sk': [float(_total[('freq', 'skew')]),
                        float(_total[('sev',  'skew')]),
                        float(_total[('agg',  'skew')])],
@@ -1038,7 +1071,6 @@ class Portfolio(object):
         # surface it in the describe table too. Under reinsurance the
         # ``total`` column is the (gross) Subject view and ``empirical``
         # the realised after-reins view, exactly mirroring Aggregate.
-        emp = self.stats_df['empirical']
         emp_agg_m = emp.get(('agg', 'mean'), np.nan)
         if pd.notna(emp_agg_m):
             mid_label = rlabel or 'Est'
@@ -1047,33 +1079,36 @@ class Portfolio(object):
             df.loc['Agg', f'{mid_label} EX'] = float(emp_agg_m)
             df[f'{change_label} EX'] = _noise_aware_rel_error(
                 df[f'{mid_label} EX'], df['EX'])
-            df.loc['Sev', f'{mid_label} CV'] = float(emp[('sev', 'cv')])
-            df.loc['Agg', f'{mid_label} CV'] = float(emp[('agg', 'cv')])
-            df[f'{change_label} CV'] = _noise_aware_rel_error(
-                df[f'{mid_label} CV'], df['CV'])
+            df.loc['Sev', f'{mid_label} {spread}'] = _emp_spread('sev')
+            df.loc['Agg', f'{mid_label} {spread}'] = _emp_spread('agg')
+            df[f'{change_label} {spread}'] = _noise_aware_rel_error(
+                df[f'{mid_label} {spread}'], df[spread])
             df[f'{mid_label} Sk'] = np.nan
             df.loc['Sev', f'{mid_label} Sk'] = float(emp[('sev', 'skew')])
             df.loc['Agg', f'{mid_label} Sk'] = float(emp[('agg', 'skew')])
             df = df[['EX', f'{mid_label} EX', f'{change_label} EX',
-                     'CV', f'{mid_label} CV', f'{change_label} CV',
+                     spread, f'{mid_label} {spread}', f'{change_label} {spread}',
                      'Sk', f'{mid_label} Sk']]
         # Subject-column label under reinsurance; plain headings otherwise.
         if rlabel:
             df = df.rename(columns={
-                'EX': 'Subject EX', 'CV': 'Subject CV', 'Sk': 'Subject Sk'})
+                'EX': 'Subject EX', spread: f'Subject {spread}',
+                'Sk': 'Subject Sk'})
         # snap floating-point dust to 0 in the moment-value columns for
         # display (e.g. the skew of a symmetric unit); NaN preserved.
         # Change/Err columns retain their numeric dust.
         for c in df.columns:
-            if (' EX' in c or ' CV' in c or ' Sk' in c
-                    or c in ('EX', 'CV', 'Sk')) \
+            if (' EX' in c or ' CV' in c or ' SD' in c or ' Sk' in c
+                    or c in ('EX', 'CV', 'SD', 'Sk')) \
                     and not (c.startswith('Err ') or c.startswith('Change ')):
                 df[c] = _snap_noise(df[c])
 
         # Force every unit block into the portfolio-wide layout so the
         # concat aligns (units with no cession render in reins view too
-        # when ``rlabel`` is set).
-        t1 = [a._describe(force_reins_label=rlabel) for a in self] + [df]
+        # when ``rlabel`` is set; unsigned units render in SD view via
+        # ``force_sd`` when the portfolio is signed).
+        t1 = [a._describe(force_reins_label=rlabel, force_sd=use_sd)
+              for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X'])
         return df
@@ -3458,15 +3493,16 @@ class Portfolio(object):
         return pd.concat({str(dist): exhibit}, names=['method'])
 
     def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
-                       lr=None, pq=None, roe=None):
+                       LR=None, PQ=None, ROE=None):
         """Complete the pricing octet at a capital level given one target.
 
         Fix the capital level with exactly one of ``p`` (a VaR probability,
         ``a = self.q(p)``) or ``a`` (an asset level, snapped to the grid), then
         supply exactly one pricing target -- premium ``P``, cost of capital
-        ``roe`` (a.k.a. CoC), or a loss ratio via ``lr`` (equivalently ``M``,
-        ``Q`` or ``pq``). Returns the canonical one-row (``'total'``) pentagon
+        ``ROE`` (a.k.a. CoC), or a loss ratio via ``LR`` (equivalently ``M``,
+        ``Q`` or ``PQ``). Returns the canonical one-row (``'total'``) pentagon
         ``DataFrame`` (columns :data:`~aggregate.pentagon.PENTAGON_STATS`).
+        The target keywords match the canonical stat names.
 
         Pure accounting completion against the portfolio's total expected loss
         at the chosen capital level -- **no distortion is involved** (contrast
@@ -3480,7 +3516,7 @@ class Portfolio(object):
             VaR probability fixing the capital level; mutually exclusive with ``a``.
         a : float, optional
             Asset level fixing the capital; mutually exclusive with ``p``.
-        P, M, Q, lr, pq, roe : float, optional
+        P, M, Q, LR, PQ, ROE : float, optional
             Exactly one pricing target -- premium, margin, capital, loss ratio,
             premium-to-capital, or cost of capital (``M/Q``).
 
@@ -3497,14 +3533,14 @@ class Portfolio(object):
         """
         if (p is None) == (a is None):
             raise ValueError('price_pentagon: pass exactly one of p= or a=')
-        targets = {'P': P, 'M': M, 'Q': Q, 'lr': lr, 'pq': pq, 'roe': roe}
+        targets = {'P': P, 'M': M, 'Q': Q, 'LR': LR, 'PQ': PQ, 'ROE': ROE}
         n_targets = sum(v is not None for v in targets.values())
         if n_targets != 1:
             raise ValueError(
                 'price_pentagon: pass exactly one pricing target '
-                f'(one of P, M, Q, lr, pq, roe); got {n_targets}.')
+                f'(one of P, M, Q, LR, PQ, ROE); got {n_targets}.')
         pent = Pentagon(obj=self)
-        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=lr, pq=pq, roe=roe)
+        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
         return pent.as_frame(line='total')
 
     def price_ccoc(self, ccoc, *, p):
@@ -3516,9 +3552,9 @@ class Portfolio(object):
 
         Thin alias for :meth:`price_pentagon` with the cost-of-capital target::
 
-            self.price_pentagon(p=p, roe=ccoc)
+            self.price_pentagon(p=p, ROE=ccoc)
         """
-        return self.price_pentagon(p=p, roe=ccoc)
+        return self.price_pentagon(p=p, ROE=ccoc)
 
     def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """

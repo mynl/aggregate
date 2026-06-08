@@ -310,7 +310,7 @@ class UnderwritingTransformer(Transformer):
 
     # ----- aggregate -------------------------------------------------
     def agg_out_full(self, c):
-        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, trailer = c
+        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, approx, trailer = c
         spec = {
             "name": name,
             **exposures,
@@ -319,13 +319,14 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **freq,
             **agg_reins,
+            **self._check_approx(approx, occ_reins),
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
         return ("agg", name, spec)
 
     def agg_out_dfreq(self, c):
-        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, trailer = c
+        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, approx, trailer = c
         spec = {
             "name": name,
             **dfreq,
@@ -333,6 +334,7 @@ class UnderwritingTransformer(Transformer):
             **sev_clause,
             **occ_reins,
             **agg_reins,
+            **self._check_approx(approx, occ_reins),
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -423,7 +425,7 @@ class UnderwritingTransformer(Transformer):
 
     def pnl_out_full(self, c):
         (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
-         occ_reins, freq, agg_reins, trailer) = c
+         occ_reins, freq, agg_reins, approx, trailer) = c
         spec = {
             "name": name,
             **exposures,
@@ -432,6 +434,7 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **freq,
             **agg_reins,
+            **self._check_approx(approx, occ_reins),
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -440,7 +443,7 @@ class UnderwritingTransformer(Transformer):
 
     def pnl_out_dfreq(self, c):
         (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
-         occ_reins, agg_reins, trailer) = c
+         occ_reins, agg_reins, approx, trailer) = c
         spec = {
             "name": name,
             **dfreq,
@@ -448,6 +451,7 @@ class UnderwritingTransformer(Transformer):
             **sev_clause,
             **occ_reins,
             **agg_reins,
+            **self._check_approx(approx, occ_reins),
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -622,6 +626,51 @@ class UnderwritingTransformer(Transformer):
 
     def occ_reins_none(self, c):
         return {}
+
+    # ----- approximate (method-of-moments) directive ----------------
+    _APPROX_KINDS = ("exact", "sgamma", "slognorm")
+
+    def approx_set(self, c):
+        """``approximate KIND`` -> ``{'approximate': KIND}`` (kind validated)."""
+        _approx, kind = c
+        kind = str(kind)
+        if kind not in self._APPROX_KINDS:
+            raise ValueError(
+                f"DecL: approximate '{kind}' is not recognised; "
+                f"use one of {', '.join(self._APPROX_KINDS)}")
+        return {"approximate": kind}
+
+    def approx_none(self, c):
+        """Omitted ``approximate`` clause -> no spec key (constructor default)."""
+        return {}
+
+    def _check_approx(self, approx, occ_reins):
+        """Validate the approximate/occurrence-reinsurance combination.
+
+        The method-of-moments fit replaces the freq x sev convolution, so
+        per-occurrence reinsurance -- which acts on the severity *before* that
+        convolution -- has nothing to bite on. Reject the combination with a
+        clear parse-time error. ``approximate exact`` (the inert default) and
+        aggregate reinsurance are always fine.
+
+        Parameters
+        ----------
+        approx : dict
+            ``{'approximate': KIND}`` or ``{}`` from the approx clause.
+        occ_reins : dict
+            ``{'occ_reins': ..., 'occ_kind': ...}`` or ``{}`` from occ_reins.
+
+        Returns
+        -------
+        dict
+            ``approx`` unchanged (so it can be spread into the spec).
+        """
+        if approx.get("approximate", "exact") != "exact" and "occ_reins" in occ_reins:
+            raise ValueError(
+                "DecL: approximate is incompatible with occurrence reinsurance "
+                "(the method-of-moments fit bypasses the per-occurrence "
+                "convolution); use aggregate reinsurance instead.")
+        return approx
 
     def reins_list_cons(self, c):
         lst, _and, clause = c

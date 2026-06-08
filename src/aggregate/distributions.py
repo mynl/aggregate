@@ -292,6 +292,99 @@ def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output
                             'exp_en': 1, **sev, 'freq_name': 'fixed'})
 
 
+def _approximate_sev_kwargs(m, cv, skew, approx_type):
+    """Severity kwargs for a method-of-moments aggregate approximation.
+
+    Backs the ``approximate`` DecL keyword (and the matching ``Aggregate``
+    constructor parameter): given the aggregate's analytic first three moments,
+    return the ``sev_*`` keyword dict for a single continuous severity whose
+    moments match -- a shifted gamma (``approx_type='sgamma'``) or shifted
+    lognormal (``'slognorm'``) -- to be carried on a fixed frequency of 1 claim.
+
+    Both signs of skew are handled. For right skew the shifted fit is used
+    directly. For left skew the fit is performed on the *reflected* aggregate
+    ``-A`` (which is right-skewed) and mapped back through the ``sev_reflect``
+    machinery (``Y = sev_loc - X`` with the base built at loc 0); the returned
+    dict then carries ``sev_reflect=True`` and a signed (negative-support)
+    severity. For a (near-)symmetric aggregate (``|skew|`` below tolerance) both
+    shifted fits degenerate to their common limit, a normal, returned instead.
+
+    Parameters
+    ----------
+    m, cv, skew : float
+        Analytic aggregate mean, coefficient of variation, and skewness. ``m``
+        may be negative; the helper is sign-agnostic via ``sd = m * cv``.
+    approx_type : {'sgamma', 'slognorm'}
+        Shifted-gamma or shifted-lognormal method-of-moments fit.
+
+    Returns
+    -------
+    dict
+        ``sev_*`` keyword arguments for :class:`Severity` / the
+        :class:`Aggregate` constructor: always ``sev_name``, ``sev_a`` (where
+        applicable), ``sev_scale``, ``sev_loc``; plus ``sev_reflect=True`` for
+        the left-skew case and ``sev_signed=True`` whenever the fit carries mass
+        at or below zero (so the loss-layering ``x<0 -> 0`` clamp is bypassed and
+        the fitted distribution is represented exactly).
+
+    Notes
+    -----
+    The standard deviation is ``sd = m * cv`` (exact, since ``cv = sd / m``),
+    correct for either sign of ``m``. The reflected fit reuses :func:`sln_fit`
+    / :func:`sgamma_fit` unchanged -- the reflection is handled here, not inside
+    those fitters, so the freeze-checked windowing code that also calls them is
+    unaffected.
+    """
+    if approx_type not in ('sgamma', 'slognorm'):
+        raise ValueError(
+            f"approximate kind {approx_type!r} must be 'sgamma' or 'slognorm'")
+    m = float(m)
+    cv = float(cv)
+    skew = float(skew)
+    sd = m * cv
+    skew_tol = 1e-3
+    # Mark the fitted severity signed (no ``x<0 -> 0`` clamp) only when it
+    # actually places mass below zero. The deciding test is the low quantile,
+    # NOT the shift/loc: a shifted gamma can have a very negative ``loc`` yet all
+    # its mass on the positive axis (the ``loc`` is just the parameterisation),
+    # in which case the ordinary 0-based grid is correct and cheaper.
+    signed_tail = 1e-8
+    if abs(skew) <= skew_tol:
+        # Symmetric limit of both shifted fits is a normal.
+        sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
+        fz = ss.norm(loc=m, scale=sd)
+        if float(fz.ppf(signed_tail)) < 0:
+            sev['sev_signed'] = True
+        return sev
+    if skew > 0:
+        if approx_type == 'sgamma':
+            shift, alpha, theta = sgamma_fit(m, cv, skew)
+            sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta,
+                   'sev_loc': shift}
+            fz = ss.gamma(alpha, loc=shift, scale=theta)
+        else:
+            shift, mu, sigma = sln_fit(m, cv, skew)
+            sev = {'sev_name': 'lognorm', 'sev_a': sigma,
+                   'sev_scale': float(np.exp(mu)), 'sev_loc': shift}
+            fz = ss.lognorm(sigma, loc=shift, scale=float(np.exp(mu)))
+        if float(fz.ppf(signed_tail)) < 0:
+            # The fit places appreciable mass below zero; keep it exact.
+            sev['sev_signed'] = True
+        return sev
+    # Left (negative) skew: fit the reflected aggregate -A (right-skewed), then
+    # map back via Y = sev_loc - X with sev_loc = -shift_R and X built at loc 0.
+    m_r = -m
+    cv_r = sd / m_r          # = -cv; the product cv_r * m_r recovers sd
+    skew_r = -skew
+    if approx_type == 'sgamma':
+        shift_r, alpha, theta = sgamma_fit(m_r, cv_r, skew_r)
+        return {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta,
+                'sev_loc': -shift_r, 'sev_reflect': True}
+    shift_r, mu, sigma = sln_fit(m_r, cv_r, skew_r)
+    return {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': float(np.exp(mu)),
+            'sev_loc': -shift_r, 'sev_reflect': True}
+
+
 def _estimate_agg_percentile(m, cv, skew, p=0.999):
     """
     Come up with an estimate of the tail of the distribution based on the three parameter fits, ln and gamma
@@ -3187,6 +3280,7 @@ class Aggregate:
                  agg_reins=None, agg_kind='',
                  reins_bucket=None, dsev_bucket=None,
                  agg_premium=None, agg_reflect=False, agg_shift=0.0, value_type='loss',
+                 approximate='exact',
                  note='', hints=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -3246,6 +3340,18 @@ class Aggregate:
         :param value_type:      ``'loss'`` (default) or ``'payoff'``; ``pnl`` sets
                                 ``'payoff'`` (more is better). Inert for the
                                 distribution, consumed at the pricing layer.
+        :param approximate:     ``'exact'`` (default), ``'sgamma'`` or ``'slognorm'``.
+                                When not ``'exact'``, the freq x sev convolution is
+                                replaced at construction by a single continuous
+                                severity fitted to the aggregate's first three
+                                moments (method of moments: shifted gamma / shifted
+                                lognormal, with normal as the symmetric limit and a
+                                reflected fit for left skew), carried on a fixed
+                                frequency of 1. The original program is preserved in
+                                ``note``. Incompatible with occurrence reinsurance
+                                (which acts pre-convolution); aggregate reinsurance
+                                rides along unchanged. Set by the ``approximate``
+                                DecL keyword. See dev/done/plan-approximate.md.
         :param note:            free-text note, from a ``note{...}`` clause
         :param hints:           raw ``hints{...}`` build-settings string
             (``key=value;`` form). Pure annotation here; the underwriter
@@ -3267,6 +3373,53 @@ class Aggregate:
         self._spec = dict(inspect.getargvalues(frame).locals)
         for n in ['frame', 'get_value', 'self']:
             if n in self._spec: self._spec.pop(n)
+
+        # Method-of-moments approximation (the ``approximate`` DecL keyword). When
+        # not ``'exact'`` the requested freq x sev aggregate is replaced, right
+        # here at construction, by a single continuous severity fitted to its
+        # first three moments and carried on a fixed frequency of 1. The fit needs
+        # the theoretical aggregate moments, so build a throwaway exact copy
+        # (analytic moments only -- no FFT) to read them, then rewrite the local
+        # construction variables before the frequency/severity setup below. The
+        # original spec was just captured into ``self._spec`` (so the object still
+        # round-trips), and any ``pnl`` affine / aggregate reinsurance rides along
+        # on the rewritten object unchanged. See dev/done/plan-approximate.md.
+        self.approximate = approximate
+        if approximate not in ('exact', 'sgamma', 'slognorm'):
+            raise ValueError(
+                f"approximate must be 'exact', 'sgamma' or 'slognorm', "
+                f"not {approximate!r}")
+        if approximate != 'exact':
+            if occ_reins is not None:
+                raise ValueError(
+                    f"{self.name}: approximate is incompatible with occurrence "
+                    "reinsurance (the method-of-moments fit bypasses the "
+                    "per-occurrence convolution); use aggregate reinsurance instead.")
+            _orig = Aggregate(**{**self._spec, 'approximate': 'exact'})
+            _m, _cv, _sk = _orig.agg_m, _orig.agg_cv, _orig.agg_skew
+            _fit = _approximate_sev_kwargs(_m, _cv, _sk, approximate)
+            # frequency -> fixed 1; exposure -> a single deterministic claim
+            freq_name, freq_a, freq_b, freq_zm, freq_p0 = 'fixed', 0.0, 0.0, False, np.nan
+            exp_en, exp_el, exp_premium, exp_lr = 1, 0.0, 0.0, 0.0
+            exp_attachment, exp_limit = None, np.inf
+            occ_reins, occ_kind = None, ''
+            # severity -> the fitted continuous distribution
+            sev_name = _fit['sev_name']
+            sev_a = _fit.get('sev_a', np.nan)
+            sev_b = 0.0
+            sev_mean, sev_cv = 0.0, 0.0
+            sev_loc = _fit['sev_loc']
+            sev_scale = _fit['sev_scale']
+            sev_xs = sev_ps = None
+            sev_wt = 1.0
+            sev_signed = bool(_fit.get('sev_signed', False))
+            sev_reflect = bool(_fit.get('sev_reflect', False))
+            # surface the approximation in the note (the full original program is
+            # retained on ``self.program``; this is the human-readable hint)
+            _approx_note = (
+                f"approximate {approximate}: fitted {sev_name} to aggregate "
+                f"(m={_m:.6g}, cv={_cv:.6g}, skew={_sk:.6g})")
+            note = f"{note}; {_approx_note}" if note else _approx_note
 
         logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
@@ -3817,6 +3970,10 @@ class Aggregate:
         s = [f'aggregate object name    {self.name}',
              f'claim count              {self.n:0,.2f}',
              f'frequency distribution   {self.frequency.freq_name}']
+        # Method-of-moments approximation marker (only when active): the object
+        # is a fixed-1-claim fit, so this explains the otherwise-bare freq/sev.
+        if getattr(self, 'approximate', 'exact') != 'exact':
+            s.append(f'approximate              {self.approximate}')
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]

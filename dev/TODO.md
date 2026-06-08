@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a46.
+> **Last updated: 2026-06-08** — current version 1.0.0a47.
 
 ---
 
@@ -49,7 +49,7 @@ alongside. **Start at `N1`.**
 | ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
-|    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
+| ✅ | F1 | `approximate` DecL keyword — MoM aggregates | A | — | H*, B*, N* |
 | ✅ | F2 | G&H tilting DIY (pedagogy) | A | — | H*, B*, N* |
 | ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
 |    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
@@ -229,10 +229,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track F — Features (approximation, pricing, config)
 
-- [ ] **F1 `[A]` `approximate()` restored, tail-aware** (#33) — pick gamma vs
-  lognormal via the **tail-thickness classifier** (a very good application of
-  it). **needs** tail work (shipped, `dev/done/plan-tail-thickness.md`).
-  Removed in `6de20f2`.
+- [x] **F1 `[A]` `approximate` DecL keyword — MoM aggregates** (#33) — **done
+  1.0.0a47** (`dev/done/plan-approximate.md`). Design-time `approximate
+  exact | sgamma | slognorm` directive: rewrites the aggregate at construction to
+  a fixed-1-claim aggregate of a continuous severity fitted to its first three
+  moments (shifted gamma / shifted lognormal; normal at the symmetric limit;
+  reflected fit for left skew). No special compute path — `density_df`,
+  validation, the `pnl` affine, and the `Portfolio` combine all just work.
+  Incompatible with occurrence reinsurance; aggregate reinsurance rides along.
+  `tests/test_approximate.py`. (The older idea of a tail-classifier-driven family
+  pick inside the legacy `.approximate()` *method* is superseded by this explicit,
+  self-documenting keyword.)
 - [x] **F2 `[A]` G&H tilting DIY** (#34) — **done 1.0.0a46**
   (`dev/done/plan-gh-tilt.md`). The `ft` exponential **tilt** (Grübel–Hermesmeier
   aliasing reduction) removed in `6de20f2` is reborn as a self-contained

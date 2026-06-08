@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a47
+
+### Added: `approximate` DecL keyword — method-of-moments aggregates
+
+A new design-time directive replaces the freq × sev FFT convolution with a single
+continuous severity fitted to the aggregate's first three moments — the fast
+shortcut for very-high-frequency books where the exact convolution is overkill.
+
+```
+agg Big 1e6 claims sev lognorm 100 cv 2 poisson approximate sgamma
+```
+
+- `approximate exact | sgamma | slognorm` (`exact` is the inert default; omitting
+  the clause is the same). `sgamma`/`slognorm` fit a **shifted gamma / shifted
+  lognormal**; a **normal** is used as the symmetric (skew ≈ 0) limit, and a
+  **reflected** fit handles genuinely left-skewed aggregates (verified to match
+  the exact aggregate's mean/CV/skew to ~7 significant figures across all three
+  skew regimes).
+- **No special compute path.** The substitution happens in `Aggregate.__init__`:
+  the object is rewritten as an ordinary fixed-1-claim aggregate of the fitted
+  severity, so `density_df`, validation, the `pnl` affine, and the `Portfolio`
+  combine all work with zero special-casing. The original program round-trips
+  (it is preserved on `self.program`); the fit is summarised in `note` and shown
+  in `info`.
+- **Incompatible with occurrence reinsurance** (which acts pre-convolution, so the
+  method-of-moments fit has nothing to bite on) — rejected with a clear error at
+  parse time and in the constructor. **Aggregate reinsurance rides along**
+  unchanged. Works on `pnl` too: the loss part is fitted and the premium affine
+  rides along.
+- Available on the `agg … claims …`, `agg … dfreq …`, and both `pnl` forms.
+
+No core/`freeze_knowledge` impact — no existing program uses `approximate`, so all
+146 knowledge-base objects are unchanged to 1e-12. Grammar changed →
+`ref_include.rst` regenerated; **doc rebuild pending**.
+
 ## 1.0.0a46
 
 ### Added: exponential-tilting pedagogy (Grübel–Hermesmeier illustration)

@@ -66,11 +66,20 @@
     // Aggregate
     // ======================================================================
     
-    agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins trailer  -> agg_out_full
-           | AGG name dfreq      layers sev_clause occ_reins         agg_reins trailer  -> agg_out_dfreq
+    agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins approx_clause trailer  -> agg_out_full
+           | AGG name dfreq      layers sev_clause occ_reins         agg_reins approx_clause trailer  -> agg_out_dfreq
            | AGG name TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
            | AGG name builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
            | builtin_agg agg_reins trailer                                              -> agg_out_builtin
+    
+    // Method-of-moments approximation directive. ``approximate KIND`` (KIND in
+    // {exact, sgamma, slognorm}) replaces the freq x sev convolution with a single
+    // continuous severity fitted to the aggregate's first three moments (shifted
+    // gamma / shifted lognormal), carried on a fixed-1 frequency. ``exact`` (or the
+    // omitted clause) is the inert default. Validated in the transformer; the kind
+    // word is an ordinary ID. See dev/done/plan-approximate.md.
+    approx_clause: APPROXIMATE ID   -> approx_set
+                 |                  -> approx_none
     
     // ======================================================================
     // Profit-and-loss aggregate (premium minus loss)
@@ -84,8 +93,8 @@
     // dev/done/plan-pnl-premium.md.
     // ======================================================================
     
-    pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins trailer  -> pnl_out_full
-           | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins trailer  -> pnl_out_dfreq
+    pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause trailer  -> pnl_out_full
+           | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins approx_clause trailer  -> pnl_out_dfreq
     
     pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
                  | numbers LOSS     -> pnl_exp_loss
@@ -328,6 +337,7 @@
     // Python's tokenizer uses to distinguish `def` from `define`.
     OCCURRENCE.2: /occurrence(?![a-zA-Z0-9._:~\-])/
     AGGREGATE.2:  /aggregate(?![a-zA-Z0-9._:~\-])/
+    APPROXIMATE.2: /(?:approximate|approx)(?![a-zA-Z0-9._:~\-])/
     MULTIVARIATE.2: /(?:multivariate|mv)(?![a-zA-Z0-9._:~\-])/
     NETCEDED.2:   /netceded(?![a-zA-Z0-9._:~\-])/
     COPULA.2:     /copula(?![a-zA-Z0-9._:~\-])/
@@ -398,7 +408,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

@@ -381,3 +381,40 @@ def test_density_property_portfolio():
     d = p.density
     assert (d.p_total > 0).all()
     assert len(p.density_df) > len(d)
+
+
+# ---------------------------------------------------------------------------
+# SD/variance for zero-mean signed aggregates (a40): derived from the second
+# moment, not mean*cv (which is nan at mean 0). See dev/done/plan-signed-sd.md.
+# ---------------------------------------------------------------------------
+
+def test_zero_mean_signed_sd_is_finite():
+    """``dsev [-1 1]`` x 3 fixed: sev SD 1, agg SD sqrt(3) -- not NaN."""
+    a = build('agg A2 dfreq [3] dsev [-1 1]')
+    assert a.sev_m == 0.0 and a.agg_m == 0.0       # genuinely mean 0
+    # theoretical
+    assert a.sev_sd == pytest.approx(1.0, abs=1e-9)
+    assert a.sev_var == pytest.approx(1.0, abs=1e-9)
+    assert a.agg_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    assert a.agg_var == pytest.approx(3.0, abs=1e-9)
+    # empirical (FFT) moments agree
+    assert a.est_sev_sd == pytest.approx(1.0, abs=1e-9)
+    assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    # describe surfaces finite SD on both the theoretical and Est columns
+    d = a.describe
+    sd = d['SD']
+    est_sd = d['Est SD']
+    assert np.isfinite(sd['Sev']) and np.isfinite(sd['Agg'])
+    assert est_sd['Sev'] == pytest.approx(1.0, abs=1e-9)
+    assert est_sd['Agg'] == pytest.approx(np.sqrt(3.0), abs=1e-9)
+
+
+def test_positive_mean_sd_unchanged():
+    """Regression guard: on a positive-mean case the new var = ex2 - mean^2
+    derivation equals the old mean*cv exactly, so nothing drifts."""
+    a = build('agg Dice dfreq [3] dsev [1:6]')
+    # the two routes to the SD must coincide to fp on the common path
+    ex2 = float(a.stats_df['mixed'][('agg', 'ex2')])
+    assert a.agg_sd == pytest.approx(np.sqrt(ex2 - a.agg_m ** 2), rel=1e-12)
+    assert a.agg_sd == pytest.approx(a.agg_m * a.agg_cv, rel=1e-12)
+    assert a.agg_var == pytest.approx(a.agg_sd ** 2, rel=1e-12)

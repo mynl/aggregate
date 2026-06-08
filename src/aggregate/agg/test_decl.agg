@@ -207,6 +207,7 @@ agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 pois
 # defaults to 'auto' -> a two-sided window); a number forces the origin. See
 # tests/test_negative_x.py and dev/plan-negative-x-agg.md.
 agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support {-6,1,8,15}}
+agg PnL.SD   dfreq [3] dsev [-1 1]                                                                           note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv}
 agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0}
 agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window}
 agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps}

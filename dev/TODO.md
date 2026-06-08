@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a39.
+> **Last updated: 2026-06-08** — current version 1.0.0a40.
 
 ---
 
@@ -177,6 +177,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
   this was about; is it the `linear`/`nearest` discretization, and was it only
   ever a stats/moment concern? (#48 — *forgotten; reconstruct on sight*)
+- [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
+  rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
+  `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.
 
 ---
 

@@ -4,6 +4,7 @@ from functools import lru_cache, wraps
 import json
 import inspect
 import logging
+import math
 import warnings
 import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
@@ -3531,15 +3532,19 @@ class Aggregate:
         self.agg_m = float(_mixed[('agg', 'mean')])
         self.agg_cv = float(_mixed[('agg', 'cv')])
         self.agg_skew = float(_mixed[('agg', 'skew')])
-        # variance and sd come up in exam questions
-        self.agg_sd = self.agg_m * self.agg_cv
-        self.agg_var = self.agg_sd * self.agg_sd
+        # variance and sd come up in exam questions. Derive them directly from
+        # the second moment (var = ex2 - mean^2), NOT as mean*cv: at mean 0 the
+        # CV is legitimately nan, which would poison sd = mean*cv -> nan for a
+        # signed (P&L) aggregate whose sd is perfectly well defined. The clamp
+        # absorbs fp dust when a symmetric ex2 - mean^2 lands slightly negative.
+        self.agg_var = max(float(_mixed[('agg', 'ex2')]) - self.agg_m ** 2, 0.0)
+        self.agg_sd = math.sqrt(self.agg_var)
         # severity exact moments
         self.sev_m = float(_mixed[('sev', 'mean')])
         self.sev_cv = float(_mixed[('sev', 'cv')])
         self.sev_skew = float(_mixed[('sev', 'skew')])
-        self.sev_sd = self.sev_m * self.sev_cv
-        self.sev_var = self.sev_sd * self.sev_sd
+        self.sev_var = max(float(_mixed[('sev', 'ex2')]) - self.sev_m ** 2, 0.0)
+        self.sev_sd = math.sqrt(self.sev_var)
 
     def _init_stats_df(self, comp_cols):
         """Pre-create the empty ``stats_df`` (NaN-filled).
@@ -4239,13 +4244,17 @@ class Aggregate:
             _mw = xsden_to_mwrangler(self.xs_sev, self.sev_density)
             sev_ex1, sev_ex2, sev_ex3 = _mw.noncentral
             self.est_sev_m, self.est_sev_cv, self.est_sev_skew = _mw.mcvsk
+            # var/sd straight off the wrangler (var = central[1]), never via
+            # mean*cv -- see the theoretical site above for the mean-0 rationale.
+            self.est_sev_var = max(float(_mw.central[1]), 0.0)
+            self.est_sev_sd = math.sqrt(self.est_sev_var)
         else:
             sev_ex1 = sev_ex2 = sev_ex3 = np.nan
             self.est_sev_m = np.nan
             self.est_sev_cv = np.nan
             self.est_sev_skew = np.nan
-        self.est_sev_sd = self.est_sev_m * self.est_sev_cv
-        self.est_sev_var = self.est_sev_sd * self.est_sev_sd
+            self.est_sev_var = np.nan
+            self.est_sev_sd = np.nan
 
         # Empirical aggregate moments from the FFT output.
         #
@@ -4270,8 +4279,10 @@ class Aggregate:
         _mw = xsden_to_mwrangler(self.xs, agg_clean)
         agg_ex1, agg_ex2, agg_ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
-        self.est_sd = self.est_m * self.est_cv
-        self.est_var = self.est_sd ** 2
+        # var/sd straight off the wrangler (var = central[1]), never via
+        # mean*cv -- correct for a mean-0 signed aggregate (see above).
+        self.est_var = max(float(_mw.central[1]), 0.0)
+        self.est_sd = math.sqrt(self.est_var)
 
         # Write empirical and error columns into the canonical stats_df.
         # This is the validation showpiece of Mildenhall 2024, §4.7:

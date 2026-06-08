@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0a40
+
+### Fixed: SD/variance for zero-mean signed aggregates
+
+`describe` reported `NaN` for the standard deviation of a mean-zero signed
+(P&L) aggregate — e.g. `agg A2 dfreq [3] dsev [-1 1]`, where the severity SD is
+1 and the aggregate SD is √3. The stored moments were always correct
+(`stats_df` carries `ex2`); only the SD/variance *derivation* was wrong. It
+reconstructed `SD = mean × CV`, and `CV = SD/mean` is `NaN` at mean 0, so
+`SD = 0 × NaN = NaN`. The irony: `_describe_signed` exists precisely to dodge
+unstable CV at mean ≈ 0, but the SD it printed was itself built from CV.
+
+The fix derives variance **directly from the second moment** at all four
+computation sites in `distributions.py` — `var = ex2 − mean²` (theoretical) or
+`MomentWrangler.central[1]` (empirical FFT), with a `max(var, 0.0)` clamp for
+fp dust before `sqrt`. For any positive-mean object `ex2 − mean² == (mean·cv)²`
+to fp, so **all normal aggregates are bit-for-bit unchanged**; the behavioural
+change is confined to mean ≈ 0 signed objects, where SD goes `NaN → correct`.
+`MomentWrangler` (whose `NaN`-at-mean-0 CV is correct) is untouched.
+
 ## 1.0.0a39
 
 ### Ergonomic tweaks: keyword-only `Underwriter`, signed Lee plot, `density` accessor

@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-06** — current version 1.0.0a33.
+> **Last updated: 2026-06-08** — current version 1.0.0a38.
 
 ---
 
@@ -65,6 +65,7 @@ alongside. **Start at `N1`.**
 |    | T1 | Merge the three `.agg` libraries into one | A | — | — |
 |    | T2 | Rationalize tests / library coupling | A | T1 | after code churn |
 |    | T3 | Switcheroo `Port.Sample` regression case | B | — | pairs F7 |
+| ✅ | T4 | Knowledge-freeze regression harness (`scripts/freeze_knowledge.py`, a38) | B | — | N* (verifies them) |
 |    | D1 | New README + split CHANGELOG | A | — | docs parallel |
 |    | D2 | v1.0 Journey + statements of philosophy | A | — | docs parallel |
 |    | D3 | Grammar reference from `decl.lark` | A | — | ready now |

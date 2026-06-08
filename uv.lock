@@ -12,7 +12,7 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a37"
+version = "1.0.0a38"
 source = { editable = "." }
 dependencies = [
     { name = "cycler" },

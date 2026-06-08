@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a38
+
+### New: knowledge-freeze regression harness (`scripts/freeze_knowledge.py`)
+
+A standalone, dependency-free tool to snapshot and verify knowledge-base
+outputs across refactors. `freeze` builds every agg/port program with default
+parameters and writes each object's `describe` and filtered `density_df`
+(`p_*`/`exeqa_*` columns) to parquet, plus a `_manifest.json` recording the
+exact program text, database list, and library version. `check` rebuilds from
+the manifest and verifies the recomputed frames match the snapshot to a tight
+absolute tolerance (default 1e-12). Importable `freeze_knowledge()` /
+`check_knowledge()` functions for Jupyter; argparse CLI for the shell. Default
+output goes to an OS-temp dir; pass `--root` for durable storage. Output parquet
+is never committed. Additive tooling only — no library code changed.
+
 ## 1.0.0a37
 
 ### New: `PricingBounds` — cross-pricing ranges and the Gini lens

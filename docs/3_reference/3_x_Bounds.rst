@@ -11,6 +11,10 @@ Bounds Module
    :special-members: __init__, __call__
    :members:
 
+.. autoclass:: aggregate.bounds.PricingBounds
+   :special-members: __init__, __call__
+   :members:
+
 .. automodule:: aggregate.bounds
    :members:
 

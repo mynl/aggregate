@@ -676,6 +676,57 @@ class Portfolio(object):
             a = self.snap(a)
         return AllocationBounds(self, a=a, units=units, s_floor=s_floor)
 
+    def pricing_bounds(self, y_sources, *, a=0, p=0, s_floor=1e-14, n_grid=1024):
+        """
+        Price ranges of other risks consistent with pricing this total.
+
+        Constructs a :class:`~aggregate.bounds.PricingBounds` object with this
+        Portfolio's total as the reference risk ``X``: for any premium P
+        within the feasible range it returns the lower/upper bound on the
+        price of each risk in ``y_sources`` over all distortions pricing the
+        total to P, together with the achieving biTVaR distortions.
+
+        With assets specified (``a`` or ``p``) both ``X`` and the ``y_sources``
+        are priced capped at ``min(., a)`` — the well-conditioned regime
+        (deep-tail vertices of unbounded heavy-tailed risks are FFT noise and
+        make the upper bound grid-sensitive; cap, or raise ``s_floor``).
+
+        Parameters
+        ----------
+        y_sources : source or list/dict of sources
+            The risk(s) ``Y`` to price.  Each may be an ``Aggregate``,
+            ``Portfolio``, pmf ``Series``, ``'uniform'``, or a TVaR source;
+            a dict supplies explicit names.
+        a : float, default 0
+            Asset level, snapped to the loss grid.  ``0`` means unspecified.
+        p : float, default 0
+            Probability level: resolves ``a = q(p)`` when ``a`` is
+            unspecified.  Both zero gives the unbounded total.
+        s_floor : float, default 1e-14
+            Tail-probability floor below which curve vertices are dropped;
+            see :class:`~aggregate.bounds.PricingBounds`.
+        n_grid : int, default 1024
+            Fallback p-grid size for all-closed-form sources.
+
+        Returns
+        -------
+        PricingBounds
+            ::
+
+                pb = port.pricing_bounds(layer_agg, p=0.99)
+                pb.bounds([1200, 1300])    # (P, risk) -> lower/upper/width
+                pb.bitvars(1200)           # achieving (p0, p1, w1)
+        """
+        from .bounds import PricingBounds
+        if a == 0 and p == 0:
+            a = np.inf
+        elif a == 0:
+            a = self.q(p)
+        else:
+            a = self.snap(a)
+        return PricingBounds(self, y_sources, a=a, s_floor=s_floor,
+                             n_grid=n_grid)
+
     @property
     def distortion(self):
         return self._distortion

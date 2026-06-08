@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.0.0a37
+
+### New: `PricingBounds` — cross-pricing ranges and the Gini lens
+
+`bounds.py` gains **`PricingBounds`**: given that a reference risk `X` is
+priced to P by *some* distortion, the range of the price of another risk `Y`
+over the whole consistent family `G_P = {g : rho_g(X) = P}` (similar-risks
+paper). A distortion prices any risk by `rho_mu(Z) = int TVaR_p(Z) mu(dp)`, so
+the pricing constraint is one affine condition and the extreme measures are
+biTVaRs; the price range of `Y` is the vertical slice at `T_X = P` through the
+convex hull of the curve `(TVaR_p(X), TVaR_p(Y))`.
+
+- **Unmatched p-grids resolved** by the *union of breakpoints*: within the
+  intersection of an X-atom and a Y-atom both TVaRs are affine in `1/(1-p)`,
+  so evaluating at every union breakpoint gives the exact piecewise-linear
+  curve — no resampling.
+- **Shared engine.** The hull/slice query core (`bounds`, `bitvars`,
+  `distortion`, `p_star`, `plot`, `check`) was factored out of
+  `AllocationBounds` into a `_HullEngine` base keyed purely on the vertex
+  table; both classes are now thin front ends. `AllocationBounds` behaviour is
+  unchanged (its test module passes verbatim).
+- **TVaR-source adapters.** Each axis is a TVaR source — a discrete risk
+  (`Aggregate`/`Portfolio`/pmf `Series`, with exact breakpoints and
+  first-principles repricing) or a closed-form `(T, T_inv)` pair. The uniform
+  reference `uniform_source()` (`TVaR_p = (1+p)/2`) is the **Gini lens**: as
+  the X-source the constraint collapses to the mean-Kusuoka-level condition
+  `E_mu[p] = 2P - 1` (`PricingBounds.mean_kusuoka_level`), reading the
+  envelope gap of `Y`'s own TVaR curve. Sources are symmetric across both
+  axes.
+- Entry point: **`Portfolio.pricing_bounds(y_sources, *, a=0, p=0,
+  s_floor=1e-14, n_grid=1024)`** — `y_sources` is one risk or a list/dict;
+  `a`/`p` cap `min(X, a)` and `min(Y, a)`. Query with `bounds(P)`,
+  `bitvars(P)`, `distortion(P, risk, bound)`, `check(P)` (independent
+  survival-hinge repricing of each `Y`, plus `total` = price of `X` = P).
+- **Conditioning.** Bounded (finite `a`) is exact and well-conditioned —
+  `check` reprices to ~1e-12. Unbounded, the upper price bound of a
+  heavy-tailed `Y` is genuinely tail-driven and the deep-tail FFT vertices
+  (`1-p` below ~1e-7) are discretization noise; cap or raise `s_floor` for
+  stable answers (documented on the class).
+- The module-docstring comparison table now spans all three classes
+  (`Bounds` / `AllocationBounds` / `PricingBounds`).
+
 ## 1.0.0a36
 
 ### New: `AllocationBounds` — natural-allocation pricing ranges (TODO N5)

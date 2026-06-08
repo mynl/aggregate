@@ -1,7 +1,7 @@
 """
 Pricing-bounds analysis.
 
-Two related classes, two related papers:
+Three related classes, two related papers:
 
 - :class:`Bounds` (Mildenhall, IME 2022) is constructed in one shot from a
   distribution and a target premium. It computes the bounding pricing
@@ -13,24 +13,47 @@ Two related classes, two related papers:
   premiums to each unit of a Portfolio? It slices the convex hull of the
   exact ``(TVaR_p(X), a_i(p))`` curve at ``T = P``.
 
+- :class:`PricingBounds` (similar-risks paper) generalizes the allocation
+  question to *any* second risk: given the reference risk X is priced to P,
+  what is the range of the price of another risk Y under the same family of
+  consistent distortions? It slices the convex hull of the exact
+  ``(TVaR_p(X), TVaR_p(Y))`` curve at ``T_X = P``.  The special case
+  ``X = U[0, 1]`` is the *Gini lens*: ``TVaR_p(X) = (1 + p) / 2`` is affine in
+  p, so the pricing constraint collapses to a mean-Kusuoka-level condition
+  ``E_mu[p] = 2P - 1`` and the bounds read off the envelope gap of Y's own
+  TVaR curve.
+
 How they differ
 ---------------
 
-==============  ===================================  ===================================
-Aspect          ``Bounds``                           ``AllocationBounds``
-==============  ===================================  ===================================
-Object of       the *distortion family* G_P:         the *allocation image* of G_P:
-study           envelopes of g in (s, g(s)) space    ranges of NA premium by unit
-Input           Portfolio, Aggregate, or pmf         Portfolio only (needs ``exeqa_*``)
-                Series (needs ``tvar``, ``cdf``)
-Premium         baked in at construction             argument at call time; hulls are
-                                                     P-independent
-Machinery       p-knot grid + brentq root find,      CDF-breakpoint vertices and
-                approximate                          monotone-chain hulls, exact for
-                                                     the discretized distribution
-``p_star``      cached property at the fixed         ``p_star(P)`` method, exact
-                premium, generic root find           per-atom inversion
-==============  ===================================  ===================================
+.. list-table:: Bounds vs AllocationBounds vs PricingBounds
+   :header-rows: 1
+   :widths: 14 28 29 29
+
+   * - Aspect
+     - ``Bounds``
+     - ``AllocationBounds``
+     - ``PricingBounds``
+   * - Object of study
+     - the distortion family G_P (envelopes of g)
+     - the allocation image of G_P (NA premium by unit)
+     - the price image of G_P (price of another risk Y)
+   * - Input
+     - Portfolio, Aggregate, or pmf Series
+     - Portfolio only (needs ``exeqa_*``)
+     - two risks X, Y (or callable TVaR sources)
+   * - Premium
+     - baked in at construction
+     - argument at call time; hulls P-independent
+     - argument at call time; hulls P-independent
+   * - Machinery
+     - p-knot grid + brentq, approximate
+     - CDF-breakpoint vertices + monotone hulls, exact
+     - union-of-breakpoints vertices + hulls, exact
+   * - ``p_star``
+     - cached property, generic root find
+     - ``p_star(P)`` exact per-atom inversion
+     - ``p_star(P)`` via the X-source inverse
 
 Both parameterize the extreme consistent distortions as biTVaRs
 ``(1 - w1) TVaR_{p0} + w1 TVaR_{p1}`` with ``p0 <= p_star <= p1``.
@@ -70,7 +93,7 @@ from .spectral import Distortion
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['AllocationBounds', 'Bounds']
+__all__ = ['AllocationBounds', 'Bounds', 'PricingBounds']
 
 
 def _resolve_obj(obj, line):
@@ -605,7 +628,471 @@ def _monotone_hull(t, y, side):
     return np.asarray(idx, dtype=np.intp)
 
 
-class AllocationBounds:
+def _bitvar_g(s, s0, s1, w1):
+    """
+    Cumulative biTVaR distortion ``g`` evaluated at survival probabilities ``s``.
+
+    ``g(s) = (1 - w1) min(1, s / s0) + w1 min(1, s / s1)`` where ``s0 = 1 - p0``
+    and ``s1 = 1 - p1`` are the tail levels of the two TVaR knots.  A level of
+    zero is the maximal distortion ``1_{s > 0}`` (the TVaR-1 / essential-sup
+    pricing measure).
+    """
+    def hinge(lvl):
+        if lvl <= 0.0:
+            return (np.asarray(s) > 0).astype(float)
+        return np.minimum(1.0, np.asarray(s) / lvl)
+    return (1.0 - w1) * hinge(s0) + w1 * hinge(s1)
+
+
+def _extract_pmf(obj, a=np.inf):
+    """
+    Coerce *obj* into ``(x, prob, name)`` — a discrete distribution of
+    ``min(obj, a)`` on a strictly increasing grid with positive masses
+    summing to 1.
+
+    Parameters
+    ----------
+    obj : Aggregate, Portfolio, pd.Series, or pd.DataFrame
+        For ``Aggregate`` / ``Portfolio`` the total ``p_total`` pmf is used;
+        for ``Series`` / ``DataFrame`` the index is outcomes and the values
+        (first column for a frame) the pmf.
+    a : float, default ``np.inf``
+        Asset cap.  Mass at outcomes ``>= a`` collapses into a single atom at
+        ``a`` — the distribution of ``min(obj, a)``.  Only the *distribution*
+        is capped (no allocation bookkeeping), so this is an exact, cheap
+        transform.
+
+    Returns
+    -------
+    x : ndarray
+    prob : ndarray
+    name : str
+    """
+    from .distributions import Aggregate
+    from .portfolio import Portfolio
+
+    if isinstance(obj, (Aggregate, Portfolio)):
+        ser = obj.density_df.query('p_total > 0').p_total
+        name = obj.name
+    elif isinstance(obj, pd.DataFrame):
+        ser = obj.iloc[:, 0]
+        ser = ser[ser > 0]
+        name = str(obj.columns[0])
+    elif isinstance(obj, pd.Series):
+        ser = obj[obj > 0]
+        name = str(ser.name) if ser.name is not None else 'series'
+    else:
+        raise TypeError(
+            f'PricingBounds: unsupported source type {type(obj).__name__}. '
+            'Accepted: Aggregate, Portfolio, pd.Series, pd.DataFrame, '
+            "a TVaR source, or 'uniform'.")
+
+    if not ser.index.is_unique:
+        raise ValueError('pmf index must be unique')
+    if not ser.index.is_monotonic_increasing:
+        raise ValueError('pmf index must be monotonic increasing')
+
+    x = ser.index.to_numpy(dtype=float)
+    prob = ser.to_numpy(dtype=float)
+    if np.isfinite(a):
+        # Collapse the tail X >= a into one atom at a (distribution of min(X,a)).
+        x = np.minimum(x, a)
+        # Sum masses sharing the (now repeated) cap value; np.add.reduceat on
+        # the unique grid keeps it O(n).
+        uniq, inv = np.unique(x, return_inverse=True)
+        pooled = np.zeros_like(uniq)
+        np.add.at(pooled, inv, prob)
+        x, prob = uniq, pooled
+    prob = prob / prob.sum()
+    return x, prob, name
+
+
+class _TVaRSource:
+    """
+    Axis adapter for :class:`PricingBounds`: a thing that returns ``TVaR_p``.
+
+    Two concrete kinds, both usable on either axis (so the uniform reference
+    can be X *or* Y):
+
+    - :class:`_RiskSource` wraps a discrete risk (Aggregate, Portfolio, pmf);
+      ``tvar`` and ``breakpoints`` come from its pmf, and it can be repriced
+      from first principles for :meth:`PricingBounds.check`.
+    - :class:`_CallableSource` wraps a closed-form ``(T, T_inv)`` pair with no
+      breakpoints — e.g. :func:`uniform_source`.
+    """
+
+    name = '?'
+    breakpoints = None      # ndarray of interior p where VaR jumps, or None
+
+    def tvar(self, p):
+        """Vectorised ``TVaR_p`` at the (array of) probability level(s) ``p``."""
+        raise NotImplementedError
+
+    def tvar_inv(self, t):
+        """The p with ``TVaR_p = t`` (scalar), or ``None`` if unavailable."""
+        return None
+
+    def reprice(self, g):
+        """``rho_g`` via the survival hinge, or ``None`` if no pmf is held."""
+        return None
+
+
+class _RiskSource(_TVaRSource):
+    """A :class:`_TVaRSource` backed by a discrete risk's pmf."""
+
+    def __init__(self, x, prob, name):
+        from .utilities import make_var_tvar
+        self.name = name
+        self._x = np.asarray(x, dtype=float)
+        self._prob = np.asarray(prob, dtype=float)
+        F = np.cumsum(self._prob)
+        F[-1] = 1.0
+        self._F = F
+        # Interior breakpoints: p where the VaR steps to the next atom.
+        self.breakpoints = F[:-1]
+        self._tvar = make_var_tvar(pd.Series(self._prob, index=self._x)).tvar
+        # Own-grid vertices for exact tvar inversion (p_star).
+        S = np.cumsum(self._prob[::-1])[::-1]            # S_m = Pr(X >= x_m)
+        self._S_own = S
+        self._T_own = np.cumsum((self._prob * self._x)[::-1])[::-1] / S
+        self._pv_own = np.concatenate([[0.0], F[:-1]])
+
+    def tvar(self, p):
+        return np.asarray(self._tvar(np.asarray(p, dtype=float)), dtype=float)
+
+    def tvar_inv(self, P):
+        """
+        Exact p with ``TVaR_p(X) = P`` from the own-grid vertices.
+
+        Locate the bracketing vertices ``T_m <= P <= T_{m+1}``; within the
+        atom at the VaR ``x_{m-1}`` the level solves
+        ``1 - p = S_m (T_m - x_{m-1}) / (P - x_{m-1})``.
+        """
+        P = float(P)
+        T = self._T_own
+        m = int(np.searchsorted(T, P))
+        if m >= len(T):
+            return float(self._pv_own[-1])
+        if T[m] == P:
+            return float(self._pv_own[m])
+        xk = self._x[m - 1]
+        s = self._S_own[m] * (T[m] - xk) / (P - xk)
+        return float(1.0 - s)
+
+    def reprice(self, g):
+        # rho_g(X) = sum_x x * Delta g(S(x)), S the strict survival function.
+        Sx = np.append(np.cumsum(self._prob[::-1])[::-1][1:], 0.0)
+        gp = -np.diff(g(Sx), prepend=1.0)
+        return float(gp @ self._x)
+
+
+class _CallableSource(_TVaRSource):
+    """A :class:`_TVaRSource` backed by closed-form ``T(p)`` and ``T_inv(t)``."""
+
+    def __init__(self, tvar, tvar_inv=None, name='callable', breakpoints=None):
+        self._tvar = tvar
+        self._tvar_inv = tvar_inv
+        self.name = name
+        self.breakpoints = breakpoints
+
+    def tvar(self, p):
+        return np.asarray(self._tvar(np.asarray(p, dtype=float)), dtype=float)
+
+    def tvar_inv(self, t):
+        return None if self._tvar_inv is None else float(self._tvar_inv(float(t)))
+
+
+def uniform_source(name='U[0,1]'):
+    """
+    The standard-uniform TVaR source — the Gini reference.
+
+    ``TVaR_p(U[0,1]) = (1 + p) / 2`` is affine in p, so its inverse is
+    ``T_inv(t) = 2t - 1``.  Used as the X-source it turns the pricing
+    constraint into the mean-Kusuoka-level condition ``E_mu[p] = 2P - 1``;
+    used as a Y-source it reports a normalised dispersion (Gini) reading.
+    """
+    return _CallableSource(lambda p: (1.0 + p) / 2.0,
+                           tvar_inv=lambda t: 2.0 * t - 1.0,
+                           name=name)
+
+
+def _coerce_source(obj, *, a=np.inf, name=None):
+    """Coerce a user argument into a :class:`_TVaRSource`."""
+    if isinstance(obj, _TVaRSource):
+        return obj
+    if isinstance(obj, str):
+        if obj.lower() in ('uniform', 'unif', 'u'):
+            return uniform_source()
+        raise ValueError(f"unknown source string {obj!r}; did you mean 'uniform'?")
+    x, prob, nm = _extract_pmf(obj, a)
+    return _RiskSource(x, prob, name or nm)
+
+
+class _HullEngine:
+    """
+    Shared convex-hull / slice engine for :class:`AllocationBounds` and
+    :class:`PricingBounds`.
+
+    Both classes reduce to the same geometry: a parametric curve
+    ``(T_X(p), y_j(p))`` per item ``j``, exactly piecewise linear in
+    ``(T_X, y_j)`` with vertices at the CDF breakpoints, whose vertical slice
+    at ``T_X = P`` through the convex hull gives ``[min, max]`` of the item's
+    score over all distortions pricing X to P.  Subclasses build the vertex
+    table and call :meth:`_init_engine`; everything below queries it.
+
+    The vertex table is held as
+
+    - ``_T`` : (n,) strictly increasing x-axis = ``TVaR_p(X)`` at the vertices,
+    - ``_A`` : (n, 1 + k), column 0 == ``_T``, columns 1.. the k item curves,
+    - ``_p_vert`` / ``_S`` : the vertex p-values and exact tail masses ``1 - p``,
+    - ``_y_names`` : the k item (unit / risk) names,
+    - ``_hulls`` : per item the lower/upper monotone-chain envelope indices.
+
+    Subclasses provide :meth:`_invert_T` (the ``p_star`` inverse) and their own
+    ``check`` / ``curve_df``.
+    """
+
+    _item_label = 'unit'
+    _curve_label = r'$a_i(p)$ vs $T(p)$'
+    _xlabel = '$T(p)$ = total premium'
+    _ylabel = 'NA premium'
+
+    def _init_engine(self, T, A, p_vert, S, y_names):
+        """Store the vertex table and build the per-item convex envelopes."""
+        self._T = np.asarray(T, dtype=float)
+        self._A = np.asarray(A, dtype=float)
+        self._p_vert = np.asarray(p_vert, dtype=float)
+        self._S = np.asarray(S, dtype=float)
+        self._y_names = list(y_names)
+        self._hulls = {}
+        for j, u in enumerate(self._y_names):
+            y = self._A[:, j + 1]
+            self._hulls[u] = {'lower': _monotone_hull(self._T, y, 'lower'),
+                              'upper': _monotone_hull(self._T, y, 'upper')}
+        self.premium_range = (float(self._T[0]), float(self._T[-1]))
+
+    # ----------------------------------------------------------------------
+    # p_star — exact inversion of TVaR_p(X) = P
+    # ----------------------------------------------------------------------
+
+    def _invert_T(self, P):
+        """Return the p with ``TVaR_p(X) = P`` (subclass hook)."""
+        raise NotImplementedError
+
+    def p_star(self, P):
+        """
+        The p with ``TVaR_p(X) = P``, exact for the discrete distribution.
+
+        Compare :attr:`Bounds.p_star`, the generic root-found counterpart
+        (premium fixed at construction, any input object).
+
+        Parameters
+        ----------
+        P : float
+            Target premium, within :attr:`premium_range`.
+
+        Returns
+        -------
+        float
+        """
+        P = float(P)
+        self._validate_P(np.array([P]))
+        return self._invert_T(P)
+
+    # ----------------------------------------------------------------------
+    # Core slicing
+    # ----------------------------------------------------------------------
+
+    def _validate_P(self, P):
+        """Raise if any target premium lies outside the feasible range."""
+        lo, hi = self.premium_range
+        bad = (P < lo) | (P > hi)
+        if bad.any():
+            raise ValueError(
+                f'P={P[bad][:5]} outside feasible premium range [{lo:.6g}, {hi:.6g}] '
+                f'(= [E[X], TVaR at s_floor truncation]).')
+
+    def _slice(self, name, side, P):
+        """
+        Evaluate one envelope at premiums P.
+
+        Returns
+        -------
+        value, p0, p1, w1, i0, i1 : ndarrays
+            Envelope height at each P; the achieving biTVaR (TVaR levels
+            ``p0 < p1``, weight ``w1`` on ``p1``); and the kept-vertex
+            indices of the edge endpoints (used internally for exact-S
+            repricing).  When the slice lands exactly on a vertex the
+            biTVaR is degenerate (``w1`` 0 or 1 — a pure TVaR).
+        """
+        h = self._hulls[name][side]
+        j = self._y_names.index(name) + 1
+        xh, yh = self._T[h], self._A[h, j]
+        # Edge e spans [xh[e], xh[e+1]]; clip handles the endpoints.
+        e = np.clip(np.searchsorted(xh, P, side='right') - 1, 0, len(xh) - 2)
+        x0, x1 = xh[e], xh[e + 1]
+        w1 = (P - x0) / (x1 - x0)
+        value = (1.0 - w1) * yh[e] + w1 * yh[e + 1]
+        return value, self._p_vert[h[e]], self._p_vert[h[e + 1]], w1, h[e], h[e + 1]
+
+    # ----------------------------------------------------------------------
+    # Public queries
+    # ----------------------------------------------------------------------
+
+    def bounds(self, P):
+        """
+        Lower/upper bounds by item at reference premium P.
+
+        Parameters
+        ----------
+        P : float or array_like
+            Target reference premium(s), each within :attr:`premium_range`.
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(P, item)`` with columns ``lower``, ``upper``,
+            ``width``.
+        """
+        P = np.atleast_1d(np.asarray(P, dtype=float))
+        self._validate_P(P)
+        blocks = []
+        for u in self._y_names:
+            lo, *_ = self._slice(u, 'lower', P)
+            hi, *_ = self._slice(u, 'upper', P)
+            blocks.append(pd.DataFrame(
+                {'lower': lo, 'upper': hi, 'width': hi - lo},
+                index=pd.MultiIndex.from_arrays(
+                    [P, [u] * len(P)], names=['P', self._item_label])))
+        return pd.concat(blocks).sort_index()
+
+    def bitvars(self, P):
+        """
+        Achieving biTVaRs for each item's lower and upper bound at P.
+
+        Parameters
+        ----------
+        P : float or array_like
+            Target reference premium(s).
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(P, item, bound)`` with columns ``value`` (the
+            bound), ``p0``, ``p1``, ``w1`` — the biTVaR
+            ``(1 - w1) TVaR_{p0} + w1 TVaR_{p1}``, weight on the upper level
+            per the :class:`~aggregate.spectral.Distortion` convention.
+
+        Notes
+        -----
+        When the achieving hull edge joins *adjacent* curve vertices the curve
+        itself is on the envelope there, and the biTVaR is equivalent to the
+        pure ``TVaR_{p_star(P)}`` inside that atom — the two-point
+        representation is then one of many optimizers.  Edges that skip
+        vertices are genuine two-point biTVaRs.
+        """
+        P = np.atleast_1d(np.asarray(P, dtype=float))
+        self._validate_P(P)
+        recs = []
+        for u in self._y_names:
+            for side in ('lower', 'upper'):
+                v, p0, p1, w1, *_ = self._slice(u, side, P)
+                for i in range(len(P)):
+                    recs.append((P[i], u, side, v[i], p0[i], p1[i], w1[i]))
+        return (pd.DataFrame(recs, columns=['P', self._item_label, 'bound',
+                                            'value', 'p0', 'p1', 'w1'])
+                .set_index(['P', self._item_label, 'bound'])
+                .sort_index())
+
+    def __call__(self, P):
+        """Shorthand for :meth:`bounds`."""
+        return self.bounds(P)
+
+    def distortion(self, P, item, bound):
+        """
+        The achieving distortion for one item/bound at premium P.
+
+        Parameters
+        ----------
+        P : float
+        item : str
+            Unit (allocation) or risk (pricing) name.
+        bound : {'lower', 'upper'}
+
+        Returns
+        -------
+        Distortion
+            ``Distortion('bitvar', p0, p1, w1)``, or ``Distortion('tvar', p)``
+            when the optimizer is degenerate (slice exactly at a vertex).
+        """
+        v, p0, p1, w1, *_ = self._slice(item, bound, np.array([float(P)]))
+        p0, p1, w1 = float(p0[0]), float(p1[0]), float(w1[0])
+        # Degenerate: slice landed on a vertex -> pure TVaR at that level.
+        if w1 == 0.0 or p0 == p1:
+            return Distortion('tvar', p=p0, display_name=f'TVaR({p0:.5g})')
+        if w1 == 1.0:
+            return Distortion('tvar', p=p1, display_name=f'TVaR({p1:.5g})')
+        return Distortion('bitvar', p0=p0, p1=p1, w1=w1,
+                          display_name=f'bitvar({p0:.5g}, {p1:.5g}; {w1:.4g})')
+
+    # ----------------------------------------------------------------------
+    # Plotting
+    # ----------------------------------------------------------------------
+
+    def plot(self, items=None, P=None, axs=None, max_t=None):
+        """
+        Plot each item's curve, convex envelopes, and optional P-slice.
+
+        Parameters
+        ----------
+        items : list of str, optional
+            Default: all items.
+        P : float, optional
+            Draw the vertical slice at T = P and mark the bounds.
+        axs : array of Axes, optional
+            One per item; created if omitted.
+        max_t : float, optional
+            Truncate the T axis (the far tail compresses the picture).
+
+        Returns
+        -------
+        array of Axes
+        """
+        if items is None:
+            items = self._y_names
+        if axs is None:
+            n = len(items)
+            ncols = min(n, 3)
+            nrows = -(-n // ncols)
+            fig, axs = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 2.8 * nrows),
+                                    constrained_layout=True, squeeze=False)
+            axs = axs.flat
+        for ax, u in zip(axs, items):
+            j = self._y_names.index(u) + 1
+            t, y = self._T, self._A[:, j]
+            if max_t is not None:
+                mask = t <= max_t
+                t, y = t[mask], y[mask]
+            ax.plot(t, y, lw=0.75, c='C0', label=self._curve_label)
+            for side, c in (('lower', 'C2'), ('upper', 'C3')):
+                h = self._hulls[u][side]
+                th, yh = self._T[h], self._A[h, j]
+                if max_t is not None:
+                    m = th <= max_t
+                    th, yh = th[m], yh[m]
+                ax.plot(th, yh, lw=1.25, c=c, ls='--', label=side)
+            if P is not None:
+                lo, *_ = self._slice(u, 'lower', np.array([float(P)]))
+                hi, *_ = self._slice(u, 'upper', np.array([float(P)]))
+                ax.axvline(P, lw=0.5, c='k')
+                ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
+                ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
+            ax.set(title=u, xlabel=self._xlabel, ylabel=self._ylabel)
+            ax.legend(fontsize='x-small')
+        return axs
+
+
+class AllocationBounds(_HullEngine):
     """
     Natural-allocation premium ranges consistent with a total premium.
 
@@ -819,29 +1306,18 @@ class AllocationBounds:
         self._x = x
         self._prob = prob
         self._kappa = kappa                                   # (n, 1 + n_units)
-        self._S = S[ok]                                       # = 1 - p, exact
-        self._T = T[ok]
-        self._A = A[ok]
-        self._p_vert = p_vert[ok]
         # Map kept-vertex position -> original row, for p_star atom lookup.
         self._row = np.flatnonzero(ok)
+
+        # Hand the vertex table to the shared engine (sets _T, _A, _p_vert,
+        # _S, _y_names, _hulls, premium_range).  P-independent, so all later
+        # queries are O(log n) slices.
+        self._init_engine(T[ok], A[ok], p_vert[ok], S[ok], self.units)
 
         self.curve_df = pd.DataFrame(
             self._A,
             index=pd.Index(self._p_vert, name='p'),
             columns=['exeqa_total'] + kcols)
-
-        # ------------------------------------------------------------------
-        # Per-unit envelopes: indices into the vertex arrays.  P-independent,
-        # so all later queries are O(log n) slices.
-        # ------------------------------------------------------------------
-        self._hulls = {}
-        for j, u in enumerate(self.units):
-            y = self._A[:, j + 1]                             # col 0 is total
-            self._hulls[u] = {'lower': _monotone_hull(self._T, y, 'lower'),
-                              'upper': _monotone_hull(self._T, y, 'upper')}
-
-        self.premium_range = (float(self._T[0]), float(self._T[-1]))
 
         # Diagnostic: sum of unit allocations should equal T at every vertex.
         # Any residual is inherited from density_df; see class docstring.
@@ -863,32 +1339,16 @@ class AllocationBounds:
     # p_star — exact inversion of TVaR_p(X) = P on the grid
     # ----------------------------------------------------------------------
 
-    def p_star(self, P):
+    def _invert_T(self, P):
         """
         The p with ``TVaR_p(X) = P``, exact for the discrete distribution.
 
-        Compare :attr:`Bounds.p_star`, the generic root-found counterpart
-        (premium fixed at construction, any input object).
-
-        Parameters
-        ----------
-        P : float
-            Target premium, within :attr:`premium_range`.
-
-        Returns
-        -------
-        float
-
-        Notes
-        -----
         Locate the bracketing vertices ``T_m <= P <= T_{m+1}``; within that
         atom ``TVaR_p = x_m + (A - S x_m)/(1 - p)`` with
         ``A = S_{m+1} T_{m+1}`` and ``S = S_{m+1}`` the strict-tail mass, so
 
             1 - p* = S_{m+1} (T_{m+1} - x_m) / (P - x_m).
         """
-        P = float(P)
-        self._validate_P(np.array([P]))
         m = int(np.searchsorted(self._T, P))
         if self._T[m] == P:
             return float(self._p_vert[m])
@@ -896,142 +1356,6 @@ class AllocationBounds:
         xk = self._x[self._row[m - 1]]
         s = self._S[m] * (self._T[m] - xk) / (P - xk)
         return float(1.0 - s)
-
-    # ----------------------------------------------------------------------
-    # Core slicing
-    # ----------------------------------------------------------------------
-
-    def _validate_P(self, P):
-        """Raise if any target premium lies outside the feasible range."""
-        lo, hi = self.premium_range
-        bad = (P < lo) | (P > hi)
-        if bad.any():
-            raise ValueError(
-                f'P={P[bad][:5]} outside feasible premium range [{lo:.6g}, {hi:.6g}] '
-                f'(= [E[X], TVaR at s_floor truncation]).')
-
-    def _slice(self, unit, side, P):
-        """
-        Evaluate one envelope at premiums P.
-
-        Returns
-        -------
-        value, p0, p1, w1, i0, i1 : ndarrays
-            Envelope height at each P; the achieving biTVaR (TVaR levels
-            ``p0 < p1``, weight ``w1`` on ``p1``); and the kept-vertex
-            indices of the edge endpoints (used internally for exact-S
-            repricing).  When the slice lands exactly on a vertex the
-            biTVaR is degenerate (``w1`` 0 or 1 — a pure TVaR).
-        """
-        h = self._hulls[unit][side]
-        xh, yh = self._T[h], self._A[h, self.units.index(unit) + 1]
-        # Edge e spans [xh[e], xh[e+1]]; right side puts P == xh[e] on the
-        # edge to its left except at the first vertex; clip handles ends.
-        e = np.clip(np.searchsorted(xh, P, side='right') - 1, 0, len(xh) - 2)
-        x0, x1 = xh[e], xh[e + 1]
-        w1 = (P - x0) / (x1 - x0)
-        value = (1.0 - w1) * yh[e] + w1 * yh[e + 1]
-        return value, self._p_vert[h[e]], self._p_vert[h[e + 1]], w1, h[e], h[e + 1]
-
-    # ----------------------------------------------------------------------
-    # Public queries
-    # ----------------------------------------------------------------------
-
-    def bounds(self, P):
-        """
-        Lower/upper natural-allocation bounds by unit at total premium P.
-
-        Parameters
-        ----------
-        P : float or array_like
-            Target total premium(s), each within :attr:`premium_range`.
-
-        Returns
-        -------
-        DataFrame
-            Indexed by ``(P, unit)`` with columns ``lower``, ``upper``,
-            ``width``.  Within each P the lower (resp. upper) column sums to
-            at most (at least) P; equality holds only when every unit's
-            bound is achieved by the same biTVaR.
-        """
-        P = np.atleast_1d(np.asarray(P, dtype=float))
-        self._validate_P(P)
-        blocks = []
-        for u in self.units:
-            lo, *_ = self._slice(u, 'lower', P)
-            hi, *_ = self._slice(u, 'upper', P)
-            blocks.append(pd.DataFrame(
-                {'lower': lo, 'upper': hi, 'width': hi - lo},
-                index=pd.MultiIndex.from_arrays([P, [u] * len(P)], names=['P', 'unit'])))
-        return pd.concat(blocks).sort_index()
-
-    def bitvars(self, P):
-        """
-        Achieving biTVaRs for each unit's lower and upper bound at P.
-
-        Parameters
-        ----------
-        P : float or array_like
-            Target total premium(s).
-
-        Returns
-        -------
-        DataFrame
-            Indexed by ``(P, unit, bound)`` with columns ``value`` (the
-            bound), ``p0``, ``p1``, ``w1`` — the biTVaR
-            ``(1 - w1) TVaR_{p0} + w1 TVaR_{p1}``, weight on the upper level
-            per the :class:`~aggregate.spectral.Distortion` convention.
-
-        Notes
-        -----
-        When the achieving hull edge joins *adjacent* curve vertices the
-        curve itself is on the envelope there, and the biTVaR is equivalent
-        (for every unit's allocation simultaneously) to the pure
-        ``TVaR_{p_star(P)}`` inside that atom — the two-point representation
-        is then one of many optimizers.  Edges that skip vertices are
-        genuine two-point biTVaRs.
-        """
-        P = np.atleast_1d(np.asarray(P, dtype=float))
-        self._validate_P(P)
-        recs = []
-        for u in self.units:
-            for side in ('lower', 'upper'):
-                v, p0, p1, w1, *_ = self._slice(u, side, P)
-                for i in range(len(P)):
-                    recs.append((P[i], u, side, v[i], p0[i], p1[i], w1[i]))
-        return (pd.DataFrame(recs, columns=['P', 'unit', 'bound', 'value', 'p0', 'p1', 'w1'])
-                .set_index(['P', 'unit', 'bound'])
-                .sort_index())
-
-    def __call__(self, P):
-        """Shorthand for :meth:`bounds`."""
-        return self.bounds(P)
-
-    def distortion(self, P, unit, bound):
-        """
-        The achieving distortion for one unit/bound at premium P.
-
-        Parameters
-        ----------
-        P : float
-        unit : str
-        bound : {'lower', 'upper'}
-
-        Returns
-        -------
-        Distortion
-            ``Distortion('bitvar', p0, p1, w1)``, or ``Distortion('tvar', p)``
-            when the optimizer is degenerate (slice exactly at a vertex).
-        """
-        v, p0, p1, w1, *_ = self._slice(unit, bound, np.array([float(P)]))
-        p0, p1, w1 = float(p0[0]), float(p1[0]), float(w1[0])
-        # Degenerate: slice landed on a vertex -> pure TVaR at that level.
-        if w1 == 0.0 or p0 == p1:
-            return Distortion('tvar', p=p0, display_name=f'TVaR({p0:.5g})')
-        if w1 == 1.0:
-            return Distortion('tvar', p=p1, display_name=f'TVaR({p1:.5g})')
-        return Distortion('bitvar', p0=p0, p1=p1, w1=w1,
-                          display_name=f'bitvar({p0:.5g}, {p1:.5g}; {w1:.4g})')
 
     # ----------------------------------------------------------------------
     # Audits
@@ -1154,58 +1478,281 @@ class AllocationBounds:
                                             'err', 'total', 'total_err'])
                 .set_index(['unit', 'bound']))
 
+
+class PricingBounds(_HullEngine):
+    """
+    Price ranges of a second risk consistent with pricing a reference risk.
+
+    Given a reference risk ``X`` priced to ``P`` by *some* distortion ``g``,
+    determine for one or more other risks ``Y`` the range of the price
+    ``rho_g(Y)`` over the whole family ``G_P = { g : rho_g(X) = P }`` — the
+    cross-pricing counterpart of :class:`AllocationBounds` (see the module
+    docstring for the comparison).
+
+    A distortion with Kusuoka measure ``mu`` prices *any* risk by
+    ``rho_mu(Z) = int TVaR_p(Z) mu(dp)``, so the pricing constraint
+    ``int TVaR_p(X) mu(dp) = P`` is one affine constraint and the extreme
+    consistent measures are biTVaRs.  Plotting ``TVaR_p(Y)`` against
+    ``TVaR_p(X)`` as ``p`` sweeps ``[0, 1]`` gives a parametric curve whose
+    vertical slice at ``T_X = P`` through the convex hull is the price range
+    of ``Y``.
+
+    Parameters
+    ----------
+    x_source : Aggregate, Portfolio, pd.Series, ``'uniform'``, or TVaR source
+        The reference risk ``X`` carrying the pricing constraint.  Pass
+        ``'uniform'`` (or :func:`uniform_source`) for the Gini lens, where
+        ``TVaR_p(X) = (1 + p) / 2`` and the constraint becomes the mean
+        Kusuoka level ``E_mu[p] = 2P - 1``.
+    y_sources : source or list/dict of sources
+        The risk(s) ``Y`` whose price range is wanted.  A dict supplies
+        explicit names; a list/single uses each source's own name.  Any
+        TVaR source is accepted (a risk, a layer, a standalone unit, or the
+        uniform reference).
+    a : float, default ``np.inf``
+        Asset cap.  Finite ``a`` prices ``min(X, a)`` and ``min(Y, a)`` —
+        only the *distributions* are capped (no allocation bookkeeping), an
+        exact, cheap pmf transform.  Ignored for closed-form sources.
+    s_floor : float, default 1e-14
+        Drop vertices with tail probability ``1 - p < s_floor`` (deep-tail
+        FFT noise); shrinks the feasible-premium upper end from ``ess sup X``.
+    n_grid : int, default 1024
+        Fallback p-grid size used only when *every* source is closed-form
+        (no breakpoints); smooth curves converge fast so this is rarely hit.
+
+    Attributes
+    ----------
+    curve_df : DataFrame
+        Vertex table indexed by ``p`` with column ``tvar_<X>`` (= ``TVaR_p(X)``)
+        and one ``price_<Y>`` column per Y (= ``TVaR_p(Y)``).  Exact at every
+        index value; the curve is linear in the ``(T_X, T_Y)`` plane between
+        rows.
+    premium_range : tuple of float
+        ``(E[X], T_X_max)`` — the feasible P values.
+    gini_level : float or None
+        For a uniform reference, ``2P - 1`` is the mean Kusuoka level; this
+        attribute is ``None`` unless the X-source is the uniform reference,
+        in which case :meth:`mean_kusuoka_level` gives it for any P.
+
+    Notes
+    -----
+    **Unmatched p-grids.**  X and Y have different CDF breakpoints.  Within a
+    single atom of X, ``TVaR_p(X)`` is affine in ``u = 1/(1 - p)``; within a
+    single atom of Y, ``TVaR_p(Y)`` is affine in the *same* ``u``.  On the
+    intersection of an X-atom and a Y-atom — between consecutive points of the
+    **union of the two breakpoint sets** — both coordinates are affine in
+    ``u``, so the curve is exactly a line segment in ``(T_X, T_Y)`` space.
+    Merging the breakpoint grids and evaluating both TVaRs at every union
+    point therefore gives the exact piecewise-linear curve with no
+    interpolation.
+
+    **Gini lens** (uniform reference).  With ``X = U[0, 1]`` the x-axis is
+    affine in ``p`` itself, so the constraint reads ``E_mu[p] = 2P - 1`` and
+    the bounds become the concave/convex envelope gap of ``Y``'s own
+    ``TVaR``-vs-``p`` curve at the mean Kusuoka level — an X-free reading of
+    why distortions pricing ``Y`` disagree.
+
+    **Bounded vs unbounded.**  For a finite asset cap ``a`` the construction
+    is exact and well-conditioned: the tail collapses into a macroscopic atom
+    at ``a``, no vertex approaches ``p = 1``, and :meth:`check` reprices to
+    ~1e-12.  Unbounded, the upper price bound of a heavy-tailed ``Y`` is
+    genuinely tail-driven (a vanishing weight on the ess-sup pricing measure
+    times a diverging ess sup), and on the FFT grid the deep-tail vertices
+    (``1 - p`` below ~1e-7) are discretization noise rather than exact math.
+    The upper bound there is grid-sensitive and :meth:`check` will show larger
+    errors at extreme-tail biTVaR knots — diagnostic of that unreliability.
+    Cap the risks (pass ``a`` / use :meth:`Portfolio.pricing_bounds` with
+    ``p=``), or raise ``s_floor``, for stable answers.
+
+    Examples
+    --------
+    ::
+
+        from aggregate.bounds import PricingBounds
+        pb = PricingBounds(port, layer_agg)      # price of layer given rho(port)=P
+        pb = PricingBounds('uniform', Y)         # Gini lens on Y
+        pb.curve_df                              # (p, T_X, T_Y) vertex table
+        pb.bounds(1200)                          # (P, risk) -> lower/upper/width
+        pb.bitvars(1200)                         # achieving biTVaRs (p0, p1, w1)
+        pb.check(1200)                           # audit: reprice each Y directly
+        pb.plot(P=1200)                          # curves, hulls, slice
+    """
+
+    _item_label = 'risk'
+    _curve_label = r'$T_Y(p)$ vs $T_X(p)$'
+    _xlabel = '$T_X(p)$ = price of X'
+    _ylabel = 'price of Y'
+
+    def __init__(self, x_source, y_sources, *, a=np.inf, s_floor=1e-14,
+                 n_grid=1024):
+        self.a = float(a)
+        self.s_floor = float(s_floor)
+        self.n_grid = int(n_grid)
+
+        # Coerce the X (reference) source and the Y (target) source(s).
+        self._x_source = _coerce_source(x_source, a=self.a, name='X')
+        self._is_uniform_x = (isinstance(self._x_source, _CallableSource)
+                              and self._x_source.breakpoints is None
+                              and self._x_source.name == 'U[0,1]')
+
+        if isinstance(y_sources, dict):
+            raw = list(y_sources.items())
+        elif isinstance(y_sources, (list, tuple)):
+            raw = [(None, y) for y in y_sources]
+        else:
+            raw = [(None, y_sources)]
+        y_items = []
+        seen = set()
+        for nm, y in raw:
+            src = _coerce_source(y, a=self.a, name=nm)
+            name = nm if nm is not None else src.name
+            base, k = name, 1                    # disambiguate clashes
+            while name in seen:
+                k += 1
+                name = f'{base}#{k}'
+            seen.add(name)
+            y_items.append((name, src))
+        self._y_sources = dict(y_items)
+        y_names = [nm for nm, _ in y_items]
+
+        # ------------------------------------------------------------------
+        # Vertex p-grid: the union of every source's CDF breakpoints (the p
+        # where some VaR jumps), plus p = 0.  Between consecutive union points
+        # every TVaR is affine in u = 1/(1 - p), so the curve is exactly
+        # piecewise linear with these vertices.  If all sources are closed
+        # form, fall back to a dense grid (approximate but fast-converging).
+        # ------------------------------------------------------------------
+        bps = [np.asarray(src.breakpoints, dtype=float)
+               for src in [self._x_source] + [s for _, s in y_items]
+               if src.breakpoints is not None]
+        if bps:
+            p_vert = np.unique(np.concatenate([[0.0]] + bps))
+        else:
+            p_vert = np.linspace(0.0, 1.0, self.n_grid, endpoint=False)
+        p_vert = p_vert[(p_vert >= 0.0) & (1.0 - p_vert >= self.s_floor)]
+
+        # Evaluate every TVaR at the shared vertices (x-vertices are common,
+        # so adding Y columns is cheap — many Ys cost almost nothing).
+        T = self._x_source.tvar(p_vert)
+        ycols = [src.tvar(p_vert) for _, src in y_items]
+        A = np.column_stack([T] + ycols)
+
+        # T_X must be strictly increasing.  It is for distinct p (conditional
+        # tail expectations increase) until X saturates at its ess sup, where
+        # several top vertices tie; keep only strictly-advancing vertices
+        # (the slicing/hull machinery needs a strict x-order).
+        order = np.argsort(T, kind='mergesort')
+        T, A, p_vert = T[order], A[order], p_vert[order]
+        runmax = np.maximum.accumulate(np.concatenate([[-np.inf], T[:-1]]))
+        ok = T > runmax
+        if ok.sum() < 2:
+            raise ValueError('Fewer than two usable curve vertices; the '
+                             'x-source is degenerate or s_floor too aggressive.')
+        T, A, p_vert = T[ok], A[ok], p_vert[ok]
+
+        self._init_engine(T, A, p_vert, 1.0 - p_vert, y_names)
+
+        self.curve_df = pd.DataFrame(
+            A, index=pd.Index(p_vert, name='p'),
+            columns=[f'tvar_{self._x_source.name}']
+                    + [f'price_{nm}' for nm in y_names])
+        self.gini_level = (self.mean_kusuoka_level(self.premium_range[0])
+                           if self._is_uniform_x else None)
+
     # ----------------------------------------------------------------------
-    # Plotting
+    # Representation
     # ----------------------------------------------------------------------
 
-    def plot(self, units=None, P=None, axs=None, max_t=None):
+    def __repr__(self):
+        lo, hi = self.premium_range
+        cap = f'a={self.a:.6g}, ' if np.isfinite(self.a) else ''
+        return (f'PricingBounds(X={self._x_source.name!r}, '
+                f'Y={list(self._y_sources)}, {cap}'
+                f'{len(self._T)} vertices, premium range [{lo:.6g}, {hi:.6g}])')
+
+    # ----------------------------------------------------------------------
+    # p_star via the X-source inverse
+    # ----------------------------------------------------------------------
+
+    def _invert_T(self, P):
+        """The p with ``TVaR_p(X) = P`` via the X-source's exact inverse."""
+        p = self._x_source.tvar_inv(P)
+        if p is None:
+            raise NotImplementedError(
+                f'X-source {self._x_source.name!r} provides no TVaR inverse; '
+                'p_star is unavailable for this reference.')
+        return float(p)
+
+    def mean_kusuoka_level(self, P):
         """
-        Plot each unit's allocation curve, envelopes, and optional P-slice.
+        The mean Kusuoka level ``pi = 2P - 1`` for the uniform (Gini) reference.
+
+        Only meaningful when the X-source is :func:`uniform_source`: there the
+        pricing constraint ``int TVaR_p(X) mu(dp) = P`` reduces to
+        ``E_mu[p] = 2P - 1``, the average TVaR threshold the consistent
+        distortions must carry.
 
         Parameters
         ----------
-        units : list of str, optional
-            Default: all units.
-        P : float, optional
-            Draw the vertical slice at T = P and mark the bounds.
-        axs : array of Axes, optional
-            One per unit; created if omitted.
-        max_t : float, optional
-            Truncate the T axis (the far tail compresses the picture).
+        P : float
 
         Returns
         -------
-        array of Axes
+        float
         """
-        if units is None:
-            units = self.units
-        if axs is None:
-            n = len(units)
-            ncols = min(n, 3)
-            nrows = -(-n // ncols)
-            fig, axs = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 2.8 * nrows),
-                                    constrained_layout=True, squeeze=False)
-            axs = axs.flat
-        for ax, u in zip(axs, units):
-            j = self.units.index(u) + 1
-            t, y = self._T, self._A[:, j]
-            if max_t is not None:
-                mask = t <= max_t
-                t, y = t[mask], y[mask]
-            ax.plot(t, y, lw=0.75, c='C0', label=r'$a_i(p)$ vs $T(p)$')
-            for side, c in (('lower', 'C2'), ('upper', 'C3')):
-                h = self._hulls[u][side]
-                th, yh = self._T[h], self._A[h, j]
-                if max_t is not None:
-                    m = th <= max_t
-                    th, yh = th[m], yh[m]
-                ax.plot(th, yh, lw=1.25, c=c, ls='--', label=side)
-            if P is not None:
-                lo, *_ = self._slice(u, 'lower', np.array([float(P)]))
-                hi, *_ = self._slice(u, 'upper', np.array([float(P)]))
-                ax.axvline(P, lw=0.5, c='k')
-                ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
-                ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
-            ax.set(title=u, xlabel='$T(p)$ = total premium', ylabel='NA premium')
-            ax.legend(fontsize='x-small')
-        return axs
+        if not self._is_uniform_x:
+            raise ValueError('mean_kusuoka_level requires the uniform X-source '
+                             "(pass x_source='uniform').")
+        return 2.0 * float(P) - 1.0
+
+    # ----------------------------------------------------------------------
+    # Audit
+    # ----------------------------------------------------------------------
+
+    def check(self, P):
+        """
+        Audit the bounds at P by direct repricing with the achieving biTVaRs.
+
+        For each Y and bound, build the achieving biTVaR distortion and
+        reprice Y from first principles via the survival hinge
+        ``rho_g(Y) = sum_y y Delta g(S_Y(y))`` — an independent path from the
+        ``TVaR``-chord that produced the slice — then compare.  ``total``
+        reprices the *reference* X with the same biTVaR and must equal P.
+
+        Parameters
+        ----------
+        P : float
+
+        Returns
+        -------
+        DataFrame
+            Indexed by ``(risk, bound)`` with columns ``value`` (hull),
+            ``repriced`` (direct), ``err``, ``total`` (price of X, == P),
+            ``total_err``.  ``repriced``/``total`` are ``NaN`` for closed-form
+            sources that hold no pmf.
+
+        Notes
+        -----
+        The biTVaR hinge uses the *exact vertex tail probabilities*
+        ``1 - p0``, ``1 - p1`` from the engine, avoiding the ``1 - p``
+        cancellation near ``p = 1``.
+        """
+        P = float(P)
+        recs = []
+        for nm, src in self._y_sources.items():
+            for side in ('lower', 'upper'):
+                v, p0, p1, w1, i0, i1 = self._slice(nm, side, np.array([P]))
+                v, w1, i0, i1 = float(v[0]), float(w1[0]), int(i0[0]), int(i1[0])
+                s0, s1 = float(self._S[i0]), float(self._S[i1])
+                g = lambda s: _bitvar_g(s, s0, s1, w1)
+                repriced = src.reprice(g)
+                total = self._x_source.reprice(g)
+                recs.append((
+                    nm, side, v,
+                    np.nan if repriced is None else repriced,
+                    np.nan if repriced is None else repriced - v,
+                    np.nan if total is None else total,
+                    np.nan if total is None else total - P))
+        return (pd.DataFrame(recs, columns=['risk', 'bound', 'value', 'repriced',
+                                            'err', 'total', 'total_err'])
+                .set_index(['risk', 'bound']))

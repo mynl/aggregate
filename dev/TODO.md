@@ -37,6 +37,7 @@ alongside. **Start at `N1`.**
 |    | N3 | Portfolio apply-distortion calcs — columns, masses, `plot_twelve` | A | N2 | (same) |
 |    | N4 | Bounds numerics read-through | A | N2 | runs after the spine settles |
 | ✅ | N5 | `Portfolio.pricing_bounds` rewrite → `allocation_bounds` (a36) | A | N4 | — |
+| ✅ | N5b | `PricingBounds` — cross-pricing ranges + Gini lens (a37) | A | N5 | — |
 |    | N6 | Validation-calc review | A | — | independent of N1–N5 |
 |    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
 |    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
@@ -117,6 +118,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   totals (`a=` / `p=`, linear NA, tail collapse) landed in the same
   release; the collapse idiom was factored into
   `Portfolio._collapsed_exeqa`, shared with `price(allocation='linear')`.
+- [x] **N5b `[A]` `PricingBounds` — cross-pricing ranges** — **done 1.0.0a37**
+  (`dev/done/plan-pricing-bounds.md`): given `X` priced to P, the range of the
+  price of another risk `Y` over the consistent family, by slicing the convex
+  hull of `(TVaR_p(X), TVaR_p(Y))` (union-of-breakpoints vertices, exact). The
+  `AllocationBounds` hull/slice core was extracted into a shared `_HullEngine`
+  base; TVaR-source adapters make either axis a risk or a closed-form pair, so
+  the uniform reference gives the Gini mean-Kusuoka-level lens. Entry point
+  `Portfolio.pricing_bounds`.
 - [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
   published *Aggregate* paper; make docs match the actual algo; finish "all
   switches → config" (`eps`/`noise` already moved in a30); fix the false-positive

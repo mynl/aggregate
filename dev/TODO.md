@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a44.
+> **Last updated: 2026-06-08** — current version 1.0.0a45.
 
 ---
 
@@ -136,6 +136,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   split; `ft.py` recentering helpers → call the core path; re-home
   `estimate_agg_window` → `utilities.py`; occ-reins on a signed severity grid;
   DecL keyword for `signed` / `value_type`. **needs N1–N3.**
+- [x] **N7a `[A]` Signed-loss `pnl`** — **done 1.0.0a45**
+  (`dev/done/plan-pnl-signed-severity.md`): a `pnl` whose loss severity is itself
+  signed (`dsev` negative atom / `ssev`) now convolves the loss on its genuine
+  signed grid before the affine relabel (was hard-coded to a 0-based grid →
+  half the mass dropped, ±2¹⁵ empirical-moment garbage). `_bs_window` hands the
+  loss origin to `update` for the affine case (0 for ordinary pnl, byte-for-byte);
+  `_apply_agg_affine` now warns on material P&L-window mass drop. A **book** of
+  signed-loss pnl units still wants the shared-combine fix in
+  `dev/plan-bucket-sizing.md` (RMS `best_bucket`) — the single-unit case is fixed
+  independently here. Knowledge-base freeze: all 146 objects match to 1e-12.
 - [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
   2026-06-06)* — three small correctness/guard items:
   - Treatment of zero `lb` is not consistent with attachment equals zero.

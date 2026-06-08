@@ -4245,14 +4245,14 @@ class Aggregate:
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
         bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p)
         N = 1 << log2
-        if self._agg_affine_active():
-            # ``pnl``: the loss convolution runs on the non-negative loss grid;
-            # ``_bs_window`` returned the (signed) P&L display origin, so build
-            # the loss grid here and let ``update_work`` relabel onto the P&L
-            # window via ``_apply_agg_affine``.
-            xs = np.arange(0, N, dtype=float) * bs
-        else:
-            xs = x_min + np.arange(0, N, dtype=float) * bs
+        # ``x_min`` is the loss-convolution origin chosen by ``_bs_window``: 0 for
+        # an ordinary aggregate or a non-negative-loss ``pnl``; a negative origin
+        # when the severity is signed -- including a signed-loss ``pnl``, whose
+        # loss convolves on its genuine signed grid before ``_apply_agg_affine``
+        # relabels it onto the P&L window. The affine path no longer hard-codes a
+        # 0-based grid (which silently wrapped a signed loss's negative atoms to
+        # the top of the FFT buffer and dropped half the mass).
+        xs = x_min + np.arange(0, N, dtype=float) * bs
         return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
                                 **kwargs)
 
@@ -4655,6 +4655,19 @@ class Aggregate:
         valid = (t >= 0) & (t < N)
         pnl_d = np.zeros(N)
         pnl_d[t[valid]] = loss_d[k[valid]]
+        # The reverse-and-roll drops buckets that fall outside the tight P&L
+        # window (``_pnl_window``). For an ordinary or correctly-sized signed
+        # ``pnl`` this sheds only far-tail dust; a *material* deficit means the
+        # window cannot represent the spread (e.g. log2 too small for a wide
+        # signed loss) -- surface it the same way the loss FFT deficit is flagged
+        # at construction, rather than letting one answer silently differ.
+        dropped = float(loss_d.sum() - pnl_d.sum())
+        if dropped > VALIDATION_NOISE:
+            warnings.warn(
+                f'{self.name}: P&L affine dropped mass {dropped:.3e} outside the '
+                f'output window [{pnl_lo}, {pnl_lo + (N - 1) * bs}]; widen log2 or '
+                f'set bs/x_min to cover the signed P&L spread.',
+                DefectiveDistributionWarning, stacklevel=2)
         self.agg_density = pnl_d
         self.xs = pnl_lo + np.arange(N, dtype=float) * bs
         self.x_min = float(self.xs[0])
@@ -6166,7 +6179,14 @@ class Aggregate:
             N = 1 << sel_l2
             x0_pnl = self._pnl_window(sel_bs, N)
             x_max_pnl = float(x0_pnl + N * sel_bs)
-            ret_x0 = x0_pnl
+            # Hand ``update`` the *loss-convolution* origin, not the P&L display
+            # origin: 0 for an ordinary (non-negative) loss -- byte-for-byte the
+            # legacy 0-based grid -- and the signed loss origin ``sel_x0`` when the
+            # loss severity is itself signed (a ``pnl`` over a negative-atom
+            # ``dsev`` / ``ssev``). The P&L display window ``x0_pnl`` is recomputed
+            # independently in ``_apply_agg_affine`` and reported in the ``used``
+            # row below.
+            ret_x0 = sel_x0 if self._signed_severity() else 0.0
         else:
             ret_x0 = sel_x0
 

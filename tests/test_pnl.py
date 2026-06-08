@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 
 from aggregate import build
+from aggregate.constants import DefectiveDistributionWarning
 
 # severities chosen light enough that the 12-nines window is well-resolved, so
 # the empirical moments match the analytic ones tightly.
@@ -194,3 +195,62 @@ def test_portfolio_pnl_mixed_with_loss_line():
     mean = float((d.loss * d.p_total).sum())
     # margin 200 plus cost line mean (0 - 200) = -200 -> ~0
     assert mean == pytest.approx(0.0, abs=2.0)
+
+
+# ----------------------------------------------------------------------
+# Signed loss severity (dsev with a negative atom / ssev) under pnl
+# ----------------------------------------------------------------------
+# A ``pnl`` whose *loss severity* is itself signed convolves the loss on its
+# genuine signed grid before the affine relabel onto the P&L window. Previously
+# the affine path hard-coded a 0-based loss grid, wrapping the negative atoms to
+# the top of the FFT buffer: half the mass dropped and the empirical moments
+# read +/-2**15 grid-index garbage. See dev/done/plan-pnl-signed-severity.md.
+def test_signed_dsev_pnl_exact():
+    """``pnl 5 prem - dfreq[3] dsev[-1 1]`` -> P&L in {2,4,6,8}, mean 5, sd sqrt3."""
+    with warnings.catch_warnings():
+        # a correctly-sized signed-loss pnl must not warn (no dropped mass)
+        warnings.simplefilter('error', category=DefectiveDistributionWarning)
+        a = build('pnl GP 5 premium - dfreq[3] dsev[-1 1]', bs=1)
+    m = a.agg_density > 1e-12
+    support = a.xs[m]
+    probs = a.agg_density[m]
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-12)
+    np.testing.assert_allclose(support, [2.0, 4.0, 6.0, 8.0])
+    np.testing.assert_allclose(probs, [0.125, 0.375, 0.375, 0.125], atol=1e-12)
+    assert a.est_m == pytest.approx(5.0, abs=1e-9)
+    assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    assert a.est_skew == pytest.approx(0.0, abs=1e-9)
+
+
+def test_signed_dsev_pnl_asymmetric_mean():
+    """Mean closed form holds for a non-symmetric signed dsev: E[PnL]=shift-2 E[X]."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('pnl Y 10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]', bs=1)
+    # per-claim E[X] = -2(.5) + 1(.3) + 3(.2) = -0.1; two claims -> E[L] = -0.2
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-12)
+    assert a.est_m == pytest.approx(10.0 - 2 * (-0.1), abs=1e-9)
+
+
+def test_signed_ssev_pnl_mass_and_mean():
+    """Continuous signed severity (``ssev``) under pnl conserves mass; mean shifts."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('pnl Z 100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson')
+    assert a._signed_severity()
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-5)
+    # loss sev = 20 - lognorm(mean 10) -> per-claim mean 10; 5 claims -> E[L]=50
+    assert a.est_m == pytest.approx(100 - 50, abs=0.5)
+
+
+def test_signed_pnl_unit_in_portfolio_conserves_mass():
+    """A signed-loss pnl placed in a book keeps its own unit density mass-conserving."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        port = build('''port SignedBook
+            pnl S 5 premium - dfreq[3] dsev[-1 1]
+            pnl T 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
+        ''', bs=1)
+    d = port.density_df
+    # the signed-loss unit's own marginal is intact (no +/-2**15 garbage, full mass)
+    assert d['p_S'].sum() == pytest.approx(1.0, abs=1e-6)

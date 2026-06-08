@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0a45
+
+### Fixed: `pnl` with a signed loss severity (`dsev` negative atom / `ssev`)
+
+A `pnl` (premium-minus-loss) aggregate whose **loss severity is itself signed**
+— a `dsev` with a negative atom, or an `ssev` — now convolves the loss on its
+genuine signed grid before the affine relabel onto the P&L window. Previously the
+affine path hard-coded a **0-based** loss grid, so the loss's negative atoms
+wrapped to the top of the FFT buffer: roughly half the mass was silently dropped
+and the empirical moments read ±2¹⁵ grid-index garbage (e.g.
+`pnl GP 5 premium - dfreq[3] dsev[-1 1]` reported `Est EX = -32763.75` instead of
+`5`). It now yields the correct `P&L ∈ {2,4,6,8}` with mass 1, mean 5, sd √3.
+This is a **bug fix, not a breaking change** — every ordinary (non-negative-loss)
+`pnl` is byte-for-byte unchanged (all 146 frozen knowledge-base objects match to
+1e-12).
+
+Implementation: `_bs_window` already sized a correct signed loss window; it now
+hands that loss origin back to `update` for the affine case (0 for an ordinary
+pnl, preserving the legacy grid), and `update` builds the loss grid uniformly
+from it. `_apply_agg_affine`, already origin-agnostic, relabels the signed loss
+onto the tight P&L window. It also now warns (`DefectiveDistributionWarning`) when
+the reverse-and-roll drops more than dust off the P&L window — surfacing the
+genuinely-unrepresentable far-tail case that was previously silent.
+
 ## 1.0.0a44
 
 ### Hygiene: module organization & dependencies

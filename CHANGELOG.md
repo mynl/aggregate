@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.0a42
+
+### Consolidated fuzz removal into one vectorized utility
+
+The scattered FFT round-off de-fuzz idioms are unified on a single helper,
+`utilities.remove_fuzz(data, eps=None)` — accepts an ndarray or a DataFrame,
+two-sided (`|x| < eps → 0`, large negatives preserved, so it is correct on
+signed/P&L densities), defaulting to machine epsilon.
+
+- Replaces the per-cell `DataFrame.map(lambda x: 0 if abs(x) < eps else x)` in
+  `Portfolio.remove_fuzz` and `Aggregate.density_df` (the former now writes the
+  float columns back in place; the latter reassigns) — faster, vectorized.
+- Replaces four duplicated `np.where(np.abs(x) < eps, 0.0, x)` array copies
+  (two in `Portfolio`, two in `Aggregate`) that fed `xsden_to_mwrangler`.
+- `ft.recentering_convolution` keeps its looser `2*eps` tolerance via the
+  explicit `eps=` argument.
+
+**Numerically inert**: a freeze/check over all 146 test-suite objects matched
+within `atol=1e-12`. The one intended change is the moment-fit (MMSE) path,
+whose threshold tightens from a stray `1e-16` to machine `eps` (~2.22e-16); it
+is not part of the frozen `describe`/`density_df` surface.
+
+**Deliberate carve-outs** (not routed through the utility): the one-sided
+`Frequency.pmf` clip (a frequency pmf has no legitimate negatives) and the
+plot-cosmetic `1e-15` clip in the reinsurance occurrence plot (looser threshold
+plus a `0 → nan` step). Both now carry a comment marking them as such.
+
 ## 1.0.0a41
 
 ### Renamed: public `reinsurance_*` methods → `reins_*`

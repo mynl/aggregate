@@ -43,7 +43,7 @@ from .utilities import (ft, ift,
                         round_bucket, make_ceder_netter,
                         nice_multiple,
                         decl_pprint, make_var_tvar,
-                        agg_help, explain_validation)
+                        agg_help, explain_validation, remove_fuzz)
 import aggregate.random_agg as ar
 from .spectral import Distortion
 from .pentagon import complete_pentagon
@@ -2091,10 +2091,7 @@ class Aggregate:
             self._density_df = self._density_df.set_index('loss', drop=False)
             self._density_df['p'] = self._density_df.p_total
             # remove the fuzz, same method as Portfolio.remove_fuzz
-            eps = np.finfo(float).eps
-            # may not have a severity, remember...
-            self._density_df.loc[:, self._density_df.select_dtypes(include=['float64']).columns] = \
-                self._density_df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
+            self._density_df = remove_fuzz(self._density_df)
 
             # Severity columns (p_sev/F_sev/S_sev/log_p_sev) now live on their
             # own native grid in ``sev_density_df`` -- on a windowed/signed grid
@@ -2290,6 +2287,9 @@ class Aggregate:
         y = rd.loss.values
         for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
                        ('net', 'p_agg_net_occ')]:
+            # Plot-cosmetic de-fuzz: deliberate carve-out from the shared
+            # ``remove_fuzz`` -- a looser 1e-15 threshold plus the 0 -> nan step
+            # below so empty buckets drop out of the survival line.
             s = rd[col].to_numpy().copy()
             s[np.abs(s) < 1e-15] = 0
             s_values = s[::-1].cumsum()[::-1]
@@ -4274,8 +4274,7 @@ class Aggregate:
         # view ``density_df.p_total`` applies the identical ``remove_fuzz``
         # separately. (We cannot source the moments from ``density_df.p_total``
         # here: building ``density_df`` needs ``est_m``, computed just below.)
-        agg_clean = np.where(
-            np.abs(self.agg_density) < np.finfo(float).eps, 0.0, self.agg_density)
+        agg_clean = remove_fuzz(self.agg_density)
         _mw = xsden_to_mwrangler(self.xs, agg_clean)
         agg_ex1, agg_ex2, agg_ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
@@ -4361,14 +4360,12 @@ class Aggregate:
         # De-fuzzed moment helper: same |x| < eps zeroing the main
         # empirical block uses (see WHY comment above), wrapped so we can
         # reuse it on subject / after-occ densities.
-        _floor = np.finfo(float).eps
         def _moments(arr, grid):
             # ``grid`` is xs_sev for severity densities, xs for aggregates
             # (they coincide on the default 0-based grid).
             if arr is None:
                 return (np.nan,) * 6
-            clean = np.where(np.abs(arr) < _floor, 0.0, arr)
-            mw = xsden_to_mwrangler(grid, clean)
+            mw = xsden_to_mwrangler(grid, remove_fuzz(arr))
             return (*mw.noncentral, *mw.mcvsk)
 
         sub_sev_mom = _moments(subject_sev, self.xs_sev)
@@ -4918,7 +4915,9 @@ class Aggregate:
         fz = ft(z, 0)
         fz = self.frequency.freq_pgf(self.en, fz)
         dist = ift(fz, 0)
-        # remove fuzz
+        # remove fuzz -- intentionally ONE-SIDED (zeroes negatives too); a
+        # frequency pmf has no legitimate negatives, so this is NOT the shared
+        # two-sided ``remove_fuzz`` utility.
         dist[dist < np.finfo(float).eps] = 0
         if not np.allclose(self.n,  self.en):
             logger.warning('Frequency.pmf | n %s != en %s; using en', self.n, self.en)
@@ -6503,8 +6502,8 @@ class Aggregate:
         # don't want to mess up the object...
         xs = self.xs.copy()
         p = self.agg_density.copy()
-        # more aggressively de-fuzz
-        p = np.where(abs(p) < 1e-16, 0, p)
+        # de-fuzz before the moment fit (threshold standardized on machine eps)
+        p = remove_fuzz(p)
         p = p / np.sum(p)
         p1 = p.copy()
 

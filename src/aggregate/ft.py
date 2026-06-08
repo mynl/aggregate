@@ -23,7 +23,7 @@ from numpy import roll
 from .constants import FIG_H, FIG_W
 from .distributions import Aggregate
 from .underwriter import build
-from .utilities import qd
+from .utilities import qd, remove_fuzz as remove_fuzz_util
 
 logger = logging.getLogger(__name__)
 
@@ -307,9 +307,9 @@ def recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz):
          'a': a}
     ).set_index('n')
     if remove_fuzz:
-        # remove fuzz
-        eps = np.finfo(float).eps
-        df.loc[df.a.abs() < 2 * eps, 'a'] = 0
+        # remove fuzz; this site keeps a looser 2*eps tolerance (preserved via
+        # the explicit eps= argument to the shared utility).
+        df = remove_fuzz_util(df, eps=2 * np.finfo(float).eps)
     qd(stats(df).T)
     print('-'*80)
     return df, ag

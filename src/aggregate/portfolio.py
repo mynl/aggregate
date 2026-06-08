@@ -38,7 +38,8 @@ from .moments import (MomentAggregator, xsden_to_mwrangler,
 from .iman_conover import iman_conover
 from .utilities import (ft, ift, decl_pprint,
                         round_bucket,
-                        make_var_tvar, agg_help, explain_validation)
+                        make_var_tvar, agg_help, explain_validation,
+                        remove_fuzz as remove_fuzz_util)
 import aggregate.random_agg as ar
 
 # Optional numba acceleration for ``make_comonotonic_allocations_work``.
@@ -576,7 +577,7 @@ class Portfolio(object):
         # ``Portfolio.update`` and ``Aggregate.update_work``.
         _xs = port.density_df['loss'].values
         _p = port.density_df['p_total'].values
-        _p_clean = np.where(np.abs(_p) < np.finfo(float).eps, 0.0, _p)
+        _p_clean = remove_fuzz_util(_p)
         _mw = xsden_to_mwrangler(_xs, _p_clean)
         _ex1, _ex2, _ex3 = _mw.noncentral
         port.est_m, port.est_cv, port.est_skew = _mw.mcvsk
@@ -751,8 +752,11 @@ class Portfolio(object):
 
         if self._remove_fuzz or force:
             logger.debug(f'Portfolio.remove_fuzz | Removing fuzz from {self.name} dataframe, caller {log}')
-            df[df.select_dtypes(include=['float64']).columns] = \
-                df.select_dtypes(include=['float64']).map(lambda x: 0 if abs(x) < eps else x)
+            # ``remove_fuzz`` returns a de-fuzzed copy; write the float columns
+            # back *in place* so the mutation reaches ``self.density_df`` (the
+            # default ``df``). Rebinding the local ``df`` would silently no-op.
+            float_cols = df.select_dtypes(include=['float64']).columns
+            df[float_cols] = remove_fuzz_util(df, eps)[float_cols]
 
     def __repr__(self):
         """
@@ -2000,7 +2004,7 @@ class Portfolio(object):
         # spurious skew on wide grids.
         _xs = self.density_df['loss'].values
         _p = self.density_df['p_total'].values
-        _p_clean = np.where(np.abs(_p) < np.finfo(float).eps, 0.0, _p)
+        _p_clean = remove_fuzz_util(_p)
         _mw = xsden_to_mwrangler(_xs, _p_clean)
         _ex1, _ex2, _ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk

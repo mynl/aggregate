@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a41.
+> **Last updated: 2026-06-08** — current version 1.0.0a42.
 
 ---
 
@@ -161,6 +161,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **H7 `[A]`** Public `reinsurance_*` methods → `reins_*` (a41) — surface made
   uniformly abbreviated (`reins_kinds`/`reins_description`/`reins_occ_plot`);
   `reins` canonized as the short form. `dev/done/plan-reins-rename.md`.
+- [x] **H8 `[A]`** Consolidate fuzz removal → `utilities.remove_fuzz` (a42) — one
+  vectorized two-sided helper replaces the per-cell `DataFrame.map` lambda (×2)
+  and four `np.where(abs<eps)` copies; `ft` keeps `2*eps` via arg; MMSE stray
+  `1e-16`→`eps`. Freeze/check on 146 objects: all match @1e-12.
+  `dev/done/plan-remove-fuzz.md`.
 - [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
   (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest

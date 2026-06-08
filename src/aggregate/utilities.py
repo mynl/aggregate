@@ -22,6 +22,7 @@ __all__ = [
     'decl_pprint',
     'ft', 'ift',
     'subsets',
+    'remove_fuzz',
     'round_bucket',
     'make_ceder_netter', 'nice_multiple',
     'qd', 'mv',
@@ -159,6 +160,48 @@ def ift(z, padding):
     return temp
 
 
+def remove_fuzz(data, eps=None):
+    """Zero entries with ``|x| < eps`` (machine-epsilon FFT/round-off noise).
+
+    Vectorized replacement for the scattered de-fuzz idioms. Accepts an ndarray
+    or a DataFrame; for a DataFrame only the float64 columns are touched and a
+    new frame is returned (callers that need in-place semantics assign the
+    result back). Two-sided: large negatives are preserved (unlike a one-sided
+    ``x < eps`` clip), so it is correct on signed / P&L densities.
+
+    Parameters
+    ----------
+    data : numpy.ndarray | pandas.DataFrame
+        Array or frame to clean. The input is never mutated.
+    eps : float, optional
+        Threshold; defaults to ``np.finfo(float).eps`` (~2.22e-16).
+
+    Returns
+    -------
+    numpy.ndarray | pandas.DataFrame
+        Same type as ``data``, a copy with sub-eps entries set to ``0.0``.
+
+    Notes
+    -----
+    The raw inverse-FFT density carries sub-machine-epsilon fuzz (tiny +/-
+    values) in essentially every bucket. In a plain mass sum this cancels, but
+    moment calculations weight each bucket by ``x**k``, so far-tail fuzz at
+    large ``x`` is amplified and corrupts the empirical skew. Zeroing
+    ``|x| < eps`` is safe and lossless: the exact aggregate has no genuine
+    density below machine epsilon.
+
+    The one-sided ``Frequency.pmf`` clip and the plot-cosmetic ``1e-15`` clip in
+    the reinsurance occurrence plot are deliberate carve-outs that do NOT route
+    through this helper -- they have different (one-sided / looser) semantics.
+    """
+    if eps is None:
+        eps = np.finfo(float).eps
+    if isinstance(data, pd.DataFrame):
+        out = data.copy()
+        float_cols = out.select_dtypes(include=['float64']).columns
+        out[float_cols] = out[float_cols].mask(out[float_cols].abs() < eps, 0.0)
+        return out
+    return np.where(np.abs(data) < eps, 0.0, data)
 
 
 def round_bucket(bs):

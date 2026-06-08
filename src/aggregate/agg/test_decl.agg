@@ -88,6 +88,7 @@ sev T.Splice01      lognorm 10 cv .5 splice [20 30]                             
 sev T.Splice02 10 * uniform + 5 splice [8 12]                                                 note{shift+scale splice; fz.sf(9) ~ 0.75 splice-only survival}
 agg T.SpliceLayer01 1 claim 5 xs 3 sev 10 * uniform + 5 splice [8 12] fixed                   note{full-limit; E[claim^k] = 5^k}
 agg T.SpliceLayer02 1 claim 2 xs 8 sev 10 * uniform + 5 splice [8 12] fixed                   note{proper excess; E[claim] = 1.5, E[claim^2] = 8/3, E[claim^3] = 5}
+agg T.SpliceUnbounded 5 claims sev lognorm 40 cv .65 splice [1 100] poisson                   note{splice on unbounded base; window must be finite}
 
 
 # U. Validation regressions — symmetric & low-skew

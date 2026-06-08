@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0a48
+
+### Fixed: spliced unbounded severities crashed window sizing
+
+Building an aggregate whose severity splices an **unbounded** base family (e.g.
+`sev lognorm 40 cv .65 splice [1 100]`) crashed in grid sizing with
+`ValueError: Inadmissible value passed to round_bucket, inf`.
+
+`splice [lb ub]` records the cap in `sev_lb`/`sev_ub` and conditions
+`fz.cdf/sf/isf/ppf/pdf`, so the severity correctly reports `bounded == True` — but
+`fz.support()` still returned the underlying family's `(0, inf)`. The bounded-window
+sizer (`_bounded_severity_window`), invoked precisely *because* the severity is
+bounded, then read an infinite upper edge. `_apply_lb_ub` now also patches
+`fz.support()` to the honest `[sev_lb, sev_ub]` (mirroring the reflect-shift support
+patch in `_apply_reflect`). The window of existing uniform-splice aggregates
+tightens slightly to the true support — a strict accuracy gain (no grid wasted over
+zero-mass regions). Only the splice path is affected; unspliced severities short-
+circuit before the patch.
+
 ## 1.0.0a47
 
 ### Added: `approximate` DecL keyword — method-of-moments aggregates

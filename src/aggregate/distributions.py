@@ -7873,6 +7873,14 @@ class Severity(ss.rv_continuous):
         self.fz.isf = make_conditional_isf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.isf)
         self.fz.ppf = make_conditional_ppf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.ppf)
         self.fz.pdf = make_conditional_pdf(self.sev_lb, self.sev_ub, plb, pub)(self.fz.pdf)
+        # Keep support() honest: the spliced distribution lives on [lb, ub].
+        # Without this, splicing an *unbounded* base family (e.g. lognorm) leaves
+        # fz.support() reporting the underlying (0, inf), so _bounded_severity_window
+        # reads an infinite upper edge and round_bucket(inf) blows up. Value-bound
+        # the bounds as default args; mirrors the reflect-shift support patch in
+        # _apply_reflect (the method-swap pattern above). Splice runs before
+        # _apply_reflect in _build, so the reflected support composes correctly.
+        self.fz.support = lambda _lo=self.sev_lb, _hi=self.sev_ub: (_lo, _hi)
 
     def _apply_layer_attachment(self):
         """Build layered-loss wrappers from the (splice-only) ``self.fz`` methods.

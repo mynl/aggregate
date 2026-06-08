@@ -210,3 +210,23 @@ def test_layer_wrappers_separate_from_fz_methods():
     # And ``_layered_sf`` exists and produces a different answer when a layer
     # is applied — Sanity-check the attribute is present.
     assert hasattr(s, '_layered_sf')
+
+
+def test_splice_unbounded_base_builds_finite_window():
+    """A splice of an unbounded family builds (regression: ``_bs_window`` inf crash).
+
+    Splicing an unbounded base (lognorm) records the cap in ``sev_ub`` but, before
+    the fix, left ``fz.support()`` reporting the underlying ``(0, inf)``; the bounded
+    window sizer then read an infinite upper edge and ``round_bucket(inf)`` raised
+    ``ValueError: Inadmissible value passed to round_bucket, inf``. ``_apply_lb_ub``
+    now patches ``fz.support()`` to the honest ``[sev_lb, sev_ub]``.
+    """
+    import numpy as np
+    from aggregate import build
+
+    a = build('agg SpliceUB 5 claims sev lognorm 40 cv .65 splice [1 100] poisson')
+    assert np.isfinite(a.bs) and a.bs > 0
+    # honest support: the spliced distribution lives on [1, 100]
+    assert a.sevs[0].fz.support() == (1.0, 100.0)
+    # finite, positive aggregate mean; all mass sits inside the bounded window
+    assert 0 < a.agg_m < np.inf

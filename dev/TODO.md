@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a43.
+> **Last updated: 2026-06-08** — current version 1.0.0a44.
 
 ---
 
@@ -41,9 +41,9 @@ alongside. **Start at `N1`.**
 |    | N6 | Validation-calc review | A | — | independent of N1–N5 |
 |    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
 |    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
-|    | H1 | Relocate `make_ceder_netter` | A | — | everything |
-|    | H2 | Dedupe `make_var_tvar` | A | — | everything |
-|    | H3 | Import-dependency audit | A | — | everything |
+| ✅ | H1 | Relocate `make_ceder_netter` (a44) | A | — | everything |
+| ✅ | H2 | Dedupe `make_var_tvar` (a44, non-issue) | A | — | everything |
+| ✅ | H3 | Import-dependency audit (a44) | A | — | everything |
 |    | H4 | Docstring style sweep → NumPy | A | — | everything |
 |    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
 | ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
@@ -150,10 +150,20 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track H — Hygiene (module organization & dependencies)  `[A]` (parallel)
 
-- [ ] **H1 `[A]`** Relocate `make_ceder_netter` `utilities.py:276` → `distributions` (#35).
-- [ ] **H2 `[A]`** Dedupe var/tvar: `utilities.make_var_tvar:498` vs
-  `distributions._make_var_tvar:6232` (#36).
-- [ ] **H3 `[A]`** Audit imports for small non-standard deps (e.g. `cycler`) (#37).
+- [x] **H1 `[A]`** Relocate `make_ceder_netter` → `distributions` (a44) — hard move
+  to its only consumer; its validator `_validate_reins_layers` moved alongside it
+  (only `make_ceder_netter` and the tests use it); test import retargeted.
+  `dev/done/plan-hygiene-1.md`.
+- [x] **H2 `[A]`** Dedupe var/tvar (a44) — **non-issue, closed.** `utilities.make_var_tvar`
+  is the single implementation; `Aggregate`/`Portfolio._make_var_tvar` are thin
+  per-instance wrappers (caller/callee, not duplication). No code change.
+  (Incidental: a likely member-crossing bug in `Aggregate.tvar_sev` was flagged
+  for a separate look — see B-track.) `dev/done/plan-hygiene-1.md`.
+- [x] **H3 `[A]`** Import-dependency audit (a44) — dropped unused runtime deps
+  `cycler`, `psutil`, `ipykernel`, `jinja2`; deferred `IPython` to lazy imports
+  inside `decl_pprint`/`agg_help` to cut ~1s off `import aggregate` (Pygments
+  left eager — ~0ms and pulled by the decl_pygments lexer anyway).
+  `dev/done/plan-hygiene-1.md`.
 - [ ] **H4 `[A]`** Docstring sweep `iman_conover.py` / `moments.py` (and pockets
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
@@ -171,7 +181,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   the Pentagon; no new math. `solve_obj` gained `a=`; `price_ccoc` now a thin
   alias. `dev/done/plan-price-pentagon.md`.
 - [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
-  (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
+  + **1.0.0a35** (`dev/done/plan-databases.md`). The a32 rewrite plus the a35
+  follow-on where a fresh `Underwriter` loads **no** databases (rather than
+  `default`) — commit `637febca`. Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest
   `_loaded` flag; single `load(request=None)` verb + `reload` (reset to
   as-created), `resolve_databases` (preview), `available_databases` (discover);
@@ -189,6 +201,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
   this was about; is it the `linear`/`nearest` discretization, and was it only
   ever a stats/moment concern? (#48 — *forgotten; reconstruct on sight*)
+- [ ] **B4 `[A]`** `Aggregate.tvar_sev` (`distributions.py`) member-crossing: tests
+  `self._var_tvar_function is None` but assigns `self._sev_var_tvar_function` and
+  returns `self._var_tvar_function['tvar']` — the `sev`/non-`sev` members look
+  swapped. Flagged during the H2 review (`plan-hygiene-1.md`); confirm and fix.
 - [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
   rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
   `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.

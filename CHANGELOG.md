@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a44
+
+### Hygiene: module organization & dependencies
+
+- **Relocated `make_ceder_netter`** and its layer-order validator
+  `_validate_reins_layers` from `utilities` to `distributions`, their only
+  consumer (the occurrence/aggregate reinsurance application). Hard move, no
+  deprecation alias. Direct importers should use
+  `from aggregate.distributions import make_ceder_netter, _validate_reins_layers`.
+- **Dropped unused runtime dependencies** `cycler`, `psutil`, `ipykernel`, and
+  `jinja2` — none were imported anywhere in `src/aggregate` (`cycler` is still
+  provided transitively by matplotlib; `bounds` uses stdlib `itertools.cycle`).
+- **Deferred `IPython` to lazy imports** inside the two display helpers that use
+  it (`decl_pprint`, `agg_help`), removing it from the top of `utilities`. Since
+  `utilities` sits on the `import aggregate` path, this cuts roughly a second off
+  cold import time; `IPython` is pulled in only when a display helper is actually
+  called. (`Pygments` is left eager — it is ~0 ms to import and is loaded anyway
+  by the `decl_pygments` lexer.)
+- Confirmed **no var/tvar duplication**: `utilities.make_var_tvar` is the single
+  implementation; the per-instance `Aggregate`/`Portfolio._make_var_tvar` are
+  thin wrappers.
+
 ## 1.0.0a43
 
 ### Fixed: `Portfolio.describe` spread column for signed portfolios

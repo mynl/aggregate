@@ -20,7 +20,7 @@ import pytest
 
 from aggregate import build
 from aggregate.config import get_settings
-from aggregate.utilities import make_ceder_netter, _validate_reins_layers
+from aggregate.distributions import make_ceder_netter, _validate_reins_layers
 
 VALIDATION_NOISE = get_settings().validation.noise
 REINS_BUCKET_DEFAULT = get_settings().discretization.reins_bucket

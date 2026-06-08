@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a43"
+version = "1.0.0a44"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -28,14 +28,10 @@ classifiers = [
 ]
 dependencies = [
     "IPython",
-    "cycler",
-    "ipykernel",
-    "jinja2",
     "lark>=1.1",
     "matplotlib>=3.5",
     "numpy>=1.26",
     "pandas>=2.1",
-    "psutil",
     "Pygments",
     "scipy>=1.11",
     # made optional in 0.27

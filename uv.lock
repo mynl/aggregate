@@ -12,18 +12,14 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a43"
+version = "1.0.0a44"
 source = { editable = "." }
 dependencies = [
-    { name = "cycler" },
-    { name = "ipykernel" },
     { name = "ipython" },
-    { name = "jinja2" },
     { name = "lark" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "psutil" },
     { name = "pygments" },
     { name = "scipy" },
 ]
@@ -57,13 +53,10 @@ notebook = [
 [package.metadata]
 requires-dist = [
     { name = "attrs", marker = "extra == 'notebook'" },
-    { name = "cycler" },
     { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.20,<0.22" },
-    { name = "ipykernel" },
     { name = "ipython" },
     { name = "ipython-autotime", marker = "extra == 'notebook'" },
     { name = "ipywidgets", marker = "extra == 'notebook'" },
-    { name = "jinja2" },
     { name = "jupyter-sphinx", marker = "extra == 'dev'", specifier = ">=0.5.3" },
     { name = "jupyterlab", marker = "extra == 'notebook'" },
     { name = "jupytext", marker = "extra == 'notebook'" },
@@ -74,7 +67,6 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.1" },
     { name = "pickleshare", marker = "extra == 'dev'" },
-    { name = "psutil" },
     { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=15" },
     { name = "pygments" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7" },

@@ -198,9 +198,9 @@ Reinsurance Functions
 
 This section demonstrates :class:`Aggregate` methods and properties for reinsurance analysis. These are:
 
-* :meth:`reinsurance_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
-* :meth:`reinsurance_description` a text description of the layers and shares, by kind.
-* :meth:`reinsurance_occ_plot` plots subject (usually gross), ceded, and net severity, and aggregates created from each. Does not consider aggregate reinsurance.
+* :meth:`reins_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
+* :meth:`reins_description` a text description of the layers and shares, by kind.
+* :meth:`reins_occ_plot` plots subject (usually gross), ceded, and net severity, and aggregates created from each. Does not consider aggregate reinsurance.
 * ``reins_density_df`` dataframe of all gross/ceded/net densities, with **consistent columns** regardless of which stages are present: severity (``p_sev_gross``, ``p_sev_ceded``, ``p_sev_net``), the aggregate of each occurrence severity view (``p_agg_gross`` is the true gross aggregate, plus ``p_agg_ceded_occ``, ``p_agg_net_occ``), and the aggregate-cover views (``p_agg_subject`` is the input to the aggregate cover, plus ``p_agg_ceded``, ``p_agg_net``).
 * ``reins_stats_df`` dataframe of per-stage moments. Columns are ``(stage, view, basis)`` with ``stage`` occurrence and/or aggregate, occurrence views gross/ceded/net, aggregate views subject/ceded/net, and ``basis`` either ``EX`` (exact, pre-bucket image moment) or ``Est`` (rebucketed, model-grid). The EX vs Est difference isolates the :attr:`reins_bucket` rebucketing error.
 * ``reins_describe`` the daily-driver per-stage loss summary: one block per stage of mean loss by view × component on ``EX | Est | Change`` bases. Following the gross/subject convention, the occurrence block leads with **Gross** and the aggregate block leads with **Subject**.
@@ -232,8 +232,8 @@ These are illustrated using the a more realistic example that includes occurrenc
               'aggregate ceded to 250 xs 750 and 1500 xs 1000 '
              )
     qd(a)
-    print(a.reinsurance_kinds())
-    print(a.reinsurance_description())
+    print(a.reins_kinds())
+    print(a.reins_description())
 
 ``'plot`` shows the impact of occurrence reinsurance on severity and aggregate losses, and the ceded severity and aggregate.
 
@@ -241,7 +241,7 @@ These are illustrated using the a more realistic example that includes occurrenc
     :okwarning:
 
     @savefig reins_oa.png scale=20
-    a.reinsurance_occ_plot()
+    a.reins_occ_plot()
 
 The ``reins_describe`` dataframe is the per-stage loss summary. The occurrence
 block leads with **Gross** and shows the gross/ceded/net mean loss for each of

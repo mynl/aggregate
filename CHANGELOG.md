@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0a41
+
+### Renamed: public `reinsurance_*` methods → `reins_*`
+
+The three spelled-out `Aggregate` reinsurance methods now use the `reins_`
+abbreviation, matching the rest of the surface (`reins_describe`,
+`reins_density_df`, `reins_stats_df`, `reins_audit_df`, `reins_df`, the
+`occ_reins`/`agg_reins` layer attributes, the `reins_bucket` config key) and the
+house abbreviation style (`sev`, `occ`, `agg`, `freq`, `cv`, `bs`). `reins` is
+now the canonical short form for "reinsurance" in identifiers.
+
+**Breaking, no alias** (alpha):
+
+| Old | New |
+|---|---|
+| `Aggregate.reinsurance_kinds()` | `Aggregate.reins_kinds()` |
+| `Aggregate.reinsurance_description()` | `Aggregate.reins_description()` |
+| `Aggregate.reinsurance_occ_plot()` | `Aggregate.reins_occ_plot()` |
+
+Pure surface rename — no behaviour, numbers, columns, grammar, spec keys, or
+config/env keys change. Docs reference the new names (reference page
+auto-regenerates on the next Sphinx build).
+
 ## 1.0.0a40
 
 ### Fixed: SD/variance for zero-mean signed aggregates

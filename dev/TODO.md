@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a40.
+> **Last updated: 2026-06-08** — current version 1.0.0a41.
 
 ---
 
@@ -158,6 +158,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
+- [x] **H7 `[A]`** Public `reinsurance_*` methods → `reins_*` (a41) — surface made
+  uniformly abbreviated (`reins_kinds`/`reins_description`/`reins_occ_plot`);
+  `reins` canonized as the short form. `dev/done/plan-reins-rename.md`.
 - [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
   (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest

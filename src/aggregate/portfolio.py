@@ -3453,7 +3453,7 @@ class Portfolio(object):
         exhibit.columns.name = 'stat'
         return pd.concat({str(dist): exhibit}, names=['method'])
 
-    def price_ccoc(self, p, ccoc):
+    def price_ccoc(self, ccoc, *, p):
         """
         Convenience function to price with a constant cost of captial equal ``ccoc``
         at VaR level ``p``. Does not invoke a Distortion. Returns the standard

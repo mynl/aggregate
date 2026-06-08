@@ -2262,13 +2262,13 @@ class Aggregate:
 
         return self._reins_density_df
 
-    def reinsurance_occ_plot(self, axs=None):
+    def reins_occ_plot(self, axs=None):
         """
         Plots for occurrence reinsurance: occurrence log density and aggregate
         quantile plot. Reads the gross/ceded/net views from ``reins_density_df``.
         """
         if self.occ_reins is None:
-            logger.warning('reinsurance_occ_plot called with no occurrence reinsurance.')
+            logger.warning('reins_occ_plot called with no occurrence reinsurance.')
             return
         if axs is None:
             fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H), constrained_layout=True)
@@ -3725,9 +3725,9 @@ class Aggregate:
                 s.append(f'loss ratio               {lr:.4g}')
                 s.append(f'P(loss)                  {p_loss:.4g}')
             s.append(f'validation_eps           {self.validation_eps}')
-            s.append(f'reinsurance              {self.reinsurance_kinds().lower()}')
-            s.append(f'occurrence reinsurance   {self.reinsurance_description("occ").lower()}')
-            s.append(f'aggregate reinsurance    {self.reinsurance_description("agg").lower()}')
+            s.append(f'reinsurance              {self.reins_kinds().lower()}')
+            s.append(f'occurrence reinsurance   {self.reins_description("occ").lower()}')
+            s.append(f'aggregate reinsurance    {self.reins_description("agg").lower()}')
             s.append(f'validation               {self.explain_validation()  }')
             # Tail-thickness classification (frequency / severity / aggregate).
             s.extend(_tail.describe_lines(
@@ -4796,7 +4796,7 @@ class Aggregate:
         # checks above ran against the SUBJECT moments and remain
         # meaningful; mark the result with REINSURANCE so callers know the
         # public surface (``agg_density`` etc.) is the after-reins view.
-        if self.reinsurance_kinds() != 'None':
+        if self.reins_kinds() != 'None':
             rv |= Validation.REINSURANCE
 
         if rv == Validation.NOT_UNREASONABLE:
@@ -5110,7 +5110,7 @@ class Aggregate:
         elif self.occ_kind == 'net of':
             self.sev_density = self.sev_density_net
         else:
-            raise ValueError(f'Unexpected kind of occ reinsurace, {self.occ_kind}')
+            raise ValueError(f'Unexpected kind of occ reinsurance, {self.occ_kind}')
         # ``est_sev_*`` is written by ``update_work`` from the post-reins
         # severity (the same density set above) using ``xsden_to_mwrangler``
         # -- no intermediate write needed here.
@@ -5151,7 +5151,7 @@ class Aggregate:
         # update ft of agg
         self.ftagg_density = ft(self.agg_density, padding)
 
-    def reinsurance_description(self, kind='both', width=0):
+    def reins_description(self, kind='both', width=0):
         """
         Text description of the reinsurance.
 
@@ -5199,7 +5199,7 @@ class Aggregate:
             reins = fill(reins, width)
         return reins
 
-    def reinsurance_kinds(self):
+    def reins_kinds(self):
         """
         Text desciption of kinds of reinsurance applied: None, Occurrence, Aggergate, both.
 

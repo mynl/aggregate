@@ -1698,20 +1698,153 @@ class Portfolio(object):
         return df
 
     def best_bucket(self, log2=16, bucket_sizing_p=BUCKET_SIZING_P):
+        """Legacy root-sum-square bucket combine. **DELETE BEFORE BETA.**
+
+        Combines the per-unit recommended buckets by root-sum-square, then
+        rounds. This is the historical heuristic and is **no longer on the live
+        path**: :meth:`best_window` (resolution + span) replaced it at
+        1.0.0a49. It is retained only as a side-by-side comparison aid for
+        reviewing the new sizer and is slated for removal before the beta.
+
+        The RMS combine scales the wrong way: *k* identical units give
+        ``round_bucket(b*sqrt(k))``, i.e. *adding* units *coarsens* the grid
+        (the ``round_bucket`` rounding-up was the only thing that ever made it
+        "work"). It also ignores the integer lattice entirely, so an all-integer
+        discrete portfolio gets a fine continuous ``bs`` (e.g. ``1/4096``) rather
+        than ``bs=1``. See :meth:`best_window` for the correct rule.
+
+        Parameters
+        ----------
+        log2 : int
+            ``log2`` of the bucket count (passed through to ``recommend_bucket``).
+        bucket_sizing_p : float
+            Tail probability for the per-unit moment windows.
+
+        Returns
+        -------
+        float
+            The rounded root-sum-square bucket.
         """
-        Recommend the best bucket. Rounded recommended bucket for log2 points.
-
-        TODO: Is this really the best approach?!
-
-        :param log2:
-        :param bucket_sizing_p:
-        :return:
-        """
-
+        # DELETE BEFORE BETA -- superseded by best_window (resolution + span).
         # bs = sum([a.recommend_bucket(log2, p=bucket_sizing_p) for a in self])
         bs = sum([a.recommend_bucket(log2, p=bucket_sizing_p) ** 2 for a in self]) ** 0.5
 
         return round_bucket(bs)
+
+    def best_window(self, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
+        """Decide the portfolio combine grid by *resolution* + *span* (replaces RMS).
+
+        The portfolio-combine grid must satisfy two **independent** constraints;
+        the right combine is their **max**, never a root-sum-square:
+
+        1. **Resolution** -- the finest bucket any unit needs,
+           ``min_k bs_k``, where ``bs_k`` is each unit's *natural selected*
+           ``bs`` from its own :meth:`Aggregate._bs_window` (captured here in a
+           phase-1 pre-pass). A finer shared grid is strictly better provided it
+           still fits -- there is no "over-cost" from one unit forcing the
+           portfolio finer.
+        2. **Span fit** -- the summed support must fit ``N = 2**log2`` buckets
+           without wrapping: ``W_tot / N``, where ``W_tot = sum_k W_k`` and
+           ``W_k`` is the **selected method's** support-window width
+           (``x_max - x_min`` of that unit's winning ``_bs_window_df`` row), *not*
+           the padded ``used``-row grid extent (``N*bs``, power-of-2 inflated --
+           that would needlessly re-coarsen).
+
+        ``bs = round_bucket(max(min_k bs_k, W_tot / N))`` (a pinned ``bs_in > 0``
+        is honoured verbatim, D4). The bare ``W_tot / N`` floor relies on the
+        FFT ``padding`` (doubling) for headroom -- that reliance is by design.
+
+        Origin and ``log2``:
+
+        - **non-signed** portfolio: the grid starts at ``x_min = 0`` (Plan A
+          keeps non-signed origins at 0; non-zero output windows are Plan B). The
+          per-unit selected rows carry ``x_min = 0`` and ``x_max`` = the from-0
+          extent, so ``W_k = x_max`` is exactly what must fit a 0-based grid.
+          ``log2`` is then **shrunk** to just hold ``W_tot`` at the chosen ``bs``
+          (``ceil(log2(W_tot/bs + 1))``, capped) -- a tiny all-integer discrete
+          book no longer inflates to the ``log2`` cap.
+        - **signed** (P&L) portfolio: the origin is the analytic estimate of the
+          summed-support min (floored so no per-line marginal wraps); ``update``
+          recomputes the realised origin from the units' post-snap ``x_min``.
+          ``log2`` is kept at the cap -- the signed origin estimate is built from
+          each unit's grid origin (0 for a non-negative unit, e.g. a point mass
+          at 12 reads ``x_min = 0``), so it is *not* the true summed-support min
+          and the grid must stay wide enough to absorb the offset. Tight signed
+          ``log2`` shrinkage is deferred to Plan B (which also fixes the origin).
+
+        Parameters
+        ----------
+        log2 : int
+            Bucket-count cap, ``2**log2`` buckets.
+        bs_in : float
+            ``0`` to estimate the bucket; ``>0`` to force it (honoured).
+        bucket_sizing_p : float
+            Tail probability for the per-unit moment / bounded windows.
+
+        Returns
+        -------
+        (bs, log2, x_min) : tuple
+            Shared grid parameters. :attr:`_bs_window_df` (unit rows + a ``used``
+            row) is also populated.
+
+        See Also
+        --------
+        best_bucket : the deprecated RMS combine (kept for comparison).
+        Aggregate._bs_window : the per-unit window estimator consumed here.
+        """
+        signed = self._signed()
+        N_cap = 1 << log2
+
+        # ---- phase 1: per-unit natural windows (analytic, no FFT) ---------
+        # Each unit sizes itself on its own (0-origin or signed) grid; we read
+        # the *selected method* row, not the padded ``used`` row, for the width.
+        rows = []
+        bs_ks, x_min_ks, W_ks = [], [], []
+        for a in self.agg_list:
+            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
+            wdf = a._bs_window_df
+            sel = wdf[wdf['selected']].iloc[0] if 'selected' in wdf.columns \
+                else wdf.loc['used']
+            sx_min, sx_max = float(sel['x_min']), float(sel['x_max'])
+            W_k = max(sx_max - sx_min, 0.0)
+            bs_ks.append(float(bs_k))
+            x_min_ks.append(sx_min)
+            W_ks.append(W_k)
+            rows.append(dict(unit=a.name, x_min=sx_min, x_max=sx_max, W=W_k,
+                             bs=float(bs_k), log2=int(l2_k),
+                             coverage=sel.get('coverage', ''),
+                             note=str(sel.get('note', ''))))
+
+        # ---- the resolution + span combine --------------------------------
+        resolution = min(bs_ks) if bs_ks else 1.0
+        W_tot = float(sum(W_ks))
+        if bs_in > 0:
+            bs = float(bs_in)
+        else:
+            span = W_tot / N_cap if N_cap else W_tot
+            bs = round_bucket(max(resolution, span))
+
+        # ---- origin and log2 ----------------------------------------------
+        if signed:
+            # Analytic origin estimate: the summed-support min, floored so no
+            # per-line marginal wraps (a unit whose support starts above the sum
+            # of mins would otherwise wrap). update recomputes from realised
+            # post-snap unit origins. log2 stays at the cap (see docstring).
+            x_min = min(sum(x_min_ks), min(x_min_ks)) if x_min_ks else 0.0
+            x_min = float(np.floor(x_min / bs) * bs)
+            log2_out = log2
+        else:
+            x_min = 0.0
+            if bs_in > 0:
+                log2_out = log2                       # user pinned the grid
+            else:
+                # Shrink to just hold the summed (0-based) support at ``bs``;
+                # never exceed the cap, never below 1 (>= 2 buckets).
+                need = int(np.ceil(np.log2(W_tot / bs + 1.0))) if W_tot > 0 else 1
+                log2_out = min(log2, max(need, 1))
+
+        self._build_bs_window_df(rows, bs, log2_out, x_min)
+        return bs, log2_out, x_min
 
     def _signed(self):
         """Whether any unit has signed (negative-support) severity.
@@ -1765,24 +1898,11 @@ class Portfolio(object):
     def _bs_window(self, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
         """Decide ``(bs, log2, x_min)`` for the portfolio combine grid.
 
-        A thin signed-aware wrapper on :meth:`best_bucket`. For a non-signed
-        portfolio it is a pure pass-through -- ``(best_bucket(...), log2,
-        0.0)`` -- so existing results are unchanged. For a signed (P&L)
-        portfolio it runs the two-phase analytic sizing of the combine plan
-        (``dev/plan-negative-x-port.md`` 3.1b):
-
-        1. **Pre-pass (analytic, no FFT):** each unit's natural signed window
-           ``(x_min_k, x_max_k)`` from its own :meth:`Aggregate._bs_window`.
-        2. **Shared grid:** the summed support
-           ``W_tot = Sigma (x_max_k - x_min_k)`` is wider than any single
-           unit's, but ``N = 2**log2`` is capped, so ``bs`` is *coarsened* to
-           ``max(best_bucket, W_tot / N)`` to hold the sum without aliasing.
-           ``log2`` is a cap (filled, not shrunk -- we want the wider span).
-
-        The origin returned here is the analytic estimate used for the
-        inspectable :attr:`_bs_window_df` ``used`` row; :meth:`update`
-        recomputes the realised origin from the units' post-snap ``x_min``
-        once they are driven on the shared ``bs``.
+        Thin forwarder to :meth:`best_window` (the resolution + span combine).
+        Retained because :meth:`update`'s signed branch calls it by name; the
+        whole decision -- the phase-1 per-unit pre-pass, the
+        ``max(resolution, span)`` bucket, the origin/``log2`` choice, and
+        building :attr:`_bs_window_df` -- lives in :meth:`best_window`.
 
         Parameters
         ----------
@@ -1796,46 +1916,9 @@ class Portfolio(object):
         Returns
         -------
         (bs, log2, x_min) : tuple
-            Shared grid parameters. For a signed portfolio
-            :attr:`_bs_window_df` is also populated.
+            Shared grid parameters; :attr:`_bs_window_df` is also populated.
         """
-        N = 1 << log2
-        if not self._signed():
-            bs = float(bs_in) if bs_in > 0 else self.best_bucket(log2, bucket_sizing_p)
-            return bs, log2, 0.0
-
-        # ---- phase 1: per-unit natural signed windows (analytic) ----------
-        rows = []
-        for a in self.agg_list:
-            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
-            used = a._bs_window_df.loc['used']
-            x_max_k = float(used['x_max'])
-            rows.append(dict(unit=a.name, x_min=float(x_min_k), x_max=x_max_k,
-                             W=x_max_k - float(x_min_k), bs=float(bs_k),
-                             log2=int(l2_k), coverage=used['coverage'],
-                             note=used['note']))
-
-        # ---- phase 2: shared coarsened grid -------------------------------
-        # Summed support fits in W_tot = Sigma range_k; N is capped, so bs
-        # must be the *coarser* of the RMS best_bucket and the fit floor
-        # W_tot/N (buy the space, avoid aliasing/wrap).
-        W_tot = sum(r['W'] for r in rows)
-        if bs_in > 0:
-            bs = float(bs_in)
-        else:
-            bs_best = self.best_bucket(log2, bucket_sizing_p)
-            bs_fit = W_tot / N if N else W_tot
-            bs = round_bucket(max(bs_best, bs_fit))
-        # Analytic origin estimate: the support min of the sum, floored so no
-        # per-line marginal wraps (safety floor under the plan's sum-of-
-        # windows -- a unit whose support starts above Sigma x_min would
-        # otherwise wrap on the shared grid). update recomputes this from the
-        # realised post-snap unit origins.
-        x_min_est = min(sum(r['x_min'] for r in rows),
-                        min(r['x_min'] for r in rows))
-        x_min_est = float(np.floor(x_min_est / bs) * bs)
-        self._build_bs_window_df(rows, bs, log2, x_min_est)
-        return bs, log2, x_min_est
+        return self.best_window(log2, bs_in, bucket_sizing_p)
 
     def update(self, log2, bs, remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
@@ -1887,8 +1970,14 @@ class Portfolio(object):
             self.log2 = log2
             self.bs = bs
         elif bs == 0:
-            self.bs = self.best_bucket(log2, bucket_sizing_p)
-            logger.info(f'bs=0 enterered, setting bs={bs:.6g} using self.best_bucket rounded to binary fraction.')
+            # Non-signed auto-size: resolution + span combine (best_window),
+            # which also shrinks log2 to just hold the summed support -- a tiny
+            # all-integer discrete book no longer inflates to the log2 cap.
+            bs, log2, _x0 = self.best_window(log2, 0, bucket_sizing_p)
+            self.log2 = log2
+            self.bs = bs
+            logger.info(f'bs=0 entered, setting bs={bs:.6g}, log2={log2} via best_window '
+                        f'(resolution + span combine).')
         else:
             self.bs = bs
         self.padding = padding

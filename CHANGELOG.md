@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.0.0a49
+
+### Fixed: Portfolio combine grid — `best_window` replaces the RMS combine
+
+The portfolio auto-sizer combined its units' per-unit window choices into one
+shared `(bs, log2)` grid by **root-sum-square** (`Portfolio.best_bucket`). That
+scaled the wrong way — *k* identical units gave `round_bucket(b·√k)`, so
+**adding units coarsened the grid** — and it ignored the integer lattice
+entirely, so an all-integer discrete book got a fine continuous `bs` (e.g.
+`1/4096`) spread over the full `log2=16` cap.
+
+New `Portfolio.best_window(log2, bs_in, bucket_sizing_p)` implements the correct
+**resolution + span** rule, the *max* of two independent constraints:
+
+```
+bs = round_bucket(max(min_k bs_k, W_tot / N))
+```
+
+- **resolution** `min_k bs_k` — the finest bucket any unit needs (from each
+  unit's own `_bs_window`), captured in a phase-1 analytic pre-pass;
+- **span** `W_tot / N` — the no-wrap floor, `W_tot = Σ_k W_k` over the
+  *selected-method* support-window widths (not the padded `used`-row extent).
+
+For a **non-signed** book the grid keeps origin 0 and `log2` is now **shrunk**
+to just hold the summed support — a tiny discrete port no longer inflates to the
+`log2` cap. The **signed** (P&L) path keeps its analytic origin estimate and the
+`log2` cap (tight signed `log2`/origin is deferred to the output-window work).
+`best_bucket` is **retained but deprecated** (`DELETE BEFORE BETA`) as a
+side-by-side comparison aid; it is no longer on the live path.
+
+**Effect on the knowledge base (9 of 146 objects move; no single aggregate
+changes — the bug was purely the combine):**
+
+- *Wins.* Discrete books size correctly: the Bodoff portfolios and
+  `PIR.1.Discrete` move from an absurd fine `bs` (≈0.03–0.0001 over 65536
+  buckets) to the lattice-correct `bs=1` with a shrunk `log2`.
+- *Neutral.* The continuous CNC ports re-resolve to each unit's natural `bs`
+  (e.g. 0.03125 → 0.125) with mean fidelity unchanged.
+- *Known limitation (surfaced, not introduced).* The two heavy-tailed HuSCS
+  catastrophe ports coarsen further (`bs` 20000 → 300000). This is **not** a
+  combine defect: the `Hu` unit's *own standalone* `_bs_window` already sizes at
+  `bs=300000`, because its `exp()·lognorm` cat severity has a `1−1e-12` window
+  ~1.9e10 wide. The span faithfully refuses to wrap that mass (the old `bs=20000`
+  silently truncated it). A combined-moment span gives the identical bucket, so
+  there is no combine-level fix — the fix belongs to the per-unit window
+  *coverage* policy for heavy tails, which is out of scope here (see
+  `dev/TODO.md`). These cat books need an explicit `bs` for production use today
+  regardless.
+
+Regression tests in `tests/test_bucket_sizing.py`; the bucket-sizing decisions
+for the whole knowledge base are snapshotted to `tests/data/bucket_baseline_*.csv`
+(a review reference, not a hard gate) via `scripts/bucket_baseline.py`.
+
 ## 1.0.0a48
 
 ### Fixed: spliced unbounded severities crashed window sizing

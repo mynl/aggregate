@@ -106,11 +106,23 @@ def discrete_ab9(small_port):
 
 @pytest.fixture(scope='module')
 def cts_port():
-    """A continuous two-unit portfolio for self-consistency audits."""
+    """A continuous two-unit portfolio for self-consistency audits.
+
+    The grid is pinned (``bs``/``log2``) so these audits exercise the
+    ``AllocationBounds`` geometry on a *fixed, fine* grid, independent of the
+    portfolio auto-sizer -- mirroring the discrete fixtures, which also pin.
+    ``test_cts_pstar_inverts_tvar`` cross-checks a TVaR inversion round-trip at
+    ``rel=1e-9``; that round-trip is grid-resolution-limited, so it needs the
+    finer ``bs=0.0625`` (the value the legacy ``best_bucket`` RMS combine
+    happened to pick). The resolution + span ``best_window`` combine
+    (1.0.0a49) correctly sizes this book at each unit's natural ``bs=0.125``
+    -- coarser, and below what the ``1e-9`` round-trip tolerates -- so the
+    pin keeps the audit meaningful rather than coupling it to the sizer.
+    """
     return build("""port CtsAB
         agg A 10 claims sev lognorm 10 cv 1.25 poisson
         agg B  4 claims sev gamma 25 cv 0.8 mixed gamma 0.6
-    """)
+    """, bs=0.0625, log2=16)
 
 
 @pytest.fixture(scope='module')

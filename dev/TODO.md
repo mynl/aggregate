@@ -142,10 +142,25 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   signed grid before the affine relabel (was hard-coded to a 0-based grid →
   half the mass dropped, ±2¹⁵ empirical-moment garbage). `_bs_window` hands the
   loss origin to `update` for the affine case (0 for ordinary pnl, byte-for-byte);
-  `_apply_agg_affine` now warns on material P&L-window mass drop. A **book** of
-  signed-loss pnl units still wants the shared-combine fix in
-  `dev/plan-bucket-sizing.md` (RMS `best_bucket`) — the single-unit case is fixed
-  independently here. Knowledge-base freeze: all 146 objects match to 1e-12.
+  `_apply_agg_affine` now warns on material P&L-window mass drop. The single-unit
+  case is fixed here; the **book**-level shared combine was fixed separately in
+  **N7b** below. Knowledge-base freeze: all 146 objects match to 1e-12.
+- [x] **N7b `[A]` Portfolio combine grid (`best_window`)** — **done 1.0.0a49**
+  (`dev/done/plan-bucket-combine.md`): replaced the root-sum-square
+  `best_bucket` combine (coarsened with unit count; ignored the integer lattice)
+  with the resolution + span rule `bs = round_bucket(max(min_k bs_k, W_tot/N))`,
+  shrinking `log2` for discrete books. Fixes the headline signed-combine bug
+  (two `bs=1` units no longer give `bs=2`) and the all-integer `bs≈1/4096`
+  mis-size. `best_bucket` kept as a comparison aid, flagged DELETE BEFORE BETA.
+- [ ] **N7c `[A]` Heavy-tail per-unit window coverage** *(surfaced by N7b,
+  2026-06-08)* — the per-aggregate `_bs_window` sizes its window to `1−1e-12`
+  coverage (`WINDOW_NINES`), which for a heavy-tailed cat severity
+  (`exp()·lognorm`, e.g. PIR `Hu`) yields an astronomically wide window
+  (~1.9e10) and a coarse `bs` (~300000) **even standalone** — the aggregate mean
+  lands in bucket 0 and the FFT moments are unusable without a manual `bs`. Cap
+  or temper the coverage for genuinely heavy tails (or fall back to a limit /
+  moment window). Independent of the combine; the combine (N7b) only surfaces it
+  on the HuSCS ports. These cat books need an explicit `bs` today regardless.
 - [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
   2026-06-06)* — three small correctness/guard items:
   - Treatment of zero `lb` is not consistent with attachment equals zero.

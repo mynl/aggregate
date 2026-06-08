@@ -1,0 +1,421 @@
+kind,name,row,x_min,x_max,W,bs,log2,coverage,note
+agg,A.Dice00,moment,0.0,15.513673505174573,15.513673505174573,1.0,5,1-1e-12,3-moment MoM window
+agg,A.Dice00,exact_discrete,0.0,6.0,6.0,1.0,3,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice00,bounded_small,0.0,15.513673505174573,15.513673505174573,1.0,5,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice00,used,0.0,8.0,8.0,1.0,3,exact,realized grid (exact_discrete)
+agg,A.Dice01,moment,0.0,15.513673505174573,15.513673505174573,1.0,5,1-1e-12,3-moment MoM window
+agg,A.Dice01,exact_discrete,0.0,6.0,6.0,1.0,3,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice01,bounded_small,0.0,6.0,6.0,1.0,3,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice01,used,0.0,8.0,8.0,1.0,3,exact,realized grid (exact_discrete)
+agg,A.Dice02,moment,0.0,23.989900004940193,23.989900004940193,1.0,5,1-1e-12,3-moment MoM window
+agg,A.Dice02,exact_discrete,0.0,12.0,12.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice02,bounded_small,0.0,12.0,12.0,1.0,4,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice02,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,A.Dice03,moment,0.0,44.3633906170585,44.3633906170585,1.0,6,1-1e-12,3-moment MoM window
+agg,A.Dice03,exact_discrete,0.0,30.0,30.0,1.0,5,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice03,bounded_small,0.0,30.0,30.0,1.0,5,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice03,used,0.0,32.0,32.0,1.0,5,exact,realized grid (exact_discrete)
+agg,A.Dice04,moment,0.0,79.34237714049986,79.34237714049986,1.0,7,1-1e-12,3-moment MoM window
+agg,A.Dice04,exact_discrete,0.0,36.0,36.0,1.0,6,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice04,bounded_small,0.0,93.08204103104744,93.08204103104744,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice04,used,0.0,64.0,64.0,1.0,6,exact,realized grid (exact_discrete)
+agg,A.Dice05,moment,0.0,156.5858001240464,156.5858001240464,1.0,8,1-1e-12,3-moment MoM window
+agg,A.Dice05,exact_discrete,0.0,64.0,64.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+agg,A.Dice05,bounded_small,0.0,165.8367273415953,165.8367273415953,1.0,8,freq 1-1e-12,bounded severity x freq quantile
+agg,A.Dice05,used,0.0,128.0,128.0,1.0,7,exact,realized grid (exact_discrete)
+agg,B.Basic01,moment,0.0,4.017243455023918,4.017243455023918,1.0,3,1-1e-12,3-moment MoM window
+agg,B.Basic01,exact_discrete,0.0,1.0,1.0,1.0,1,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic01,bounded_small,0.0,1.0,1.0,1.0,1,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic01,used,0.0,2.0,2.0,1.0,1,exact,realized grid (exact_discrete)
+agg,B.Basic02,moment,0.0,18.18408873338105,18.18408873338105,1.0,5,1-1e-12,3-moment MoM window
+agg,B.Basic02,exact_discrete,0.0,12.0,12.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic02,bounded_small,0.0,12.0,12.0,1.0,4,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic02,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,B.Basic03,moment,0.0,250.75627106580208,250.75627106580208,1.0,8,1-1e-12,3-moment MoM window
+agg,B.Basic03,exact_discrete,0.0,110.0,110.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic03,bounded_small,0.0,300.2734701034915,300.2734701034915,1.0,9,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic03,used,0.0,128.0,128.0,1.0,7,exact,realized grid (exact_discrete)
+agg,B.Basic04,moment,0.0,147.30509263576246,147.30509263576246,1.0,8,1-1e-12,3-moment MoM window
+agg,B.Basic04,exact_discrete,0.0,30.0,30.0,1.0,5,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic04,bounded_small,0.0,75.82688418323801,75.82688418323801,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic04,used,0.0,32.0,32.0,1.0,5,exact,realized grid (exact_discrete)
+agg,B.Basic05,moment,0.0,161.87046305976753,161.87046305976753,1.0,8,1-1e-12,3-moment MoM window
+agg,B.Basic05,exact_discrete,0.0,30.0,30.0,1.0,5,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic05,bounded_small,0.0,77.436345106349,77.436345106349,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic05,used,0.0,32.0,32.0,1.0,5,exact,realized grid (exact_discrete)
+agg,B.Basic06,moment,0.0,182.15187294399112,182.15187294399112,1.0,8,1-1e-12,3-moment MoM window
+agg,B.Basic06,exact_discrete,0.0,30.0,30.0,1.0,5,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic06,bounded_small,0.0,75.82688418323801,75.82688418323801,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic06,used,0.0,32.0,32.0,1.0,5,exact,realized grid (exact_discrete)
+agg,B.Basic07,moment,0.0,11.812326596049092,11.812326596049092,1.0,4,1-1e-12,3-moment MoM window
+agg,B.Basic07,exact_discrete,0.0,2.0,2.0,1.0,2,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic07,bounded_small,0.0,6.194109910937072,6.194109910937072,1.0,3,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic07,used,0.0,4.0,4.0,1.0,2,exact,realized grid (exact_discrete)
+agg,B.Basic08,moment,0.0,11.812326596049092,11.812326596049092,1.0,4,1-1e-12,3-moment MoM window
+agg,B.Basic08,exact_discrete,0.0,2.0,2.0,1.0,2,exact,dfreq/fixed x dsev integer lattice
+agg,B.Basic08,bounded_small,0.0,6.194109910937072,6.194109910937072,1.0,3,freq 1-1e-12,bounded severity x freq quantile
+agg,B.Basic08,used,0.0,4.0,4.0,1.0,2,exact,realized grid (exact_discrete)
+agg,B.Basic09,moment,0.0,166.23282636876579,166.23282636876579,0.00390625,16,1-1e-12,3-moment MoM window
+agg,B.Basic09,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realized grid (moment)
+agg,Ca.Freq01.Fixed,moment,0.0,10.0,10.0,1.0,4,1-1e-12,3-moment MoM window
+agg,Ca.Freq01.Fixed,exact_discrete,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,Ca.Freq01.Fixed,bounded_small,0.0,10.0,10.0,1.0,4,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq01.Fixed,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,Ca.Freq02.Poisson,moment,0.0,42.450648488360265,42.450648488360265,1.0,6,1-1e-12,3-moment MoM window
+agg,Ca.Freq02.Poisson,bounded_small,0.0,32.24500080639116,32.24500080639116,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq02.Poisson,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq03.Bernoulli,moment,0.0,3.6137947640191337,3.6137947640191337,1.0,3,1-1e-12,3-moment MoM window
+agg,Ca.Freq03.Bernoulli,bounded_small,0.0,3.6137947640191337,3.6137947640191337,1.0,3,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq03.Bernoulli,used,0.0,8.0,8.0,1.0,3,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq04.Binomial,moment,0.0,25.72959091769941,25.72959091769941,1.0,5,1-1e-12,3-moment MoM window
+agg,Ca.Freq04.Binomial,bounded_small,0.0,25.72959091769941,25.72959091769941,1.0,5,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq04.Binomial,used,0.0,32.0,32.0,1.0,5,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq05.Geometric,moment,0.0,724.7826967590393,724.7826967590393,1.0,10,1-1e-12,3-moment MoM window
+agg,Ca.Freq05.Geometric,bounded_small,0.0,83.7783211359528,83.7783211359528,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq05.Geometric,used,0.0,128.0,128.0,1.0,7,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq06.Pascal,moment,0.0,239.79315635341837,239.79315635341837,1.0,8,1-1e-12,3-moment MoM window
+agg,Ca.Freq06.Pascal,bounded_small,0.0,66.2758952803827,66.2758952803827,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq06.Pascal,used,0.0,128.0,128.0,1.0,7,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq07.NegBin,moment,0.0,127.61517627677051,127.61517627677051,1.0,8,1-1e-12,3-moment MoM window
+agg,Ca.Freq07.NegBin,bounded_small,0.0,48.52947161108014,48.52947161108014,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq07.NegBin,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq08.Logarithmic,moment,0.0,4145.522088535672,4145.522088535672,1.0,13,1-1e-12,3-moment MoM window
+agg,Ca.Freq08.Logarithmic,bounded_small,0.0,125.90799086414424,125.90799086414424,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq08.Logarithmic,used,0.0,128.0,128.0,1.0,7,freq 1-1e-12,realized grid (bounded_small)
+agg,Ca.Freq09.NeymanA,moment,0.0,121.39717584898001,121.39717584898001,1.0,7,1-1e-12,3-moment MoM window
+agg,Ca.Freq09.NeymanA,bounded_small,0.0,54.49000161278233,54.49000161278233,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Ca.Freq09.NeymanA,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq10.NegBin,moment,0.0,255.73004081191317,255.73004081191317,1.0,9,1-1e-12,3-moment MoM window
+agg,Cb.Freq10.NegBin,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq10.NegBin,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq11.Delaporte,moment,0.0,353.3727243263652,353.3727243263652,1.0,9,1-1e-12,3-moment MoM window
+agg,Cb.Freq11.Delaporte,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq11.Delaporte,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq12.IG,moment,0.0,411.0739905389359,411.0739905389359,1.0,9,1-1e-12,3-moment MoM window
+agg,Cb.Freq12.IG,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq12.IG,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq13.SIG,moment,0.0,384.2313462684782,384.2313462684782,1.0,9,1-1e-12,3-moment MoM window
+agg,Cb.Freq13.SIG,bounded_small,0.0,51.61658579301289,51.61658579301289,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq13.SIG,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq14.Sichel,moment,0.0,208.1540746605225,208.1540746605225,1.0,8,1-1e-12,3-moment MoM window
+agg,Cb.Freq14.Sichel,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq14.Sichel,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq15.Sichel.gamma,moment,0.0,60.848198769267086,60.848198769267086,1.0,6,1-1e-12,3-moment MoM window
+agg,Cb.Freq15.Sichel.gamma,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq15.Sichel.gamma,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq16.Sichel.ig,moment,0.0,60.848198769267086,60.848198769267086,1.0,6,1-1e-12,3-moment MoM window
+agg,Cb.Freq16.Sichel.ig,bounded_small,0.0,60.848198769267086,60.848198769267086,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq16.Sichel.ig,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cb.Freq17.Beta,moment,0.0,489030.7582920876,489030.7582920876,10.0,16,1-1e-12,3-moment MoM window
+agg,Cb.Freq17.Beta,bounded_small,0.0,51.61658579301289,51.61658579301289,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cb.Freq17.Beta,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cc.Freq21.Poisson,moment,0.0,67.74611814356814,67.74611814356814,1.0,7,1-1e-12,3-moment MoM window
+agg,Cc.Freq21.Poisson,bounded_small,0.0,35.450715242905844,35.450715242905844,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cc.Freq21.Poisson,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cc.Freq22.Geometric,moment,0.0,729.1542489686166,729.1542489686166,1.0,10,1-1e-12,3-moment MoM window
+agg,Cc.Freq22.Geometric,bounded_small,0.0,50.66150734659041,50.66150734659041,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cc.Freq22.Geometric,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cc.Freq23.Logarithmic,moment,0.0,3822.582461399907,3822.582461399907,1.0,12,1-1e-12,3-moment MoM window
+agg,Cc.Freq23.Logarithmic,bounded_small,0.0,72.22947381125427,72.22947381125427,1.0,7,freq 1-1e-12,bounded severity x freq quantile
+agg,Cc.Freq23.Logarithmic,used,0.0,128.0,128.0,1.0,7,freq 1-1e-12,realized grid (bounded_small)
+agg,Cc.Freq24.Binomial,moment,0.0,43.975496589190726,43.975496589190726,1.0,6,1-1e-12,3-moment MoM window
+agg,Cc.Freq24.Binomial,bounded_small,0.0,33.511195789337066,33.511195789337066,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cc.Freq24.Binomial,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,Cc.Freq25.Negbin,moment,0.0,195.51686747818735,195.51686747818735,1.0,8,1-1e-12,3-moment MoM window
+agg,Cc.Freq25.Negbin,bounded_small,0.0,40.943831833239486,40.943831833239486,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,Cc.Freq25.Negbin,used,0.0,64.0,64.0,1.0,6,freq 1-1e-12,realized grid (bounded_small)
+agg,D.Sev01,moment,0.0,6901.418216931757,6901.418216931757,0.125,16,1-1e-12,3-moment MoM window
+agg,D.Sev01,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realized grid (moment)
+agg,D.Sev02,moment,0.0,6911.418216933882,6911.418216933882,0.125,16,1-1e-12,3-moment MoM window
+agg,D.Sev02,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realized grid (moment)
+agg,D.Sev03,moment,0.0,6911.418216933882,6911.418216933882,0.125,16,1-1e-12,3-moment MoM window
+agg,D.Sev03,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realized grid (moment)
+agg,D.Sev04,moment,0.0,1203.4503299010642,1203.4503299010642,0.03125,16,1-1e-12,3-moment MoM window
+agg,D.Sev04,used,0.0,2048.0,2048.0,0.03125,16,1-1e-12,realized grid (moment)
+agg,D.Sev05,moment,0.0,303.06814555635094,303.06814555635094,0.0078125,16,1-1e-12,3-moment MoM window
+agg,D.Sev05,bounded_small,0.0,150.0,150.0,0.00390625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev05,used,0.0,256.0,256.0,0.00390625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,D.Sev05b,moment,0.0,487.18172553174554,487.18172553174554,0.0078125,16,1-1e-12,3-moment MoM window
+agg,D.Sev05b,bounded_small,0.0,300.0,300.0,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev05b,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,D.Sev06,moment,0.0,1143.0004457781379,1143.0004457781379,0.03125,16,1-1e-12,3-moment MoM window
+agg,D.Sev06,used,0.0,2048.0,2048.0,0.03125,16,1-1e-12,realized grid (moment)
+agg,D.Sev07,moment,0.0,64.55889289145053,64.55889289145053,0.001953125,16,1-1e-12,3-moment MoM window
+agg,D.Sev07,used,0.0,128.0,128.0,0.001953125,16,1-1e-12,realized grid (moment)
+agg,D.Sev08,moment,0.0,377.65489490410187,377.65489490410187,0.0078125,16,1-1e-12,3-moment MoM window
+agg,D.Sev08,used,0.0,512.0,512.0,0.0078125,16,1-1e-12,realized grid (moment)
+agg,D.Sev09,moment,0.0,394.40136293595685,394.40136293595685,0.0078125,16,1-1e-12,3-moment MoM window
+agg,D.Sev09,used,0.0,512.0,512.0,0.0078125,16,1-1e-12,realized grid (moment)
+agg,D.Sev10,moment,0.0,9439.462459655984,9439.462459655984,0.25,16,1-1e-12,3-moment MoM window
+agg,D.Sev10,used,0.0,16384.0,16384.0,0.25,16,1-1e-12,realized grid (moment)
+agg,D.Sev11,moment,0.0,1681.9139938020462,1681.9139938020462,0.03125,16,1-1e-12,3-moment MoM window
+agg,D.Sev11,used,0.0,2048.0,2048.0,0.03125,16,1-1e-12,realized grid (moment)
+agg,D.Sev12,moment,0.0,219.34275908352643,219.34275908352643,0.00390625,16,1-1e-12,3-moment MoM window
+agg,D.Sev12,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realized grid (moment)
+agg,D.Sev13,moment,0.0,24269.363376620022,24269.363376620022,0.5,16,1-1e-12,3-moment MoM window
+agg,D.Sev13,used,0.0,32768.0,32768.0,0.5,16,1-1e-12,realized grid (moment)
+agg,D.Sev14,moment,0.0,110.3448808110585,110.3448808110585,0.001953125,16,1-1e-12,3-moment MoM window
+agg,D.Sev14,bounded_small,0.0,60.0,60.0,0.0009765625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev14,used,0.0,64.0,64.0,0.0009765625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,D.Sev15,moment,0.0,485.7408350616456,485.7408350616456,1.0,9,1-1e-12,3-moment MoM window
+agg,D.Sev15,exact_discrete,0.0,40.0,40.0,1.0,6,exact,dfreq/fixed x dsev integer lattice
+agg,D.Sev15,bounded_small,0.0,40.0,40.0,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev15,used,0.0,64.0,64.0,1.0,6,exact,realized grid (exact_discrete)
+agg,D.Sev16,moment,0.0,485.7408350616456,485.7408350616456,1.0,9,1-1e-12,3-moment MoM window
+agg,D.Sev16,exact_discrete,0.0,40.0,40.0,1.0,6,exact,dfreq/fixed x dsev integer lattice
+agg,D.Sev16,bounded_small,0.0,40.0,40.0,1.0,6,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev16,used,0.0,64.0,64.0,1.0,6,exact,realized grid (exact_discrete)
+agg,D.Sev17,moment,0.0,197.20726192066223,197.20726192066223,0.00390625,16,1-1e-12,3-moment MoM window
+agg,D.Sev17,bounded_small,0.0,40.0,40.0,0.0009765625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,D.Sev17,used,0.0,64.0,64.0,0.0009765625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev00,moment,0.0,18.73472565270986,18.73472565270986,0.00048828125,16,1-1e-12,3-moment MoM window
+agg,E.TSev00,used,0.0,32.0,32.0,0.00048828125,16,1-1e-12,realized grid (moment)
+agg,E.TSev01,moment,0.0,187.34725652669607,187.34725652669607,0.00390625,16,1-1e-12,3-moment MoM window
+agg,E.TSev01,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realized grid (moment)
+agg,E.TSev02,moment,0.0,38.73472621667413,38.73472621667413,0.0009765625,16,1-1e-12,3-moment MoM window
+agg,E.TSev02,used,0.0,64.0,64.0,0.0009765625,16,1-1e-12,realized grid (moment)
+agg,E.TSev03,moment,0.0,207.34726991511195,207.34726991511195,0.00390625,16,1-1e-12,3-moment MoM window
+agg,E.TSev03,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realized grid (moment)
+agg,E.TSev04,moment,0.0,78.88027258719579,78.88027258719579,0.001953125,16,1-1e-12,3-moment MoM window
+agg,E.TSev04,used,0.0,128.0,128.0,0.001953125,16,1-1e-12,realized grid (moment)
+agg,E.TSev05,moment,0.0,83.88026459992325,83.88026459992325,0.001953125,16,1-1e-12,3-moment MoM window
+agg,E.TSev05,used,0.0,128.0,128.0,0.001953125,16,1-1e-12,realized grid (moment)
+agg,E.TSev06,moment,0.0,1705.3945268511352,1705.3945268511352,0.03125,16,1-1e-12,3-moment MoM window
+agg,E.TSev06,bounded_small,0.0,130.0,130.0,0.00390625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev06,used,0.0,256.0,256.0,0.00390625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev07,moment,0.0,1856.742687533615,1856.742687533615,0.03125,16,1-1e-12,3-moment MoM window
+agg,E.TSev07,bounded_small,0.0,130.0,130.0,0.00390625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev07,used,0.0,256.0,256.0,0.00390625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev08,moment,0.0,1705.3945268511352,1705.3945268511352,0.03125,16,1-1e-12,3-moment MoM window
+agg,E.TSev08,bounded_small,0.0,130.0,130.0,0.00390625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev08,used,0.0,256.0,256.0,0.00390625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev09,moment,0.0,1323.7120405314306,1323.7120405314306,0.03125,16,1-1e-12,3-moment MoM window
+agg,E.TSev09,bounded_small,0.0,130.0,130.0,0.00390625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev09,used,0.0,256.0,256.0,0.00390625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev10,moment,0.0,740.4212138082568,740.4212138082568,0.015625,16,1-1e-12,3-moment MoM window
+agg,E.TSev10,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,E.TSev11,moment,0.0,580.3601340716809,580.3601340716809,0.015625,16,1-1e-12,3-moment MoM window
+agg,E.TSev11,bounded_small,0.0,967.3500241917349,967.3500241917349,0.015625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev11,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,E.TSev12,moment,0.0,797.5918462024148,797.5918462024148,0.015625,16,1-1e-12,3-moment MoM window
+agg,E.TSev12,bounded_small,0.0,3224.5000806391163,3224.5000806391163,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev12,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,E.TSev13,moment,0.0,740.4212138082568,740.4212138082568,0.015625,16,1-1e-12,3-moment MoM window
+agg,E.TSev13,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,E.TSev14,moment,0.0,836.111474574927,836.111474574927,0.015625,16,1-1e-12,3-moment MoM window
+agg,E.TSev14,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,E.TSev15,moment,0.0,5160.7499158633545,5160.7499158633545,0.125,16,1-1e-12,3-moment MoM window
+agg,E.TSev15,bounded_small,0.0,4145.918183539882,4145.918183539882,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev15,used,0.0,8192.0,8192.0,0.125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev16,moment,0.0,5160.7499158633545,5160.7499158633545,0.125,16,1-1e-12,3-moment MoM window
+agg,E.TSev16,bounded_small,0.0,4145.918183539882,4145.918183539882,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev16,used,0.0,8192.0,8192.0,0.125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev17,moment,0.0,5260.6864309881785,5260.6864309881785,0.125,16,1-1e-12,3-moment MoM window
+agg,E.TSev17,bounded_small,0.0,4145.918183539882,4145.918183539882,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev17,used,0.0,8192.0,8192.0,0.125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,E.TSev18,moment,0.0,5128.088547268315,5128.088547268315,0.125,16,1-1e-12,3-moment MoM window
+agg,E.TSev18,bounded_small,0.0,4145.918183539882,4145.918183539882,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,E.TSev18,used,0.0,8192.0,8192.0,0.125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,F.Expos01,moment,0.0,3702.1060690413133,3702.1060690413133,0.0625,16,1-1e-12,3-moment MoM window
+agg,F.Expos01,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+agg,F.Expos02,moment,0.0,3702.106069041288,3702.106069041288,0.0625,16,1-1e-12,3-moment MoM window
+agg,F.Expos02,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+agg,F.Expos03,moment,0.0,3702.106069041288,3702.106069041288,0.0625,16,1-1e-12,3-moment MoM window
+agg,F.Expos03,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+agg,G.Mixed00,moment,0.0,492.1409953710985,492.1409953710985,0.0078125,16,1-1e-12,3-moment MoM window
+agg,G.Mixed00,bounded_small,0.0,401.72434550239177,401.72434550239177,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed00,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed01,moment,0.0,551.1043566525722,551.1043566525722,0.015625,16,1-1e-12,3-moment MoM window
+agg,G.Mixed01,bounded_small,0.0,417.21099736909235,417.21099736909235,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed01,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed02,moment,0.0,655.8100544498047,655.8100544498047,0.015625,16,1-1e-12,3-moment MoM window
+agg,G.Mixed02,bounded_small,0.0,417.21099736909235,417.21099736909235,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed02,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed03,moment,0.0,687.1998918669638,687.1998918669638,0.015625,16,1-1e-12,3-moment MoM window
+agg,G.Mixed03,bounded_small,0.0,1197.0467836059486,1197.0467836059486,0.03125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed03,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,G.Mixed04,moment,0.0,966.2194828897177,966.2194828897177,0.015625,16,1-1e-12,3-moment MoM window
+agg,G.Mixed04,bounded_small,0.0,417.21099736909235,417.21099736909235,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed04,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed05,moment,0.0,7123.411801663556,7123.411801663556,0.125,16,1-1e-12,3-moment MoM window
+agg,G.Mixed05,bounded_small,0.0,2086.054986845462,2086.054986845462,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed05,used,0.0,4096.0,4096.0,0.0625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed07,moment,0.0,2943.154843393372,2943.154843393372,0.0625,16,1-1e-12,3-moment MoM window
+agg,G.Mixed07,bounded_small,0.0,917.8641942120031,917.8641942120031,0.015625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed07,used,0.0,1024.0,1024.0,0.015625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed08,moment,0.0,8996.710284372955,8996.710284372955,0.25,16,1-1e-12,3-moment MoM window
+agg,G.Mixed08,bounded_small,0.0,2586.7081836883726,2586.7081836883726,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,G.Mixed08,used,0.0,4096.0,4096.0,0.0625,16,freq 1-1e-12,realized grid (bounded_small)
+agg,G.Mixed09,moment,0.0,9516.493299992955,9516.493299992955,0.25,16,1-1e-12,3-moment MoM window
+agg,G.Mixed09,used,0.0,16384.0,16384.0,0.25,16,1-1e-12,realized grid (moment)
+agg,G.Mixed10,moment,0.0,53762522.20869446,53762522.20869446,1600.0,16,1-1e-12,3-moment MoM window
+agg,G.Mixed10,used,0.0,104857600.0,104857600.0,1600.0,16,1-1e-12,realized grid (moment)
+agg,G.Mixed11,moment,0.0,64033262.19303391,64033262.19303391,1000.0,16,1-1e-12,3-moment MoM window
+agg,G.Mixed11,used,0.0,65536000.0,65536000.0,1000.0,16,1-1e-12,realized grid (moment)
+agg,H.Limits01,moment,0.0,184.08826744968098,184.08826744968098,0.00390625,16,1-1e-12,3-moment MoM window
+agg,H.Limits01,bounded_small,0.0,80.0,80.0,0.001953125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,H.Limits01,used,0.0,128.0,128.0,0.001953125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,H.Limits02,moment,0.0,1733.0155761537783,1733.0155761537783,0.03125,16,1-1e-12,3-moment MoM window
+agg,H.Limits02,bounded_small,0.0,2000.0,2000.0,0.03125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,H.Limits02,used,0.0,2048.0,2048.0,0.03125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,H.Limits03,moment,0.0,2124.3111578441844,2124.3111578441844,0.0625,16,1-1e-12,3-moment MoM window
+agg,H.Limits03,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+agg,I.Blend01,moment,0.0,532.6119290598522,532.6119290598522,0.015625,16,1-1e-12,3-moment MoM window
+agg,I.Blend01,bounded_small,0.0,1027.942074166202,1027.942074166202,0.03125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend01,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,I.Blend02,moment,0.0,929.6651507315038,929.6651507315038,0.015625,16,1-1e-12,3-moment MoM window
+agg,I.Blend02,bounded_small,0.0,1429.94846453176,1429.94846453176,0.03125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend02,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,I.Blend03,moment,0.0,976.4511978748095,976.4511978748095,0.015625,16,1-1e-12,3-moment MoM window
+agg,I.Blend03,bounded_small,0.0,1429.94846453176,1429.94846453176,0.03125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend03,used,0.0,2048.0,2048.0,0.03125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,I.Blend04,moment,0.0,367.71543917342694,367.71543917342694,0.0078125,16,1-1e-12,3-moment MoM window
+agg,I.Blend04,bounded_small,0.0,394.59181835398823,394.59181835398823,0.0078125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend04,used,0.0,512.0,512.0,0.0078125,16,freq 1-1e-12,realized grid (bounded_small)
+agg,I.Blend05,moment,0.0,1454.99863140132,1454.99863140132,0.03125,16,1-1e-12,3-moment MoM window
+agg,I.Blend05,bounded_small,0.0,6718.877275309819,6718.877275309819,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend05,used,0.0,2048.0,2048.0,0.03125,16,1-1e-12,realized grid (moment)
+agg,I.Blend06,moment,0.0,2798.091812773397,2798.091812773397,0.0625,16,1-1e-12,3-moment MoM window
+agg,I.Blend06,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+agg,I.Blend07,moment,0.0,33221.4021179488,33221.4021179488,1.0,16,1-1e-12,3-moment MoM window
+agg,I.Blend07,bounded_small,0.0,47480.60195190352,47480.60195190352,1.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,I.Blend07,used,0.0,65536.0,65536.0,1.0,16,freq 1-1e-12,realized grid (bounded_small)
+agg,I.Blend08,moment,0.0,64729.49708947355,64729.49708947355,1.0,16,1-1e-12,3-moment MoM window
+agg,I.Blend08,used,0.0,65536.0,65536.0,1.0,16,1-1e-12,realized grid (moment)
+agg,I.Blend09,moment,0.0,31922.392966136773,31922.392966136773,0.25,17,1-1e-12,3-moment MoM window
+agg,I.Blend09,used,0.0,32768.0,32768.0,0.25,17,1-1e-12,realized grid (moment)
+agg,I.Blend10,moment,0.0,19656.76095127058,19656.76095127058,0.5,16,1-1e-12,3-moment MoM window
+agg,I.Blend10,used,0.0,32768.0,32768.0,0.5,16,1-1e-12,realized grid (moment)
+agg,I.Blend11,moment,0.0,31922.392966136773,31922.392966136773,0.25,17,1-1e-12,3-moment MoM window
+agg,I.Blend11,used,0.0,32768.0,32768.0,0.25,17,1-1e-12,realized grid (moment)
+agg,I.Blend12,moment,0.0,19656.76095127058,19656.76095127058,0.5,16,1-1e-12,3-moment MoM window
+agg,I.Blend12,used,0.0,32768.0,32768.0,0.5,16,1-1e-12,realized grid (moment)
+agg,J.Re01,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re01,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re01,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re02,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re02,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re02,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re03,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re03,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re03,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re04,moment,0.0,2103.4944868701104,2103.4944868701104,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re04,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re04,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re05,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re05,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re05,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re06,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re06,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re06,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re07,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re07,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re07,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re08,moment,0.0,2103.4944868701104,2103.4944868701104,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re08,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re08,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re09,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re09,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re09,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re10,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re10,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re10,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re11,moment,0.0,613.0409728655179,613.0409728655179,0.015625,16,1-1e-12,3-moment MoM window
+agg,J.Re11,bounded_small,0.0,2072.959091769941,2072.959091769941,0.0625,16,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re11,used,0.0,1024.0,1024.0,0.015625,16,1-1e-12,realized grid (moment)
+agg,J.Re12,moment,0.0,2103.4944868701104,2103.4944868701104,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re12,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re12,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re13,moment,0.0,2103.4944868701104,2103.4944868701104,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re13,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re13,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re14,moment,0.0,6737.840721454672,6737.840721454672,0.125,16,1-1e-12,3-moment MoM window
+agg,J.Re14,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realized grid (moment)
+agg,J.Re15,moment,0.0,141.04570560122016,141.04570560122016,0.00390625,16,1-1e-12,3-moment MoM window
+agg,J.Re15,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realized grid (moment)
+agg,J.Re16,moment,0.0,2098.4600806688154,2098.4600806688154,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re16,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re16,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re17,moment,0.0,2098.4600806688154,2098.4600806688154,1.0,12,1-1e-12,3-moment MoM window
+agg,J.Re17,bounded_small,0.0,2072.959091769941,2072.959091769941,1.0,12,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re17,used,0.0,4096.0,4096.0,1.0,12,freq 1-1e-12,realized grid (bounded_small)
+agg,J.Re18a,moment,0.0,10.0,10.0,10.0,1,1-1e-12,3-moment MoM window
+agg,J.Re18a,exact_discrete,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,J.Re18a,bounded_small,0.0,10.0,10.0,10.0,1,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re18a,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,J.Re18b,moment,0.0,10.0,10.0,10.0,1,1-1e-12,3-moment MoM window
+agg,J.Re18b,exact_discrete,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,J.Re18b,bounded_small,0.0,10.0,10.0,10.0,1,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re18b,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,J.Re18c,moment,0.0,10.0,10.0,10.0,1,1-1e-12,3-moment MoM window
+agg,J.Re18c,exact_discrete,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,J.Re18c,bounded_small,0.0,10.0,10.0,10.0,1,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re18c,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,J.Re18d,moment,0.0,10.0,10.0,10.0,1,1-1e-12,3-moment MoM window
+agg,J.Re18d,exact_discrete,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+agg,J.Re18d,bounded_small,0.0,10.0,10.0,10.0,1,freq 1-1e-12,bounded severity x freq quantile
+agg,J.Re18d,used,0.0,16.0,16.0,1.0,4,exact,realized grid (exact_discrete)
+agg,K.Tweedie0,moment,0.0,4.25137904250592,4.25137904250592,0.0001220703125,16,1-1e-12,3-moment MoM window
+agg,K.Tweedie0,used,0.0,8.0,8.0,0.0001220703125,16,1-1e-12,realized grid (moment)
+agg,K.Tweedie1,moment,0.0,4.251379042506112,4.251379042506112,0.0001220703125,16,1-1e-12,3-moment MoM window
+agg,K.Tweedie1,used,0.0,8.0,8.0,0.0001220703125,16,1-1e-12,realized grid (moment)
+agg,K.Tweedie2,moment,0.0,4.251379042505985,4.251379042505985,0.0001220703125,16,1-1e-12,3-moment MoM window
+agg,K.Tweedie2,used,0.0,8.0,8.0,0.0001220703125,16,1-1e-12,realized grid (moment)
+agg,N.Comm.Liability,moment,0.0,56207505.36093554,56207505.36093554,900.0,16,1-1e-12,3-moment MoM window
+agg,N.Comm.Liability,bounded_small,0.0,346814985.847361,346814985.847361,10000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Comm.Liability,used,0.0,58982400.0,58982400.0,900.0,16,1-1e-12,realized grid (moment)
+agg,N.Comm.Professional,moment,0.0,131539886.41746628,131539886.41746628,4000.0,16,1-1e-12,3-moment MoM window
+agg,N.Comm.Professional,bounded_small,0.0,340318448.7309354,340318448.7309354,10000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Comm.Professional,used,0.0,262144000.0,262144000.0,4000.0,16,1-1e-12,realized grid (moment)
+agg,N.Comm.Property,moment,0.0,3207990508.0629663,3207990508.0629663,50000.0,16,1-1e-12,3-moment MoM window
+agg,N.Comm.Property,bounded_small,0.0,830503608.1844474,830503608.1844474,20000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Comm.Property,used,0.0,1310720000.0,1310720000.0,20000.0,16,freq 1-1e-12,realized grid (bounded_small)
+agg,N.Comm.Umbrella,moment,0.0,100696517.77733994,100696517.77733994,2000.0,16,1-1e-12,3-moment MoM window
+agg,N.Comm.Umbrella,bounded_small,0.0,224220707.27331507,224220707.27331507,6000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Comm.Umbrella,used,0.0,131072000.0,131072000.0,2000.0,16,1-1e-12,realized grid (moment)
+agg,N.Homeowners,moment,0.0,79355356.66208288,79355356.66208288,2000.0,16,1-1e-12,3-moment MoM window
+agg,N.Homeowners,bounded_small,0.0,366383303.20213646,366383303.20213646,6000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Homeowners,used,0.0,131072000.0,131072000.0,2000.0,16,1-1e-12,realized grid (moment)
+agg,N.Personal.Auto,moment,0.0,28353472.84872813,28353472.84872813,800.0,16,1-1e-12,3-moment MoM window
+agg,N.Personal.Auto,bounded_small,0.0,276150481.7458336,276150481.7458336,8000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.Personal.Auto,used,0.0,52428800.0,52428800.0,800.0,16,1-1e-12,realized grid (moment)
+agg,N.US.Hurricane,moment,0.0,79907650061371.2,79907650061371.2,2000000000.0,16,1-1e-12,3-moment MoM window
+agg,N.US.Hurricane,bounded_small,0.0,11201502053172.252,11201502053172.252,200000000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.US.Hurricane,used,0.0,13107200000000.0,13107200000000.0,200000000.0,16,freq 1-1e-12,realized grid (bounded_small)
+agg,N.US.SCS,moment,0.0,846986102755.8893,846986102755.8893,20000000.0,16,1-1e-12,3-moment MoM window
+agg,N.US.SCS,bounded_small,0.0,4028862941488.089,4028862941488.089,120000000.0,16,freq 1-1e-12,bounded severity x freq quantile
+agg,N.US.SCS,used,0.0,1310720000000.0,1310720000000.0,20000000.0,16,1-1e-12,realized grid (moment)
+agg,O.Logo,moment,0.0,4000.3449308324753,4000.3449308324753,0.0625,16,1-1e-12,3-moment MoM window
+agg,O.Logo,bounded_small,0.0,6250.0,6250.0,0.125,16,freq 1-1e-12,bounded severity x freq quantile
+agg,O.Logo,used,0.0,4096.0,4096.0,0.0625,16,1-1e-12,realized grid (moment)
+port,L.Bodoff1,wind1,0.0,99.0,99.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff1,quake1,0.0,100.0,100.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff1,used,0.0,256.0,256.0,1.0,8,1-1e-12,realised portfolio grid
+port,L.Bodoff2,wind2,0.0,50.0,50.0,1.0,6,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff2,quake2,0.0,100.0,100.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff2,used,0.0,256.0,256.0,1.0,8,1-1e-12,realised portfolio grid
+port,L.Bodoff3,wind3,0.0,5.0,5.0,1.0,3,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff3,quake3,0.0,100.0,100.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+port,L.Bodoff3,used,0.0,128.0,128.0,1.0,7,1-1e-12,realised portfolio grid
+port,L.Bodoff4,a,0.0,775.8370403012025,775.8370403012025,0.015625,16,1-1e-12,3-moment MoM window
+port,L.Bodoff4,b,0.0,6358.342259512888,6358.342259512888,0.125,16,1-1e-12,3-moment MoM window
+port,L.Bodoff4,c,0.0,31791.711297564467,31791.711297564467,0.5,16,1-1e-12,3-moment MoM window
+port,L.Bodoff4,used,0.0,65536.0,65536.0,1.0,16,1-1e-12,realised portfolio grid
+port,M.PIR.1.Discrete,Discrete.X1,0.0,10.0,10.0,1.0,4,exact,dfreq/fixed x dsev integer lattice
+port,M.PIR.1.Discrete,Discrete.X2,0.0,90.0,90.0,1.0,7,exact,dfreq/fixed x dsev integer lattice
+port,M.PIR.1.Discrete,used,0.0,128.0,128.0,1.0,7,1-1e-12,realised portfolio grid
+port,M.PIR.2.Tame,Tame.A,0.0,94.53193199310218,94.53193199310218,0.001953125,16,1-1e-12,3-moment MoM window
+port,M.PIR.2.Tame,Tame.B,0.0,125.44492745818104,125.44492745818104,0.001953125,16,1-1e-12,3-moment MoM window
+port,M.PIR.2.Tame,used,0.0,256.0,256.0,0.00390625,16,1-1e-12,realised portfolio grid
+port,M.PIR.3.CNC.Gross,CNC.NonCat,0.0,200.71188393309308,200.71188393309308,0.00390625,16,1-1e-12,3-moment MoM window
+port,M.PIR.3.CNC.Gross,CNC.Cat,0.0,4943.125969293176,4943.125969293176,0.125,16,1-1e-12,3-moment MoM window
+port,M.PIR.3.CNC.Gross,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realised portfolio grid
+port,M.PIR.4.CNC.Net,CNC.Net.NonCat,0.0,200.71188393309308,200.71188393309308,0.00390625,16,1-1e-12,3-moment MoM window
+port,M.PIR.4.CNC.Net,CNC.Net.Cat,0.0,4943.125969293176,4943.125969293176,0.125,16,1-1e-12,3-moment MoM window
+port,M.PIR.4.CNC.Net,used,0.0,8192.0,8192.0,0.125,16,1-1e-12,realised portfolio grid
+port,M.PIR.5.HuSCS.Gross,SCS,0.0,6490925.312064269,6490925.312064269,100.0,16,1-1e-12,3-moment MoM window
+port,M.PIR.5.HuSCS.Gross,Hu,0.0,19023362913.914356,19023362913.914356,300000.0,16,1-1e-12,3-moment MoM window
+port,M.PIR.5.HuSCS.Gross,used,0.0,19660800000.0,19660800000.0,300000.0,16,1-1e-12,realised portfolio grid
+port,M.PIR.6.HuSCS.Net,Net.SCS,0.0,6490925.312064269,6490925.312064269,100.0,16,1-1e-12,3-moment MoM window
+port,M.PIR.6.HuSCS.Net,Net.Hu,0.0,19023362913.914356,19023362913.914356,300000.0,16,1-1e-12,3-moment MoM window
+port,M.PIR.6.HuSCS.Net,used,0.0,19660800000.0,19660800000.0,300000.0,16,1-1e-12,realised portfolio grid

@@ -55,6 +55,8 @@ cheat-sheets/preamble.fmt
 # Editors / IDEs
 .idea/
 *.sublime-*
+# write back the syntax file
+!*.sublime-syntax
 
 # pyenv
 .python-version

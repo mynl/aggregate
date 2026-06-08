@@ -1,0 +1,135 @@
+%YAML 1.2
+---
+name: DecL
+file_extensions:
+  - agg
+  - decl
+scope: source.decl
+
+variables:
+  name_char: '[a-zA-Z0-9._:~\-]'
+  name_tail: '[._:~a-zA-Z0-9\-]*'
+  keyword_boundary: '(?![a-zA-Z0-9._:~\-])'
+
+contexts:
+  prototype:
+    - include: comments
+
+  main:
+    - include: note_hints
+    - include: builtins
+    - include: keywords
+    - include: frequencies
+    - include: operators
+    - include: identifiers
+    - include: numbers
+    - include: strings
+
+  note_hints:
+    - match: '\b(note)\{'
+      captures:
+        1: keyword.other.note.decl
+      push:
+        - meta_scope: comment.block.note.decl
+        - match: '\}'
+          pop: true
+
+    - match: '\b(hints)\{'
+      captures:
+        1: keyword.other.hints.decl
+      push:
+        - meta_scope: meta.mapping.hints.decl
+        - match: '\b[a-zA-Z][._:~a-zA-Z0-9\-]*\b(?=\s*=)'
+          scope: variable.parameter.hints.decl
+        - match: '='
+          scope: keyword.operator.assignment.decl
+        - match: ';'
+          scope: punctuation.separator.decl
+        - include: numbers
+        - include: identifiers
+        - match: '\}'
+          pop: true
+
+  builtins:
+    - match: '\bagg\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
+      scope: support.type.builtin.aggregate.decl
+
+    - match: '\bsev\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
+      scope: support.type.builtin.severity.decl
+
+    - match: '\b(?:distortion|dist)\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
+      scope: support.type.builtin.distortion.decl
+
+  keywords:
+    - match: '\b(?:occurrence|aggregate|netceded|copula|exposure|tweedie|tower|mixed|picks|splice|ceded|dfreq|dsev|ssev|loss|pnl|port|rate|net|sev|agg|xps|wts|and|exp|at|cv|lr|xs|of|to|po|so|zm|zt){{keyword_boundary}}'
+      scope: keyword.control.decl
+
+    - match: '\b(?:multivariate|mv){{keyword_boundary}}'
+      scope: keyword.control.multivariate.decl
+
+    - match: '\b(?:premium|prem){{keyword_boundary}}'
+      scope: keyword.control.premium.decl
+
+    - match: '\b(?:claims|claim){{keyword_boundary}}'
+      scope: keyword.control.claims.decl
+
+    - match: '\b(?:distortion|dist){{keyword_boundary}}'
+      scope: keyword.control.distortion.decl
+
+  frequencies:
+    - match: '\b(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|neyman|logarithmic|negbin){{keyword_boundary}}'
+      scope: support.function.frequency.decl
+
+  operators:
+    - match: '\*\*|\^'
+      scope: keyword.operator.exponent.decl
+
+    - match: '@'
+      scope: keyword.operator.inhomogeneous-multiply.decl
+
+    - match: '[+\-*/=]'
+      scope: keyword.operator.arithmetic.decl
+
+    - match: ':'
+      scope: keyword.operator.range.decl
+
+    - match: '[\[\]()]'
+      scope: punctuation.section.brackets.decl
+
+    - match: '[,|\\]'
+      scope: punctuation.separator.decl
+
+    - match: '!'
+      scope: keyword.operator.unconditional.decl
+
+  identifiers:
+    # Mirrors the Lark ID token. Placing this before numbers prevents
+    # names such as mydist.1 from splitting and coloring .1 as a number.
+    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
+      scope: variable.other.identifier.decl
+
+  numbers:
+    - match: '(?<![a-zA-Z0-9._:~\-])-?(?:inf|(?:\d+\.?\d*|\d*\.\d+)(?:[eE][+\-]?\d+)?%?)(?![a-zA-Z0-9._:~\-])'
+      scope: constant.numeric.decl
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.decl
+      push: inside_string
+
+  inside_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.decl
+    - match: '\\.'
+      scope: constant.character.escape.decl
+    - match: '"'
+      scope: punctuation.definition.string.end.decl
+      pop: true
+
+  comments:
+    - match: '#'
+      scope: punctuation.definition.comment.decl
+      push:
+        - meta_scope: comment.line.number-sign.decl
+        - match: '$\n?'
+          pop: true

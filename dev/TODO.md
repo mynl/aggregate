@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a45.
+> **Last updated: 2026-06-08** — current version 1.0.0a46.
 
 ---
 
@@ -50,7 +50,7 @@ alongside. **Start at `N1`.**
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
 |    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
-|    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
+| ✅ | F2 | G&H tilting DIY (pedagogy) | A | — | H*, B*, N* |
 | ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
 |    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
 |    | F5 | DecL `of` synonym | B | — | — |
@@ -233,10 +233,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   lognormal via the **tail-thickness classifier** (a very good application of
   it). **needs** tail work (shipped, `dev/done/plan-tail-thickness.md`).
   Removed in `6de20f2`.
-- [ ] **F2 `[A]` G&H tilting DIY** (#34) — the `ft` exponential **tilt**
-  (Grübel–Hermesmeier aliasing reduction) was removed in `6de20f2`, breaking the
-  doc example. Replace it with a hands-on illustration of the mechanics;
-  consider exposing it as a small `Aggregate` method.
+- [x] **F2 `[A]` G&H tilting DIY** (#34) — **done 1.0.0a46**
+  (`dev/done/plan-gh-tilt.md`). The `ft` exponential **tilt** (Grübel–Hermesmeier
+  aliasing reduction) removed in `6de20f2` is reborn as a self-contained
+  **pedagogy** illustration, not a core method (the production convolution stays
+  tilt-free — padding is the operational aliasing control). Added
+  `pedagogy.tilted_aggregate_density` (+ `tilt_vector`, `gh_tilting_exhibit`) and
+  rewired `docs/.../010_gh_example.rst`. `tilt=None` reproduces the untilted
+  convolution byte-for-byte; `tests/test_pedagogy_tilt.py`.
 - [x] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — **done v1.0.0a31**
   (`dev/done/plan-pentagon.md`). Canonical `pentagon.py` contract
   (`PENTAGON_STATS`/`complete_pentagon`); all emitters routed through it;

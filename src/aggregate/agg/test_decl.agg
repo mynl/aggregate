@@ -323,3 +323,13 @@ agg TAIL.PowerLaw 100 claims sev 100 * pareto 3 poisson
 agg TAIL.FreqDriven 100 claims sev 100 * uniform poisson
 agg TAIL.Bounded  dfreq [2] dsev [1 2 3]
 agg TAIL.Mixed    10 claims sev [100 200] * [lognorm pareto] [2 3] wts [.5 .5] poisson
+
+# ============================================================
+# GH. Exponential-tilting pedagogy (Grübel-Hermesmeier, 1.0.0a46)
+# ============================================================
+# The Poisson/Levy aliasing demo reproduced by
+# aggregate.pedagogy.gh_tilting_exhibit / tilted_aggregate_density. Tilting is a
+# teaching device only; the production convolution is tilt-free (padding is the
+# operational aliasing control). See tests/test_pedagogy_tilt.py and
+# docs/2_user_guides/problems/010_gh_example.rst.
+agg GH.PoissonLevy 20 claim sev levy poisson                                                                 note{zero-parameter Levy severity; alpha=1/2 stable aggregate}

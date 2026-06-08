@@ -21,6 +21,7 @@ from matplotlib.patches import Polygon
 import numpy as np
 import pandas as pd
 from pandas.io.formats.format import EngFormatter
+import scipy.fft as sfft
 import scipy.stats as ss
 
 from .bounds import Bounds
@@ -1501,3 +1502,191 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
                     ax.legend(prop={'size': 7})
             except Exception:
                 pass
+
+
+# ======================================================================
+# Exponential tilting (Grübel–Hermesmeier aliasing-control illustration)
+# ======================================================================
+# Tilting is a *teaching device* about FFT aliasing control; it is NOT part of
+# the production convolution path, which controls aliasing purely through
+# padding (the ``tilt``/``tilt_vector`` arguments were dropped from the core
+# ``ft``/``ift``/``update_work`` in the 1.0 refactor). These helpers keep the
+# tilted transform entirely local so the numerical-methods docs can reproduce
+# the Grübel & Hermesmeier (1999) example without touching the core.
+
+
+def tilt_vector(theta, n):
+    r"""Exponential tilt vector :math:`e^{-\theta k}` for ``k = 0 \dots n-1``.
+
+    Parameters
+    ----------
+    theta : float
+        Tilt amount :math:`\theta`. Embrechts–Frei recommend
+        :math:`\theta\, n \le 20` to keep the untilting amplification bounded.
+    n : int
+        Grid length (``2**log2``).
+
+    Returns
+    -------
+    numpy.ndarray
+        The length-``n`` vector ``exp(-theta * arange(n))``.
+    """
+    return np.exp(-theta * np.arange(n))
+
+
+def tilted_aggregate_density(agg, *, log2, bs, padding=0, tilt=None,
+                             normalize=False):
+    r"""Aggregate density via FFT with optional exponential tilting (pedagogy).
+
+    Illustrates Grübel–Hermesmeier exponential tilting for aliasing control. The
+    severity density :math:`p` is multiplied by the tilt vector
+    :math:`e^{-\theta k}`, transformed, run through the frequency PGF, inverted,
+    and un-tilted by :math:`e^{+\theta k}`. Tilting damps the wrapped (aliased)
+    mass before the transform so it does not contaminate the low buckets, at the
+    cost of amplifying round-off in the tail on the un-tilt — hence the
+    :math:`\theta\, n \le 20` rule of thumb.
+
+    **Not part of the production update path** — a self-contained teaching helper
+    that mirrors the pre-refactor ``ft``/``ift`` tilt logic locally. The core
+    convolution is tilt-free and controls aliasing through padding.
+
+    Parameters
+    ----------
+    agg : Aggregate or str
+        A built or buildable aggregate; only its discretized severity and
+        frequency PGF are used. The object is updated in place onto the
+        ``(log2, bs)`` grid.
+    log2 : int
+        Grid is ``N = 2**log2`` buckets.
+    bs : float
+        Bucket size.
+    padding : int, default 0
+        FFT zero-padding factor (transform length ``N << padding``).
+    tilt : float or None, default None
+        Tilt amount :math:`\theta`; ``None`` (or ``0``) means no tilt. The tilt
+        vector is :math:`e^{-\theta k}`; :math:`\theta\, N \le 20` recommended.
+    normalize : bool, default False
+        Severity normalization passed to ``update``. ``False`` matches the GH
+        doc example, which compares un-normalized tail probabilities.
+
+    Returns
+    -------
+    pandas.Series
+        Aggregate density indexed by loss (``agg.xs``), name ``p_total`` — read
+        ``series / bs`` for the density at a chosen loss, as the doc does.
+
+    Notes
+    -----
+    With ``tilt=None`` this reproduces the ordinary (untilted) convolution on the
+    same grid byte-for-byte: the transform is ``irfft(freq_pgf(n, rfft(p, M)))``
+    with ``M = N << padding``, exactly the non-negative path of
+    ``Aggregate._fft_aggregate``. Only the non-negative severity case is covered
+    (the GH example is Levy on ``[0, ∞)``); signed severities are out of scope
+    for this illustration.
+    """
+    if isinstance(agg, str):
+        agg = build(agg, update=False)
+    # Discretize the severity and set up the frequency PGF on the target grid.
+    # (update also runs the untilted convolution; we ignore its agg_density and
+    # re-transform below with the tilt applied.)
+    agg.update(log2=log2, bs=bs, padding=padding, normalize=normalize)
+    N = 1 << log2
+    p = np.asarray(agg.sev_density, dtype=float)
+    tv = tilt_vector(tilt, N) if tilt else None
+
+    # Classic tilted transform, kept local: z*tilt -> rfft -> freq_pgf -> irfft
+    # -> /tilt. Padding is handled by the rfft length (N << padding).
+    z = sfft.rfft(p * tv if tv is not None else p, N << padding)
+    ftagg = agg.frequency.freq_pgf(agg.n, z)
+    a = np.real(sfft.irfft(ftagg, N << padding))
+    if padding:
+        a = a[:N]
+    if tv is not None:
+        a = a / tv
+    return pd.Series(a, index=agg.xs, name='p_total')
+
+
+def _gh_levy_exact(x, claims):
+    r"""Exact aggregate density at integer ``x`` for the Poisson/Levy example.
+
+    The Levy distribution is :math:`\alpha = 1/2` stable, so a sum of ``i`` iid
+    Levy variables is distributed as :math:`i^2 X`. Conditioning on the Poisson
+    claim count gives the exact aggregate probability of the bucket
+    :math:`(x-\tfrac12,\, x+\tfrac12)` as
+    :math:`\sum_i P(N=i)\,[F((x+\tfrac12)/i^2) - F((x-\tfrac12)/i^2)]`.
+
+    Parameters
+    ----------
+    x : float
+        Loss bucket centre.
+    claims : float
+        Poisson mean claim count :math:`\lambda`.
+
+    Returns
+    -------
+    float
+        The exact bucket probability (truncating the Poisson sum at 100 terms).
+    """
+    lam = claims
+    n = 100
+    p = np.zeros(n)
+    contrib = np.zeros(n)
+    p[0] = np.exp(-lam)
+    fz = ss.levy()
+    for i in range(1, n):
+        p[i] = p[i - 1] * lam / i
+        contrib[i] = fz.cdf((x + 0.5) / i ** 2) - fz.cdf((x - 0.5) / i ** 2)
+    return float(np.sum(p * contrib))
+
+
+def gh_tilting_exhibit(claims=20, bs=1, accurate_log2=16, tilt_log2=10,
+                       tilts=(None, 1 / 1024, 5 / 1024, 25 / 1024),
+                       index=(1, 10, 100, 1000)):
+    r"""Reproduce Grübel & Hermesmeier (1999) Table 1 (Poisson/Levy tilting).
+
+    Assembles the full comparison in one call: an ``accurate`` column (a
+    high-resolution padded convolution), an ``exact`` column (closed-form via
+    Levy stability, :func:`_gh_levy_exact`), and a sweep of tilted convolutions
+    at a coarse grid showing aliasing reduction as the tilt increases.
+
+    Parameters
+    ----------
+    claims : float, default 20
+        Poisson mean claim count.
+    bs : float, default 1
+        Bucket size.
+    accurate_log2 : int, default 16
+        ``log2`` for the high-resolution accurate column (padded).
+    tilt_log2 : int, default 10
+        ``log2`` for the coarse tilted columns (no padding) — the grid where
+        aliasing bites and tilting helps.
+    tilts : iterable of (float or None), default ``(None, 1/1024, 5/1024, 25/1024)``
+        Tilt amounts for the sweep; ``None`` is the untilted baseline.
+    index : iterable of int, default ``(1, 10, 100, 1000)``
+        Loss buckets to tabulate.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Rows indexed by loss; columns ``accurate``, ``exact``, and one
+        ``tilt {theta:.4f}`` per swept tilt. Each cell is a density
+        (probability / ``bs``).
+
+    Notes
+    -----
+    With ``bs=1`` the table matches the published paper table: the untilted
+    coarse column is badly aliased at small ``x`` and converges to the accurate /
+    exact column as the tilt rises toward :math:`\theta\, N = 25`.
+    """
+    idx = list(index)
+    a = build(f'agg L {claims} claim sev levy poisson', update=False)
+    a.update(log2=accurate_log2, bs=bs, padding=2, normalize=False)
+    df = a.density_df.loc[idx, ['p_total']] / a.bs
+    df.columns = ['accurate']
+    df['exact'] = [_gh_levy_exact(x, claims) for x in idx]
+    for tilt in tilts:
+        series = tilted_aggregate_density(a, log2=tilt_log2, bs=bs, padding=0,
+                                          tilt=tilt)
+        key = 0.0 if tilt is None else tilt
+        df[f'tilt {key:.4f}'] = series.loc[idx].to_numpy() / bs
+    return df

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a46
+
+### Added: exponential-tilting pedagogy (Grübel–Hermesmeier illustration)
+
+Exponential tilting for FFT aliasing control returns as a **pedagogy helper**, not
+a core feature. The production convolution stays tilt-free — padding remains the
+operational aliasing control (the `tilt`/`tilt_vector` arguments dropped from the
+core `ft`/`ift`/`update_work` in the 1.0 refactor are **not** restored).
+
+- New `aggregate.pedagogy.tilted_aggregate_density(agg, *, log2, bs, padding=0,
+  tilt=None, normalize=False)` runs a single tilted convolution
+  (`z·e^{-θk} → rfft → freq_pgf → irfft → ·e^{+θk}`) entirely locally. With
+  `tilt=None` it reproduces the ordinary untilted convolution byte-for-byte.
+- New `tilt_vector(theta, n)` helper and `gh_tilting_exhibit(...)`, which
+  assembles the full Grübel–Hermesmeier (1999) Poisson/Levy comparison table
+  (accurate + closed-form exact + tilt sweep) in one call.
+- Rewired `docs/2_user_guides/problems/010_gh_example.rst` to the new helpers
+  (the old `tilt_vector=` kwarg no longer existed). **Doc rebuild pending.**
+
+No core/`freeze_knowledge` impact — the production path is untouched (all 146
+knowledge-base objects unchanged).
+
 ## 1.0.0a45
 
 ### Fixed: `pnl` with a signed loss severity (`dsev` negative atom / `ssev`)

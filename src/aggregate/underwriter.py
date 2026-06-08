@@ -303,11 +303,16 @@ class Underwriter(object):
     (inspect), :meth:`to_agg` (save), and :meth:`reload` (reset to as-created).
     """
 
-    def __init__(self, name='Rory', databases=None, update=_UNSET, log2=_UNSET, debug=False):
+    def __init__(self, *, name='Rory', databases=None, update=_UNSET, log2=_UNSET, debug=False):
         """
         Create an underwriter object. The underwriter is the interface to the knowledge base
         of the aggregate system. It is the interface to the parser and the interpreter, and
         to the database of curves, portfolios and aggregates.
+
+        All arguments are **keyword-only**. This prevents the easy mistake of
+        ``Underwriter('test_suite')``, which previously bound the first
+        positional to ``name`` and silently *named* the underwriter after the
+        database you meant to load. Use ``Underwriter(databases='test_suite')``.
 
         ``update`` and ``log2`` default to the configured values in
         :mod:`aggregate.config` (the ``[build]`` section); pass an explicit
@@ -737,6 +742,24 @@ class Underwriter(object):
         except ValueError:
             return str(path.resolve())
 
+    def _format_request(self) -> str:
+        """Render the load *request* (``self._request``) for :meth:`__repr__`.
+
+        The request is what the constructor was *asked* to load (``None``, a
+        keyword like ``'all'``, a path/glob, or an iterable of these); the
+        resolved files actually read live in :attr:`databases`. ``None`` loads
+        nothing, which is the bare-underwriter default.
+        """
+        req = self._request
+        if req is None:
+            return 'none (loads nothing)'
+        if isinstance(req, str):
+            return req
+        try:
+            return ', '.join(str(r) for r in req)
+        except TypeError:
+            return str(req)
+
     def _config_line(self) -> str:
         """One-line summary of the active config file and override counts.
 
@@ -776,6 +799,7 @@ class Underwriter(object):
             f'Underwriter        {self.name}\n'
             f'version            {self.version}\n'
             f'{kn_line}\n'
+            f'requested          {self._format_request()}\n'
             f'update             {self.update}\n'
             f'log2               {self.log2}\n'
             f'debug              {self.debug}\n'

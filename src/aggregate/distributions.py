@@ -2032,6 +2032,18 @@ class Aggregate:
         return out
 
     @property
+    def density(self):
+        """The "live" part of :attr:`density_df` — rows with positive total mass.
+
+        Returns ``density_df.query('p_total > 0')``: the actual support of the
+        aggregate, dropping the leading and trailing zero-probability buckets of
+        the FFT grid. This is usually what you want to *see*. It is recomputed on
+        each access (a plain property, not cached) because the underlying frame
+        can be rebuilt by ``update``.
+        """
+        return self.density_df.query('p_total > 0')
+
+    @property
     def density_df(self):
         """Per-bucket density / distribution / risk-measure frame.
 
@@ -5319,9 +5331,12 @@ class Aggregate:
             # Aggregate from density_df; severity from its own grid
             # (sev_density_df), which may differ from the aggregate window.
             df = self.density_df[['p_total', 'F', 'loss']].copy()
-            # anchor a zero row just left of the support so the steps/stems
-            # start from the baseline (at mn - 0.5, not a fixed -0.5).
-            df.loc[mn - 0.5, :] = (0, 0, 0)
+            # anchor a zero-mass row just left of the support so the steps/stems
+            # start from the baseline (at mn - 0.5, not a fixed -0.5). ``loss``
+            # must equal the row's own index, not 0: the Lee plot (panel C) plots
+            # ``loss`` against ``F``, so a stray ``loss=0`` here would draw a
+            # spurious vertical segment from 0 down to the first (signed) point.
+            df.loc[mn - 0.5, :] = (0, 0, mn - 0.5)
             df = df.sort_index()
             sdf = self.sev_density_df
             if mx <= 60:

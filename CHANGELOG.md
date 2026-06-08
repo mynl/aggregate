@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0a39
+
+### Ergonomic tweaks: keyword-only `Underwriter`, signed Lee plot, `density` accessor
+
+Three small quality-of-life fixes, no behavioural change to the numerics:
+
+- **`Underwriter` is now keyword-only** (`Underwriter(*, name=, databases=, …)`).
+  This blocks the easy slip of `Underwriter('test_suite')`, which used to bind
+  the first positional to `name` and silently *name* the underwriter after the
+  database you meant to load. Use `Underwriter(databases='test_suite')`. The
+  `repr` now also reports a **`requested`** line (the load *request*
+  `self._request`) directly under `knowledge`, distinct from the resolved
+  `databases` actually read. All existing call sites already used keywords, so
+  blast radius is zero.
+- **Signed (P&L) Lee plot fix.** `Aggregate.plot`'s discrete branch anchors a
+  zero-mass row just left of the support; it set `loss=0` on that row, which made
+  the quantile (Lee) panel draw a spurious vertical segment from `(F=0, loss=0)`
+  down to the first point on signed support. The anchor's `loss` now equals its
+  own index, so the Lee plot starts cleanly at the true minimum. `Portfolio.plot`
+  was unaffected (its limits are already two-sided on signed support).
+- **New `density` property** on `Aggregate` and `Portfolio`:
+  `density_df.query('p_total > 0')` — the "live" support of the distribution
+  with the grid's leading/trailing zero-probability buckets dropped. This is
+  usually what you want to inspect. Plain property (recomputed per access) so it
+  never goes stale against an `update`/resample.
+
 ## 1.0.0a38
 
 ### New: knowledge-freeze regression harness (`scripts/freeze_knowledge.py`)

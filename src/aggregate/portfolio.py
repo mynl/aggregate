@@ -2347,6 +2347,18 @@ class Portfolio(object):
             # if you fall through to here, wrong args
             raise ValueError('Inadmissible stat/kind passsed, expected range/density and log/linear.')
 
+    @property
+    def density(self):
+        """The "live" part of :attr:`density_df` — rows with positive total mass.
+
+        Returns ``density_df.query('p_total > 0')``: the actual support of the
+        portfolio, dropping the leading and trailing zero-probability buckets of
+        the FFT grid. This is usually what you want to *see*. It is recomputed on
+        each access (a plain property, not cached) because ``density_df`` can be
+        reassigned by ``update`` or by sampling.
+        """
+        return self.density_df.query('p_total > 0')
+
     def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
         """
         Defualt plot of density, survival functions (linear and log)

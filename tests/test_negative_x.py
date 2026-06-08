@@ -334,3 +334,50 @@ def test_validate_discrete_clamp_vs_preserve():
         np.array([5.0, -2.0]), np.array([0.5, 0.5]), allow_negative=True)
     assert list(xs) == [-2.0, 5.0]            # preserved and sorted (dsev)
     assert list(ps) == [0.5, 0.5]
+
+
+# ---------------------------------------------------------------------------
+# density accessor and the signed Lee-plot anchor (a39 ergonomic tweaks).
+# ---------------------------------------------------------------------------
+
+def test_density_property_is_live_support():
+    """``density`` returns only the positive-mass rows of ``density_df``."""
+    a = build('agg X dfreq [1] dsev [-5 -3 -1 2 4]')
+    d = a.density
+    assert (d.p_total > 0).all()
+    # exactly the five atoms, nothing else from the padded grid
+    assert sorted(round(float(x)) for x in d.index) == [-5, -3, -1, 2, 4]
+    # the full frame is wider (carries the zero-probability buckets)
+    assert len(a.density_df) > len(d)
+
+
+def test_signed_lee_plot_anchor_not_zero():
+    """The discrete plot's zero-mass anchor must sit at its own (signed) index.
+
+    Regression: the anchor row used ``loss=0``, so the Lee panel drew a
+    spurious vertical segment from ``(F=0, loss=0)`` down to the first point.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    a = build('agg X dfreq [1] dsev [-5 -3 -1 2 4]')
+    _, axd = plt.subplot_mosaic('ABC')
+    a.plot(axd=axd)
+    # panel C is the Lee plot: y = loss against x = F. The Aggregate line's
+    # value at F == 0 is the anchor; it must be the true minimum, not 0.
+    line = axd['C'].lines[0]
+    x, y = line.get_xdata(), line.get_ydata()
+    y_at_zero = y[np.argmin(np.abs(x))]
+    assert y_at_zero < 0                  # near the support minimum, not 0
+    assert abs(y_at_zero - (a.q(0) - 0.5)) < 1e-9
+    plt.close('all')
+
+
+def test_density_property_portfolio():
+    """``Portfolio.density`` mirrors the Aggregate accessor."""
+    p = build('port S\n  agg A dfreq [1] dsev [-5 -3 -1 2 4]\n'
+              '  agg B dfreq [1] dsev [-2 0 1 3]')
+    d = p.density
+    assert (d.p_total > 0).all()
+    assert len(p.density_df) > len(d)

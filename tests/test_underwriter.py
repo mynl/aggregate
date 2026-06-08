@@ -308,6 +308,26 @@ def test_repr_lazy_load_pending():
     assert 'programs' in s2
 
 
+def test_constructor_is_keyword_only():
+    """``Underwriter('test_suite')`` must fail, not silently name the uw."""
+    with pytest.raises(TypeError):
+        Underwriter('test_suite')
+    # the keyword form is the supported way to ask for a database
+    uw = Underwriter(databases='test_suite')
+    assert uw._request == 'test_suite'
+
+
+def test_repr_reports_request():
+    """repr carries a ``requested`` line distinct from resolved databases."""
+    uw = Underwriter(databases='test_suite')
+    assert 'requested          test_suite' in repr(uw)
+    # a bare underwriter requests nothing
+    assert 'requested          none' in repr(Underwriter())
+    # an iterable request is rendered comma-joined
+    uw2 = Underwriter(databases=['test_suite', 'site'])
+    assert 'requested          test_suite, site' in repr(uw2)
+
+
 # ---------------------------------------------------------------------------
 # interpret_file — bug fix pin + happy path
 # ---------------------------------------------------------------------------

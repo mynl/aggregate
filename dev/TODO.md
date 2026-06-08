@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a38.
+> **Last updated: 2026-06-08** — current version 1.0.0a39.
 
 ---
 
@@ -224,6 +224,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   **needs W1**; ties Track M.
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
+- [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
+  discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
+  the first point on signed support; anchor `loss` now equals its index.
+
+### Ergonomic tweaks (a39)
+
+- [x] Keyword-only `Underwriter(*, …)` (kills `Underwriter('db')` silently naming
+  the underwriter); `repr` gains a `requested` line for `self._request`.
+- [x] New `density` property on `Aggregate`/`Portfolio` =
+  `density_df.query('p_total > 0')` (the live support).
 
 ---
 

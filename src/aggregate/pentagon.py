@@ -359,15 +359,31 @@ class Pentagon():
             p.shape = getattr(distortion, 'shape', None)
         return p
 
-    def solve_obj(self, p, *, P=None, M=None, Q=None, lr=None, pq=None, roe=None):
-        """
-        Solve using the embedded option to determine a = obj.q(p) and L = obj.density_df.loc[a, 'exa_total']
-        Any one of the other variables can be passed in as a keyword argument.
+    def solve_obj(self, *, p=None, a=None, P=None, M=None, Q=None, lr=None, pq=None, roe=None):
+        """Solve the pentagon at a capital level read off the embedded object.
+
+        Fix the capital level with exactly one of ``p`` (a VaR/quantile
+        probability, ``a = obj.q(p)``) or ``a`` (an asset level, snapped to the
+        ``density_df`` grid). The expected loss ``L`` is read from the object's
+        ``exa`` (Aggregate) or ``exa_total`` (Portfolio) column at that level.
+        Pass one further target among ``P, M, Q, lr, pq, roe``; the resulting
+        triple ``{L, a, target}`` is handed to :meth:`solve`.
+
+        Parameters
+        ----------
+        p : float, optional
+            VaR probability; mutually exclusive with ``a``.
+        a : float, optional
+            Asset level, snapped to the grid; mutually exclusive with ``p``.
+        P, M, Q, lr, pq, roe : float, optional
+            One pricing target (see :meth:`solve`).
         """
         assert self.obj is not None and self.obj.density_df is not None, \
             'obj must be set and recomputed before calling this method'
+        if (p is None) == (a is None):
+            raise ValueError('pass exactly one of p= or a=')
 
-        a = self.obj.q(p)
+        a = self.obj.q(p) if a is None else self.obj.snap(a)
         if 'exa' in self.obj.density_df.columns:
             # Aggregate
             L = self.obj.density_df.loc[a, 'exa']

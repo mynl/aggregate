@@ -3457,6 +3457,56 @@ class Portfolio(object):
         exhibit.columns.name = 'stat'
         return pd.concat({str(dist): exhibit}, names=['method'])
 
+    def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
+                       lr=None, pq=None, roe=None):
+        """Complete the pricing octet at a capital level given one target.
+
+        Fix the capital level with exactly one of ``p`` (a VaR probability,
+        ``a = self.q(p)``) or ``a`` (an asset level, snapped to the grid), then
+        supply exactly one pricing target -- premium ``P``, cost of capital
+        ``roe`` (a.k.a. CoC), or a loss ratio via ``lr`` (equivalently ``M``,
+        ``Q`` or ``pq``). Returns the canonical one-row (``'total'``) pentagon
+        ``DataFrame`` (columns :data:`~aggregate.pentagon.PENTAGON_STATS`).
+
+        Pure accounting completion against the portfolio's total expected loss
+        at the chosen capital level -- **no distortion is involved** (contrast
+        :meth:`price`, which calibrates and applies a :class:`Distortion`). The
+        triple ``{L, a, target}`` is solved by :meth:`Pentagon.solve`.
+        Generalizes :meth:`price_ccoc` (the cost-of-capital special case).
+
+        Parameters
+        ----------
+        p : float, optional
+            VaR probability fixing the capital level; mutually exclusive with ``a``.
+        a : float, optional
+            Asset level fixing the capital; mutually exclusive with ``p``.
+        P, M, Q, lr, pq, roe : float, optional
+            Exactly one pricing target -- premium, margin, capital, loss ratio,
+            premium-to-capital, or cost of capital (``M/Q``).
+
+        Returns
+        -------
+        pandas.DataFrame
+            One ``'total'`` row, eight canonical pentagon columns.
+
+        Raises
+        ------
+        ValueError
+            If not exactly one of ``p``/``a`` is given, or not exactly one
+            pricing target is supplied.
+        """
+        if (p is None) == (a is None):
+            raise ValueError('price_pentagon: pass exactly one of p= or a=')
+        targets = {'P': P, 'M': M, 'Q': Q, 'lr': lr, 'pq': pq, 'roe': roe}
+        n_targets = sum(v is not None for v in targets.values())
+        if n_targets != 1:
+            raise ValueError(
+                'price_pentagon: pass exactly one pricing target '
+                f'(one of P, M, Q, lr, pq, roe); got {n_targets}.')
+        pent = Pentagon(obj=self)
+        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=lr, pq=pq, roe=roe)
+        return pent.as_frame(line='total')
+
     def price_ccoc(self, ccoc, *, p):
         """
         Convenience function to price with a constant cost of captial equal ``ccoc``
@@ -3464,14 +3514,11 @@ class Portfolio(object):
         canonical pentagon DataFrame (one ``'total'`` row, columns
         :data:`~aggregate.pentagon.PENTAGON_STATS`).
 
+        Thin alias for :meth:`price_pentagon` with the cost-of-capital target::
+
+            self.price_pentagon(p=p, roe=ccoc)
         """
-        a = self.q(p)
-        el = self.density_df.loc[a, 'exa_total']
-        prem = (el + ccoc * a) / (1 + ccoc)
-        df = pd.DataFrame([[el, prem - el, prem, a - prem]],
-                          columns=['L', 'M', 'P', 'Q'],
-                          index=pd.Index(['total'], name='line'))
-        return complete_pentagon(df)
+        return self.price_pentagon(p=p, roe=ccoc)
 
     def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """

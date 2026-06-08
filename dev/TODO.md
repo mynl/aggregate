@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a42.
+> **Last updated: 2026-06-08** — current version 1.0.0a43.
 
 ---
 
@@ -166,6 +166,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   and four `np.where(abs<eps)` copies; `ft` keeps `2*eps` via arg; MMSE stray
   `1e-16`→`eps`. Freeze/check on 146 objects: all match @1e-12.
   `dev/done/plan-remove-fuzz.md`.
+- [x] **H9 `[A]`** `price_pentagon` on `Aggregate`/`Portfolio` (a43) — complete the
+  pricing octet from a capital level (`p`/`a`) + one target (P/roe/lr/M/Q/pq) via
+  the Pentagon; no new math. `solve_obj` gained `a=`; `price_ccoc` now a thin
+  alias. `dev/done/plan-price-pentagon.md`.
 - [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
   (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest

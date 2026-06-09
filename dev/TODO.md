@@ -107,7 +107,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   trim. **needs N1.**
 - [ ] **N3 `[A]` Portfolio apply-distortion calcs.** Which columns;
   **handling masses (currently black-magic / a cluster)**; signed /
-  `value_type` distortion pricing (`dev/plan-portfolio-neg-x-pricing.md`:
+  `value_type` distortion pricing (`dev/plan-numerics-3-distortion.md`:
   `add_exa` column audit, distortion pricing, `value_type` consumption — signed
   books warn + fall back to F/S-only until this lands); `plot_twelve` impact;
   **trim unused `density_df` columns**. **needs N2.**
@@ -341,7 +341,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Related plans
 
-- `dev/plan-portfolio-neg-x-pricing.md` → **N3**.
+- **Numerics program** (`dev/plan-numerics-0-meta.md` + `-1`…`-4`) → the N-track:
+  numerics-1 (unit-density) + numerics-2 (objective spine) → **N2**; numerics-3
+  (distortion spine, incl. `AllocationBounds`) → **N3** (+ **N4** bounds read-through);
+  numerics-4 (windowed combine/bivariate) → **W2/M-track**. Absorbs the former
+  `plan-portfolio-neg-x-pricing` and `plan-window-port-bv` drafts (removed; git history).
 - `dev/plan-config.md` (Phase 2) → **F8**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
 - `dev/done/plan-decl-unparser.md` → shipped a53: `decl_writer` unparser +

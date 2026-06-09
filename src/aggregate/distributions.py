@@ -64,6 +64,13 @@ logger = logging.getLogger(__name__)
 # percentile) so a P&L / signed aggregate's window captures essentially all the
 # mass.
 WINDOW_NINES = get_settings().discretization.window_nines
+# WINDOW_LOG2_GROWTH: how many powers of 2 the *windowed* sizing may grow log2
+# past the requested cap to preserve an exact integer-lattice bs -- e.g. keep
+# bs=1 for a high-mean ``dsev`` rather than coarsening to bs=2 and mis-placing
+# the atoms at half-integer buckets. Small and bounded because the windowed band
+# is provably narrow (a concentrated aggregate, agg_cv < 1/z); it never fires for
+# a genuinely wide band, which coarsens bs as before.
+WINDOW_LOG2_GROWTH = 4
 # BUCKET_SIZING_P: percentile of the fitted distribution fed to
 # recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
@@ -6130,6 +6137,49 @@ class Aggregate:
         g = int(np.gcd.reduce(ints))
         return float(g) if g > 0 else 1.0
 
+    def _severity_high_estimate(self, p):
+        """Upper extent (~``p`` quantile) of the per-occurrence severity mixture.
+
+        Used by ``_bs_window``'s ``windowed`` guard. The windowed method only
+        relabels the finished *aggregate*; the severity is still discretised on
+        ``xs_sev = [0, N*bs]`` (physical 0 at index 0). So windowing is valid
+        only when a single severity fits in the windowed grid extent -- true for
+        a genuine compound (many small claims summing far above 0), false for a
+        ``fixed``-1 / ``approximate`` object whose one severity already sits at
+        the aggregate mean.
+
+        Parameters
+        ----------
+        p : float
+            Coverage (e.g. ``1 - 1e-12``) for the method-of-moments percentile
+            on an unbounded severity.
+
+        Returns
+        -------
+        float
+            A (conservative) upper bound on the severity support: the analytic
+            method-of-moments high quantile from the severity moments, capped by
+            any finite policy/support limit. ``inf`` if it cannot be estimated
+            (forces the windowed guard to fail safe -> no windowing).
+
+        Notes
+        -----
+        The method-of-moments quantile slightly *overstates* a bounded
+        severity's reach, which biases the guard toward **not** windowing --
+        the safe direction (a false reject merely keeps the legacy 0-based
+        grid; a false accept would corrupt the severity discretisation).
+        """
+        try:
+            sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
+            sev_cv = float(self.stats_df['mixed'][('sev', 'cv')])
+            sev_sk = float(self.stats_df['mixed'][('sev', 'skew')])
+            hi = float(_estimate_agg_percentile(sev_m, sev_cv, sev_sk, p))
+        except (ValueError, KeyError):
+            hi = np.inf
+        lim = (float(self.limit.max())
+               if self.limit is not None and len(self.limit) else np.inf)
+        return min(hi, lim) if np.isfinite(lim) else hi
+
     def _exact_discrete_window(self):
         """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
 
@@ -6250,9 +6300,15 @@ class Aggregate:
           lattice: exact finite support, ``bs=1``, minimal ``log2`` (<= cap).
         - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
           frequency quantile; selected only when tighter than ``moment``.
+        - ``windowed`` -- non-signed high-mean / thin-spread aggregate
+          (``agg_cv < 1/z``): a two-sided window far from 0, computed via benign
+          FFT wrap. Auto-origin only; selected only when strictly finer than the
+          0-based pick. Gives the windowed grid a non-zero ``x_min`` (so ``q`` /
+          ``F`` / plots are defined on the window, not from 0); pass
+          ``x_min=0`` to force the legacy grid.
 
         Selection: ``exact_discrete`` > ``bounded_small`` (if tighter) >
-        ``moment``.
+        ``moment``; ``windowed`` then overrides if strictly finer.
         """
         N0 = 1 << log2
         m = self.agg_m
@@ -6273,7 +6329,7 @@ class Aggregate:
         p = 1.0 - 10.0 ** -WINDOW_NINES
         lattice = self._severity_lattice()
 
-        def _size(x_lo, x_hi, lattice_bs):
+        def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None):
             """Origin ``x0`` and grid ``(bs, log2)`` for a window ``[x_lo, x_hi]``.
 
             Returns ``(x0, bs, log2)`` only -- the *window* edges stay the
@@ -6288,7 +6344,21 @@ class Aggregate:
             sensible; if the user pinned bs they control the grid so the cap
             ``log2`` is honoured; if the window needs more than the cap, bs is
             coarsened to fit.
+
+            ``force_origin`` makes the origin follow ``x_lo`` (snapped down to a
+            multiple of ``bs``) even for a non-signed aggregate -- used by the
+            ``windowed`` method, whose mass band sits far from 0 and is computed
+            via the benign FFT wrap in ``_fft_aggregate``. The default
+            (``signed`` only) keeps the 0-based convention for every legacy
+            method.
+
+            ``grow_cap`` (windowed only) is an *absolute* log2 ceiling above the
+            requested cap: when an integer lattice is present and the band needs
+            more than the cap to hold ``bs = lattice_bs``, grow ``log2`` up to
+            ``grow_cap`` rather than coarsening below the lattice (which would
+            mis-place the atoms). Only coarsen if even ``grow_cap`` is too small.
             """
+            use_origin = signed or force_origin
             W = max(x_hi - x_lo, 0.0)
             if bs_in > 0:
                 bs = float(bs_in)
@@ -6296,7 +6366,7 @@ class Aggregate:
                 bs = float(lattice_bs)
             else:
                 bs = round_bucket(W / N0) if W > 0 else 1.0
-            x0 = float(np.floor(x_lo / bs) * bs) if signed else 0.0
+            x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
             span = x_hi - x0
             need = int(np.ceil(np.log2(max(span / bs + 1.0, 1.0)))) if span > 0 else 0
             if bs_in > 0:
@@ -6305,17 +6375,24 @@ class Aggregate:
                 # at least 1 (>= 2 buckets) so a degenerate / point-mass window
                 # never collapses to a single bucket.
                 l2 = min(log2, max(need, 1))
+            elif (grow_cap is not None and lattice_bs is not None
+                  and need <= grow_cap):
+                # windowed lattice case: keep the exact lattice bs and grow log2
+                # past the cap (the band is narrow, so a small bounded bump) so
+                # an integer-atom severity is not coarsened off its lattice.
+                l2 = need
             else:
                 bs = round_bucket(span / N0)
-                x0 = float(np.floor(x_lo / bs) * bs) if signed else 0.0
+                x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
                 l2 = log2
             return x0, float(bs), int(l2)
 
-        def _row(x_lo, x_hi, lattice_bs, coverage, note):
+        def _row(x_lo, x_hi, lattice_bs, coverage, note, force_origin=False,
+                 grow_cap=None):
             # ``x_max`` is the method's own computed window top (e.g. the exact
             # support max), NOT the padded grid extent -- the ``used`` row shows
             # the realized grid.
-            x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs)
+            x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs, force_origin, grow_cap)
             return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
                         W=float(x_hi - x0), bs=bs_, log2=l2_,
                         coverage=coverage, note=note)
@@ -6361,6 +6438,54 @@ class Aggregate:
             rows['bounded_small'] = _row(a_lo, a_hi, lattice, f'freq 1-1e-{WINDOW_NINES}',
                                          'bounded severity x freq quantile')
 
+        # ---- windowed (non-signed high-mean / thin relative spread) -----
+        # A concentrated aggregate -- ``agg_cv = sd/m < 1/z`` with
+        # ``z = norm.isf(1e-WINDOW_NINES)`` -- has its whole mass band sitting a
+        # long way above 0. Compute it on the two-sided window
+        # ``[m - z*sd, m + z*sd]`` (``estimate_agg_window``) far from 0 and let
+        # the periodic FFT wrap: ``_fft_aggregate`` lays the severity at period
+        # ``M*bs`` and relabels the finished aggregate by ``round(x_min/bs)``
+        # (modular ``np.roll``, so a 15M-bucket roll and any period straddle are
+        # handled automatically). The relabel carries no ``N*s`` shift, so it is
+        # exact for random frequency. Eligibility is deliberately narrow:
+        #   - auto origin only (``x_min_in is None``); an explicit ``x_min`` --
+        #     including ``x_min=0`` to force the legacy grid back -- keeps the
+        #     0-based methods;
+        #   - non-signed, non-affine, finite positive sd;
+        #   - no *occurrence* reinsurance: the occ-reins severity rebucketing and
+        #     ``reins_density_df`` carry the severity on the *output* grid
+        #     (``xs == xs_sev``), which windowing breaks (the output window sits
+        #     far above the severity grid). Aggregate reinsurance is fine -- it
+        #     operates on the aggregate, on the windowed ``xs``/``x_min``.
+        #   - the window lower edge clears 0 (``w_lo > 0``) -- this is exactly
+        #     ``agg_cv < 1/z``, so an ordinary aggregate (whose window includes
+        #     0) never qualifies.
+        # Selection then takes it only when *strictly finer* than the 0-based
+        # pick (below), which is the feasibility test: the band always fits the
+        # period by construction, so the only failure mode is "not actually
+        # finer", a quiet fall back to the 0-based grid.
+        if (x_min_in is None and not signed and not self._agg_affine_active()
+                and self.occ_reins is None
+                and np.isfinite(sd) and sd > 0):
+            try:
+                w_lo, w_hi, _Ww = estimate_agg_window(m, sd, skew, p)
+            except ValueError:
+                w_lo = -1.0  # no finite window (e.g. infinite variance)
+            if w_lo > 0:
+                r = _row(w_lo, w_hi, lattice, f'1-1e-{WINDOW_NINES}',
+                         'two-sided window, benign FFT wrap',
+                         force_origin=True, grow_cap=log2 + WINDOW_LOG2_GROWTH)
+                # Severity-fit guard: the severity discretises on [0, N*bs]; a
+                # single occurrence must fit the windowed extent or its mass
+                # overflows (the fixed-1 / approximate trap). Record the row
+                # either way (inspectable) but mark it inapplicable -> not
+                # selected -> quiet fall back to the 0-based grid.
+                extent = float((1 << int(r['log2'])) * r['bs'])
+                sev_hi = self._severity_high_estimate(p)
+                r['applies'] = bool(np.isfinite(sev_hi) and sev_hi < extent)
+                r['note'] += f'; sev_hi={sev_hi:.6g}, extent={extent:.6g}'
+                rows['windowed'] = r
+
         # ---- selection (D1/D2) ------------------------------------------
         # bounded_small is selected a bit permissively -- it is a hard support
         # bound, so accept it even when modestly wider (1.5x) than the moment
@@ -6372,6 +6497,13 @@ class Aggregate:
             selected = 'bounded_small'
         else:
             selected = 'moment'
+        # windowed overrides the 0-based pick only when it is applicable (the
+        # severity fits the windowed extent) and lands a strictly finer bucket.
+        # Self-limiting: it can only be finer when the mass band clears 0
+        # (``agg_cv < 1/z``), so ordinary aggregates are byte-for-byte unchanged.
+        if ('windowed' in rows and rows['windowed']['applies']
+                and rows['windowed']['bs'] < rows[selected]['bs']):
+            selected = 'windowed'
 
         # ---- realized grid (the ``used`` row) ---------------------------
         sel_bs = float(rows[selected]['bs'])

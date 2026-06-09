@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a47.
+> **Last updated: 2026-06-08** — current version 1.0.0a42.
 
 ---
 
@@ -41,16 +41,16 @@ alongside. **Start at `N1`.**
 |    | N6 | Validation-calc review | A | — | independent of N1–N5 |
 |    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
 |    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
-| ✅ | H1 | Relocate `make_ceder_netter` (a44) | A | — | everything |
-| ✅ | H2 | Dedupe `make_var_tvar` (a44, non-issue) | A | — | everything |
-| ✅ | H3 | Import-dependency audit (a44) | A | — | everything |
+|    | H1 | Relocate `make_ceder_netter` | A | — | everything |
+|    | H2 | Dedupe `make_var_tvar` | A | — | everything |
+|    | H3 | Import-dependency audit | A | — | everything |
 |    | H4 | Docstring style sweep → NumPy | A | — | everything |
 |    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
 | ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
-| ✅ | F1 | `approximate` DecL keyword — MoM aggregates | A | — | H*, B*, N* |
-| ✅ | F2 | G&H tilting DIY (pedagogy) | A | — | H*, B*, N* |
+|    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
+|    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
 | ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
 |    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
 |    | F5 | DecL `of` synonym | B | — | — |
@@ -58,8 +58,9 @@ alongside. **Start at `N1`.**
 |    | F7 | PMIR best-bucket + manual kappa | B | — | pairs T3 |
 |    | F8 | Config **Phase 2** (plotting/style, env, floors) | B | — | ties W1–W3 |
 |    | W1 | Support-aware window bounds | A | — | N*, H*, B* |
-|    | W2 | Window bounds for bivariate | B | W1 | ties M |
+|    | W2 | Window bounds for bivariate | B | W1, W5 | ties M |
 |    | W3 | Plot severity outside the agg window | B | — | — |
+| ✅ | W5 | Non-zero output window (windowed sizing, a51) | A | — | W2/M, N* |
 |    | M1 | Multivariate later stages (2–5) | B | — | — |
 |    | M2 | Multivariate punch-up (sizing/coverage) | B | — | ties W2 |
 |    | T1 | Merge the three `.agg` libraries into one | A | — | — |
@@ -136,31 +137,6 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   split; `ft.py` recentering helpers → call the core path; re-home
   `estimate_agg_window` → `utilities.py`; occ-reins on a signed severity grid;
   DecL keyword for `signed` / `value_type`. **needs N1–N3.**
-- [x] **N7a `[A]` Signed-loss `pnl`** — **done 1.0.0a45**
-  (`dev/done/plan-pnl-signed-severity.md`): a `pnl` whose loss severity is itself
-  signed (`dsev` negative atom / `ssev`) now convolves the loss on its genuine
-  signed grid before the affine relabel (was hard-coded to a 0-based grid →
-  half the mass dropped, ±2¹⁵ empirical-moment garbage). `_bs_window` hands the
-  loss origin to `update` for the affine case (0 for ordinary pnl, byte-for-byte);
-  `_apply_agg_affine` now warns on material P&L-window mass drop. The single-unit
-  case is fixed here; the **book**-level shared combine was fixed separately in
-  **N7b** below. Knowledge-base freeze: all 146 objects match to 1e-12.
-- [x] **N7b `[A]` Portfolio combine grid (`best_window`)** — **done 1.0.0a49**
-  (`dev/done/plan-bucket-combine.md`): replaced the root-sum-square
-  `best_bucket` combine (coarsened with unit count; ignored the integer lattice)
-  with the resolution + span rule `bs = round_bucket(max(min_k bs_k, W_tot/N))`,
-  shrinking `log2` for discrete books. Fixes the headline signed-combine bug
-  (two `bs=1` units no longer give `bs=2`) and the all-integer `bs≈1/4096`
-  mis-size. `best_bucket` kept as a comparison aid, flagged DELETE BEFORE BETA.
-- [ ] **N7c `[A]` Heavy-tail per-unit window coverage** *(surfaced by N7b,
-  2026-06-08)* — the per-aggregate `_bs_window` sizes its window to `1−1e-12`
-  coverage (`WINDOW_NINES`), which for a heavy-tailed cat severity
-  (`exp()·lognorm`, e.g. PIR `Hu`) yields an astronomically wide window
-  (~1.9e10) and a coarse `bs` (~300000) **even standalone** — the aggregate mean
-  lands in bucket 0 and the FFT moments are unusable without a manual `bs`. Cap
-  or temper the coverage for genuinely heavy tails (or fall back to a limit /
-  moment window). Independent of the combine; the combine (N7b) only surfaces it
-  on the HuSCS ports. These cat books need an explicit `bs` today regardless.
 - [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
   2026-06-06)* — three small correctness/guard items:
   - Treatment of zero `lb` is not consistent with attachment equals zero.
@@ -175,20 +151,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track H — Hygiene (module organization & dependencies)  `[A]` (parallel)
 
-- [x] **H1 `[A]`** Relocate `make_ceder_netter` → `distributions` (a44) — hard move
-  to its only consumer; its validator `_validate_reins_layers` moved alongside it
-  (only `make_ceder_netter` and the tests use it); test import retargeted.
-  `dev/done/plan-hygiene-1.md`.
-- [x] **H2 `[A]`** Dedupe var/tvar (a44) — **non-issue, closed.** `utilities.make_var_tvar`
-  is the single implementation; `Aggregate`/`Portfolio._make_var_tvar` are thin
-  per-instance wrappers (caller/callee, not duplication). No code change.
-  (Incidental: a likely member-crossing bug in `Aggregate.tvar_sev` was flagged
-  for a separate look — see B-track.) `dev/done/plan-hygiene-1.md`.
-- [x] **H3 `[A]`** Import-dependency audit (a44) — dropped unused runtime deps
-  `cycler`, `psutil`, `ipykernel`, `jinja2`; deferred `IPython` to lazy imports
-  inside `decl_pprint`/`agg_help` to cut ~1s off `import aggregate` (Pygments
-  left eager — ~0ms and pulled by the decl_pygments lexer anyway).
-  `dev/done/plan-hygiene-1.md`.
+- [x] **H1 `[A]`** Relocate `make_ceder_netter` `utilities.py:276` → `distributions` (#35).
+- [x] **H2 `[A]`** Dedupe var/tvar: `utilities.make_var_tvar:498` vs
+  `distributions._make_var_tvar:6232` (#36).
+- [x] **H3 `[A]`** Audit imports for small non-standard deps (e.g. `cycler`) (#37).
 - [ ] **H4 `[A]`** Docstring sweep `iman_conover.py` / `moments.py` (and pockets
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
@@ -201,14 +167,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   and four `np.where(abs<eps)` copies; `ft` keeps `2*eps` via arg; MMSE stray
   `1e-16`→`eps`. Freeze/check on 146 objects: all match @1e-12.
   `dev/done/plan-remove-fuzz.md`.
-- [x] **H9 `[A]`** `price_pentagon` on `Aggregate`/`Portfolio` (a43) — complete the
-  pricing octet from a capital level (`p`/`a`) + one target (P/roe/lr/M/Q/pq) via
-  the Pentagon; no new math. `solve_obj` gained `a=`; `price_ccoc` now a thin
-  alias. `dev/done/plan-price-pentagon.md`.
 - [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
-  + **1.0.0a35** (`dev/done/plan-databases.md`). The a32 rewrite plus the a35
-  follow-on where a fresh `Underwriter` loads **no** databases (rather than
-  `default`) — commit `637febca`. Loading made legible: dict-backed store (with a
+  (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
   DataFrame view) + `source` provenance; one glob-aware resolver; honest
   `_loaded` flag; single `load(request=None)` verb + `reload` (reset to
   as-created), `resolve_databases` (preview), `available_databases` (discover);
@@ -221,60 +181,37 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track B — Bugs & investigations  `[A]` (small, parallel)
 
-- [ ] **B1 `[A]`** `10000 xs 0 lognorm 120 cv 1.5` triggers a "sum sev < 1"
+- [x] **B1 `[A]`** `10000 xs 0 lognorm 120 cv 1.5` triggers a "sum sev < 1"
   warning — is it firing for the **agg, not the sev**? (#43)
-- [ ] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
+- [x] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
   this was about; is it the `linear`/`nearest` discretization, and was it only
   ever a stats/moment concern? (#48 — *forgotten; reconstruct on sight*)
-- [ ] **B4 `[A]`** `Aggregate.tvar_sev` (`distributions.py`) member-crossing: tests
-  `self._var_tvar_function is None` but assigns `self._sev_var_tvar_function` and
-  returns `self._var_tvar_function['tvar']` — the `sev`/non-`sev` members look
-  swapped. Flagged during the H2 review (`plan-hygiene-1.md`); confirm and fix.
 - [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
   rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
   `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.
-- [x] **B3b `[A]`** `Portfolio.describe` CV/SD mixing (a43, no bump) — spread
-  choice now portfolio-wide: any signed unit forces SD across all unit blocks +
-  total (via `Aggregate._describe(force_sd=...)`); total SD from `ex2-mean^2`.
-  All-unsigned output byte-identical. NB surfaced a **pre-existing** signed-
-  *combine* gap (FFT total var > independent sum of unit vars; identical under
-  the old CV path) — tracked under **N2** / `plan-portfolio-neg-x-pricing.md`.
 
 ---
 
 ## Track F — Features (approximation, pricing, config)
 
-- [x] **F1 `[A]` `approximate` DecL keyword — MoM aggregates** (#33) — **done
-  1.0.0a47** (`dev/done/plan-approximate.md`). Design-time `approximate
-  exact | sgamma | slognorm` directive: rewrites the aggregate at construction to
-  a fixed-1-claim aggregate of a continuous severity fitted to its first three
-  moments (shifted gamma / shifted lognormal; normal at the symmetric limit;
-  reflected fit for left skew). No special compute path — `density_df`,
-  validation, the `pnl` affine, and the `Portfolio` combine all just work.
-  Incompatible with occurrence reinsurance; aggregate reinsurance rides along.
-  `tests/test_approximate.py`. (The older idea of a tail-classifier-driven family
-  pick inside the legacy `.approximate()` *method* is superseded by this explicit,
-  self-documenting keyword.)
-- [x] **F2 `[A]` G&H tilting DIY** (#34) — **done 1.0.0a46**
-  (`dev/done/plan-gh-tilt.md`). The `ft` exponential **tilt** (Grübel–Hermesmeier
-  aliasing reduction) removed in `6de20f2` is reborn as a self-contained
-  **pedagogy** illustration, not a core method (the production convolution stays
-  tilt-free — padding is the operational aliasing control). Added
-  `pedagogy.tilted_aggregate_density` (+ `tilt_vector`, `gh_tilting_exhibit`) and
-  rewired `docs/.../010_gh_example.rst`. `tilt=None` reproduces the untilted
-  convolution byte-for-byte; `tests/test_pedagogy_tilt.py`.
+- [x] **F1 `[A]` `approximate()` restored, tail-aware** (#33) — pick gamma vs
+  lognormal via the **tail-thickness classifier** (a very good application of
+  it). **needs** tail work (shipped, `dev/done/plan-tail-thickness.md`).
+  Removed in `6de20f2`.
+- [x] **F2 `[A]` G&H tilting DIY** (#34) — the `ft` exponential **tilt**
+  (Grübel–Hermesmeier aliasing reduction) was removed in `6de20f2`, breaking the
+  doc example. Replace it with a hands-on illustration of the mechanics;
+  consider exposing it as a small `Aggregate` method.
 - [x] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — **done v1.0.0a31**
   (`dev/done/plan-pentagon.md`). Canonical `pentagon.py` contract
   (`PENTAGON_STATS`/`complete_pentagon`); all emitters routed through it;
   `analyze_distortion` audit fixed; additive `Portfolio.pentagon_at` →
   `Pentagon` object output.
-- [ ] **F4 `[A]` Gross → Subject in `describe`** (#46) — relabel the first
+- [x] **F4 `[A]` Gross → Subject in `describe`** (#46) — relabel the first
   describe column to *Subject* for agg-only covers (no occ reins). Uses the
   `REINS_LABEL_*` constants.
 - [ ] **F5 `[B]` DecL `of`** (#44) — `of` in place of / alongside `po` / `so`;
   maybe spell them out.
-- [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
-  both premium legs (`plan-pnl-premium.md` §9).
 - [ ] **F7 `[B]` PMIR best-bucket + manual kappa** (#47) — port the best-bucket
   and clever manual kappa calc. Pairs **T3**.
 - [ ] **F8 `[B]` Config Phase 2** — `dev/plan-config.md`: `[plotting]` +
@@ -300,16 +237,18 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
   discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
   the first point on signed support; anchor `loss` now equals its index.
-- [x] **W5 `[A]`** Window-aware plot x-limits (a50) — `Aggregate`/`Portfolio`
-  `_limits(stat='range')` and the discrete left edge now key on the grid origin
-  (ordinary 0-based and signed unchanged; a thin-tailed window `x_min > 0`
-  anchors at the realised support min). See `dev/done/plan-hygiene-2.md`.
-- [ ] **W6 `[B]`** Plot: revisit the severity overlay vs the aggregate output
-  window — the severity is drawn on its own `sev_density_df` grid, which need not
-  match the (windowed) aggregate axis, so for a non-zero-origin / thin-tailed
-  aggregate the severity curve may fall outside or be mis-scaled against the
-  windowed aggregate. Decide *whether* and *how* to show it (overlay on the
-  aggregate window, inset, or separate). Surfaced by W5; pairs with **W3**.
+- [x] **W5 `[A]`** Non-zero aggregate **output window** for high-mean / thin-tail
+  aggregates (a51, `dev/done/plan-bucket-window.md`) — the `windowed` sizing
+  method in `_bs_window`: a concentrated aggregate (`agg_cv < 1/z`) is computed
+  on a two-sided window far from 0 via benign FFT wrap; resolves the 10M-claim
+  `dsev` case at `bs=1`. Self-limiting (only fires when the band clears 0),
+  severity-fit guarded, occ-reins suppressed, `x_min=0` opts out. This is the
+  1-D enabler Track M / W2 consume for per-axis bivariate windowing.
+  **Deferred follow-ups:** (a) occ-reins **with** windowing — needs the
+  occ-reins severity rebucketing / `reins_density_df` to ride `xs_sev` not `xs`
+  (currently suppressed); (b) the from-0 severity overlay on a windowed grid is
+  unavailable — ties **W3**; (c) reconcile with W1's exact `fz.support()` bounds
+  (windowed uses a MoM `estimate_agg_window`).
 
 ### Ergonomic tweaks (a39)
 
@@ -362,7 +301,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   at `x_i`, no jump detection; `qd` is the doc-only fixed-font exception); cover
   the v1.0 shift (linear allocation default, bounded detection, forwards-`S`,
   pentagon columns, `DefectiveDistributionWarning`) (#15 + DOD).
-- [ ] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
+- [x] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
   — `docs/4_agg_language_reference/` still describes the SLY-era grammar (#17).
   *No code dependency — ready now.*
 - [ ] **D4 `[A]`** Tail-descriptor docs **+ tests** (bounded / log-concave /
@@ -406,3 +345,5 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **DecL colorization** (#22) — design parked 2026-05-27
   (`dev/tentative-plan-decl-colorization.md`); payoff mostly Sphinx-docs
   identity. Wait for a clearer use case.
+- [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
+  both premium legs (`plan-pnl-premium.md` §9).

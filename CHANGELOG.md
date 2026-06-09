@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.0.0a51
+
+### Non-zero aggregate output window for high-mean / thin-tail aggregates (Plan B)
+
+A concentrated aggregate — one whose coefficient of variation is small enough
+(`agg_cv < 1/z`, `z = norm.isf(1e-WINDOW_NINES) ≈ 7`) that its whole probability
+mass sits a long way above 0 — is now computed on a **two-sided output window**
+far from 0 instead of the wasteful `[0, x_max]` grid. The headline case
+
+```
+agg Window 10000000 claims dsev [1 2] poisson
+```
+
+(mean 15,000,000, sd ≈ 5,000) used to build at `bs ≈ several hundred`, spending
+almost all of its resolution on the empty `[0, 14.97M]`; it now resolves at
+**`bs = 1`** on the window `[≈14.96M, ≈15.04M]`, with matching moments and mass.
+
+**How it works.** This reuses the existing benign-FFT-wrap machinery built for
+the negative-x / `pnl` work: the severity is laid into the period-`M·bs` FFT
+buffer and the finished aggregate is relabelled onto the window by a single
+modular `np.roll` of `round(x_min/bs)`. Relabelling a finished, exact array
+carries no `N·s` shift term, so it is correct for random as well as fixed
+frequency; the large roll and any period straddle are handled automatically by
+`np.roll`'s modular semantics. The compute path was already in place — the new
+work is purely the **sizing** decision in `Aggregate._bs_window`.
+
+- **New `windowed` sizing method** (a row in the inspectable `_bs_window_df`).
+  It sizes `bs` from the realised band *width* (`estimate_agg_window`), not from
+  `x_max`, and is selected only when **strictly finer** than the 0-based pick —
+  a self-tuning, self-limiting rule. It can only be finer when the band clears 0
+  (`agg_cv < 1/z`), so **ordinary aggregates are byte-for-byte unchanged** (their
+  window would include 0; the candidate never qualifies).
+- **Integer lattice preserved.** For a discrete `dsev` the windowed method keeps
+  the exact lattice `bs` and grows `log2` a small, bounded amount past the cap
+  (`WINDOW_LOG2_GROWTH = 4`) rather than coarsening below the lattice and
+  mis-placing the atoms — so the headline case lands at `bs = 1`, `log2 = 17`.
+- **Severity-fit guard.** Windowing relabels only the aggregate; the severity is
+  still discretised on `[0, N·bs]`. A single occurrence must fit that extent, so
+  a `fixed`-1 / `approximate` object (whose one severity already sits at the
+  aggregate mean) is **not** windowed — it falls back quietly to the 0-based
+  grid. The `windowed` row is still recorded (marked `applies=False`) for
+  inspection.
+- **Occurrence reinsurance suppresses windowing.** The occ-reins severity
+  rebucketing and `reins_density_df` carry the severity on the *output* grid
+  (`xs == xs_sev`), which a non-zero window origin would break. A book with occ
+  reins keeps the 0-based grid; **aggregate** reinsurance is unaffected
+  (it operates on the aggregate, on the windowed `xs`/`x_min`).
+
+**Behavioural note (intended).** `q` / `F` / quantiles / plots of a windowed
+aggregate are defined on the window `[x_min, x_max]`, not from 0. The window
+covers the probability mass to `1 − 1e-WINDOW_NINES` per edge; what is given up
+is the `[0, x_min)` *axis* region (sub-tolerance far tail, low-attachment layer
+losses, the from-0 severity overlay). Pass **`x_min=0` to `update`** to force the
+legacy 0-based grid back. The footprint is broader than the single headline
+example: **any** non-reinsured aggregate concentrated enough that its mass clears
+0 (e.g. large claim counts) now resolves on a finer, non-zero-origin window.
+
 ## 1.0.0a50
 
 ### Hygiene: consistent `info`, self-describing `approximate` note, window-aware plots

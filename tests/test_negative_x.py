@@ -282,11 +282,36 @@ def test_bs_window_bounded_small_selected():
     assert df.loc['bounded_small', 'W'] <= 1.5 * df.loc['moment', 'W']
 
 
-def test_bs_window_large_count_uses_moment():
-    """Large claim count: LLN concentrates; moment window beats bounded."""
+def test_bs_window_large_count_windows():
+    """Large claim count: LLN concentrates -> the windowed grid is finer.
+
+    A 5000-claim book has ``agg_cv ~ 0.016 < 1/z``, so its whole mass band
+    clears 0 and the two-sided ``windowed`` method (a non-zero origin computed
+    via the benign FFT wrap) lands a strictly finer bucket than the 0-based
+    moment / bounded grids. Plan B: this case used to select ``moment``; it now
+    selects ``windowed``, with a non-zero ``x_min`` and matching moments.
+    """
     a = build('agg C 5000 claims sev 500 * beta 2 3 poisson', update=False)
     a.update()
-    assert bool(a._bs_window_df.loc['moment', 'selected'])
+    df = a._bs_window_df
+    assert bool(df.loc['windowed', 'selected'])
+    assert a.x_min > 0
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-4)
+    assert a.est_cv == pytest.approx(a.agg_cv, rel=1e-3)
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
+
+
+def test_bs_window_x_min_zero_forces_legacy_grid():
+    """Passing ``x_min=0`` opts out of windowing back to the 0-based grid.
+
+    An explicit origin suppresses the windowed candidate entirely (it is
+    auto-origin only), so the selected method is one of the 0-based methods.
+    """
+    a = build('agg C 5000 claims sev 500 * beta 2 3 poisson', update=False)
+    a.update(x_min=0)
+    assert a.x_min == 0.0
+    assert 'windowed' not in a._bs_window_df.index
+    assert a._bs_window_df.index[a._bs_window_df.selected][0] != 'windowed'
 
 
 # ---------------------------------------------------------------------------

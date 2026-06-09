@@ -364,3 +364,15 @@ pnl APX.PnL 600000 prem - 5000 claim sev lognorm 100 cv 2 poisson approximate sg
 port BucketMotiv agg M1 dfreq[4] dsev[3] agg M2 dfreq[3] dsev[-1 1]
 port BucketTinyDisc agg D1 dfreq[2] dsev[1 2] agg D2 dfreq[3] dsev[1 2 3]
 port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims sev lognorm 120 cv 1.5 poisson
+
+# ============================================================
+# WIN. Non-zero aggregate output window -- windowed sizing (1.0.0a51)
+# ============================================================
+# A concentrated aggregate (agg_cv < 1/z, mass band clears 0) is computed on a
+# two-sided window far from 0 via benign FFT wrap: bs sizes off the band width,
+# not x_max, so a high-mean book resolves finely with a non-zero x_min. Window
+# is the headline 10M-claim integer case (resolves at bs=1); WinCts is the
+# continuous analogue. See tests/test_bucket_sizing.py and
+# dev/done/plan-bucket-window.md.
+agg Window 10000000 claims dsev [1 2] poisson
+agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson

@@ -702,6 +702,16 @@ class UnderwritingTransformer(Transformer):
             return (float(n), limit, attach)
         return (n / limit, limit, attach)
 
+    def reins_clause_of(self, c):
+        # ``of`` is a natural-language synonym for ``so`` (share of): a
+        # literal percentage (``90%``) is the share directly, a bare number
+        # is an absolute amount and the share is ``amount / limit``. Reads as
+        # a share, so -- unlike ``po`` -- no "suspiciously small" warning.
+        n, _of, limit, _xs, attach = c
+        if isinstance(n, _PercentNumber):
+            return (float(n), limit, attach)
+        return (n / limit, limit, attach)
+
     def reins_clause_part(self, c):
         n, _po, limit, _xs, attach = c
         if isinstance(n, _PercentNumber):

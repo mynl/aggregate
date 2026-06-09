@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.0a52
+
+### Hygiene-3 batch (grammar + robustness nits)
+
+Three small, independent nits, one version bump (`dev/done/plan-hygiene-3.md`).
+No movement of the numeric baseline.
+
+- **Underscore digit separators in DecL numbers.** The `NUMBER` terminal now
+  accepts Python-style `_` group separators — `agg BIG 10_000_000 claims …` —
+  with leading / trailing / doubled underscores (`_1`, `1_`, `1__0`) rejected by
+  the lexer, exactly as Python's `float()` / `int()` behave. Grammar-only: the
+  transformer already coerces via `float`, which strips the underscores.
+- **`of` as a share synonym in reinsurance.** A reinsurance clause now accepts
+  `of` alongside `so` / `po`, so `occurrence net of 90% of 6000 xs 4000` reads
+  naturally. `of` is treated as *share of* (`so`): a literal percentage is the
+  share directly, a bare amount is `amount / limit`. No new terminal (the `OF`
+  token already existed); a single new `reins_clause` alternative.
+- **Fixed an array-ambiguous truth test.** `Aggregate._sev_label` used
+  `if not self.sevs:`, which raised *"truth value of an array … is ambiguous"*
+  for a multi-component (weighted) severity, where `self.sevs` is an ndarray.
+  Replaced with the explicit `self.sevs is None or len(self.sevs) == 0` idiom; a
+  sweep of `distributions` / `portfolio` / `spectral` found no other array-valued
+  truthiness tests.
+
+Deferred: the "every public DataFrame member present (`None`) before compute"
+item was moved to `dev/TODO.md` Track H (**H9**) — review found it largely
+already-satisfied or aimed at members that don't exist; the genuine narrow
+version needs separate scoping.
+
 ## 1.0.0a51
 
 ### Non-zero aggregate output window for high-mean / thin-tail aggregates (Plan B)

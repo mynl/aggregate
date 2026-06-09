@@ -168,6 +168,7 @@
     reins_clause: expr XS expr                   -> reins_clause_xs
                 | expr SHARE_OF expr XS expr     -> reins_clause_share
                 | expr PART_OF expr XS expr      -> reins_clause_part
+                | expr OF expr XS expr           -> reins_clause_of
     
     // ======================================================================
     // Severity (continuous: scipy.stats wrappers)
@@ -388,7 +389,12 @@
     
     // NUMBER absorbs an optional leading minus so `-3` is one token rather than
     // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
-    NUMBER.2: /-?(\d+\.?\d*|\d*\.\d+)([eE][+\-]?\d+)?%?|-?inf/
+    // Each digit run is `\d(?:_?\d)*` so Python-style `_` group separators are
+    // accepted (`10_000_000`, `1_000.5`, `1_0e3`) while leading / trailing /
+    // doubled underscores (`_1`, `1_`, `1__0`) are rejected by the lexer, exactly
+    // as Python's float()/int() do. `float('10_000_000')` already strips them, so
+    // the transformer needs no change.
+    NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)*)?%?|-?inf/
     
     // ID is the catch-all identifier — priority 1 (default).
     // Two negative lookaheads at the start of the match make the grammar

@@ -2142,7 +2142,7 @@ class Aggregate:
 
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
-        if not self.sevs:
+        if self.sevs is None or len(self.sevs) == 0:
             return ''
         if len(self.sevs) == 1:
             name = getattr(self.sevs[0], 'sev_name', '')

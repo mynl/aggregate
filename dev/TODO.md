@@ -176,6 +176,18 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   (`UnderwritingLexer.preprocess`); **`to_agg(path, pattern, kind, source)`**
   save/export (to user dir unless absolute). Renamed outright (no
   `read_database(s)` aliases).
+- [ ] **H9 `[A]` Public DataFrame members present (`None`) before compute** —
+  moved out of the hygiene-3 batch (deferred at a52; needs scoping). Goal:
+  reading a documented `*_df` member on a freshly constructed (not-yet-`update`d)
+  object never raises `AttributeError`. Caveats found during review: the scope
+  list in the old plan named several non-members (`reins_audit_df`, public
+  `reins_df`/`report_df`/`statistics_df`/`bs_window_df` don't exist); the real
+  properties (`density_df`, `sev_density_df`) already raise an *informative*
+  `ValueError('Update … first')`, not `AttributeError`, and `reins_*_df` already
+  return `None`; `augmented_df` is a parameterised method (can't return `None`).
+  So the genuine work is narrow — enumerate the real members per class
+  (`Aggregate`/`Portfolio`/`Distortion`/`Underwriter`) and decide
+  informative-`ValueError`-vs-`None` before touching anything.
 
 ---
 

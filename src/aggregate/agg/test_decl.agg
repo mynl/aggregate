@@ -376,3 +376,15 @@ port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims s
 # dev/done/plan-bucket-window.md.
 agg Window 10000000 claims dsev [1 2] poisson
 agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
+
+# ============================================================
+# HY3. Hygiene-3 batch: number separators + 'of' synonym (1.0.0a52)
+# ============================================================
+# Item 1: Python-style `_` digit-group separators in numbers (equal to their
+# underscore-free forms). Item 4: `of` as a natural-language share synonym for
+# `so` / `po` in a reinsurance clause (`90% of` == `90% so`). See
+# tests/test_hygiene3.py and dev/done/plan-hygiene-3.md.
+agg HY3.Sep   10_000_000 claims dsev [1 2] poisson                                                          note{underscore digit separators == 10000000}
+agg HY3.SepFl 1_000.5 claims sev lognorm 100 cv 1 poisson                                                   note{underscore in the integer part of a float}
+agg HY3.OfPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% of 6000 xs 4000 poisson       note{'of' percentage share == 'so'}
+agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 of 6000 xs 4000 poisson      note{'of' bare amount -> amount/limit share}

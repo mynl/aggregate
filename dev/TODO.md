@@ -331,6 +331,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
   renamings (#40). **needs H5.**
 - [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
+- [ ] **D10 `[B]`** Single keyword source of truth — derive `decl_pygments.AggLexer`,
+  `parser_errors._TERMINAL_LABELS`, and the web app's `decl-keywords.json` from
+  the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
+  the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53); ties the
+  parked DecL colorization (#22).
 
 ---
 
@@ -339,6 +344,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - `dev/plan-portfolio-neg-x-pricing.md` → **N3**.
 - `dev/plan-config.md` (Phase 2) → **F8**.
 - `dev/plan-multivariate-punchup.md` → **M2**.
+- `dev/done/plan-decl-unparser.md` → shipped a53: `decl_writer` unparser +
+  `format_program`; `decl_pprint` removed. Follow-on **D10**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
   pentagon pricing contract (**F3**, `plan-pentagon.md`), database loading
   (**H6**, `plan-databases.md`), multivariate stages 0–1, etc.

@@ -207,7 +207,7 @@ agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 pois
 # sibling of sev). A signed aggregate auto-windows from build/update (x_min
 # defaults to 'auto' -> a two-sided window); a number forces the origin. See
 # tests/test_negative_x.py and dev/plan-negative-x-agg.md.
-agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support {-6,1,8,15}}
+agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support (-6,1,8,15)}
 agg PnL.SD   dfreq [3] dsev [-1 1]                                                                           note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv}
 agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0}
 agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window}
@@ -245,7 +245,7 @@ port PnLprem.Book  pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl P
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
 # loss convolves on its genuine signed grid before the affine relabel. See
 # tests/test_pnl.py and dev/done/plan-pnl-signed-severity.md.
-pnl PnLsigned.Dsev   5 premium - dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in {2,4,6,8}, mean 5, sd sqrt3}
+pnl PnLsigned.Dsev   5 premium - dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3}
 pnl PnLsigned.Asym   10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]                                            note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2}
 pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson                              note{continuous signed severity: E[loss]=50, margin 50}
 
@@ -388,3 +388,14 @@ agg HY3.Sep   10_000_000 claims dsev [1 2] poisson                              
 agg HY3.SepFl 1_000.5 claims sev lognorm 100 cv 1 poisson                                                   note{underscore in the integer part of a float}
 agg HY3.OfPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% of 6000 xs 4000 poisson       note{'of' percentage share == 'so'}
 agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 of 6000 xs 4000 poisson      note{'of' bare amount -> amount/limit share}
+
+# ============================================================
+# DW. decl_writer unparser coverage (1.0.0a53)
+# ============================================================
+# The spec->DecL unparser is exercised by round-tripping the whole corpus
+# (tests/test_decl_unparser.py). These two lines cover constructs not otherwise
+# present: the `exposure at rate` exposure head (which canonicalizes to the
+# equivalent `premium at lr` form) and a `picks` severity. See
+# dev/done/plan-decl-unparser.md.
+agg DW.ExpRate 1000 exposure at 0.05 rate sev lognorm 100 cv 2 poisson                                       note{exposure/rate head; renders as premium/lr}
+agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500 900] poisson                note{picks severity layering}

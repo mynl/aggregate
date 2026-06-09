@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.0a53
+
+### DecL unparser + program formatter (`decl_writer`)
+
+New `aggregate.decl_writer` module — the structural inverse of the parser
+(`dev/done/plan-decl-unparser.md`). It renders a parsed spec back to canonical
+DecL text instead of pretty-printing by regex, so a single function backs program
+display, the `to_agg` exporter, and any future web `format` endpoint.
+
+- **`spec_to_decl(spec, kind, name)`** — the unparser. Pure function from a raw
+  transformer spec (`parsed.spec` / a knowledge entry's `pp.spec`) to canonical
+  DecL. Built from clause renderers that mirror the transformer rules one-for-one
+  (exposure, layers, severity incl. scale/reflect/`mean cv`/mixtures/splice/
+  `dsev`/`xps`/`picks`, frequency incl. `mixed`/`zm`/`zt`, reinsurance, `pnl`,
+  `port`, `multivariate`/`copula`/`netceded`, `approximate`, distortions, note/
+  hints trailer).
+- **`format_program(spec_or_text, *, fmt='text'|'html'|'ansi'|'latex')`** — the
+  public entry. Accepts a spec, a `(kind, name, spec)` tuple, or a program string
+  (which it parses first). Pure: returns a `str`, never prints. Colorization
+  reuses the existing `decl_pygments.AggLexer` (no second keyword list).
+- **Contract:** idempotence one step removed — `f(f(f(x))) == f(x)` with
+  `f = spec_to_decl`. The whole reference corpus (`test_suite.agg` +
+  `test_suite2.agg` + `test_decl.agg`) round-trips, verified by
+  `tests/test_decl_unparser.py` with a numpy/inf/object-aware spec comparator.
+
+**Breaking.** `utilities.decl_pprint` is **removed** (along with its
+`pygments`/IPython plumbing in `utilities`). `Aggregate.pprogram` /
+`pprogram_html` and `Portfolio.pprogram` / `pprogram_html` now render the
+**canonical** form via `format_program(self.program)` (was the verbatim text with
+notes stripped); `self.program` still holds the raw input. `Underwriter.to_agg`
+now emits `spec_to_decl(spec)` per entry, so exported `.agg` files are canonical
+(it falls back to the stored program only for `minimum`/`mixture` combinator
+distortions, whose child references cannot round-trip). Docs that imported
+`decl_pprint` now use `format_program`.
+
+Also: fixed two `test_decl.agg` notes that carried `{...}` braces inside
+`note{...}` (the `NOTE` terminal cannot represent `}`); they never parsed
+standalone (`test_decl.agg` is a reference corpus, not runtime-loaded).
+
 ## 1.0.0a52
 
 ### Hygiene-3 batch (grammar + robustness nits)

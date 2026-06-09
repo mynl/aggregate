@@ -24,6 +24,7 @@ from .parser        import *  # noqa: F401,F403
 from .moments       import *  # noqa: F401,F403
 from .iman_conover  import *  # noqa: F401,F403
 from .utilities     import *  # noqa: F401,F403
+from .decl_writer   import *  # noqa: F401,F403
 from .spectral      import *  # noqa: F401,F403
 from .distributions import *  # noqa: F401,F403
 from .portfolio     import *  # noqa: F401,F403

@@ -1102,14 +1102,14 @@ The DecL Program
 ~~~~~~~~~~~~~~~~~~
 
 The ``program`` property returns the DecL program used to create the object.
-It is blank if the object was not created using DecL. The helper function :func:`decl_pprint` pretty prints a program.
+It is blank if the object was not created using DecL. The helper function :func:`format_program` pretty prints a program.
 
 .. ipython:: python
     :okwarning:
 
-    from aggregate import decl_pprint
-    decl_pprint(a05n.program, split=20)
-    decl_pprint(p07.program, split=20)
+    from aggregate import format_program
+    print(format_program(a05n.program))
+    print(format_program(p07.program))
 
 .. _10 min update:
 
@@ -1592,9 +1592,9 @@ Each of the objects created by :meth:`build` is automatically stored in the know
 .. ipython:: python
     :okwarning:
 
-    from aggregate import decl_pprint
+    from aggregate import format_program
     for n, r in build.discover('^TenM:').iterrows():
-        decl_pprint(r.program, split=20)
+        print(format_program(r.program))
 
 
 .. ipython:: python

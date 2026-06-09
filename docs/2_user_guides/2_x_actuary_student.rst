@@ -176,9 +176,9 @@ Objects created by :meth:`build` in this guide.
     :okwarning:
     :okexcept:
 
-    from aggregate import decl_pprint
+    from aggregate import format_program
     for n, r in build.discover('^Actuary:').iterrows():
-        decl_pprint(r.program, split=20)
+        print(format_program(r.program))
 
 
 .. ipython:: python

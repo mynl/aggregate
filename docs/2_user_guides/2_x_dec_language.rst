@@ -44,6 +44,6 @@ Objects created by :meth:`build` in the DecL guide.
     :okwarning:
     :okexcept:
 
-    from aggregate import build, decl_pprint
+    from aggregate import build, format_program
     for n, r in build.discover('^DecL:').iterrows():
-        decl_pprint(r.program, split=20)
+        print(format_program(r.program))

@@ -42,8 +42,9 @@ __all__ = [
 from .utilities import (ft, ift,
                         round_bucket,
                         nice_multiple,
-                        decl_pprint, make_var_tvar,
+                        make_var_tvar,
                         agg_help, explain_validation, remove_fuzz)
+from .decl_writer import format_program
 import aggregate.random_agg as ar
 from .spectral import Distortion
 from .pentagon import complete_pentagon, Pentagon
@@ -5860,16 +5861,20 @@ class Aggregate:
 
     @property
     def pprogram(self):
-        """Cleaned DecL program text (notes removed, whitespace collapsed).
+        """Canonical DecL program text, rendered from the parsed spec.
 
-        For the raw input as supplied to ``build`` use ``self.program``.
+        Derived by re-parsing :attr:`program` and rendering through
+        :func:`aggregate.decl_writer.format_program` (the inverse of the
+        parser). It is canonical, not verbatim --- equivalent programs share one
+        form. For the raw input as supplied to ``build`` use :attr:`program`.
+        An object built programmatically (empty ``program``) returns ``''``.
         """
-        return decl_pprint(self.program, split=0, show=False)
+        return format_program(self.program, fmt='text')
 
     @property
     def pprogram_html(self):
         """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        return decl_pprint(self.program, split=0, html=True, show=False)
+        return format_program(self.program, fmt='html')
 
     @property
     def describe(self):

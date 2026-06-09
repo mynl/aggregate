@@ -36,7 +36,8 @@ from .pentagon import (PENTAGON_STATS, PENTAGON_DTYPE, complete_pentagon,
 from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from .iman_conover import iman_conover
-from .utilities import (ft, ift, decl_pprint,
+from .decl_writer import format_program
+from .utilities import (ft, ift,
                         round_bucket,
                         make_var_tvar, agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
@@ -2406,17 +2407,20 @@ class Portfolio(object):
 
     @property
     def pprogram(self):
+        """Canonical DecL program text, rendered from the parsed spec.
+
+        Re-parses :attr:`program` and renders through
+        :func:`aggregate.decl_writer.format_program` (the inverse of the
+        parser): one ``port`` line then one tab-indented unit per line. Canonical
+        rather than verbatim. A portfolio built programmatically (empty
+        ``program``) returns ``''``.
         """
-        pretty print the program to html
-        """
-        return decl_pprint(self.program, 20, show=False)
+        return format_program(self.program, fmt='text')
 
     @property
     def pprogram_html(self):
-        """
-        pretty print the program to html
-        """
-        return decl_pprint(self.program, 0, html=True, show=False)
+        """Syntax-highlighted DecL program for IPython / Jupyter display."""
+        return format_program(self.program, fmt='html')
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """

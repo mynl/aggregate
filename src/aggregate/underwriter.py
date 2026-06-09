@@ -47,6 +47,22 @@ _UNSET = _Unset()
 _KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'mvagg': 3, 'port': 4}
 
 
+def _entry_to_decl(pp):
+    """Render a knowledge entry to canonical DecL for :meth:`Underwriter.to_agg`.
+
+    Uses :func:`aggregate.decl_writer.spec_to_decl` (the parser's inverse) so the
+    exported ``.agg`` is canonical and re-loads cleanly. Falls back to the stored
+    verbatim ``program`` only for a ``minimum`` / ``mixture`` combinator
+    distortion, whose child references are not retained on the spec and so cannot
+    be unparsed.
+    """
+    from .decl_writer import spec_to_decl
+    try:
+        return spec_to_decl(pp.spec, pp.kind, pp.name)
+    except NotImplementedError:
+        return pp.program
+
+
 # Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
 # else is warned about and dropped (never crashes the build).
 _HINT_KEYS = {
@@ -1597,7 +1613,7 @@ class Underwriter(object):
             out = self.user_dir / out.name
 
         stamp = f'{datetime.now():%Y-%m-%d %H:%M:%S}'
-        body = '\n'.join(pp.program for pp in selected)
+        body = '\n'.join(_entry_to_decl(pp) for pp in selected)
 
         if mode == 'x' and out.exists():
             raise FileExistsError(

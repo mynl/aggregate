@@ -5,18 +5,14 @@ from numbers import Number
 
 import numpy as np
 import pandas as pd
-from pygments import highlight
-from pygments.formatters import HtmlFormatter
-from pygments.lexers import get_lexer_by_name
 import re
 import scipy.fft as sft
 
 # IPython is deliberately NOT imported at module scope: `from IPython.display
 # import ...` costs ~1s and utilities.py sits on the `import aggregate` path
-# (distributions/portfolio/everything import it). The only consumers are the
-# display helpers (`decl_pprint`, `agg_help`), so it is imported lazily inside
-# those functions instead. Pygments, by contrast, is cheap (~0ms) and is loaded
-# eagerly anyway by the decl_pygments lexer, so it stays a top-level import.
+# (distributions/portfolio/everything import it). The only consumer left is
+# `agg_help`, so it is imported lazily inside that function instead. (Program
+# pretty-printing/colorization moved to aggregate.decl_writer at 1.0.0a53.)
 
 from .constants import Validation
 
@@ -24,7 +20,6 @@ from .constants import Validation
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'decl_pprint',
     'ft', 'ift',
     'subsets',
     'remove_fuzz',
@@ -71,57 +66,6 @@ def silence_warnings(category=Warning, message='', module=''):
     """
     import warnings
     warnings.filterwarnings('ignore', message=message, category=category, module=module)
-
-
-def decl_pprint(txt, split=0, html=False, show=True):
-    """
-    Try to format an agg program. This is difficult because of dfreq and dsev, optional
-    reinsurance, etc. Go for a simple approach of removing unnecessary spacing
-    and removing notes. Notes can be accessed from the spec that is always to hand.
-
-    For long programs use split=60 or so, they are split at appropriate points.
-
-    Best to use html = True to get colorization.
-
-    :param txt: program text input
-    :param split: if > 0 split lines at this length
-    :param html: if True return html (via pygments) , else return text
-    """
-    ans = []
-    # programs come in as multiline
-    txt = txt.replace('\n\tagg', ' agg')
-    for t in txt.split('\n'):
-        clean = re.sub(r'[ \t]+', ' ', t.strip())
-        clean = re.sub(r' note\{[^}]*\}', '', clean)
-        if split > 0 and len(clean) > split:
-            clean = re.sub(
-                r' ((dfreq )([0-9]+ )|([0-9]+ )(claims?|premium|loss|exposure)'
-                r'|d?sev|dfreq|occurrence|agg|aggregate|wts?|mixed|poisson|fixed)',
-                           r'\n  \1', clean)
-        if clean[:4] == 'port':
-            # put in extra tabs at agg for portfolios
-            sc = clean.split('\n')
-            clean = sc[0] + '\n' + '\n'.join([i if i[:5] == '  agg' else '  ' + i for i in sc[1:]])
-        ans.append(clean)
-    ans = '\n'.join(ans)
-    if html is True:
-        # ans = f'<p><code>{ans}\n</code></p>'
-        # notes = re.findall('note\{([^}]*)\}', txt)
-        # for i, n in enumerate(notes):
-        #     ans += f'<p><small>Note {i+1}. {n}</small><p>'
-        # use pygments to colorize
-        # IPython imported lazily to keep it off the `import aggregate` path
-        # (it is ~1s to import); see module note below.
-        from IPython.display import HTML
-        agg_lex = get_lexer_by_name('agg')
-        # remove extra spaces
-        txt = re.sub(r'[ \t\n]+', ' ', txt.strip())
-        ans = HTML(highlight(txt, agg_lex, HtmlFormatter(style='friendly', full=False)))
-    if show:
-        print(ans)
-        return
-    else:
-        return ans
 
 
 def ft(z, padding):

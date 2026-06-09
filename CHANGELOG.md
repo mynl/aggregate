@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.0a50
+
+### Hygiene: consistent `info`, self-describing `approximate` note, window-aware plots
+
+Three small display/consistency fixes (no numeric baseline moves):
+
+- **`Aggregate.info` always emits the `approximate` line.** It is now a
+  permanent header line positioned *after* severity (`freq → sev → approximate`)
+  and shows `exact` for an ordinary aggregate, instead of appearing only when a
+  fit was active and *before* severity. The scaffold no longer reorders or drops
+  the line by state. (`Portfolio.info` and `Distortion.info` audited — their
+  conditionals are all feature/content driven, left as-is.)
+
+- **The `approximate` note records the original program and fitted params.**
+  Previously the note was assembled inside `Aggregate.__init__` **before**
+  `self.program` was set by the build path, so it could only ever carry the fit
+  moments — never *what* was approximated. The note is now kept as the user's
+  pure note at construction; the fit is captured in a structured
+  `self._approx_fit`, and a new `_approx_description()` renders
+  `"<program>  approximated by <kind>: <family>(params), m=.. cv=.. skew=.."`
+  lazily — shown indented under the `info` `approximate` line and folded into the
+  note once `program` is available. Round-tripping rides on `program` (re-parsed
+  on load), not the note, so the note never compounds across re-exports.
+
+- **`Aggregate`/`Portfolio` plots are window-aware.** The linear x-limits
+  (`_limits(stat='range')` and the discrete-plot left edge) are keyed on the grid
+  origin: an ordinary 0-based aggregate is unchanged and a signed P&L window
+  keeps its two-sided range, but a **thin-tailed output window starting above 0**
+  now anchors the left edge at the realised support minimum instead of forcing 0
+  (no empty `[0, x_min]` band). Existing ordinary/signed plots are unchanged; the
+  new branch prepares the axes for non-zero-origin output windows. The
+  severity-overlay-vs-window question is deferred (see `dev/TODO.md`).
+
 ## 1.0.0a49
 
 ### Fixed: Portfolio combine grid — `best_window` replaces the RMS combine

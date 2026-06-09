@@ -187,10 +187,52 @@ def test_exact_default_is_inert():
 
 
 def test_note_and_info_surface_approximation():
-    """The approximation is visible in ``note`` and ``info``."""
+    """The approximation is visible in ``note`` and ``info``.
+
+    The note (and the indented ``info`` line) records *what* was approximated --
+    the original program -- and *how* -- the fitted family and parameters.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         a = build("agg A 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma")
-    assert "approximate sgamma" in a.note
-    assert "approximate" in a.info
+    # note: non-empty, names the fit, and preserves the original program text
+    assert a.note
+    assert "sgamma" in a.note
+    assert "approximated by" in a.note
+    assert "lognorm" in a.note            # the original program is preserved
+    # info: the always-present marker line plus the program-aware description
+    assert "approximate              sgamma" in a.info
     assert "sgamma" in a.info
+    assert "lognorm" in a.info            # description carries the program
+
+
+def test_info_always_shows_approximate_marker_for_exact():
+    """An ordinary (``exact``) aggregate still emits the ``approximate`` line.
+
+    Item 1: the marker is a permanent header line (freq -> sev -> approximate),
+    positioned after the severity line, shown as ``exact`` when no fit is active.
+    """
+    a = build("agg X 5 claims sev lognorm 100 cv 2 poisson")
+    assert "approximate              exact" in a.info
+    # ordering: the approximate line follows the severity line
+    info = a.info
+    assert info.index("severity distribution") < info.index("approximate")
+    # no description continuation for an exact aggregate
+    assert a._approx_description() == ""
+
+
+def test_approximate_note_round_trips_via_program():
+    """Re-building from ``a.program`` reproduces the approximation.
+
+    The round-trip rides on ``program`` (re-parsed), not the note, so the
+    rebuilt aggregate is itself approximated and self-describing, and the note
+    does not compound across the round-trip.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = build("agg A 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma")
+        b = build(a.program)
+    assert a.approximate == b.approximate == "sgamma"
+    assert b.note and "sgamma" in b.note
+    # note length is stable across the round-trip (no recursive growth)
+    assert len(b.note) == len(a.note)

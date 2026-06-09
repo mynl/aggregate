@@ -829,6 +829,14 @@ class Underwriter(object):
         if kind == 'agg':
             obj = Aggregate(**spec)
             obj.program = program
+            # With ``program`` now populated, fold the method-of-moments
+            # approximation description into the (pure) user note so the
+            # human-readable record names what was approximated and how. The
+            # round-trip itself rides on ``program`` (re-parsed on load), not the
+            # note, so this never compounds across re-exports.
+            if getattr(obj, '_approx_fit', None):
+                _desc = obj._approx_description()
+                obj.note = f"{obj.note}; {_desc}" if obj.note else _desc
         elif kind == 'mvagg':
             from .multivariate import MultivariateAggregate
             obj = MultivariateAggregate(**spec)

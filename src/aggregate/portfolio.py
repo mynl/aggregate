@@ -2447,13 +2447,20 @@ class Portfolio(object):
         if stat == 'range':
             p = 0.999 if kind == 'linear' else 1 - 1e-10
             hi = self.q(p)
-            # Signed (P&L) portfolio (grid origin < 0): the mass can sit
-            # anywhere on the real line, possibly entirely negative, so use a
-            # *two-sided* quantile range. ``f(hi)`` would clip the negative
-            # tail (or reverse the axis when hi < 0). Mirrors the Aggregate
-            # ``_limits`` signed branch.
+            # Window-aware x-limits keyed on the grid origin
+            # (``density_df.index[0]``); mirrors the Aggregate ``_limits``:
+            #  * origin < 0  -- signed (P&L) book: two-sided quantile range
+            #    (``f(hi)`` would clip the negative tail or reverse when hi < 0);
+            #  * origin > 0  -- thin-tailed output window: anchor the left edge
+            #    at the realised support minimum, not 0;
+            #  * origin == 0 -- ordinary non-negative book: unchanged.
             if self.density_df.index[0] < 0:
                 lo = self.q(1 - p)
+                w = hi - lo
+                pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
+                return [lo - pad, hi + pad]
+            if self.density_df.index[0] > 0:
+                lo = float(self.density['loss'].min())
                 w = hi - lo
                 pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
                 return [lo - pad, hi + pad]

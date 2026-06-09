@@ -300,6 +300,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
   discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
   the first point on signed support; anchor `loss` now equals its index.
+- [x] **W5 `[A]`** Window-aware plot x-limits (a50) — `Aggregate`/`Portfolio`
+  `_limits(stat='range')` and the discrete left edge now key on the grid origin
+  (ordinary 0-based and signed unchanged; a thin-tailed window `x_min > 0`
+  anchors at the realised support min). See `dev/done/plan-hygiene-2.md`.
+- [ ] **W6 `[B]`** Plot: revisit the severity overlay vs the aggregate output
+  window — the severity is drawn on its own `sev_density_df` grid, which need not
+  match the (windowed) aggregate axis, so for a non-zero-origin / thin-tailed
+  aggregate the severity curve may fall outside or be mis-scaled against the
+  windowed aggregate. Decide *whether* and *how* to show it (overlay on the
+  aggregate window, inset, or separate). Surfaced by W5; pairs with **W3**.
 
 ### Ergonomic tweaks (a39)
 

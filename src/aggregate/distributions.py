@@ -3385,6 +3385,13 @@ class Aggregate:
         # round-trips), and any ``pnl`` affine / aggregate reinsurance rides along
         # on the rewritten object unchanged. See dev/done/plan-approximate.md.
         self.approximate = approximate
+        # Structured record of the method-of-moments fit, populated below when
+        # ``approximate != 'exact'``. Kept here (not folded into ``note``) so the
+        # human-readable description can be composed *lazily* -- the original
+        # ``program`` text is set by the build path only after ``__init__``
+        # returns, so it is not yet visible at construction. See
+        # ``_approx_description`` and the note finalisation in ``Underwriter``.
+        self._approx_fit = None
         if approximate not in ('exact', 'sgamma', 'slognorm'):
             raise ValueError(
                 f"approximate must be 'exact', 'sgamma' or 'slognorm', "
@@ -3414,12 +3421,12 @@ class Aggregate:
             sev_wt = 1.0
             sev_signed = bool(_fit.get('sev_signed', False))
             sev_reflect = bool(_fit.get('sev_reflect', False))
-            # surface the approximation in the note (the full original program is
-            # retained on ``self.program``; this is the human-readable hint)
-            _approx_note = (
-                f"approximate {approximate}: fitted {sev_name} to aggregate "
-                f"(m={_m:.6g}, cv={_cv:.6g}, skew={_sk:.6g})")
-            note = f"{note}; {_approx_note}" if note else _approx_note
+            # Record the fit for a lazy, program-aware description (rendered in
+            # ``info`` and folded into ``note`` once ``self.program`` is set).
+            # ``note`` is deliberately left as the user's pure note here.
+            self._approx_fit = dict(
+                kind=approximate, sev_name=sev_name, sev_a=sev_a,
+                sev_loc=sev_loc, sev_scale=sev_scale, m=_m, cv=_cv, skew=_sk)
 
         logger.debug(
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
@@ -3965,21 +3972,54 @@ class Aggregate:
         """
         agg_help(self, regex)
 
+    def _approx_description(self):
+        """One-line description of the method-of-moments fit, or ``''`` if none.
+
+        Renders the *original* program together with the fitted family and its
+        parameters, e.g.::
+
+            <program>  approximated by sgamma: gamma(loc=.., scale=.., a=..), m=.. cv=.. skew=..
+
+        Composed lazily (not at construction) because the original ``program``
+        text is assigned by the build path only after ``__init__`` returns; the
+        fit itself is captured in :attr:`_approx_fit`. Returns ``''`` for an
+        ordinary (``exact``) aggregate, or when no fit was recorded.
+
+        Returns
+        -------
+        str
+        """
+        fit = getattr(self, '_approx_fit', None)
+        if not fit:
+            return ''
+        prog = self.pprogram if self.program else self.name
+        parts = [f"loc={fit['sev_loc']:.6g}", f"scale={fit['sev_scale']:.6g}"]
+        a = fit.get('sev_a')
+        if a is not None and np.isfinite(a):
+            parts.append(f"a={a:.6g}")
+        params = ', '.join(parts)
+        return (f"{prog}  approximated by {fit['kind']}: {fit['sev_name']}({params}), "
+                f"m={fit['m']:.6g} cv={fit['cv']:.6g} skew={fit['skew']:.6g}")
+
     @property
     def info(self):
         s = [f'aggregate object name    {self.name}',
              f'claim count              {self.n:0,.2f}',
              f'frequency distribution   {self.frequency.freq_name}']
-        # Method-of-moments approximation marker (only when active): the object
-        # is a fixed-1-claim fit, so this explains the otherwise-bare freq/sev.
-        if getattr(self, 'approximate', 'exact') != 'exact':
-            s.append(f'approximate              {self.approximate}')
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
             s.append(f'severity distribution    {sv.long_name}, {sv.support_description}.')
         else:
             s.append(f'severity distribution    {n} components')
+        # Method-of-moments approximation marker -- a permanent header line
+        # (freq -> sev -> approximate), shown as ``exact`` for an ordinary
+        # aggregate. When a fit is active the family + params + original
+        # program follow on an indented continuation line.
+        s.append(f'approximate              {getattr(self, "approximate", "exact")}')
+        _desc = self._approx_description()
+        if _desc:
+            s.append(f'                         {_desc}')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
             s.append(f'bs                       {bss}')
@@ -5643,9 +5683,17 @@ class Aggregate:
                 mx = xmax
             else:
                 mx = self.q(1) * 1.05
-            # Signed aggregate: the support reaches below 0 (e.g. a P&L); use
-            # the true minimum so the left of the axis isn't clipped at ~0.
-            mn = min(self.q(0), 0.0) if (self.xs is not None and self.xs[0] < 0) else 0.0
+            # Window-aware left edge: an ordinary 0-based aggregate anchors at 0
+            # (unchanged); a windowed grid anchors below the mass instead of
+            # clipping at ~0 or padding empty space. Signed P&L keeps its exact
+            # ``min(q(0), 0)`` floor; a thin-tailed window (origin > 0) anchors at
+            # the true support minimum.
+            if self.xs is not None and self.xs[0] < 0:
+                mn = min(float(self.q(0)), 0.0)
+            elif self.xs is not None and self.xs[0] > 0:
+                mn = float(self.q(0))
+            else:
+                mn = 0.0
             span = nice_multiple(mx - mn)
             left = mn - (mx - mn) / 25
 
@@ -5764,11 +5812,21 @@ class Aggregate:
         if stat == 'range':
             p = 0.999 if kind == 'linear' else 0.99999
             hi = self.q(p)
-            # Signed aggregate (grid origin < 0): the mass can sit anywhere on
-            # the real line, possibly entirely negative, so use a *two-sided*
-            # quantile range. ``f(hi)`` would be reversed/clipped when hi < 0.
+            # Window-aware x-limits keyed on the grid origin (``xs[0]``):
+            #  * origin < 0  -- signed P&L: mass can sit anywhere on the real
+            #    line, so use a *two-sided* quantile range (``f(hi)`` would be
+            #    reversed/clipped when hi < 0);
+            #  * origin > 0  -- thin-tailed output window: anchor the left edge
+            #    at the realised support minimum, not 0, so the empty
+            #    ``[0, x_min]`` band isn't drawn;
+            #  * origin == 0 -- ordinary non-negative aggregate: unchanged.
             if self.xs is not None and self.xs[0] < 0:
                 lo = self.q(1 - p)
+                w = hi - lo
+                pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
+                return [lo - pad, hi + pad]
+            if self.xs is not None and self.xs[0] > 0:
+                lo = float(self.density['loss'].min())
                 w = hi - lo
                 pad = 0.02 * w if w > 0 else max(abs(hi), 1.0)
                 return [lo - pad, hi + pad]

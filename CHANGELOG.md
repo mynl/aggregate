@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.0.0a54
+
+### Hygiene 4 — value_type, fixed-layout info strings, pnl prem/lr meta
+
+One batch, four items (`dev/done/plan-hygiene-4.md`):
+
+- **`Portfolio.value_type` derived from its units.** Read-only property: the
+  unanimous `value_type` of the constituent aggregates. A mixed loss/payoff
+  book is rejected at construction with a `ValueError` naming the offending
+  units (no coherent sign convention); an empty portfolio defaults to loss.
+- **Fixed-layout `info` strings** across `Aggregate` / `Portfolio` /
+  `Distortion`. Every row is always present, in the same order, for every
+  instance — no conditional rows; unavailable values render as `n/a`. All
+  three classes share one label/value convention
+  (`aggregate.constants.info_row`, 25-col label, no colon); `Distortion` was
+  rewritten onto it (was indent+colon style). Row changes: Aggregate gains
+  `value_type`-near-top, `x_min`/`x_max` (replacing the conditional
+  `window`/`signed severity`/`severity window` block), always-present
+  `premium`/`expected loss`/`loss ratio`/`P(loss)` (the `E[margin]` row is
+  dropped — derivable), `bounded` and `id` footer rows; the `approximate`
+  continuation line is dropped (detail stays in the note). Portfolio gains
+  `value_type`, `x_min`/`x_max` (replacing `signed window`), premium rows;
+  `tail`/`bounded` move to the footer; `hash` is relabelled `id`. Distortion
+  drops `display name`/`strict-pricing`, renames `mu({0})`/`mu({1})` to
+  `weights mean`/`weights max`, adds `kind name`/`shape`/`shape name`/
+  `other params`/`area`. The full row catalogue and value enumerations are
+  documented in `dev/info-strings.rst` (destined for docs; **docs pending
+  rebuild**).
+- **`stats_df` `('meta','prem')`/`('meta','lr')` backfilled for `pnl`.** The
+  `pnl X prem - ...` form routes premium through `agg_premium`, which never
+  reached the meta rows; they now backfill from it when the exposure clause
+  supplied no premium. GROSS basis: under reinsurance `prem`/`lr` are the
+  theoretical pre-reinsurance figures (`lr = gross el / prem`). The frozen
+  numeric baseline is unaffected (no `pnl` programs in the corpus); no
+  density / risk-measure numbers move.
+- **`value_type` labels configurable.** New `[labels]` config section
+  (`loss = "loss"`, `payoff = "payoff"`; env `AGGREGATE_VALUE_TYPE_LOSS` /
+  `_PAYOFF`). Objects store the role as a private boolean `_is_loss_value`
+  (loss is the anchor pole); the label is resolved at the display/parse
+  boundaries only, so a relabel renames the printed word without moving any
+  object's role, and future pricing code branches on the boolean, never the
+  label text.
+
+Breaking (display-level): code pinning the old `Distortion.info` format
+(`Distortion: {name}`, colon rows), the Portfolio `hash` label, the Aggregate
+`E[margin]` / `signed window` / `severity window` info rows, or the
+conditional presence of `dsev_bucket` must be updated. Constructing a
+`Portfolio` mixing loss and payoff units is now an error. The `Aggregate`
+constructor and `value_type` setter now raise on an invalid `value_type`
+(previously the constructor silently coerced to `'loss'`).
+
 ## 1.0.0a53
 
 ### DecL unparser + program formatter (`decl_writer`)

@@ -95,6 +95,17 @@ the **native** unit pmf via the numerics-1 accessors / native prefix sums
 (`lev_i(a) = unit_cum_xp[idx] + a·(1 − unit_cum_p[idx])`), valid whether or not unit
 support overlaps the total window.
 
+**Sampling/switcheroo cluster (found in review; design deferred to its own
+future plan).** `Portfolio.sample`, `swap_density_df` (method + module twin),
+`add_exa_sample`, and `make_awkward` still read `p_{unit}` and are structurally
+premised on unit columns living in `density_df`. Their *redesign* is explicitly
+not this plan — but dropping the write must not leave them broken: give them the
+**minimal mechanical re-source** (unit pmf via the numerics-1 accessors where
+they read `port.density_df[p_{unit}]`; `swap_density_df` keeps accepting a
+user-supplied `p_{line}` frame as input) so pytest stays green, and flag any
+deeper semantic question (e.g. `add_exa_sample` on a windowed/signed book) for
+the separate sampling plan rather than solving it here.
+
 ### 5. Aggregate-side objective columns
 
 `Aggregate.density_df` `lev/exa/exlea/exgta` to direct sums carrying `x0`
@@ -141,6 +152,9 @@ surface (`apply_distortion`, `exag`) is numerics-3.
 - Windowed *combine* sizing (numerics-4) — this plan makes allocation correct *given*
   a combine; the windowed sizing/routing of `p_total` is numerics-4. (They meet at
   the per-unit-origin state captured in `update`.)
+- **Sampling/switcheroo redesign** (`sample` / `swap_density_df` /
+  `add_exa_sample` semantics) — separate future plan; deliverable 4 only keeps
+  them mechanically working when the `p_{unit}` write goes.
 
 ## Housekeeping
 

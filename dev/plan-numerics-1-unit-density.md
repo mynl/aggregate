@@ -20,6 +20,11 @@ rewrite to *only* the kappa compute, and these accessors are independently testa
 
 ## Background facts (verified in current code)
 
+> **Line numbers are stale** (hygiene-4 / 1.0.0a54 shifted `portfolio.py` by
+> ~16–70 lines after this was drafted; e.g. the `p_{unit}` writes are now near
+> :2122/:2140, `percentiles` near :1728). The *function names* below are the
+> contract — read the then-current code, as plan-4 already says.
+
 - `Aggregate` already models the native-grid split: `density_df` (aggregate on
   `self.xs`) vs `sev_density_df` (severity on `self.xs_sev`). We mirror that one
   level up for the portfolio.
@@ -36,6 +41,15 @@ rewrite to *only* the kappa compute, and these accessors are independently testa
     :1339, :1464`).
   - `add_exa` (`:2617–2658`) — kappa + stand-alone `lev_/e_`: **left for
     numerics-2** (this is the deliberate last reader).
+- **Sampling/switcheroo cluster — found in review, deliberately NOT migrated
+  here** (its design hasn't been considered yet; it gets its own future plan):
+  `Portfolio.sample` (draws unit samples straight from `density_df[p_{unit}]`),
+  `swap_density_df` (method + module twin; recombines from `p_{line}` columns and
+  reads `port.density_df[f'p_{...}']` for lines not supplied), `add_exa_sample`
+  (sample-based kappa), `make_awkward` (helper), and the `independent_density_df`
+  `p_` columns read by `sample_density_compare`. This plan leaves them on
+  `p_{unit}` untouched (the write stays, so they keep working); see the matching
+  note in numerics-2 for what happens when the write is dropped.
 
 ## Deliverables
 
@@ -137,6 +151,9 @@ Produce the reader table: every site that reads `density_df['p_{unit}']` /
 - Kappa / `add_exa` (numerics-2). The `p_{unit}` **write** stays.
 - Any distortion column, `T.*`/`M.*`, allocation diagnostics (numerics-3).
 - Reinsurance native-grid *combine* (numerics-2/4).
+- **The sampling/switcheroo cluster** (`sample`, `swap_density_df`,
+  `add_exa_sample`, `make_awkward`) — not yet designed; separate future plan.
+  They keep reading `p_{unit}` here (the write stays).
 
 ## Housekeeping
 

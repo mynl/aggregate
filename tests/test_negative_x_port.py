@@ -217,8 +217,12 @@ def test_describe_unsigned_portfolio_uses_cv():
 
 
 def test_info_reports_window(pnl):
-    """``info`` advertises the realised signed window."""
-    assert 'signed window' in pnl.info
+    """``info`` advertises the realised (signed) window via x_min/x_max."""
+    info = pnl.info
+    assert 'x_min' in info and 'x_max' in info
+    # a signed book's window starts below zero
+    assert float(pnl.density_df.index[0]) < 0
+    assert 'x_min                    -' in info
 
 
 # ---------------------------------------------------------------------------

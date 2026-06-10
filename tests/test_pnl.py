@@ -149,7 +149,7 @@ def test_non_pnl_describe_unchanged():
 def test_info_pnl_readout():
     a = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
     info = a.info
-    assert 'premium' in info and 'E[margin]' in info and 'P(loss)' in info
+    assert 'premium' in info and 'expected loss' in info and 'P(loss)' in info
     assert 'value_type               payoff' in info
 
 

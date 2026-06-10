@@ -1,6 +1,17 @@
 # Plan — hygiene 4 (rolling collector)
 
-> **Status: accumulating — do not execute yet.** Rolling list of nits and gnats
+> **Status: EXECUTED 2026-06-10 in 1.0.0a54** (all four items, one batch; see
+> `CHANGELOG.md` and `tests/test_hygiene4.py`). Execution notes: the §2.3
+> layout's `P(loss)` row (named in the notes, missed in the listing) was kept;
+> `weights mean`/`weights max` render the numeric Kusuoka atom weights (the
+> `{True/False}` braces in §2.5 read as a copy-paste slip — the §2.5 note and
+> §2.8 describe a pure rename of `mu({0})`/`mu({1})`); Portfolio keeps its
+> single worst-of `aggregate tail` line (there is no portfolio-level freq/sev
+> tail) plus the kept `last update` row; the empty-portfolio default is
+> defensive only (empty books already fail in `_build_stats_df`); the frozen
+> baseline needed no regeneration (no `pnl` programs in the corpus).
+>
+> Original header: Rolling list of nits and gnats
 > added over time (the author says *"add to hygiene plan: …"*). Executed **as one
 > batch** when the group is large enough and the author green-lights it.
 >

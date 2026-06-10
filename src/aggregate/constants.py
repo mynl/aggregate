@@ -26,7 +26,8 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR', 'FT_NOISE_FLOOR',
            'Validation', 'DefectiveDistributionWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
-           'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT']
+           'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
+           'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
 
 # --- plotting figure defaults (move to config [plotting] in Phase 2) -------
 # These are used as module-level constants in default argument expressions
@@ -70,6 +71,33 @@ REINS_LABEL_SUBJECT = 'Subject'
 REINS_LABEL_NET = 'Net'
 REINS_LABEL_CEDED = 'Ceded'
 REINS_LABEL_OUTPUT = 'Output'
+
+# --- shared ``info`` string convention --------------------------------------
+# Every ``info`` row across Aggregate / Portfolio / Distortion is a label
+# left-padded to one shared column width, no colon, value follows. The label
+# width matches ``tail.describe_lines``. ``INFO_NA`` is the fixed placeholder
+# for a value that is not (yet) available -- rows are never conditionally
+# dropped, so two objects of one class always emit the same lines in the same
+# order. The contract is documented in ``dev/info-strings.rst``.
+INFO_LABEL_WIDTH = 25
+INFO_NA = 'n/a'
+
+
+def info_row(label, value):
+    """Format one ``info`` line: ``label`` padded to ``INFO_LABEL_WIDTH``, then ``value``.
+
+    Parameters
+    ----------
+    label : str
+        Row label (no trailing colon).
+    value : object
+        Row value; rendered with ``str``. Pass ``INFO_NA`` for unavailable.
+
+    Returns
+    -------
+    str
+    """
+    return f'{label:<{INFO_LABEL_WIDTH}}{value}'
 
 
 class Validation(Flag):

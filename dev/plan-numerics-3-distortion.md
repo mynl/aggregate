@@ -1,10 +1,12 @@
 # Plan numerics-3 — distortion spine
 
 > Part of the numerics program; see `plan-numerics-0-meta.md`. Depends on
-> `plan-numerics-2-objective` (kappa + objective columns on the total grid).
-> Implements `choquet-calc-method.md` (Task B) + the distorted half of
-> `portfolio-calc-methods.md`, and absorbs the distortion / `value_type` half of the
-> former `plan-portfolio-neg-x-pricing` draft (folded in and removed; in git
+> `plan-numerics-2-objective` (kappa + objective columns on the total grid) **and on
+> hygiene-4** (Item 1: `Portfolio.value_type` + mixed-book raise; Item 4: the
+> canonical role flag `_is_loss_value` + configurable `loss`/`payoff` labels — land
+> hygiene-4 first). Implements `choquet-calc-method.md` (Task B) + the distorted half
+> of `portfolio-calc-methods.md`, and absorbs the distortion / `value_type` half of
+> the former `plan-portfolio-neg-x-pricing` draft (folded in and removed; in git
 > history). **This is where linear and lifted become one engine and `T.*`/`M.*` die.**
 
 ## Step 0 — the audit (do before editing)
@@ -55,9 +57,12 @@ returns S, T, gS, gp   (+ deficit, layer-form reconciliation assert)
 ### 2. `view × value_type` — the 2×2 (D3)
 
 Two orthogonal inputs; each toggles `g ↔ g_dual`; compose by XOR — use the dual iff
-`(view==bid) XOR (value_type==payoff)`. No negate-the-variable path: the
-`dot(x, gp)` engine is orientation-agnostic, so `value_type` only selects the
-effective `g`.
+`(view==bid) XOR (payoff role)`. **Branch on the canonical role flag
+`_is_loss_value`** (hygiene-4 Item 4; `payoff role == not _is_loss_value`), **never
+on the label string** — the `loss`/`payoff` labels are user-configurable, so a
+literal `value_type == 'payoff'` test would couple pricing to a tunable string and
+mis-route after a relabel. No negate-the-variable path: the `dot(x, gp)` engine is
+orientation-agnostic, so the role only selects the effective `g`.
 
 | | loss | payoff |
 |---|---|---|
@@ -67,19 +72,23 @@ effective `g`.
 (Sanity, author-checked: ask-of-loss puts the heaviest distortion weight on the
 large-loss tail = upside for the insurer; ask-of-payoff sorts ascending so the
 largest *good* outcome is down-weighted = dual. ✓) A dedicated `value_type` DecL
-keyword stays deferred — but note the *attribute* already exists on `Aggregate`
-(`distributions.py:3290`; `pnl` sets it), so this deliverable **consumes** the
-existing attribute rather than inventing the axis.
+keyword stays deferred — but note the role **already exists** on `Aggregate` as the
+canonical `_is_loss_value` flag (hygiene-4 Item 4; `pnl` sets the payoff role) with a
+public `value_type` getter returning the configured label, so this deliverable
+**consumes** that flag rather than inventing the axis.
 
-**Portfolio-level `value_type` (D8 — settled).** A Portfolio's units must have a
-consistent `value_type` and the Portfolio must know what it is. **Homogeneous books
-adopt the units' common level** (default `loss`). **A mixed book raises** — a clear
-error naming the offending units and telling the user to redeclare them explicitly
-(reflect / `pnl` at declaration). No magic, no invisible reversal: auto-reversal
-was rejected because it acts at *combine* time (it changes the total law, not just
-the pricing) and drags in the deferred straddling-P&L allocation semantics; it
-could return later as an explicit opt-in flag if ever wanted. The 2×2 table above
-is unaffected — a separate, happy circumstance.
+**Portfolio-level `value_type` (D8 — settled; implemented upstream in hygiene-4
+Item 1).** A Portfolio's units must have a consistent role and the Portfolio must
+know what it is: **homogeneous books adopt the units' common level** (default
+`loss`), **a mixed book raises** at construction with a clear error naming the
+offending units. **This derivation and its error are delivered by hygiene-4 Item 1,
+not here** — numerics-3 just reads `Portfolio.value_type` / the portfolio's
+`_is_loss_value` and feeds the 2×2 above; the mixed-book case never reaches pricing
+because construction already rejected it. No magic, no invisible reversal:
+auto-reversal was rejected because it acts at *combine* time (it changes the total
+law, not just the pricing) and drags in the deferred straddling-P&L allocation
+semantics; it could return later as an explicit opt-in flag if ever wanted. The 2×2
+table above is unaffected — a separate, happy circumstance.
 
 ### 3. Unified linear/lifted builder at `apply_distortion`
 
@@ -156,7 +165,9 @@ cache-pop hack** (`pedagogy.py:1408–1410`). The core pricing frame no longer c
 
 Widen the `apply_distortion` cache key from `name` to
 `(name, view, value_type, S_calculation, allocation)` so bid/ask, loss/payoff,
-linear/lifted, and forward/backward frames coexist. **`efficient` is removed
+linear/lifted, and forward/backward frames coexist. The `value_type` slot keys on the
+canonical role flag `_is_loss_value`, not the configurable label string (hygiene-4
+Item 4), so a relabel can't collide or stale cache entries. **`efficient` is removed
 entirely** (D7): with diagnostics out of the core frame (deliverable 6) and the
 methods it gated gone, there is no lean/full split — one frame shape, no flag.
 
@@ -169,15 +180,18 @@ methods it gated gone, there is no lean/full split — one frame shape, no flag.
   cuts a tail; `Σ_i exag_i == exag_total` (= `rho(X∧a)`) for **both**.
 - the consistency target (deliverable 5) holds across all six surfaces.
 - **mass-on-unbounded raises in the builder**, not just in `price` (G6).
-- `value_type='payoff'` prices as the dual of the matching `loss` object (round-trip).
+- a payoff-role object (`_is_loss_value False`) prices as the dual of the matching
+  loss object (round-trip); the round-trip holds **after relabeling** the payoff
+  label in config (guards branch-on-flag-not-string, hygiene-4 §4.3).
 - signed P&L total prices via `dot(kappa, gp)` (steering 6); equal-priority share
   rejected on signed grids unless an explicit non-negative payment law is given.
 - cache: ask/bid, loss/payoff, linear/lifted, fwd/bwd-S frames do not overwrite each
   other.
 - forwards vs backwards `S_calculation` agree to tol on a clean law (D7); a material
   difference is a defective-distribution diagnostic, not a free parameter.
-- mixed-`value_type` book **raises** with the D8 error (no combine, no reversal);
-  homogeneous `payoff` book adopts the common level.
+- mixed-`value_type` book **raises** with the D8 error at construction (delivered by
+  hygiene-4 Item 1 — assert it still holds here, don't re-implement); homogeneous
+  `payoff` book adopts the common level and prices through the dual.
 - **legacy regression (D5)**: zero-origin book reproduces today's lifted `exag_*`
   (key distorted columns, captured augmented baseline) to 1e-14 relative, and the
   `pricing_at`/`pentagon_at`/linear-price scalars from the Step-0 pre-capture to

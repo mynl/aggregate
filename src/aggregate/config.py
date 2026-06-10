@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'BuildSettings', 'DiscretizationSettings', 'ValidationSettings',
-    'MultivariateSettings', 'Settings',
+    'MultivariateSettings', 'LabelSettings', 'Settings',
     'get_settings', 'load_settings', 'reload_settings',
     'config_path', 'user_dir', 'write_default_config', 'describe_settings',
     'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME',
@@ -171,6 +171,30 @@ class MultivariateSettings:
 
 
 @dataclass(frozen=True)
+class LabelSettings:
+    """Display labels for the two ``value_type`` sign-convention roles.
+
+    ``value_type`` is a two-valued semantic role: *loss* convention ("more is
+    worse", the default) vs *payoff* convention ("more is better"). Objects
+    store the role internally as a boolean (``_is_loss_value``); these strings
+    are only how the role is displayed (``info``, ``stats_df``) and spelled
+    when setting ``value_type``. Changing a label renames the value everywhere
+    it is shown or accepted; it never changes the underlying role of existing
+    objects.
+
+    Parameters
+    ----------
+    loss : str
+        Label for the loss convention.
+    payoff : str
+        Label for the payoff convention.
+    """
+
+    loss: str = 'loss'
+    payoff: str = 'payoff'
+
+
+@dataclass(frozen=True)
 class Settings:
     """Resolved, immutable snapshot of the library configuration.
 
@@ -184,6 +208,7 @@ class Settings:
     discretization: DiscretizationSettings = field(default_factory=DiscretizationSettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
     multivariate: MultivariateSettings = field(default_factory=MultivariateSettings)
+    labels: LabelSettings = field(default_factory=LabelSettings)
     sources: dict = field(default_factory=dict, compare=False, repr=False)
 
 
@@ -194,6 +219,7 @@ _SECTIONS = {
     'discretization': DiscretizationSettings,
     'validation': ValidationSettings,
     'multivariate': MultivariateSettings,
+    'labels': LabelSettings,
 }
 
 
@@ -216,6 +242,8 @@ _ENV_MAP = {
     'AGGREGATE_REINS_BUCKET': ('discretization', 'reins_bucket', str),
     'AGGREGATE_DSEV_BUCKET': ('discretization', 'dsev_bucket', str),
     'AGGREGATE_VALIDATION_EPS': ('validation', 'eps', float),
+    'AGGREGATE_VALUE_TYPE_LOSS': ('labels', 'loss', str),
+    'AGGREGATE_VALUE_TYPE_PAYOFF': ('labels', 'payoff', str),
 }
 
 

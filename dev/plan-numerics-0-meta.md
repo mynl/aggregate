@@ -170,9 +170,10 @@ allocation mean on a straddling P&L" semantics stay deferred.)
   is absorbed/retired, not kept as a downstream primitive.
 - **`T.*`/`M.*` removed**: explicit per-line `L/M/P/Q` columns by direct sums;
   migrate `pricing_at`, `pentagon_at`, `price(lifted)`, `pentagon.py`.
-- **Cache key** widened to `(name, view, value_type, S_calculation, allocation)`;
-  `efficient` removed entirely (D7 — a non-issue once diagnostics move out of the
-  core frame).
+- **Cache key** widened to `(name, view, value_type, S_calculation, allocation)` —
+  the `value_type` slot keys on the canonical role flag `_is_loss_value`, not the
+  configurable label string (hygiene-4 Item 4); `efficient` removed entirely (D7 — a
+  non-issue once diagnostics move out of the core frame).
 - **Aggregate distortion surface**: `Aggregate.apply_distortion/price` (`exag`) route
   through the helper; the six price surfaces must agree on the total premium (the
   `choquet` note's consistency target). (Aggregate *objective* columns were done in
@@ -180,12 +181,17 @@ allocation mean on a straddling P&L" semantics stay deferred.)
 - **`plot_twelve` adapter**: an explicit `allocation_diagnostics(distortion,
   surface=...)` frame (layer curves `S·alpha`, `gS·beta`, layer margin) + native unit
   pmfs; remove the efficient→full cache-pop hack.
-- **`value_type` as the second pricing axis** (D3): `view ∈ {ask, bid}` and
-  `value_type ∈ {loss, payoff}` are **orthogonal** inputs; each independently toggles
-  `g ↔ g_dual`, composing by XOR — use the dual iff `(view==bid) XOR
-  (value_type==payoff)`. No separate negate-the-variable path: the exact-discrete
-  `rho = dot(x, gp)` engine is orientation-agnostic, so `value_type` only selects the
-  effective `g`. DecL keyword for `value_type` deferred.
+- **`value_type` as the second pricing axis** (D3): `view ∈ {ask, bid}` and the
+  value-type **role** (loss vs payoff convention) are **orthogonal** inputs; each
+  independently toggles `g ↔ g_dual`, composing by XOR — use the dual iff
+  `(view==bid) XOR (payoff role)`. **Branch on the canonical role flag
+  `_is_loss_value`** (hygiene-4 Item 4 — `payoff role == not _is_loss_value`),
+  **never on the label string**: the `loss`/`payoff` labels are user-configurable
+  (hygiene-4 Item 4), so a literal `value_type == 'payoff'` comparison would couple
+  pricing to a tunable string and mis-route after a relabel. No separate
+  negate-the-variable path: the exact-discrete `rho = dot(x, gp)` engine is
+  orientation-agnostic, so the role only selects the effective `g`. DecL keyword for
+  `value_type` deferred.
 
   | | loss | payoff |
   |---|---|---|
@@ -203,7 +209,10 @@ allocation mean on a straddling P&L" semantics stay deferred.)
 1. **The bucketed law is an exact discrete atom table, not a curve.** Primary object
    is `(x_k, p_k)`. Compute values as `dot(x, weights)` / direct prefix sums that
    **carry `x0`**. Never reintroduce `cumsum(S)*bs` or `loss[0]==0` assumptions. The
-   layer `gS·dx` form survives **only** as a reconciliation `assert`.
+   layer `gS·dx` form survives **only** as a reconciliation `assert` — with **one
+   deliberate exception**: the on-demand per-line capital `Q_i(a)` in numerics-3
+   deliverable 4 *is* layer-based, because capital genuinely is allocated by layer
+   (the layer-ROE construction); that is sanctioned there, not a rule violation.
 2. **Three owners, no overlap** (the picture in §1). Portfolio never reimplements a
    distorted integral; Distortion never knows line names / equal priority / boundedness.
 3. **Total-grid vs native-grid line is hard.** `Portfolio.density_df` carries
@@ -273,6 +282,13 @@ parts that *will* bite if unmanaged:
 - **G6 — mass-distortion-on-unbounded guard must move *down*** into the builder; today
   it only fires in `price(lifted)`, so `apply_distortion`/`exag_total` can still build
   an unstable frame.
+- **G7 — sampling/switcheroo cluster reads `p_{unit}` too** (found in the
+  pre-execution review): `Portfolio.sample`, `swap_density_df` (method + module
+  twin), `add_exa_sample`, `make_awkward`. Its *design* hasn't been considered and
+  is **deferred to its own future plan** — numerics-1 leaves it untouched (the
+  write stays), numerics-2 deliverable 4 gives it only the minimal mechanical
+  re-source onto the accessors so dropping the write doesn't break pytest. Do not
+  let either plan grow a sampling redesign.
 
 ---
 
@@ -288,6 +304,14 @@ Both sibling drafts have been **folded into this program and removed** — they 
 separate live dependencies. (`plan-portfolio-neg-x-pricing` was tracked, so recoverable
 in git history; `plan-window-port-bv` was untracked and is gone — its content survives
 only in numerics-4.)
+
+- **hygiene-4 is a live upstream dependency of numerics-3** (not folded in — it
+  ships first, separately). It delivers: `Portfolio.value_type` derived from its
+  units with the mixed-book raise (Item 1, = D8); the canonical role flag
+  `_is_loss_value` on `Aggregate`/`Portfolio`; and user-configurable `loss`/`payoff`
+  labels (Item 4). numerics-3 **consumes** all three — it builds the `view×value_type`
+  pricing axis on `_is_loss_value` and does **not** re-implement the Portfolio
+  derivation or the mixed-book error. Sequencing: land hygiene-4 before numerics-3.
 
 - **`plan-portfolio-neg-x-pricing`** (was tracked) — folded into numerics-2
   (signed objective columns) + numerics-3 (signed / `value_type` distortion pricing).
@@ -332,8 +356,12 @@ computed on demand at the requested `a` via the layer-ROE construction inside
 it gated go away); **`S_calculation` survives only as the deficit-parking direction**
 — on a clean law forwards/backwards agree to tol (asserted), and a material
 difference means the law is defective and the deficit policy governs. D8 —
-Portfolio `value_type` (settled): a Portfolio's units must be consistent and the
-Portfolio must know its level; **homogeneous books adopt the units' common level**
-(default `loss`); **mixed books raise** with a clear error — no magic, no invisible
-reversal — and the user redeclares the inconsistent units explicitly
-(reflect / `pnl` at declaration).
+Portfolio `value_type` (settled, and **now implemented in hygiene-4 Item 1** — a
+dependency of numerics-3, not a numerics deliverable): a Portfolio's units must be
+consistent and the Portfolio must know its level; **homogeneous books adopt the
+units' common level** (default `loss`); **mixed books raise** with a clear error —
+no magic, no invisible reversal — and the user redeclares the inconsistent units
+explicitly (reflect / `pnl` at declaration). The canonical internal storage is the
+role flag `_is_loss_value` on both `Aggregate` and `Portfolio` (hygiene-4 Item 4);
+numerics-3 **consumes** it and never re-derives the derivation or the mixed-book
+error.

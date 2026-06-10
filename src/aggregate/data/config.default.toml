@@ -82,3 +82,14 @@
 # [discretization].window_nines because the 2-D per-axis grid may want fewer
 # nines to control memory (memory ~ grid squared). Typical 8..12.
 # window_nines = 12
+
+
+# [labels] -- display / semantic-convention labels for value_type.
+[labels]
+# The two value_type sign-convention labels: loss ("more is worse", the
+# default) and payoff ("more is better"; set by pnl). These are display and
+# spelling settings only: changing one renames that value everywhere it
+# appears (info blocks, stats_df, the value_type setter's accepted inputs).
+# The underlying role of existing objects never changes with a relabel.
+# loss = "loss"
+# payoff = "payoff"

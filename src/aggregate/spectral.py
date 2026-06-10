@@ -39,7 +39,7 @@ except ImportError:
 
 import hashlib
 
-from .constants import FIG_H, FIG_W
+from .constants import FIG_H, FIG_W, INFO_NA, info_row
 from .random_agg import RANDOM
 
 
@@ -1123,50 +1123,93 @@ class Distortion:
             ['E[D_g]+E[D_g_inv]', 'g(g_inv(0.5))', 'g(0), g(1)'], name='stat'))
         return pd.concat([moments, kusuoka_summary, checks])
 
+    def _other_params_text(self):
+        """Render the non-primary parameters as compact ``name=value`` text.
+
+        Single source: the kind's :attr:`decl_params` (minus the primary
+        :attr:`param_name`). Multi-knot / combo kinds (``wtdtvar``,
+        ``minimum``, ``mixture``) have no ``decl_params``; their knot
+        vectors / member names are rendered compactly here instead, so the
+        ``info`` row set stays fixed. Returns ``'none'`` when there is
+        nothing to show.
+        """
+        pn = type(self).param_name
+        params = type(self).decl_params
+        if params is None and pn is not None:
+            params = (pn,)
+        parts = []
+        for p in (params or ()):
+            if p == pn:
+                continue
+            v = getattr(self, p, None)
+            if isinstance(v, (int, float, np.floating)):
+                parts.append(f'{p}={float(v):.4g}')
+            elif v is not None:
+                parts.append(f'{p}={v}')
+        # Knot-vector kinds (wtdtvar; bitvar exposes p0/p1/w1 via decl_params).
+        if not parts and hasattr(self, '_ps') and hasattr(self, '_wts') \
+                and not hasattr(self, '_distortions'):
+            if len(self._ps) <= 8:
+                parts.append('ps=[' + ', '.join(f'{p:.3g}' for p in self._ps) + ']')
+                parts.append('wts=[' + ', '.join(f'{w:.3g}' for w in self._wts) + ']')
+            else:
+                parts.append(f'ps=[{len(self._ps)} knots, '
+                             f'min={self._ps.min():.3g}, max={self._ps.max():.3g}]')
+                parts.append(f'wts=[{len(self._wts)} weights, '
+                             f'sum={self._wts.sum():.4g}]')
+        # Combinator kinds (minimum, mixture): member names (+ weights).
+        if hasattr(self, '_distortions'):
+            members = ', '.join(d.name for d in self._distortions)
+            parts.append(f'members=[{members}]')
+            if getattr(self, '_wts', None) is not None:
+                parts.append(
+                    'wts=[' + ', '.join(f'{w:.3g}' for w in self._wts) + ']')
+        return ', '.join(parts) if parts else 'none'
+
     def _compute_info(self):
-        """Multi-line summary string mirroring Aggregate/Portfolio.info."""
-        lines = [f'Distortion: {self.name}']
+        """Fixed-layout multi-line summary string.
+
+        Every row is always present, in the same order, for every
+        ``Distortion``; an inapplicable value (e.g. ``shape`` for a kind
+        with no primary parameter, ``gini_p`` for multi-knot kinds) renders
+        as ``n/a``. The row catalogue is documented in
+        ``dev/info-strings.rst``. Shares the label/value convention
+        (:func:`aggregate.constants.info_row`) with ``Aggregate`` and
+        ``Portfolio``.
+        """
         kind = self._name
         long = getattr(type(self), 'long_name', kind)
-        lines.append(f'  kind:           {kind}  ({long})')
-        if self.display_name:
-            lines.append(f'  display:        {self.display_name}')
-        pn = getattr(type(self), 'param_name', None)
+        pn = type(self).param_name
         if pn is not None:
             try:
-                val = getattr(self, pn)
-                lines.append(f'  {pn:<15s} {float(val):.4g}')
+                shape_text = f'{float(getattr(self, pn)):.4g}'
             except (AttributeError, TypeError):
-                pass
-        # Multi-param / composite kinds: surface their structural state.
-        for attr in ('r', 'd', 'p0', 'p1', 'w1', 'r0', 'slope',
-                     'a', 'b', 'x0', 'x1', 'alpha'):
-            if pn == attr:
-                continue
-            if hasattr(self, attr):
-                v = getattr(self, attr)
-                if isinstance(v, (int, float, np.floating)) and not callable(v):
-                    lines.append(f'  {attr:<15s} {float(v):.4g}')
-        if hasattr(self, '_ps') and hasattr(self, '_wts'):
-            lines.append(f'  ps              [{len(self._ps)} knots] '
-                         f'min={self._ps.min():.3g}, '
-                         f'max={self._ps.max():.3g}')
-            lines.append(f'  wts             sum={self._wts.sum():.4g}')
-            lines.append('  (see stats_df / tvar_info_df for per-knot detail)')
-        if hasattr(self, '_distortions'):
-            n = len(self._distortions)
-            members = ', '.join(d.name for d in self._distortions)
-            lines.append(f'  members         [{n}] {members}')
-            if hasattr(self, '_wts') and self._wts is not None:
-                wts_str = ', '.join(f'{w:.3g}' for w in self._wts)
-                lines.append(f'  wts             [{wts_str}]')
+                shape_text = INFO_NA
+        else:
+            shape_text = INFO_NA
         mu0, mu1, interior = self._kusuoka_summary()
-        lines.append(f'  mu({{0}})         {mu0:.4g}')
-        lines.append(f'  mu({{1}})         {mu1:.4g}')
-        lines.append(f'  interior atoms  {interior}')
-        lines.append(f'  strict-pricing  {getattr(type(self), "strict_pricing", False)}')
-        lines.append(f'  id              {self.id()}')
-        return '\n'.join(lines)
+        # gini_p may be NaN (multi-knot kinds); area = integral of g
+        # = (gini_p + 1) / 2.
+        gini_text = f'{self.gini_p:.4g}' if not np.isnan(self.gini_p) else INFO_NA
+        area_text = (f'{(self.gini_p + 1) / 2:.4g}'
+                     if not np.isnan(self.gini_p) else INFO_NA)
+        rows = [
+            ('distortion object name', self.name),
+            ('kind', kind),
+            ('kind name', long.lower()),
+            ('shape', shape_text),
+            ('shape name', pn if pn is not None else INFO_NA),
+            ('other params', self._other_params_text()),
+            # Kusuoka measure atoms: mu({0}) weights the mean component,
+            # mu({1}) the max / ess-sup component.
+            ('weights mean', f'{mu0:.4g}'),
+            ('weights max', f'{mu1:.4g}'),
+            ('interior atoms', bool(interior)),
+            ('gini_p', gini_text),
+            ('area', area_text),
+            ('id', self.id()),
+        ]
+        return '\n'.join(info_row(label, value) for label, value in rows)
 
     # ------------------------------------------------------------------
     # Plotting

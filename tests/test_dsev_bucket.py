@@ -139,13 +139,13 @@ def test_layered_discrete_falls_through():
 
 
 # ----------------------------------------------------------------------
-# info() surfaces dsev_bucket only when a discrete component is present
+# info() always surfaces dsev_bucket (fixed-layout rows, hygiene-4 item 2)
 # ----------------------------------------------------------------------
 def test_info_shows_dsev_bucket_for_discrete():
     a = build('agg D dfreq [1] dsev [1:6]')
     assert 'dsev_bucket' in a.info
 
 
-def test_info_hides_dsev_bucket_for_continuous():
+def test_info_shows_dsev_bucket_for_continuous():
     a = build('agg C 10 claims sev lognorm 100 cv 2 poisson')
-    assert 'dsev_bucket' not in a.info
+    assert 'dsev_bucket' in a.info

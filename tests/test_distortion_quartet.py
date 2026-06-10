@@ -48,7 +48,7 @@ def test_info_is_str(kind, kw):
     d = Distortion(kind, **kw)
     s = d.info
     assert isinstance(s, str)
-    assert 'Distortion:' in s
+    assert 'distortion object name' in s
     assert kind in s
     assert 'id' in s.lower()
 

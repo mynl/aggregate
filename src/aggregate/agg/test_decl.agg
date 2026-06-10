@@ -399,3 +399,18 @@ agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 o
 # dev/done/plan-decl-unparser.md.
 agg DW.ExpRate 1000 exposure at 0.05 rate sev lognorm 100 cv 2 poisson                                       note{exposure/rate head; renders as premium/lr}
 agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500 900] poisson                note{picks severity layering}
+
+
+# H4. Hygiene-4 regressions — value_type, info rows, pnl prem/lr meta
+# ===================================================================
+# Programs behind tests/test_hygiene4.py (1.0.0a54): Portfolio.value_type
+# derived from its units (mixed books rejected), fixed-layout info rows, and
+# the stats_df ('meta','prem')/('meta','lr') backfill from the pnl premium
+# (GROSS basis under reinsurance). See dev/done/plan-hygiene-4.md.
+agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson                                                             note{loss unit for value_type derivation}
+pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson                                                  note{payoff unit for value_type derivation}
+pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson                                                note{pnl premium backfills meta prem/lr}
+pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson                                                 note{bare-lr pnl; exposure clause carries premium}
+agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard}
+pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance}
+port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson          note{homogeneous loss book; portfolio value_type}

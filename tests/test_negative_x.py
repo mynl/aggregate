@@ -335,12 +335,15 @@ def test_sev_density_df_off_window():
 
 
 def test_info_discrete_support_and_warning():
-    """info renders discrete support (not 'L xs 0') and warns when sev off-window."""
+    """info renders discrete support (not 'L xs 0') and the realized window."""
     a = build('agg PnL 2000 claims dsev [-2 5] [.5 .5] poisson', update=False)
     a.update(log2=16, bs=1)
     info = a.info
     assert 'atoms [-2 5]' in info and 'xs 0' not in info
-    assert 'OUTSIDE output window' in info
+    # fixed-layout window rows replace the old conditional signed-window block
+    assert 'x_min' in info and 'x_max' in info
+    # off-window severity is still flagged programmatically
+    assert not a._severity_in_window()
     # many-atom dsev is shortened
     b = build('agg Big dfreq [2] dsev [1:1001]', update=False)
     b.update(log2=12, bs=1)

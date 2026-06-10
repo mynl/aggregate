@@ -14,11 +14,12 @@ from textwrap import fill
 import warnings
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
-                        EXEQA_NOISE_FLOOR, FIG_H, FIG_W,
+                        EXEQA_NOISE_FLOOR, FIG_H, FIG_W, INFO_NA, info_row,
                         REINS_LABEL_OUTPUT, Validation)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
-                            _flat_col_to_stats_index, approximate_from_mcvsk)
+                            _flat_col_to_stats_index, approximate_from_mcvsk,
+                            value_type_label)
 
 # Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
 # is the absolute dust floor used throughout validation.
@@ -292,6 +293,21 @@ class Portfolio(object):
             # line names cannot equal total
             if n == 'total':
                 raise ValueError('Line names cannot equal total, it is reserved for...total')
+
+        # value_type: derived, the unanimous sign-convention role of the
+        # units. Mixed loss/payoff units have no coherent "more is worse /
+        # more is better" reading, so they are rejected here, before any
+        # expensive update. Empty portfolio -> neutral default loss.
+        roles = {a._is_loss_value for a in self.agg_list}
+        if len(roles) == 2:
+            loss_label, payoff_label = value_type_label(True), value_type_label(False)
+            loss_units = [a.name for a in self.agg_list if a._is_loss_value]
+            payoff_units = [a.name for a in self.agg_list if not a._is_loss_value]
+            raise ValueError(
+                f"Portfolio {self.name!r}: mixed value_type across units -- "
+                f"{loss_label}: {loss_units}, {payoff_label}: {payoff_units}. "
+                f"A portfolio cannot mix {loss_label} and {payoff_label} units.")
+        self._is_loss_value = roles.pop() if roles else True
 
         # Canonical ``stats_df``: per-unit columns + ``mixed`` +
         # ``empirical`` + ``error``. Mirror of ``Aggregate.stats_df``
@@ -955,25 +971,81 @@ class Portfolio(object):
             self._allocation_method = value
 
     @property
+    def value_type(self):
+        """Sign convention for the portfolio: ``'loss'`` or ``'payoff'``.
+
+        Derived, not user-set: the unanimous
+        :attr:`~aggregate.distributions.Aggregate.value_type` of the units
+        (mixed books are rejected at construction; an empty portfolio
+        defaults to loss). Read-only — there is no setter, unlike
+        ``Aggregate``. It is **inert for the distribution itself**: density,
+        moments, quantiles and allocation do not depend on it. It is consumed
+        only by distortion / pricing, where a payoff portfolio is negated /
+        the dual distortion applied. Returns the configured label for the
+        role (``[labels]`` in the config); pricing code must branch on
+        ``_is_loss_value``, never on the label text.
+        """
+        return value_type_label(self._is_loss_value)
+
+    @property
     def info(self):
-        s = []
-        s.append(f'portfolio object name    {self.name}')
-        s.append(f'aggregate objects        {len(self.line_names):d}')
-        s.append(f'allocation_method        {self.allocation_method}')
-        s.append(f'bounded                  {self.bounded}')
-        s.append(self.tail_description)
-        if self.bs > 0:
+        """Fixed-layout multi-line summary string.
+
+        Every row is always present, in the same order, for every
+        ``Portfolio``; a value that is not (yet) available -- e.g. the grid
+        block before ``update`` -- renders as ``n/a``. The row catalogue is
+        documented in ``dev/info-strings.rst``. Shares the label/value
+        convention (:func:`aggregate.constants.info_row`) with ``Aggregate``
+        and ``Distortion``.
+        """
+        updated = self.bs > 0
+        if updated:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1/self.bs)}'
-            s.append(f'bs                       {bss}')
-            s.append(f'log2                     {self.log2}')
-            win = getattr(self, '_signed_window', None)
-            if win is not None:
-                s.append(f'signed window            [{win[0]:.6g}, {win[1]:.6g})')
-            s.append(f'padding                  {self.padding}')
-            s.append(f'sev_calc                 {self.sev_calc}')
-            s.append(f'normalize                {self.normalize}')
-            s.append(f'last update              {self.last_update}')
-            s.append(f'hash                     {self.hash_rep_at_last_update:x}')
+        else:
+            bss = INFO_NA
+        # Realized grid window, read off the density index (the signed path
+        # may start below 0; the non-signed grid starts at 0).
+        if self.density_df is not None:
+            x_min = f'{float(self.density_df.index[0]):,.6g}'
+            x_max = f'{float(self.density_df.index[-1]) + self.bs:,.6g}'
+        else:
+            x_min = x_max = INFO_NA
+        # premium / expected loss / loss ratio: populated when the units
+        # carry a premium. Expected loss is empirical (est_m); for a payoff
+        # book est_m is E[PnL], so E[loss] = premium - E[PnL].
+        prem = float(self.stats_df.loc[('meta', 'prem'), 'total'])
+        e_loss = None
+        if updated:
+            if self._is_loss_value:
+                e_loss = float(self.est_m)
+            elif prem > 0:
+                e_loss = prem - float(self.est_m)
+        h = self.hash_rep_at_last_update
+        rows = [
+            ('portfolio object name', self.name),
+            ('value_type', self.value_type),
+            ('aggregate objects', f'{len(self.line_names):d}'),
+            ('allocation_method', self.allocation_method),
+            ('bs', bss),
+            ('log2', self.log2 if updated else INFO_NA),
+            ('padding', self.padding if updated else INFO_NA),
+            ('sev_calc', self.sev_calc if updated else INFO_NA),
+            ('normalize', self.normalize if updated else INFO_NA),
+            ('x_min', x_min),
+            ('x_max', x_max),
+            ('premium', f'{prem:,.6g}' if prem > 0 else INFO_NA),
+            ('expected loss', f'{e_loss:,.6g}' if e_loss is not None else INFO_NA),
+            ('loss ratio', f'{e_loss / prem:.1%}'
+             if prem > 0 and e_loss is not None else INFO_NA),
+        ]
+        s = [info_row(label, value) for label, value in rows]
+        # Footer: tail, bounded, last update, id -- matching Aggregate.info
+        # (tail near the end; ``id`` was labelled ``hash``).
+        s.append(self.tail_description)
+        s.append(info_row('bounded', self.bounded))
+        s.append(info_row('last update',
+                          self.last_update if self.last_update != 0 else INFO_NA))
+        s.append(info_row('id', f'{h:x}' if isinstance(h, int) else INFO_NA))
         return '\n'.join(s)
 
     def _reins_after_label(self):

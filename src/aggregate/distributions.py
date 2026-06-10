@@ -1,6 +1,7 @@
 from collections import namedtuple
 from collections.abc import Iterable
 from functools import lru_cache, wraps
+import hashlib
 import json
 import inspect
 import logging
@@ -22,7 +23,7 @@ from scipy.optimize import NoConvergence  # noqa
 from textwrap import fill
 
 from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
-                        FIG_H, FIG_W,
+                        FIG_H, FIG_W, INFO_NA, info_row,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
                         Validation)
@@ -78,6 +79,58 @@ BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
 # VALIDATION_NOISE: absolute dust floor below which a quantity is treated as
 # exact zero / numerical noise.
 VALIDATION_NOISE = get_settings().validation.noise
+
+
+def value_type_role(v):
+    """Map a ``value_type`` token to the is-loss boolean role.
+
+    Parameters
+    ----------
+    v : str
+        Either a canonical token (``'loss'`` / ``'payoff'``) or the
+        currently-configured label (``settings.labels``).
+
+    Returns
+    -------
+    bool
+        ``True`` for the loss convention, ``False`` for payoff.
+
+    Raises
+    ------
+    ValueError
+        If ``v`` is outside the accepted pair.
+
+    Notes
+    -----
+    The role is the canonical, never-reconfigured spec field
+    (``_is_loss_value``); the label strings are display/spelling settings
+    (``[labels]`` in the config). Read at call time, not import time, so a
+    :func:`~aggregate.config.reload_settings` is honoured.
+    """
+    labels = get_settings().labels
+    if v in ('loss', labels.loss):
+        return True
+    if v in ('payoff', labels.payoff):
+        return False
+    raise ValueError(
+        f"value_type must be {labels.loss!r} or {labels.payoff!r}, not {v!r}")
+
+
+def value_type_label(is_loss_value):
+    """Render the is-loss boolean role as the configured label string.
+
+    Parameters
+    ----------
+    is_loss_value : bool
+        ``True`` for the loss convention, ``False`` for payoff.
+
+    Returns
+    -------
+    str
+        ``settings.labels.loss`` or ``settings.labels.payoff``.
+    """
+    labels = get_settings().labels
+    return labels.loss if is_loss_value else labels.payoff
 
 
 def max_log2(x):
@@ -3492,7 +3545,9 @@ class Aggregate:
         # Sign convention: how the variable is read. Inert for the
         # distribution itself; consumed at the pricing/distortion layer
         # (actuarial loss orientation). ``pnl`` sets ``payoff``. See plan §5.5.
-        self._value_type = value_type if value_type in ('loss', 'payoff') else 'loss'
+        # Canonical role boolean; the label string is resolved at display time
+        # (value_type_label) so a [labels] config relabel never moves the role.
+        self._is_loss_value = value_type_role(value_type)
         self.validation_eps = get_settings().validation.eps
         self.sev_calc = ""
         self.discretization_calc = ""
@@ -3807,6 +3862,14 @@ class Aggregate:
         # store answer for total
         tot_prem = float(self.stats_df.loc[('meta', 'prem'), _comp_cols].sum())
         tot_loss = float(self.stats_df.loc[('meta', 'el'), _comp_cols].sum())
+        # Backfill from the pnl premium when the exposure clause supplied
+        # none: ``pnl X prem - ...`` routes premium through ``agg_premium``,
+        # not ``exp_premium``, so the meta rows would stay blank. GROSS
+        # basis: ``tot_loss`` here is the theoretical loss before
+        # ``update_work`` applies any reinsurance, so ``lr`` is a gross
+        # loss ratio -- do not recompute it against a net/ceded loss.
+        if tot_prem == 0 and self._agg_premium is not None:
+            tot_prem = float(np.sum(np.asarray(self._agg_premium, dtype=float)))
         if tot_prem > 0:
             lr = tot_loss / tot_prem
         else:
@@ -4009,76 +4072,86 @@ class Aggregate:
         return (f"{prog}  approximated by {fit['kind']}: {fit['sev_name']}({params}), "
                 f"m={fit['m']:.6g} cv={fit['cv']:.6g} skew={fit['skew']:.6g}")
 
+    def _spec_hash(self):
+        """Display-only 8-hex id of the canonical spec.
+
+        Computed on the fly from ``self._spec`` (machine-independent md5,
+        first 8 hex, matching ``Distortion.id()``); no stored attribute, no
+        timestamp.
+        """
+        blob = json.dumps(self._spec, sort_keys=True, default=str)
+        return hashlib.md5(blob.encode('utf-8')).hexdigest()[:8].upper()
+
     @property
     def info(self):
-        s = [f'aggregate object name    {self.name}',
-             f'claim count              {self.n:0,.2f}',
-             f'frequency distribution   {self.frequency.freq_name}']
-        n = len(self.sevs)
-        if n == 1:
+        """Fixed-layout multi-line summary string.
+
+        Every row is always present, in the same order, for every
+        ``Aggregate``; a value that is not (yet) available -- e.g. the grid
+        block before ``update`` -- renders as ``n/a``. The row catalogue and
+        value enumerations are documented in ``dev/info-strings.rst``. Shares
+        the label/value convention (:func:`aggregate.constants.info_row`)
+        with ``Portfolio`` and ``Distortion``.
+        """
+        updated = self.bs > 0
+        n_sev = len(self.sevs)
+        if n_sev == 1:
             sv = self.sevs[0]
-            s.append(f'severity distribution    {sv.long_name}, {sv.support_description}.')
+            sev_desc = f'{sv.long_name}, {sv.support_description}.'
         else:
-            s.append(f'severity distribution    {n} components')
-        # Method-of-moments approximation marker -- a permanent header line
-        # (freq -> sev -> approximate), shown as ``exact`` for an ordinary
-        # aggregate. When a fit is active the family + params + original
-        # program follow on an indented continuation line.
-        s.append(f'approximate              {getattr(self, "approximate", "exact")}')
-        _desc = self._approx_description()
-        if _desc:
-            s.append(f'                         {_desc}')
-        if self.bs > 0:
+            sev_desc = f'{n_sev} components'
+        if updated:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
-            s.append(f'bs                       {bss}')
-            s.append(f'log2                     {self.log2}')
-            s.append(f'padding                  {self.padding}')
-            s.append(f'sev_calc                 {self.sev_calc}')
-            # dsev_bucket governs discrete-atom placement; only meaningful (and
-            # only shown) when a point-mass severity component is present.
-            if any(sv.sev_kind in ('dhistogram', 'fixed') for sv in self.sevs):
-                s.append(f'dsev_bucket              {self.dsev_bucket}')
-            s.append(f'normalize                {self.normalize}')
-            s.append(f'value_type               {self.value_type}')
-            # Signed-support / output-window line: shown only when the grid is
-            # offset from the default 0-based, non-negative layout.
-            if self._signed_sev or self.x_min != 0:
-                s.append(f'window                   [{self.x_min:,.6g}, '
-                         f'{self.x_max:,.6g}]')
-                s.append(f'signed severity          {self._signed_sev}')
-                # Severity-vs-window status only when the *severity* is signed;
-                # for a ``pnl`` (affine) aggregate the loss severity is
-                # non-negative and the comparison against the P&L window is
-                # uninformative, so it is skipped in favour of the readout below.
-                if self._signed_sev:
-                    if self._severity_in_window():
-                        s.append('severity window          inside output window')
-                    else:
-                        s.append('severity window          OUTSIDE output window; '
-                                 'see sev_density_df')
-            # P&L readout: a ``pnl`` (premium-minus-loss) aggregate. ``E[margin]``
-            # and ``P(loss)`` are the headline numbers an underwriter wants;
-            # ``P(loss) = P(PnL < 0)`` is read straight off the signed density.
-            if self._agg_affine_active() and self.agg_density is not None:
-                premium = float(self._agg_shift)
-                e_margin = float(self.est_m)         # PnL mean = premium - E[loss]
-                e_loss = premium - e_margin
-                lr = e_loss / premium if premium else np.nan
-                p_loss = float(self.agg_density[self.xs < 0].sum())
-                s.append(f'premium                  {premium:,.6g}')
-                s.append(f'E[loss]                  {e_loss:,.6g}')
-                s.append(f'E[margin]                {e_margin:,.6g}')
-                s.append(f'loss ratio               {lr:.4g}')
-                s.append(f'P(loss)                  {p_loss:.4g}')
-            s.append(f'validation_eps           {self.validation_eps}')
-            s.append(f'reinsurance              {self.reins_kinds().lower()}')
-            s.append(f'occurrence reinsurance   {self.reins_description("occ").lower()}')
-            s.append(f'aggregate reinsurance    {self.reins_description("agg").lower()}')
-            s.append(f'validation               {self.explain_validation()  }')
-            # Tail-thickness classification (frequency / severity / aggregate).
-            s.extend(_tail.describe_lines(
-                self._tail_info(), self.frequency.freq_name, self._sev_label()))
-            s.append('')
+        else:
+            bss = INFO_NA
+        # premium / expected loss / loss ratio / P(loss): populated when a
+        # premium is known (a ``pnl``, or the DecL exposure clause states
+        # one) and the object is updated. ``P(loss) = P(PnL < 0)`` is read
+        # straight off the signed density, so it needs the pnl affine form.
+        prem = float(self.stats_df.loc[('meta', 'prem'), 'mixed'])
+        e_loss = None
+        p_loss = INFO_NA
+        if updated and self.agg_density is not None:
+            if self._agg_affine_active():
+                # PnL mean = premium - E[loss]
+                e_loss = float(self._agg_shift) - float(self.est_m)
+                p_loss = f'{float(self.agg_density[self.xs < 0].sum()):.4g}'
+            else:
+                e_loss = float(self.est_m)
+        rows = [
+            ('aggregate object name', self.name),
+            ('value_type', self.value_type),
+            ('claim count', f'{self.n:,.3f}'),
+            ('frequency distribution', self.frequency.freq_name),
+            ('severity distribution', sev_desc),
+            ('approximate', getattr(self, 'approximate', 'exact')),
+            ('bs', bss),
+            ('log2', self.log2 if updated else INFO_NA),
+            ('padding', self.padding if updated else INFO_NA),
+            ('sev_calc', self.sev_calc if updated else INFO_NA),
+            ('dsev_bucket', self.dsev_bucket),
+            ('normalize', self.normalize if updated else INFO_NA),
+            ('x_min', f'{self.x_min:,.6g}' if updated else INFO_NA),
+            ('x_max', f'{self.x_max:,.6g}'
+             if updated and self.x_max is not None else INFO_NA),
+            ('premium', f'{prem:,.6g}' if prem > 0 else INFO_NA),
+            ('expected loss', f'{e_loss:,.6g}' if e_loss is not None else INFO_NA),
+            ('loss ratio', f'{e_loss / prem:.1%}'
+             if prem > 0 and e_loss is not None else INFO_NA),
+            ('P(loss)', p_loss),
+            ('validation_eps', self.validation_eps),
+            ('reinsurance', self.reins_kinds().lower()),
+            ('occurrence reinsurance', self.reins_description('occ').lower()),
+            ('aggregate reinsurance', self.reins_description('agg').lower()),
+            ('validation', self.explain_validation()),
+        ]
+        s = [info_row(label, value) for label, value in rows]
+        # Tail-thickness classification (frequency / severity / aggregate);
+        # spec-only, so available before update.
+        s.extend(_tail.describe_lines(
+            self._tail_info(), self.frequency.freq_name, self._sev_label()))
+        s.append(info_row('bounded', self.bounded))
+        s.append(info_row('id', self._spec_hash()))
         return '\n'.join(s)
 
     def explain_validation(self):
@@ -4403,16 +4476,19 @@ class Aggregate:
         in the Portfolio plan and downstream pricing work), where a
         ``'payoff'`` object is negated / the dual distortion applied.
 
+        The role is stored as a boolean (``_is_loss_value``); this getter
+        returns the **configured label** for the role (``[labels]`` in the
+        config, defaults ``'loss'`` / ``'payoff'``). The setter accepts the
+        canonical tokens or the configured labels. Pricing code must branch
+        on ``_is_loss_value``, never on the label text.
+
         See ``dev/plan-negative-x-agg.md`` §5.5.
         """
-        return self._value_type
+        return value_type_label(self._is_loss_value)
 
     @value_type.setter
     def value_type(self, v):
-        if v not in ('loss', 'payoff'):
-            raise ValueError(
-                f"value_type must be 'loss' or 'payoff', not {v!r}")
-        self._value_type = v
+        self._is_loss_value = value_type_role(v)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, **kwargs):

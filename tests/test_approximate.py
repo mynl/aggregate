@@ -200,10 +200,10 @@ def test_note_and_info_surface_approximation():
     assert "sgamma" in a.note
     assert "approximated by" in a.note
     assert "lognorm" in a.note            # the original program is preserved
-    # info: the always-present marker line plus the program-aware description
+    # info: the always-present marker line (one row, no continuation -- the
+    # fitted family + program detail lives in the note / _approx_description)
     assert "approximate              sgamma" in a.info
-    assert "sgamma" in a.info
-    assert "lognorm" in a.info            # description carries the program
+    assert "lognorm" in a._approx_description()
 
 
 def test_info_always_shows_approximate_marker_for_exact():

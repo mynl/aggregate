@@ -28,7 +28,15 @@ It covers **everything added on `REFACTOR`, i.e. the entire `1.0.0a*` series sin
 0.30.1** (and, going forward, the `1.0.0b*` series). It is a Quarto-markdown
 notebook the author opens in **Jupyter Lab** (jupytext pairs `.qmd` ↔ notebook;
 `jupytext` ships in the `notebook` extra). It lives in `dev/` — it is a project
-artifact, **not** part of the Sphinx/readthedocs tree.
+artifact, **not** part of the Sphinx/readthedocs tree *today*.
+
+**Destiny and scale.** This document is expected to graduate into the Sphinx docs
+at release as a **"What changed in 1.0 vs 0.30"** chapter. Write it to that
+standard from the start: match the level of detail of the existing docs (the
+10-minutes guide and the feature chapters are the register to aim for), and
+expect a substantial document — **tens of pages** when rendered. "Prose is
+tight" (§2.1) governs density, not total length; there is a lot of material and
+it should all be here.
 
 ---
 
@@ -50,7 +58,9 @@ artifact, **not** part of the Sphinx/readthedocs tree.
   for "reinsurance"; lean to full words for any *new* prose identifiers but keep
   house abbreviations (`sev`, `occ`, `agg`, `freq`, `cv`, `bs`).
 - Prose is tight: no filler, one or two illustrative examples per feature, the
-  "why it matters" in a sentence.
+  "why it matters" in a sentence. For depth, calibrate to the existing Sphinx
+  docs (the 10-minutes guide is the register) — this doc is headed there (§1).
+  Tight density, not short length: the full document will run to tens of pages.
 
 ### 2.2 Top-level section layout
 
@@ -65,14 +75,16 @@ artifact, **not** part of the Sphinx/readthedocs tree.
 2.  The cast of examples                  ← canonical objects, built once (§2.4)
 3.  New DecL elements                     ← examples first
 4.  Better parse errors (Lark report)
-5.  The reporting quartet                 ← info / describe / stats_df / density_df
-6.  Tail-thickness classification
-7.  Pricing & the pentagon
-8.  Pricing & allocation bounds
-9.  Configuration (config.toml)
-10. Underwriter & persistence
-11. Pedagogy helpers
-12. Under the hood                        ← appendix: internal changes, named only
+5.  Programs as text                      ← decl_writer: format_program, canonical pprogram / to_agg (a53)
+6.  The reporting quartet                 ← info / describe / stats_df / density_df
+7.  Grids, buckets & windows              ← bs/log2 sizing, output windows (a49/a51), dsev_bucket, hints{}
+8.  Tail-thickness classification
+9.  Pricing & the pentagon
+10. Pricing & allocation bounds
+11. Configuration (config.toml)
+12. Underwriter & persistence
+13. Pedagogy helpers
+14. Under the hood                        ← appendix: internal changes, named only
 ```
 
 **"Examples first, then the new properties"** (author's instruction): §2 builds a
@@ -95,11 +107,17 @@ treatment in the doc:
 | fuzz consolidation | a42 | Under the hood | — |
 | … | | | |
 
-This table **is** the maintenance state. Every `## 1.0.0aN` heading (and its
-`###` sub-items) in `CHANGELOG.md` must appear as a row. A row whose **Section**
-is "Under the hood" and **Example** is "—" is an internal change that is named but
-not exampled (§2.5). The reconciliation in §3 is: *CHANGELOG items with no ledger
-row are the work list.*
+This table **is** the maintenance state. The contract is **morally complete,
+not slavishly so**: every *major point* in `CHANGELOG.md` must be accounted for
+by a row, but the row granularity is a judgment call. The default unit is one
+row per logical feature — usually a `###` sub-heading, but merge trivially
+related sub-items into one row, and split a mega-entry (the early `a8`/`a9`
+"in progress" entries, the `a17` core refactor) into the several features it
+actually contains. The test is a reader's, not an auditor's: *could a returning
+0.30.1 user find every change that matters to them via this table?* A row whose
+**Section** is "Under the hood" and **Example** is "—" is an internal change
+that is named but not exampled (§2.5). The reconciliation in §3 is: *CHANGELOG
+items not accounted for by any ledger row are the work list.*
 
 ### 2.4 The cast of examples
 
@@ -112,8 +130,15 @@ and say why in a comment.
 
 > **This block is the canonical definition of the cast.** The `execute` step
 > copies it verbatim into `features.qmd` §2. To change the cast, **edit it here**
-> and it flows through on the next run — do not diverge the two. The DecL is the
-> author's draft and is meant to be tuned in place.
+> and it flows through on the next run — do not diverge the two.
+>
+> **The run has full license to edit this block** — fix API drift and parse
+> errors, tidy names and comments, and tune programs to be more educational /
+> illustrative. The cast is expected to evolve and settle over time; what is
+> most useful long-term is hard to call up front, so improve it whenever an
+> improvement is clear, and report the edits in the run summary. Compositional
+> judgment calls (drop a member, change what a member is *for*) deserve a note
+> to the author but need not block the run.
 
 Members are **clustered** (`n.a`, `n.b`, …) so closely-related examples — and the
 features they illustrate — sit together. Renumber freely as the set evolves.
@@ -151,7 +176,7 @@ pnl = build('pnl PNL 1000 premium - 10 claim sev lognorm 80 cv 0.025 poisson')
 
 # 4. Multivariate ────────────────────────────────────────────────────────────
 # 4.a mv_indep — INDEPENDENT (shared frequency only; positive baseline corr from
-#     the shared mixing / common shock). [splice → needs a48, see Pending below]
+#     the shared mixing / common shock). Splicing an unbounded base works since a48.
 mv_indep = build('''
 multivariate Cat 25 claims
     agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
@@ -210,14 +235,16 @@ port Book
     agg B  50 claims 4000 xs 0 sev lognorm 200 cv 2.0 occurrence net of 50% po 2000 xs 1000 mixed gamma 0.4
 ''')
 
-# 8. Approximate (a47) ───────────────────────────────────────────────────────
+# 8. Approximate (a47) vs exact on a non-zero window (a51) ───────────────────
 # 8.a big — very-high-frequency book via the `approximate` shortcut (sgamma fit).
-#     NB: the info display note is currently incorrect (see Pending below).
-big = build('agg Big 1e6 claims dsev [1 3] approximate sgamma')
+#     Note `approximate` comes AFTER the frequency clause. The info line and the
+#     self-describing fit note are a50.
+big = build('agg Big 1e6 claims dsev [1 3] poisson approximate sgamma')
 
-# 8.b bigex — the EXACT convolution for comparison.
-#     [needs the updated bucket/window work to build at 1e6 — see Pending below]
-bigex = build('agg Big 1e6 claims dsev [1 3] poisson')
+# 8.b bigex — the EXACT convolution for comparison: since a51 it resolves at
+#     bs=1 on a two-sided output window far from 0 (mean 2e6, sd ≈ 2,200)
+#     instead of wasting the whole grid on [0, 2e6).
+bigex = build('agg BigEx 1e6 claims dsev [1 3] poisson')
 ```
 
 | Member | Drives |
@@ -231,24 +258,19 @@ bigex = build('agg Big 1e6 claims dsev [1 3] poisson')
 | `reins` / `netceded` | reins gross/net reporting; `netceded` occurrence bivariate |
 | `mix_sev` / `mix_exp` / `mix_both` | mixed severity, mixed exposure, and the joint |
 | `book` / `book_w_re` | combine, pentagon pricing, `price_pentagon` / `price_stand_alone`, bounds; reins in a portfolio |
-| `big` / `bigex` | `approximate sgamma` vs the exact convolution |
+| `big` / `bigex` | `approximate sgamma` vs the exact convolution on a non-zero output window (a51) |
 
 #### Pending dependencies (do not block the whole run on these)
 
-Three cast members depend on work that has not landed yet. The `execute` step
-should **tag these cells pending** and **exclude them from the must-pass
-verification gate (§4)** until the dependency ships, then drop the tag so they
-become required:
+**Currently none.** The original three (the `mv_*` splice crash, the `bigex`
+window infeasibility, the wrong `approximate` info note) were resolved by a48,
+a51 and a50 respectively; the full cast was smoke-tested green against a57 on
+2026-06-11.
 
-- **`mv_indep` / `mv_copula`** splice an unbounded (`lognorm`) base — blocked by
-  the `dev/plan-splice-window.md` fix (**a48**). Until then they crash in window
-  sizing. (Alternatively the author may tune them to a bounded base or drop the
-  splice.)
-- **`bigex`** — the exact `1e6 claims dsev` convolution needs the updated
-  bucket/window work to be feasible; until then only `big` (the `approximate`
-  side) runs, which is enough to demonstrate the feature.
-- **`big`** builds today, but its `info` display note is currently incorrect;
-  the example text should not lean on that note until it is fixed.
+The mechanism stands for future use: when a cast member depends on work that has
+not landed, **tag its cell pending** and **exclude it from the must-pass
+verification gate (§4)**; drop the tag when the dependency ships so the cell
+becomes required again.
 
 ### 2.5 Internal changes — the "Under the hood" appendix
 
@@ -348,45 +370,69 @@ This task is **part of release hygiene**, not a separately versioned change:
 
 ## 6. First-run note
 
-The first execution is large (the entire `a1`–`a47` series) and will surface
+The first execution is large (the entire `a1`–`a57` series) and will surface
 judgement calls — which features share a cast object, how deep each example goes,
 where the user-facing/internal line falls. **Expect feedback that edits both this
 spec and the output `.qmd`.** Once tuned, subsequent runs are a small top-up per
 release. Treat the initial classification below as a seed, not gospel.
 
-### 6.1 Seed classification (a21–a47, verified against CHANGELOG)
+### 6.1 Seed classification (a21–a57, verified against CHANGELOG)
 
 User-facing (get worked examples):
 
-- **a21** negative-support severity, `ssev`, output window → §3 / §5
-- **a22** signed `Portfolio` combine; `shift - dist` severity → §3 / §5
-- **a23** `pnl` premium keyword; signed-aware `describe` → §3 / §5
+- **a21** negative-support severity, `ssev`, output window → §3 / §6
+- **a22** signed `Portfolio` combine; `shift - dist` severity → §3 / §6
+- **a23** `pnl` premium keyword; signed-aware `describe` → §3 / §6
 - **a24** `multivariate` / `copula` / `netceded` → §3
-- **a25** `hints{}` vs `note{}` → §3
+- **a25** `hints{}` vs `note{}` → §3 / §7
 - **a27** distortion flat-number DecL syntax (breaking) → §3
-- **a28** `dsev_bucket` linear/nearest → §3
-- **a29** tail-thickness classification → §6
-- **a30** config.toml layering, `show_settings` (user surface) → §9
-- **a31** the pentagon octet; one canonical pricing readout → §7
-- **a32** legible `Underwriter` loading; `to_agg` (breaking renames) → §10
-- **a33** `price_stand_alone` restored → §7
-- **a34** `distortion_df` / `calibration_df`; `gini_p` rename → §7
-- **a35** empty `Underwriter()` by default; `to_agg` modes → §10
-- **a36** `AllocationBounds` → §8
-- **a37** `PricingBounds`, the Gini lens → §8
-- **a39** keyword-only `Underwriter`, signed Lee plot, `density` property → §10 / §5
-- **a40** SD for zero-mean signed aggregates → §5
-- **a41** `reinsurance_*` → `reins_*` (breaking) → §3 or §5 (reins reporting)
-- **a43** `price_pentagon`; signed `Portfolio.describe` spread → §7 / §5
+- **a28** `dsev_bucket` linear/nearest → §7
+- **a29** tail-thickness classification → §8
+- **a30** config.toml layering, `show_settings` (user surface) → §11
+- **a31** the pentagon octet; one canonical pricing readout → §9
+- **a32** legible `Underwriter` loading; `to_agg` (breaking renames) → §12
+- **a33** `price_stand_alone` restored → §9
+- **a34** `distortion_df` / `calibration_df`; `gini_p` rename → §9
+- **a35** empty `Underwriter()` by default; `to_agg` modes → §12
+- **a36** `AllocationBounds` → §10
+- **a37** `PricingBounds`, the Gini lens → §10
+- **a39** keyword-only `Underwriter`, signed Lee plot, `density` property → §12 / §6
+- **a40** SD for zero-mean signed aggregates → §6
+- **a41** `reinsurance_*` → `reins_*` (breaking) → §3 or §6 (reins reporting)
+- **a43** `price_pentagon`; signed `Portfolio.describe` spread → §9 / §6
 - **a45** `pnl` with signed loss severity (bug fix, enables the case) → §3
-- **a46** exponential-tilting pedagogy → §11
-- **a47** `approximate` DecL keyword → §3
+- **a46** exponential-tilting pedagogy → §13
+- **a47** `approximate` DecL keyword (note: comes *after* the freq clause) → §3
+- **a48** spliced unbounded severities build (fix; enables the `mv_*` cast splices) → §3 / §7
+- **a50** always-present `approximate` info line; self-describing fit note; window-aware plots → §6
+- **a51** non-zero output window for concentrated aggregates; `x_min=0` to `update`
+  restores the legacy 0-based grid (behavioral note: `q`/`F`/plots live on the
+  window) → §7, demonstrated by `bigex`
+- **a52** `_` digit separators in DecL numbers; `of` as a share synonym in reins → §3
+- **a53** `format_program` / `spec_to_decl`; `pprogram` and `to_agg` now emit
+  canonical DecL (breaking: `decl_pprint` removed) → §5
+- **a54** `value_type` on `Aggregate`/`Portfolio` (mixed loss/payoff books rejected);
+  fixed-layout `info` rows (breaking, display-level); `pnl` prem/lr in `stats_df`
+  meta; configurable `[labels]` → §6 / §11
+- **a55** `unit_density` / `unit_density_df` / `aligned_unit_density_df` accessors → §6
+- **a56** breaking: `p_<unit>` columns and the EPD family removed from
+  `density_df` (use the a55 accessors; EPD is the one-liner `(e − lev)/e`);
+  signed books get the objective columns → §6
+- **a57** breaking: `T.*`/`M.*` columns and `efficient` removed from
+  `apply_distortion`/`price`; new `allocation_diagnostics`; signed (P&L) books
+  price; deficit policy (`allow_deficit`) → §9
 
 Internal (named in "Under the hood"):
 
 - **a38** knowledge-freeze regression harness
 - **a42** fuzz-removal consolidation (`utilities.remove_fuzz`)
 - **a44** module organisation, dropped deps, lazy IPython
+- **a49** portfolio combine grid: `best_window` replaces the RMS combine — mostly
+  internal, but worth a one-line user note in §7 (discrete books now land on the
+  integer lattice; adding units no longer coarsens the grid)
+- **a55/a56/a57** numerics spine mechanics (shifted kappa, direct sums, one
+  Choquet engine) — internal; only the breaking column changes and new
+  surfaces above are exampled
 
 **a1–a20 are not yet classified** — the first run must read them in `CHANGELOG.md`
 and slot them in (the negative-x backbone, parser-error promotion, the

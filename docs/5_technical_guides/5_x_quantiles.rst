@@ -382,5 +382,7 @@ payments, making it attractive to regulators. It is used to set risk
 based capital standards in :cite:t:`Butsic1994` and as a capital standard in
 :cite:t:`Myers2001`.
 
-EPD is available in aggregate as the ``epd`` column in ``density_df``.
+EPD is available in aggregate as the one-liner
+``(density_df.e - density_df.lev) / density_df.e`` (the dedicated ``epd``
+column was removed in the 1.0 numerics rationalization).
 

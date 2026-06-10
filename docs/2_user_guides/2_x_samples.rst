@@ -290,7 +290,9 @@ The :class:`Portfolio` total is a convolution of the input marginals and include
 .. ipython:: python
     :okwarning:
 
-    ax = p03.density_df.filter(regex='p_[ABCt]').cumsum().plot(
+    ax = pd.concat([p03.density_df.p_total] +
+        [p03.unit_density(u) for u in p03.unit_names],
+        axis=1).cumsum().plot(
         drawstyle='steps-post', lw=1, figsize=(3.5, 2.45))
     ax.plot(np.hstack((0, sample.total.sort_values())), np.linspace(0, 1, 11),
         drawstyle='steps-post', lw=2, label='dependent');

@@ -62,13 +62,15 @@ The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printe
                 'poisson')
     qd(a01)
 
-The survival function ``a01.sf`` answers 3 and 4. ``qd`` is used to print with reasonable defaults. The dataframe ``a01.density_df`` computes limited expected values (levs) and expected policyholder deficit indexed by loss level, and other values. Querying it answers 5 and 6.
+The survival function ``a01.sf`` answers 3 and 4. ``qd`` is used to print with reasonable defaults. The dataframe ``a01.density_df`` computes limited expected values (levs) indexed by loss level, and other values; the expected policyholder deficit ratio is the one-liner ``(e - lev) / e`` from its columns. Querying it answers 5 and 6.
 
 .. ipython:: python
     :okwarning:
 
     qd(a01.sf(2000), a01.sf(2500))
-    qd(a01.density_df.loc[[2500], ['F', 'S', 'lev', 'epd']])
+    bit = a01.density_df.loc[[2500], ['F', 'S', 'lev', 'e']]
+    bit['epd'] = (bit.e - bit.lev) / bit.e
+    qd(bit)
 
 
 ..  # other things to consider
@@ -76,7 +78,7 @@ The survival function ``a01.sf`` answers 3 and 4. ``qd`` is used to print with r
     xs = xs.prod()
     xxs = xs - 2500 * a01.density_df.loc[2500, 'S']
     lev = a01.density_df.loc[2500, 'lev']
-    xs, a01.est_m - lev, xxs, xxs/a01.est_m, a01.density_df.loc[2500, 'epd']
+    xs, a01.est_m - lev, xxs, xxs/a01.est_m, (a01.est_m - lev)/a01.est_m
 
 
 College and Exam Questions

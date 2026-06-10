@@ -2359,14 +2359,21 @@ class Aggregate:
         ``log_p``         ``np.log(p)``                          ``plot`` log scale
         ``F``             ``p.cumsum()``                         ``q``, ``var``, ``tvar``
         ``S``             ``1 - p_total.cumsum()``               ``q``, ``tvar``, ``plot``
-        ``lev``           ``S.shift(1).cumsum() * bs``           ``epd``, pricing
+        ``lev``           ``cumsum(loss·p) + loss·S``            pricing
         ``exa``           alias of ``lev``                       Portfolio API compat
-        ``exlea``         ``(lev - loss * S) / F``               pricing
-        ``e``             ``self.est_m`` (constant column)       ``epd``
-        ``epd``           ``max(0, e - lev) / e``                pricing, allocation
-        ``exgta``         ``loss + (e - exa) / S``               pricing
+        ``exlea``         ``cumsum(loss·p) / F``                 pricing
+        ``e``             ``self.est_m`` (constant column)       ``exgta``
+        ``exgta``         ``(e - cumsum(loss·p)) / S``           pricing
         ``exeqa``         ``loss`` (since ``E[X|X=a] = a``)      Portfolio API compat
         ================  =====================================  =========================
+
+        ``lev``, ``exlea`` and ``exgta`` are direct sums that carry the
+        window origin ``x0`` (numerics-2): on a windowed or signed grid
+        ``E[X ∧ a] = Σ_{x≤a} x·p + a·S(a)``, never ``cumsum(S)·bs`` (which
+        silently assumes the grid starts at 0). Ratio denominators are
+        guarded: ``exlea`` (``exgta``) is NaN where ``F`` (``S``) is at or
+        below the validation noise floor. The ``epd`` column was removed
+        at numerics-2 (no consumers; ``max(0, e - lev)/e`` if needed).
 
         Duplicated columns (``p == p_total``, ``exa == lev``, ``exeqa == loss``) are
         intentional: Portfolio's ``filter(regex='p_<name>')`` / ``exeqa_*`` /
@@ -2407,19 +2414,30 @@ class Aggregate:
             # Update 2021-01-28: S is best computed forwards
             self._density_df['S'] = 1 - self._density_df.p_total.cumsum()
 
-            # add LEV, TVaR to each threshold point...
-            self._density_df['lev'] = self._density_df.S.shift(1, fill_value=0).cumsum() * self.bs
+            # LEV and the conditional means by direct sums that carry the
+            # window origin (numerics-2): E[X∧a] = Σ_{x≤a} x·p + a·S(a),
+            # valid on windowed and signed grids where cumsum(S)·bs is not.
+            loss_v = self._density_df['loss'].to_numpy()
+            p_v = self._density_df['p_total'].to_numpy()
+            F_v = self._density_df['F'].to_numpy()
+            S_v = self._density_df['S'].to_numpy()
+            cum_xp = np.cumsum(loss_v * p_v)
+            self._density_df['lev'] = cum_xp + loss_v * S_v
             self._density_df['exa'] = self._density_df['lev']
-            self._density_df['exlea'] = \
-                (self._density_df.lev - self._density_df.loss * self._density_df.S) / self._density_df.F
+            # explicit denominator guards (F/S at or below the validation
+            # noise floor cannot support a conditional mean)
+            tol = VALIDATION_NOISE
+            with np.errstate(divide='ignore', invalid='ignore'):
+                exlea = cum_xp / F_v
+            exlea[F_v <= tol] = np.nan
+            self._density_df['exlea'] = exlea
 
-            # expected value and epd
+            # expected value
             self._density_df['e'] = self.est_m  # np.sum(self._density_df.p * self._density_df.loss)
-            self._density_df.loc[:, 'epd'] = \
-                np.maximum(0, (self._density_df.loc[:, 'e'] - self._density_df.loc[:, 'lev'])) / \
-                self._density_df.loc[:, 'e']
-            self._density_df['exgta'] = self._density_df.loss + (
-                    self._density_df.e - self._density_df.exa) / self._density_df.S
+            with np.errstate(divide='ignore', invalid='ignore'):
+                exgta = (self.est_m - cum_xp) / S_v
+            exgta[S_v <= tol] = np.nan
+            self._density_df['exgta'] = exgta
             self._density_df['exeqa'] = self._density_df.loss  # E(X | X=a) = a(!) included for symmetry was exa
 
         return self._density_df
@@ -7139,11 +7157,11 @@ class Aggregate:
         Make a dictionary of value at risks for the line, mirrors Portfolio.var_dict.
         Here is just marshals calls to the appropriate var or tvar function.
 
-        No epd. Allows the price function to run consistently with Portfolio version.
+        Allows the price function to run consistently with Portfolio version.
 
         Example Use: ::
 
-            for p, arg in zip([.996, .996, .996, .985, .01], ['var', 'lower', 'upper', 'tvar', 'epd']):
+            for p, arg in zip([.996, .996, .996, .985], ['var', 'lower', 'upper', 'tvar']):
                 print(port.var_dict(p, arg,  snap=True))
 
         :param p:

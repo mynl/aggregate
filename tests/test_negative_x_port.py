@@ -7,9 +7,11 @@ Covers ``dev/plan-negative-x-port.md`` -- the combine half of the P&L work:
   unit's ``x_min``) and a single F2 ``np.roll`` present step. The truncating
   ``ift`` of the non-negative path is replaced by a full-length ``irfft`` plus
   roll, so the wrapped negative tail is kept.
-- **density_df** ``loss`` / ``p_total`` / ``p_{line}`` / ``F`` / ``S`` correct
-  on signed support (and hence signed VaR/TVaR). Pricing columns (``add_exa``)
-  are deferred -- a signed portfolio warns and falls back to F/S only.
+- **density_df** ``loss`` / ``p_total`` / ``F`` / ``S`` correct on signed
+  support (and hence signed VaR/TVaR). Since numerics-2 the objective
+  ``add_exa`` columns are computed on signed support too (shifted-support
+  kappa); the share-based columns stay blanked and unit pmfs are read via
+  ``unit_density`` (the ``p_{line}`` total-grid columns are gone).
 - **Per-unit integrity**: units are driven on their own signed grids, so each
   unit object stays internally correct (moments, describe, plot).
 - **Instrumentation**: two-sided ``_limits`` so ``plot`` shows the negative
@@ -94,12 +96,15 @@ def test_signed_window_brackets_mass(pnl):
 # ---------------------------------------------------------------------------
 
 def test_per_line_marginals(pnl):
-    """Each ``p_{line}`` integrates to 1 and carries the right (signed) mean."""
-    df = pnl.density_df
-    assert float(df.p_A.sum()) == pytest.approx(1.0, abs=1e-9)
-    assert float(df.p_B.sum()) == pytest.approx(1.0, abs=1e-9)
-    mean_A = float((df.p_A * df.loss).sum())
-    mean_B = float((df.p_B * df.loss).sum())
+    """Each native unit pmf integrates to 1 and carries the right (signed)
+    mean (the ``p_{unit}`` total-grid columns left at numerics-2; the
+    accessor reads the unit's own window)."""
+    ser_a = pnl.unit_density('A')
+    ser_b = pnl.unit_density('B')
+    assert float(ser_a.sum()) == pytest.approx(1.0, abs=1e-9)
+    assert float(ser_b.sum()) == pytest.approx(1.0, abs=1e-9)
+    mean_A = float((ser_a * ser_a.index).sum())
+    mean_B = float((ser_b * ser_b.index).sum())
     assert mean_A == pytest.approx(250.0, abs=0.5)
     assert mean_B == pytest.approx(-250.0, abs=0.5)
     # per-line means sum to the total mean.
@@ -226,17 +231,31 @@ def test_info_reports_window(pnl):
 
 
 # ---------------------------------------------------------------------------
-# add_exa is deferred: warn + fall back to F/S only.
+# add_exa runs on signed support (numerics-2): objective columns present,
+# share-based columns blanked (kappa/x is not a recovery share).
 # ---------------------------------------------------------------------------
 
-def test_add_exa_fallback():
-    """``add_exa=True`` on a signed portfolio warns and writes F/S only."""
+def test_add_exa_signed():
+    """``add_exa=True`` on a signed portfolio writes the objective columns."""
     p = build(PNL_PROGRAM, update=False)
-    with pytest.warns(UserWarning, match='add_exa'):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
         p.update(log2=16, bs=0, add_exa=True)
-    assert 'F' in p.density_df and 'S' in p.density_df
-    # the pricing columns are NOT present.
-    assert 'exa_total' not in p.density_df
+    df = p.density_df
+    assert 'F' in df and 'S' in df and 'exa_total' in df
+    # the shifted-method key invariant. kappa divides a noise-floor-bounded
+    # FFT numerator by p_total, so the resolvable statement is
+    # probability-weighted: |Σκ − x| · p stays at the numerator dust level
+    # (the un-weighted error at a row scales like dust/p).
+    pv = df.p_total.to_numpy()
+    mat = pv > 1e-12
+    tot = df.filter(regex='exeqa_[AB]').sum(axis=1).to_numpy()[mat]
+    loss = df.loss.to_numpy()[mat]
+    weighted = np.abs(tot - loss) * pv[mat]
+    assert np.max(weighted) <= 1e-12 * np.max(np.abs(loss))
+    # share-based columns are blanked on a signed grid (steering 6)
+    assert df['exi_xgta_A'].isna().all()
+    assert df['exa_A'].isna().all()
 
 
 # ---------------------------------------------------------------------------

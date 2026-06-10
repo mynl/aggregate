@@ -99,24 +99,31 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   (#31). Includes **BUG: `.plot` draws a baseline from 0 to the first `xs`**,
   wrong for signed support *(new, 2026-06-05)*. The severity-moments and
   agg-loop pieces can split into parallel sub-tasks.
-- [ ] **N2 `[A]` Portfolio `update`.** Computation of **kappas, exa / exeqa,
-  `add_exa`** with the negative-x angle (#28 + #9). Trace
-  `Portfolio.update → add_exa` end-to-end (every column, the `shift(-1)` tail,
-  the `loss_max` blanking heuristic → wants a principled `F < k·eps` rule).
-  Audit **what `plot_twelve` actually needs** (#29) — it constrains the column
-  trim. **needs N1.**
+- [x] **N2 `[A]` Portfolio `update`.** — **done 1.0.0a56**
+  (`dev/done/plan-numerics-2-objective.md`): shifted-support kappa from
+  native unit pmfs (`ft_xp` captured at combine, prefix/suffix `ft_nots`
+  fallback); every objective column rewritten as direct sums carrying the
+  grid origin; the `loss_max`/`mult` blanking heuristic replaced by explicit
+  `F/S ≤ tol` guards; the `p_{unit}` write dropped; EPD family
+  (`add_exa_details`, `epd_*`, `Aggregate.density_df['epd']`) deleted;
+  signed (P&L) books now get the objective columns (share-based ones blanked
+  per steering 6). Step-0 audit + measured verdicts in
+  `dev/audit-numerics-2-findings.md`. `plot_twelve`'s needs audited at
+  numerics-1; the allocation panels ride with N3.
   - [x] **numerics-1 pre-step — unit-density decoupling** — **done 1.0.0a55**
     (`dev/done/plan-numerics-1-unit-density.md`): `unit_density` /
     `unit_density_df` / `aligned_unit_density_df` accessors; all display
     readers (`percentiles`, `_limits`, `plot`, pedagogy density/bivariate
-    panels) off `p_{unit}`; the only remaining readers are kappa in `add_exa`
-    (removed with the `p_{unit}` write in numerics-2) and the deferred
-    sampling/switcheroo cluster.
+    panels) off `p_{unit}`; the only remaining readers were kappa in `add_exa`
+    (removed with the `p_{unit}` write at numerics-2) and the
+    sampling/switcheroo cluster (mechanically re-sourced at numerics-2;
+    redesign still its own future plan).
 - [ ] **N3 `[A]` Portfolio apply-distortion calcs.** Which columns;
   **handling masses (currently black-magic / a cluster)**; signed /
   `value_type` distortion pricing (`dev/plan-numerics-3-distortion.md`:
   `add_exa` column audit, distortion pricing, `value_type` consumption — signed
-  books warn + fall back to F/S-only until this lands); `plot_twelve` impact;
+  books now compute the objective columns but `apply_distortion` raises
+  `NotImplementedError` until this lands); `plot_twelve` impact;
   **trim unused `density_df` columns**. **needs N2.**
 - [ ] **N4 `[A]` Bounds numerics read-through** (#30 + #10) — `bounds.py`
   (IME 2022, 513-point binary `s_grid`) end-to-end. **needs N2; prereq for N5.**

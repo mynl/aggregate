@@ -166,10 +166,12 @@ AGG_FRAMES = {
 PORT_FRAMES = {
     "stats_df": None,
     "describe": None,
-    # density_df keeps the per-line p_/exeqa_ family plus the totals.
+    # density_df keeps the exeqa_ family plus the totals. The per-line
+    # p_{unit} columns left Portfolio.density_df at numerics-2 (unit pmfs
+    # live on the Aggregates; see Portfolio.unit_density).
     # The capture script expands the regex against the actual columns.
     "density_df": {
-        "regex": r"^(loss|S|F|p_total|p_[^t]|exeqa_)",
+        "regex": r"^(loss|S|F|p_total|exeqa_)",
     },
 }
 

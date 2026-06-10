@@ -44,7 +44,7 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
      -
    * - exa_total
      - :math:`\mathsf E[\min(X,a)]=\mathsf E[X\wedge a]`
-     - Cumsum of :math:`S`
+     - Direct sum :math:`\sum_{x\le a} x p(x) + aS(a)`
      - :math:`O(n)`
    * - exlea_total
      - :math:`\mathsf E[X \mid X\le a]`
@@ -58,22 +58,20 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
      -
      -
      -
-   * - p_line
-     - Density of :math:`X_i`
-     - FFT computation of aggregate using MGF
+   * - (unit pmf)
+     - Density of :math:`X_i` on the unit's native grid
+     - FFT computation of aggregate using MGF; read via
+       ``Portfolio.unit_density`` (not a ``density_df`` column)
      -
    * - exeqa_line
      - :math:`\mathsf E[X_i \mid X=a]`
-     - Conv :math:`xf_i(x)`, :math:`f_{\hat i}`
+     - Conv :math:`xf_i(x)`, :math:`f_{\hat i}` (first moment on the
+       unit's native grid)
      - :math:`O(n\log(n))`
    * - lev_line
      - :math:`\mathsf E[\min(X_i,a)]=\mathsf E[X_i\wedge a]`
-     - Cumsum of :math:`S_i`
+     - Native capped sums :math:`\sum_{x\le a} x p_i(x) + a S_i(a)`
      - :math:`O(n)`
-   * - e2pri_line
-     - :math:`\mathsf E[X_{i,2}(a)]`
-     - Conv :math:`\mathsf E[X_i\wedge x]`, :math:`f_{\hat i}`
-     - :math:`O(n\log(n))`
    * - exlea_line
      - :math:`\mathsf E[X_i \mid X\le a]`
      - Cumsum of :math:`E(X_i \mid X=x)f_X(x)`
@@ -102,18 +100,6 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
      - :math:`\mathsf E[X_i(a)]`
      - Conditional expectation formula
      -
-   * - epd_i_line
-     - :math:`(\mathsf E[X_i]-\mathsf E[X\wedge a)]/\mathsf E[X_i]`
-     - Stand-alone Expected Policyholder Deficit
-     -
-   * - epd_i_line
-     - :math:`(\mathsf E[X_i]-\mathsf E[X_i(a)]/\mathsf E[X_i]`
-     - Equal priority EPD
-     -
-   * - epd_i_line
-     - :math:`(\mathsf E[X_i]-\mathsf E[X_{i,2}(a)]/\mathsf E[X_i]`
-     - Second priority EPD
-     -
 
 **For Total, All Lines** :math:`X`
 
@@ -122,21 +108,28 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
 -  :math:`F` and :math:`S` are computed from the cumulative sums of the
    density.
 -  exa_total :math:`=\mathsf{E}[\min(X,a)]=\mathsf{E}[X\wedge a]`, also
-   called lev_total for limited expected value, is computed as
-   cumulative sums of :math:`S` times bucket size. Note exa_total=
-   lev_total.
--  exlea\_total :math:`=\mathsf{E}[X \mid X\le a]` is computed using the relation :math:`\mathsf E[X\wedge a]=\int_0^a tf(t)dt + aS(a)` as
+   called lev_total for limited expected value, is computed as the direct
+   sum :math:`\sum_{x\le a} x p(x) + aS(a)`. The direct form carries the
+   grid origin, so it is exact on windowed and signed (P&L) grids where
+   the legacy cumulative-survival form :math:`\sum S\cdot bs` (which
+   silently integrates from 0) is not. Note exa_total= lev_total.
+-  exlea\_total :math:`=\mathsf{E}[X \mid X\le a]` is the direct ratio
 
    .. math::
 
-      \mathsf E[X \mid X\le a]=\frac{1}{F(a)} \int_0^a tf(t)dt = \frac{\mathsf{E}[X\wedge a]-aS(a)}{F(a)}.
+      \mathsf E[X \mid X\le a]=\frac{1}{F(a)} \sum_{x \le a} x p(x).
 
-   When :math:`F(a)` is very small these values are unreliable and so the first values are set equal to zero.
+   When :math:`F(a)` is at or below the validation noise floor the
+   conditional mean is unresolvable and the value is left NaN (an
+   explicit denominator guard; the legacy code blanked a heuristic
+   ``loss_max`` region instead).
 -  exgta\_total :math:`=\mathsf{E}[X\mid X > a]` is computed using the relation :math:`\mathsf{E}[X] = \mathsf{E}[X\mid X \le a]F(a) + \mathsf{E}[X\mid X > a]S(a)`. Therefore
 
    .. math::
 
-      \mathsf{E}[X\mid X > a] = \frac{\mathsf{E}[X]-\mathsf{E}[X\mid X \le a]F(a)}{/S(a)}.
+      \mathsf{E}[X\mid X > a] = \frac{\mathsf{E}[X]-\sum_{x\le a} x p(x)}{S(a)},
+
+   guarded NaN where :math:`S(a)` is at or below the noise floor.
 
 
 **For Individual Lines** :math:`X_i`
@@ -208,44 +201,21 @@ Densities are computed using FFT in :math:`O(n\log(n))` time.
    showing it is a simple weighted average of
    :math:`\mathsf{E}[X_i \mid X \le a]` and
    :math:`\mathsf{E}[X_i/X \mid X > a]`, both of which have already been
-   computed. The computation could also be carried out using
-   :math:`\mathsf{E}[X_i ; X \le a]` and
-   :math:`\mathsf{E}[X_i/X ; X > a]` which would avoid multiplying and
-   dividing by :math:`F` and :math:`S`.
--  e2pri_line :math:`=\mathsf{E}[X_{i,2}(a)]` is the recovery to
-   :math:`X_i` when it is subordinate to :math:`\hat X_i` and total
-   assets :math:`=a`. It can also be computed using FFTs. Assuming
-   independence between the lines the recovery to line :math:`i` given
-   :math:`\hat X_i` is
+   computed. The implementation uses the equivalent direct-sum form
+   :math:`\sum_{x\le a}\kappa_i(x)p(x) + a\sum_{x>a}\kappa_i(x)x^{-1}p(x)`,
+   which avoids multiplying and dividing by :math:`F` and :math:`S` and
+   carries the grid origin (exact on windowed grids). On a signed (P&L)
+   grid the ratio :math:`X_i/X` is not a recovery share, so the
+   share-based columns (``exi_x*_line`` and ``exa_line``) are left NaN
+   there; the conditional means (``exeqa/exlea/exgta``) remain valid.
 
-   .. math::
-
-      X_{i,2}(a,\hat X_i) = \max(0, \min(X_{i,2}, a-\hat X_i)) = X_{i,2} \wedge (a-\hat X_i)^+
-
-   which can be computed as
-
-   .. math::
-      \mathsf{E}[X_{i,2}(a)] &=\mathsf{E}_{\hat X_i}[\mathsf{E}[X_{i,2}(a)\mid \hat X_i]] \\
-      &=\mathsf{E}_{\hat X_i}[\mathsf{E}[X_i\wedge (a-\hat X_i)^+\mid \hat X_i]] \\
-      &= \int_0^a  \mathsf{E}[X_i\wedge (a-x)\mid \hat X_i=x) f_{\hat i}(x)dx \\
-      &= \int_0^a  \mathsf{E}[X_i\wedge (a-x)] f_{\hat i}(x)dx
-
-   showing :math:`\mathsf{E}[X_{i,2}(a)]` is the
-   convolution of the functions :math:`x\mapsto \mathsf{E}[X_i\wedge x]`
-   and :math:`f_{\hat i}`, i.e. of the limited expected values of
-   :math:`X_i` on a stand-alone basis and the density of
-   :math:`\hat X_i`.
--  epd_i_line are the expected policyholder deficits of line with assets
-   :math:`a`. When :math:`i=1` the computation is for the standalone
-   line, when :math:`i=1` for the line with equal priority and when
-   :math:`i=2` for the line with second priority relative to all other
-   lines. The calculation are all simple
-
-   .. math::
-
-      \text{epd}_{0}(X_i, a)  &= \frac{\mathsf{E}[X_i] - \mathsf{E}[X_i\wedge a]}{\mathsf{E}[X_i]} \\
-      \text{epd}_{1}(X_i, a)  &= \frac{\mathsf{E}[X_i] - \mathsf{E}[X_i(a)]}{\mathsf{E}[X_i]} \\
-      \text{epd}_{2}(X_i, a)  &= \frac{\mathsf{E}[X_i] - \mathsf{E}[X_{i,2}(a)]}{\mathsf{E}[X_i]}
+.. note::
+   The second-priority recovery (``e2pri_line``) and expected
+   policyholder deficit (``epd_*``) columns were removed in the 1.0
+   numerics rationalization -- they had no remaining consumers. The
+   stand-alone EPD is the one-liner ``(e_line - lev_line) / e_line``
+   from the surviving columns, and the equal-priority version is
+   ``(e_line - exa_line) / e_line``.
 
 The upshot of these calculations is that all the required values, for
 all levels of capital :math:`a` can be computed in time

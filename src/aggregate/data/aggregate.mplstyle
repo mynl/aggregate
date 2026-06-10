@@ -1,44 +1,61 @@
-# aggregate house style - color, screen/PDF rendering
-# Source of truth used by docs build and aggregate.apiweb.
+# aggregate house style — screen/PDF rendering, aligned to the apiweb SPA.
+#
+# Palette and type mirror web/src/styles/site.css: blue #0d6efd primary on a
+# white ground, muted #6c757d text, light #dee2e6 grid, system sans UI font.
+# Replaces the old serif-on-blue look. The previous style is preserved beside
+# this file as aggregate.mplstyle.original (and in git) for easy comparison.
+# Colors are 6-digit hex without the leading '#', per matplotlib style files.
 
 # --- fonts ---
-font.size:           9
-font.family:         serif
-font.serif:          STIX Two Text, Times New Roman, DejaVu Serif
-font.sans-serif:     Myriad Pro, Segoe UI, DejaVu Sans
-font.monospace:      Ubuntu Mono, Cascadia Mono, DejaVu Sans Mono
-mathtext.fontset:    stixsans
+font.size:           8.5
+font.family:         sans-serif
+font.sans-serif:     Segoe UI, Helvetica Neue, Arial, DejaVu Sans
+font.monospace:      Cascadia Mono, SFMono-Regular, Consolas, DejaVu Sans Mono
+mathtext.fontset:    dejavusans
+
+# --- color cycle (site-harmonized: blue primary, then complements) ---
+axes.prop_cycle: cycler('color', ['0d6efd', 'a81313', '198754', 'b54708', '6f42c1', '0aa2c0', 'd63384', '6c757d'])
+
+# --- text / label colors ---
+text.color:          212529
+axes.labelcolor:     212529
+axes.titlecolor:     212529
+axes.titlesize:      medium
+axes.titleweight:    semibold
+axes.labelsize:      small
 
 # --- legend ---
 legend.fontsize:     x-small
-legend.facecolor:    lightsteelblue
-legend.edgecolor:    lightsteelblue
+legend.facecolor:    white
+legend.edgecolor:    dee2e6
+legend.framealpha:   0.9
 legend.frameon:      True
 
 # --- axes / figure background ---
-axes.facecolor:      lightsteelblue
-figure.facecolor:    aliceblue
-axes.edgecolor:      black
-axes.linewidth:      0.6
+axes.facecolor:      white
+figure.facecolor:    white
+axes.edgecolor:      adb5bd
+axes.linewidth:      0.8
+axes.axisbelow:      True
 axes.grid:           True
-grid.color:          white
-grid.linewidth:      0.25
-grid.alpha:          0.8
+grid.color:          dee2e6
+grid.linewidth:      0.6
+grid.alpha:          1.0
 
-# --- figure sizing & resolution (docs canonical; apiweb overrides at render time) ---
+# --- figure sizing & resolution (apiweb overrides dpi at render time) ---
 figure.figsize:      3.5, 2.45
-figure.dpi:          300
+figure.dpi:          144
 figure.constrained_layout.use: True
 
 # --- savefig ---
 savefig.dpi:         300
 savefig.bbox:        tight
 savefig.pad_inches:  0.05
-savefig.facecolor:   auto
+savefig.facecolor:   white
 savefig.transparent: False
 
 # --- lines ---
-lines.linewidth:     1.2
+lines.linewidth:     1.4
 lines.markersize:    4
 
 # --- ticks ---
@@ -46,3 +63,5 @@ xtick.direction:     out
 ytick.direction:     out
 xtick.labelsize:     small
 ytick.labelsize:     small
+xtick.color:         6c757d
+ytick.color:         6c757d

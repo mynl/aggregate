@@ -424,3 +424,18 @@ port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gam
 # dev/done/plan-numerics-1-unit-density.md.
 port UD.Plain    agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson    note{zero-origin book; aligned grid=total legacy parity}
 port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims ssev 1 * norm - 100 poisson note{disjoint unit windows near +/-10000}
+
+
+# N2. Objective spine (numerics-2)
+# ================================
+# Programs behind tests/test_numerics2_objective.py (1.0.0a56): shifted-
+# support kappa (exeqa_*) and the direct-sum objective columns on signed /
+# zero-spectrum / legacy books, plus the Aggregate-side direct sums. See
+# dev/done/plan-numerics-2-objective.md.
+port N2.SignedD  agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed discrete; exact brute-force kappa incl negative origins}
+port N2.ZeroSpec agg S dfreq [1] dsev [-1 1] agg T dfreq [1] dsev [1 2] agg U dfreq [1 2] dsev [2 3]              note{symmetric line zeroes FFT bins; prefix/suffix ft_nots branch}
+port N2.Legacy   agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6 .4]                              note{zero-origin book; sum exa_i == exa_total; F/S guards}
+port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4]                               note{base for the hand-built positive-origin add_exa frame}
+port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0}
+agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5}
+pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]                                                                 note{signed Aggregate direct sums carry the origin}

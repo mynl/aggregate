@@ -1311,7 +1311,8 @@ Here are some :math:`\kappa` values and graph for ``p07``. Looking the log densi
     bit.plot(xlim=lm, ylim=lm, ax=ax0); \
     ax0.set(title=r'$E[X_i\mid X]$', aspect='equal'); \
     ax0.axhline(bit['B'].max(), lw=.5, c='C7');
-    p07.density_df.filter(regex='p_[ABCt]').rename(
+    pd.concat([p07.density_df.p_total] +
+        [p07.unit_density(u) for u in p07.unit_names], axis=1).rename(
         columns=lambda x: x.replace('p_', '')).plot(ax=ax1, xlim=lm, logy=True);
     @savefig 10mins_exa.png scale=20
     ax1.set(title='Log density');

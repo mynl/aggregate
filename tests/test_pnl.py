@@ -168,9 +168,10 @@ def test_portfolio_of_pnl_combines():
     assert d.p_total.sum() == pytest.approx(1.0, abs=1e-5)
     mean = float((d.loss * d.p_total).sum())
     assert mean == pytest.approx(2 * 200.0, rel=TOL, abs=2.0)
-    # per-line means
+    # per-line means from the native unit pmfs (numerics-2)
     for u in ('A', 'B'):
-        mu = float((d.loss * d[f'p_{u}']).sum())
+        ser = port.unit_density(u)
+        mu = float((ser.index * ser).sum())
         assert mu == pytest.approx(200.0, rel=TOL, abs=1.0)
     # variances add under independence: sd_total = sqrt(2) * unit sd
     var = float((d.loss ** 2 * d.p_total).sum()) - mean ** 2
@@ -251,6 +252,6 @@ def test_signed_pnl_unit_in_portfolio_conserves_mass():
             pnl S 5 premium - dfreq[3] dsev[-1 1]
             pnl T 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
         ''', bs=1)
-    d = port.density_df
-    # the signed-loss unit's own marginal is intact (no +/-2**15 garbage, full mass)
-    assert d['p_S'].sum() == pytest.approx(1.0, abs=1e-6)
+    # the signed-loss unit's own marginal is intact (no +/-2**15 garbage,
+    # full mass); read off the unit's native window (numerics-2)
+    assert port.unit_density('S').sum() == pytest.approx(1.0, abs=1e-6)

@@ -152,15 +152,19 @@ def test_disjoint_windows(disjoint):
 # ---------------------------------------------------------------------------
 
 def test_aligned_total_legacy_parity(plain):
-    """Zero-origin book: grid='total' reproduces the p_{unit} columns exactly."""
+    """Zero-origin book: grid='total' reproduces each native unit pmf
+    exactly (the legacy ``p_{unit}`` columns themselves left
+    ``density_df`` at numerics-2; on a zero-origin book the unit grid is
+    the total grid, so the aligned view IS the old column)."""
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         aligned = plain.aligned_unit_density_df(grid='total')
     assert np.array_equal(aligned.index.to_numpy(),
                           plain.density_df.index.to_numpy())
     for u in plain.line_names:
+        assert f'p_{u}' not in plain.density_df.columns
         assert np.array_equal(aligned[f'p_{u}'].to_numpy(),
-                              plain.density_df[f'p_{u}'].to_numpy())
+                              plain.unit_density(u).to_numpy())
 
 
 def test_aligned_union_and_zero(plain):
@@ -213,10 +217,13 @@ def test_aligned_bs_mismatch_raises(plain):
 
 @pytest.fixture()
 def stripped():
-    """A fresh portfolio with the legacy p_{unit} columns removed."""
+    """A fresh portfolio. The legacy p_{unit} columns no longer exist
+    (numerics-2), so this is just a plain build; the fixture name is kept
+    to document what these tests guard: display readers must not need
+    unit pmfs on the total frame."""
     port = build(PLAIN_PROGRAM)
-    port.density_df = port.density_df.drop(
-        columns=[f'p_{u}' for u in port.line_names])
+    assert not [c for c in port.density_df.columns
+                if c in (f'p_{u}' for u in port.line_names)]
     return port
 
 
@@ -256,8 +263,7 @@ def test_plot_twelve_off_p_unit():
     port = build(PLAIN_PROGRAM)
     d = Distortion('ph', 0.6)
     port.apply_distortion(d, efficient=False)
-    port.density_df = port.density_df.drop(
-        columns=[f'p_{u}' for u in port.line_names])
+    assert f'p_{port.line_names[0]}' not in port.density_df.columns
     fig, axs = plt.subplots(4, 3, figsize=(12, 16))
     plot_twelve(port, fig, axs, d)
     plt.close('all')

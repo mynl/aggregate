@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.0.0a56
+
+### Numerics-2 — objective spine (shifted-support kappa + direct sums)
+
+Second plan of the numerics program
+(`dev/done/plan-numerics-2-objective.md`). `Portfolio.add_exa` and the
+Aggregate objective columns rewritten on the exact-discrete, origin-carrying
+footing; signed (P&L) books now get the objective allocation columns. Step-0
+audit with measured verdicts in `dev/audit-numerics-2-findings.md`.
+
+- **Shifted-support kappa.** `exeqa_{line}` is computed from each unit's
+  **native** pmf: the first-moment density `x·p_i(x)` is built from true
+  physical values and scattered into the physical-zero FFT buffer
+  (first moments, unlike probabilities, cannot be recovered from a rolled
+  vector), then `ift(ft_xp_i · ft_not_i) / p_total`, relabelled onto the
+  output window by the same roll as the combine. Exact on negative and
+  nonzero origins (brute-force-convolution tested). Per-unit FT state is
+  transient within `update` (D6) — only scalars and native pmfs persist.
+- **`ft_nots` single owner.** Per-line "not-line" FT products live in one
+  helper: spectral division when the line's spectrum has no exact zero bins
+  (measured per-bin well-conditioned even on underflowed spectra),
+  prefix/suffix partial products otherwise — `O(m·M)`, replacing the legacy
+  `O(m²·M)` rebuild.
+- **Direct sums carrying the origin.** `exa_total/lev_total` =
+  `Σ_{x≤a} x·p + a·S(a)`; `exlea/exgta/exi_xlea/exi_xgta/exa_{line}` from
+  forward/reverse direct sums of `kappa·p_total`; Aggregate `lev/exa/exlea/
+  exgta` likewise. `cumsum(S)·bs` and the `loss_max` / `mult ∈ {1,10,100}`
+  blanking heuristic are gone; ratio denominators carry explicit
+  `F/S ≤ validation-noise` guards (NaN where the conditioning event is
+  unresolvable; previously unguarded division could emit `-inf`).
+- **Stand-alone unit quantities from native pmfs.** `lev_{line}` is the
+  exact capped native sum `Σ_{x≤a} x·p_i + a·(1−F_i(a))` and `e_{line}` the
+  native mean — valid whether or not the unit window overlaps the total
+  window.
+- **Signed (P&L) books**: `update(add_exa=True)` now computes the objective
+  columns (the warn + F/S-only fallback is removed). The equal-priority
+  share `kappa/x` is not a recovery share on a signed grid (steering 6), so
+  `exi_x*_{line}` and `exa_{line}` are NaN there; `apply_distortion` /
+  pricing on signed books raises `NotImplementedError` until numerics-3.
+- **Breaking: `p_{unit}` columns removed from `Portfolio.density_df`**
+  (both combine paths). Unit pmfs live on the Aggregates — read them via
+  `unit_density` / `unit_density_df` / `aligned_unit_density_df`
+  (numerics-1). The sampling/switcheroo cluster (`sample`,
+  `add_exa_sample`, `swap_density_df`, `make_awkward`) is mechanically
+  re-sourced onto the accessors (redesign deferred to its own plan);
+  `swap_density_df` still accepts a user `p_{line}` frame.
+- **Breaking: EPD family removed** — `add_exa_details` (`epd_0_*`,
+  `epd_1_*`, `e1xi_1gta_*`), and `Aggregate.density_df['epd']` (no
+  consumers). Stand-alone EPD is the one-liner `(e − lev) / e`.
+- **`add_exa` signature changed**: takes the per-unit native state
+  (`{name: dict(xs, p, ft_p)}`) instead of pre-built `ft_nots`. The
+  `Portfolio.ft` / `Portfolio.ift` padding-bound wrappers (only used by the
+  old `add_exa`) are removed — use `aggregate.utilities.ft/ift` directly.
+- Regression: key columns byte-stable (baseline harness; recaptured for the
+  removed `p_{unit}` columns and the ≤2.8e-12 Aggregate `lev` drift);
+  derived columns gated by new pre-change spot-checks
+  (`tests/test_baseline_spotchecks.py`, measured drift ≤7.5e-12 on the
+  `(e−cum)/S` cancellation, ≤2.5e-14 elsewhere). New invariant suite
+  `tests/test_numerics2_objective.py` (Σκ(x)=x, Σ exa_i = exa_total,
+  brute-force kappa incl. negative/positive origins, zero-spectrum
+  prefix/suffix, native lev, signed exeqa vs Monte Carlo). Docs updated in
+  lockstep (`5_x_portfolio_calculations.rst`, quantiles, student guide,
+  10mins, samples); doc build pending.
+
 ## 1.0.0a55
 
 ### Numerics-1 — unit-density decoupling

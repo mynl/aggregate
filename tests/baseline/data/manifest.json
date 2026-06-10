@@ -1,12 +1,12 @@
 {
   "env": {
-    "aggregate": "1.0.0a27",
+    "aggregate": "1.0.0a55",
     "numpy": "2.4.5",
     "scipy": "1.17.1",
     "pandas": "3.0.3",
     "python": "3.14.3"
   },
-  "commit": "a2d3f7a1189f37967956c62888a837de39e743f7",
+  "commit": "50f1d0a1dd5430667e9e495d3bd89517485f2a1a",
   "tolerance": {
     "rtol": 1e-12,
     "atol": 1e-14

@@ -443,9 +443,16 @@ class Portfolio(object):
         # want all probs to be positive
         probs = np.maximum(0, probs.fillna(0.0))
 
-        # working copy of self's density_df with relevant columns
+        # working copy of self's density_df with relevant columns, plus the
+        # unit pmfs scattered back onto the total grid for the stand-alone
+        # lev calc below. Sample grids are zero-origin, so the aligned view
+        # is exact; sampling semantics on a windowed/signed book are
+        # deferred to the sampling redesign plan (numerics-2 deliverable 4
+        # keeps this path mechanically working only).
         df = self.density_df.filter(
-            regex=f'^(loss|(p|e)_({self.line_name_pipe})|(e|p)_total)$').copy()
+            regex=f'^(loss|e_({self.line_name_pipe})|(e|p)_total)$').copy()
+        df = df.join(self.aligned_unit_density_df(grid='total',
+                                                  allow_window_mismatch=True))
 
         # want every value in sample_in.total to be in the index of df
         # this code verifies that has occurred
@@ -2027,10 +2034,8 @@ class Portfolio(object):
         :param discretization_calc:  survival or distribution (accurate on right or left tails)
         :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
         :param padding: for fft 1 = double, 2 = quadruple
-        :param epds: epd points for priority analysis; if None-> sensible defaults
         :param trim_df: remove unnecessary columns from density_df before returning
-        :param add_exa: run add_exa to append additional allocation information needed for pricing; if add_exa also add
-            epd info
+        :param add_exa: run add_exa to append the objective allocation columns needed for pricing
         :param force_severity: force computation of severities for aggregate components even when approximating
         :param bucket_sizing_p: percentile to use for bucket recommendation.
         :param debug: if True, print debug information
@@ -2080,7 +2085,13 @@ class Portfolio(object):
         self._reins_stats_df = None
         self._reins_describe = None
 
-        ft_line_density = {}
+        # Per-unit state for the kappa construction in ``add_exa``: the
+        # unit's native grid / pmf plus the padded FT of its pmf. Captured
+        # at combine time (it cannot be reconstructed after rebasing) and
+        # **transient within this call** — freed before ``update`` returns
+        # (meta D6); only scalars (``agg.x_min``) and the native pmfs
+        # persist, on the Aggregate objects themselves.
+        unit_state = {}
 
         # Build the grid and the per-line densities, accumulating their
         # product in Fourier space to get ``p_total``.
@@ -2102,7 +2113,13 @@ class Portfolio(object):
                            discretization_calc=discretization_calc,
                            normalize=normalize, force_severity=force_severity,
                            x_min='auto', bucket_sizing_p=bucket_sizing_p, debug=debug)
-                ft_line_density[agg.name] = agg.ftagg_density
+                # de-fuzz the native pmf when requested — same convention
+                # as the de-fuzzed density_df the kappa numerator used to
+                # read (the first-moment weighting amplifies far-tail dust)
+                p_unit = (remove_fuzz_util(agg.agg_density)
+                          if self._remove_fuzz else agg.agg_density)
+                unit_state[agg.name] = dict(
+                    xs=agg.xs, p=p_unit, ft_p=agg.ftagg_density)
                 x_mins.append(agg.x_min)
                 if ft_all is None:
                     ft_all = np.copy(agg.ftagg_density)
@@ -2125,16 +2142,9 @@ class Portfolio(object):
             # wrapped to the top); the truncating ``ift(., padding)`` used on
             # the non-signed path would silently drop that wrapped tail.
             self.density_df['p_total'] = np.roll(ift(ft_all, 0), -j0_tot)[:N]
-            # LEGACY: rolled unit-pmf presentation on the total grid; read
-            # only by kappa (add_exa) and the sampling cluster. Display
-            # readers use the unit_density accessors; the write is dropped
-            # in dev/plan-numerics-2-objective.md.
-            for agg in self.agg_list:
-                self.density_df[f'p_{agg.name}'] = np.roll(
-                    ift(agg.ftagg_density, 0), -j0_tot)[:N]
             self._signed_window = (x_min_tot, x_min_tot + N * self.bs)
         else:
-            # ---- non-signed path (unchanged, byte-for-byte) ---------------
+            # ---- non-signed path (combine unchanged, byte-for-byte) -------
             # Use self.bs (resolved above): build_many now passes bs through
             # as 0 => auto, so the grid must read the resolved bucket, not the
             # raw parameter.
@@ -2144,54 +2154,33 @@ class Portfolio(object):
             self.density_df['loss'] = xs
             ft_all = None
             for agg in self.agg_list:
-                raw_nm = agg.name
                 agg.update_work(xs, self.padding, sev_calc, discretization_calc,
                                 normalize, force_severity, debug=debug)
-                ft_line_density[raw_nm] = agg.ftagg_density
-                # LEGACY: kept for kappa (add_exa) and the sampling cluster
-                # only; display readers use the unit_density accessors. The
-                # write is dropped in dev/plan-numerics-2-objective.md.
-                self.density_df[f'p_{raw_nm}'] = agg.agg_density
+                # de-fuzz as for the signed path above (legacy parity: the
+                # kappa numerator read the de-fuzzed p_{unit} columns)
+                p_unit = (remove_fuzz_util(agg.agg_density)
+                          if self._remove_fuzz else agg.agg_density)
+                unit_state[agg.name] = dict(
+                    xs=xs, p=p_unit, ft_p=agg.ftagg_density)
                 if ft_all is None:
-                    ft_all = np.copy(ft_line_density[raw_nm])
+                    ft_all = np.copy(agg.ftagg_density)
                 else:
-                    ft_all *= ft_line_density[raw_nm]
+                    ft_all *= agg.ftagg_density
             self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
-
-        # ``ft_nots[i]`` = FFT of the sum of all lines except ``i`` —
-        # needed for ``exeqa_{i}`` in ``add_exa``. The direct division
-        # path is faster but unsafe if any FFT bin is exactly zero
-        # (symmetric distributions); fall back to building the product.
-        # Skipped for signed books -- ``ft_nots`` is consumed only by
-        # ``add_exa``, which is deferred to the pricing iteration (plan 3.3).
-        ft_nots = {}
-        if not signed:
-            for line in self.line_names:
-                ft_not = np.ones_like(ft_all)
-                if np.any(ft_line_density[line] == 0):
-                    for not_line in self.line_names:
-                        if not_line != line:
-                            ft_not *= ft_line_density[not_line]
-                elif len(self.line_names) > 1:
-                    ft_not = ft_all / ft_line_density[line]
-                ft_nots[line] = ft_not
 
         self.remove_fuzz(log='update')
 
-        # add exa details
-        if add_exa and not signed:
-            self.add_exa(self.density_df, ft_nots=ft_nots)
+        # Objective allocation columns (kappa + direct sums) — now valid on
+        # signed (P&L) windows too (the shifted-support kappa carries unit
+        # origins; share-based columns are blanked per steering 6).
+        if add_exa:
+            self.add_exa(self.density_df, unit_state)
         else:
             # at least want F and S to get quantile functions
-            if add_exa and signed:
-                # Pricing/allocation columns assume a loss>=0 axis; defer to
-                # the pricing iteration rather than emit wrong numbers.
-                warnings.warn(
-                    'pricing/allocation columns (add_exa) are not yet '
-                    'available on signed (P&L) support; writing F/S only. '
-                    'See dev/plan-numerics-2-objective.md.', stacklevel=2)
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
+        # D6: the padded FT state is transient — drop it before returning.
+        del unit_state, ft_all
 
         # Mass-conservation check on the signed grid: a window narrower than
         # the summed support shows up as a deficit (the wrapped tail would be
@@ -2482,8 +2471,6 @@ class Portfolio(object):
         """
         Trim out unwanted columns from density_df
 
-        epd used in graphics
-
         :return:
         """
         self.density_df = self.density_df.drop(
@@ -2592,9 +2579,9 @@ class Portfolio(object):
     # ================================================================
     # Unit (native-grid) density accessors -- numerics-1.
     # Unit pmfs live on each Aggregate's own grid; these are the only
-    # supported ways to read them from the Portfolio. The legacy
-    # ``density_df['p_{unit}']`` columns are scheduled for removal
-    # (dev/plan-numerics-2-objective.md).
+    # ways to read them from the Portfolio. The legacy
+    # ``density_df['p_{unit}']`` columns were removed at numerics-2
+    # (dev/done/plan-numerics-2-objective.md).
     # ================================================================
 
     def unit_density(self, unit, view='agg'):
@@ -2603,8 +2590,9 @@ class Portfolio(object):
         The unit's pmf lives on the unit's **own** loss grid (which on a
         windowed or signed book differs from the portfolio total grid).
         This accessor is the supported source for per-unit densities; the
-        legacy ``density_df['p_{unit}']`` columns are a total-grid
-        presentation and are scheduled for removal.
+        legacy ``density_df['p_{unit}']`` total-grid columns were removed
+        at numerics-2 (use :meth:`aligned_unit_density_df` for an
+        explicitly-labelled total-grid display view).
 
         Parameters
         ----------
@@ -2810,15 +2798,66 @@ class Portfolio(object):
                             figsize=(10, 10), diagonal='kde', **kwargs)
         return ax
 
-    def add_exa(self, df, ft_nots):
-        r"""Add the conditional-expectation columns to ``df``.
+    @staticmethod
+    def _ft_nots(ft_lines):
+        """Per-line "everything except this line" FT products.
 
-        Per-line and total: ``exeqa_*`` = ``E[X_i | X=a]``, ``exlea_*`` =
-        ``E[X_i | X≤a]``, ``exgta_*`` = ``E[X_i | X>a]``, ``exi_x_*`` =
-        ``E[X_i / X | X=a]``, ``exi_xlea_*`` / ``exi_xgta_*`` =
-        conditional-share variants, ``e_*`` = unconditional mean,
-        ``lev_*`` = ``E[X_i ∧ a]``, ``exa_*`` = portfolio-allocated
-        expected loss to line ``i``. Also writes ``F``, ``S``,
+        ``ft_lines`` maps line name to the (padded) rfft of that line's
+        pmf laid into the physical-zero FFT buffer. Returns
+        ``(ft_all, ft_nots)`` where ``ft_all`` is the product over all
+        lines and ``ft_nots[i]`` is the product over ``j != i``.
+
+        Spectral division ``ft_all / ft_i`` is the fast path and is
+        per-bin well-conditioned — ``(a·b)/a = b·(1+O(eps))`` — even on
+        deeply underflowed spectra (the Step-0 audit measured division
+        and prefix/suffix both at ~2e-9 against an untrimmed brute-force
+        reference on tight thin-CV units). It fails only on **exactly
+        zero** bins (symmetric severities zero bins exactly): those lines
+        use prefix/suffix partial products instead — ``O(m·M)`` total,
+        no division, replacing the legacy ``O(m²·M)`` rebuild.
+
+        Single owner of this construction, shared by ``add_exa`` callers
+        (``update`` via ``add_exa`` and :func:`swap_density_df`).
+        """
+        names = list(ft_lines)
+        ft_all = None
+        for nm in names:
+            ft_all = (np.copy(ft_lines[nm]) if ft_all is None
+                      else ft_all * ft_lines[nm])
+        nots = {}
+        if len(names) == 1:
+            nots[names[0]] = np.ones_like(ft_all)
+            return ft_all, nots
+        prefix = suffix = None
+        for i, nm in enumerate(names):
+            f = ft_lines[nm]
+            if not np.any(f == 0):
+                nots[nm] = ft_all / f
+                continue
+            if prefix is None:
+                # prefix[i] = prod(arrs[:i]), suffix[i] = prod(arrs[i:])
+                arrs = [ft_lines[n2] for n2 in names]
+                m = len(arrs)
+                prefix = [np.ones_like(ft_all)]
+                for k in range(m - 1):
+                    prefix.append(prefix[-1] * arrs[k])
+                suffix = [None] * (m + 1)
+                suffix[m] = np.ones_like(ft_all)
+                for k in range(m - 1, -1, -1):
+                    suffix[k] = suffix[k + 1] * arrs[k]
+            nots[nm] = prefix[i] * suffix[i + 1]
+        return ft_all, nots
+
+    def add_exa(self, df, unit_state):
+        r"""Add the objective (conditional-expectation) allocation columns to ``df``.
+
+        Per-line and total: ``exeqa_*`` = ``E[X_i | X=a]`` (kappa),
+        ``exlea_*`` = ``E[X_i | X≤a]``, ``exgta_*`` = ``E[X_i | X>a]``,
+        ``exi_x_*`` = ``E[X_i / X]``, ``exi_xlea_*`` / ``exi_xgta_*`` /
+        ``exi_xeqa_*`` = conditional-share variants (``exi_xgta`` is
+        alpha, the objective tail share), ``e_*`` = unconditional mean,
+        ``lev_*`` = stand-alone ``E[X_i ∧ a]``, ``exa_*`` = equal-priority
+        expected loss allocated to line ``i``. Also writes ``F``, ``S``,
         ``exa_total``, ``lev_total``.
 
         Names with a leading ``t`` clash with the ``total`` regex
@@ -2827,145 +2866,187 @@ class Portfolio(object):
         Parameters
         ----------
         df : pandas.DataFrame
-            Frame to extend in place. ``update`` passes
-            ``self.density_df``; ``gradient`` and ``swap_density_df``
-            pass their own frames.
-        ft_nots : dict[str, np.ndarray]
-            FFTs of the "not-line" densities, one per line — used by
-            ``exeqa_{line} = ift(ft(loss · p_i) · ft_nots[i]) / p_total``.
-            Always pre-computed by the caller.
+            Frame to extend in place, carrying ``loss`` (the total output
+            grid, any snapped origin — zero, positive or negative) and
+            ``p_total``. ``update`` passes ``self.density_df``;
+            :func:`swap_density_df` passes its own frame.
+        unit_state : dict[str, dict]
+            Per-line native-grid state captured at combine time (transient
+            — the caller frees it after this returns): ``xs`` the unit's
+            native loss grid, ``p`` the unit's pmf on it, and ``ft_p`` the
+            (padded) rfft of the pmf laid into the physical-zero FFT
+            buffer (``Aggregate.ftagg_density`` on the update path).
+
+        Notes
+        -----
+        Kappa uses the shifted-support method
+        (``dev/../math/docs/shifted-calc-method.md``): the numerator is
+        ``ift(ft_xp_i · ft_not_i)`` where ``ft_xp_i`` is the FFT of the
+        **native first-moment density** ``x · p_i(x)`` scattered into the
+        same physical-zero buffer convention as ``ft_p`` — first moments,
+        unlike probabilities, cannot be recovered from a rolled vector,
+        so they are built from the true physical values. The result is
+        relabelled onto the output window by the same single roll the
+        combine applies to ``p_total``.
+
+        All cumulative columns are **direct sums that carry the origin**
+        (``E[X∧a] = Σ_{x≤a} x·p + a·S(a)``, etc.) — never
+        ``cumsum(S)·bs``, which silently assumes the grid starts at 0.
+        Ratio denominators carry explicit guards (``F``/``S`` at or below
+        the validation noise floor blank the row) replacing the legacy
+        ``loss_max`` / ``mult ∈ {1,10,100}`` blanking heuristic.
+
+        On a signed (P&L) grid the equal-priority share ``kappa/x`` is
+        not a recovery share, so the share-based columns (``exi_x*_*``,
+        ``exa_{line}``) are left NaN rather than divided through zero;
+        the conditional means (``exeqa/exlea/exgta``), ``lev_*`` and the
+        total columns are valid on any signed window.
         """
         cut_eps = np.finfo(float).eps
+        # Explicit denominator guard (meta steering 1): F or S at or below
+        # the validation noise floor cannot support a conditional mean.
+        tol = VALIDATION_NOISE
         bs = self.bs
+        n_out = len(df)
+        loss = df['loss'].to_numpy()
+        origin = float(loss[0])
+        j0 = int(round(origin / bs))
+        signed = origin < 0
 
-        if not np.all(df.p_total >= 0):
-            n_neg = (df.p_total < -cut_eps).sum()
+        p_total = df['p_total'].to_numpy()
+        if not np.all(p_total >= 0):
+            n_neg = int((p_total < -cut_eps).sum())
             logger.warning(f'p_total has {n_neg} negative values; NOT setting to zero...')
-        sum_p_total = df.p_total.sum()
+        sum_p_total = p_total.sum()
         logger.info(f'{self.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')
-        df['F'] = np.cumsum(df.p_total)
+        df['F'] = np.cumsum(p_total)
         df['S'] = 1 - df.F
+        F = df['F'].to_numpy()
+        S = df['S'].to_numpy()
+        F_small = F <= tol
+        S_small = S <= tol
 
         logger.info(
             f'Portfolio.add_exa | {self.name}: S <= 0 values has length {len(np.argwhere((df.S <= 0).to_numpy()))}')
 
-        df['exa_total'] = df.S.shift(1, fill_value=0).cumsum() * self.bs
+        # total columns by direct sums carrying the origin
+        cum_x = np.cumsum(loss * p_total)
+        e_total = np.sum(loss * p_total)
+        df['exa_total'] = cum_x + loss * S
         df['lev_total'] = df['exa_total']
+        with np.errstate(divide='ignore', invalid='ignore'):
+            exlea_total = cum_x / F
+            exgta_total = (e_total - cum_x) / S
+        exlea_total[F_small] = np.nan
+        exgta_total[S_small] = np.nan
+        df['exlea_total'] = exlea_total
+        df['e_total'] = e_total
+        df['exgta_total'] = exgta_total
+        df['exeqa_total'] = loss  # E[X | X=a] = a
 
-        # exlea_total = (E[X∧a] - a·S(a)) / F(a)
-        df['exlea_total'] = (df.exa_total - df.loss * df.S) / df.F
-        # Blank ``exlea_total`` where ``exlea > loss`` (numerical noise
-        # at the small-F end of the grid), plus a small ``mult·bs``
-        # safety buffer that scales with grid size. The bucketing
-        # ``mult ∈ {1, 10, 100}`` is a heuristic carried over from
-        # earlier code; replacement with a principled ``F < k·eps``
-        # rule is tracked separately.
-        n_ = df.shape[0]
-        if n_ < 1100:
-            mult = 1
-        elif n_ < 15000:
-            mult = 10
-        else:
-            mult = 100
-        loss_max = df[['loss', 'exlea_total']].query(' exlea_total>loss ').loss.max()
-        if np.isnan(loss_max):
-            loss_max = 0
-        else:
-            loss_max += mult * bs
-        df.loc[0:loss_max, 'exlea_total'] = np.nan
-
-        df['e_total'] = np.sum(df.p_total * df.loss)
-        df['exgta_total'] = df.loss + (df.e_total - df.exa_total) / df.S
-        df['exeqa_total'] = df.loss  # E[X | X=a] = a
-
-        Seq0 = (df.S == 0)
+        # kappa numerators: not-line FT products plus the native
+        # first-moment FTs, all in the physical-zero buffer convention
+        # (transient — freed with unit_state when the caller returns).
+        ft_all, ft_nots = self._ft_nots(
+            {nm: st['ft_p'] for nm, st in unit_state.items()})
+        m_buf = 2 * (len(ft_all) - 1)
 
         for col in self.line_names:
-            # exeqa_{line} via FFT: E[X_i | X=a] = E[X_i 1_{X=a}] / P(X=a)
-            # = ift( ft(loss · p_i) · ft_nots[i] ) / p_total
-            df[f'exeqa_{col}'] = (
-                np.real(self.ift(self.ft(df.loss * df[f'p_{col}']) *
-                                 ft_nots[col])) / df.p_total)
+            st = unit_state[col]
+            xs_n = np.asarray(st['xs'], dtype=float)
+            p_n = np.asarray(st['p'], dtype=float)
+
+            # exeqa_{line} = E[X_i | X=a] = ift(ft_xp_i · ft_not_i) / p_total,
+            # ft_xp_i from the native physical values (shifted-support method);
+            # rebased onto the output window by the same roll as p_total.
+            # j_native: signed bucket numbers; the % m_buf wrap places
+            # negative-x mass at the top of the FFT buffer (same
+            # convention as the signed combine).
+            j_native = np.round(xs_n / bs).astype(np.int64)
+            buf = np.zeros(m_buf)
+            buf[j_native % m_buf] = xs_n * p_n
+            num = ift(ft(buf, 0) * ft_nots[col], 0)
+            if j0:
+                num = np.roll(num, -j0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                kappa = np.real(num[:n_out]) / p_total
             # p_total ≈ 0 ⇒ exeqa is unreliable; zero it.
-            df.loc[df.p_total < cut_eps, f'exeqa_{col}'] = 0
+            kappa[p_total < cut_eps] = 0.0
+            df[f'exeqa_{col}'] = kappa
 
-            stemp = 1 - df[f'p_{col}'].cumsum()
-            df[f'lev_{col}'] = stemp.shift(1, fill_value=0).cumsum() * self.bs
+            # stand-alone lev_{col} = E[X_i ∧ a] from the native unit pmf:
+            # cum_xp[i(a)] + a·(1 − cum_p[i(a)]), valid whether or not the
+            # unit window overlaps the total window (a below the window
+            # gives a; deficit mass stays in the tail term).
+            cum_p_n = np.cumsum(p_n)
+            cum_xp_n = np.cumsum(xs_n * p_n)
+            pos = np.searchsorted(j_native,
+                                  np.round(loss / bs).astype(np.int64),
+                                  side='right') - 1
+            inside = pos >= 0
+            pos_c = np.maximum(pos, 0)
+            df[f'lev_{col}'] = np.where(
+                inside, cum_xp_n[pos_c] + loss * (1 - cum_p_n[pos_c]), loss)
 
-            temp = np.cumsum(df[f'exeqa_{col}'] * df.p_total)
-            df[f'exlea_{col}'] = temp / df.F
-            df.loc[0:loss_max, f'exlea_{col}'] = 0
+            # e_{col} from the native pmf (the unit's represented mean)
+            e_col = float(np.sum(xs_n * p_n))
+            df[f'e_{col}'] = e_col
 
-            df[f'e_{col}'] = np.sum(df[f'p_{col}'] * df.loss)
-            df[f'exgta_{col}'] = (df[f'e_{col}'] - temp) / df.S
+            # conditional means by direct sums of kappa · p_total
+            kp = kappa * p_total
+            cum_xi = np.cumsum(kp)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                exlea = cum_xi / F
+                exgta = (e_col - cum_xi) / S
+            exlea[F_small] = np.nan
+            exgta[S_small] = np.nan
+            df[f'exlea_{col}'] = exlea
+            df[f'exgta_{col}'] = exgta
 
-            # exi_x_{col}: guard loss[0]=0 by copying and patching.
-            denom = df['loss'].copy()
-            denom.iat[0] = 1.0
-            df[f'exi_x_{col}'] = np.sum(df[f'exeqa_{col}'] * df.p_total / denom)
-            temp_xi_x = np.cumsum(df[f'exeqa_{col}'] * df.p_total / denom)
-            df[f'exi_xlea_{col}'] = temp_xi_x / df.F
-            df.loc[0, f'exi_xlea_{col}'] = 0
-            df.loc[df.exlea_total == 0, f'exi_xlea_{col}'] = 0
+            if signed:
+                # kappa/x is not a recovery share on a signed grid
+                # (steering 6): blank rather than divide through zero.
+                df[f'exi_x_{col}'] = np.nan
+                df[f'exi_xlea_{col}'] = np.nan
+                df[f'exi_xgta_{col}'] = np.nan
+                df[f'exi_xeqa_{col}'] = np.nan
+                df[f'exa_{col}'] = np.nan
+                continue
 
-            # exi_xgta_{col}: tail-reverse-cumsum of (exeqa_i/loss · p_total),
-            # normalised by S. Last value is undefined (we have no information
-            # past the grid), so we fill with NaN and zero out the S==0 rows
-            # to avoid NaN propagation into exa.
-            df[f'exi_xgta_{col}'] = (
-                (df[f'exeqa_{col}'] / df.loss * df.p_total)
-                .shift(-1, fill_value=np.nan)[::-1].cumsum()) / df.S
-            df.loc[Seq0, f'exi_xgta_{col}'] = 0.
+            # share s_i(x) = kappa_i(x)/x; the origin row x=0 takes the
+            # 0 convention (X=0 ⇒ X_i=0 a.s. on a non-negative book).
+            with np.errstate(divide='ignore', invalid='ignore'):
+                share = np.where(np.abs(loss) < bs / 2, 0.0, kappa / loss)
+            sp = share * p_total
+            df[f'exi_x_{col}'] = np.sum(sp)
+            cum_sp = np.cumsum(sp)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                exi_xlea = cum_sp / F
+            exi_xlea[F_small] = 0.0
+            df[f'exi_xlea_{col}'] = exi_xlea
 
-            df[f'exi_xeqa_{col}'] = df[f'exeqa_{col}'] / df['loss']
-            df.loc[0, f'exi_xeqa_{col}'] = 0
+            # tail_share_k = Σ_{j>k} share_j·p_j (reverse cumsum);
+            # alpha = exi_xgta = tail_share / S. The last row has no
+            # information past the grid: NaN when material tail mass
+            # remains, 0 when the support is exhausted.
+            rev = np.cumsum(sp[::-1])[::-1]
+            tail_share = np.append(rev[1:], 0.0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                alpha = tail_share / S
+            alpha[S_small] = 0.0
+            if S[-1] > tol:
+                alpha[-1] = np.nan
+            df[f'exi_xgta_{col}'] = alpha
+            df[f'exi_xeqa_{col}'] = share
 
-            # exa_{col} = ∫₀ᵃ S(x)·exi_xgta_{col}(x) dx (PIR-style).
-            df[f'exa_{col}'] = (df.S * df[f'exi_xgta_{col}']).shift(1, fill_value=0).cumsum() * self.bs
+            # exa_{col} = E[X_i(a)] = Σ_{x≤a} kappa_i·p + a·tail_share(a)
+            # — the direct-sum form of ∫ S·alpha dx, carrying the origin.
+            df[f'exa_{col}'] = cum_xi + loss * tail_share
 
         # Sum-of-shares check columns.
         for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
             df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
-    def ft(self, x):
-        """
-        FT of x with padding applied
-        """
-        return ft(x, self.padding)
-
-    def ift(self, x):
-        """
-        IFT of x with padding applied
-        """
-        return ift(x, self.padding)
-
-    def add_exa_details(self, df):
-        """Add EPD (expected policyholder deficit) and reimbursement columns.
-
-        Adds, in-place on ``df``:
-
-        - ``epd_0_total`` and ``epd_0_{line}`` — ``max(0, E[X]-LEV(a))/E[X]``
-          (pure stand-alone EPD on the unmodified loss).
-        - ``epd_1_{line}`` — ``max(0, E[X]-E[X∧a;X≤a])/E[X]`` using
-          ``exa_{line}`` (the in-portfolio allocation of expected loss).
-        - ``e1xi_1gta_total`` / ``e1xi_1gta_{line}`` — ``E[1/X · 1_{X>a}]``
-          (reimbursement-effectiveness diagnostic).
-
-        Pure diagnostic columns; no core surface consumes them. The
-        legacy ``eta_mu`` second-priority / EPD-interpolation branch
-        (and the companion ``add_eta_mu`` method) was retired in the
-        v1.0 refactor — there are no callers left.
-        """
-        index_inv = 1.0 / df.loss
-        df['epd_0_total'] = \
-            np.maximum(0, df['e_total'] - df['lev_total']) / df['e_total']
-        df['e1xi_1gta_total'] = (df['p_total'] * index_inv).shift(-1)[::-1].cumsum()
-        for col in self.line_names:
-            df[f'e1xi_1gta_{col}'] = (df[f'p_{col}'] * index_inv).shift(-1)[::-1].cumsum()
-            df[f'epd_0_{col}'] = \
-                np.maximum(0, df[f'e_{col}'] - df[f'lev_{col}']) / df[f'e_{col}']
-            df[f'epd_1_{col}'] = \
-                np.maximum(0, df[f'e_{col}'] - df[f'exa_{col}']) / df[f'e_{col}']
 
     def calibrate_distortion(self, name, r0=0.05, premium_target=0.0,
                              roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
@@ -3374,6 +3455,14 @@ class Portfolio(object):
         Unified here.
         """
 
+        # The distorted surface is still zero-origin (cumsum·bs, loc[0]
+        # idioms); the signed/windowed rewrite is numerics-3. Refuse rather
+        # than emit wrong numbers on the signed books numerics-2 enabled.
+        if float(self.density_df.loss.iloc[0]) < 0:
+            raise NotImplementedError(
+                'apply_distortion / pricing on signed (P&L) support is not '
+                'yet available; see dev/plan-numerics-3-distortion.md.')
+
         df = self.density_df.copy()
 
         # forwards S keeps the tail accurate (recomputed from p_total cumsum);
@@ -3508,15 +3597,13 @@ class Portfolio(object):
 
          Returns: {line : var(p, kind)} and includes the total as self.name line
 
-        if p near 1 and epd uses 1-p.
-
         Example:
 
-            for p, arg in zip([.996, .996, .996, .985, .01], ['var', 'lower', 'upper', 'tvar', 'epd']):
+            for p, arg in zip([.996, .996, .996, .985], ['var', 'lower', 'upper', 'tvar']):
                 print(port.var_dict(p, arg,  snap=True))
 
         :param p:
-        :param kind: var (defaults to lower), upper, lower, tvar, epd
+        :param kind: var (defaults to lower), upper, lower, tvar
         :param total: name for total: total=='name' gives total name self.name
         :param snap: snap tvars to index
         :return:
@@ -4145,8 +4232,11 @@ class Portfolio(object):
         """
         df = pd.DataFrame(index=range(n))
         for c in self.line_names:
+            # native unit pmf via the accessor (the p_{unit} columns left
+            # density_df at numerics-2); same draw mechanics as before.
             pc = f'p_{c}'
-            df[c] = self.density_df[['loss', pc]].\
+            bit = self.unit_density(c).reset_index()
+            df[c] = bit[['loss', pc]].\
                     query(f'`{pc}` > 0').\
                     sample(n, replace=replace, weights=pc, ignore_index=True, random_state=ar.RANDOM).\
                     drop(columns=pc)
@@ -4239,30 +4329,24 @@ def swap_density_df(port, new_df, padding=1):
     port.padding = padding
     port.bs = float(new_df['loss'].iloc[1] - new_df['loss'].iloc[0])
 
-    # Recombine via FFT — same logic as ``Portfolio.update``'s
-    # ``ft_nots`` block; reuse the recipe so the two stay aligned.
+    # Recombine via FFT and build the per-unit state ``add_exa`` needs:
+    # the user-supplied ``p_{line}`` columns ARE the native unit pmfs
+    # here, on the frame's own (zero-origin) grid.
+    xs = port.density_df['loss'].to_numpy()
     ft_all = None
-    ft_line_density = {}
+    unit_state = {}
     for agg in port.agg_list:
         raw_nm = agg.name
-        ft_line_density[raw_nm] = ft(port.density_df[f'p_{raw_nm}'], padding)
+        p_line = port.density_df[f'p_{raw_nm}'].to_numpy()
+        ft_p = ft(p_line, padding)
+        unit_state[raw_nm] = dict(xs=xs, p=p_line, ft_p=ft_p)
         if ft_all is None:
-            ft_all = np.copy(ft_line_density[raw_nm])
+            ft_all = np.copy(ft_p)
         else:
-            ft_all *= ft_line_density[raw_nm]
+            ft_all *= ft_p
     port.density_df['p_total'] = np.real(ift(ft_all, padding))
-    ft_nots = {}
-    for line in port.line_names:
-        ft_not = np.ones_like(ft_all)
-        if np.any(ft_line_density[line] == 0):
-            for not_line in port.line_names:
-                if not_line != line:
-                    ft_not *= ft_line_density[not_line]
-        elif len(port.line_names) > 1:
-            ft_not = ft_all / ft_line_density[line]
-        ft_nots[line] = ft_not
 
-    port.add_exa(port.density_df, ft_nots)
+    port.add_exa(port.density_df, unit_state)
     port._augmented_dfs.clear()
 
     # Refresh empirical rows of stats_df from the swapped densities.
@@ -4347,7 +4431,7 @@ def make_awkward(log2, scale=False):
     Usage: ::
 
         awk = make_awkward(16)
-        awk.density_df.filter(regex='p_[ABt]').cumsum().plot()
+        awk.aligned_unit_density_df().cumsum().plot()
         awk.density_df.filter(regex='exeqa_[AB]|loss').plot()
 
     """

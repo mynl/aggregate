@@ -370,3 +370,4 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   identity. Wait for a clearer use case.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
   both premium legs (`plan-pnl-premium.md` §9).
+- [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)  

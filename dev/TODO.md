@@ -105,6 +105,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   the `loss_max` blanking heuristic → wants a principled `F < k·eps` rule).
   Audit **what `plot_twelve` actually needs** (#29) — it constrains the column
   trim. **needs N1.**
+  - [x] **numerics-1 pre-step — unit-density decoupling** — **done 1.0.0a55**
+    (`dev/done/plan-numerics-1-unit-density.md`): `unit_density` /
+    `unit_density_df` / `aligned_unit_density_df` accessors; all display
+    readers (`percentiles`, `_limits`, `plot`, pedagogy density/bivariate
+    panels) off `p_{unit}`; the only remaining readers are kappa in `add_exa`
+    (removed with the `p_{unit}` write in numerics-2) and the deferred
+    sampling/switcheroo cluster.
 - [ ] **N3 `[A]` Portfolio apply-distortion calcs.** Which columns;
   **handling masses (currently black-magic / a cluster)**; signed /
   `value_type` distortion pricing (`dev/plan-numerics-3-distortion.md`:

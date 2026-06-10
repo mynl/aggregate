@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a55
+
+### Numerics-1 — unit-density decoupling
+
+First plan of the numerics program (`dev/done/plan-numerics-1-unit-density.md`;
+target architecture in `dev/plan-numerics-0-meta.md`). Pure-additive accessors
+plus migration of the display readers off the legacy
+`Portfolio.density_df['p_{unit}']` columns. No compute change; no distortion
+surface touched.
+
+- **New accessors on `Portfolio`** sourcing unit pmfs from the owning
+  `Aggregate` objects on their native grids:
+  - `unit_density(unit, view='agg')` — one unit's pmf (`view='sev'` for the
+    discretized severity), indexed by the unit's own loss grid.
+  - `unit_density_df(view='agg')` — long form, `(unit, loss)` MultiIndex, with
+    window-audit metadata (`bs`, `x_min`, `x_max`, represented `mass`).
+  - `aligned_unit_density_df(grid='total'|'union'|'zero', *,
+    allow_window_mismatch=False)` — the explicitly-named **display adapter**
+    scattering unit pmfs onto a common grid (bucket-number alignment). On a
+    legacy zero-origin book `grid='total'` reproduces the `p_{unit}` columns
+    exactly; on a windowed book it warns that the view is clipped unless
+    acknowledged. Raises if a unit was re-updated off the portfolio `bs`.
+- **Display readers migrated** off `density_df['p_{unit}']`:
+  `Portfolio.percentiles` (still deliberately interpolated), `_limits`, and
+  `plot` (total now always plotted first — Book standard — previously only
+  guaranteed for two-unit books); `pedagogy.ClassicalPremium.distribution`,
+  `pedagogy.plot_bivariate`, and the density / bivariate / stand-alone-M
+  panels of `pedagogy.plot_twelve` (allocation panels ride with numerics-3).
+- **`p_{unit}` columns are now legacy.** The write remains (kappa in `add_exa`
+  and the sampling/switcheroo cluster still read them) and is dropped in
+  numerics-2 when kappa goes shifted-support. Do not write new readers.
+- **Fix:** `ClassicalPremium.distribution` referenced the removed
+  `Portfolio.audit_df`; empirical moments now computed directly from the pmf.
+- Stale plan pointer in the signed-path `update` warning repointed to
+  `dev/plan-numerics-2-objective.md`.
+- Tests: `tests/test_unit_density.py` (native-grid accessors, disjoint-support
+  signed book, exact legacy parity gate, windowed-clip warning, and
+  stripped-frame proofs that the migrated readers no longer need `p_{unit}`).
+  New DecL programs mirrored in `test_decl.agg` (section UD).
+
 ## 1.0.0a54
 
 ### Hygiene 4 — value_type, fixed-layout info strings, pnl prem/lr meta

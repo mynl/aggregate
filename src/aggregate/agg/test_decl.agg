@@ -414,3 +414,13 @@ pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson                    
 agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard}
 pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance}
 port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson          note{homogeneous loss book; portfolio value_type}
+
+
+# UD. Unit-density accessors (numerics-1)
+# =======================================
+# Programs behind tests/test_unit_density.py (1.0.0a55): native-grid unit
+# pmf accessors and the aligned display adapter. UD.PnLpair in the tests
+# reuses the PortPnL.Pair program above (not repeated here). See
+# dev/done/plan-numerics-1-unit-density.md.
+port UD.Plain    agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson    note{zero-origin book; aligned grid=total legacy parity}
+port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims ssev 1 * norm - 100 poisson note{disjoint unit windows near +/-10000}

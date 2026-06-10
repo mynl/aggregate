@@ -1739,7 +1739,14 @@ class Portfolio(object):
         if pvalues is None:
             pvalues = [0.5, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99, 0.994, 0.995, 0.999, 0.9999]
         for line in self.line_names_ex:
-            q_agg = interpolate.interp1d(self.density_df[f'p_{line}'].cumsum(), self.density_df.loss,
+            # total from the portfolio frame; units from their native pmfs
+            # (numerics-1) -- deliberately interpolated, unlike the exact
+            # step-function q.
+            if line == 'total':
+                ser = self.density_df.p_total
+            else:
+                ser = self.unit_density(line)
+            q_agg = interpolate.interp1d(ser.cumsum(), ser.index,
                                          kind='linear', bounds_error=False, fill_value='extrapolate')
             for p in pvalues:
                 qq = q_agg(p)
@@ -2118,6 +2125,10 @@ class Portfolio(object):
             # wrapped to the top); the truncating ``ift(., padding)`` used on
             # the non-signed path would silently drop that wrapped tail.
             self.density_df['p_total'] = np.roll(ift(ft_all, 0), -j0_tot)[:N]
+            # LEGACY: rolled unit-pmf presentation on the total grid; read
+            # only by kappa (add_exa) and the sampling cluster. Display
+            # readers use the unit_density accessors; the write is dropped
+            # in dev/plan-numerics-2-objective.md.
             for agg in self.agg_list:
                 self.density_df[f'p_{agg.name}'] = np.roll(
                     ift(agg.ftagg_density, 0), -j0_tot)[:N]
@@ -2137,6 +2148,9 @@ class Portfolio(object):
                 agg.update_work(xs, self.padding, sev_calc, discretization_calc,
                                 normalize, force_severity, debug=debug)
                 ft_line_density[raw_nm] = agg.ftagg_density
+                # LEGACY: kept for kappa (add_exa) and the sampling cluster
+                # only; display readers use the unit_density accessors. The
+                # write is dropped in dev/plan-numerics-2-objective.md.
                 self.density_df[f'p_{raw_nm}'] = agg.agg_density
                 if ft_all is None:
                     ft_all = np.copy(ft_line_density[raw_nm])
@@ -2175,7 +2189,7 @@ class Portfolio(object):
                 warnings.warn(
                     'pricing/allocation columns (add_exa) are not yet '
                     'available on signed (P&L) support; writing F/S only. '
-                    'See dev/plan-portfolio-neg-x-pricing.md.', stacklevel=2)
+                    'See dev/plan-numerics-2-objective.md.', stacklevel=2)
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
             self.density_df['S'] = 1 - self.density_df.F
 
@@ -2542,8 +2556,11 @@ class Portfolio(object):
                 return [lo - pad, hi + pad]
             return f(hi)
         elif stat == 'density':
-            mx = self.density_df.filter(regex='p_[a-zA-Z]').max().max()
-            mxx0 = self.density_df.filter(regex='p_[a-zA-Z]').iloc[1:].max().max()
+            # total + native unit pmfs (numerics-1)
+            pmfs = [self.density_df.p_total] + \
+                   [self.unit_density(line) for line in self.line_names]
+            mx = max(float(s.max()) for s in pmfs)
+            mxx0 = max(float(s.iloc[1:].max()) for s in pmfs)
             if kind == 'linear':
                 if zero_mass == 'include':
                     return f(mx)
@@ -2552,7 +2569,9 @@ class Portfolio(object):
             else:
                 return [eps, mx * 1.5]
         elif stat == 'logy':
-            mx = min(1, self.density_df.filter(regex='p_[A-Za-z]').max().max())
+            pmfs = [self.density_df.p_total] + \
+                   [self.unit_density(line) for line in self.line_names]
+            mx = min(1, max(float(s.max()) for s in pmfs))
             return [1e-12, mx * 2]
         else:
             # if you fall through to here, wrong args
@@ -2570,6 +2589,180 @@ class Portfolio(object):
         """
         return self.density_df.query('p_total > 0')
 
+    # ================================================================
+    # Unit (native-grid) density accessors -- numerics-1.
+    # Unit pmfs live on each Aggregate's own grid; these are the only
+    # supported ways to read them from the Portfolio. The legacy
+    # ``density_df['p_{unit}']`` columns are scheduled for removal
+    # (dev/plan-numerics-2-objective.md).
+    # ================================================================
+
+    def unit_density(self, unit, view='agg'):
+        """Native-grid pmf of one unit, read from the owning :class:`Aggregate`.
+
+        The unit's pmf lives on the unit's **own** loss grid (which on a
+        windowed or signed book differs from the portfolio total grid).
+        This accessor is the supported source for per-unit densities; the
+        legacy ``density_df['p_{unit}']`` columns are a total-grid
+        presentation and are scheduled for removal.
+
+        Parameters
+        ----------
+        unit : str
+            Unit (line) name; one of :attr:`line_names`.
+        view : {'agg', 'sev'}
+            ``'agg'`` reads the unit's aggregate pmf
+            (``Aggregate.density_df.p_total`` on grid ``xs``); ``'sev'``
+            reads the discretized severity
+            (``Aggregate.sev_density_df.p_sev`` on grid ``xs_sev``).
+
+        Returns
+        -------
+        pandas.Series
+            pmf named ``p_{unit}``, indexed by the unit's native loss grid.
+        """
+        if unit not in self.line_names:
+            raise KeyError(
+                f'unknown unit {unit!r}; expected one of {self.line_names}')
+        agg = self[unit]
+        if view == 'agg':
+            ser = agg.density_df['p_total'].copy()
+        elif view == 'sev':
+            ser = agg.sev_density_df['p_sev'].copy()
+        else:
+            raise ValueError(f"view must be 'agg' or 'sev', not {view!r}")
+        ser.name = f'p_{agg.name}'
+        return ser
+
+    def unit_density_df(self, view='agg'):
+        """Long-form frame of all unit pmfs, each on its native grid.
+
+        One block per unit, concatenated with a ``(unit, loss)``
+        MultiIndex. Each block carries the unit's pmf plus the
+        window-audit metadata needed to reason about grid alignment.
+
+        Parameters
+        ----------
+        view : {'agg', 'sev'}
+            As in :meth:`unit_density`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Index ``(unit, loss)``; columns ``unit, loss, p, F, S, bs,
+            x_min, x_max, mass`` where ``x_min`` / ``x_max`` are the unit's
+            grid edges and ``mass`` is the unit's represented probability
+            ``p.sum()`` (less than 1 on a too-narrow window).
+        """
+        blocks = []
+        for agg in self.agg_list:
+            if view == 'agg':
+                src = agg.density_df
+                df = src[['loss', 'p_total', 'F', 'S']].rename(
+                    columns={'p_total': 'p'}).copy()
+            elif view == 'sev':
+                src = agg.sev_density_df
+                df = src[['loss', 'p_sev', 'F_sev', 'S_sev']].rename(
+                    columns={'p_sev': 'p', 'F_sev': 'F', 'S_sev': 'S'}).copy()
+            else:
+                raise ValueError(f"view must be 'agg' or 'sev', not {view!r}")
+            df['unit'] = agg.name
+            df['bs'] = agg.bs
+            df['x_min'] = float(df['loss'].iloc[0])
+            df['x_max'] = float(df['loss'].iloc[-1])
+            df['mass'] = float(df['p'].sum())
+            blocks.append(df[['unit', 'loss', 'p', 'F', 'S', 'bs',
+                              'x_min', 'x_max', 'mass']])
+        out = pd.concat(blocks)
+        out = out.set_index(['unit', 'loss'], drop=False)
+        return out
+
+    def aligned_unit_density_df(self, grid='total', *,
+                                allow_window_mismatch=False):
+        """Unit pmfs scattered onto a common grid — a **display adapter**.
+
+        Reindexes each unit's native pmf onto the requested grid. The
+        result is a labelled presentation artifact, never compute input:
+        on a windowed book a unit's grid can extend beyond the requested
+        grid, and the off-grid buckets are silently dropped (the method
+        warns; see below).
+
+        Alignment is by bucket number ``round(loss / bs)`` — the Portfolio
+        dictates a common ``bs`` to its units, asserted here — so
+        physically identical points always land together regardless of how
+        each grid's floats were built.
+
+        Parameters
+        ----------
+        grid : {'total', 'union', 'zero'}
+            ``'total'`` — the portfolio ``density_df`` grid (for a legacy
+            zero-origin book this reproduces the ``p_{unit}`` columns
+            exactly); ``'union'`` — the union of the unit grids (never
+            drops a bucket); ``'zero'`` — the bucket lattice from
+            ``min(0, lowest unit x_min)`` through the highest unit
+            ``x_max`` (always contains the origin).
+        allow_window_mismatch : bool, keyword only
+            When unit buckets fall outside the requested grid the method
+            warns unless this is ``True`` (acknowledging the view is a
+            window-clipped artifact).
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by the requested grid's loss values, one ``p_{unit}``
+            column per unit; zero where a unit has no bucket.
+        """
+        bs = self.bs
+        for agg in self.agg_list:
+            if not np.isclose(agg.bs, bs, rtol=1e-12, atol=0):
+                raise ValueError(
+                    f'unit {agg.name!r} has bs={agg.bs} != portfolio '
+                    f'bs={bs}; it was re-updated off the portfolio grid')
+        # per-unit pmfs on the integer bucket lattice
+        unit_j = {}
+        unit_p = {}
+        for agg in self.agg_list:
+            ser = agg.density_df['p_total']
+            unit_j[agg.name] = np.round(
+                ser.index.to_numpy() / bs).astype(np.int64)
+            unit_p[agg.name] = ser.to_numpy()
+        if grid == 'total':
+            target_x = self.density_df.index.to_numpy()
+            target_j = np.round(target_x / bs).astype(np.int64)
+        elif grid == 'union':
+            target_j = None
+            for j in unit_j.values():
+                target_j = j if target_j is None else np.union1d(target_j, j)
+            target_x = target_j * bs
+        elif grid == 'zero':
+            j_lo = min(0, min(int(j[0]) for j in unit_j.values()))
+            j_hi = max(int(j[-1]) for j in unit_j.values())
+            target_j = np.arange(j_lo, j_hi + 1, dtype=np.int64)
+            target_x = target_j * bs
+        else:
+            raise ValueError(
+                f"grid must be 'total', 'union' or 'zero', not {grid!r}")
+        out = pd.DataFrame(index=pd.Index(target_x, name='loss'))
+        mismatched = []
+        for agg in self.agg_list:
+            j, p = unit_j[agg.name], unit_p[agg.name]
+            inside = np.isin(j, target_j)
+            if not inside.all():
+                dropped = float(np.abs(p[~inside]).sum())
+                mismatched.append(
+                    f'{agg.name} ({int(np.sum(~inside))} buckets, '
+                    f'|p| {dropped:.3e} dropped)')
+            col = np.zeros(len(target_j))
+            col[np.searchsorted(target_j, j[inside])] = p[inside]
+            out[f'p_{agg.name}'] = col
+        if mismatched and not allow_window_mismatch:
+            warnings.warn(
+                f'{self.name}: unit window(s) extend beyond the {grid!r} '
+                f'grid -- {"; ".join(mismatched)}. This view is a clipped '
+                f'display artifact; pass allow_window_mismatch=True to '
+                f'acknowledge.', stacklevel=2)
+        return out
+
     def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
         """
         Defualt plot of density, survival functions (linear and log)
@@ -2585,10 +2778,11 @@ class Portfolio(object):
         ax = axd['A']
         xl = self._limits()
         yl = self._limits(stat='density', zero_mass='exclude')
-        bit = self.density_df.filter(regex='p_[a-zA-Z]')
-        if bit.shape[1] == 3:
-            # put total first = Book standard
-            bit = bit.iloc[:, [2,0,1]]
+        # total first = Book standard, then each unit on its native grid
+        # (numerics-1); on a legacy zero-origin book the grids coincide.
+        bit = pd.concat(
+            [self.density_df.p_total] +
+            [self.unit_density(line) for line in self.line_names], axis=1)
         bit.plot(ax=ax, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Density')
         ax.legend()

@@ -670,18 +670,28 @@ class ClassicalPremium:
         self.calibration_premium = calibration_premium
 
     def distribution(self, port_name, line_name):
-        """Pull the per-line marginal and basic moment stats out of ``ports[port_name]``."""
-        df = self.ports[port_name].density_df.filter(regex=f'p_{line_name}|loss'). \
-            rename(columns={f'p_{line_name}': 'p'})
-        df['F'] = df.p.cumsum()
+        """Pull the per-line marginal and basic moment stats out of ``ports[port_name]``.
+
+        The total reads ``density_df.p_total``; units read their native
+        pmf via :meth:`~aggregate.portfolio.Portfolio.unit_density`.
+        """
+        port = self.ports[port_name]
         if line_name == 'total':
-            ob = self.ports[port_name]
+            ser = port.density_df.p_total
+            ob = port
         else:
-            ob = self.ports[port_name][line_name]
-        stats = self.ports[port_name].audit_df.T[line_name]
-        mn = stats['EmpEX1']
-        var = stats['EmpEX2'] - stats['EmpEX1'] ** 2
+            ser = port.unit_density(line_name)
+            ob = port[line_name]
+        df = pd.DataFrame({'loss': np.asarray(ser.index, dtype=float),
+                           'p': ser.to_numpy()}, index=ser.index)
+        df['F'] = df.p.cumsum()
+        # empirical moments straight from the pmf (the removed
+        # ``audit_df`` carried exactly these as EmpEX1/EmpEX2)
+        mn = float((df.loss * df.p).sum())
+        ex2 = float((df.loss ** 2 * df.p).sum())
+        var = ex2 - mn ** 2
         sd = var ** 0.5
+        stats = pd.Series({'EmpEX1': mn, 'EmpEX2': ex2}, name=line_name)
         return df, ob, stats, mn, var, sd
 
     def calibrate(self, port_name, line_name, calibration_premium,
@@ -1219,7 +1229,10 @@ def plot_bivariate(port, fig, ax, min_loss, max_loss, jump,
     """
     npts = np.arange(min_loss, max_loss, jump)
     ps = [f'p_{i}' for i in port.line_names]
-    bit = port.density_df.loc[npts, ps]
+    # native unit pmfs scattered onto the sample points (numerics-1);
+    # zero where a unit has no bucket at the sampled loss.
+    bit = pd.concat([port.unit_density(line) for line in port.line_names],
+                    axis=1).reindex(npts).fillna(0.0)
     n = len(bit)
     Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
     if normalize:
@@ -1311,8 +1324,12 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         xmax = port.q(p)
     ymax = xmax
 
+    # total + native unit pmfs (numerics-1); on a legacy zero-origin book
+    # the grids coincide and this matches the old p_{unit} columns.
     temp = (
-        port.density_df.filter(regex='p_')
+        pd.concat([port.density_df.p_total] +
+                  [port.unit_density(line) for line in port.line_names],
+                  axis=1)
         .rename(columns=_short_renamer(port, 'p'))
         .sort_index(axis=1).loc[:xmax]
     )
@@ -1336,10 +1353,13 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         color_bar = False
         ps = [f'p_{i}' for i in port.line_names]
         title = 'Bivariate density'
-        query = ' or '.join([f'`p_{i}` > 0' for i in port.line_names])
-        if port.density_df.query(query).shape[0] < 512:
+        # native unit pmfs on the union of their grids (numerics-1)
+        biv = pd.concat([port.unit_density(line)
+                         for line in port.line_names], axis=1).fillna(0.0)
+        nz = (biv[ps] > 0).any(axis=1)
+        if int(nz.sum()) < 512:
             logger.info('Contour plot has few points...going discrete...')
-            bit = port.density_df.query(query)
+            bit = biv.loc[nz]
             n = len(bit)
             Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
             X, Y = np.meshgrid(bit.index, bit.index)
@@ -1352,7 +1372,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
                     ylim=[min_loss - (max_loss - min_loss) / 10, max_loss])
         else:
             npts = np.arange(min_loss, max_loss, jump)
-            bit = port.density_df.loc[npts, ps]
+            bit = biv.reindex(npts).fillna(0.0)
             n = len(bit)
             Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
             Z = Z / np.sum(Z)
@@ -1461,11 +1481,14 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
             line = sorted(port.line_names_ex)[ln]
             c = col_list[cn]
             s = lss[cn]
-            f1 = port.density_df[f'p_{line}'].cumsum()
-            idx = (f1 < p2) * (f1 > 1.0 - p2)
+            # total from the portfolio frame; units native (numerics-1)
+            ser = (port.density_df.p_total if line == 'total'
+                   else port.unit_density(line))
+            f1 = ser.cumsum()
+            idx = (f1 < p2) & (f1 > 1.0 - p2)
             f1 = f1[idx]
             gf = 1 - port.distortion.g(1 - f1)
-            x = port.density_df.loss[idx]
+            x = f1.index
             a33.plot(gf, x, c=c, ls=s, lw=1, label=None)
             a33.plot(f1, x, ls=s, c=c, lw=1, label=None)
             a33.fill_betweenx(x, gf, f1, color=c, alpha=alpha, label=line.title())
